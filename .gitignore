@@ -1,0 +1,9 @@
+# Composer dependencies
+/vendor/
+
+# Composer lock file (kept for reproducibility in libraries, excluded here for plugin dev)
+# composer.lock
+
+# PHPUnit cache
+.phpunit.cache/
+.phpunit.result.cache

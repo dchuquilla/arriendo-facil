@@ -1,0 +1,59 @@
+/* Arriendo Fácil – Admin Styles */
+
+.af-dashboard .af-stats {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 16px;
+	margin: 24px 0;
+}
+
+.af-stat-card {
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	padding: 20px 24px;
+	min-width: 160px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	text-align: center;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.07);
+}
+
+.af-stat-number {
+	font-size: 2.4em;
+	font-weight: 700;
+	color: #1d2327;
+	line-height: 1.2;
+}
+
+.af-stat-label {
+	font-size: 0.875em;
+	color: #646970;
+	margin: 4px 0 8px;
+}
+
+.af-stat-card a {
+	font-size: 0.8em;
+}
+
+.af-quick-actions {
+	margin-top: 24px;
+}
+
+.af-quick-actions .button {
+	margin-right: 8px;
+}
+
+/* Unread contact row highlight */
+.af-unread td {
+	font-weight: 600;
+	background-color: #f0f6fc;
+}
+
+/* Predict cost result inline */
+.af-predict-result {
+	margin-left: 10px;
+	color: #1d6c00;
+	font-weight: 600;
+}

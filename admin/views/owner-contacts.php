@@ -16,7 +16,12 @@ $contacts = $wpdb->get_results(
 );
 ?>
 <div class="wrap">
-	<h1><?php esc_html_e( 'Owner Contacts', 'arriendo-facil' ); ?></h1>
+	<h1>
+		<?php esc_html_e( 'Owner Contacts', 'arriendo-facil' ); ?>
+		<a href="admin.php?page=add-owner-contact" class="page-title-action">
+			<?php esc_html_e( '+ New Owner Contact', 'arriendo-facil' ); ?>
+		</a>
+	</h1>
 
 	<table class="wp-list-table widefat fixed striped">
 		<thead>

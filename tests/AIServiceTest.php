@@ -69,11 +69,9 @@ class AIServiceTest extends TestCase {
 				$ref = new ReflectionClass( Arriendo_Facil_AI_Service::class );
 
 				$urlProp = $ref->getProperty( 'api_url' );
-				$urlProp->setAccessible( true );
 				$urlProp->setValue( $this, 'https://api.example.com' );
 
 				$keyProp = $ref->getProperty( 'api_key' );
-				$keyProp->setAccessible( true );
 				$keyProp->setValue( $this, 'test-key' );
 			}
 		};

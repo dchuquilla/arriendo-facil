@@ -72,7 +72,7 @@ class Arriendo_Facil_Admin {
 			'arriendo-facil',
 			__( 'Owner Contacts', 'arriendo-facil' ),
 			__( 'Owner Contacts', 'arriendo-facil' ),
-			'edit_posts',
+			'manage_options',
 			'af-owner-contacts',
 			array( $this, 'render_owner_contacts' )
 		);

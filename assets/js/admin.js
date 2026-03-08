@@ -178,4 +178,23 @@
 				$btn.prop( 'disabled', false );
 			} );
 	} );
+
+	// ── Show forms for new entries ──────────────────────────────────────────
+	$( document ).on( 'click', '.af-new-entry', function () {
+		var $btn = $( this );
+		var entryType = $btn.data( 'entry-type' );
+
+		// Example logic to show forms dynamically
+		if ( entryType === 'cleaning-request' ) {
+			alert( 'Show form for New Cleaning Request' );
+		} else if ( entryType === 'owner-contact' ) {
+			alert( 'Show form for New Owner Contact' );
+		} else if ( entryType === 'lease' ) {
+			alert( 'Show form for New Lease' );
+		} else if ( entryType === 'guest' ) {
+			alert( 'Show form for New Guest' );
+		} else {
+			alert( 'Unknown entry type.' );
+		}
+	} );
 } )( jQuery );

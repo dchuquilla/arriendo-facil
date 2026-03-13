@@ -148,6 +148,31 @@
 			} );
 	} );
 
+	//. ________ Submit new owner contact form (admin page). ________________
+	$( document ).on( 'submit', '#af-owner-contact-form', function ( e ) {
+			e.preventDefault();
+
+			var $form = $( this );
+			var $submit = $form.find( 'button[type="submit"]' );
+
+			$submit.prop( 'disabled', true );
+
+			$.post( afAdmin.ajaxUrl, $form.serialize() )
+					.done( function ( response ) {
+							if ( response.success ) {
+									window.location.href = 'admin.php?page=af-owner-contacts';
+							} else {
+									alert( response.data && response.data.message ? response.data.message : 'Error sending message.' );
+							}
+					} )
+					.fail( function () {
+							alert( 'Request failed.' );
+					} )
+					.always( function () {
+							$submit.prop( 'disabled', false );
+					} );
+	} );
+
 	// ── Score guest via AI ──────────────────────────────────────────────────
 	$( document ).on( 'click', '.af-score-guest', function () {
 		var $btn = $( this );

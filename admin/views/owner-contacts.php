@@ -29,7 +29,7 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
     <div class="card" style="max-width: 900px; margin: 16px 0; padding: 16px;">
         <h2><?php esc_html_e( 'New Owner Contact', 'arriendo-facil' ); ?></h2>
 
-        <form id="af-owner-contact-form">
+        <form id="af-owner-contact-form" method="post">
             <input type="hidden" name="action" value="af_send_owner_contact" />
             <input type="hidden" name="nonce" value="<?php echo esc_attr( wp_create_nonce( 'af_owner_contact_nonce' ) ); ?>" />
 

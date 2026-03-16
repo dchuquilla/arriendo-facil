@@ -160,15 +160,10 @@
 			return;
 		}
 
-		var $submit = $form.find( '#af-owner-contact-submit' );
+		var $submit = $form.find( 'button[type="submit"]' );
 		$submit.prop( 'disabled', true );
 
-		$.ajax( {
-			url: afAdmin.ajaxUrl,
-			method: 'POST',
-			dataType: 'json',
-			data: $form.serialize(),
-		} )
+		$.post( afAdmin.ajaxUrl, $form.serialize() )
 			.done( function ( response ) {
 				if ( response && response.success ) {
 					window.location.href = 'admin.php?page=af-owner-contacts';
@@ -177,7 +172,7 @@
 				}
 			} )
 			.fail( function ( xhr ) {
-				alert( 'Request failed (' + xhr.status + ').' );
+				alert( 'Request failed (' + xhr.status + '): ' + ( xhr.responseText || '' ) );
 			} )
 			.always( function () {
 				$submit.prop( 'disabled', false );

@@ -43,7 +43,7 @@ class Arriendo_Facil_Owner_Contact {
 
 		global $wpdb;
 		$inserted = $wpdb->insert(
-			$wpdb->prefix . 'af_owner_contacts',
+			$wpdb->prefix . 'af_af_owner_contacts',
 			array(
 				'owner_id' => $owner_id,
 				'subject'  => $subject,

@@ -37,8 +37,20 @@ class Arriendo_Facil_Owner_Contact {
 		$subject  = isset( $_POST['subject'] ) ? sanitize_text_field( wp_unslash( $_POST['subject'] ) ) : '';
 		$message  = isset( $_POST['message'] ) ? sanitize_textarea_field( wp_unslash( $_POST['message'] ) ) : '';
 
+		$redirect_to = isset( $_POST['redirect_to'] )
+			? esc_url_raw( wp_unslash( $_POST['redirect_to'] ) )
+			: admin_url( 'admin.php?page=af-owner-contacts' );
+
+		$is_xhr = isset( $_SERVER['HTTP_X_REQUESTED_WITH'] )
+			&& 'xmlhttprequest' === strtolower( sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_REQUESTED_WITH'] ) ) );
+
 		if ( ! $owner_id || ! $subject || ! $message ) {
-			wp_send_json_error( array( 'message' => __( 'Missing required fields.', 'arriendo-facil' ) ) );
+			if ( $is_xhr ) {
+				wp_send_json_error( array( 'message' => __( 'Missing required fields.', 'arriendo-facil' ) ) );
+			}
+
+			wp_safe_redirect( $redirect_to );
+			exit;
 		}
 
 		global $wpdb;
@@ -62,10 +74,26 @@ class Arriendo_Facil_Owner_Contact {
 					$message
 				);
 			}
-			wp_send_json_success( array( 'id' => $wpdb->insert_id ) );
-		} else {
+
+			if ( $is_xhr ) {
+				wp_send_json_success(
+					array(
+						'id'          => $wpdb->insert_id,
+						'redirect_to' => $redirect_to,
+					)
+				);
+			}
+
+			wp_safe_redirect( $redirect_to );
+			exit;
+		}
+
+		if ( $is_xhr ) {
 			wp_send_json_error( array( 'message' => __( 'Could not send message.', 'arriendo-facil' ) ) );
 		}
+
+		wp_safe_redirect( $redirect_to );
+		exit;
 	}
 
 	/**

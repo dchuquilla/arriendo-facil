@@ -29,7 +29,7 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
     <div class="card" style="max-width: 900px; margin: 16px 0; padding: 16px;">
         <h2><?php esc_html_e( 'New Owner Contact', 'arriendo-facil' ); ?></h2>
 
-        <form id="af-owner-contact-form" method="post">
+        <form id="af-owner-contact-form" method="post" action="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>">
             <input type="hidden" name="action" value="af_send_owner_contact" />
             <input type="hidden" name="nonce" value="<?php echo esc_attr( wp_create_nonce( 'af_owner_contact_nonce' ) ); ?>" />
 
@@ -49,7 +49,9 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
             </table>
 
             <p class="submit">
-                <button type="submit" class="button button-primary"><?php esc_html_e( 'Send Message', 'arriendo-facil' ); ?></button>
+                <button id="af-owner-contact-submit" type="submit" class="button button-primary">
+                    <?php esc_html_e( 'Send Message', 'arriendo-facil' ); ?>
+                </button>
                 <a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=af-owner-contacts' ) ); ?>"><?php esc_html_e( 'Cancel', 'arriendo-facil' ); ?></a>
             </p>
         </form>

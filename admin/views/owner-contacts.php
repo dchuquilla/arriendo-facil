@@ -40,11 +40,11 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
                     <td><input type="text" required id="af_owner_id" name="owner_id" class="regular-text" inputmode="numeric" pattern="[0-9]{10,13}" minlength="10" maxlength="13" /></td>
                 </tr>
                 <tr>
-                    <th scope="row"><label for="af_subject"><?php esc_html_e( 'Subject', 'arriendo-facil' ); ?></label></th>
+                    <th scope="row"><label for="af_subject"><?php esc_html_e( 'Client Name', 'arriendo-facil' ); ?></label></th>
                     <td><input type="text" required id="af_subject" name="subject" class="regular-text" /></td>
                 </tr>
                 <tr>
-                    <th scope="row"><label for="af_message"><?php esc_html_e( 'Message', 'arriendo-facil' ); ?></label></th>
+                    <th scope="row"><label for="af_message"><?php esc_html_e( 'Contract Parameter Details', 'arriendo-facil' ); ?></label></th>
                     <td><textarea required id="af_message" name="message" rows="5" class="large-text"></textarea></td>
                 </tr>
             </table>
@@ -64,8 +64,8 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
 			<tr>
 				<th><?php esc_html_e( 'ID', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Owner ID', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Subject', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Message', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'Client Name', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'Contract Parameter Details', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Status', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Date', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Actions', 'arriendo-facil' ); ?></th>

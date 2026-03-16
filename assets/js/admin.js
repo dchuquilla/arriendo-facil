@@ -148,29 +148,40 @@
 			} );
 	} );
 
-	//. ________ Submit new owner contact form (admin page). ________________
+	// Submit new owner contact form (admin page).
 	$( document ).on( 'submit', '#af-owner-contact-form', function ( e ) {
-			e.preventDefault();
+		e.preventDefault();
 
-			var $form = $( this );
-			var $submit = $form.find( 'button[type="submit"]' );
+		var $form = $( this );
+		var formEl = $form.get( 0 );
 
-			$submit.prop( 'disabled', true );
+		if ( formEl && ! formEl.checkValidity() ) {
+			formEl.reportValidity();
+			return;
+		}
 
-			$.post( afAdmin.ajaxUrl, $form.serialize() )
-					.done( function ( response ) {
-							if ( response.success ) {
-									window.location.href = 'admin.php?page=af-owner-contacts';
-							} else {
-									alert( response.data && response.data.message ? response.data.message : 'Error sending message.' );
-							}
-					} )
-					.fail( function () {
-							alert( 'Request failed.' );
-					} )
-					.always( function () {
-							$submit.prop( 'disabled', false );
-					} );
+		var $submit = $form.find( '#af-owner-contact-submit' );
+		$submit.prop( 'disabled', true );
+
+		$.ajax( {
+			url: afAdmin.ajaxUrl,
+			method: 'POST',
+			dataType: 'json',
+			data: $form.serialize(),
+		} )
+			.done( function ( response ) {
+				if ( response && response.success ) {
+					window.location.href = 'admin.php?page=af-owner-contacts';
+				} else {
+					alert( response && response.data && response.data.message ? response.data.message : 'Error sending message.' );
+				}
+			} )
+			.fail( function ( xhr ) {
+				alert( 'Request failed (' + xhr.status + ').' );
+			} )
+			.always( function () {
+				$submit.prop( 'disabled', false );
+			} );
 	} );
 
 	// ── Score guest via AI ──────────────────────────────────────────────────
@@ -223,42 +234,4 @@
 		}
 	} );
 
-	
-	$( document ).on( 'click', '#af-owner-contact-submit', function ( e ) {
-		e.preventDefault();
-
-		var $form = $( '#af-owner-contact-form' );
-		if ( ! $form.length ) {
-			return;
-		}
-
-		var formEl = $form.get( 0 );
-		if ( formEl && ! formEl.checkValidity() ) {
-			formEl.reportValidity();
-			return;
-		}
-
-		var $submit = $( this );
-		$submit.prop( 'disabled', true );
-
-		$.ajax( {
-			url: afAdmin.ajaxUrl,
-			method: 'POST',
-			dataType: 'json',
-			data: $form.serialize(),
-		} )
-			.done( function ( response ) {
-				if ( response && response.success ) {
-					window.location.href = 'admin.php?page=af-owner-contacts';
-				} else {
-					alert( response && response.data && response.data.message ? response.data.message : 'Error sending message.' );
-				}
-			} )
-			.fail( function ( xhr ) {
-				alert( 'Request failed (' + xhr.status + ').' );
-			} )
-			.always( function () {
-				$submit.prop( 'disabled', false );
-			} );
-	} );
 } )( jQuery );

@@ -37,7 +37,7 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
             <table class="form-table" role="presentation">
                 <tr>
                     <th scope="row"><label for="af_owner_id"><?php esc_html_e( 'Owner ID', 'arriendo-facil' ); ?></label></th>
-                    <td><input type="number" min="1" required id="af_owner_id" name="owner_id" class="regular-text" /></td>
+                    <td><input type="text" required id="af_owner_id" name="owner_id" class="regular-text" inputmode="numeric" pattern="[0-9]{10,13}" minlength="10" maxlength="13" /></td>
                 </tr>
                 <tr>
                     <th scope="row"><label for="af_subject"><?php esc_html_e( 'Subject', 'arriendo-facil' ); ?></label></th>

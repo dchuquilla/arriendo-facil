@@ -58,7 +58,7 @@ class Arriendo_Facil_Activator {
 
 			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_owner_contacts (
 				id          BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
-				owner_id    BIGINT(20) UNSIGNED NOT NULL,
+				owner_id    VARCHAR(13) NOT NULL,
 				subject     VARCHAR(255) NOT NULL,
 				message     TEXT NOT NULL,
 				status      VARCHAR(20) NOT NULL DEFAULT 'unread',
@@ -95,6 +95,28 @@ class Arriendo_Facil_Activator {
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		foreach ( $tables as $sql ) {
 			dbDelta( $sql );
+		}
+
+		$owner_contacts_table = $wpdb->prefix . 'af_owner_contacts';
+
+		$owner_id_type = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT DATA_TYPE
+				 FROM INFORMATION_SCHEMA.COLUMNS
+				 WHERE TABLE_SCHEMA = %s
+				   AND TABLE_NAME = %s
+				   AND COLUMN_NAME = %s",
+				DB_NAME,
+				$owner_contacts_table,
+				'owner_id'
+			)
+		);
+
+		if ( 'varchar' !== $owner_id_type ) {
+			$wpdb->query(
+				"ALTER TABLE {$owner_contacts_table}
+				 MODIFY owner_id VARCHAR(13) NOT NULL"
+			);
 		}
 
 		add_option( 'arriendo_facil_version', ARRIENDO_FACIL_VERSION );

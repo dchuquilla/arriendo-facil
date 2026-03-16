@@ -222,4 +222,43 @@
 			alert( 'Unknown entry type.' );
 		}
 	} );
+
+	
+	$( document ).on( 'click', '#af-owner-contact-submit', function ( e ) {
+		e.preventDefault();
+
+		var $form = $( '#af-owner-contact-form' );
+		if ( ! $form.length ) {
+			return;
+		}
+
+		var formEl = $form.get( 0 );
+		if ( formEl && ! formEl.checkValidity() ) {
+			formEl.reportValidity();
+			return;
+		}
+
+		var $submit = $( this );
+		$submit.prop( 'disabled', true );
+
+		$.ajax( {
+			url: afAdmin.ajaxUrl,
+			method: 'POST',
+			dataType: 'json',
+			data: $form.serialize(),
+		} )
+			.done( function ( response ) {
+				if ( response && response.success ) {
+					window.location.href = 'admin.php?page=af-owner-contacts';
+				} else {
+					alert( response && response.data && response.data.message ? response.data.message : 'Error sending message.' );
+				}
+			} )
+			.fail( function ( xhr ) {
+				alert( 'Request failed (' + xhr.status + ').' );
+			} )
+			.always( function () {
+				$submit.prop( 'disabled', false );
+			} );
+	} );
 } )( jQuery );

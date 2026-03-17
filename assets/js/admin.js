@@ -137,7 +137,7 @@
 				if ( response.success ) {
 					var $row = $btn.closest( 'tr' );
 					$row.removeClass( 'af-unread' );
-					$row.find( 'td:nth-child(6)' ).text( 'read' );
+					$row.find( '.af-contact-status' ).text( 'read' );
 					$btn.remove();
 				} else {
 					alert( response.data && response.data.message ? response.data.message : 'Error.' );
@@ -161,8 +161,16 @@
 
     function submitOwnerContactForm( $form, $submit ) {
         var formEl = $form.get( 0 );
+        var idEl = document.getElementById( 'af_owner_id' );
+        if ( ! validateOwnerDocumentField() ) {
+            if ( idEl ) {
+                idEl.reportValidity();
+                idEl.focus();
+            }
+            return;
+        }
 
-        if ( ! validateOwnerDocumentField() || ( formEl && ! formEl.checkValidity() ) ) {
+        if ( formEl && ! formEl.checkValidity() ) {
             formEl.reportValidity();
             return;
         }

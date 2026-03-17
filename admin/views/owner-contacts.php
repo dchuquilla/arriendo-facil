@@ -35,16 +35,6 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
 						<input type="hidden" name="redirect_to" value="<?php echo esc_url( admin_url( 'admin.php?page=af-owner-contacts&action=new' ) ); ?>" />
 
             <table class="form-table" role="presentation">
-								<tr>
-                    <th scope="row"><label for="af_owner_id_type"><?php esc_html_e( 'Document Type', 'arriendo-facil' ); ?></label></th>
-                    <td>
-                        <select id="af_owner_id_type" name="owner_id_type" required>
-                            <option value="cedula"><?php esc_html_e( 'Cedula', 'arriendo-facil' ); ?></option>
-                            <option value="ruc"><?php esc_html_e( 'RUC', 'arriendo-facil' ); ?></option>
-                            <option value="pasaporte"><?php esc_html_e( 'Pasaporte', 'arriendo-facil' ); ?></option>
-                        </select>
-                    </td>
-                </tr>
                 <tr>
                     <th scope="row"><label for="af_owner_id"><?php esc_html_e( 'Owner ID', 'arriendo-facil' ); ?></label></th>
                     <td><input type="text" required id="af_owner_id" name="owner_id" class="regular-text" /></td>
@@ -56,6 +46,16 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
                 <tr>
                     <th scope="row"><label for="af_message"><?php esc_html_e( 'Contract Parameter Details', 'arriendo-facil' ); ?></label></th>
                     <td><textarea required id="af_message" name="message" rows="5" class="large-text"></textarea></td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="af_owner_id_type"><?php esc_html_e( 'Document Type', 'arriendo-facil' ); ?></label></th>
+                    <td>
+                        <select id="af_owner_id_type" name="owner_id_type" required>
+                            <option value="cedula"><?php esc_html_e( 'Cedula', 'arriendo-facil' ); ?></option>
+                            <option value="ruc"><?php esc_html_e( 'RUC', 'arriendo-facil' ); ?></option>
+                            <option value="pasaporte"><?php esc_html_e( 'Pasaporte', 'arriendo-facil' ); ?></option>
+                        </select>
+                    </td>
                 </tr>
             </table>
 
@@ -111,3 +111,51 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
 		</tbody>
 	</table>
 </div>
+
+<script>
+( function () {
+    var typeEl = document.getElementById( 'af_owner_id_type' );
+    var idEl = document.getElementById( 'af_owner_id' );
+    var formEl = document.getElementById( 'af-owner-contact-form' );
+
+    if ( ! typeEl || ! idEl ) {
+        return;
+    }
+
+    function applyRules() {
+        var type = typeEl.value;
+
+        if ( type === 'cedula' ) {
+            idEl.setAttribute( 'pattern', '^[0-9]{10}$' );
+            idEl.setAttribute( 'minlength', '10' );
+            idEl.setAttribute( 'maxlength', '10' );
+            idEl.setAttribute( 'title', 'Cedula: exactamente 10 digitos numericos' );
+            return;
+        }
+
+        if ( type === 'ruc' ) {
+            idEl.setAttribute( 'pattern', '^[0-9]{13}$' );
+            idEl.setAttribute( 'minlength', '13' );
+            idEl.setAttribute( 'maxlength', '13' );
+            idEl.setAttribute( 'title', 'RUC: exactamente 13 digitos numericos' );
+            return;
+        }
+
+        idEl.setAttribute( 'pattern', '^[A-Za-z0-9]{6,15}$' );
+        idEl.setAttribute( 'minlength', '6' );
+        idEl.setAttribute( 'maxlength', '15' );
+        idEl.setAttribute( 'title', 'Pasaporte: alfanumerico de 6 a 15 caracteres' );
+    }
+
+    typeEl.addEventListener( 'change', function () {
+        idEl.value = '';
+        applyRules();
+    } );
+
+    if ( formEl ) {
+        formEl.addEventListener( 'submit', applyRules );
+    }
+
+    applyRules();
+} )();
+</script>

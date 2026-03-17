@@ -35,16 +35,6 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
 						<input type="hidden" name="redirect_to" value="<?php echo esc_url( admin_url( 'admin.php?page=af-owner-contacts&action=new' ) ); ?>" />
 
             <table class="form-table" role="presentation">
-								<tr>
-                    <th scope="row"><label for="af_owner_id_type"><?php esc_html_e( 'Document Type', 'arriendo-facil' ); ?></label></th>
-                    <td>
-                        <select id="af_owner_id_type" name="owner_id_type" required>
-                            <option value="cedula"><?php esc_html_e( 'Cedula', 'arriendo-facil' ); ?></option>
-                            <option value="ruc"><?php esc_html_e( 'RUC', 'arriendo-facil' ); ?></option>
-                            <option value="pasaporte"><?php esc_html_e( 'Pasaporte', 'arriendo-facil' ); ?></option>
-                        </select>
-                    </td>
-                </tr>
                 <tr>
                     <th scope="row"><label for="af_owner_id"><?php esc_html_e( 'Owner ID', 'arriendo-facil' ); ?></label></th>
                     <td><input type="text" required id="af_owner_id" name="owner_id" class="regular-text" /></td>
@@ -56,6 +46,16 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
                 <tr>
                     <th scope="row"><label for="af_message"><?php esc_html_e( 'Contract Parameter Details', 'arriendo-facil' ); ?></label></th>
                     <td><textarea required id="af_message" name="message" rows="5" class="large-text"></textarea></td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="af_owner_id_type"><?php esc_html_e( 'Document Type', 'arriendo-facil' ); ?></label></th>
+                    <td>
+                        <select id="af_owner_id_type" name="owner_id_type" required>
+                            <option value="cedula"><?php esc_html_e( 'Cedula', 'arriendo-facil' ); ?></option>
+                            <option value="ruc"><?php esc_html_e( 'RUC', 'arriendo-facil' ); ?></option>
+                            <option value="pasaporte"><?php esc_html_e( 'Pasaporte', 'arriendo-facil' ); ?></option>
+                        </select>
+                    </td>
                 </tr>
             </table>
 

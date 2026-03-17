@@ -123,39 +123,47 @@
 
 	// ── Mark owner contact as read ──────────────────────────────────────────
 	$( document ).on( 'click', '.af-mark-read', function () {
-		var $btn = $( this );
-		var contactId = $btn.data( 'contact-id' );
+    var $btn = $( this );
+    var contactId = $btn.data( 'contact-id' );
 
-		$btn.prop( 'disabled', true );
+    $btn.prop( 'disabled', true );
 
-		$.post( afAdmin.ajaxUrl, {
-			action: 'af_mark_contact_read',
-			nonce: afAdmin.ownerContactNonce,
-			contact_id: contactId,
-		} )
-			.done( function ( response ) {
-				if ( response.success ) {
-					var $row = $btn.closest( 'tr' );
-					var $statusCell = $row.find( '.af-contact-status' );
+    $.ajax( {
+        url: afAdmin.ajaxUrl,
+        method: 'POST',
+        dataType: 'json',
+        data: {
+            action: 'af_mark_contact_read',
+            nonce: afAdmin.ownerContactNonce,
+            contact_id: contactId
+        }
+    } )
+        .done( function ( response ) {
+            if ( response && response.success ) {
+                var $row = $btn.closest( 'tr' );
+                var $cells = $row.children( 'td' );
+                var $statusCell = $row.find( '.af-contact-status' );
 
-					$row.removeClass( 'af-unread' );
+                $row.removeClass( 'af-unread unread' );
 
-					if ( $statusCell.length ) {
-							$statusCell.text( 'read' );
-					} else {
-							$row.children( 'td' ).eq( 5 ).text( 'read' ); // fallback
-					}
+                // Fuerza actualización visual del estado
+                if ( $statusCell.length ) {
+                    $statusCell.text( 'read' );
+                } else if ( $cells.length >= 6 ) {
+                    $cells.eq( 5 ).text( 'read' );
+                }
 
-					$btn.remove();
-			} else {
-					alert( response.data && response.data.message ? response.data.message : 'Error.' );
-					$btn.prop( 'disabled', false );
-			}
-			} )
-			.fail( function () {
-				alert( 'Request failed.' );
-				$btn.prop( 'disabled', false );
-			} );
+                // Oculta acción para evitar doble click
+                $btn.closest( 'td' ).empty().append( '<span>—</span>' );
+            } else {
+                alert( response && response.data && response.data.message ? response.data.message : 'Error.' );
+                $btn.prop( 'disabled', false );
+            }
+        } )
+        .fail( function ( xhr ) {
+            alert( 'Request failed (' + xhr.status + ').' );
+            $btn.prop( 'disabled', false );
+        } );
 	} );
 
 	// Submit new owner contact form (admin page).

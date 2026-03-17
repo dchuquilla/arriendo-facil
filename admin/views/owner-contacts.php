@@ -116,8 +116,6 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
 ( function () {
     var typeEl = document.getElementById( 'af_owner_id_type' );
     var idEl = document.getElementById( 'af_owner_id' );
-    var formEl = document.getElementById( 'af-owner-contact-form' );
-
     if ( ! typeEl || ! idEl ) {
         return;
     }
@@ -126,36 +124,28 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
         var type = typeEl.value;
 
         if ( type === 'cedula' ) {
-            idEl.setAttribute( 'pattern', '^[0-9]{10}$' );
-            idEl.setAttribute( 'minlength', '10' );
-            idEl.setAttribute( 'maxlength', '10' );
-            idEl.setAttribute( 'title', 'Cedula: exactamente 10 digitos numericos' );
+            idEl.pattern = '^[0-9]{10}$';
+            idEl.minLength = 10;
+            idEl.maxLength = 10;
+            idEl.title = 'Cedula: exactamente 10 digitos numericos';
             return;
         }
 
         if ( type === 'ruc' ) {
-            idEl.setAttribute( 'pattern', '^[0-9]{13}$' );
-            idEl.setAttribute( 'minlength', '13' );
-            idEl.setAttribute( 'maxlength', '13' );
-            idEl.setAttribute( 'title', 'RUC: exactamente 13 digitos numericos' );
+            idEl.pattern = '^[0-9]{13}$';
+            idEl.minLength = 13;
+            idEl.maxLength = 13;
+            idEl.title = 'RUC: exactamente 13 digitos numericos';
             return;
         }
 
-        idEl.setAttribute( 'pattern', '^[A-Za-z0-9]{6,15}$' );
-        idEl.setAttribute( 'minlength', '6' );
-        idEl.setAttribute( 'maxlength', '15' );
-        idEl.setAttribute( 'title', 'Pasaporte: alfanumerico de 6 a 15 caracteres' );
+        idEl.pattern = '^[A-Za-z0-9]{6,15}$';
+        idEl.minLength = 6;
+        idEl.maxLength = 15;
+        idEl.title = 'Pasaporte: alfanumerico de 6 a 15 caracteres';
     }
 
-    typeEl.addEventListener( 'change', function () {
-        idEl.value = '';
-        applyRules();
-    } );
-
-    if ( formEl ) {
-        formEl.addEventListener( 'submit', applyRules );
-    }
-
+    typeEl.addEventListener( 'change', applyRules );
     applyRules();
 } )();
 </script>

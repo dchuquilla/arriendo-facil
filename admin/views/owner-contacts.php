@@ -11,8 +11,18 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 global $wpdb;
 
+$per_page    = 20;
+$paged       = isset( $_GET['paged'] ) ? max( 1, absint( wp_unslash( $_GET['paged'] ) ) ) : 1;
+$offset      = ( $paged - 1 ) * $per_page;
+$total_items = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_owner_contacts" );
+$total_pages = (int) ceil( $total_items / $per_page );
+
 $contacts = $wpdb->get_results(
-	"SELECT * FROM {$wpdb->prefix}af_owner_contacts ORDER BY created_at DESC LIMIT 100"
+    $wpdb->prepare(
+        "SELECT * FROM {$wpdb->prefix}af_owner_contacts ORDER BY created_at DESC LIMIT %d OFFSET %d",
+        $per_page,
+        $offset
+    )
 );
 // Define if we are in "new contact" mode.
 $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET['action'] ) );
@@ -91,7 +101,7 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
 						<td><?php echo esc_html( $contact->owner_id ); ?></td>
 						<td><?php echo esc_html( $contact->subject ); ?></td>
 						<td><?php echo esc_html( wp_trim_words( $contact->message, 15 ) ); ?></td>
-						<td><?php echo esc_html( $contact->status ); ?></td>
+						<td class="af-contact-status"><?php echo esc_html( $contact->status ); ?></td>
 						<td><?php echo esc_html( $contact->created_at ); ?></td>
 						<td>
 							<?php if ( 'unread' === $contact->status ) : ?>
@@ -110,52 +120,36 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
 			<?php endif; ?>
 		</tbody>
 	</table>
+
+<?php if ( $total_pages > 1 ) : ?>
+    <?php
+    $pagination_args = array(
+        'page'  => 'af-owner-contacts',
+        'paged' => '%#%',
+    );
+
+    if ( $is_new ) {
+        $pagination_args['action'] = 'new';
+    }
+    ?>
+    <div class="tablenav">
+        <div class="tablenav-pages">
+            <?php
+            echo wp_kses_post(
+                paginate_links(
+                    array(
+                        'base'      => add_query_arg( $pagination_args, admin_url( 'admin.php' ) ),
+                        'format'    => '',
+                        'current'   => $paged,
+                        'total'     => $total_pages,
+                        'prev_text' => __( '&laquo;', 'arriendo-facil' ),
+                        'next_text' => __( '&raquo;', 'arriendo-facil' ),
+                    )
+                )
+            );
+            ?>
+        </div>
+    </div>
+<?php endif; ?>
+
 </div>
-
-<script>
-( function () {
-    var typeEl = document.getElementById( 'af_owner_id_type' );
-    var idEl = document.getElementById( 'af_owner_id' );
-    var formEl = document.getElementById( 'af-owner-contact-form' );
-
-    if ( ! typeEl || ! idEl ) {
-        return;
-    }
-
-    function applyRules() {
-        var type = typeEl.value;
-
-        if ( type === 'cedula' ) {
-            idEl.setAttribute( 'pattern', '^[0-9]{10}$' );
-            idEl.setAttribute( 'minlength', '10' );
-            idEl.setAttribute( 'maxlength', '10' );
-            idEl.setAttribute( 'title', 'Cedula: exactamente 10 digitos numericos' );
-            return;
-        }
-
-        if ( type === 'ruc' ) {
-            idEl.setAttribute( 'pattern', '^[0-9]{13}$' );
-            idEl.setAttribute( 'minlength', '13' );
-            idEl.setAttribute( 'maxlength', '13' );
-            idEl.setAttribute( 'title', 'RUC: exactamente 13 digitos numericos' );
-            return;
-        }
-
-        idEl.setAttribute( 'pattern', '^[A-Za-z0-9]{6,15}$' );
-        idEl.setAttribute( 'minlength', '6' );
-        idEl.setAttribute( 'maxlength', '15' );
-        idEl.setAttribute( 'title', 'Pasaporte: alfanumerico de 6 a 15 caracteres' );
-    }
-
-    typeEl.addEventListener( 'change', function () {
-        idEl.value = '';
-        applyRules();
-    } );
-
-    if ( formEl ) {
-        formEl.addEventListener( 'submit', applyRules );
-    }
-
-    applyRules();
-} )();
-</script>

@@ -137,7 +137,7 @@
 				if ( response.success ) {
 					var $row = $btn.closest( 'tr' );
 					$row.removeClass( 'af-unread' );
-					$row.find( '.af-contact-status' ).text( 'read' );
+					$row.find( '.af-contact-status, td:nth-child(6)' ).first().text( 'read' );
 					$btn.remove();
 				} else {
 					alert( response.data && response.data.message ? response.data.message : 'Error.' );
@@ -185,7 +185,15 @@
         } )
             .done( function ( response ) {
                 if ( response && response.success ) {
-                    window.location.href = 'admin.php?page=af-owner-contacts';
+                    var params = new URLSearchParams( window.location.search );
+                    var paged = params.get( 'paged' );
+                    var target = 'admin.php?page=af-owner-contacts';
+
+                    if ( paged ) {
+                        target += '&paged=' + encodeURIComponent( paged );
+                    }
+
+                    window.location.href = target;
                 } else {
                     alert( response && response.data && response.data.message ? response.data.message : 'Error sending message.' );
                 }
@@ -234,6 +242,7 @@
             idEl.setAttribute( 'maxlength', '15' );
             idEl.setAttribute( 'title', 'Pasaporte: alfanumerico de 6 a 15 caracteres' );
             idEl.addEventListener( 'input', enforceUppercase );
+						enforceUppercase();
         }
 
         typeEl.addEventListener( 'change', function () {

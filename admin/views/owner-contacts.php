@@ -122,7 +122,11 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
         return;
     }
 
+		function enforceUppercase(){
+			idEl.value = idEl.value.toUpperCase();
+		}
     function applyRules() {
+				idEl.removeEventListener( 'input', enforceUppercase );
         var type = typeEl.value;
 
         if ( type === 'cedula' ) {
@@ -145,6 +149,8 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
         idEl.setAttribute( 'minlength', '6' );
         idEl.setAttribute( 'maxlength', '15' );
         idEl.setAttribute( 'title', 'Pasaporte: alfanumerico de 6 a 15 caracteres' );
+				idEl.addEventListener( 'input', enforceUppercase );
+        enforceUppercase();
     }
 
     typeEl.addEventListener( 'change', function () {

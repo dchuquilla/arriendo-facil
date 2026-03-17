@@ -35,19 +35,7 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
 						<input type="hidden" name="redirect_to" value="<?php echo esc_url( admin_url( 'admin.php?page=af-owner-contacts&action=new' ) ); ?>" />
 
             <table class="form-table" role="presentation">
-                <tr>
-                    <th scope="row"><label for="af_owner_id"><?php esc_html_e( 'Owner ID', 'arriendo-facil' ); ?></label></th>
-                    <td><input type="text" required id="af_owner_id" name="owner_id" class="regular-text" inputmode="numeric" pattern="[0-9]{10,13}" minlength="10" maxlength="13" /></td>
-                </tr>
-                <tr>
-                    <th scope="row"><label for="af_subject"><?php esc_html_e( 'Subject', 'arriendo-facil' ); ?></label></th>
-                    <td><input type="text" required id="af_subject" name="subject" class="regular-text" /></td>
-                </tr>
-                <tr>
-                    <th scope="row"><label for="af_message"><?php esc_html_e( 'Message', 'arriendo-facil' ); ?></label></th>
-                    <td><textarea required id="af_message" name="message" rows="5" class="large-text"></textarea></td>
-                </tr>
-                <tr>
+								<tr>
                     <th scope="row"><label for="af_owner_id_type"><?php esc_html_e( 'Document Type', 'arriendo-facil' ); ?></label></th>
                     <td>
                         <select id="af_owner_id_type" name="owner_id_type" required>
@@ -56,6 +44,18 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
                             <option value="pasaporte"><?php esc_html_e( 'Pasaporte', 'arriendo-facil' ); ?></option>
                         </select>
                     </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="af_owner_id"><?php esc_html_e( 'Owner ID', 'arriendo-facil' ); ?></label></th>
+                    <td><input type="text" required id="af_owner_id" name="owner_id" class="regular-text" /></td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="af_subject"><?php esc_html_e( 'Client Name', 'arriendo-facil' ); ?></label></th>
+                    <td><input type="text" required id="af_subject" name="subject" class="regular-text" /></td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="af_message"><?php esc_html_e( 'Contract Parameter Details', 'arriendo-facil' ); ?></label></th>
+                    <td><textarea required id="af_message" name="message" rows="5" class="large-text"></textarea></td>
                 </tr>
             </table>
 
@@ -114,8 +114,6 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
 ( function () {
     var typeEl = document.getElementById( 'af_owner_id_type' );
     var idEl = document.getElementById( 'af_owner_id' );
-    var formEl = document.getElementById( 'af-owner-contact-form' );
-
     if ( ! typeEl || ! idEl ) {
         return;
     }
@@ -124,36 +122,28 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
         var type = typeEl.value;
 
         if ( type === 'cedula' ) {
-            idEl.setAttribute( 'pattern', '^[0-9]{10}$' );
-            idEl.setAttribute( 'minlength', '10' );
-            idEl.setAttribute( 'maxlength', '10' );
-            idEl.setAttribute( 'title', 'Cedula: exactamente 10 digitos numericos' );
+            idEl.pattern = '^[0-9]{10}$';
+            idEl.minLength = 10;
+            idEl.maxLength = 10;
+            idEl.title = 'Cedula: exactamente 10 digitos numericos';
             return;
         }
 
         if ( type === 'ruc' ) {
-            idEl.setAttribute( 'pattern', '^[0-9]{13}$' );
-            idEl.setAttribute( 'minlength', '13' );
-            idEl.setAttribute( 'maxlength', '13' );
-            idEl.setAttribute( 'title', 'RUC: exactamente 13 digitos numericos' );
+            idEl.pattern = '^[0-9]{13}$';
+            idEl.minLength = 13;
+            idEl.maxLength = 13;
+            idEl.title = 'RUC: exactamente 13 digitos numericos';
             return;
         }
 
-        idEl.setAttribute( 'pattern', '^[A-Za-z0-9]{6,15}$' );
-        idEl.setAttribute( 'minlength', '6' );
-        idEl.setAttribute( 'maxlength', '15' );
-        idEl.setAttribute( 'title', 'Pasaporte: alfanumerico de 6 a 15 caracteres' );
+        idEl.pattern = '^[A-Za-z0-9]{6,15}$';
+        idEl.minLength = 6;
+        idEl.maxLength = 15;
+        idEl.title = 'Pasaporte: alfanumerico de 6 a 15 caracteres';
     }
 
-    typeEl.addEventListener( 'change', function () {
-        idEl.value = '';
-        applyRules();
-    } );
-
-    if ( formEl ) {
-        formEl.addEventListener( 'submit', applyRules );
-    }
-
+    typeEl.addEventListener( 'change', applyRules );
     applyRules();
 } )();
 </script>

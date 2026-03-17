@@ -155,6 +155,11 @@
         e.preventDefault();
 
         var $form = $( this );
+        var $submit = $form.find( '#af-owner-contact-submit' );
+        submitOwnerContactForm( $form, $submit );
+    } );
+
+    function submitOwnerContactForm( $form, $submit ) {
         var formEl = $form.get( 0 );
 
         if ( formEl && ! formEl.checkValidity() ) {
@@ -162,7 +167,6 @@
             return;
         }
 
-        var $submit = $form.find( '#af-owner-contact-submit' );
         $submit.prop( 'disabled', true );
 
         $.ajax( {
@@ -184,7 +188,7 @@
             .always( function () {
                 $submit.prop( 'disabled', false );
             } );
-    } );
+    }
 
     function initOwnerContactDocumentRules() {
         var typeEl = document.getElementById( 'af_owner_id_type' );
@@ -288,42 +292,18 @@
 		}
 	} );
 
-	$( document ).on( 'click', '#af-owner-contact-submit', function ( e ) {
+	
+	$( document ).on( 'submit', '#af-owner-contact-form', function ( e ) {
 		e.preventDefault();
 
-		var $form = $( '#af-owner-contact-form' );
-		if ( ! $form.length ) {
-			return;
-		}
+		var $form = $( this );
+		var $submit = $form.find( '#af-owner-contact-submit' );
+		submitOwnerContactForm( $form, $submit );
+	} );
 
-		var formEl = $form.get( 0 );
-		if ( formEl && ! formEl.checkValidity() ) {
-			formEl.reportValidity();
-			return;
-		}
-
-		var $submit = $( this );
-		$submit.prop( 'disabled', true );
-
-		$.ajax( {
-			url: afAdmin.ajaxUrl,
-			method: 'POST',
-			dataType: 'json',
-			data: $form.serialize(),
-		} )
-			.done( function ( response ) {
-				if ( response && response.success ) {
-					window.location.href = 'admin.php?page=af-owner-contacts';
-				} else {
-					alert( response && response.data && response.data.message ? response.data.message : 'Error sending message.' );
-				}
-			} )
-			.fail( function ( xhr ) {
-				alert( 'Request failed (' + xhr.status + ').' );
-			} )
-			.always( function () {
-				$submit.prop( 'disabled', false );
-			} );
+	$( document ).on( 'click', '#af-owner-contact-submit', function ( e ) {
+		e.preventDefault();
+		$( this ).closest( 'form' ).trigger( 'submit' );
 	} );
 
 } )( jQuery );

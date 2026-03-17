@@ -58,13 +58,15 @@ class Arriendo_Facil_Activator {
 
 			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_owner_contacts (
 				id          BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
-				owner_id    VARCHAR(13) NOT NULL,
+				owner_id_type VARCHAR(20) NOT NULL DEFAULT 'cedula',
+				owner_id    VARCHAR(15) NOT NULL,
 				subject     VARCHAR(255) NOT NULL,
 				message     TEXT NOT NULL,
 				status      VARCHAR(20) NOT NULL DEFAULT 'unread',
 				created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 				PRIMARY KEY (id),
-				KEY owner_id (owner_id)
+				KEY owner_id (owner_id),
+				KEY owner_id_type (owner_id_type)
 			) $charset_collate;",
 
 			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_ai_logs (
@@ -99,6 +101,26 @@ class Arriendo_Facil_Activator {
 
 		$owner_contacts_table = $wpdb->prefix . 'af_owner_contacts';
 
+		$owner_id_type_exists = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				 FROM INFORMATION_SCHEMA.COLUMNS
+				 WHERE TABLE_SCHEMA = %s
+				   AND TABLE_NAME = %s
+				   AND COLUMN_NAME = %s",
+				DB_NAME,
+				$owner_contacts_table,
+				'owner_id_type'
+			)
+		);
+
+		if ( ! $owner_id_type_exists ) {
+			$wpdb->query(
+				"ALTER TABLE {$owner_contacts_table}
+				 ADD COLUMN owner_id_type VARCHAR(20) NOT NULL DEFAULT 'cedula' AFTER id"
+			);
+		}
+
 		$owner_id_type = $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT DATA_TYPE
@@ -112,10 +134,10 @@ class Arriendo_Facil_Activator {
 			)
 		);
 
-		if ( 'varchar' !== $owner_id_type ) {
+		if ( 'varchar' !== strtolower( (string) $owner_id_type ) ) {
 			$wpdb->query(
 				"ALTER TABLE {$owner_contacts_table}
-				 MODIFY owner_id VARCHAR(13) NOT NULL"
+				 MODIFY owner_id VARCHAR(15) NOT NULL"
 			);
 		}
 

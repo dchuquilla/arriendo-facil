@@ -125,8 +125,18 @@
 	$( document ).on( 'click', '.af-mark-read', function () {
     var $btn = $( this );
     var contactId = $btn.data( 'contact-id' );
-
-    $btn.prop( 'disabled', true );
+    var $row = $btn.closest( 'tr' );
+    var $statusCell = $row.find( '.af-contact-status' );
+    var $actionCell = $btn.closest( 'td' );
+    var prevStatus = ( $statusCell.text() || '' ).trim();
+    var prevActionHtml = $actionCell.html()
+    $row.removeClass( 'af-unread unread' );
+    if ( $statusCell.length ) {
+        $statusCell.text( 'read' );
+    } else {
+        $row.children( 'td' ).eq( 5 ).text( 'read' );
+    }
+    $actionCell.html( '<span>—</span>' );
 
     $.ajax( {
         url: afAdmin.ajaxUrl,
@@ -139,32 +149,29 @@
         }
     } )
         .done( function ( response ) {
-            if ( response && response.success ) {
-                var $row = $btn.closest( 'tr' );
-                var $cells = $row.children( 'td' );
-                var $statusCell = $row.find( '.af-contact-status' );
-
-                $row.removeClass( 'af-unread unread' );
-
-                // Fuerza actualización visual del estado
+            if ( ! ( response && response.success ) ) {
+                
+                $row.addClass( 'af-unread' );
                 if ( $statusCell.length ) {
-                    $statusCell.text( 'read' );
-                } else if ( $cells.length >= 6 ) {
-                    $cells.eq( 5 ).text( 'read' );
+                    $statusCell.text( prevStatus || 'unread' );
+                } else {
+                    $row.children( 'td' ).eq( 5 ).text( prevStatus || 'unread' );
                 }
-
-                // Oculta acción para evitar doble click
-                $btn.closest( 'td' ).empty().append( '<span>—</span>' );
-            } else {
+                $actionCell.html( prevActionHtml );
                 alert( response && response.data && response.data.message ? response.data.message : 'Error.' );
-                $btn.prop( 'disabled', false );
             }
         } )
         .fail( function ( xhr ) {
+            $row.addClass( 'af-unread' );
+            if ( $statusCell.length ) {
+                $statusCell.text( prevStatus || 'unread' );
+            } else {
+                $row.children( 'td' ).eq( 5 ).text( prevStatus || 'unread' );
+            }
+            $actionCell.html( prevActionHtml );
             alert( 'Request failed (' + xhr.status + ').' );
-            $btn.prop( 'disabled', false );
         } );
-	} );
+} );
 
 	// Submit new owner contact form (admin page).
 	$( document ).on( 'submit', '#af-owner-contact-form', function ( e ) {

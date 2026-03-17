@@ -128,17 +128,16 @@
     var $row = $btn.closest( 'tr' );
     var $statusCell = $row.find( '.af-contact-status' );
     var $actionCell = $btn.closest( 'td' );
-    var prevStatus = ( $statusCell.text() || '' ).trim();
-    var prevActionHtml = $actionCell.html()
+
     $row.removeClass( 'af-unread unread' );
     if ( $statusCell.length ) {
         $statusCell.text( 'read' );
     } else {
         $row.children( 'td' ).eq( 5 ).text( 'read' );
     }
-    $actionCell.html( '<span>—</span>' );
+    $actionCell.html( '<span>-</span>' );
 
-    $.ajax( {
+    $.ajax({
         url: afAdmin.ajaxUrl,
         method: 'POST',
         dataType: 'json',
@@ -147,31 +146,32 @@
             nonce: afAdmin.ownerContactNonce,
             contact_id: contactId
         }
-    } )
-        .done( function ( response ) {
-            if ( ! ( response && response.success ) ) {
-                
-                $row.addClass( 'af-unread' );
-                if ( $statusCell.length ) {
-                    $statusCell.text( prevStatus || 'unread' );
-                } else {
-                    $row.children( 'td' ).eq( 5 ).text( prevStatus || 'unread' );
-                }
-                $actionCell.html( prevActionHtml );
-                alert( response && response.data && response.data.message ? response.data.message : 'Error.' );
-            }
-        } )
-        .fail( function ( xhr ) {
+    }).done(function(response){
+        if ( ! ( response && response.success ) ) {
+            // rollback 
             $row.addClass( 'af-unread' );
             if ( $statusCell.length ) {
-                $statusCell.text( prevStatus || 'unread' );
+                $statusCell.text( 'unread' );
             } else {
-                $row.children( 'td' ).eq( 5 ).text( prevStatus || 'unread' );
+                $row.children( 'td' ).eq( 5 ).text( 'unread' );
             }
-            $actionCell.html( prevActionHtml );
-            alert( 'Request failed (' + xhr.status + ').' );
-        } );
-} );
+            $actionCell.html(
+                '<button type="button" class="button af-mark-read" data-contact-id="' + contactId + '">Mark Read</button>'
+            );
+        }
+    }).fail(function(){
+        
+        $row.addClass( 'af-unread' );
+        if ( $statusCell.length ) {
+            $statusCell.text( 'unread' );
+        } else {
+            $row.children( 'td' ).eq( 5 ).text( 'unread' );
+        }
+        $actionCell.html(
+            '<button type="button" class="button af-mark-read" data-contact-id="' + contactId + '">Mark Read</button>'
+        );
+    });
+});
 
 	// Submit new owner contact form (admin page).
 	$( document ).on( 'submit', '#af-owner-contact-form', function ( e ) {

@@ -136,13 +136,21 @@
 			.done( function ( response ) {
 				if ( response.success ) {
 					var $row = $btn.closest( 'tr' );
+					var $statusCell = $row.find( '.af-contact-status' );
+
 					$row.removeClass( 'af-unread' );
-					$row.find( '.af-contact-status, td:nth-child(6)' ).first().text( 'read' );
+
+					if ( $statusCell.length ) {
+							$statusCell.text( 'read' );
+					} else {
+							$row.children( 'td' ).eq( 5 ).text( 'read' ); // fallback
+					}
+
 					$btn.remove();
-				} else {
+			} else {
 					alert( response.data && response.data.message ? response.data.message : 'Error.' );
 					$btn.prop( 'disabled', false );
-				}
+			}
 			} )
 			.fail( function () {
 				alert( 'Request failed.' );

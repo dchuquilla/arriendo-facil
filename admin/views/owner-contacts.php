@@ -91,7 +91,7 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
 						<td><?php echo esc_html( $contact->owner_id ); ?></td>
 						<td><?php echo esc_html( $contact->subject ); ?></td>
 						<td><?php echo esc_html( wp_trim_words( $contact->message, 15 ) ); ?></td>
-						<td><?php echo esc_html( $contact->status ); ?></td>
+						<td class="af-contact-status"><?php echo esc_html( $contact->status ); ?></td>
 						<td><?php echo esc_html( $contact->created_at ); ?></td>
 						<td>
 							<?php if ( 'unread' === $contact->status ) : ?>

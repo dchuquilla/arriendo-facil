@@ -162,7 +162,7 @@
     function submitOwnerContactForm( $form, $submit ) {
         var formEl = $form.get( 0 );
 
-        if ( formEl && ! formEl.checkValidity() ) {
+        if ( ! validateOwnerDocumentField() || ( formEl && ! formEl.checkValidity() ) ) {
             formEl.reportValidity();
             return;
         }
@@ -230,12 +230,44 @@
 
         typeEl.addEventListener( 'change', function () {
             applyRules();
-            if ( idEl.value && ! idEl.checkValidity() ) {
-                idEl.reportValidity();
-            }
+            validateOwnerDocumentField();
         } );
+				idEl.addEventListener( 'input', function () {
+					validateOwnerDocumentField();
+				} );
 
         applyRules();
+    }
+
+    function validateOwnerDocumentField() {
+        var typeEl = document.getElementById( 'af_owner_id_type' );
+        var idEl = document.getElementById( 'af_owner_id' );
+
+        if ( ! typeEl || ! idEl ) {
+            return true;
+        }
+
+        var type = ( typeEl.value || '' ).trim();
+        var value = ( idEl.value || '' ).trim();
+        var ok = true;
+        var msg = '';
+
+        if ( type === 'cedula' ) {
+            ok = /^[0-9]{10}$/.test( value );
+            msg = 'Cedula: exactamente 10 digitos numericos.';
+        } else if ( type === 'ruc' ) {
+            ok = /^[0-9]{13}$/.test( value );
+            msg = 'RUC: exactamente 13 digitos numericos.';
+        } else if ( type === 'pasaporte' ) {
+            ok = /^[A-Za-z0-9]{6,15}$/.test( value );
+            msg = 'Pasaporte: alfanumerico de 6 a 15 caracteres.';
+        } else {
+            ok = false;
+            msg = 'Seleccione un tipo de documento valido.';
+        }
+
+        idEl.setCustomValidity( ok ? '' : msg );
+        return ok;
     }
 
     $( function () {
@@ -290,20 +322,6 @@
 		} else {
 			alert( 'Unknown entry type.' );
 		}
-	} );
-
-	
-	$( document ).on( 'submit', '#af-owner-contact-form', function ( e ) {
-		e.preventDefault();
-
-		var $form = $( this );
-		var $submit = $form.find( '#af-owner-contact-submit' );
-		submitOwnerContactForm( $form, $submit );
-	} );
-
-	$( document ).on( 'click', '#af-owner-contact-submit', function ( e ) {
-		e.preventDefault();
-		$( this ).closest( 'form' ).trigger( 'submit' );
 	} );
 
 } )( jQuery );

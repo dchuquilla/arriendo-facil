@@ -135,7 +135,9 @@
 		} )
 			.done( function ( response ) {
 				if ( response.success ) {
-					$btn.closest( 'tr' ).removeClass( 'af-unread' );
+					var $row = $btn.closest( 'tr' );
+					$row.removeClass( 'af-unread' );
+					$row.find( 'td:nth-child(6)' ).text( 'read' );
 					$btn.remove();
 				} else {
 					alert( response.data && response.data.message ? response.data.message : 'Error.' );
@@ -150,39 +152,91 @@
 
 	// Submit new owner contact form (admin page).
 	$( document ).on( 'submit', '#af-owner-contact-form', function ( e ) {
-		e.preventDefault();
+        e.preventDefault();
 
-		var $form = $( this );
-		var formEl = $form.get( 0 );
+        var $form = $( this );
+        var formEl = $form.get( 0 );
 
-		if ( formEl && ! formEl.checkValidity() ) {
-			formEl.reportValidity();
-			return;
-		}
+        if ( formEl && ! formEl.checkValidity() ) {
+            formEl.reportValidity();
+            return;
+        }
 
-		var $submit = $form.find( '#af-owner-contact-submit' );
-		$submit.prop( 'disabled', true );
+        var $submit = $form.find( '#af-owner-contact-submit' );
+        $submit.prop( 'disabled', true );
 
-		$.ajax( {
-			url: afAdmin.ajaxUrl,
-			method: 'POST',
-			dataType: 'json',
-			data: $form.serialize(),
-		} )
-			.done( function ( response ) {
-				if ( response && response.success ) {
-					window.location.href = 'admin.php?page=af-owner-contacts';
-				} else {
-					alert( response && response.data && response.data.message ? response.data.message : 'Error sending message.' );
-				}
-			} )
-			.fail( function ( xhr ) {
-				alert( 'Request failed (' + xhr.status + ').' );
-			} )
-			.always( function () {
-				$submit.prop( 'disabled', false );
-			} );
-	} );
+        $.ajax( {
+            url: afAdmin.ajaxUrl,
+            method: 'POST',
+            dataType: 'json',
+            data: $form.serialize(),
+        } )
+            .done( function ( response ) {
+                if ( response && response.success ) {
+                    window.location.href = 'admin.php?page=af-owner-contacts';
+                } else {
+                    alert( response && response.data && response.data.message ? response.data.message : 'Error sending message.' );
+                }
+            } )
+            .fail( function ( xhr ) {
+                alert( 'Request failed (' + xhr.status + ').' );
+            } )
+            .always( function () {
+                $submit.prop( 'disabled', false );
+            } );
+    } );
+
+    function initOwnerContactDocumentRules() {
+        var typeEl = document.getElementById( 'af_owner_id_type' );
+        var idEl = document.getElementById( 'af_owner_id' );
+
+        if ( ! typeEl || ! idEl ) {
+            return;
+        }
+
+        function enforceUppercase() {
+            idEl.value = idEl.value.toUpperCase();
+        }
+
+        function applyRules() {
+            idEl.removeEventListener( 'input', enforceUppercase );
+
+            if ( typeEl.value === 'cedula' ) {
+                idEl.setAttribute( 'pattern', '^[0-9]{10}$' );
+                idEl.setAttribute( 'minlength', '10' );
+                idEl.setAttribute( 'maxlength', '10' );
+                idEl.setAttribute( 'title', 'Cedula: exactamente 10 digitos numericos' );
+                return;
+            }
+
+            if ( typeEl.value === 'ruc' ) {
+                idEl.setAttribute( 'pattern', '^[0-9]{13}$' );
+                idEl.setAttribute( 'minlength', '13' );
+                idEl.setAttribute( 'maxlength', '13' );
+                idEl.setAttribute( 'title', 'RUC: exactamente 13 digitos numericos' );
+                return;
+            }
+
+            idEl.setAttribute( 'pattern', '^[A-Za-z0-9]{6,15}$' );
+            idEl.setAttribute( 'minlength', '6' );
+            idEl.setAttribute( 'maxlength', '15' );
+            idEl.setAttribute( 'title', 'Pasaporte: alfanumerico de 6 a 15 caracteres' );
+            idEl.addEventListener( 'input', enforceUppercase );
+        }
+
+        typeEl.addEventListener( 'change', function () {
+            applyRules();
+            if ( idEl.value && ! idEl.checkValidity() ) {
+                idEl.reportValidity();
+            }
+        } );
+
+        applyRules();
+    }
+
+    $( function () {
+        initOwnerContactDocumentRules();
+  } );
 
 	// ── Score guest via AI ──────────────────────────────────────────────────
 	$( document ).on( 'click', '.af-score-guest', function () {

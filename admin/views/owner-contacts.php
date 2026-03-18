@@ -73,10 +73,10 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
 		<thead>
 			<tr>
 				<th><?php esc_html_e( 'ID', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Document Type', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Owner ID', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Client Name', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Contract Parameter Details', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'Document Type*', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'Owner ID*', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'Client Name*', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'Contract Parameter Details*', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Status', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Date', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Actions', 'arriendo-facil' ); ?></th>
@@ -85,7 +85,6 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
 		<tbody>
 			<?php if ( $contacts ) : ?>
 				<?php foreach ( $contacts as $contact ) : ?>
-					<tr class="<?php echo 'unread' === $contact->status ? 'af-unread' : ''; ?>">
 						<td><?php echo esc_html( $contact->id ); ?></td>
 						<td><?php echo esc_html( $contact->owner_id_type ); ?></td>
 						<td><?php echo esc_html( $contact->owner_id ); ?></td>
@@ -93,15 +92,6 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
 						<td><?php echo esc_html( wp_trim_words( $contact->message, 15 ) ); ?></td>
 						<td class="af-contact-status"><?php echo esc_html( $contact->status ); ?></td>
 						<td><?php echo esc_html( $contact->created_at ); ?></td>
-						<td>
-							<?php if ( 'unread' === $contact->status ) : ?>
-								<button type="button" class="button af-mark-read"
-									data-contact-id="<?php echo esc_attr( $contact->id ); ?>">
-									<?php esc_html_e( 'Mark Read', 'arriendo-facil' ); ?>
-								</button>
-							<?php endif; ?>
-						</td>
-					</tr>
 				<?php endforeach; ?>
 			<?php else : ?>
 				<tr>

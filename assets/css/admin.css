@@ -45,12 +45,6 @@
 	margin-right: 8px;
 }
 
-/* Unread contact row highlight */
-.af-unread td {
-	font-weight: 600;
-	background-color: #f0f6fc;
-}
-
 /* Predict cost result inline */
 .af-predict-result {
 	margin-left: 10px;

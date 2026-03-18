@@ -121,58 +121,6 @@
 			} );
 	} );
 
-	// ── Mark owner contact as read ──────────────────────────────────────────
-	$( document ).on( 'click', '.af-mark-read', function () {
-    var $btn = $( this );
-    var contactId = $btn.data( 'contact-id' );
-    var $row = $btn.closest( 'tr' );
-    var $statusCell = $row.find( '.af-contact-status' );
-    var $actionCell = $btn.closest( 'td' );
-
-    $row.removeClass( 'af-unread unread' );
-    if ( $statusCell.length ) {
-        $statusCell.text( 'read' );
-    } else {
-        $row.children( 'td' ).eq( 5 ).text( 'read' );
-    }
-    $actionCell.html( '<span>-</span>' );
-
-    $.ajax({
-        url: afAdmin.ajaxUrl,
-        method: 'POST',
-        dataType: 'json',
-        data: {
-            action: 'af_mark_contact_read',
-            nonce: afAdmin.ownerContactNonce,
-            contact_id: contactId
-        }
-    }).done(function(response){
-        if ( ! ( response && response.success ) ) {
-            // rollback 
-            $row.addClass( 'af-unread' );
-            if ( $statusCell.length ) {
-                $statusCell.text( 'unread' );
-            } else {
-                $row.children( 'td' ).eq( 5 ).text( 'unread' );
-            }
-            $actionCell.html(
-                '<button type="button" class="button af-mark-read" data-contact-id="' + contactId + '">Mark Read</button>'
-            );
-        }
-    }).fail(function(){
-        
-        $row.addClass( 'af-unread' );
-        if ( $statusCell.length ) {
-            $statusCell.text( 'unread' );
-        } else {
-            $row.children( 'td' ).eq( 5 ).text( 'unread' );
-        }
-        $actionCell.html(
-            '<button type="button" class="button af-mark-read" data-contact-id="' + contactId + '">Mark Read</button>'
-        );
-    });
-});
-
 	// Submit new owner contact form (admin page).
 	$( document ).on( 'submit', '#af-owner-contact-form', function ( e ) {
         e.preventDefault();

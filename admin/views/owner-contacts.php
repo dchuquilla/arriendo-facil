@@ -85,6 +85,7 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
 		<tbody>
 			<?php if ( $contacts ) : ?>
 				<?php foreach ( $contacts as $contact ) : ?>
+					<tr>
 						<td><?php echo esc_html( $contact->id ); ?></td>
 						<td><?php echo esc_html( $contact->owner_id_type ); ?></td>
 						<td><?php echo esc_html( $contact->owner_id ); ?></td>
@@ -92,6 +93,8 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
 						<td><?php echo esc_html( wp_trim_words( $contact->message, 15 ) ); ?></td>
 						<td class="af-contact-status"><?php echo esc_html( $contact->status ); ?></td>
 						<td><?php echo esc_html( $contact->created_at ); ?></td>
+						<td>-</td>
+					</tr>
 				<?php endforeach; ?>
 			<?php else : ?>
 				<tr>

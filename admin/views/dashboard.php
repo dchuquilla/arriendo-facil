@@ -16,7 +16,7 @@ $cleaning_service_count = wp_count_posts( 'cleaning_service' )->publish;
 $lease_count           = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_leases" );
 $guest_count           = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_guests" );
 $pending_cleaning      = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_cleaning_requests WHERE status = 'pending'" );
-$unread_contacts       = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_owner_contacts WHERE status = 'unread'" );
+$active_contacts = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_owner_contacts WHERE status IN ('active', 'read')" );
 ?>
 <div class="wrap af-dashboard">
 	<h1><?php esc_html_e( 'Arriendo Fácil – Dashboard', 'arriendo-facil' ); ?></h1>
@@ -41,8 +41,8 @@ $unread_contacts       = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af
 		</div>
 
 		<div class="af-stat-card">
-			<span class="af-stat-number"><?php echo esc_html( $unread_contacts ); ?></span>
-			<span class="af-stat-label"><?php esc_html_e( 'Unread Contacts', 'arriendo-facil' ); ?></span>
+			<span class="af-stat-number"><?php echo esc_html( $active_contacts ); ?></span>
+			<span class="af-stat-label"><?php esc_html_e( 'Active Contacts', 'arriendo-facil' ); ?></span>
 			<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-owner-contacts' ) ); ?>"><?php esc_html_e( 'View all', 'arriendo-facil' ); ?></a>
 		</div>
 

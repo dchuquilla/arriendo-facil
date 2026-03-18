@@ -24,7 +24,6 @@ class Arriendo_Facil_Owner_Contact {
 		add_action( 'wp_ajax_af_send_owner_contact', array( $this, 'ajax_send_contact' ) );
 		add_action( 'wp_ajax_nopriv_af_send_owner_contact', array( $this, 'ajax_send_contact' ) );
 		add_action( 'wp_ajax_af_get_owner_contacts', array( $this, 'ajax_get_contacts' ) );
-		add_action( 'wp_ajax_af_mark_contact_read', array( $this, 'ajax_mark_read' ) );
 	}
 
 	/**
@@ -125,37 +124,6 @@ class Arriendo_Facil_Owner_Contact {
 		);
 
 		wp_send_json_success( $contacts );
-	}
-
-	/**
-	 * Marks a contact message as read via AJAX.
-	 */
-	public function ajax_mark_read() {
-		check_ajax_referer( 'af_owner_contact_nonce', 'nonce' );
-
-		if ( ! current_user_can( 'edit_posts' ) ) {
-			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
-		}
-
-		$contact_id = isset( $_POST['contact_id'] ) ? absint( $_POST['contact_id'] ) : 0;
-		if ( ! $contact_id ) {
-			wp_send_json_error( array( 'message' => __( 'Invalid contact ID.', 'arriendo-facil' ) ) );
-		}
-
-		global $wpdb;
-		$updated = $wpdb->update(
-			$wpdb->prefix . 'af_owner_contacts',
-			array( 'status' => 'read' ),
-			array( 'id' => $contact_id ),
-			array( '%s' ),
-			array( '%d' )
-		);
-
-		if ( false !== $updated ) {
-			wp_send_json_success();
-		} else {
-			wp_send_json_error( array( 'message' => __( 'Could not mark as read.', 'arriendo-facil' ) ) );
-		}
 	}
 
 	private function find_owner_email_by_document( $type, $value ) {

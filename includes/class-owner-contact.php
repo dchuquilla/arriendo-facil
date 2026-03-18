@@ -24,6 +24,7 @@ class Arriendo_Facil_Owner_Contact {
 		add_action( 'wp_ajax_af_send_owner_contact', array( $this, 'ajax_send_contact' ) );
 		/*add_action( 'wp_ajax_nopriv_af_send_owner_contact', array( $this, 'ajax_send_contact' ) );*/ // Only logged-in users can send contacts for now.
 		add_action( 'wp_ajax_af_get_owner_contacts', array( $this, 'ajax_get_contacts' ) );
+		add_action( 'after_password_reset', array( $this, 'handle_owner_password_reset' ), 10, 2 );
 	}
 
 	/**
@@ -228,6 +229,32 @@ class Arriendo_Facil_Owner_Contact {
 		);
 
 		wp_send_json_success( $contacts );
+	}
+
+	/**
+	 * Activates owner account status after successful password reset.
+	 *
+	 * @param WP_User $user User whose password was reset.
+	 * @param string  $new_pass New password value.
+	 */
+	public function handle_owner_password_reset( $user, $new_pass ) {
+		if ( ! $user || empty( $user->ID ) ) {
+			return;
+		}
+
+		global $wpdb;
+		$table = $wpdb->prefix . 'af_owner_contacts';
+
+		$wpdb->query(
+			$wpdb->prepare(
+				"UPDATE {$table}
+				 SET status = %s,
+				     temp_password_hash = NULL
+				 WHERE wp_user_id = %d",
+				'read',
+				(int) $user->ID
+			)
+		);
 	}
 
 	private function find_owner_email_by_document( $type, $value ) {

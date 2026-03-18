@@ -61,7 +61,7 @@ class Arriendo_Facil_Activator {
 				owner_id_type VARCHAR(20) NOT NULL DEFAULT 'cedula',
 				owner_id    VARCHAR(15) NOT NULL,
 				owner_email VARCHAR(190) NOT NULL,
-				wp_user_id  BIGINT(20) UNSIGNED DEFAULT NULL,
+				wp_user_id  BIGINT UNSIGNED DEFAULT NULL,
 				temp_password_hash VARCHAR(255) DEFAULT NULL,
 				subject     VARCHAR(255) NOT NULL,
 				message     TEXT NOT NULL,
@@ -126,6 +126,66 @@ class Arriendo_Facil_Activator {
 			);
 		}
 
+		$owner_email_exists = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				 FROM INFORMATION_SCHEMA.COLUMNS
+				 WHERE TABLE_SCHEMA = %s
+				   AND TABLE_NAME = %s
+				   AND COLUMN_NAME = %s",
+				DB_NAME,
+				$owner_contacts_table,
+				'owner_email'
+			)
+		);
+
+		if ( ! $owner_email_exists ) {
+			$wpdb->query(
+				"ALTER TABLE {$owner_contacts_table}
+				 ADD COLUMN owner_email VARCHAR(190) NOT NULL AFTER owner_id"
+			);
+		}
+
+		$wp_user_id_exists = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				 FROM INFORMATION_SCHEMA.COLUMNS
+				 WHERE TABLE_SCHEMA = %s
+				   AND TABLE_NAME = %s
+				   AND COLUMN_NAME = %s",
+				DB_NAME,
+				$owner_contacts_table,
+				'wp_user_id'
+			)
+		);
+
+		if ( ! $wp_user_id_exists ) {
+			$wpdb->query(
+				"ALTER TABLE {$owner_contacts_table}
+				 ADD COLUMN wp_user_id BIGINT UNSIGNED DEFAULT NULL AFTER owner_email"
+			);
+		}
+
+		$temp_password_hash_exists = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				 FROM INFORMATION_SCHEMA.COLUMNS
+				 WHERE TABLE_SCHEMA = %s
+				   AND TABLE_NAME = %s
+				   AND COLUMN_NAME = %s",
+				DB_NAME,
+				$owner_contacts_table,
+				'temp_password_hash'
+			)
+		);
+
+		if ( ! $temp_password_hash_exists ) {
+			$wpdb->query(
+				"ALTER TABLE {$owner_contacts_table}
+				 ADD COLUMN temp_password_hash VARCHAR(255) DEFAULT NULL AFTER wp_user_id"
+			);
+		}
+
 		$owner_id_type = $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT DATA_TYPE
@@ -144,6 +204,40 @@ class Arriendo_Facil_Activator {
 				"ALTER TABLE {$owner_contacts_table}
 				 MODIFY owner_id VARCHAR(15) NOT NULL"
 			);
+		}
+
+		$owner_email_index_exists = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				 FROM INFORMATION_SCHEMA.STATISTICS
+				 WHERE TABLE_SCHEMA = %s
+				   AND TABLE_NAME = %s
+				   AND INDEX_NAME = %s",
+				DB_NAME,
+				$owner_contacts_table,
+				'owner_email'
+			)
+		);
+
+		if ( ! $owner_email_index_exists ) {
+			$wpdb->query( "ALTER TABLE {$owner_contacts_table} ADD KEY owner_email (owner_email)" );
+		}
+
+		$wp_user_id_index_exists = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				 FROM INFORMATION_SCHEMA.STATISTICS
+				 WHERE TABLE_SCHEMA = %s
+				   AND TABLE_NAME = %s
+				   AND INDEX_NAME = %s",
+				DB_NAME,
+				$owner_contacts_table,
+				'wp_user_id'
+			)
+		);
+
+		if ( ! $wp_user_id_index_exists ) {
+			$wpdb->query( "ALTER TABLE {$owner_contacts_table} ADD KEY wp_user_id (wp_user_id)" );
 		}
 
 		add_option( 'arriendo_facil_version', ARRIENDO_FACIL_VERSION );

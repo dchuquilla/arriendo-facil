@@ -60,13 +60,18 @@ class Arriendo_Facil_Activator {
 				id          BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
 				owner_id_type VARCHAR(20) NOT NULL DEFAULT 'cedula',
 				owner_id    VARCHAR(15) NOT NULL,
+				owner_email VARCHAR(190) NOT NULL,
+				wp_user_id  BIGINT(20) UNSIGNED DEFAULT NULL,
+				temp_password_hash VARCHAR(255) DEFAULT NULL,
 				subject     VARCHAR(255) NOT NULL,
 				message     TEXT NOT NULL,
 				status      VARCHAR(20) NOT NULL DEFAULT 'unread',
 				created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 				PRIMARY KEY (id),
 				KEY owner_id (owner_id),
-				KEY owner_id_type (owner_id_type)
+				KEY owner_id_type (owner_id_type),
+				KEY owner_email (owner_email),
+				KEY wp_user_id (wp_user_id)
 			) $charset_collate;",
 
 			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_ai_logs (

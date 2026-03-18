@@ -22,7 +22,7 @@ class Arriendo_Facil_Owner_Contact {
 	 */
 	public function __construct() {
 		add_action( 'wp_ajax_af_send_owner_contact', array( $this, 'ajax_send_contact' ) );
-		add_action( 'wp_ajax_nopriv_af_send_owner_contact', array( $this, 'ajax_send_contact' ) );
+		/*add_action( 'wp_ajax_nopriv_af_send_owner_contact', array( $this, 'ajax_send_contact' ) );*/ // Only logged-in users can send contacts for now.
 		add_action( 'wp_ajax_af_get_owner_contacts', array( $this, 'ajax_get_contacts' ) );
 	}
 
@@ -32,6 +32,9 @@ class Arriendo_Facil_Owner_Contact {
 	public function ajax_send_contact() {
 		check_ajax_referer( 'af_owner_contact_nonce', 'nonce' );
 
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+		}
 		$redirect_to = isset( $_POST['redirect_to'] )
 			? esc_url_raw( wp_unslash( $_POST['redirect_to'] ) )
 			: admin_url( 'admin.php?page=af-owner-contacts' );
@@ -54,28 +57,125 @@ class Arriendo_Facil_Owner_Contact {
 			wp_safe_redirect( $redirect_to );
 			exit;
 		}
+ /** User WordPress */
+		$user               = get_user_by( 'email', $owner_email );
+		$temp_password_plain = wp_generate_password( 14, true, true );
 
-		global $wpdb;
-		$inserted = $wpdb->insert(
-			$wpdb->prefix . 'af_owner_contacts',
+		if ( ! $user ) {
+			$base_login = sanitize_user( current( explode( '@', $owner_email ) ), true );
+			$user_login = $this->generate_unique_login( $base_login ? $base_login : 'owner', $owner_id );
+
+			$user_id = wp_insert_user(
+				array(
+					'user_login'   => $user_login,
+					'user_pass'    => $temp_password_plain,
+					'user_email'   => $owner_email,
+					'display_name' => $subject,
+					'role'         => 'subscriber',
+				)
+			);
+
+			if ( is_wp_error( $user_id ) ) {
+				if ( $is_xhr ) {
+					wp_send_json_error( array( 'message' => $user_id->get_error_message() ) );
+				}
+
+				wp_safe_redirect( $redirect_to );
+				exit;
+			}
+
+			$user = get_user_by( 'id', (int) $user_id );
+		} else {
+			$user_id = (int) $user->ID;
+			wp_set_password( $temp_password_plain, $user_id );
+			$user = get_user_by( 'id', $user_id );
+		}
+
+		if ( ! $user ) {
+			if ( $is_xhr ) {
+				wp_send_json_error( array( 'message' => __( 'Could not load owner user.', 'arriendo-facil' ) ) );
+			}
+
+			wp_safe_redirect( $redirect_to );
+			exit;
+		}
+ /** links for emails */
+		$reset_key = get_password_reset_key( $user );
+		if ( is_wp_error( $reset_key ) ) {
+			if ( $is_xhr ) {
+				wp_send_json_error( array( 'message' => $reset_key->get_error_message() ) );
+			}
+
+			wp_safe_redirect( $redirect_to );
+			exit;
+		}
+
+		$reset_url = add_query_arg(
 			array(
-				'owner_id_type' => $owner_id_type,
-				'owner_id'      => $owner_id,
-				'owner_email'   => $owner_email,
-				'subject'       => $subject,
-				'message'       => $message,
-				'status'        => 'unread',
+				'action' => 'rp',
+				'key'    => $reset_key,
+				'login'  => rawurlencode( $user->user_login ),
 			),
-			array( '%s', '%s', '%s', '%s', '%s', '%s' )
+			wp_login_url()
 		);
 
-		if ( $inserted ) {
-			wp_mail( $owner_email, $subject, $message );
+		global $wpdb;
+		$existing_contact_id = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT id
+				 FROM {$wpdb->prefix}af_owner_contacts
+				 WHERE owner_email = %s
+				 ORDER BY id DESC
+				 LIMIT 1",
+				$owner_email
+			)
+		);
+
+		$owner_data = array(
+			'owner_id_type'      => $owner_id_type,
+			'owner_id'           => $owner_id,
+			'owner_email'        => $owner_email,
+			'wp_user_id'         => (int) $user->ID,
+			'temp_password_hash' => wp_hash_password( $temp_password_plain ),
+			'subject'            => $subject,
+			'message'            => $message,
+			'status'             => 'unread',
+		);
+
+		$owner_formats = array( '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s' );
+
+		if ( $existing_contact_id > 0 ) {
+			$inserted = $wpdb->update(
+				$wpdb->prefix . 'af_owner_contacts',
+				$owner_data,
+				array( 'id' => $existing_contact_id ),
+				$owner_formats,
+				array( '%d' )
+			);
+		} else {
+			$inserted = $wpdb->insert(
+				$wpdb->prefix . 'af_owner_contacts',
+				$owner_data,
+				$owner_formats
+			);
+		}
+
+		if ( false !== $inserted ) {
+			$mail_subject = __( 'Owner account created', 'arriendo-facil' );
+			$mail_body    = sprintf(
+				"Hola %s,\n\nTu cuenta ha sido creada.\n\nUsuario: %s\nContrasena temporal: %s\n\nActiva tu cuenta y cambia tu contrasena aqui:\n%s\n\nSi no reconoces este registro, ignora este correo.",
+				$subject,
+				$user->user_login,
+				$temp_password_plain,
+				$reset_url
+			);
+
+			wp_mail( $owner_email, $mail_subject, $mail_body );
 
 			if ( $is_xhr ) {
 				wp_send_json_success(
 					array(
-						'id'          => $wpdb->insert_id,
+						'id'          => $existing_contact_id > 0 ? $existing_contact_id : $wpdb->insert_id,
 						'redirect_to' => $redirect_to,
 					)
 				);
@@ -187,5 +287,25 @@ class Arriendo_Facil_Owner_Contact {
 		}
 
 		return $value;
+	}
+
+	private function generate_unique_login( $base_login, $owner_id ) {
+		$base_login = sanitize_user( (string) $base_login, true );
+		if ( '' === $base_login ) {
+			$base_login = 'owner';
+		}
+
+		$candidate = $base_login;
+		if ( username_exists( $candidate ) ) {
+			$candidate = sanitize_user( $base_login . '_' . $owner_id, true );
+		}
+
+		$suffix = 1;
+		while ( username_exists( $candidate ) ) {
+			$candidate = sanitize_user( $base_login . '_' . $suffix, true );
+			$suffix++;
+		}
+
+		return $candidate;
 	}
 }

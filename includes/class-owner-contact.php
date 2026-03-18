@@ -42,13 +42,14 @@ class Arriendo_Facil_Owner_Contact {
 		$owner_id_type = isset( $_POST['owner_id_type'] ) ? sanitize_key( wp_unslash( $_POST['owner_id_type'] ) ) : '';
 		$owner_id_raw  = isset( $_POST['owner_id'] ) ? sanitize_text_field( wp_unslash( $_POST['owner_id'] ) ) : '';
 		$owner_id      = $this->normalize_owner_document( $owner_id_type, $owner_id_raw );
+		$owner_email   = isset( $_POST['owner_email'] ) ? sanitize_email( wp_unslash( $_POST['owner_email'] ) ) : '';
 
 		$subject = isset( $_POST['subject'] ) ? sanitize_text_field( wp_unslash( $_POST['subject'] ) ) : '';
 		$message = isset( $_POST['message'] ) ? sanitize_textarea_field( wp_unslash( $_POST['message'] ) ) : '';
 
-		if ( ! $this->is_valid_owner_document( $owner_id_type, $owner_id ) || ! $subject || ! $message ) {
+		if ( ! $this->is_valid_owner_document( $owner_id_type, $owner_id ) || ! is_email( $owner_email ) || ! $subject || ! $message ) {
 			if ( $is_xhr ) {
-				wp_send_json_error( array( 'message' => __( 'Invalid owner document data.', 'arriendo-facil' ) ) );
+				wp_send_json_error( array( 'message' => __( 'Invalid owner registration data.', 'arriendo-facil' ) ) );
 			}
 			wp_safe_redirect( $redirect_to );
 			exit;
@@ -60,18 +61,16 @@ class Arriendo_Facil_Owner_Contact {
 			array(
 				'owner_id_type' => $owner_id_type,
 				'owner_id'      => $owner_id,
+				'owner_email'   => $owner_email,
 				'subject'       => $subject,
 				'message'       => $message,
 				'status'        => 'unread',
 			),
-			array( '%s', '%s', '%s', '%s', '%s' )
+			array( '%s', '%s', '%s', '%s', '%s', '%s' )
 		);
 
 		if ( $inserted ) {
-			$owner_email = $this->find_owner_email_by_document( $owner_id_type, $owner_id );
-			if ( $owner_email ) {
-				wp_mail( $owner_email, $subject, $message );
-			}
+			wp_mail( $owner_email, $subject, $message );
 
 			if ( $is_xhr ) {
 				wp_send_json_success(
@@ -87,7 +86,12 @@ class Arriendo_Facil_Owner_Contact {
 		}
 
 		if ( $is_xhr ) {
-			wp_send_json_error( array( 'message' => __( 'Could not send message.', 'arriendo-facil' ) ) );
+			wp_send_json_error(
+				array(
+					'message' => __( 'Could not register owner.', 'arriendo-facil' ),
+					'error'   => $wpdb->last_error,
+				)
+			);
 		}
 
 		wp_safe_redirect( $redirect_to );

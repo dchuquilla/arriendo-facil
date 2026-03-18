@@ -49,6 +49,13 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
                     <th scope="row"><label for="af_owner_id"><?php esc_html_e( 'Owner ID', 'arriendo-facil' ); ?></label></th>
                     <td><input type="text" required id="af_owner_id" name="owner_id" class="regular-text" /></td>
                 </tr>
+								<tr>
+										<th scope="row"><label for="af_owner_email"><?php esc_html_e( 'Owner Email', 'arriendo-facil' ); ?></label></th>
+										<td>
+												<input type="email" required id="af_owner_email" name="owner_email" class="regular-text" autocomplete="email" />
+												<p class="description"><?php esc_html_e( 'Temporary credentials will be sent to this email.', 'arriendo-facil' ); ?></p>
+										</td>
+								</tr>
                 <tr>
                     <th scope="row"><label for="af_subject"><?php esc_html_e( 'Client Name', 'arriendo-facil' ); ?></label></th>
                     <td><input type="text" required id="af_subject" name="subject" class="regular-text" /></td>
@@ -61,7 +68,7 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
 
             <p class="submit">
                 <button id="af-owner-contact-submit" type="submit" class="button button-primary">
-                    <?php esc_html_e( 'Send Message', 'arriendo-facil' ); ?>
+                    <?php esc_html_e( 'Register Owner', 'arriendo-facil' ); ?>
                 </button>
                 <a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=af-owner-contacts' ) ); ?>"><?php esc_html_e( 'Cancel', 'arriendo-facil' ); ?></a>
             </p>
@@ -76,10 +83,10 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
 				<th><?php esc_html_e( 'Document Type*', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Owner ID*', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Client Name*', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'Owner Email*', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Contract Parameter Details*', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Status', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Date', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Actions', 'arriendo-facil' ); ?></th>
 			</tr>
 		</thead>
 		<tbody>
@@ -89,11 +96,11 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
 						<td><?php echo esc_html( $contact->id ); ?></td>
 						<td><?php echo esc_html( $contact->owner_id_type ); ?></td>
 						<td><?php echo esc_html( $contact->owner_id ); ?></td>
+						<td><?php echo esc_html( $contact->owner_email ); ?></td>
 						<td><?php echo esc_html( $contact->subject ); ?></td>
 						<td><?php echo esc_html( wp_trim_words( $contact->message, 15 ) ); ?></td>
 						<td class="af-contact-status"><?php echo esc_html( $contact->status ); ?></td>
 						<td><?php echo esc_html( $contact->created_at ); ?></td>
-						<td>-</td>
 					</tr>
 				<?php endforeach; ?>
 			<?php else : ?>

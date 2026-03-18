@@ -82,8 +82,8 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
 				<th><?php esc_html_e( 'ID', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Document Type*', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Owner ID*', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Client Name*', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Owner Email*', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'Client Name*', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Contract Parameter Details*', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Status', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Date', 'arriendo-facil' ); ?></th>

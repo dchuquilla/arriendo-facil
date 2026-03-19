@@ -345,9 +345,9 @@ class Arriendo_Facil_Owner_Contact {
 	public function ajax_deactivate_owner_contact() {
     check_ajax_referer( 'af_owner_contact_nonce', 'nonce' );
 
-    if ( ! is_super_admin() ) {
-        wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
-    }
+    if ( ! current_user_can( 'manage_options' ) ) {
+    	wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+		}
 
     $contact_id = isset( $_POST['contact_id'] ) ? absint( wp_unslash( $_POST['contact_id'] ) ) : 0;
     if ( ! $contact_id ) {

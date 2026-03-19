@@ -177,6 +177,43 @@
             } );
     }
 
+	// Disable owner account from owner contacts table.
+	$( document ).on( 'click', '.af-disable-owner', function () {
+		var $btn = $( this );
+		var userId = parseInt( $btn.data( 'user-id' ), 10 );
+
+		if ( ! userId ) {
+			alert( 'Invalid user.' );
+			return;
+		}
+
+		if ( ! window.confirm( 'Disable this account? The user will no longer be able to log in.' ) ) {
+			return;
+		}
+
+		$btn.prop( 'disabled', true );
+
+		$.post( afAdmin.ajaxUrl, {
+			action: 'af_disable_owner_account',
+			nonce: afAdmin.ownerContactNonce,
+			user_id: userId,
+		} )
+			.done( function ( response ) {
+				if ( response && response.success ) {
+					window.location.reload();
+					return;
+				}
+
+				alert( response && response.data && response.data.message ? response.data.message : 'Could not disable account.' );
+			} )
+			.fail( function () {
+				alert( 'Request failed.' );
+			} )
+			.always( function () {
+				$btn.prop( 'disabled', false );
+			} );
+	} );
+
     function initOwnerContactDocumentRules() {
         var typeEl = document.getElementById( 'af_owner_id_type' );
         var idEl = document.getElementById( 'af_owner_id' );

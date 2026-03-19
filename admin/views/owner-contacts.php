@@ -86,12 +86,23 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
 				<th><?php esc_html_e( 'Client Name', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Contract Parameter Details', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Status', 'arriendo-facil' ); ?></th>
+                <th><?php esc_html_e( 'Account Status', 'arriendo-facil' ); ?></th>
+                <th><?php esc_html_e( 'Actions', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Date', 'arriendo-facil' ); ?></th>
 			</tr>
 		</thead>
 		<tbody>
 			<?php if ( $contacts ) : ?>
 				<?php foreach ( $contacts as $contact ) : ?>
+                    <?php
+                    $account_status = '';
+                    if ( ! empty( $contact->wp_user_id ) ) {
+                        $account_status = (string) get_user_meta( (int) $contact->wp_user_id, 'af_owner_account_status', true );
+                        if ( '' === $account_status ) {
+                            $account_status = 'inactive';
+                        }
+                    }
+                    ?>
 					<tr>
 						<td><?php echo esc_html( $contact->id ); ?></td>
 						<td><?php echo esc_html( $contact->owner_id_type ); ?></td>
@@ -100,12 +111,25 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
 						<td><?php echo esc_html( $contact->subject ); ?></td>
 						<td><?php echo esc_html( wp_trim_words( $contact->message, 15 ) ); ?></td>
 						<td class="af-contact-status"><?php echo esc_html( $contact->status ); ?></td>
+                        <td><?php echo esc_html( $account_status ? $account_status : 'n/a' ); ?></td>
+                        <td>
+                            <?php if ( ! empty( $contact->wp_user_id ) && 'active' === $account_status ) : ?>
+                                <button
+                                    type="button"
+                                    class="button af-disable-owner"
+                                    data-user-id="<?php echo esc_attr( (int) $contact->wp_user_id ); ?>">
+                                    <?php esc_html_e( 'Disable Account', 'arriendo-facil' ); ?>
+                                </button>
+                            <?php else : ?>
+                                <span class="description">-</span>
+                            <?php endif; ?>
+                        </td>
 						<td><?php echo esc_html( $contact->created_at ); ?></td>
 					</tr>
 				<?php endforeach; ?>
 			<?php else : ?>
 				<tr>
-					<td colspan="8"><?php esc_html_e( 'No contacts found.', 'arriendo-facil' ); ?></td>
+                    <td colspan="10"><?php esc_html_e( 'No contacts found.', 'arriendo-facil' ); ?></td>
 				</tr>
 			<?php endif; ?>
 		</tbody>

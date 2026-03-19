@@ -24,7 +24,9 @@ class Arriendo_Facil_Owner_Contact {
 		add_action( 'wp_ajax_af_send_owner_contact', array( $this, 'ajax_send_contact' ) );
 		/*add_action( 'wp_ajax_nopriv_af_send_owner_contact', array( $this, 'ajax_send_contact' ) );*/ // Only logged-in users can send contacts for now.
 		add_action( 'wp_ajax_af_get_owner_contacts', array( $this, 'ajax_get_contacts' ) );
+		add_action( 'wp_ajax_af_disable_owner_account', array( $this, 'ajax_disable_owner_account' ) );
 		add_action( 'after_password_reset', array( $this, 'handle_owner_password_reset' ), 10, 2 );
+		add_filter( 'authenticate', array( $this, 'block_disabled_owner_login' ), 30, 3 );
 	}
 
 	/**
@@ -232,6 +234,43 @@ class Arriendo_Facil_Owner_Contact {
 	}
 
 	/**
+	 * Disables an owner account without deleting the user.
+	 */
+	public function ajax_disable_owner_account() {
+		check_ajax_referer( 'af_owner_contact_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$user_id = isset( $_POST['user_id'] ) ? absint( $_POST['user_id'] ) : 0;
+		if ( ! $user_id ) {
+			wp_send_json_error( array( 'message' => __( 'Invalid user ID.', 'arriendo-facil' ) ) );
+		}
+
+		$user = get_user_by( 'id', $user_id );
+		if ( ! $user ) {
+			wp_send_json_error( array( 'message' => __( 'User not found.', 'arriendo-facil' ) ) );
+		}
+
+		update_user_meta( $user_id, 'af_owner_account_status', 'disabled' );
+
+		if ( class_exists( 'WP_Session_Tokens' ) ) {
+			$tokens = WP_Session_Tokens::get_instance( $user_id );
+			if ( $tokens ) {
+				$tokens->destroy_all();
+			}
+		}
+
+		wp_send_json_success(
+			array(
+				'user_id'        => $user_id,
+				'account_status' => 'disabled',
+			)
+		);
+	}
+
+	/**
 	 * Activates owner account status after successful password reset.
 	 *
 	 * @param WP_User $user User whose password was reset.
@@ -255,7 +294,35 @@ class Arriendo_Facil_Owner_Contact {
 				(int) $user->ID
 			)
 		);
-		update_user_meta( (int) $user->ID, 'af_owner_account_status', 'active' );
+
+		$current_status = get_user_meta( (int) $user->ID, 'af_owner_account_status', true );
+		if ( 'disabled' !== $current_status ) {
+			update_user_meta( (int) $user->ID, 'af_owner_account_status', 'active' );
+		}
+	}
+
+	/**
+	 * Blocks authentication for disabled owner accounts.
+	 *
+	 * @param WP_User|WP_Error|null $user     Authenticated user object.
+	 * @param string                $username Login username.
+	 * @param string                $password Login password.
+	 * @return WP_User|WP_Error|null
+	 */
+	public function block_disabled_owner_login( $user, $username, $password ) {
+		if ( $user instanceof WP_Error || ! ( $user instanceof WP_User ) ) {
+			return $user;
+		}
+
+		$account_status = get_user_meta( (int) $user->ID, 'af_owner_account_status', true );
+		if ( 'disabled' === $account_status ) {
+			return new WP_Error(
+				'af_owner_account_disabled',
+				__( '<strong>Error:</strong> Your account is disabled. Please contact support.', 'arriendo-facil' )
+			);
+		}
+
+		return $user;
 	}
 
 	private function find_owner_email_by_document( $type, $value ) {

@@ -181,6 +181,7 @@
 	$( document ).on( 'click', '.af-disable-owner', function () {
 		var $btn = $( this );
 		var userId = parseInt( $btn.data( 'user-id' ), 10 );
+		var $row = $btn.closest( 'tr' );
 
 		if ( ! userId ) {
 			alert( 'Invalid user.' );
@@ -200,7 +201,9 @@
 		} )
 			.done( function ( response ) {
 				if ( response && response.success ) {
-					window.location.reload();
+					$row.find( '.af-contact-status' ).text( response.data && response.data.contact_status ? response.data.contact_status : 'inactive' );
+					$row.find( '.af-account-status' ).text( response.data && response.data.account_status ? response.data.account_status : 'disabled' );
+					$row.find( '.af-account-actions' ).html( '<span class="description">-</span>' );
 					return;
 				}
 

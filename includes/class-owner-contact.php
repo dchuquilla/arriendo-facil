@@ -25,8 +25,6 @@ class Arriendo_Facil_Owner_Contact {
 		/*add_action( 'wp_ajax_nopriv_af_send_owner_contact', array( $this, 'ajax_send_contact' ) );*/ // Only logged-in users can send contacts for now.
 		add_action( 'wp_ajax_af_get_owner_contacts', array( $this, 'ajax_get_contacts' ) );
 		add_action( 'after_password_reset', array( $this, 'handle_owner_password_reset' ), 10, 2 );
-		add_action( 'wp_ajax_af_deactivate_owner_contact', array( $this, 'ajax_deactivate_owner_contact' ) );
-		add_filter( 'authenticate', array( $this, 'block_inactive_owner_login' ), 30, 3 );
 	}
 
 	/**
@@ -142,7 +140,7 @@ class Arriendo_Facil_Owner_Contact {
 			'temp_password_hash' => wp_hash_password( $temp_password_plain ),
 			'subject'            => $subject,
 			'message'            => $message,
-			'status'             => 'active',
+			'status'             => 'unread',
 		);
 
 		$owner_formats = array( '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s' );
@@ -337,94 +335,5 @@ class Arriendo_Facil_Owner_Contact {
 		}
 
 		return $candidate;
-	}
-
-	/**
-	 * AJAX handler to deactivate an owner contact and block login.
-	 */
-	public function ajax_deactivate_owner_contact() {
-    check_ajax_referer( 'af_owner_contact_nonce', 'nonce' );
-
-    if ( ! is_super_admin() ) {
-        wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
-    }
-
-    $contact_id = isset( $_POST['contact_id'] ) ? absint( $_POST['contact_id'] ) : 0;
-    if ( ! $contact_id ) {
-        wp_send_json_error( array( 'message' => __( 'Invalid contact ID.', 'arriendo-facil' ) ), 400 );
-    }
-
-    global $wpdb;
-    $table = $wpdb->prefix . 'af_owner_contacts';
-
-    $contact = $wpdb->get_row(
-        $wpdb->prepare(
-            "SELECT id, wp_user_id, status
-             FROM {$table}
-             WHERE id = %d
-             LIMIT 1",
-            $contact_id
-        )
-    );
-
-    if ( ! $contact ) {
-        wp_send_json_error( array( 'message' => __( 'Contact not found.', 'arriendo-facil' ) ), 404 );
-    }
-
-    $updated = $wpdb->update(
-        $table,
-        array( 'status' => 'inactive' ),
-        array( 'id' => $contact_id ),
-        array( '%s' ),
-        array( '%d' )
-    );
-
-    if ( false === $updated ) {
-        wp_send_json_error(
-            array(
-                'message' => __( 'Could not deactivate contact.', 'arriendo-facil' ),
-                'error'   => $wpdb->last_error,
-            )
-        );
-    }
-
-    wp_send_json_success(
-        array(
-            'id'     => $contact_id,
-            'status' => 'inactive',
-        )
-    );
-	}
-
-	/**
-	 * Filter to block login for users with inactive owner contact status.
-	 */
-	public function block_inactive_owner_login( $user, $username, $password ) {
-    if ( is_wp_error( $user ) || ! ( $user instanceof WP_User ) ) {
-        return $user;
-    }
-
-    global $wpdb;
-    $table = $wpdb->prefix . 'af_owner_contacts';
-
-    $status = $wpdb->get_var(
-        $wpdb->prepare(
-            "SELECT status
-             FROM {$table}
-             WHERE wp_user_id = %d
-             ORDER BY id DESC
-             LIMIT 1",
-            (int) $user->ID
-        )
-    );
-
-    if ( 'inactive' === strtolower( (string) $status ) ) {
-        return new WP_Error(
-            'af_owner_inactive',
-            __( 'Your account is inactive. Please contact the administrator.', 'arriendo-facil' )
-        );
-    }
-
-    return $user;
 	}
 }

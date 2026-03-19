@@ -10,8 +10,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 global $wpdb;
-/** Check if the current user is a super admin */
-$is_superadmin = is_super_admin();
 
 $contacts = $wpdb->get_results(
 	"SELECT * FROM {$wpdb->prefix}af_owner_contacts ORDER BY created_at DESC LIMIT 100"

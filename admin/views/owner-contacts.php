@@ -36,7 +36,7 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
 
             <table class="form-table" role="presentation">
 								<tr>
-                    <th scope="row"><label for="af_owner_id_type"><?php esc_html_e( 'Document Type', 'arriendo-facil' ); ?></label></th>
+                    <th scope="row"><label for="af_owner_id_type"><?php esc_html_e( 'Document Type*', 'arriendo-facil' ); ?></label></th>
                     <td>
                         <select id="af_owner_id_type" name="owner_id_type" required>
                             <option value="cedula"><?php esc_html_e( 'Cedula', 'arriendo-facil' ); ?></option>
@@ -46,22 +46,22 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row"><label for="af_owner_id"><?php esc_html_e( 'Owner ID', 'arriendo-facil' ); ?></label></th>
+                    <th scope="row"><label for="af_owner_id"><?php esc_html_e( 'Owner ID*', 'arriendo-facil' ); ?></label></th>
                     <td><input type="text" required id="af_owner_id" name="owner_id" class="regular-text" /></td>
                 </tr>
 								<tr>
-										<th scope="row"><label for="af_owner_email"><?php esc_html_e( 'Owner Email', 'arriendo-facil' ); ?></label></th>
+										<th scope="row"><label for="af_owner_email"><?php esc_html_e( 'Owner Email*', 'arriendo-facil' ); ?></label></th>
 										<td>
 												<input type="email" required id="af_owner_email" name="owner_email" class="regular-text" autocomplete="email" />
 												<p class="description"><?php esc_html_e( 'Temporary credentials will be sent to this email.', 'arriendo-facil' ); ?></p>
 										</td>
 								</tr>
                 <tr>
-                    <th scope="row"><label for="af_subject"><?php esc_html_e( 'Client Name', 'arriendo-facil' ); ?></label></th>
+                    <th scope="row"><label for="af_subject"><?php esc_html_e( 'Client Name*', 'arriendo-facil' ); ?></label></th>
                     <td><input type="text" required id="af_subject" name="subject" class="regular-text" /></td>
                 </tr>
                 <tr>
-                    <th scope="row"><label for="af_message"><?php esc_html_e( 'Contract Parameter Details', 'arriendo-facil' ); ?></label></th>
+                    <th scope="row"><label for="af_message"><?php esc_html_e( 'Contract Parameter Details*', 'arriendo-facil' ); ?></label></th>
                     <td><textarea required id="af_message" name="message" rows="5" class="large-text"></textarea></td>
                 </tr>
             </table>
@@ -80,11 +80,11 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
 		<thead>
 			<tr>
 				<th><?php esc_html_e( 'ID', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Document Type*', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Owner ID*', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Owner Email*', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Client Name*', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Contract Parameter Details*', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'Document Type', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'Owner ID', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'Owner Email', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'Client Name', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'Contract Parameter Details', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Status', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Date', 'arriendo-facil' ); ?></th>
 			</tr>

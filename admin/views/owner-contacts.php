@@ -110,9 +110,9 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
 						<td><?php echo esc_html( $contact->owner_email ); ?></td>
 						<td><?php echo esc_html( $contact->subject ); ?></td>
 						<td><?php echo esc_html( wp_trim_words( $contact->message, 15 ) ); ?></td>
-						<td class="af-contact-status"><?php echo esc_html( $contact->status ); ?></td>
-                        <td><?php echo esc_html( $account_status ? $account_status : 'n/a' ); ?></td>
-                        <td>
+                        <td class="af-contact-status"><?php echo esc_html( $contact->status ); ?></td>
+                        <td class="af-account-status"><?php echo esc_html( $account_status ? $account_status : 'n/a' ); ?></td>
+                        <td class="af-account-actions">
                             <?php if ( ! empty( $contact->wp_user_id ) && 'active' === $account_status ) : ?>
                                 <button
                                     type="button"

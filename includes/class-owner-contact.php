@@ -255,6 +255,22 @@ class Arriendo_Facil_Owner_Contact {
 
 		update_user_meta( $user_id, 'af_owner_account_status', 'disabled' );
 
+		global $wpdb;
+		$table          = $wpdb->prefix . 'af_owner_contacts';
+		$contacts_query = $wpdb->query(
+			$wpdb->prepare(
+				"UPDATE {$table}
+				 SET status = %s
+				 WHERE wp_user_id = %d",
+				'inactive',
+				$user_id
+			)
+		);
+
+		if ( false === $contacts_query ) {
+			wp_send_json_error( array( 'message' => __( 'Could not update contact status.', 'arriendo-facil' ) ) );
+		}
+
 		if ( class_exists( 'WP_Session_Tokens' ) ) {
 			$tokens = WP_Session_Tokens::get_instance( $user_id );
 			if ( $tokens ) {
@@ -265,6 +281,7 @@ class Arriendo_Facil_Owner_Contact {
 		wp_send_json_success(
 			array(
 				'user_id'        => $user_id,
+				'contact_status' => 'inactive',
 				'account_status' => 'disabled',
 			)
 		);

@@ -65,7 +65,7 @@ class Arriendo_Facil_Activator {
 				temp_password_hash VARCHAR(255) DEFAULT NULL,
 				subject     VARCHAR(255) NOT NULL,
 				message     TEXT NOT NULL,
-				status      VARCHAR(20) NOT NULL DEFAULT 'unread',
+				status      VARCHAR(20) NOT NULL DEFAULT 'active',
 				created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 				PRIMARY KEY (id),
 				KEY owner_id (owner_id),
@@ -239,6 +239,18 @@ class Arriendo_Facil_Activator {
 		if ( ! $wp_user_id_index_exists ) {
 			$wpdb->query( "ALTER TABLE {$owner_contacts_table} ADD KEY wp_user_id (wp_user_id)" );
 		}
+
+		// Update existing records with default status if they have 'unread' or 'read' status
+		$wpdb->query(
+        "ALTER TABLE {$owner_contacts_table}
+         MODIFY status VARCHAR(20) NOT NULL DEFAULT 'active'"
+    );
+
+    $wpdb->query(
+        "UPDATE {$owner_contacts_table}
+         SET status = 'active'
+         WHERE status IN ('unread', 'read')"
+    );
 
 		add_option( 'arriendo_facil_version', ARRIENDO_FACIL_VERSION );
 		flush_rewrite_rules();

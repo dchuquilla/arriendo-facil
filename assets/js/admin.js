@@ -262,6 +262,42 @@
         initOwnerContactDocumentRules();
   } );
 
+	// ── Delete guest ───────────────────────────────────────────────────────
+	// Deactivate owner account from owner contacts table.
+	$( document ).on( 'click', '.af-owner-delete', function () {
+			var $btn = $( this );
+			var contactId = parseInt( $btn.data( 'contact-id' ), 10 );
+
+			if ( ! contactId ) {
+					alert( 'Invalid contact.' );
+					return;
+			}
+
+			if ( ! window.confirm( 'This will deactivate the owner account. Continue?' ) ) {
+					return;
+			}
+
+			$btn.prop( 'disabled', true );
+
+			$.post( afAdmin.ajaxUrl, {
+					action: 'af_deactivate_owner_contact',
+					nonce: afAdmin.ownerContactNonce,
+					contact_id: contactId,
+			} )
+					.done( function ( response ) {
+							if ( response && response.success ) {
+									window.location.reload();
+							} else {
+									alert( response && response.data && response.data.message ? response.data.message : 'Could not deactivate owner.' );
+									$btn.prop( 'disabled', false );
+							}
+					} )
+					.fail( function ( xhr ) {
+							alert( 'Request failed (' + xhr.status + ').' );
+							$btn.prop( 'disabled', false );
+					} );
+	} );
+
 	// ── Score guest via AI ──────────────────────────────────────────────────
 	$( document ).on( 'click', '.af-score-guest', function () {
 		var $btn = $( this );

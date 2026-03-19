@@ -22,11 +22,11 @@ class Arriendo_Facil_Owner_Contact {
 	 */
 	public function __construct() {
 		add_action( 'wp_ajax_af_send_owner_contact', array( $this, 'ajax_send_contact' ) );
-		/*add_action( 'wp_ajax_nopriv_af_send_owner_contact', array( $this, 'ajax_send_contact' ) );*/ // Only logged-in users can send contacts for now.
-		add_action( 'wp_ajax_af_get_owner_contacts', array( $this, 'ajax_get_contacts' ) );
-		add_action( 'after_password_reset', array( $this, 'handle_owner_password_reset' ), 10, 2 );
-		add_action( 'wp_ajax_af_deactivate_owner_contact', array( $this, 'ajax_deactivate_owner_contact' ) );
-		add_filter( 'authenticate', array( $this, 'block_inactive_owner_login' ), 30, 3 );
+    /*add_action( 'wp_ajax_nopriv_af_send_owner_contact', array( $this, 'ajax_send_contact' ) );*/ // Only logged-in users can send contacts for now.
+    add_action( 'wp_ajax_af_get_owner_contacts', array( $this, 'ajax_get_contacts' ) );
+    add_action( 'after_password_reset', array( $this, 'handle_owner_password_reset' ), 10, 2 );
+    add_action( 'wp_ajax_af_deactivate_owner_contact', array( $this, 'ajax_deactivate_owner_contact' ) );
+    add_filter( 'authenticate', array( $this, 'block_inactive_owner_login' ), 30, 3 );
 	}
 
 	/**
@@ -142,7 +142,7 @@ class Arriendo_Facil_Owner_Contact {
 			'temp_password_hash' => wp_hash_password( $temp_password_plain ),
 			'subject'            => $subject,
 			'message'            => $message,
-			'status'             => 'active',
+			'status'             => 'inactive',
 		);
 
 		$owner_formats = array( '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s' );
@@ -172,7 +172,7 @@ class Arriendo_Facil_Owner_Contact {
 				$temp_password_plain,
 				$reset_url
 			);
-
+			update_user_meta( (int) $user->ID, 'af_owner_account_status', 'inactive' );
 			wp_mail( $owner_email, $mail_subject, $mail_body );
 
 			if ( $is_xhr ) {
@@ -257,6 +257,7 @@ class Arriendo_Facil_Owner_Contact {
 				(int) $user->ID
 			)
 		);
+		update_user_meta( (int) $user->ID, 'af_owner_account_status', 'active' );
 	}
 
 	private function find_owner_email_by_document( $type, $value ) {
@@ -348,7 +349,7 @@ class Arriendo_Facil_Owner_Contact {
         wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
     }
 
-    $contact_id = isset( $_POST['contact_id'] ) ? absint( $_POST['contact_id'] ) : 0;
+    $contact_id = isset( $_POST['contact_id'] ) ? absint( wp_unslash( $_POST['contact_id'] ) ) : 0;
     if ( ! $contact_id ) {
         wp_send_json_error( array( 'message' => __( 'Invalid contact ID.', 'arriendo-facil' ) ), 400 );
     }
@@ -358,7 +359,7 @@ class Arriendo_Facil_Owner_Contact {
 
     $contact = $wpdb->get_row(
         $wpdb->prepare(
-            "SELECT id, wp_user_id, status
+            "SELECT id, wp_user_id, owner_email
              FROM {$table}
              WHERE id = %d
              LIMIT 1",
@@ -387,6 +388,19 @@ class Arriendo_Facil_Owner_Contact {
         );
     }
 
+    $user_id = ! empty( $contact->wp_user_id ) ? (int) $contact->wp_user_id : 0;
+
+    if ( ! $user_id && ! empty( $contact->owner_email ) ) {
+        $user = get_user_by( 'email', sanitize_email( $contact->owner_email ) );
+        if ( $user && ! empty( $user->ID ) ) {
+            $user_id = (int) $user->ID;
+        }
+    }
+
+    if ( $user_id > 0 ) {
+        update_user_meta( $user_id, 'af_owner_account_status', 'inactive' );
+    }
+
     wp_send_json_success(
         array(
             'id'     => $contact_id,
@@ -403,6 +417,14 @@ class Arriendo_Facil_Owner_Contact {
         return $user;
     }
 
+    $meta_status = get_user_meta( (int) $user->ID, 'af_owner_account_status', true );
+    if ( 'inactive' === strtolower( (string) $meta_status ) ) {
+        return new WP_Error(
+            'af_owner_inactive',
+            __( 'Your account is inactive. Please contact the administrator.', 'arriendo-facil' )
+        );
+    }
+
     global $wpdb;
     $table = $wpdb->prefix . 'af_owner_contacts';
 
@@ -410,10 +432,11 @@ class Arriendo_Facil_Owner_Contact {
         $wpdb->prepare(
             "SELECT status
              FROM {$table}
-             WHERE wp_user_id = %d
+             WHERE (wp_user_id = %d OR owner_email = %s)
              ORDER BY id DESC
              LIMIT 1",
-            (int) $user->ID
+            (int) $user->ID,
+            (string) $user->user_email
         )
     );
 

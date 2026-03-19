@@ -265,53 +265,37 @@
 	// ── Delete guest ───────────────────────────────────────────────────────
 	// Deactivate owner account from owner contacts table.
 	$( document ).on( 'click', '.af-owner-delete', function () {
-    var $btn = $( this );
-    var contactId = parseInt( $btn.data( 'contact-id' ), 10 );
+			var $btn = $( this );
+			var contactId = parseInt( $btn.data( 'contact-id' ), 10 );
 
-    if ( ! contactId ) {
-        alert( 'Invalid contact.' );
-        return;
-    }
+			if ( ! contactId ) {
+					alert( 'Invalid contact.' );
+					return;
+			}
 
-    if ( typeof afAdmin === 'undefined' || ! afAdmin.ajaxUrl || ! afAdmin.ownerContactNonce ) {
-        alert( 'Owner contact config missing in admin script.' );
-        return;
-    }
+			if ( ! window.confirm( 'This will deactivate the owner account. Continue?' ) ) {
+					return;
+			}
 
-    if ( ! window.confirm( 'This will deactivate the owner account. Continue?' ) ) {
-        return;
-    }
+			$btn.prop( 'disabled', true );
 
-    $btn.prop( 'disabled', true );
-
-    $.ajax( {
-        url: afAdmin.ajaxUrl,
-        method: 'POST',
-        dataType: 'json',
-        data: {
-            action: 'af_deactivate_owner_contact',
-            nonce: afAdmin.ownerContactNonce,
-            contact_id: contactId,
-        },
-    } )
-        .done( function ( response ) {
-            if ( response && response.success ) {
-                window.location.reload();
-                return;
-            }
-
-            var msg = response && response.data && response.data.message ? response.data.message : 'Could not deactivate owner.';
-            alert( msg );
-            $btn.prop( 'disabled', false );
-        } )
-        .fail( function ( xhr ) {
-            var msg = 'Request failed (' + xhr.status + ').';
-            if ( xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message ) {
-                msg = xhr.responseJSON.data.message + ' (' + xhr.status + ')';
-            }
-            alert( msg );
-            $btn.prop( 'disabled', false );
-        } );
+			$.post( afAdmin.ajaxUrl, {
+					action: 'af_deactivate_owner_contact',
+					nonce: afAdmin.ownerContactNonce,
+					contact_id: contactId,
+			} )
+					.done( function ( response ) {
+							if ( response && response.success ) {
+									window.location.reload();
+							} else {
+									alert( response && response.data && response.data.message ? response.data.message : 'Could not deactivate owner.' );
+									$btn.prop( 'disabled', false );
+							}
+					} )
+					.fail( function ( xhr ) {
+							alert( 'Request failed (' + xhr.status + ').' );
+							$btn.prop( 'disabled', false );
+					} );
 	} );
 
 	// ── Score guest via AI ──────────────────────────────────────────────────

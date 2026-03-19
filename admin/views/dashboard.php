@@ -16,7 +16,7 @@ $cleaning_service_count = wp_count_posts( 'cleaning_service' )->publish;
 $lease_count           = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_leases" );
 $guest_count           = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_guests" );
 $pending_cleaning      = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_cleaning_requests WHERE status = 'pending'" );
-$active_contacts = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_owner_contacts WHERE status = 'active'" );
+$active_contacts = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_owner_contacts WHERE status IN ('active', 'read')" );
 ?>
 <div class="wrap af-dashboard">
 	<h1><?php esc_html_e( 'Arriendo Fácil – Dashboard', 'arriendo-facil' ); ?></h1>

@@ -10,6 +10,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 global $wpdb;
+/** Check if the current user is a super admin */
+$is_superadmin = is_super_admin();
 
 $contacts = $wpdb->get_results(
 	"SELECT * FROM {$wpdb->prefix}af_owner_contacts ORDER BY created_at DESC LIMIT 100"
@@ -87,6 +89,9 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
 				<th><?php esc_html_e( 'Contract Parameter Details', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Status', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Date', 'arriendo-facil' ); ?></th>
+				<?php if ( $is_superadmin ) : ?>
+                <th><?php esc_html_e( 'Action', 'arriendo-facil' ); ?></th>
+        <?php endif; ?>
 			</tr>
 		</thead>
 		<tbody>
@@ -101,12 +106,28 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
 						<td><?php echo esc_html( wp_trim_words( $contact->message, 15 ) ); ?></td>
 						<td class="af-contact-status"><?php echo esc_html( $contact->status ); ?></td>
 						<td><?php echo esc_html( $contact->created_at ); ?></td>
+						<?php if ( $is_superadmin ) : ?>
+            	<td>
+            		<?php if ( 'active' === strtolower( (string) $contact->status ) ) : ?>
+                    	<button
+                    		type="button"
+                      	class="button button-secondary af-owner-delete"
+                      	data-contact-id="<?php echo esc_attr( $contact->id ); ?>">
+                      	<?php esc_html_e( 'Delete', 'arriendo-facil' ); ?>
+                    	</button>
+                	<?php else : ?>
+                    <span><?php esc_html_e( 'N/A', 'arriendo-facil' ); ?></span>
+                	<?php endif; ?>
+            	</td>
+            <?php endif; ?>
 					</tr>
 				<?php endforeach; ?>
 			<?php else : ?>
 				<tr>
-					<td colspan="8"><?php esc_html_e( 'No contacts found.', 'arriendo-facil' ); ?></td>
-				</tr>
+            <td colspan="<?php echo esc_attr( $is_superadmin ? 9 : 8 ); ?>">
+              <?php esc_html_e( 'No contacts found.', 'arriendo-facil' ); ?>
+            </td>
+          </tr>
 			<?php endif; ?>
 		</tbody>
 	</table>

@@ -16,6 +16,8 @@ $contacts = $wpdb->get_results(
 );
 // Define if we are in "new contact" mode.
 $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET['action'] ) );
+$notice = isset( $_GET['af_notice'] ) ? sanitize_key( wp_unslash( $_GET['af_notice'] ) ) : '';
+$message = isset( $_GET['af_message'] ) ? sanitize_text_field( wp_unslash( $_GET['af_message'] ) ) : '';
 ?>
 <div class="wrap">
 	<h1>
@@ -24,6 +26,22 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
 			<?php esc_html_e( '+ New Owner Contact', 'arriendo-facil' ); ?>
 		</a>
 	</h1>
+
+    <?php if ( 'owner_disabled' === $notice ) : ?>
+        <div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'Owner account disabled successfully.', 'arriendo-facil' ); ?></p></div>
+    <?php elseif ( 'owner_disable_error' === $notice ) : ?>
+        <div class="notice notice-error is-dismissible">
+            <p>
+                <?php
+                echo esc_html(
+                    $message
+                        ? $message
+                        : __( 'Could not disable owner account.', 'arriendo-facil' )
+                );
+                ?>
+            </p>
+        </div>
+    <?php endif; ?>
 
 	<?php if ( $is_new ) : ?>
     <div class="card" style="max-width: 900px; margin: 16px 0; padding: 16px;">
@@ -114,12 +132,14 @@ $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET[
                         <td class="af-account-status"><?php echo esc_html( $account_status ? $account_status : 'n/a' ); ?></td>
                         <td class="af-account-actions">
                             <?php if ( ! empty( $contact->wp_user_id ) && 'active' === $account_status ) : ?>
-                                <button
-                                    type="button"
-                                    class="button af-disable-owner"
-                                    data-user-id="<?php echo esc_attr( (int) $contact->wp_user_id ); ?>">
-                                    <?php esc_html_e( 'Disable Account', 'arriendo-facil' ); ?>
-                                </button>
+                                <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Disable this account? The user will no longer be able to log in.');" style="display:inline;">
+                                    <input type="hidden" name="action" value="af_disable_owner_account" />
+                                    <input type="hidden" name="user_id" value="<?php echo esc_attr( (int) $contact->wp_user_id ); ?>" />
+                                    <?php wp_nonce_field( 'af_disable_owner_account_' . (int) $contact->wp_user_id, 'af_disable_owner_account_nonce' ); ?>
+                                    <button type="submit" class="button button-secondary">
+                                        <?php esc_html_e( 'Disable Account', 'arriendo-facil' ); ?>
+                                    </button>
+                                </form>
                             <?php else : ?>
                                 <span class="description">-</span>
                             <?php endif; ?>

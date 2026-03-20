@@ -165,16 +165,26 @@ class Arriendo_Facil_Owner_Contact {
 		}
 
 		if ( false !== $inserted ) {
-			$mail_subject = __( 'Owner account created', 'arriendo-facil' );
-			$mail_body    = sprintf(
-				"Hola %s,\n\nTu cuenta ha sido creada.\n\nUsuario: %s\nContrasena temporal: %s\n\nActiva tu cuenta y cambia tu contrasena aqui:\n%s\n\nSi no reconoces este registro, ignora este correo.",
+			$mail_result = $this->send_owner_activation_email(
+				$owner_email,
 				$subject,
-				$user->user_login,
-				$temp_password_plain,
 				$reset_url
 			);
+
+			if ( is_wp_error( $mail_result ) ) {
+				if ( $is_xhr ) {
+					wp_send_json_error(
+						array(
+							'message' => $mail_result->get_error_message(),
+						)
+					);
+				}
+
+				wp_safe_redirect( $redirect_to );
+				exit;
+			}
+
 			update_user_meta( (int) $user->ID, 'af_owner_account_status', 'inactive' );
-			wp_mail( $owner_email, $mail_subject, $mail_body );
 
 			if ( $is_xhr ) {
 				wp_send_json_success(
@@ -405,6 +415,57 @@ class Arriendo_Facil_Owner_Contact {
 		}
 
 		return $user;
+	}
+
+	/**
+	 * Sends the activation email with retries and HTML formatting.
+	 *
+	 * @param string $owner_email Owner email address.
+	 * @param string $owner_name  Owner display name.
+	 * @param string $reset_url   One-time password reset URL.
+	 * @return true|WP_Error
+	 */
+	private function send_owner_activation_email( $owner_email, $owner_name, $reset_url ) {
+		$mail_subject = __( 'Activa tu cuenta en Arriendo Facil', 'arriendo-facil' );
+
+		$safe_name     = esc_html( $owner_name );
+		$safe_email    = esc_html( $owner_email );
+		$safe_reset    = esc_url( $reset_url );
+
+		$mail_body =
+			'<div style="font-family:Arial,Helvetica,sans-serif;line-height:1.6;color:#111;max-width:640px">'
+			. '<p>Hola ' . $safe_name . ',</p>'
+			. '<p>Te damos la bienvenida a Arriendo Facil.</p>'
+			. '<p>Hemos creado tu cuenta exitosamente. Para comenzar a utilizar el sistema, es necesario que actives tu cuenta y establezcas tu contrasena.</p>'
+			. '<p><strong>Usuario:</strong> ' . $safe_email . '</p>'
+			. '<p>Por favor, haz clic en el siguiente enlace:</p>'
+			. '<p><a href="' . $safe_reset . '" style="display:inline-block;background:#0f766e;color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:700">Activar mi cuenta</a></p>'
+			. '<p>Si el boton no funciona, copia y pega este enlace en tu navegador:<br><a href="' . $safe_reset . '">' . $safe_reset . '</a></p>'
+			. '<p>Por seguridad, este enlace es de uso unico y puede tener un tiempo de expiracion.</p>'
+			. '<p>Si no solicitaste la creacion de esta cuenta, puedes ignorar este mensaje sin ningun problema.</p>'
+			. '<p>Saludos cordiales,<br>Equipo de Arriendo Facil</p>'
+			. '</div>';
+
+		$headers = array( 'Content-Type: text/html; charset=UTF-8' );
+
+		$max_attempts = 3;
+		for ( $attempt = 1; $attempt <= $max_attempts; $attempt++ ) {
+			$sent = wp_mail( $owner_email, $mail_subject, $mail_body, $headers );
+			if ( true === $sent ) {
+				return true;
+			}
+
+			if ( $attempt < $max_attempts ) {
+				sleep( 1 );
+			}
+		}
+
+		error_log( sprintf( 'Arriendo Facil: failed to send owner activation email to %s after %d attempts.', $owner_email, $max_attempts ) );
+
+		return new WP_Error(
+			'af_owner_email_failed',
+			__( 'No se pudo enviar el correo de activacion. Intenta nuevamente en unos segundos.', 'arriendo-facil' )
+		);
 	}
 
 	private function find_owner_email_by_document( $type, $value ) {

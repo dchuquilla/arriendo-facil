@@ -71,9 +71,56 @@ $message = isset( $_GET['af_message'] ) ? sanitize_text_field( wp_unslash( $_GET
 										<th scope="row"><label for="af_owner_email"><?php esc_html_e( 'Owner Email*', 'arriendo-facil' ); ?></label></th>
 										<td>
 												<input type="email" required id="af_owner_email" name="owner_email" class="regular-text" autocomplete="email" />
-												<p class="description"><?php esc_html_e( 'Temporary credentials will be sent to this email.', 'arriendo-facil' ); ?></p>
+                                                <p class="description"><?php esc_html_e( 'Activation instructions will be sent only to this email.', 'arriendo-facil' ); ?></p>
 										</td>
 								</tr>
+                                <tr>
+                                    <th scope="row"><?php esc_html_e( 'Has Legal Agent?', 'arriendo-facil' ); ?></th>
+                                    <td>
+                                        <fieldset>
+                                            <label style="margin-right:16px;">
+                                                <input type="radio" name="has_legal_agent" value="0" checked />
+                                                <?php esc_html_e( 'No', 'arriendo-facil' ); ?>
+                                            </label>
+                                            <label>
+                                                <input type="radio" name="has_legal_agent" value="1" />
+                                                <?php esc_html_e( 'Yes', 'arriendo-facil' ); ?>
+                                            </label>
+                                        </fieldset>
+                                    </td>
+                                </tr>
+                                <tr id="af-legal-agent-fields" style="display:none;">
+                                    <th scope="row"><?php esc_html_e( 'Legal Agent Details', 'arriendo-facil' ); ?></th>
+                                    <td>
+                                        <p>
+                                            <label for="af_legal_agent_name"><?php esc_html_e( 'Name', 'arriendo-facil' ); ?></label><br />
+                                            <input type="text" id="af_legal_agent_name" name="legal_agent_name" class="regular-text" />
+                                        </p>
+                                        <p>
+                                            <label for="af_legal_agent_id_type"><?php esc_html_e( 'ID Type', 'arriendo-facil' ); ?></label><br />
+                                            <select id="af_legal_agent_id_type" name="legal_agent_id_type">
+                                                <option value="cedula"><?php esc_html_e( 'Cedula', 'arriendo-facil' ); ?></option>
+                                                <option value="ruc"><?php esc_html_e( 'RUC', 'arriendo-facil' ); ?></option>
+                                                <option value="pasaporte"><?php esc_html_e( 'Pasaporte', 'arriendo-facil' ); ?></option>
+                                            </select>
+                                        </p>
+                                        <p>
+                                            <label for="af_legal_agent_id"><?php esc_html_e( 'ID Number', 'arriendo-facil' ); ?></label><br />
+                                            <input type="text" id="af_legal_agent_id" name="legal_agent_id" class="regular-text" />
+                                        </p>
+                                        <p>
+                                            <label for="af_legal_agent_phone"><?php esc_html_e( 'Phone', 'arriendo-facil' ); ?></label><br />
+                                            <input type="text" id="af_legal_agent_phone" name="legal_agent_phone" class="regular-text" autocomplete="tel" inputmode="numeric" pattern="^[0-9]+$" title="Use only numbers" />
+                                        </p>
+                                        <p>
+                                            <label for="af_legal_agent_email"><?php esc_html_e( 'Email', 'arriendo-facil' ); ?></label><br />
+                                            <input type="email" id="af_legal_agent_email" name="legal_agent_email" class="regular-text" autocomplete="email" />
+                                            <span class="description" style="display:block;margin-top:6px;">
+                                                <?php esc_html_e( 'No activation email is sent to the legal agent.', 'arriendo-facil' ); ?>
+                                            </span>
+                                        </p>
+                                    </td>
+                                </tr>
                 <tr>
                     <th scope="row"><label for="af_subject"><?php esc_html_e( 'Client Name*', 'arriendo-facil' ); ?></label></th>
                     <td><input type="text" required id="af_subject" name="subject" class="regular-text" /></td>
@@ -103,6 +150,8 @@ $message = isset( $_GET['af_message'] ) ? sanitize_text_field( wp_unslash( $_GET
 				<th><?php esc_html_e( 'Owner Email', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Client Name', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Contract Parameter Details', 'arriendo-facil' ); ?></th>
+                <th><?php esc_html_e( 'Legal Agent', 'arriendo-facil' ); ?></th>
+                <th><?php esc_html_e( 'Legal Agent Details', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Status', 'arriendo-facil' ); ?></th>
                 <th><?php esc_html_e( 'Account Status', 'arriendo-facil' ); ?></th>
                 <th><?php esc_html_e( 'Actions', 'arriendo-facil' ); ?></th>
@@ -128,6 +177,22 @@ $message = isset( $_GET['af_message'] ) ? sanitize_text_field( wp_unslash( $_GET
 						<td><?php echo esc_html( $contact->owner_email ); ?></td>
 						<td><?php echo esc_html( $contact->subject ); ?></td>
 						<td><?php echo esc_html( wp_trim_words( $contact->message, 15 ) ); ?></td>
+                        <td><?php echo ! empty( $contact->has_legal_agent ) ? esc_html__( 'Yes', 'arriendo-facil' ) : esc_html__( 'No', 'arriendo-facil' ); ?></td>
+                        <td>
+                            <?php
+                            if ( ! empty( $contact->has_legal_agent ) ) {
+                                echo esc_html( (string) $contact->legal_agent_name );
+                                echo '<br />';
+                                echo esc_html( strtoupper( (string) $contact->legal_agent_id_type ) . ': ' . (string) $contact->legal_agent_id );
+                                echo '<br />';
+                                echo esc_html( (string) $contact->legal_agent_phone );
+                                echo '<br />';
+                                echo esc_html( (string) $contact->legal_agent_email );
+                            } else {
+                                echo '-';
+                            }
+                            ?>
+                        </td>
                         <td class="af-contact-status"><?php echo esc_html( $contact->status ); ?></td>
                         <td class="af-account-status"><?php echo esc_html( $account_status ? $account_status : 'n/a' ); ?></td>
                         <td class="af-account-actions">
@@ -149,7 +214,7 @@ $message = isset( $_GET['af_message'] ) ? sanitize_text_field( wp_unslash( $_GET
 				<?php endforeach; ?>
 			<?php else : ?>
 				<tr>
-                    <td colspan="10"><?php esc_html_e( 'No contacts found.', 'arriendo-facil' ); ?></td>
+                    <td colspan="12"><?php esc_html_e( 'No contacts found.', 'arriendo-facil' ); ?></td>
 				</tr>
 			<?php endif; ?>
 		</tbody>
@@ -160,6 +225,13 @@ $message = isset( $_GET['af_message'] ) ? sanitize_text_field( wp_unslash( $_GET
 ( function () {
     var typeEl = document.getElementById( 'af_owner_id_type' );
     var idEl = document.getElementById( 'af_owner_id' );
+    var legalTypeEl = document.getElementById( 'af_legal_agent_id_type' );
+    var legalIdEl = document.getElementById( 'af_legal_agent_id' );
+    var legalFieldsEl = document.getElementById( 'af-legal-agent-fields' );
+    var legalNameEl = document.getElementById( 'af_legal_agent_name' );
+    var legalPhoneEl = document.getElementById( 'af_legal_agent_phone' );
+    var legalEmailEl = document.getElementById( 'af_legal_agent_email' );
+    var legalAgentRadios = document.querySelectorAll( 'input[name="has_legal_agent"]' );
     var formEl = document.getElementById( 'af-owner-contact-form' );
 
     if ( ! typeEl || ! idEl ) {
@@ -197,15 +269,146 @@ $message = isset( $_GET['af_message'] ) ? sanitize_text_field( wp_unslash( $_GET
         enforceUppercase();
     }
 
+                function enforceLegalUppercase() {
+                    if ( legalIdEl ) {
+                        legalIdEl.value = legalIdEl.value.toUpperCase();
+                    }
+                }
+
+                function applyLegalIdRules() {
+                    if ( ! legalTypeEl || ! legalIdEl ) {
+                        return;
+                    }
+
+                    legalIdEl.removeEventListener( 'input', enforceLegalUppercase );
+
+                    if ( legalTypeEl.value === 'cedula' ) {
+                        legalIdEl.setAttribute( 'pattern', '^[0-9]{10}$' );
+                        legalIdEl.setAttribute( 'minlength', '10' );
+                        legalIdEl.setAttribute( 'maxlength', '10' );
+                        legalIdEl.setAttribute( 'title', 'Cedula: exactamente 10 digitos numericos' );
+                        return;
+                    }
+
+                    if ( legalTypeEl.value === 'ruc' ) {
+                        legalIdEl.setAttribute( 'pattern', '^[0-9]{13}$' );
+                        legalIdEl.setAttribute( 'minlength', '13' );
+                        legalIdEl.setAttribute( 'maxlength', '13' );
+                        legalIdEl.setAttribute( 'title', 'RUC: exactamente 13 digitos numericos' );
+                        return;
+                    }
+
+                    legalIdEl.setAttribute( 'pattern', '^[A-Za-z0-9]{6,15}$' );
+                    legalIdEl.setAttribute( 'minlength', '6' );
+                    legalIdEl.setAttribute( 'maxlength', '15' );
+                    legalIdEl.setAttribute( 'title', 'Pasaporte: alfanumerico de 6 a 15 caracteres' );
+                    legalIdEl.addEventListener( 'input', enforceLegalUppercase );
+                    enforceLegalUppercase();
+                }
+
+                function hasLegalAgentSelected() {
+                    for ( var i = 0; i < legalAgentRadios.length; i++ ) {
+                        if ( legalAgentRadios[ i ].checked && legalAgentRadios[ i ].value === '1' ) {
+                            return true;
+                        }
+                    }
+
+                    return false;
+                }
+
+                function setLegalRequired( required ) {
+                    if ( legalNameEl ) {
+                        legalNameEl.required = required;
+                    }
+                    if ( legalTypeEl ) {
+                        legalTypeEl.required = required;
+                    }
+                    if ( legalIdEl ) {
+                        legalIdEl.required = required;
+                    }
+                    if ( legalPhoneEl ) {
+                        legalPhoneEl.required = required;
+                    }
+                    if ( legalEmailEl ) {
+                        legalEmailEl.required = required;
+                    }
+                }
+
+                function clearLegalFields() {
+                    if ( legalNameEl ) {
+                        legalNameEl.value = '';
+                    }
+                    if ( legalTypeEl ) {
+                        legalTypeEl.value = 'cedula';
+                    }
+                    if ( legalIdEl ) {
+                        legalIdEl.value = '';
+                    }
+                    if ( legalPhoneEl ) {
+                        legalPhoneEl.value = '';
+                    }
+                    if ( legalEmailEl ) {
+                        legalEmailEl.value = '';
+                    }
+                    applyLegalIdRules();
+                }
+
+                function enforceLegalPhoneNumeric() {
+                    if ( legalPhoneEl ) {
+                        legalPhoneEl.value = legalPhoneEl.value.replace( /[^0-9]/g, '' );
+                    }
+                }
+
+                function toggleLegalAgentFields() {
+                    if ( ! legalFieldsEl ) {
+                        return;
+                    }
+
+                    if ( hasLegalAgentSelected() ) {
+                        legalFieldsEl.style.display = '';
+                        setLegalRequired( true );
+                        applyLegalIdRules();
+                        return;
+                    }
+
+                    legalFieldsEl.style.display = 'none';
+                    setLegalRequired( false );
+                    clearLegalFields();
+                }
+
     typeEl.addEventListener( 'change', function () {
         idEl.value = '';
         applyRules();
     } );
 
+        if ( legalTypeEl ) {
+            legalTypeEl.addEventListener( 'change', function () {
+                if ( legalIdEl ) {
+                    legalIdEl.value = '';
+                }
+                applyLegalIdRules();
+            } );
+        }
+
+        if ( legalPhoneEl ) {
+            legalPhoneEl.addEventListener( 'input', enforceLegalPhoneNumeric );
+        }
+
+        for ( var i = 0; i < legalAgentRadios.length; i++ ) {
+            legalAgentRadios[ i ].addEventListener( 'change', toggleLegalAgentFields );
+        }
+
     if ( formEl ) {
-        formEl.addEventListener( 'submit', applyRules );
+                formEl.addEventListener( 'submit', function () {
+                    applyRules();
+                    toggleLegalAgentFields();
+                    if ( hasLegalAgentSelected() ) {
+                        applyLegalIdRules();
+                    }
+                } );
     }
 
     applyRules();
+        toggleLegalAgentFields();
 } )();
 </script>

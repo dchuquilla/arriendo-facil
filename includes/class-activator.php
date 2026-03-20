@@ -61,6 +61,12 @@ class Arriendo_Facil_Activator {
 				owner_id_type VARCHAR(20) NOT NULL DEFAULT 'cedula',
 				owner_id    VARCHAR(15) NOT NULL,
 				owner_email VARCHAR(190) NOT NULL,
+				has_legal_agent TINYINT(1) NOT NULL DEFAULT 0,
+				legal_agent_name VARCHAR(190) DEFAULT NULL,
+				legal_agent_id_type VARCHAR(20) DEFAULT NULL,
+				legal_agent_id VARCHAR(15) DEFAULT NULL,
+				legal_agent_phone VARCHAR(50) DEFAULT NULL,
+				legal_agent_email VARCHAR(190) DEFAULT NULL,
 				wp_user_id  BIGINT UNSIGNED DEFAULT NULL,
 				temp_password_hash VARCHAR(255) DEFAULT NULL,
 				subject     VARCHAR(255) NOT NULL,
@@ -186,6 +192,126 @@ class Arriendo_Facil_Activator {
 			);
 		}
 
+		$has_legal_agent_exists = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				 FROM INFORMATION_SCHEMA.COLUMNS
+				 WHERE TABLE_SCHEMA = %s
+				   AND TABLE_NAME = %s
+				   AND COLUMN_NAME = %s",
+				DB_NAME,
+				$owner_contacts_table,
+				'has_legal_agent'
+			)
+		);
+
+		if ( ! $has_legal_agent_exists ) {
+			$wpdb->query(
+				"ALTER TABLE {$owner_contacts_table}
+				 ADD COLUMN has_legal_agent TINYINT(1) NOT NULL DEFAULT 0 AFTER owner_email"
+			);
+		}
+
+		$legal_agent_name_exists = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				 FROM INFORMATION_SCHEMA.COLUMNS
+				 WHERE TABLE_SCHEMA = %s
+				   AND TABLE_NAME = %s
+				   AND COLUMN_NAME = %s",
+				DB_NAME,
+				$owner_contacts_table,
+				'legal_agent_name'
+			)
+		);
+
+		if ( ! $legal_agent_name_exists ) {
+			$wpdb->query(
+				"ALTER TABLE {$owner_contacts_table}
+				 ADD COLUMN legal_agent_name VARCHAR(190) DEFAULT NULL AFTER has_legal_agent"
+			);
+		}
+
+		$legal_agent_id_type_exists = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				 FROM INFORMATION_SCHEMA.COLUMNS
+				 WHERE TABLE_SCHEMA = %s
+				   AND TABLE_NAME = %s
+				   AND COLUMN_NAME = %s",
+				DB_NAME,
+				$owner_contacts_table,
+				'legal_agent_id_type'
+			)
+		);
+
+		if ( ! $legal_agent_id_type_exists ) {
+			$wpdb->query(
+				"ALTER TABLE {$owner_contacts_table}
+				 ADD COLUMN legal_agent_id_type VARCHAR(20) DEFAULT NULL AFTER legal_agent_name"
+			);
+		}
+
+		$legal_agent_id_exists = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				 FROM INFORMATION_SCHEMA.COLUMNS
+				 WHERE TABLE_SCHEMA = %s
+				   AND TABLE_NAME = %s
+				   AND COLUMN_NAME = %s",
+				DB_NAME,
+				$owner_contacts_table,
+				'legal_agent_id'
+			)
+		);
+
+		if ( ! $legal_agent_id_exists ) {
+			$wpdb->query(
+				"ALTER TABLE {$owner_contacts_table}
+				 ADD COLUMN legal_agent_id VARCHAR(15) DEFAULT NULL AFTER legal_agent_id_type"
+			);
+		}
+
+		$legal_agent_phone_exists = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				 FROM INFORMATION_SCHEMA.COLUMNS
+				 WHERE TABLE_SCHEMA = %s
+				   AND TABLE_NAME = %s
+				   AND COLUMN_NAME = %s",
+				DB_NAME,
+				$owner_contacts_table,
+				'legal_agent_phone'
+			)
+		);
+
+		if ( ! $legal_agent_phone_exists ) {
+			$wpdb->query(
+				"ALTER TABLE {$owner_contacts_table}
+				 ADD COLUMN legal_agent_phone VARCHAR(50) DEFAULT NULL AFTER legal_agent_id"
+			);
+		}
+
+		$legal_agent_email_exists = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				 FROM INFORMATION_SCHEMA.COLUMNS
+				 WHERE TABLE_SCHEMA = %s
+				   AND TABLE_NAME = %s
+				   AND COLUMN_NAME = %s",
+				DB_NAME,
+				$owner_contacts_table,
+				'legal_agent_email'
+			)
+		);
+
+		if ( ! $legal_agent_email_exists ) {
+			$wpdb->query(
+				"ALTER TABLE {$owner_contacts_table}
+				 ADD COLUMN legal_agent_email VARCHAR(190) DEFAULT NULL AFTER legal_agent_phone"
+			);
+		}
+
 		$owner_id_type = $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT DATA_TYPE
@@ -241,6 +367,7 @@ class Arriendo_Facil_Activator {
 		}
 
 		add_option( 'arriendo_facil_version', ARRIENDO_FACIL_VERSION );
+		update_option( 'arriendo_facil_version', ARRIENDO_FACIL_VERSION );
 		flush_rewrite_rules();
 	}
 

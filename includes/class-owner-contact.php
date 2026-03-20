@@ -50,6 +50,17 @@ class Arriendo_Facil_Owner_Contact {
 		$owner_id_raw  = isset( $_POST['owner_id'] ) ? sanitize_text_field( wp_unslash( $_POST['owner_id'] ) ) : '';
 		$owner_id      = $this->normalize_owner_document( $owner_id_type, $owner_id_raw );
 		$owner_email   = isset( $_POST['owner_email'] ) ? sanitize_email( wp_unslash( $_POST['owner_email'] ) ) : '';
+		$has_legal_agent = isset( $_POST['has_legal_agent'] ) && '1' === wp_unslash( $_POST['has_legal_agent'] ) ? 1 : 0;
+
+		$legal_agent_name_raw    = isset( $_POST['legal_agent_name'] ) ? sanitize_text_field( wp_unslash( $_POST['legal_agent_name'] ) ) : '';
+		$legal_agent_id_type     = isset( $_POST['legal_agent_id_type'] ) ? sanitize_key( wp_unslash( $_POST['legal_agent_id_type'] ) ) : '';
+		$legal_agent_id_raw      = isset( $_POST['legal_agent_id'] ) ? sanitize_text_field( wp_unslash( $_POST['legal_agent_id'] ) ) : '';
+		$legal_agent_phone_raw   = isset( $_POST['legal_agent_phone'] ) ? sanitize_text_field( wp_unslash( $_POST['legal_agent_phone'] ) ) : '';
+		$legal_agent_email_raw   = isset( $_POST['legal_agent_email'] ) ? sanitize_email( wp_unslash( $_POST['legal_agent_email'] ) ) : '';
+		$legal_agent_name        = trim( $legal_agent_name_raw );
+		$legal_agent_id          = $this->normalize_owner_document( $legal_agent_id_type, $legal_agent_id_raw );
+		$legal_agent_phone       = preg_replace( '/\D+/', '', trim( $legal_agent_phone_raw ) );
+		$legal_agent_email       = trim( $legal_agent_email_raw );
 
 		$subject = isset( $_POST['subject'] ) ? sanitize_text_field( wp_unslash( $_POST['subject'] ) ) : '';
 		$message = isset( $_POST['message'] ) ? sanitize_textarea_field( wp_unslash( $_POST['message'] ) ) : '';
@@ -60,6 +71,32 @@ class Arriendo_Facil_Owner_Contact {
 			}
 			wp_safe_redirect( $redirect_to );
 			exit;
+		}
+
+		if ( $has_legal_agent ) {
+			$is_numeric_phone = '' !== $legal_agent_phone && 1 === preg_match( '/^[0-9]+$/', $legal_agent_phone );
+
+			$legal_agent_data_valid =
+				$legal_agent_name
+				&& in_array( $legal_agent_id_type, array( 'cedula', 'ruc', 'pasaporte' ), true )
+				&& $this->is_valid_owner_document( $legal_agent_id_type, $legal_agent_id )
+				&& $is_numeric_phone
+				&& is_email( $legal_agent_email );
+
+			if ( ! $legal_agent_data_valid ) {
+				if ( $is_xhr ) {
+					wp_send_json_error( array( 'message' => __( 'Invalid legal agent data.', 'arriendo-facil' ) ) );
+				}
+
+				wp_safe_redirect( $redirect_to );
+				exit;
+			}
+		} else {
+			$legal_agent_name    = '';
+			$legal_agent_id_type = '';
+			$legal_agent_id      = '';
+			$legal_agent_phone   = '';
+			$legal_agent_email   = '';
 		}
  /** User WordPress */
 		$user               = get_user_by( 'email', $owner_email );
@@ -139,6 +176,12 @@ class Arriendo_Facil_Owner_Contact {
 			'owner_id_type'      => $owner_id_type,
 			'owner_id'           => $owner_id,
 			'owner_email'        => $owner_email,
+			'has_legal_agent'    => $has_legal_agent,
+			'legal_agent_name'   => $legal_agent_name,
+			'legal_agent_id_type'=> $legal_agent_id_type,
+			'legal_agent_id'     => $legal_agent_id,
+			'legal_agent_phone'  => $legal_agent_phone,
+			'legal_agent_email'  => $legal_agent_email,
 			'wp_user_id'         => (int) $user->ID,
 			'temp_password_hash' => wp_hash_password( $temp_password_plain ),
 			'subject'            => $subject,
@@ -146,7 +189,7 @@ class Arriendo_Facil_Owner_Contact {
 			'status'             => 'unread',
 		);
 
-		$owner_formats = array( '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s' );
+		$owner_formats = array( '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s' );
 
 		if ( $existing_contact_id > 0 ) {
 			$inserted = $wpdb->update(

@@ -229,11 +229,25 @@ class Arriendo_Facil_Owner_Contact {
 
 			update_user_meta( (int) $user->ID, 'af_owner_account_status', 'inactive' );
 
+			$contact_id = $existing_contact_id > 0 ? $existing_contact_id : (int) $wpdb->insert_id;
+			$contact    = $wpdb->get_row(
+				$wpdb->prepare(
+					"SELECT *
+					 FROM {$wpdb->prefix}af_owner_contacts
+					 WHERE id = %d
+					 LIMIT 1",
+					$contact_id
+				),
+				ARRAY_A
+			);
+
 			if ( $is_xhr ) {
 				wp_send_json_success(
 					array(
-						'id'          => $existing_contact_id > 0 ? $existing_contact_id : $wpdb->insert_id,
+						'id'          => $contact_id,
 						'redirect_to' => $redirect_to,
+						'contact'     => $contact,
+						'account_status' => 'inactive',
 					)
 				);
 			}

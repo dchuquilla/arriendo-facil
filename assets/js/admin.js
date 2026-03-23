@@ -160,6 +160,7 @@
             .done( function ( response ) {
                 if ( response && response.success ) {
                     if ( isNewMode && formEl ) {
+						refreshOwnerContactsTable();
 						formEl.reset();
 
 						if ( idEl ) {
@@ -223,6 +224,24 @@
 		if ( cardEl ) {
 			cardEl.insertBefore( noticeEl, formEl );
 		}
+	}
+
+	// Refresh only owner contacts table body from server-rendered HTML.
+	function refreshOwnerContactsTable() {
+		var $tableBody = $( '.wp-list-table.widefat.fixed.striped tbody' ).first();
+		if ( ! $tableBody.length ) {
+			return;
+		}
+
+		$.get( window.location.href )
+			.done( function ( html ) {
+				var $doc = $( '<div></div>' ).append( $.parseHTML( html ) );
+				var $newBody = $doc.find( '.wp-list-table.widefat.fixed.striped tbody' ).first();
+
+				if ( $newBody.length ) {
+					$tableBody.html( $newBody.html() );
+				}
+			} );
 	}
 
 	// Disable owner account from owner contacts table.

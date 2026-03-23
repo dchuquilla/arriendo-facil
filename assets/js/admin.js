@@ -492,7 +492,7 @@
 		toggleLegalAgentFields();
     }
 
-	// Show legal agent details in modal (owner contacts table).
+	// Show owner and legal-agent details in modal (owner contacts table).
 	function initLegalAgentModal() {
 		var modalEl = document.getElementById( 'af-legal-agent-modal' );
 
@@ -500,10 +500,14 @@
 			return;
 		}
 
-		var nameEl = modalEl.querySelector( '[data-af-field="name"]' );
-		var idEl = modalEl.querySelector( '[data-af-field="id"]' );
-		var phoneEl = modalEl.querySelector( '[data-af-field="phone"]' );
-		var emailEl = modalEl.querySelector( '[data-af-field="email"]' );
+		var ownerNameEl = modalEl.querySelector( '[data-af-field="owner-name"]' );
+		var ownerIdEl = modalEl.querySelector( '[data-af-field="owner-id"]' );
+		var ownerEmailEl = modalEl.querySelector( '[data-af-field="owner-email"]' );
+		var legalSectionEl = modalEl.querySelector( '[data-af-legal-agent-section]' );
+		var legalNameEl = modalEl.querySelector( '[data-af-field="legal-name"]' );
+		var legalIdEl = modalEl.querySelector( '[data-af-field="legal-id"]' );
+		var legalPhoneEl = modalEl.querySelector( '[data-af-field="legal-phone"]' );
+		var legalEmailEl = modalEl.querySelector( '[data-af-field="legal-email"]' );
 
 		// Normalize empty values to a fallback for modal display.
 		function safeText( value ) {
@@ -511,15 +515,26 @@
 			return text || '-';
 		}
 
-		// Fill and open legal-agent modal using clicked button dataset.
+		// Fill and open owner-details modal using clicked button dataset.
 		function openModal( triggerEl ) {
-			var idType = safeText( triggerEl.getAttribute( 'data-legal-agent-id-type' ) );
-			var idNumber = safeText( triggerEl.getAttribute( 'data-legal-agent-id' ) );
+			var ownerIdType = safeText( triggerEl.getAttribute( 'data-owner-id-type' ) );
+			var ownerIdNumber = safeText( triggerEl.getAttribute( 'data-owner-id' ) );
+			var hasLegalAgent = triggerEl.getAttribute( 'data-has-legal-agent' ) === '1';
 
-			nameEl.textContent = safeText( triggerEl.getAttribute( 'data-legal-agent-name' ) );
-			idEl.textContent = idType + ': ' + idNumber;
-			phoneEl.textContent = safeText( triggerEl.getAttribute( 'data-legal-agent-phone' ) );
-			emailEl.textContent = safeText( triggerEl.getAttribute( 'data-legal-agent-email' ) );
+			ownerNameEl.textContent = safeText( triggerEl.getAttribute( 'data-owner-name' ) );
+			ownerIdEl.textContent = ownerIdType + ': ' + ownerIdNumber;
+			ownerEmailEl.textContent = safeText( triggerEl.getAttribute( 'data-owner-email' ) );
+
+			if ( legalSectionEl ) {
+				legalSectionEl.style.display = hasLegalAgent ? '' : 'none';
+			}
+
+			if ( hasLegalAgent ) {
+				legalNameEl.textContent = safeText( triggerEl.getAttribute( 'data-legal-agent-name' ) );
+				legalIdEl.textContent = safeText( triggerEl.getAttribute( 'data-legal-agent-id-type' ) ) + ': ' + safeText( triggerEl.getAttribute( 'data-legal-agent-id' ) );
+				legalPhoneEl.textContent = safeText( triggerEl.getAttribute( 'data-legal-agent-phone' ) );
+				legalEmailEl.textContent = safeText( triggerEl.getAttribute( 'data-legal-agent-email' ) );
+			}
 
 			modalEl.hidden = false;
 			document.body.classList.add( 'af-modal-open' );
@@ -531,7 +546,7 @@
 			document.body.classList.remove( 'af-modal-open' );
 		}
 
-		$( document ).on( 'click', '.af-open-legal-agent-modal', function () {
+		$( document ).on( 'click', '.af-open-owner-details-modal', function () {
 			openModal( this );
 		} );
 

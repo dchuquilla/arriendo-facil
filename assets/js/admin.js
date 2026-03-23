@@ -134,6 +134,7 @@
 	function submitOwnerContactForm( $form, $submit ) {
         var formEl = $form.get( 0 );
         var idEl = document.getElementById( 'af_owner_id' );
+		var formData;
 		var params = new URLSearchParams( window.location.search );
 		var isNewMode = params.get( 'action' ) === 'new';
         if ( ! validateOwnerDocumentField() ) {
@@ -151,11 +152,15 @@
 
         $submit.prop( 'disabled', true );
 
+		formData = new FormData( formEl );
+
         $.ajax( {
             url: afAdmin.ajaxUrl,
             method: 'POST',
             dataType: 'json',
-            data: $form.serialize(),
+			data: formData,
+			processData: false,
+			contentType: false,
         } )
             .done( function ( response ) {
                 if ( response && response.success ) {

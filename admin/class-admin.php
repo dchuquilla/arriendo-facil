@@ -102,18 +102,24 @@ class Arriendo_Facil_Admin {
 	 * @param string $hook Current admin page hook.
 	 */
 	public function enqueue_assets( $hook ) {
+		$admin_css_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/admin.css';
+		$admin_js_path  = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/admin.js';
+
+		$admin_css_version = file_exists( $admin_css_path ) ? (string) filemtime( $admin_css_path ) : ARRIENDO_FACIL_VERSION;
+		$admin_js_version  = file_exists( $admin_js_path ) ? (string) filemtime( $admin_js_path ) : ARRIENDO_FACIL_VERSION;
+
 		wp_enqueue_style(
 			'af-admin',
 			ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/admin.css',
 			array(),
-			ARRIENDO_FACIL_VERSION
+			$admin_css_version
 		);
 
 		wp_enqueue_script(
 			'af-admin',
 			ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/admin.js',
 			array( 'jquery' ),
-			ARRIENDO_FACIL_VERSION,
+			$admin_js_version,
 			true
 		);
 

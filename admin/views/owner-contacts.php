@@ -126,7 +126,7 @@ $message = isset( $_GET['af_message'] ) ? sanitize_text_field( wp_unslash( $_GET
                     <td><input type="text" required id="af_subject" name="subject" class="regular-text" /></td>
                 </tr>
                 <tr>
-                    <th scope="row"><label for="af_message"><?php esc_html_e( 'Contract Parameter Details*', 'arriendo-facil' ); ?></label></th>
+                    <th scope="row"><label for="af_message"><?php esc_html_e( 'Observations*', 'arriendo-facil' ); ?></label></th>
                     <td><textarea required id="af_message" name="message" rows="5" class="large-text"></textarea></td>
                 </tr>
             </table>
@@ -147,15 +147,10 @@ $message = isset( $_GET['af_message'] ) ? sanitize_text_field( wp_unslash( $_GET
 				<th><?php esc_html_e( 'ID', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Document Type', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Owner ID', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Owner Email', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Client Name', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Contract Parameter Details', 'arriendo-facil' ); ?></th>
+                <th><?php esc_html_e( 'Observations', 'arriendo-facil' ); ?></th>
                 <th><?php esc_html_e( 'Legal Agent', 'arriendo-facil' ); ?></th>
-                <th><?php esc_html_e( 'Details', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Status', 'arriendo-facil' ); ?></th>
-                <th><?php esc_html_e( 'Account Status', 'arriendo-facil' ); ?></th>
                 <th><?php esc_html_e( 'Actions', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Date', 'arriendo-facil' ); ?></th>
 			</tr>
 		</thead>
 		<tbody>
@@ -174,34 +169,26 @@ $message = isset( $_GET['af_message'] ) ? sanitize_text_field( wp_unslash( $_GET
 						<td><?php echo esc_html( $contact->id ); ?></td>
 						<td><?php echo esc_html( $contact->owner_id_type ); ?></td>
 						<td><?php echo esc_html( $contact->owner_id ); ?></td>
-						<td><?php echo esc_html( $contact->owner_email ); ?></td>
 						<td><?php echo esc_html( $contact->subject ); ?></td>
 						<td><?php echo esc_html( wp_trim_words( $contact->message, 15 ) ); ?></td>
                         <td><?php echo ! empty( $contact->has_legal_agent ) ? esc_html__( 'Yes', 'arriendo-facil' ) : esc_html__( 'No', 'arriendo-facil' ); ?></td>
-                        <td>
-                            <?php
-                            if ( ! empty( $contact->has_legal_agent ) ) {
-                                ?>
-                                <button
-                                    type="button"
-                                    class="button button-secondary af-open-legal-agent-modal"
-                                    data-legal-agent-name="<?php echo esc_attr( (string) $contact->legal_agent_name ); ?>"
-                                    data-legal-agent-id-type="<?php echo esc_attr( strtoupper( (string) $contact->legal_agent_id_type ) ); ?>"
-                                    data-legal-agent-id="<?php echo esc_attr( (string) $contact->legal_agent_id ); ?>"
-                                    data-legal-agent-phone="<?php echo esc_attr( (string) $contact->legal_agent_phone ); ?>"
-                                    data-legal-agent-email="<?php echo esc_attr( (string) $contact->legal_agent_email ); ?>"
-                                >
-                                    <?php esc_html_e( 'More Details', 'arriendo-facil' ); ?>
-                                </button>
-                                <?php
-                            } else {
-                                echo '-';
-                            }
-                            ?>
-                        </td>
-                        <td class="af-contact-status"><?php echo esc_html( $contact->status ); ?></td>
-                        <td class="af-account-status"><?php echo esc_html( $account_status ? $account_status : 'n/a' ); ?></td>
                         <td class="af-account-actions">
+                            <button
+                                type="button"
+                                class="button button-secondary af-open-owner-details-modal"
+                                data-owner-name="<?php echo esc_attr( (string) $contact->subject ); ?>"
+                                data-owner-id-type="<?php echo esc_attr( strtoupper( (string) $contact->owner_id_type ) ); ?>"
+                                data-owner-id="<?php echo esc_attr( (string) $contact->owner_id ); ?>"
+                                data-owner-email="<?php echo esc_attr( (string) $contact->owner_email ); ?>"
+                                data-has-legal-agent="<?php echo esc_attr( ! empty( $contact->has_legal_agent ) ? '1' : '0' ); ?>"
+                                data-legal-agent-name="<?php echo esc_attr( (string) $contact->legal_agent_name ); ?>"
+                                data-legal-agent-id-type="<?php echo esc_attr( strtoupper( (string) $contact->legal_agent_id_type ) ); ?>"
+                                data-legal-agent-id="<?php echo esc_attr( (string) $contact->legal_agent_id ); ?>"
+                                data-legal-agent-phone="<?php echo esc_attr( (string) $contact->legal_agent_phone ); ?>"
+                                data-legal-agent-email="<?php echo esc_attr( (string) $contact->legal_agent_email ); ?>"
+                            >
+                                <?php esc_html_e( 'Details', 'arriendo-facil' ); ?>
+                            </button>
                             <?php if ( ! empty( $contact->wp_user_id ) && 'active' === $account_status ) : ?>
                                 <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Disable this account? The user will no longer be able to log in.');" style="display:inline;">
                                     <input type="hidden" name="action" value="af_disable_owner_account" />
@@ -211,16 +198,13 @@ $message = isset( $_GET['af_message'] ) ? sanitize_text_field( wp_unslash( $_GET
                                         <?php esc_html_e( 'Disable Account', 'arriendo-facil' ); ?>
                                     </button>
                                 </form>
-                            <?php else : ?>
-                                <span class="description">-</span>
                             <?php endif; ?>
                         </td>
-						<td><?php echo esc_html( $contact->created_at ); ?></td>
 					</tr>
 				<?php endforeach; ?>
 			<?php else : ?>
 				<tr>
-                    <td colspan="12"><?php esc_html_e( 'No contacts found.', 'arriendo-facil' ); ?></td>
+                    <td colspan="7"><?php esc_html_e( 'No contacts found.', 'arriendo-facil' ); ?></td>
 				</tr>
 			<?php endif; ?>
 		</tbody>
@@ -230,14 +214,22 @@ $message = isset( $_GET['af_message'] ) ? sanitize_text_field( wp_unslash( $_GET
         <div class="af-modal__backdrop" data-af-close-modal="1"></div>
         <div class="af-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="af-legal-agent-modal-title">
             <div class="af-modal__header">
-                <h2 id="af-legal-agent-modal-title"><?php esc_html_e( 'Legal Agent Details', 'arriendo-facil' ); ?></h2>
+                <h2 id="af-legal-agent-modal-title"><?php esc_html_e( 'Owner Details', 'arriendo-facil' ); ?></h2>
                 <button type="button" class="button-link af-modal__close" data-af-close-modal="1" aria-label="<?php esc_attr_e( 'Close', 'arriendo-facil' ); ?>">&times;</button>
             </div>
             <div class="af-modal__body">
-                <p><strong><?php esc_html_e( 'Name', 'arriendo-facil' ); ?>:</strong> <span data-af-field="name">-</span></p>
-                <p><strong><?php esc_html_e( 'ID', 'arriendo-facil' ); ?>:</strong> <span data-af-field="id">-</span></p>
-                <p><strong><?php esc_html_e( 'Phone', 'arriendo-facil' ); ?>:</strong> <span data-af-field="phone">-</span></p>
-                <p><strong><?php esc_html_e( 'Email', 'arriendo-facil' ); ?>:</strong> <span data-af-field="email">-</span></p>
+                <h3><?php esc_html_e( 'Owner', 'arriendo-facil' ); ?></h3>
+                <p><strong><?php esc_html_e( 'Name', 'arriendo-facil' ); ?>:</strong> <span data-af-field="owner-name">-</span></p>
+                <p><strong><?php esc_html_e( 'ID', 'arriendo-facil' ); ?>:</strong> <span data-af-field="owner-id">-</span></p>
+                <p><strong><?php esc_html_e( 'Email', 'arriendo-facil' ); ?>:</strong> <span data-af-field="owner-email">-</span></p>
+
+                <div data-af-legal-agent-section>
+                    <h3><?php esc_html_e( 'Legal Agent', 'arriendo-facil' ); ?></h3>
+                    <p><strong><?php esc_html_e( 'Name', 'arriendo-facil' ); ?>:</strong> <span data-af-field="legal-name">-</span></p>
+                    <p><strong><?php esc_html_e( 'ID', 'arriendo-facil' ); ?>:</strong> <span data-af-field="legal-id">-</span></p>
+                    <p><strong><?php esc_html_e( 'Phone', 'arriendo-facil' ); ?>:</strong> <span data-af-field="legal-phone">-</span></p>
+                    <p><strong><?php esc_html_e( 'Email', 'arriendo-facil' ); ?>:</strong> <span data-af-field="legal-email">-</span></p>
+                </div>
             </div>
         </div>
     </div>

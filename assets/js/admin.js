@@ -130,9 +130,12 @@
         submitOwnerContactForm( $form, $submit );
     } );
 
-    function submitOwnerContactForm( $form, $submit ) {
+	// Submit owner contact data via AJAX and keep UX smooth in new-contact mode.
+	function submitOwnerContactForm( $form, $submit ) {
         var formEl = $form.get( 0 );
         var idEl = document.getElementById( 'af_owner_id' );
+		var params = new URLSearchParams( window.location.search );
+		var isNewMode = params.get( 'action' ) === 'new';
         if ( ! validateOwnerDocumentField() ) {
             if ( idEl ) {
                 idEl.reportValidity();
@@ -156,15 +159,37 @@
         } )
             .done( function ( response ) {
                 if ( response && response.success ) {
-                    var params = new URLSearchParams( window.location.search );
-                    var paged = params.get( 'paged' );
-                    var target = 'admin.php?page=af-owner-contacts';
+                    if ( isNewMode && formEl ) {
+						formEl.reset();
 
-                    if ( paged ) {
-                        target += '&paged=' + encodeURIComponent( paged );
-                    }
+						if ( idEl ) {
+							idEl.setCustomValidity( '' );
+						}
 
-                    window.location.href = target;
+						// Re-apply dynamic field rules after reset.
+						var ownerTypeEl = document.getElementById( 'af_owner_id_type' );
+						if ( ownerTypeEl ) {
+							ownerTypeEl.dispatchEvent( new Event( 'change' ) );
+						}
+
+						var legalNoRadio = document.querySelector( 'input[name="has_legal_agent"][value="0"]' );
+						if ( legalNoRadio ) {
+							legalNoRadio.checked = true;
+							legalNoRadio.dispatchEvent( new Event( 'change' ) );
+						}
+
+						showOwnerContactNotice( 'success', 'Owner registered successfully.' );
+						return;
+					}
+
+					var paged = params.get( 'paged' );
+					var target = 'admin.php?page=af-owner-contacts';
+
+					if ( paged ) {
+						target += '&paged=' + encodeURIComponent( paged );
+					}
+
+					window.location.href = target;
                 } else {
                     alert( response && response.data && response.data.message ? response.data.message : 'Error sending message.' );
                 }
@@ -176,6 +201,29 @@
                 $submit.prop( 'disabled', false );
             } );
     }
+
+	// Render a runtime notice above the owner contact form.
+	function showOwnerContactNotice( type, text ) {
+		var formEl = document.getElementById( 'af-owner-contact-form' );
+		if ( ! formEl ) {
+			return;
+		}
+
+		var existingNotice = document.getElementById( 'af-owner-contact-runtime-notice' );
+		if ( existingNotice ) {
+			existingNotice.parentNode.removeChild( existingNotice );
+		}
+
+		var noticeEl = document.createElement( 'div' );
+		noticeEl.id = 'af-owner-contact-runtime-notice';
+		noticeEl.className = 'notice is-dismissible ' + ( type === 'success' ? 'notice-success' : 'notice-error' );
+		noticeEl.innerHTML = '<p>' + text + '</p>';
+
+		var cardEl = formEl.closest( '.card' );
+		if ( cardEl ) {
+			cardEl.insertBefore( noticeEl, formEl );
+		}
+	}
 
 	// Disable owner account from owner contacts table.
 	$( document ).on( 'click', '.af-disable-owner', function () {
@@ -234,10 +282,12 @@
             return;
         }
 
-        function enforceUppercase() {
+		// Keep passport values uppercase while typing.
+		function enforceUppercase() {
             idEl.value = idEl.value.toUpperCase();
         }
 
+		// Apply HTML constraints according to selected owner document type.
         function applyRules() {
             idEl.removeEventListener( 'input', enforceUppercase );
 
@@ -265,12 +315,14 @@
 						enforceUppercase();
         }
 
+		// Keep legal-agent passport values uppercase while typing.
 		function enforceLegalUppercase() {
 			if ( legalIdEl ) {
 				legalIdEl.value = legalIdEl.value.toUpperCase();
 			}
 		}
 
+		// Apply HTML constraints according to selected legal-agent document type.
 		function applyLegalIdRules() {
 			if ( ! legalTypeEl || ! legalIdEl ) {
 				return;
@@ -302,6 +354,7 @@
 			enforceLegalUppercase();
 		}
 
+		// Check whether the user selected "Yes" for legal agent.
 		function hasLegalAgentSelected() {
 			var i;
 
@@ -314,6 +367,7 @@
 			return false;
 		}
 
+		// Toggle required attributes for legal-agent fields.
 		function setLegalRequired( required ) {
 			if ( legalNameEl ) {
 				legalNameEl.required = required;
@@ -332,6 +386,7 @@
 			}
 		}
 
+		// Reset legal-agent field values when the section is hidden.
 		function clearLegalFields() {
 			if ( legalNameEl ) {
 				legalNameEl.value = '';
@@ -352,12 +407,14 @@
 			applyLegalIdRules();
 		}
 
+		// Enforce numeric-only input for legal-agent phone.
 		function enforceLegalPhoneNumeric() {
 			if ( legalPhoneEl ) {
 				legalPhoneEl.value = legalPhoneEl.value.replace( /[^0-9]/g, '' );
 			}
 		}
 
+		// Show/hide legal-agent section and update related constraints.
 		function toggleLegalAgentFields() {
 			if ( ! legalFieldsEl ) {
 				return;
@@ -429,11 +486,13 @@
 		var phoneEl = modalEl.querySelector( '[data-af-field="phone"]' );
 		var emailEl = modalEl.querySelector( '[data-af-field="email"]' );
 
+		// Normalize empty values to a fallback for modal display.
 		function safeText( value ) {
 			var text = value ? String( value ).trim() : '';
 			return text || '-';
 		}
 
+		// Fill and open legal-agent modal using clicked button dataset.
 		function openModal( triggerEl ) {
 			var idType = safeText( triggerEl.getAttribute( 'data-legal-agent-id-type' ) );
 			var idNumber = safeText( triggerEl.getAttribute( 'data-legal-agent-id' ) );
@@ -447,6 +506,7 @@
 			document.body.classList.add( 'af-modal-open' );
 		}
 
+		// Close modal and restore body scrolling.
 		function closeModal() {
 			modalEl.hidden = true;
 			document.body.classList.remove( 'af-modal-open' );

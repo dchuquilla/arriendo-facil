@@ -151,7 +151,7 @@ $message = isset( $_GET['af_message'] ) ? sanitize_text_field( wp_unslash( $_GET
 				<th><?php esc_html_e( 'Client Name', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Contract Parameter Details', 'arriendo-facil' ); ?></th>
                 <th><?php esc_html_e( 'Legal Agent', 'arriendo-facil' ); ?></th>
-                <th><?php esc_html_e( 'Legal Agent Details', 'arriendo-facil' ); ?></th>
+                <th><?php esc_html_e( 'Details', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Status', 'arriendo-facil' ); ?></th>
                 <th><?php esc_html_e( 'Account Status', 'arriendo-facil' ); ?></th>
                 <th><?php esc_html_e( 'Actions', 'arriendo-facil' ); ?></th>
@@ -181,13 +181,19 @@ $message = isset( $_GET['af_message'] ) ? sanitize_text_field( wp_unslash( $_GET
                         <td>
                             <?php
                             if ( ! empty( $contact->has_legal_agent ) ) {
-                                echo esc_html( (string) $contact->legal_agent_name );
-                                echo '<br />';
-                                echo esc_html( strtoupper( (string) $contact->legal_agent_id_type ) . ': ' . (string) $contact->legal_agent_id );
-                                echo '<br />';
-                                echo esc_html( (string) $contact->legal_agent_phone );
-                                echo '<br />';
-                                echo esc_html( (string) $contact->legal_agent_email );
+                                ?>
+                                <button
+                                    type="button"
+                                    class="button button-secondary af-open-legal-agent-modal"
+                                    data-legal-agent-name="<?php echo esc_attr( (string) $contact->legal_agent_name ); ?>"
+                                    data-legal-agent-id-type="<?php echo esc_attr( strtoupper( (string) $contact->legal_agent_id_type ) ); ?>"
+                                    data-legal-agent-id="<?php echo esc_attr( (string) $contact->legal_agent_id ); ?>"
+                                    data-legal-agent-phone="<?php echo esc_attr( (string) $contact->legal_agent_phone ); ?>"
+                                    data-legal-agent-email="<?php echo esc_attr( (string) $contact->legal_agent_email ); ?>"
+                                >
+                                    <?php esc_html_e( 'More Details', 'arriendo-facil' ); ?>
+                                </button>
+                                <?php
                             } else {
                                 echo '-';
                             }
@@ -219,196 +225,20 @@ $message = isset( $_GET['af_message'] ) ? sanitize_text_field( wp_unslash( $_GET
 			<?php endif; ?>
 		</tbody>
 	</table>
+
+    <div id="af-legal-agent-modal" class="af-modal" hidden>
+        <div class="af-modal__backdrop" data-af-close-modal="1"></div>
+        <div class="af-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="af-legal-agent-modal-title">
+            <div class="af-modal__header">
+                <h2 id="af-legal-agent-modal-title"><?php esc_html_e( 'Legal Agent Details', 'arriendo-facil' ); ?></h2>
+                <button type="button" class="button-link af-modal__close" data-af-close-modal="1" aria-label="<?php esc_attr_e( 'Close', 'arriendo-facil' ); ?>">&times;</button>
+            </div>
+            <div class="af-modal__body">
+                <p><strong><?php esc_html_e( 'Name', 'arriendo-facil' ); ?>:</strong> <span data-af-field="name">-</span></p>
+                <p><strong><?php esc_html_e( 'ID', 'arriendo-facil' ); ?>:</strong> <span data-af-field="id">-</span></p>
+                <p><strong><?php esc_html_e( 'Phone', 'arriendo-facil' ); ?>:</strong> <span data-af-field="phone">-</span></p>
+                <p><strong><?php esc_html_e( 'Email', 'arriendo-facil' ); ?>:</strong> <span data-af-field="email">-</span></p>
+            </div>
+        </div>
+    </div>
 </div>
-
-<script>
-( function () {
-    var typeEl = document.getElementById( 'af_owner_id_type' );
-    var idEl = document.getElementById( 'af_owner_id' );
-    var legalTypeEl = document.getElementById( 'af_legal_agent_id_type' );
-    var legalIdEl = document.getElementById( 'af_legal_agent_id' );
-    var legalFieldsEl = document.getElementById( 'af-legal-agent-fields' );
-    var legalNameEl = document.getElementById( 'af_legal_agent_name' );
-    var legalPhoneEl = document.getElementById( 'af_legal_agent_phone' );
-    var legalEmailEl = document.getElementById( 'af_legal_agent_email' );
-    var legalAgentRadios = document.querySelectorAll( 'input[name="has_legal_agent"]' );
-    var formEl = document.getElementById( 'af-owner-contact-form' );
-
-    if ( ! typeEl || ! idEl ) {
-        return;
-    }
-
-		function enforceUppercase(){
-			idEl.value = idEl.value.toUpperCase();
-		}
-    function applyRules() {
-				idEl.removeEventListener( 'input', enforceUppercase );
-        var type = typeEl.value;
-
-        if ( type === 'cedula' ) {
-            idEl.setAttribute( 'pattern', '^[0-9]{10}$' );
-            idEl.setAttribute( 'minlength', '10' );
-            idEl.setAttribute( 'maxlength', '10' );
-            idEl.setAttribute( 'title', 'Cedula: exactamente 10 digitos numericos' );
-            return;
-        }
-
-        if ( type === 'ruc' ) {
-            idEl.setAttribute( 'pattern', '^[0-9]{13}$' );
-            idEl.setAttribute( 'minlength', '13' );
-            idEl.setAttribute( 'maxlength', '13' );
-            idEl.setAttribute( 'title', 'RUC: exactamente 13 digitos numericos' );
-            return;
-        }
-
-        idEl.setAttribute( 'pattern', '^[A-Za-z0-9]{6,15}$' );
-        idEl.setAttribute( 'minlength', '6' );
-        idEl.setAttribute( 'maxlength', '15' );
-        idEl.setAttribute( 'title', 'Pasaporte: alfanumerico de 6 a 15 caracteres' );
-				idEl.addEventListener( 'input', enforceUppercase );
-        enforceUppercase();
-    }
-
-                function enforceLegalUppercase() {
-                    if ( legalIdEl ) {
-                        legalIdEl.value = legalIdEl.value.toUpperCase();
-                    }
-                }
-
-                function applyLegalIdRules() {
-                    if ( ! legalTypeEl || ! legalIdEl ) {
-                        return;
-                    }
-
-                    legalIdEl.removeEventListener( 'input', enforceLegalUppercase );
-
-                    if ( legalTypeEl.value === 'cedula' ) {
-                        legalIdEl.setAttribute( 'pattern', '^[0-9]{10}$' );
-                        legalIdEl.setAttribute( 'minlength', '10' );
-                        legalIdEl.setAttribute( 'maxlength', '10' );
-                        legalIdEl.setAttribute( 'title', 'Cedula: exactamente 10 digitos numericos' );
-                        return;
-                    }
-
-                    if ( legalTypeEl.value === 'ruc' ) {
-                        legalIdEl.setAttribute( 'pattern', '^[0-9]{13}$' );
-                        legalIdEl.setAttribute( 'minlength', '13' );
-                        legalIdEl.setAttribute( 'maxlength', '13' );
-                        legalIdEl.setAttribute( 'title', 'RUC: exactamente 13 digitos numericos' );
-                        return;
-                    }
-
-                    legalIdEl.setAttribute( 'pattern', '^[A-Za-z0-9]{6,15}$' );
-                    legalIdEl.setAttribute( 'minlength', '6' );
-                    legalIdEl.setAttribute( 'maxlength', '15' );
-                    legalIdEl.setAttribute( 'title', 'Pasaporte: alfanumerico de 6 a 15 caracteres' );
-                    legalIdEl.addEventListener( 'input', enforceLegalUppercase );
-                    enforceLegalUppercase();
-                }
-
-                function hasLegalAgentSelected() {
-                    for ( var i = 0; i < legalAgentRadios.length; i++ ) {
-                        if ( legalAgentRadios[ i ].checked && legalAgentRadios[ i ].value === '1' ) {
-                            return true;
-                        }
-                    }
-
-                    return false;
-                }
-
-                function setLegalRequired( required ) {
-                    if ( legalNameEl ) {
-                        legalNameEl.required = required;
-                    }
-                    if ( legalTypeEl ) {
-                        legalTypeEl.required = required;
-                    }
-                    if ( legalIdEl ) {
-                        legalIdEl.required = required;
-                    }
-                    if ( legalPhoneEl ) {
-                        legalPhoneEl.required = required;
-                    }
-                    if ( legalEmailEl ) {
-                        legalEmailEl.required = required;
-                    }
-                }
-
-                function clearLegalFields() {
-                    if ( legalNameEl ) {
-                        legalNameEl.value = '';
-                    }
-                    if ( legalTypeEl ) {
-                        legalTypeEl.value = 'cedula';
-                    }
-                    if ( legalIdEl ) {
-                        legalIdEl.value = '';
-                    }
-                    if ( legalPhoneEl ) {
-                        legalPhoneEl.value = '';
-                    }
-                    if ( legalEmailEl ) {
-                        legalEmailEl.value = '';
-                    }
-                    applyLegalIdRules();
-                }
-
-                function enforceLegalPhoneNumeric() {
-                    if ( legalPhoneEl ) {
-                        legalPhoneEl.value = legalPhoneEl.value.replace( /[^0-9]/g, '' );
-                    }
-                }
-
-                function toggleLegalAgentFields() {
-                    if ( ! legalFieldsEl ) {
-                        return;
-                    }
-
-                    if ( hasLegalAgentSelected() ) {
-                        legalFieldsEl.style.display = '';
-                        setLegalRequired( true );
-                        applyLegalIdRules();
-                        return;
-                    }
-
-                    legalFieldsEl.style.display = 'none';
-                    setLegalRequired( false );
-                    clearLegalFields();
-                }
-
-    typeEl.addEventListener( 'change', function () {
-        idEl.value = '';
-        applyRules();
-    } );
-
-        if ( legalTypeEl ) {
-            legalTypeEl.addEventListener( 'change', function () {
-                if ( legalIdEl ) {
-                    legalIdEl.value = '';
-                }
-                applyLegalIdRules();
-            } );
-        }
-
-        if ( legalPhoneEl ) {
-            legalPhoneEl.addEventListener( 'input', enforceLegalPhoneNumeric );
-        }
-
-        for ( var i = 0; i < legalAgentRadios.length; i++ ) {
-            legalAgentRadios[ i ].addEventListener( 'change', toggleLegalAgentFields );
-        }
-
-    if ( formEl ) {
-                formEl.addEventListener( 'submit', function () {
-                    applyRules();
-                    toggleLegalAgentFields();
-                    if ( hasLegalAgentSelected() ) {
-                        applyLegalIdRules();
-                    }
-                } );
-    }
-
-    applyRules();
-        toggleLegalAgentFields();
-} )();
-</script>

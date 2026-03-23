@@ -217,9 +217,18 @@
 			} );
 	} );
 
-    function initOwnerContactDocumentRules() {
+	// Init owner + legal-agent form validation rules (owner contacts page).
+	function initOwnerContactDocumentRules() {
         var typeEl = document.getElementById( 'af_owner_id_type' );
         var idEl = document.getElementById( 'af_owner_id' );
+		var legalTypeEl = document.getElementById( 'af_legal_agent_id_type' );
+		var legalIdEl = document.getElementById( 'af_legal_agent_id' );
+		var legalFieldsEl = document.getElementById( 'af-legal-agent-fields' );
+		var legalNameEl = document.getElementById( 'af_legal_agent_name' );
+		var legalPhoneEl = document.getElementById( 'af_legal_agent_phone' );
+		var legalEmailEl = document.getElementById( 'af_legal_agent_email' );
+		var legalAgentRadios = document.querySelectorAll( 'input[name="has_legal_agent"]' );
+		var formEl = document.getElementById( 'af-owner-contact-form' );
 
         if ( ! typeEl || ! idEl ) {
             return;
@@ -256,7 +265,118 @@
 						enforceUppercase();
         }
 
+		function enforceLegalUppercase() {
+			if ( legalIdEl ) {
+				legalIdEl.value = legalIdEl.value.toUpperCase();
+			}
+		}
+
+		function applyLegalIdRules() {
+			if ( ! legalTypeEl || ! legalIdEl ) {
+				return;
+			}
+
+			legalIdEl.removeEventListener( 'input', enforceLegalUppercase );
+
+			if ( legalTypeEl.value === 'cedula' ) {
+				legalIdEl.setAttribute( 'pattern', '^[0-9]{10}$' );
+				legalIdEl.setAttribute( 'minlength', '10' );
+				legalIdEl.setAttribute( 'maxlength', '10' );
+				legalIdEl.setAttribute( 'title', 'Cedula: exactamente 10 digitos numericos' );
+				return;
+			}
+
+			if ( legalTypeEl.value === 'ruc' ) {
+				legalIdEl.setAttribute( 'pattern', '^[0-9]{13}$' );
+				legalIdEl.setAttribute( 'minlength', '13' );
+				legalIdEl.setAttribute( 'maxlength', '13' );
+				legalIdEl.setAttribute( 'title', 'RUC: exactamente 13 digitos numericos' );
+				return;
+			}
+
+			legalIdEl.setAttribute( 'pattern', '^[A-Za-z0-9]{6,15}$' );
+			legalIdEl.setAttribute( 'minlength', '6' );
+			legalIdEl.setAttribute( 'maxlength', '15' );
+			legalIdEl.setAttribute( 'title', 'Pasaporte: alfanumerico de 6 a 15 caracteres' );
+			legalIdEl.addEventListener( 'input', enforceLegalUppercase );
+			enforceLegalUppercase();
+		}
+
+		function hasLegalAgentSelected() {
+			var i;
+
+			for ( i = 0; i < legalAgentRadios.length; i++ ) {
+				if ( legalAgentRadios[ i ].checked && legalAgentRadios[ i ].value === '1' ) {
+					return true;
+				}
+			}
+
+			return false;
+		}
+
+		function setLegalRequired( required ) {
+			if ( legalNameEl ) {
+				legalNameEl.required = required;
+			}
+			if ( legalTypeEl ) {
+				legalTypeEl.required = required;
+			}
+			if ( legalIdEl ) {
+				legalIdEl.required = required;
+			}
+			if ( legalPhoneEl ) {
+				legalPhoneEl.required = required;
+			}
+			if ( legalEmailEl ) {
+				legalEmailEl.required = required;
+			}
+		}
+
+		function clearLegalFields() {
+			if ( legalNameEl ) {
+				legalNameEl.value = '';
+			}
+			if ( legalTypeEl ) {
+				legalTypeEl.value = 'cedula';
+			}
+			if ( legalIdEl ) {
+				legalIdEl.value = '';
+			}
+			if ( legalPhoneEl ) {
+				legalPhoneEl.value = '';
+			}
+			if ( legalEmailEl ) {
+				legalEmailEl.value = '';
+			}
+
+			applyLegalIdRules();
+		}
+
+		function enforceLegalPhoneNumeric() {
+			if ( legalPhoneEl ) {
+				legalPhoneEl.value = legalPhoneEl.value.replace( /[^0-9]/g, '' );
+			}
+		}
+
+		function toggleLegalAgentFields() {
+			if ( ! legalFieldsEl ) {
+				return;
+			}
+
+			if ( hasLegalAgentSelected() ) {
+				legalFieldsEl.style.display = '';
+				setLegalRequired( true );
+				applyLegalIdRules();
+				return;
+			}
+
+			legalFieldsEl.style.display = 'none';
+			setLegalRequired( false );
+			clearLegalFields();
+		}
+
         typeEl.addEventListener( 'change', function () {
+			idEl.value = '';
             applyRules();
             validateOwnerDocumentField();
         } );
@@ -264,10 +384,90 @@
 					validateOwnerDocumentField();
 				} );
 
+		if ( legalTypeEl ) {
+			legalTypeEl.addEventListener( 'change', function () {
+				if ( legalIdEl ) {
+					legalIdEl.value = '';
+				}
+				applyLegalIdRules();
+			} );
+		}
+
+		if ( legalPhoneEl ) {
+			legalPhoneEl.addEventListener( 'input', enforceLegalPhoneNumeric );
+		}
+
+		legalAgentRadios.forEach( function ( radioEl ) {
+			radioEl.addEventListener( 'change', toggleLegalAgentFields );
+		} );
+
+		if ( formEl ) {
+			formEl.addEventListener( 'submit', function () {
+				applyRules();
+				toggleLegalAgentFields();
+				if ( hasLegalAgentSelected() ) {
+					applyLegalIdRules();
+				}
+			} );
+		}
+
         applyRules();
+		toggleLegalAgentFields();
     }
 
-    function validateOwnerDocumentField() {
+	// Show legal agent details in modal (owner contacts table).
+	function initLegalAgentModal() {
+		var modalEl = document.getElementById( 'af-legal-agent-modal' );
+
+		if ( ! modalEl ) {
+			return;
+		}
+
+		var nameEl = modalEl.querySelector( '[data-af-field="name"]' );
+		var idEl = modalEl.querySelector( '[data-af-field="id"]' );
+		var phoneEl = modalEl.querySelector( '[data-af-field="phone"]' );
+		var emailEl = modalEl.querySelector( '[data-af-field="email"]' );
+
+		function safeText( value ) {
+			var text = value ? String( value ).trim() : '';
+			return text || '-';
+		}
+
+		function openModal( triggerEl ) {
+			var idType = safeText( triggerEl.getAttribute( 'data-legal-agent-id-type' ) );
+			var idNumber = safeText( triggerEl.getAttribute( 'data-legal-agent-id' ) );
+
+			nameEl.textContent = safeText( triggerEl.getAttribute( 'data-legal-agent-name' ) );
+			idEl.textContent = idType + ': ' + idNumber;
+			phoneEl.textContent = safeText( triggerEl.getAttribute( 'data-legal-agent-phone' ) );
+			emailEl.textContent = safeText( triggerEl.getAttribute( 'data-legal-agent-email' ) );
+
+			modalEl.hidden = false;
+			document.body.classList.add( 'af-modal-open' );
+		}
+
+		function closeModal() {
+			modalEl.hidden = true;
+			document.body.classList.remove( 'af-modal-open' );
+		}
+
+		$( document ).on( 'click', '.af-open-legal-agent-modal', function () {
+			openModal( this );
+		} );
+
+		$( modalEl ).on( 'click', '[data-af-close-modal="1"]', function () {
+			closeModal();
+		} );
+
+		document.addEventListener( 'keydown', function ( event ) {
+			if ( event.key === 'Escape' && ! modalEl.hidden ) {
+				closeModal();
+			}
+		} );
+	}
+
+	// Validate owner document field before submitting owner contact form.
+	function validateOwnerDocumentField() {
         var typeEl = document.getElementById( 'af_owner_id_type' );
         var idEl = document.getElementById( 'af_owner_id' );
 
@@ -298,8 +498,10 @@
         return ok;
     }
 
-    $( function () {
+	// Bootstrap owner contacts UI behaviors on admin page load.
+	$( function () {
         initOwnerContactDocumentRules();
+		initLegalAgentModal();
   } );
 
 	// ── Score guest via AI ──────────────────────────────────────────────────

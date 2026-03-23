@@ -397,9 +397,10 @@
 			legalPhoneEl.addEventListener( 'input', enforceLegalPhoneNumeric );
 		}
 
-		legalAgentRadios.forEach( function ( radioEl ) {
-			radioEl.addEventListener( 'change', toggleLegalAgentFields );
-		} );
+		var radioIndex;
+		for ( radioIndex = 0; radioIndex < legalAgentRadios.length; radioIndex++ ) {
+			legalAgentRadios[ radioIndex ].addEventListener( 'change', toggleLegalAgentFields );
+		}
 
 		if ( formEl ) {
 			formEl.addEventListener( 'submit', function () {
@@ -500,8 +501,17 @@
 
 	// Bootstrap owner contacts UI behaviors on admin page load.
 	$( function () {
-        initOwnerContactDocumentRules();
-		initLegalAgentModal();
+		try {
+			initOwnerContactDocumentRules();
+		} catch ( ownerContactsInitError ) {
+			window.console && window.console.error && window.console.error( 'Owner contact rules init failed', ownerContactsInitError );
+		}
+
+		try {
+			initLegalAgentModal();
+		} catch ( legalAgentModalInitError ) {
+			window.console && window.console.error && window.console.error( 'Legal agent modal init failed', legalAgentModalInitError );
+		}
   } );
 
 	// ── Score guest via AI ──────────────────────────────────────────────────

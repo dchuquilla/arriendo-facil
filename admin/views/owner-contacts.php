@@ -170,7 +170,7 @@ $message = isset( $_GET['af_message'] ) ? sanitize_text_field( wp_unslash( $_GET
                         }
                     }
                     ?>
-					<tr>
+                    <tr class="af-owner-contact-row" data-contact-id="<?php echo esc_attr( (int) $contact->id ); ?>">
 						<td><?php echo esc_html( $contact->id ); ?></td>
 						<td><?php echo esc_html( $contact->owner_id_type ); ?></td>
 						<td><?php echo esc_html( $contact->owner_id ); ?></td>

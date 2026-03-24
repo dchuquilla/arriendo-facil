@@ -18,6 +18,20 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Arriendo_Facil_Owner_Contact {
 
 	/**
+	 * Last upload error from sensitive document processing.
+	 *
+	 * @var WP_Error|null
+	 */
+	private $last_upload_error = null;
+
+	/**
+	 * Uploaded sensitive docs keyed by type.
+	 *
+	 * @var array<string,int>
+	 */
+	private $uploaded_document_ids = array();
+
+	/**
 	 * Constructor – hooks into WordPress.
 	 */
 	public function __construct() {
@@ -25,6 +39,8 @@ class Arriendo_Facil_Owner_Contact {
 		/*add_action( 'wp_ajax_nopriv_af_send_owner_contact', array( $this, 'ajax_send_contact' ) );*/ // Only logged-in users can send contacts for now.
 		add_action( 'wp_ajax_af_get_owner_contacts', array( $this, 'ajax_get_contacts' ) );
 		add_action( 'wp_ajax_af_disable_owner_account', array( $this, 'ajax_disable_owner_account' ) );
+		add_action( 'af_owner_contact_saved', array( $this, 'upload_sensitive_documents' ), 10, 2 );
+		add_filter( 'as3cf_upload_acl', array( $this, 'force_private_acl_for_sensitive_docs' ), 10, 2 );
 		add_action( 'admin_post_af_disable_owner_account', array( $this, 'handle_disable_owner_account_post' ) );
 		add_action( 'after_password_reset', array( $this, 'handle_owner_password_reset' ), 10, 2 );
 		add_filter( 'authenticate', array( $this, 'block_disabled_owner_login' ), 30, 3 );
@@ -208,6 +224,22 @@ class Arriendo_Facil_Owner_Contact {
 		}
 
 		if ( false !== $inserted ) {
+			$contact_id = $existing_contact_id > 0 ? $existing_contact_id : (int) $wpdb->insert_id;
+
+			$this->last_upload_error = null;
+			$this->uploaded_document_ids = array();
+
+			do_action( 'af_owner_contact_saved', $contact_id, (int) $user->ID );
+
+			if ( $this->last_upload_error instanceof WP_Error ) {
+				if ( $is_xhr ) {
+					wp_send_json_error( array( 'message' => $this->last_upload_error->get_error_message() ) );
+				}
+
+				wp_safe_redirect( $redirect_to );
+				exit;
+			}
+
 			$mail_result = $this->send_owner_activation_email(
 				$owner_email,
 				$subject,
@@ -229,7 +261,6 @@ class Arriendo_Facil_Owner_Contact {
 
 			update_user_meta( (int) $user->ID, 'af_owner_account_status', 'inactive' );
 
-			$contact_id = $existing_contact_id > 0 ? $existing_contact_id : (int) $wpdb->insert_id;
 			$contact    = $wpdb->get_row(
 				$wpdb->prepare(
 					"SELECT *
@@ -248,6 +279,7 @@ class Arriendo_Facil_Owner_Contact {
 						'redirect_to' => $redirect_to,
 						'contact'     => $contact,
 						'account_status' => 'inactive',
+						'uploaded_documents' => $this->uploaded_document_ids,
 					)
 				);
 			}
@@ -267,6 +299,84 @@ class Arriendo_Facil_Owner_Contact {
 
 		wp_safe_redirect( $redirect_to );
 		exit;
+	}
+
+	/**
+	 * Hook callback for uploading sensitive owner documents.
+	 *
+	 * @param int $contact_id Contact ID.
+	 * @param int $user_id    Owner user ID.
+	 */
+	public function upload_sensitive_documents( $contact_id, $user_id ) {
+		$fields = array(
+			'owner_bank_statement_pdf'       => 'bank_statement',
+			'owner_police_record_pdf'        => 'police_record',
+			'owner_additional_sensitive_pdf' => 'additional_sensitive',
+		);
+
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		require_once ABSPATH . 'wp-admin/includes/image.php';
+		require_once ABSPATH . 'wp-admin/includes/media.php';
+
+		foreach ( $fields as $field_name => $doc_type ) {
+			if ( empty( $_FILES[ $field_name ]['name'] ) ) {
+				continue;
+			}
+
+			$file_data = $_FILES[ $field_name ];
+			if ( UPLOAD_ERR_OK !== (int) $file_data['error'] ) {
+				$this->last_upload_error = new WP_Error( 'af_pdf_upload_error', __( 'Could not upload PDF document.', 'arriendo-facil' ) );
+				return;
+			}
+
+			if ( ! empty( $file_data['size'] ) && (int) $file_data['size'] > ( 10 * 1024 * 1024 ) ) {
+				$this->last_upload_error = new WP_Error( 'af_pdf_upload_too_large', __( 'PDF exceeds maximum size (10 MB).', 'arriendo-facil' ) );
+				return;
+			}
+
+			$checked = wp_check_filetype_and_ext( $file_data['tmp_name'], $file_data['name'], array( 'pdf' => 'application/pdf' ) );
+			if ( 'pdf' !== (string) $checked['ext'] ) {
+				$this->last_upload_error = new WP_Error( 'af_pdf_upload_invalid_type', __( 'Only PDF files are allowed.', 'arriendo-facil' ) );
+				return;
+			}
+
+			$attachment_id = media_handle_upload(
+				$field_name,
+				0,
+				array( 'post_title' => sprintf( 'owner-contact-%d-%s', (int) $contact_id, $doc_type ) ),
+				array(
+					'test_form' => false,
+					'mimes'     => array( 'pdf' => 'application/pdf' ),
+				)
+			);
+
+			if ( is_wp_error( $attachment_id ) ) {
+				$this->last_upload_error = new WP_Error( 'af_pdf_upload_failed', __( 'Could not save PDF document.', 'arriendo-facil' ) );
+				return;
+			}
+
+			update_post_meta( (int) $attachment_id, '_af_sensitive_doc', '1' );
+			update_post_meta( (int) $attachment_id, '_af_sensitive_doc_type', $doc_type );
+			update_post_meta( (int) $attachment_id, '_af_owner_contact_id', (int) $contact_id );
+			update_post_meta( (int) $attachment_id, '_af_owner_user_id', (int) $user_id );
+
+			$this->uploaded_document_ids[ $doc_type ] = (int) $attachment_id;
+		}
+	}
+
+	/**
+	 * Offload hook: enforce private ACL for sensitive documents.
+	 *
+	 * @param string $acl ACL.
+	 * @param int    $attachment_id Attachment ID.
+	 * @return string
+	 */
+	public function force_private_acl_for_sensitive_docs( $acl, $attachment_id ) {
+		if ( '1' === get_post_meta( (int) $attachment_id, '_af_sensitive_doc', true ) ) {
+			return 'private';
+		}
+
+		return $acl;
 	}
 
 	/**

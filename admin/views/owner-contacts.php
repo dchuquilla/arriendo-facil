@@ -133,15 +133,15 @@ $message = isset( $_GET['af_message'] ) ? sanitize_text_field( wp_unslash( $_GET
                     <th scope="row"><?php esc_html_e( 'Sensitive Documents (PDF)', 'arriendo-facil' ); ?></th>
                     <td>
                         <p>
-                            <label for="af_owner_bank_statement_pdf"><?php esc_html_e( 'Bank Statement (PDF)', 'arriendo-facil' ); ?></label><br />
+                            <label for="af_owner_bank_statement_pdf"><?php esc_html_e( 'Servicios basicos del lugar (PDF)', 'arriendo-facil' ); ?></label><br />
                             <input type="file" id="af_owner_bank_statement_pdf" name="owner_bank_statement_pdf" class="regular-text" accept="application/pdf,.pdf" />
                         </p>
                         <p>
-                            <label for="af_owner_police_record_pdf"><?php esc_html_e( 'Police Record (PDF)', 'arriendo-facil' ); ?></label><br />
+                            <label for="af_owner_police_record_pdf"><?php esc_html_e( 'Documentos de identidad del propietario (cedula y papeleta de votacion) (PDF)', 'arriendo-facil' ); ?></label><br />
                             <input type="file" id="af_owner_police_record_pdf" name="owner_police_record_pdf" class="regular-text" accept="application/pdf,.pdf" />
                         </p>
                         <p>
-                            <label for="af_owner_additional_sensitive_pdf"><?php esc_html_e( 'Additional Sensitive Document (PDF)', 'arriendo-facil' ); ?></label><br />
+                            <label for="af_owner_additional_sensitive_pdf"><?php esc_html_e( 'Contratos de arrendamientos suscritos (PDF)', 'arriendo-facil' ); ?></label><br />
                             <input type="file" id="af_owner_additional_sensitive_pdf" name="owner_additional_sensitive_pdf" class="regular-text" accept="application/pdf,.pdf" />
                         </p>
                         <p class="description"><?php esc_html_e( 'Only PDF files are allowed.', 'arriendo-facil' ); ?></p>

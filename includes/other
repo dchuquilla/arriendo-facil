@@ -1,0 +1,15 @@
+
+
+//no tomar en cuenta el siguiente código, es solo para pruebas
+//Credenciales de bucket cloudflare
+token Value= cfat_SmYDRP5DLmGj6QKkErlmvgy5UlxLVv6iKh4PMX1Y6d67cfbd
+
+credenciales del s3 de r2
+Access Key ID= 9e50a8dfa4d53fdcea91e918f13013ca
+Secret Access Key= 4aa1d107e4aea6db701176300da58c47c3fb12b39b5411cb237f78ed38f00c9b
+
+Use jurisdiction-specific endpoints for S3 clients:
+Default
+https://8088bc29e75206bf131252a55578c8b5.r2.cloudflarestorage.com
+
+https://8088bc29e75206bf131252a55578c8b5.r2.cloudflarestorage.com

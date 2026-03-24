@@ -47,7 +47,7 @@ $message = isset( $_GET['af_message'] ) ? sanitize_text_field( wp_unslash( $_GET
     <div class="card" style="max-width: 900px; margin: 16px 0; padding: 16px;">
         <h2><?php esc_html_e( 'New Owner Contact', 'arriendo-facil' ); ?></h2>
 
-         <form id="af-owner-contact-form" method="post" action="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>">
+         <form id="af-owner-contact-form" method="post" action="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>" enctype="multipart/form-data">
             <input type="hidden" name="action" value="af_send_owner_contact" />
             <input type="hidden" name="nonce" value="<?php echo esc_attr( wp_create_nonce( 'af_owner_contact_nonce' ) ); ?>" />
 						<input type="hidden" name="redirect_to" value="<?php echo esc_url( admin_url( 'admin.php?page=af-owner-contacts&action=new' ) ); ?>" />
@@ -128,6 +128,24 @@ $message = isset( $_GET['af_message'] ) ? sanitize_text_field( wp_unslash( $_GET
                 <tr>
                     <th scope="row"><label for="af_message"><?php esc_html_e( 'Observations*', 'arriendo-facil' ); ?></label></th>
                     <td><textarea required id="af_message" name="message" rows="5" class="large-text"></textarea></td>
+                </tr>
+                <tr>
+                    <th scope="row"><?php esc_html_e( 'Sensitive Documents (PDF)', 'arriendo-facil' ); ?></th>
+                    <td>
+                        <p>
+                            <label for="af_owner_bank_statement_pdf"><?php esc_html_e( 'Bank Statement (PDF)', 'arriendo-facil' ); ?></label><br />
+                            <input type="file" id="af_owner_bank_statement_pdf" name="owner_bank_statement_pdf" class="regular-text" accept="application/pdf,.pdf" />
+                        </p>
+                        <p>
+                            <label for="af_owner_police_record_pdf"><?php esc_html_e( 'Police Record (PDF)', 'arriendo-facil' ); ?></label><br />
+                            <input type="file" id="af_owner_police_record_pdf" name="owner_police_record_pdf" class="regular-text" accept="application/pdf,.pdf" />
+                        </p>
+                        <p>
+                            <label for="af_owner_additional_sensitive_pdf"><?php esc_html_e( 'Additional Sensitive Document (PDF)', 'arriendo-facil' ); ?></label><br />
+                            <input type="file" id="af_owner_additional_sensitive_pdf" name="owner_additional_sensitive_pdf" class="regular-text" accept="application/pdf,.pdf" />
+                        </p>
+                        <p class="description"><?php esc_html_e( 'Only PDF files are allowed.', 'arriendo-facil' ); ?></p>
+                    </td>
                 </tr>
             </table>
 

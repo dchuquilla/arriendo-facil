@@ -794,8 +794,7 @@
 			name: $( '#af_guest_name' ).val(),
 			email: $( '#af_guest_email' ).val(),
 			phone: $( '#af_guest_phone' ).val(),
-			id_number: $( '#af_guest_id_number' ).val(),
-			ai_score: $( '#af_guest_ai_score' ).val()
+			id_number: $( '#af_guest_id_number' ).val()
 		} )
 			.done( function ( response ) {
 				if ( response && response.success ) {

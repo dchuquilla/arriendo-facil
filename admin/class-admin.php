@@ -124,7 +124,7 @@ class Arriendo_Facil_Admin {
 		);
 
 		$php_post_max_bytes = wp_convert_hr_to_bytes( ini_get( 'post_max_size' ) );
-		$safe_request_bytes = (int) apply_filters( 'af_owner_contact_safe_request_bytes', min( $php_post_max_bytes, 950 * 1024 ) );
+		$safe_request_bytes = (int) apply_filters( 'af_owner_contact_safe_request_bytes', min( $php_post_max_bytes, 30 * 1024 * 1024 ) );
 
 		wp_localize_script(
 			'af-admin',

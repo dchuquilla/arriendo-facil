@@ -30,6 +30,32 @@ register_activation_hook( __FILE__, array( 'Arriendo_Facil_Activator', 'activate
 register_deactivation_hook( __FILE__, array( 'Arriendo_Facil_Activator', 'deactivate' ) );
 
 /**
+ * Applies runtime PHP limits used by owner PDF uploads.
+ */
+function arriendo_facil_apply_runtime_upload_limits() {
+	if ( function_exists( 'ini_set' ) ) {
+		@ini_set( 'upload_max_filesize', '12M' );
+		@ini_set( 'post_max_size', '36M' );
+		@ini_set( 'memory_limit', '256M' );
+		@ini_set( 'max_execution_time', '120' );
+	}
+}
+add_action( 'init', 'arriendo_facil_apply_runtime_upload_limits', 1 );
+
+/**
+ * Raises WordPress-level upload limit where possible.
+ *
+ * @param int $size_bytes Current max bytes.
+ * @return int
+ */
+function arriendo_facil_max_upload_size( $size_bytes ) {
+	$target = 12 * 1024 * 1024;
+	return max( (int) $size_bytes, $target );
+}
+add_filter( 'upload_size_limit', 'arriendo_facil_max_upload_size' );
+add_filter( 'wp_max_upload_size', 'arriendo_facil_max_upload_size' );
+
+/**
  * Initialises all plugin components.
  */
 function arriendo_facil_init() {

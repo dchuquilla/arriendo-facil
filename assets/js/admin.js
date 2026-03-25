@@ -135,6 +135,7 @@
         var formEl = $form.get( 0 );
         var idEl = document.getElementById( 'af_owner_id' );
 		var formData;
+		var requiredDocumentsValidation;
 		var fileValidation;
 		var params = new URLSearchParams( window.location.search );
 		var isNewMode = params.get( 'action' ) === 'new';
@@ -150,6 +151,12 @@
             formEl.reportValidity();
             return;
         }
+
+		requiredDocumentsValidation = validateRequiredOwnerDocuments( formEl );
+		if ( ! requiredDocumentsValidation.valid ) {
+			alert( requiredDocumentsValidation.message );
+			return;
+		}
 
 		fileValidation = validateOwnerUploadSize( formEl );
 		if ( ! fileValidation.valid ) {
@@ -271,6 +278,33 @@
 			return {
 				valid: false,
 				message: 'La suma de archivos excede el limite del servidor (' + formatBytes( effectiveTotalLimit ) + '). Reduce tamano o sube menos archivos.'
+			};
+		}
+
+		return { valid: true, message: '' };
+	}
+
+	function validateRequiredOwnerDocuments( formEl ) {
+		var fieldNames = [
+			'owner_bank_statement_pdf',
+			'owner_police_record_pdf',
+			'owner_additional_sensitive_pdf'
+		];
+		var uploadedCount = 0;
+		var i;
+
+		for ( i = 0; i < fieldNames.length; i++ ) {
+			var fileInput = formEl.querySelector( 'input[name="' + fieldNames[ i ] + '"]' );
+
+			if ( fileInput && fileInput.files && fileInput.files.length ) {
+				uploadedCount++;
+			}
+		}
+
+		if ( uploadedCount !== fieldNames.length ) {
+			return {
+				valid: false,
+				message: 'Debes subir los 3 documentos PDF obligatorios antes de registrar al propietario.'
 			};
 		}
 

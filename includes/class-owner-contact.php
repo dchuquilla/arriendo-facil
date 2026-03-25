@@ -348,7 +348,8 @@ class Arriendo_Facil_Owner_Contact {
 
 		foreach ( $fields as $field_name => $doc_type ) {
 			if ( ! isset( $_FILES[ $field_name ] ) || ! is_array( $_FILES[ $field_name ] ) ) {
-				continue;
+				$this->last_upload_error = new WP_Error( 'af_pdf_upload_required', __( 'You must upload all three required PDF documents.', 'arriendo-facil' ) );
+				return;
 			}
 
 			$file_data = $_FILES[ $field_name ];
@@ -356,7 +357,8 @@ class Arriendo_Facil_Owner_Contact {
 			$file_error = isset( $file_data['error'] ) ? (int) $file_data['error'] : UPLOAD_ERR_NO_FILE;
 
 			if ( UPLOAD_ERR_NO_FILE === $file_error && '' === $file_name ) {
-				continue;
+				$this->last_upload_error = new WP_Error( 'af_pdf_upload_required', __( 'You must upload all three required PDF documents.', 'arriendo-facil' ) );
+				return;
 			}
 
 			$selected_documents++;
@@ -411,7 +413,12 @@ class Arriendo_Facil_Owner_Contact {
 			$this->uploaded_document_ids[ $doc_type ] = (int) $attachment_id;
 		}
 
-		if ( $selected_documents > 0 && count( $this->uploaded_document_ids ) !== $selected_documents && ! ( $this->last_upload_error instanceof WP_Error ) ) {
+		if ( $selected_documents !== count( $fields ) && ! ( $this->last_upload_error instanceof WP_Error ) ) {
+			$this->last_upload_error = new WP_Error( 'af_pdf_upload_required', __( 'You must upload all three required PDF documents.', 'arriendo-facil' ) );
+			return;
+		}
+
+		if ( count( $this->uploaded_document_ids ) !== $selected_documents && ! ( $this->last_upload_error instanceof WP_Error ) ) {
 			$this->last_upload_error = new WP_Error( 'af_pdf_upload_incomplete', __( 'One or more selected PDFs were not uploaded to Cloudflare R2.', 'arriendo-facil' ) );
 		}
 	}

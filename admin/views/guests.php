@@ -32,7 +32,7 @@ $guests = $wpdb->get_results(
 
 			<table class="form-table" role="presentation">
 				<tr>
-					<th scope="row"><label for="af_guest_id_number"><?php esc_html_e( 'ID (cedula o pasaporte)*', 'arriendo-facil' ); ?></label></th>
+					<th scope="row"><label for="af_guest_id_number"><?php esc_html_e( 'ID (National ID or Passport)*', 'arriendo-facil' ); ?></label></th>
 					<td><input type="text" required id="af_guest_id_number" name="id_number" class="regular-text" inputmode="numeric" pattern="^[0-9]{1,10}$" maxlength="10" title="Use only numbers (max 10)" /></td>
 				</tr>
 				<tr>
@@ -40,27 +40,27 @@ $guests = $wpdb->get_results(
 					<td><input type="text" required id="af_guest_name" name="name" class="regular-text" /></td>
 				</tr>
 				<tr>
-					<th scope="row"><label for="af_guest_email"><?php esc_html_e( 'Correo Electronico*', 'arriendo-facil' ); ?></label></th>
+					<th scope="row"><label for="af_guest_email"><?php esc_html_e( 'Email*', 'arriendo-facil' ); ?></label></th>
 					<td><input type="email" required id="af_guest_email" name="email" class="regular-text" /></td>
 				</tr>
 				<tr>
-					<th scope="row"><label for="af_guest_phone"><?php esc_html_e( 'Contacto*', 'arriendo-facil' ); ?></label></th>
+					<th scope="row"><label for="af_guest_phone"><?php esc_html_e( 'Contact*', 'arriendo-facil' ); ?></label></th>
 					<td><input type="text" required id="af_guest_phone" name="phone" class="regular-text" inputmode="numeric" pattern="^[0-9]{1,10}$" maxlength="10" title="Use only numbers (max 10)" /></td>
 				</tr>
 				<tr>
-					<th scope="row"><label for="af_guest_mascotas"><?php esc_html_e( 'Mascotas (1 a 10)*', 'arriendo-facil' ); ?></label></th>
+					<th scope="row"><label for="af_guest_mascotas"><?php esc_html_e( 'Pets (1 to 10)*', 'arriendo-facil' ); ?></label></th>
 					<td><input type="number" required id="af_guest_mascotas" name="mascotas" class="small-text" min="1" max="10" step="1" /></td>
 				</tr>
 				<tr>
-					<th scope="row"><label for="af_guest_referencia_1"><?php esc_html_e( 'Referencias personales (min2)*', 'arriendo-facil' ); ?></label></th>
+					<th scope="row"><label for="af_guest_referencia_1"><?php esc_html_e( 'Personal References (min 2)*', 'arriendo-facil' ); ?></label></th>
 					<td>
-						<input type="text" required id="af_guest_referencia_1" name="referencia_personal_1" class="regular-text" placeholder="Referencia personal 1" style="margin-bottom:8px;" />
+						<input type="text" required id="af_guest_referencia_1" name="referencia_personal_1" class="regular-text" placeholder="Personal reference 1" style="margin-bottom:8px;" />
 						<br />
-						<input type="text" required id="af_guest_referencia_2" name="referencia_personal_2" class="regular-text" placeholder="Referencia personal 2" />
+						<input type="text" required id="af_guest_referencia_2" name="referencia_personal_2" class="regular-text" placeholder="Personal reference 2" />
 					</td>
 				</tr>
 				<tr>
-					<th scope="row"><label for="af_guest_personas_viviran"><?php esc_html_e( 'Cuantas personas van a vivir o ingresar en la propiedad?*', 'arriendo-facil' ); ?></label></th>
+					<th scope="row"><label for="af_guest_personas_viviran"><?php esc_html_e( 'How many people will live in or enter the property?*', 'arriendo-facil' ); ?></label></th>
 					<td>
 						<select id="af_guest_personas_viviran" name="personas_viviran" required>
 							<option value="">--</option>
@@ -71,15 +71,15 @@ $guests = $wpdb->get_results(
 					</td>
 				</tr>
 				<tr>
-					<th scope="row"><label for="af_guest_garantia_alicuota_pdf"><?php esc_html_e( 'Garantia y Alicuota (PDF)', 'arriendo-facil' ); ?></label></th>
+					<th scope="row"><label for="af_guest_garantia_alicuota_pdf"><?php esc_html_e( 'Guarantee and HOA Fee (PDF)', 'arriendo-facil' ); ?></label></th>
 					<td><input type="file" id="af_guest_garantia_alicuota_pdf" name="guest_garantia_alicuota_pdf" class="regular-text" accept="application/pdf,.pdf" /></td>
 				</tr>
 				<tr>
-					<th scope="row"><label for="af_guest_cedula_papeleta_pdf"><?php esc_html_e( 'Cedula y Papeleta de votacion (PDF)', 'arriendo-facil' ); ?></label></th>
+					<th scope="row"><label for="af_guest_cedula_papeleta_pdf"><?php esc_html_e( 'National ID and Voting Certificate (PDF)', 'arriendo-facil' ); ?></label></th>
 					<td><input type="file" id="af_guest_cedula_papeleta_pdf" name="guest_cedula_papeleta_pdf" class="regular-text" accept="application/pdf,.pdf" /></td>
 				</tr>
 				<tr>
-					<th scope="row"><label for="af_guest_certificado_bancario_pdf"><?php esc_html_e( 'Certificado bancario (PDF)', 'arriendo-facil' ); ?></label></th>
+					<th scope="row"><label for="af_guest_certificado_bancario_pdf"><?php esc_html_e( 'Bank Certificate (PDF)', 'arriendo-facil' ); ?></label></th>
 					<td><input type="file" id="af_guest_certificado_bancario_pdf" name="guest_certificado_bancario_pdf" class="regular-text" accept="application/pdf,.pdf" /></td>
 				</tr>
 			</table>
@@ -94,7 +94,7 @@ $guests = $wpdb->get_results(
 	<table class="wp-list-table widefat fixed striped">
 		<thead>
 			<tr>
-				<th><?php esc_html_e( 'ID (cedula o pasaporte)', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'ID (National ID or Passport)', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Name', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Email', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Phone', 'arriendo-facil' ); ?></th>

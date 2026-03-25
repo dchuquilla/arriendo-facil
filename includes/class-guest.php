@@ -66,15 +66,15 @@ class Arriendo_Facil_Guest {
 		}
 
 		if ( 1 !== preg_match( '/^[0-9]{1,10}$/', $id_number ) ) {
-			wp_send_json_error( array( 'message' => __( 'ID (cedula o pasaporte) must contain only numbers with a maximum of 10 digits.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'ID (National ID or Passport) must contain only numbers with a maximum of 10 digits.', 'arriendo-facil' ) ) );
 		}
 
 		if ( $mascotas < 1 || $mascotas > 10 ) {
-			wp_send_json_error( array( 'message' => __( 'Mascotas must be between 1 and 10.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'Pets must be between 1 and 10.', 'arriendo-facil' ) ) );
 		}
 
 		if ( $personas_viviran < 1 || $personas_viviran > 10 ) {
-			wp_send_json_error( array( 'message' => __( 'Cuantas personas van a vivir o ingresar en la propiedad? must be between 1 and 10.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'How many people will live in or enter the property? must be between 1 and 10.', 'arriendo-facil' ) ) );
 		}
 
 		$schema_result = $this->ensure_guest_extra_columns();

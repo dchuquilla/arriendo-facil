@@ -59,7 +59,7 @@ $guests = $wpdb->get_results(
 	<table class="wp-list-table widefat fixed striped">
 		<thead>
 			<tr>
-				<th><?php esc_html_e( 'ID', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'ID (cedula o pasaporte)', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Name', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Email', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Phone', 'arriendo-facil' ); ?></th>
@@ -72,11 +72,11 @@ $guests = $wpdb->get_results(
 			<?php if ( $guests ) : ?>
 				<?php foreach ( $guests as $guest ) : ?>
 					<tr>
-						<td><?php echo esc_html( $guest->id ); ?></td>
+						<td><?php echo esc_html( $guest->id_number ); ?></td>
 						<td><?php echo esc_html( $guest->first_name . ' ' . $guest->last_name ); ?></td>
 						<td><?php echo esc_html( $guest->email ); ?></td>
 						<td><?php echo esc_html( $guest->phone ); ?></td>
-						<td><?php echo esc_html( $guest->id_number ); ?></td>
+						<td>—</td>
 						<td>
 							<?php echo $guest->ai_score ? esc_html( number_format( (float) $guest->ai_score, 2 ) ) : '—'; ?>
 						</td>

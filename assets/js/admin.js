@@ -759,6 +759,60 @@
 			} );
 	} );
 
+	// ── Create guest from Guests page form ─────────────────────────────────
+	$( document ).on( 'click', '#af-new-guest', function () {
+		$( '#af-guest-form-card' ).show();
+		$( '#af_guest_id' ).trigger( 'focus' );
+	} );
+
+	$( document ).on( 'click', '#af-cancel-new-guest', function () {
+		var formEl = document.getElementById( 'af-guest-form' );
+		if ( formEl ) {
+			formEl.reset();
+		}
+		$( '#af-guest-form-card' ).hide();
+	} );
+
+	$( document ).on( 'submit', '#af-guest-form', function ( event ) {
+		event.preventDefault();
+
+		var formEl = this;
+		var $form = $( formEl );
+		var $submit = $form.find( 'button[type="submit"]' );
+
+		if ( ! formEl.checkValidity() ) {
+			formEl.reportValidity();
+			return;
+		}
+
+		$submit.prop( 'disabled', true );
+
+		$.post( afAdmin.ajaxUrl, {
+			action: 'af_create_guest',
+			nonce: afAdmin.guestNonce,
+			guest_id: $( '#af_guest_id' ).val(),
+			name: $( '#af_guest_name' ).val(),
+			email: $( '#af_guest_email' ).val(),
+			phone: $( '#af_guest_phone' ).val(),
+			id_number: $( '#af_guest_id_number' ).val(),
+			ai_score: $( '#af_guest_ai_score' ).val()
+		} )
+			.done( function ( response ) {
+				if ( response && response.success ) {
+					window.location.reload();
+					return;
+				}
+
+				alert( response && response.data && response.data.message ? response.data.message : 'Could not create guest.' );
+			} )
+			.fail( function () {
+				alert( 'Request failed.' );
+			} )
+			.always( function () {
+				$submit.prop( 'disabled', false );
+			} );
+	} );
+
 	// ── Show forms for new entries ──────────────────────────────────────────
 	$( document ).on( 'click', '.af-new-entry', function () {
 		var $btn = $( this );

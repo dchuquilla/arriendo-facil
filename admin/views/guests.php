@@ -32,8 +32,8 @@ $guests = $wpdb->get_results(
 
 			<table class="form-table" role="presentation">
 				<tr>
-					<th scope="row"><label for="af_guest_id"><?php esc_html_e( 'ID*', 'arriendo-facil' ); ?></label></th>
-					<td><input type="text" required id="af_guest_id" name="guest_id" class="regular-text" inputmode="numeric" pattern="^[0-9]+$" title="Use only numbers" /></td>
+					<th scope="row"><label for="af_guest_id_number"><?php esc_html_e( 'ID (cedula o pasaporte)*', 'arriendo-facil' ); ?></label></th>
+					<td><input type="text" required id="af_guest_id_number" name="id_number" class="regular-text" inputmode="numeric" pattern="^[0-9]{1,10}$" maxlength="10" title="Use only numbers (max 10)" /></td>
 				</tr>
 				<tr>
 					<th scope="row"><label for="af_guest_name"><?php esc_html_e( 'Name*', 'arriendo-facil' ); ?></label></th>
@@ -45,11 +45,7 @@ $guests = $wpdb->get_results(
 				</tr>
 				<tr>
 					<th scope="row"><label for="af_guest_phone"><?php esc_html_e( 'Phone*', 'arriendo-facil' ); ?></label></th>
-					<td><input type="text" required id="af_guest_phone" name="phone" class="regular-text" /></td>
-				</tr>
-				<tr>
-					<th scope="row"><label for="af_guest_id_number"><?php esc_html_e( 'ID Number*', 'arriendo-facil' ); ?></label></th>
-					<td><input type="text" required id="af_guest_id_number" name="id_number" class="regular-text" /></td>
+					<td><input type="text" required id="af_guest_phone" name="phone" class="regular-text" inputmode="numeric" pattern="^[0-9]{1,10}$" maxlength="10" title="Use only numbers (max 10)" /></td>
 				</tr>
 			</table>
 

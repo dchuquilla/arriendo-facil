@@ -762,7 +762,7 @@
 	// ── Create guest from Guests page form ─────────────────────────────────
 	$( document ).on( 'click', '#af-new-guest', function () {
 		$( '#af-guest-form-card' ).show();
-		$( '#af_guest_id' ).trigger( 'focus' );
+		$( '#af_guest_id_number' ).trigger( 'focus' );
 	} );
 
 	$( document ).on( 'click', '#af-cancel-new-guest', function () {
@@ -771,6 +771,11 @@
 			formEl.reset();
 		}
 		$( '#af-guest-form-card' ).hide();
+	} );
+
+	$( document ).on( 'input', '#af_guest_phone, #af_guest_id_number', function () {
+		var sanitized = String( $( this ).val() || '' ).replace( /\D+/g, '' ).slice( 0, 10 );
+		$( this ).val( sanitized );
 	} );
 
 	$( document ).on( 'submit', '#af-guest-form', function ( event ) {
@@ -790,7 +795,6 @@
 		$.post( afAdmin.ajaxUrl, {
 			action: 'af_create_guest',
 			nonce: afAdmin.guestNonce,
-			guest_id: $( '#af_guest_id' ).val(),
 			name: $( '#af_guest_name' ).val(),
 			email: $( '#af_guest_email' ).val(),
 			phone: $( '#af_guest_phone' ).val(),

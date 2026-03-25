@@ -123,6 +123,9 @@ class Arriendo_Facil_Admin {
 			true
 		);
 
+		$php_post_max_bytes = wp_convert_hr_to_bytes( ini_get( 'post_max_size' ) );
+		$safe_request_bytes = (int) apply_filters( 'af_owner_contact_safe_request_bytes', min( $php_post_max_bytes, 950 * 1024 ) );
+
 		wp_localize_script(
 			'af-admin',
 			'afAdmin',
@@ -131,6 +134,9 @@ class Arriendo_Facil_Admin {
 				'leaseNonce'         => wp_create_nonce( 'af_lease_nonce' ),
 				'cleaningNonce'      => wp_create_nonce( 'af_cleaning_request_nonce' ),
 				'ownerContactNonce'  => wp_create_nonce( 'af_owner_contact_nonce' ),
+				'ownerMaxFileBytes'  => min( wp_convert_hr_to_bytes( ini_get( 'upload_max_filesize' ) ), 10 * 1024 * 1024 ),
+				'ownerMaxTotalBytes' => $php_post_max_bytes,
+				'ownerSafeTotalBytes'=> max( 1, $safe_request_bytes ),
 				'guestNonce'         => wp_create_nonce( 'af_guest_nonce' ),
 			)
 		);

@@ -139,6 +139,13 @@ if ( $r2_last_check_raw ) {
 	}
 }
 
+$php_upload_max_bytes = wp_convert_hr_to_bytes( ini_get( 'upload_max_filesize' ) );
+$php_post_max_bytes   = wp_convert_hr_to_bytes( ini_get( 'post_max_size' ) );
+$owner_safe_total     = (int) apply_filters( 'af_owner_contact_safe_request_bytes', min( $php_post_max_bytes, 950 * 1024 ) );
+$php_upload_max_human = size_format( $php_upload_max_bytes );
+$php_post_max_human   = size_format( $php_post_max_bytes );
+$owner_safe_human     = size_format( $owner_safe_total );
+
 $ai_url_locked            = af_settings_is_locked( 'AF_AI_API_URL' );
 $ai_key_locked            = af_settings_is_locked( 'AF_AI_API_KEY' );
 $provider_locked          = af_settings_is_locked( 'AF_STORAGE_PROVIDER' );
@@ -239,6 +246,27 @@ $any_storage_field_locked = $provider_locked || $access_key_locked || $secret_ke
 					<?php if ( $r2_last_check ) : ?>
 						<p class="description"><?php echo esc_html__( 'Last check:', 'arriendo-facil' ) . ' ' . esc_html( $r2_last_check ); ?></p>
 					<?php endif; ?>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Upload Limits', 'arriendo-facil' ); ?></th>
+				<td>
+					<p class="description">
+						<?php
+						echo esc_html(
+							sprintf(
+								/* translators: 1: upload_max_filesize, 2: post_max_size, 3: plugin safe request cap */
+								__( 'PHP upload_max_filesize: %1$s | PHP post_max_size: %2$s | Plugin safe request cap: %3$s', 'arriendo-facil' ),
+								$php_upload_max_human,
+								$php_post_max_human,
+								$owner_safe_human
+							)
+						);
+						?>
+					</p>
+					<p class="description">
+						<?php esc_html_e( 'If Nginx is used, set client_max_body_size >= post_max_size to avoid 413/400 on admin-ajax uploads.', 'arriendo-facil' ); ?>
+					</p>
 				</td>
 			</tr>
 		</table>

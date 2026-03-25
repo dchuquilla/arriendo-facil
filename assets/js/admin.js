@@ -784,6 +784,7 @@
 		var formEl = this;
 		var $form = $( formEl );
 		var $submit = $form.find( 'button[type="submit"]' );
+		var formData;
 
 		if ( ! formEl.checkValidity() ) {
 			formEl.reportValidity();
@@ -792,13 +793,17 @@
 
 		$submit.prop( 'disabled', true );
 
-		$.post( afAdmin.ajaxUrl, {
-			action: 'af_create_guest',
-			nonce: afAdmin.guestNonce,
-			name: $( '#af_guest_name' ).val(),
-			email: $( '#af_guest_email' ).val(),
-			phone: $( '#af_guest_phone' ).val(),
-			id_number: $( '#af_guest_id_number' ).val()
+		formData = new FormData( formEl );
+		formData.set( 'action', 'af_create_guest' );
+		formData.set( 'nonce', afAdmin.guestNonce || formData.get( 'nonce' ) || '' );
+
+		$.ajax( {
+			url: afAdmin.ajaxUrl,
+			method: 'POST',
+			dataType: 'json',
+			data: formData,
+			processData: false,
+			contentType: false,
 		} )
 			.done( function ( response ) {
 				if ( response && response.success ) {

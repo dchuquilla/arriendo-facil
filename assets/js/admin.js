@@ -135,6 +135,7 @@
         var formEl = $form.get( 0 );
         var idEl = document.getElementById( 'af_owner_id' );
 		var formData;
+		var fileValidation;
 		var params = new URLSearchParams( window.location.search );
 		var isNewMode = params.get( 'action' ) === 'new';
         if ( ! validateOwnerDocumentField() ) {
@@ -150,9 +151,17 @@
             return;
         }
 
+		fileValidation = validateOwnerUploadSize( formEl );
+		if ( ! fileValidation.valid ) {
+			alert( fileValidation.message );
+			return;
+		}
+
         $submit.prop( 'disabled', true );
 
 		formData = new FormData( formEl );
+		formData.set( 'action', 'af_send_owner_contact' );
+		formData.set( 'nonce', afAdmin.ownerContactNonce || formData.get( 'nonce' ) || '' );
 
         $.ajax( {
             url: afAdmin.ajaxUrl,
@@ -200,13 +209,85 @@
                     alert( response && response.data && response.data.message ? response.data.message : 'Error sending message.' );
                 }
             } )
-            .fail( function ( xhr ) {
-                alert( 'Request failed (' + xhr.status + ').' );
-            } )
+			.fail( function ( xhr ) {
+				var body = ( xhr && typeof xhr.responseText === 'string' ) ? xhr.responseText.trim() : '';
+
+				if ( xhr.status === 413 ) {
+					alert( 'Request failed (413): upload is too large for server limits. Reduce file size or increase Nginx client_max_body_size and PHP post_max_size.' );
+					return;
+				}
+
+				if ( xhr.status === 400 && body === '0' ) {
+					alert( 'Request failed (400): admin-ajax did not receive a valid action or your session expired. Reload the page and try again.' );
+					return;
+				}
+
+				if ( xhr.status === 403 && body === '-1' ) {
+					alert( 'Nonce is invalid or expired. Reload the page and try again.' );
+					return;
+				}
+
+				alert( 'Request failed (' + xhr.status + '): ' + ( body || 'no details' ) );
+			} )
             .always( function () {
                 $submit.prop( 'disabled', false );
             } );
     }
+
+	function validateOwnerUploadSize( formEl ) {
+		var maxFileBytes = parseInt( afAdmin.ownerMaxFileBytes, 10 ) || ( 10 * 1024 * 1024 );
+		var maxTotalBytes = parseInt( afAdmin.ownerMaxTotalBytes, 10 ) || ( 8 * 1024 * 1024 );
+		var safeTotalBytes = parseInt( afAdmin.ownerSafeTotalBytes, 10 ) || maxTotalBytes;
+		var safetyMarginBytes = 128 * 1024;
+		var effectiveTotalLimit = Math.max( 1, Math.min( maxTotalBytes, safeTotalBytes ) - safetyMarginBytes );
+		var fieldNames = [
+			'owner_bank_statement_pdf',
+			'owner_police_record_pdf',
+			'owner_additional_sensitive_pdf'
+		];
+		var totalBytes = 0;
+		var i;
+
+		for ( i = 0; i < fieldNames.length; i++ ) {
+			var fileInput = formEl.querySelector( 'input[name="' + fieldNames[ i ] + '"]' );
+			var file;
+
+			if ( ! fileInput || ! fileInput.files || ! fileInput.files.length ) {
+				continue;
+			}
+
+			file = fileInput.files[0];
+			totalBytes += file.size;
+
+			if ( file.size > maxFileBytes ) {
+				return {
+					valid: false,
+					message: 'El archivo "' + file.name + '" supera el limite permitido. Maximo por archivo: ' + formatBytes( maxFileBytes ) + '.'
+				};
+			}
+		}
+
+		if ( totalBytes > effectiveTotalLimit ) {
+			return {
+				valid: false,
+				message: 'La suma de archivos excede el limite del servidor (' + formatBytes( effectiveTotalLimit ) + '). Reduce tamano o sube menos archivos.'
+			};
+		}
+
+		return { valid: true, message: '' };
+	}
+
+	function formatBytes( bytes ) {
+		if ( bytes <= 0 ) {
+			return '0 B';
+		}
+
+		if ( bytes < 1024 * 1024 ) {
+			return ( bytes / 1024 ).toFixed( 1 ) + ' KB';
+		}
+
+		return ( bytes / ( 1024 * 1024 ) ).toFixed( 1 ) + ' MB';
+	}
 
 	// Render a runtime notice above the owner contact form.
 	function showOwnerContactNotice( type, text ) {

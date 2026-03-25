@@ -36,7 +36,7 @@ class Arriendo_Facil_Owner_Contact {
 	 */
 	public function __construct() {
 		add_action( 'wp_ajax_af_send_owner_contact', array( $this, 'ajax_send_contact' ) );
-		/*add_action( 'wp_ajax_nopriv_af_send_owner_contact', array( $this, 'ajax_send_contact' ) );*/ // Only logged-in users can send contacts for now.
+		add_action( 'wp_ajax_nopriv_af_send_owner_contact', array( $this, 'ajax_send_contact' ) );
 		add_action( 'wp_ajax_af_get_owner_contacts', array( $this, 'ajax_get_contacts' ) );
 		add_action( 'wp_ajax_af_disable_owner_account', array( $this, 'ajax_disable_owner_account' ) );
 		add_action( 'af_owner_contact_saved', array( $this, 'upload_sensitive_documents' ), 10, 2 );
@@ -49,7 +49,29 @@ class Arriendo_Facil_Owner_Contact {
 	 * Handles sending a contact message to an owner via AJAX.
 	 */
 	public function ajax_send_contact() {
-		check_ajax_referer( 'af_owner_contact_nonce', 'nonce' );
+		if ( empty( $_POST ) ) {
+			$content_length = isset( $_SERVER['CONTENT_LENGTH'] ) ? (int) $_SERVER['CONTENT_LENGTH'] : 0;
+			$post_max_size  = wp_convert_hr_to_bytes( ini_get( 'post_max_size' ) );
+
+			if ( $content_length > 0 && $post_max_size > 0 && $content_length > $post_max_size ) {
+				wp_send_json_error(
+					array( 'message' => __( 'Request too large for server limits (post_max_size).', 'arriendo-facil' ) ),
+					413
+				);
+			}
+
+			wp_send_json_error(
+				array( 'message' => __( 'Empty request received. Session cookie or server limit issue.', 'arriendo-facil' ) ),
+				400
+			);
+		}
+
+		if ( false === check_ajax_referer( 'af_owner_contact_nonce', 'nonce', false ) ) {
+			wp_send_json_error(
+				array( 'message' => __( 'Invalid or expired nonce. Reload and try again.', 'arriendo-facil' ) ),
+				403
+			);
+		}
 
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
@@ -113,39 +135,55 @@ class Arriendo_Facil_Owner_Contact {
 			$legal_agent_phone   = '';
 			$legal_agent_email   = '';
 		}
- /** User WordPress */
-		$user               = get_user_by( 'email', $owner_email );
-		$temp_password_plain = wp_generate_password( 14, true, true );
 
-		if ( ! $user ) {
-			$base_login = sanitize_user( current( explode( '@', $owner_email ) ), true );
-			$user_login = $this->generate_unique_login( $base_login ? $base_login : 'owner', $owner_id );
+		global $wpdb;
+		$existing_contact_id = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT id
+				 FROM {$wpdb->prefix}af_owner_contacts
+				 WHERE owner_email = %s
+				 ORDER BY id DESC
+				 LIMIT 1",
+				$owner_email
+			)
+		);
 
-			$user_id = wp_insert_user(
-				array(
-					'user_login'   => $user_login,
-					'user_pass'    => $temp_password_plain,
-					'user_email'   => $owner_email,
-					'display_name' => $subject,
-					'role'         => 'subscriber',
-				)
-			);
-
-			if ( is_wp_error( $user_id ) ) {
-				if ( $is_xhr ) {
-					wp_send_json_error( array( 'message' => $user_id->get_error_message() ) );
-				}
-
-				wp_safe_redirect( $redirect_to );
-				exit;
+		$existing_user = get_user_by( 'email', $owner_email );
+		if ( $existing_user || $existing_contact_id > 0 ) {
+			if ( $is_xhr ) {
+				wp_send_json_error( array( 'message' => __( 'This email is already registered.', 'arriendo-facil' ) ) );
 			}
 
-			$user = get_user_by( 'id', (int) $user_id );
-		} else {
-			$user_id = (int) $user->ID;
-			wp_set_password( $temp_password_plain, $user_id );
-			$user = get_user_by( 'id', $user_id );
+			wp_safe_redirect( $redirect_to );
+			exit;
 		}
+
+		/** User WordPress */
+		$temp_password_plain = wp_generate_password( 14, true, true );
+
+		$base_login = sanitize_user( current( explode( '@', $owner_email ) ), true );
+		$user_login = $this->generate_unique_login( $base_login ? $base_login : 'owner', $owner_id );
+
+		$user_id = wp_insert_user(
+			array(
+				'user_login'   => $user_login,
+				'user_pass'    => $temp_password_plain,
+				'user_email'   => $owner_email,
+				'display_name' => $subject,
+				'role'         => 'subscriber',
+			)
+		);
+
+		if ( is_wp_error( $user_id ) ) {
+			if ( $is_xhr ) {
+				wp_send_json_error( array( 'message' => $user_id->get_error_message() ) );
+			}
+
+			wp_safe_redirect( $redirect_to );
+			exit;
+		}
+
+		$user = get_user_by( 'id', (int) $user_id );
 
 		if ( ! $user ) {
 			if ( $is_xhr ) {
@@ -175,18 +213,6 @@ class Arriendo_Facil_Owner_Contact {
 			wp_login_url()
 		);
 
-		global $wpdb;
-		$existing_contact_id = (int) $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT id
-				 FROM {$wpdb->prefix}af_owner_contacts
-				 WHERE owner_email = %s
-				 ORDER BY id DESC
-				 LIMIT 1",
-				$owner_email
-			)
-		);
-
 		$owner_data = array(
 			'owner_id_type'      => $owner_id_type,
 			'owner_id'           => $owner_id,
@@ -206,24 +232,14 @@ class Arriendo_Facil_Owner_Contact {
 
 		$owner_formats = array( '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s' );
 
-		if ( $existing_contact_id > 0 ) {
-			$inserted = $wpdb->update(
-				$wpdb->prefix . 'af_owner_contacts',
-				$owner_data,
-				array( 'id' => $existing_contact_id ),
-				$owner_formats,
-				array( '%d' )
-			);
-		} else {
-			$inserted = $wpdb->insert(
-				$wpdb->prefix . 'af_owner_contacts',
-				$owner_data,
-				$owner_formats
-			);
-		}
+		$inserted = $wpdb->insert(
+			$wpdb->prefix . 'af_owner_contacts',
+			$owner_data,
+			$owner_formats
+		);
 
 		if ( false !== $inserted ) {
-			$contact_id = $existing_contact_id > 0 ? $existing_contact_id : (int) $wpdb->insert_id;
+			$contact_id = (int) $wpdb->insert_id;
 
 			$this->last_upload_error = null;
 			$this->uploaded_document_ids = array();
@@ -312,6 +328,7 @@ class Arriendo_Facil_Owner_Contact {
 			'owner_police_record_pdf'        => 'police_record',
 			'owner_additional_sensitive_pdf' => 'additional_sensitive',
 		);
+		$selected_documents = 0;
 
 		$storage_provider = $this->get_storage_setting( 'AF_STORAGE_PROVIDER', 'af_storage_provider', 'cloudflare_r2' );
 		if ( 'cloudflare_r2' !== $storage_provider ) {
@@ -330,11 +347,25 @@ class Arriendo_Facil_Owner_Contact {
 		require_once ABSPATH . 'wp-admin/includes/media.php';
 
 		foreach ( $fields as $field_name => $doc_type ) {
-			if ( empty( $_FILES[ $field_name ]['name'] ) ) {
+			if ( ! isset( $_FILES[ $field_name ] ) || ! is_array( $_FILES[ $field_name ] ) ) {
 				continue;
 			}
 
 			$file_data = $_FILES[ $field_name ];
+			$file_name = isset( $file_data['name'] ) ? (string) $file_data['name'] : '';
+			$file_error = isset( $file_data['error'] ) ? (int) $file_data['error'] : UPLOAD_ERR_NO_FILE;
+
+			if ( UPLOAD_ERR_NO_FILE === $file_error && '' === $file_name ) {
+				continue;
+			}
+
+			$selected_documents++;
+
+			if ( UPLOAD_ERR_INI_SIZE === $file_error || UPLOAD_ERR_FORM_SIZE === $file_error ) {
+				$this->last_upload_error = new WP_Error( 'af_pdf_upload_too_large', __( 'The uploaded PDF exceeds the server upload limit.', 'arriendo-facil' ) );
+				return;
+			}
+
 			if ( UPLOAD_ERR_OK !== (int) $file_data['error'] ) {
 				$this->last_upload_error = new WP_Error( 'af_pdf_upload_error', __( 'Could not upload PDF document.', 'arriendo-facil' ) );
 				return;
@@ -378,6 +409,10 @@ class Arriendo_Facil_Owner_Contact {
 			}
 
 			$this->uploaded_document_ids[ $doc_type ] = (int) $attachment_id;
+		}
+
+		if ( $selected_documents > 0 && count( $this->uploaded_document_ids ) !== $selected_documents && ! ( $this->last_upload_error instanceof WP_Error ) ) {
+			$this->last_upload_error = new WP_Error( 'af_pdf_upload_incomplete', __( 'One or more selected PDFs were not uploaded to Cloudflare R2.', 'arriendo-facil' ) );
 		}
 	}
 
@@ -511,7 +546,6 @@ class Arriendo_Facil_Owner_Contact {
 					'Content-Type'         => $mime_type,
 					'x-amz-date'           => $amz_date,
 					'x-amz-content-sha256' => $payload_hash,
-					'x-amz-acl'            => 'private',
 					'Authorization'        => $authorization,
 				),
 				'body'    => $contents,
@@ -524,7 +558,9 @@ class Arriendo_Facil_Owner_Contact {
 
 		$status_code = (int) wp_remote_retrieve_response_code( $response );
 		if ( $status_code < 200 || $status_code >= 300 ) {
-			return new WP_Error( 'af_r2_upload_failed', __( 'Cloudflare R2 rejected the uploaded file.', 'arriendo-facil' ) );
+			$response_body = (string) wp_remote_retrieve_body( $response );
+			$error_detail  = '' !== trim( $response_body ) ? ' ' . wp_strip_all_tags( $response_body ) : '';
+			return new WP_Error( 'af_r2_upload_failed', sprintf( '%s (HTTP %d).%s', __( 'Cloudflare R2 rejected the uploaded file.', 'arriendo-facil' ), $status_code, $error_detail ) );
 		}
 
 		update_post_meta( (int) $attachment_id, '_af_r2_uploaded', '1' );

@@ -41,13 +41,12 @@ class Arriendo_Facil_Guest {
 		$email      = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
 		$phone      = isset( $_POST['phone'] ) ? sanitize_text_field( wp_unslash( $_POST['phone'] ) ) : '';
 		$id_number  = isset( $_POST['id_number'] ) ? sanitize_text_field( wp_unslash( $_POST['id_number'] ) ) : '';
-		$ai_score   = isset( $_POST['ai_score'] ) ? floatval( wp_unslash( $_POST['ai_score'] ) ) : -1;
 
 		$name_parts = preg_split( '/\s+/', trim( $name ) );
 		$first_name = ! empty( $name_parts[0] ) ? $name_parts[0] : '';
 		$last_name  = count( $name_parts ) > 1 ? trim( implode( ' ', array_slice( $name_parts, 1 ) ) ) : '';
 
-		if ( ! $guest_id || ! $first_name || ! $last_name || ! $email || ! $phone || ! $id_number || $ai_score < 0 ) {
+		if ( ! $guest_id || ! $first_name || ! $last_name || ! $email || ! $phone || ! $id_number ) {
 			wp_send_json_error( array( 'message' => __( 'Missing required fields.', 'arriendo-facil' ) ) );
 		}
 
@@ -76,9 +75,8 @@ class Arriendo_Facil_Guest {
 				'email'      => $email,
 				'phone'      => $phone,
 				'id_number'  => $id_number,
-				'ai_score'   => $ai_score,
 			),
-			array( '%d', '%s', '%s', '%s', '%s', '%s', '%f' )
+			array( '%d', '%s', '%s', '%s', '%s', '%s' )
 		);
 
 		if ( $inserted ) {

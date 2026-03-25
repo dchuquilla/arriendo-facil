@@ -33,7 +33,7 @@ $guests = $wpdb->get_results(
 			<table class="form-table" role="presentation">
 				<tr>
 					<th scope="row"><label for="af_guest_id"><?php esc_html_e( 'ID*', 'arriendo-facil' ); ?></label></th>
-					<td><input type="number" min="1" step="1" required id="af_guest_id" name="guest_id" class="regular-text" /></td>
+					<td><input type="text" required id="af_guest_id" name="guest_id" class="regular-text" inputmode="numeric" pattern="^[0-9]+$" title="Use only numbers" /></td>
 				</tr>
 				<tr>
 					<th scope="row"><label for="af_guest_name"><?php esc_html_e( 'Name*', 'arriendo-facil' ); ?></label></th>
@@ -50,10 +50,6 @@ $guests = $wpdb->get_results(
 				<tr>
 					<th scope="row"><label for="af_guest_id_number"><?php esc_html_e( 'ID Number*', 'arriendo-facil' ); ?></label></th>
 					<td><input type="text" required id="af_guest_id_number" name="id_number" class="regular-text" /></td>
-				</tr>
-				<tr>
-					<th scope="row"><label for="af_guest_ai_score"><?php esc_html_e( 'AI Score*', 'arriendo-facil' ); ?></label></th>
-					<td><input type="number" required id="af_guest_ai_score" name="ai_score" class="small-text" min="0" max="100" step="0.01" /></td>
 				</tr>
 			</table>
 

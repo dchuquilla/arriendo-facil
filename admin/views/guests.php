@@ -26,7 +26,7 @@ $guests = $wpdb->get_results(
 
 	<div id="af-guest-form-card" class="card" style="max-width: 900px; margin: 16px 0; padding: 16px; display: none;">
 		<h2><?php esc_html_e( 'New Guest', 'arriendo-facil' ); ?></h2>
-		<form id="af-guest-form" method="post" action="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>">
+		<form id="af-guest-form" method="post" action="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>" enctype="multipart/form-data">
 			<input type="hidden" name="action" value="af_create_guest" />
 			<input type="hidden" name="nonce" value="<?php echo esc_attr( wp_create_nonce( 'af_guest_nonce' ) ); ?>" />
 
@@ -40,12 +40,47 @@ $guests = $wpdb->get_results(
 					<td><input type="text" required id="af_guest_name" name="name" class="regular-text" /></td>
 				</tr>
 				<tr>
-					<th scope="row"><label for="af_guest_email"><?php esc_html_e( 'Email*', 'arriendo-facil' ); ?></label></th>
+					<th scope="row"><label for="af_guest_email"><?php esc_html_e( 'Correo Electronico*', 'arriendo-facil' ); ?></label></th>
 					<td><input type="email" required id="af_guest_email" name="email" class="regular-text" /></td>
 				</tr>
 				<tr>
-					<th scope="row"><label for="af_guest_phone"><?php esc_html_e( 'Phone*', 'arriendo-facil' ); ?></label></th>
+					<th scope="row"><label for="af_guest_phone"><?php esc_html_e( 'Contacto*', 'arriendo-facil' ); ?></label></th>
 					<td><input type="text" required id="af_guest_phone" name="phone" class="regular-text" inputmode="numeric" pattern="^[0-9]{1,10}$" maxlength="10" title="Use only numbers (max 10)" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="af_guest_mascotas"><?php esc_html_e( 'Mascotas (1 a 10)*', 'arriendo-facil' ); ?></label></th>
+					<td><input type="number" required id="af_guest_mascotas" name="mascotas" class="small-text" min="1" max="10" step="1" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="af_guest_referencia_1"><?php esc_html_e( 'Referencias personales (min2)*', 'arriendo-facil' ); ?></label></th>
+					<td>
+						<input type="text" required id="af_guest_referencia_1" name="referencia_personal_1" class="regular-text" placeholder="Referencia personal 1" style="margin-bottom:8px;" />
+						<br />
+						<input type="text" required id="af_guest_referencia_2" name="referencia_personal_2" class="regular-text" placeholder="Referencia personal 2" />
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="af_guest_personas_viviran"><?php esc_html_e( 'Cuantas personas van a vivir o ingresar en la propiedad?*', 'arriendo-facil' ); ?></label></th>
+					<td>
+						<select id="af_guest_personas_viviran" name="personas_viviran" required>
+							<option value="">--</option>
+							<?php for ( $i = 1; $i <= 10; $i++ ) : ?>
+								<option value="<?php echo esc_attr( (string) $i ); ?>"><?php echo esc_html( (string) $i ); ?></option>
+							<?php endfor; ?>
+						</select>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="af_guest_garantia_alicuota_pdf"><?php esc_html_e( 'Garantia y Alicuota (PDF)', 'arriendo-facil' ); ?></label></th>
+					<td><input type="file" id="af_guest_garantia_alicuota_pdf" name="guest_garantia_alicuota_pdf" class="regular-text" accept="application/pdf,.pdf" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="af_guest_cedula_papeleta_pdf"><?php esc_html_e( 'Cedula y Papeleta de votacion (PDF)', 'arriendo-facil' ); ?></label></th>
+					<td><input type="file" id="af_guest_cedula_papeleta_pdf" name="guest_cedula_papeleta_pdf" class="regular-text" accept="application/pdf,.pdf" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="af_guest_certificado_bancario_pdf"><?php esc_html_e( 'Certificado bancario (PDF)', 'arriendo-facil' ); ?></label></th>
+					<td><input type="file" id="af_guest_certificado_bancario_pdf" name="guest_certificado_bancario_pdf" class="regular-text" accept="application/pdf,.pdf" /></td>
 				</tr>
 			</table>
 

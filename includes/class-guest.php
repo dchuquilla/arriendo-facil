@@ -36,27 +36,49 @@ class Arriendo_Facil_Guest {
 			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
 		}
 
-		$first_name = isset( $_POST['first_name'] ) ? sanitize_text_field( wp_unslash( $_POST['first_name'] ) ) : '';
-		$last_name  = isset( $_POST['last_name'] ) ? sanitize_text_field( wp_unslash( $_POST['last_name'] ) ) : '';
+		$guest_id   = isset( $_POST['guest_id'] ) ? absint( wp_unslash( $_POST['guest_id'] ) ) : 0;
+		$name       = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
 		$email      = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
 		$phone      = isset( $_POST['phone'] ) ? sanitize_text_field( wp_unslash( $_POST['phone'] ) ) : '';
 		$id_number  = isset( $_POST['id_number'] ) ? sanitize_text_field( wp_unslash( $_POST['id_number'] ) ) : '';
+		$ai_score   = isset( $_POST['ai_score'] ) ? floatval( wp_unslash( $_POST['ai_score'] ) ) : -1;
 
-		if ( ! $first_name || ! $last_name || ! $email ) {
+		$name_parts = preg_split( '/\s+/', trim( $name ) );
+		$first_name = ! empty( $name_parts[0] ) ? $name_parts[0] : '';
+		$last_name  = count( $name_parts ) > 1 ? trim( implode( ' ', array_slice( $name_parts, 1 ) ) ) : '';
+
+		if ( ! $guest_id || ! $first_name || ! $last_name || ! $email || ! $phone || ! $id_number || $ai_score < 0 ) {
 			wp_send_json_error( array( 'message' => __( 'Missing required fields.', 'arriendo-facil' ) ) );
 		}
 
+		if ( ! is_email( $email ) ) {
+			wp_send_json_error( array( 'message' => __( 'Invalid email.', 'arriendo-facil' ) ) );
+		}
+
 		global $wpdb;
+		$existing_id = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT id FROM {$wpdb->prefix}af_guests WHERE id = %d LIMIT 1",
+				$guest_id
+			)
+		);
+
+		if ( $existing_id > 0 ) {
+			wp_send_json_error( array( 'message' => __( 'This guest ID is already in use.', 'arriendo-facil' ) ) );
+		}
+
 		$inserted = $wpdb->insert(
 			$wpdb->prefix . 'af_guests',
 			array(
+				'id'         => $guest_id,
 				'first_name' => $first_name,
 				'last_name'  => $last_name,
 				'email'      => $email,
 				'phone'      => $phone,
 				'id_number'  => $id_number,
+				'ai_score'   => $ai_score,
 			),
-			array( '%s', '%s', '%s', '%s', '%s' )
+			array( '%d', '%s', '%s', '%s', '%s', '%s', '%f' )
 		);
 
 		if ( $inserted ) {

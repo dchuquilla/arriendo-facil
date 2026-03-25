@@ -24,6 +24,46 @@ $guests = $wpdb->get_results(
 		</button>
 	</div>
 
+	<div id="af-guest-form-card" class="card" style="max-width: 900px; margin: 16px 0; padding: 16px; display: none;">
+		<h2><?php esc_html_e( 'New Guest', 'arriendo-facil' ); ?></h2>
+		<form id="af-guest-form" method="post" action="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>">
+			<input type="hidden" name="action" value="af_create_guest" />
+			<input type="hidden" name="nonce" value="<?php echo esc_attr( wp_create_nonce( 'af_guest_nonce' ) ); ?>" />
+
+			<table class="form-table" role="presentation">
+				<tr>
+					<th scope="row"><label for="af_guest_id"><?php esc_html_e( 'ID*', 'arriendo-facil' ); ?></label></th>
+					<td><input type="number" min="1" step="1" required id="af_guest_id" name="guest_id" class="regular-text" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="af_guest_name"><?php esc_html_e( 'Name*', 'arriendo-facil' ); ?></label></th>
+					<td><input type="text" required id="af_guest_name" name="name" class="regular-text" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="af_guest_email"><?php esc_html_e( 'Email*', 'arriendo-facil' ); ?></label></th>
+					<td><input type="email" required id="af_guest_email" name="email" class="regular-text" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="af_guest_phone"><?php esc_html_e( 'Phone*', 'arriendo-facil' ); ?></label></th>
+					<td><input type="text" required id="af_guest_phone" name="phone" class="regular-text" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="af_guest_id_number"><?php esc_html_e( 'ID Number*', 'arriendo-facil' ); ?></label></th>
+					<td><input type="text" required id="af_guest_id_number" name="id_number" class="regular-text" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="af_guest_ai_score"><?php esc_html_e( 'AI Score*', 'arriendo-facil' ); ?></label></th>
+					<td><input type="number" required id="af_guest_ai_score" name="ai_score" class="small-text" min="0" max="100" step="0.01" /></td>
+				</tr>
+			</table>
+
+			<p class="submit">
+				<button type="submit" class="button button-primary"><?php esc_html_e( 'Save Guest', 'arriendo-facil' ); ?></button>
+				<button type="button" class="button" id="af-cancel-new-guest"><?php esc_html_e( 'Cancel', 'arriendo-facil' ); ?></button>
+			</p>
+		</form>
+	</div>
+
 	<table class="wp-list-table widefat fixed striped">
 		<thead>
 			<tr>

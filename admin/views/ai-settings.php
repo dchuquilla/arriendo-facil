@@ -141,7 +141,7 @@ if ( $r2_last_check_raw ) {
 
 $php_upload_max_bytes = wp_convert_hr_to_bytes( ini_get( 'upload_max_filesize' ) );
 $php_post_max_bytes   = wp_convert_hr_to_bytes( ini_get( 'post_max_size' ) );
-$owner_safe_total     = (int) apply_filters( 'af_owner_contact_safe_request_bytes', min( $php_post_max_bytes, 950 * 1024 ) );
+$owner_safe_total     = (int) apply_filters( 'af_owner_contact_safe_request_bytes', min( $php_post_max_bytes, 30 * 1024 * 1024 ) );
 $php_upload_max_human = size_format( $php_upload_max_bytes );
 $php_post_max_human   = size_format( $php_post_max_bytes );
 $owner_safe_human     = size_format( $owner_safe_total );

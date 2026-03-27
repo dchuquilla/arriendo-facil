@@ -120,15 +120,23 @@ if ( isset( $_POST['af_test_storage_connection'] ) ) {
 }
 
 if ( isset( $_POST['af_test_owner_data'] ) ) {
-    check_admin_referer( 'af_ai_settings_nonce' );
+	check_admin_referer( 'af_ai_settings_nonce' );
 
-    $result = af_gemini_collect_owner_data();
+	if ( class_exists( 'Arriendo_Facil_AI_Service' ) ) {
+		$ai_service = new Arriendo_Facil_AI_Service();
+		$result     = $ai_service->test_gemini_owner_connection();
+	} else {
+		$result = array(
+			'success' => false,
+			'message' => __( 'AI service class is not available.', 'arriendo-facil' ),
+		);
+	}
 
-    if ( $result['success'] ) {
-        echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( $result['message'] ) . '</p></div>';
-    } else {
-        echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( $result['message'] ) . '</p></div>';
-    }
+	if ( ! empty( $result['success'] ) ) {
+		echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( $result['message'] ) . '</p></div>';
+	} else {
+		echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( $result['message'] ) . '</p></div>';
+	}
 }
 
 $api_url = af_settings_get_value( 'AF_AI_API_URL', 'af_ai_api_url', '' );
@@ -167,13 +175,6 @@ $endpoint_locked          = af_settings_is_locked( 'AF_R2_ENDPOINT_URL' );
 $bucket_locked            = af_settings_is_locked( 'AF_R2_BUCKET_NAME' );
 $custom_domain_locked     = af_settings_is_locked( 'AF_R2_CUSTOM_DOMAIN' );
 $any_storage_field_locked = $provider_locked || $access_key_locked || $secret_key_locked || $endpoint_locked || $bucket_locked || $custom_domain_locked;
-?>
-
-<?php
-// Ensure the AI service class is included.
-if ( ! function_exists( 'af_gemini_collect_owner_data' ) ) {
-    require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ai-service.php';
-}
 ?>
 
 <div class="wrap">

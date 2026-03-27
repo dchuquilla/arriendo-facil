@@ -807,6 +807,7 @@
 		var ownerNameEl = modalEl.querySelector( '[data-af-field="owner-name"]' );
 		var ownerIdEl = modalEl.querySelector( '[data-af-field="owner-id"]' );
 		var ownerEmailEl = modalEl.querySelector( '[data-af-field="owner-email"]' );
+		var ownerAccommodationsEl = modalEl.querySelector( '[data-af-field="owner-accommodations"]' );
 		var legalSectionEl = modalEl.querySelector( '[data-af-legal-agent-section]' );
 		var legalNameEl = modalEl.querySelector( '[data-af-field="legal-name"]' );
 		var legalIdEl = modalEl.querySelector( '[data-af-field="legal-id"]' );
@@ -824,10 +825,28 @@
 			var ownerIdType = safeText( triggerEl.getAttribute( 'data-owner-id-type' ) );
 			var ownerIdNumber = safeText( triggerEl.getAttribute( 'data-owner-id' ) );
 			var hasLegalAgent = triggerEl.getAttribute( 'data-has-legal-agent' ) === '1';
+			var accommodationsRaw = String( triggerEl.getAttribute( 'data-owner-accommodations' ) || '' ).trim();
+			var accommodationsText = '-';
+			var parsedAccommodations;
 
 			ownerNameEl.textContent = safeText( triggerEl.getAttribute( 'data-owner-name' ) );
 			ownerIdEl.textContent = ownerIdType + ': ' + ownerIdNumber;
 			ownerEmailEl.textContent = safeText( triggerEl.getAttribute( 'data-owner-email' ) );
+
+			if ( accommodationsRaw ) {
+				try {
+					parsedAccommodations = JSON.parse( accommodationsRaw );
+					if ( Array.isArray( parsedAccommodations ) && parsedAccommodations.length ) {
+						accommodationsText = parsedAccommodations.join( ', ' );
+					}
+				} catch ( error ) {
+					accommodationsText = accommodationsRaw;
+				}
+			}
+
+			if ( ownerAccommodationsEl ) {
+				ownerAccommodationsEl.textContent = accommodationsText;
+			}
 
 			if ( legalSectionEl ) {
 				legalSectionEl.style.display = hasLegalAgent ? '' : 'none';

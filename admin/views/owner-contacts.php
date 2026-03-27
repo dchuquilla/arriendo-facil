@@ -14,6 +14,53 @@ global $wpdb;
 $contacts = $wpdb->get_results(
 	"SELECT * FROM {$wpdb->prefix}af_owner_contacts ORDER BY created_at DESC LIMIT 100"
 );
+
+$owner_accommodations = array();
+$owner_user_ids       = array();
+
+if ( $contacts ) {
+    foreach ( $contacts as $contact ) {
+        if ( ! empty( $contact->wp_user_id ) ) {
+            $owner_user_ids[] = (int) $contact->wp_user_id;
+        }
+    }
+
+    $owner_user_ids = array_values( array_unique( array_filter( $owner_user_ids ) ) );
+
+    if ( ! empty( $owner_user_ids ) ) {
+        $placeholders = implode( ',', array_fill( 0, count( $owner_user_ids ), '%d' ) );
+        $query        = $wpdb->prepare(
+            "SELECT CAST(pm.meta_value AS UNSIGNED) AS owner_user_id, p.post_title
+             FROM {$wpdb->postmeta} pm
+             INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id
+             WHERE pm.meta_key = '_af_owner_id'
+                AND CAST(pm.meta_value AS UNSIGNED) IN ($placeholders)
+                AND p.post_type = 'accommodation'
+                AND p.post_status IN ('publish', 'draft', 'pending', 'private')
+             ORDER BY p.post_title ASC",
+            $owner_user_ids
+        );
+        $rows         = $wpdb->get_results( $query );
+
+        foreach ( $owner_user_ids as $owner_user_id ) {
+            $owner_accommodations[ (int) $owner_user_id ] = array();
+        }
+
+        if ( $rows ) {
+            foreach ( $rows as $row ) {
+                $owner_user_id = (int) $row->owner_user_id;
+                if ( ! isset( $owner_accommodations[ $owner_user_id ] ) ) {
+                    $owner_accommodations[ $owner_user_id ] = array();
+                }
+
+                $title = trim( (string) $row->post_title );
+                if ( '' !== $title ) {
+                    $owner_accommodations[ $owner_user_id ][] = $title;
+                }
+            }
+        }
+    }
+}
 // Define if we are in "new contact" mode.
 $is_new = isset( $_GET['action'] ) && 'new' === sanitize_key( wp_unslash( $_GET['action'] ) );
 $notice = isset( $_GET['af_notice'] ) ? sanitize_key( wp_unslash( $_GET['af_notice'] ) ) : '';
@@ -176,12 +223,23 @@ $message = isset( $_GET['af_message'] ) ? sanitize_text_field( wp_unslash( $_GET
 				<?php foreach ( $contacts as $contact ) : ?>
                     <?php
                     $account_status = '';
+                    $accommodations = array();
+
                     if ( ! empty( $contact->wp_user_id ) ) {
                         $account_status = (string) get_user_meta( (int) $contact->wp_user_id, 'af_owner_account_status', true );
                         if ( '' === $account_status ) {
                             $account_status = 'inactive';
                         }
+
+						if ( isset( $owner_accommodations[ (int) $contact->wp_user_id ] ) ) {
+							$accommodations = $owner_accommodations[ (int) $contact->wp_user_id ];
+						}
                     }
+
+					$accommodations_json = wp_json_encode( array_values( array_unique( $accommodations ) ) );
+					if ( false === $accommodations_json ) {
+						$accommodations_json = '[]';
+					}
                     ?>
                     <tr class="af-owner-contact-row" data-contact-id="<?php echo esc_attr( (int) $contact->id ); ?>">
 						<td><?php echo esc_html( $contact->id ); ?></td>
@@ -198,6 +256,7 @@ $message = isset( $_GET['af_message'] ) ? sanitize_text_field( wp_unslash( $_GET
                                 data-owner-id-type="<?php echo esc_attr( strtoupper( (string) $contact->owner_id_type ) ); ?>"
                                 data-owner-id="<?php echo esc_attr( (string) $contact->owner_id ); ?>"
                                 data-owner-email="<?php echo esc_attr( (string) $contact->owner_email ); ?>"
+                                data-owner-accommodations="<?php echo esc_attr( $accommodations_json ); ?>"
                                 data-has-legal-agent="<?php echo esc_attr( ! empty( $contact->has_legal_agent ) ? '1' : '0' ); ?>"
                                 data-legal-agent-name="<?php echo esc_attr( (string) $contact->legal_agent_name ); ?>"
                                 data-legal-agent-id-type="<?php echo esc_attr( strtoupper( (string) $contact->legal_agent_id_type ) ); ?>"
@@ -240,6 +299,7 @@ $message = isset( $_GET['af_message'] ) ? sanitize_text_field( wp_unslash( $_GET
                 <p><strong><?php esc_html_e( 'Name', 'arriendo-facil' ); ?>:</strong> <span data-af-field="owner-name">-</span></p>
                 <p><strong><?php esc_html_e( 'ID', 'arriendo-facil' ); ?>:</strong> <span data-af-field="owner-id">-</span></p>
                 <p><strong><?php esc_html_e( 'Email', 'arriendo-facil' ); ?>:</strong> <span data-af-field="owner-email">-</span></p>
+                <p><strong><?php esc_html_e( 'Accommodations', 'arriendo-facil' ); ?>:</strong> <span data-af-field="owner-accommodations">-</span></p>
 
                 <div data-af-legal-agent-section>
                     <h3><?php esc_html_e( 'Legal Agent', 'arriendo-facil' ); ?></h3>

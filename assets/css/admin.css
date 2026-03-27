@@ -133,3 +133,17 @@ body.af-modal-open {
 .af-cleaning-service-table td textarea {
 	border-color: #8bb2f3;
 }
+
+/* Blue Add New button on Cleaning Services screens */
+body.post-type-cleaning_service .page-title-action {
+	background: #2271b1;
+	border-color: #2271b1;
+	color: #fff;
+}
+
+body.post-type-cleaning_service .page-title-action:hover,
+body.post-type-cleaning_service .page-title-action:focus {
+	background: #135e96;
+	border-color: #135e96;
+	color: #fff;
+}

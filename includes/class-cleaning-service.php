@@ -84,9 +84,9 @@ class Arriendo_Facil_Cleaning_Service {
 	public function render_meta_box( $post ) {
 		wp_nonce_field( 'af_save_cleaning_service_meta', 'af_cleaning_service_nonce' );
 
-		$price_per_hour = get_post_meta( $post->ID, '_af_price_per_hour', true );
-		$duration_hours = get_post_meta( $post->ID, '_af_duration_hours', true );
-		$service_type   = get_post_meta( $post->ID, '_af_service_type', true );
+		$company_name         = get_post_meta( $post->ID, '_af_company_name', true );
+		$company_ruc          = get_post_meta( $post->ID, '_af_company_ruc', true );
+		$services_description = get_post_meta( $post->ID, '_af_services_description', true );
 
 		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/cleaning-service-meta-box.php';
 	}
@@ -110,14 +110,14 @@ class Arriendo_Facil_Cleaning_Service {
 			return;
 		}
 
-		if ( isset( $_POST['af_price_per_hour'] ) ) {
-			update_post_meta( $post_id, '_af_price_per_hour', floatval( wp_unslash( $_POST['af_price_per_hour'] ) ) );
+		if ( isset( $_POST['af_company_name'] ) ) {
+			update_post_meta( $post_id, '_af_company_name', sanitize_text_field( wp_unslash( $_POST['af_company_name'] ) ) );
 		}
-		if ( isset( $_POST['af_duration_hours'] ) ) {
-			update_post_meta( $post_id, '_af_duration_hours', floatval( wp_unslash( $_POST['af_duration_hours'] ) ) );
+		if ( isset( $_POST['af_company_ruc'] ) ) {
+			update_post_meta( $post_id, '_af_company_ruc', sanitize_text_field( wp_unslash( $_POST['af_company_ruc'] ) ) );
 		}
-		if ( isset( $_POST['af_service_type'] ) ) {
-			update_post_meta( $post_id, '_af_service_type', sanitize_text_field( wp_unslash( $_POST['af_service_type'] ) ) );
+		if ( isset( $_POST['af_services_description'] ) ) {
+			update_post_meta( $post_id, '_af_services_description', sanitize_textarea_field( wp_unslash( $_POST['af_services_description'] ) ) );
 		}
 	}
 

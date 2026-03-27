@@ -3,51 +3,35 @@
  * Cleaning service meta box view.
  *
  * @package Arriendo_Facil
- * @var float  $price_per_hour Current price per hour meta value.
- * @var float  $duration_hours Current duration meta value.
- * @var string $service_type   Current service type meta value.
+ * @var string $company_name         Company name meta value.
+ * @var string $company_ruc          Company RUC meta value.
+ * @var string $services_description Services description meta value.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-$service_types = array(
-	'standard'  => __( 'Standard', 'arriendo-facil' ),
-	'deep'      => __( 'Deep Clean', 'arriendo-facil' ),
-	'move_in'   => __( 'Move-In', 'arriendo-facil' ),
-	'move_out'  => __( 'Move-Out', 'arriendo-facil' ),
-	'post_stay' => __( 'Post-Stay', 'arriendo-facil' ),
-);
 ?>
-<table class="form-table">
+<table class="form-table af-cleaning-service-table">
 	<tr>
-		<th><label for="af_service_type"><?php esc_html_e( 'Service Type', 'arriendo-facil' ); ?></label></th>
+		<th><label for="af_company_name"><?php esc_html_e( 'Company Name', 'arriendo-facil' ); ?></label></th>
 		<td>
-			<select id="af_service_type" name="af_service_type">
-				<?php foreach ( $service_types as $value => $label ) : ?>
-					<option value="<?php echo esc_attr( $value ); ?>"
-						<?php selected( $service_type, $value ); ?>>
-						<?php echo esc_html( $label ); ?>
-					</option>
-				<?php endforeach; ?>
-			</select>
+			<input type="text" id="af_company_name" name="af_company_name"
+				value="<?php echo esc_attr( $company_name ); ?>" class="regular-text" required />
 		</td>
 	</tr>
 	<tr>
-		<th><label for="af_price_per_hour"><?php esc_html_e( 'Price per Hour', 'arriendo-facil' ); ?></label></th>
+		<th><label for="af_company_ruc"><?php esc_html_e( 'RUC', 'arriendo-facil' ); ?></label></th>
 		<td>
-			<input type="number" id="af_price_per_hour" name="af_price_per_hour"
-				step="0.01" min="0"
-				value="<?php echo esc_attr( $price_per_hour ); ?>" class="regular-text" />
+			<input type="text" id="af_company_ruc" name="af_company_ruc"
+				value="<?php echo esc_attr( $company_ruc ); ?>" class="regular-text" required />
 		</td>
 	</tr>
 	<tr>
-		<th><label for="af_duration_hours"><?php esc_html_e( 'Duration (hours)', 'arriendo-facil' ); ?></label></th>
+		<th><label for="af_services_description"><?php esc_html_e( 'Services Description', 'arriendo-facil' ); ?></label></th>
 		<td>
-			<input type="number" id="af_duration_hours" name="af_duration_hours"
-				step="0.5" min="0"
-				value="<?php echo esc_attr( $duration_hours ); ?>" class="regular-text" />
+			<textarea id="af_services_description" name="af_services_description" rows="5" class="large-text" required><?php echo esc_textarea( $services_description ); ?></textarea>
 		</td>
 	</tr>
 </table>

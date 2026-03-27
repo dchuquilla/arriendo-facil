@@ -40,8 +40,24 @@ class Arriendo_Facil_AI_Service {
 	 * Constructor – loads API configuration from plugin options.
 	 */
 	public function __construct() {
-		$this->api_url = get_option( 'af_ai_api_url', '' );
-		$this->api_key = get_option( 'af_ai_api_key', '' );
+		$this->api_url = $this->get_setting_value( 'AF_AI_API_URL', 'af_ai_api_url' );
+		$this->api_key = $this->get_setting_value( 'AF_AI_API_KEY', 'af_ai_api_key' );
+	}
+
+	/**
+	 * Returns a setting value, prioritizing wp-config constants.
+	 *
+	 * @param string $constant_name Constant name.
+	 * @param string $option_name   Option name.
+	 * @return string
+	 */
+	private function get_setting_value( $constant_name, $option_name ) {
+		if ( defined( $constant_name ) ) {
+			$value = constant( $constant_name );
+			return is_string( $value ) ? $value : '';
+		}
+
+		return (string) get_option( $option_name, '' );
 	}
 
 	/**
@@ -112,12 +128,17 @@ class Arriendo_Facil_AI_Service {
 			return new WP_Error( 'no_api_url', __( 'AI API URL is not configured.', 'arriendo-facil' ) );
 		}
 
+		$headers = array(
+			'Content-Type' => 'application/json',
+		);
+
+		if ( '' !== $this->api_key ) {
+			$headers['Authorization'] = 'Bearer ' . $this->api_key;
+		}
+
 		$args = array(
 			'method'  => 'POST',
-			'headers' => array(
-				'Content-Type'  => 'application/json',
-				'Authorization' => 'Bearer ' . $this->api_key,
-			),
+			'headers' => $headers,
 			'body'    => wp_json_encode( $payload ),
 			'timeout' => 30,
 		);
@@ -199,27 +220,32 @@ class Arriendo_Facil_AI_Service {
 			);
 		}
 
-		if ( empty( $this->api_url ) || empty( $this->api_key ) ) {
+		if ( empty( $this->api_url ) ) {
 			return array(
 				'success' => false,
-				'message' => __( 'Gemini API URL or API key is missing.', 'arriendo-facil' ),
+				'message' => __( 'Gemini API URL is missing.', 'arriendo-facil' ),
 			);
 		}
 
-		$endpoint = trailingslashit( untrailingslashit( $this->api_url ) ) . 'owners/test-connection';
+		$headers = array(
+			'Content-Type' => 'application/json',
+		);
+
+		if ( '' !== $this->api_key ) {
+			$headers['Authorization'] = 'Bearer ' . $this->api_key;
+		}
 
 		$response = wp_remote_post(
-			esc_url_raw( $endpoint ),
+			esc_url_raw( $this->api_url ),
 			array(
 				'timeout' => 20,
-				'headers' => array(
-					'Authorization' => 'Bearer ' . $this->api_key,
-					'Content-Type'  => 'application/json',
-				),
+				'headers' => $headers,
 				'body'    => wp_json_encode(
 					array(
 						'action' => 'test_owner_connection',
-						'owners' => $owners,
+						'data'   => array(
+							'owners' => $owners,
+						),
 					)
 				),
 			)
@@ -234,9 +260,13 @@ class Arriendo_Facil_AI_Service {
 
 		$status_code = wp_remote_retrieve_response_code( $response );
 		if ( $status_code >= 200 && $status_code < 300 ) {
+			$message = '' !== $this->api_key
+				? __( 'Gemini connection successful with owner payload.', 'arriendo-facil' )
+				: __( 'Gemini connection successful (without API key).', 'arriendo-facil' );
+
 			return array(
 				'success' => true,
-				'message' => __( 'Gemini connection successful with owner payload.', 'arriendo-facil' ),
+				'message' => $message,
 			);
 		}
 

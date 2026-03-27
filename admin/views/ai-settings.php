@@ -222,6 +222,11 @@ $any_storage_field_locked = $provider_locked || $access_key_locked || $secret_ke
 		<p class="submit">
 			<input type="submit" name="af_save_ai_settings" class="button button-primary"
 				value="<?php esc_attr_e( 'Save Settings', 'arriendo-facil' ); ?>" />
+			<input type="submit" name="af_test_owner_data" class="button button-secondary"
+				value="<?php esc_attr_e( 'Test Gemini Connection', 'arriendo-facil' ); ?>" />
+		</p>
+		<p class="description">
+			<?php esc_html_e( 'This test uses AI API URL / API key and owner records. It is not related to Cloud Provider settings.', 'arriendo-facil' ); ?>
 		</p>
 
 		<hr />
@@ -295,7 +300,6 @@ $any_storage_field_locked = $provider_locked || $access_key_locked || $secret_ke
 		<p class="submit">
 			<input type="submit" name="af_save_storage_credentials" class="button button-primary" value="<?php esc_attr_e( 'Save Credentials', 'arriendo-facil' ); ?>" />
 			<input type="submit" name="af_test_storage_connection" class="button button-secondary" value="<?php esc_attr_e( 'Test Connection', 'arriendo-facil' ); ?>" />
-			<input type="submit" name="af_test_owner_data" class="button button-secondary" value="<?php esc_attr_e( 'Test Owner Data Collection', 'arriendo-facil' ); ?>" />
 		</p>
 
 		<?php if ( $any_storage_field_locked ) : ?>

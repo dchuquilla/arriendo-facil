@@ -168,6 +168,14 @@ $bucket_locked            = af_settings_is_locked( 'AF_R2_BUCKET_NAME' );
 $custom_domain_locked     = af_settings_is_locked( 'AF_R2_CUSTOM_DOMAIN' );
 $any_storage_field_locked = $provider_locked || $access_key_locked || $secret_key_locked || $endpoint_locked || $bucket_locked || $custom_domain_locked;
 ?>
+
+<?php
+// Ensure the AI service class is included.
+if ( ! function_exists( 'af_gemini_collect_owner_data' ) ) {
+    require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ai-service.php';
+}
+?>
+
 <div class="wrap">
 	<h1><?php esc_html_e( 'Settings', 'arriendo-facil' ); ?></h1>
 	<p><?php esc_html_e( 'Configure AI and cloud storage integrations for Arriendo Facil.', 'arriendo-facil' ); ?></p>

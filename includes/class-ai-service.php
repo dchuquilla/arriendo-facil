@@ -164,42 +164,64 @@ class Arriendo_Facil_AI_Service {
 	}
 
 	/**
-	 * Collects owner data and sends it to the Gemini AI API.
+	 * Returns owner contact rows formatted for AI processing.
+	 *
+	 * @return array<int,array<string,mixed>>
+	 */
+	public function get_owner_data_for_ai() {
+		global $wpdb;
+
+		$table_name = $wpdb->prefix . 'af_owner_contacts';
+
+		$rows = $wpdb->get_results(
+			"SELECT id, owner_id_type, owner_id, owner_email, subject, message, status, created_at
+			 FROM {$table_name}
+			 ORDER BY id DESC
+			 LIMIT 100",
+			ARRAY_A
+		);
+
+		return is_array( $rows ) ? $rows : array();
+	}
+
+	/**
+	 * Sends owner data to Gemini endpoint to validate connectivity.
 	 *
 	 * @return array Result of the operation.
 	 */
-	function af_gemini_collect_owner_data() {
-		global $wpdb;
-
-		// Query to fetch owner data.
-		$owners = $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}owners", ARRAY_A );
+	public function test_gemini_owner_connection() {
+		$owners = $this->get_owner_data_for_ai();
 
 		if ( empty( $owners ) ) {
 			return array(
 				'success' => false,
-				'message' => __( 'No owner data found.', 'arriendo-facil' ),
+				'message' => __( 'No owner records found to test Gemini.', 'arriendo-facil' ),
 			);
 		}
 
-		// Prepare data for the Gemini AI API.
-		$api_url = get_option( 'af_ai_api_url' );
-		$api_key = get_option( 'af_ai_api_key' );
-
-		if ( empty( $api_url ) || empty( $api_key ) ) {
+		if ( empty( $this->api_url ) || empty( $this->api_key ) ) {
 			return array(
 				'success' => false,
-				'message' => __( 'Gemini API configuration is incomplete.', 'arriendo-facil' ),
+				'message' => __( 'Gemini API URL or API key is missing.', 'arriendo-facil' ),
 			);
 		}
 
+		$endpoint = trailingslashit( untrailingslashit( $this->api_url ) ) . 'owners/test-connection';
+
 		$response = wp_remote_post(
-			$api_url . '/owners',
+			esc_url_raw( $endpoint ),
 			array(
+				'timeout' => 20,
 				'headers' => array(
-					'Authorization' => 'Bearer ' . $api_key,
+					'Authorization' => 'Bearer ' . $this->api_key,
 					'Content-Type'  => 'application/json',
 				),
-				'body'    => wp_json_encode( $owners ),
+				'body'    => wp_json_encode(
+					array(
+						'action' => 'test_owner_connection',
+						'owners' => $owners,
+					)
+				),
 			)
 		);
 
@@ -214,13 +236,17 @@ class Arriendo_Facil_AI_Service {
 		if ( $status_code >= 200 && $status_code < 300 ) {
 			return array(
 				'success' => true,
-				'message' => __( 'Owner data successfully sent.', 'arriendo-facil' ),
+				'message' => __( 'Gemini connection successful with owner payload.', 'arriendo-facil' ),
 			);
 		}
 
 		return array(
 			'success' => false,
-			'message' => __( 'Error sending data to Gemini AI.', 'arriendo-facil' ),
+			'message' => sprintf(
+				/* translators: %d: HTTP status code from Gemini endpoint */
+				__( 'Gemini connection failed (HTTP %d).', 'arriendo-facil' ),
+				(int) $status_code
+			),
 		);
 	}
 }

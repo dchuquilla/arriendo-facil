@@ -56,7 +56,8 @@ class Arriendo_Facil_Cleaning_Service {
 			'has_archive'        => false,
 			'hierarchical'       => false,
 			'supports'           => array( 'title', 'editor' ),
-			'show_in_rest'       => true,
+			// Keep classic editor so the custom details table is always visible.
+			'show_in_rest'       => false,
 		);
 
 		register_post_type( 'cleaning_service', $args );

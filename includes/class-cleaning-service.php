@@ -115,7 +115,10 @@ class Arriendo_Facil_Cleaning_Service {
 			update_post_meta( $post_id, '_af_company_name', sanitize_text_field( wp_unslash( $_POST['af_company_name'] ) ) );
 		}
 		if ( isset( $_POST['af_company_ruc'] ) ) {
-			update_post_meta( $post_id, '_af_company_ruc', sanitize_text_field( wp_unslash( $_POST['af_company_ruc'] ) ) );
+			$ruc = preg_replace( '/\D+/', '', (string) wp_unslash( $_POST['af_company_ruc'] ) );
+			if ( 1 === preg_match( '/^[0-9]{13}$/', $ruc ) ) {
+				update_post_meta( $post_id, '_af_company_ruc', $ruc );
+			}
 		}
 		if ( isset( $_POST['af_services_description'] ) ) {
 			update_post_meta( $post_id, '_af_services_description', sanitize_textarea_field( wp_unslash( $_POST['af_services_description'] ) ) );

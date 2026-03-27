@@ -121,6 +121,190 @@
 			} );
 	} );
 
+	// ── Create cleaning request with owner-based filtering ──────────────────
+	$( document ).on( 'click', '#af-new-cleaning-request', function () {
+		$( '#af-cleaning-request-form-card' ).show();
+		$( '#af_cleaning_owner_search' ).trigger( 'focus' );
+	} );
+
+	$( document ).on( 'click', '#af-cancel-cleaning-request', function () {
+		var formEl = document.getElementById( 'af-cleaning-request-form' );
+		if ( formEl ) {
+			formEl.reset();
+		}
+
+		resetCleaningRequestFilters();
+		$( '#af-cleaning-request-form-card' ).hide();
+	} );
+
+	$( document ).on( 'input', '#af_cleaning_owner_search', function () {
+		filterOwnersAndCleaningServices();
+	} );
+
+	$( document ).on( 'change', '#af_cleaning_owner_select', function () {
+		filterOwnerAccommodations();
+	} );
+
+	$( document ).on( 'submit', '#af-cleaning-request-form', function ( event ) {
+		event.preventDefault();
+
+		var formEl = this;
+		var $form = $( formEl );
+		var $submit = $form.find( '#af-cleaning-request-submit' );
+		var ownerText = $( '#af_cleaning_owner_select option:selected' ).text() || '';
+		var serviceText = $( '#af_cleaning_service_select option:selected' ).text() || '';
+		var baseNotes = $( '#af_cleaning_notes' ).val() || '';
+		var computedNotes = baseNotes;
+
+		if ( ! formEl.checkValidity() ) {
+			formEl.reportValidity();
+			return;
+		}
+
+		if ( ownerText ) {
+			computedNotes += ( computedNotes ? '\n' : '' ) + 'Owner: ' + ownerText;
+		}
+
+		if ( serviceText ) {
+			computedNotes += ( computedNotes ? '\n' : '' ) + 'Cleaning service: ' + serviceText;
+		}
+
+		$submit.prop( 'disabled', true );
+
+		$.post( afAdmin.ajaxUrl, {
+			action: 'af_create_cleaning_request',
+			nonce: afAdmin.cleaningNonce,
+			accommodation_id: $( '#af_cleaning_accommodation_id' ).val(),
+			requested_date: $( '#af_cleaning_requested_date' ).val(),
+			notes: computedNotes
+		} )
+			.done( function ( response ) {
+				if ( response && response.success ) {
+					window.location.reload();
+					return;
+				}
+
+				alert( response && response.data && response.data.message ? response.data.message : 'Could not create cleaning request.' );
+			} )
+			.fail( function () {
+				alert( 'Request failed.' );
+			} )
+			.always( function () {
+				$submit.prop( 'disabled', false );
+			} );
+	} );
+
+	function filterOwnersAndCleaningServices() {
+		var term = String( $( '#af_cleaning_owner_search' ).val() || '' ).toLowerCase().trim();
+		var ownerSelect = document.getElementById( 'af_cleaning_owner_select' );
+		var serviceSelect = document.getElementById( 'af_cleaning_service_select' );
+		var i;
+
+		if ( ownerSelect ) {
+			for ( i = 0; i < ownerSelect.options.length; i++ ) {
+				var ownerOption = ownerSelect.options[ i ];
+				if ( ! ownerOption.value ) {
+					ownerOption.hidden = false;
+					continue;
+				}
+
+				var ownerName = String( ownerOption.getAttribute( 'data-owner-name' ) || '' );
+				var ownerRuc = String( ownerOption.getAttribute( 'data-owner-ruc' ) || '' );
+				var ownerVisible = ! term || ownerName.indexOf( term ) !== -1 || ownerRuc.indexOf( term ) !== -1;
+				ownerOption.hidden = ! ownerVisible;
+			}
+
+			if ( ownerSelect.selectedIndex >= 0 && ownerSelect.options[ ownerSelect.selectedIndex ] && ownerSelect.options[ ownerSelect.selectedIndex ].hidden ) {
+				ownerSelect.value = '';
+			}
+		}
+
+		if ( serviceSelect ) {
+			for ( i = 0; i < serviceSelect.options.length; i++ ) {
+				var serviceOption = serviceSelect.options[ i ];
+				if ( ! serviceOption.value ) {
+					serviceOption.hidden = false;
+					continue;
+				}
+
+				var serviceName = String( serviceOption.getAttribute( 'data-company-name' ) || '' );
+				var serviceRuc = String( serviceOption.getAttribute( 'data-company-ruc' ) || '' );
+				var serviceVisible = ! term || serviceName.indexOf( term ) !== -1 || serviceRuc.indexOf( term ) !== -1;
+				serviceOption.hidden = ! serviceVisible;
+			}
+
+			if ( serviceSelect.selectedIndex >= 0 && serviceSelect.options[ serviceSelect.selectedIndex ] && serviceSelect.options[ serviceSelect.selectedIndex ].hidden ) {
+				serviceSelect.value = '';
+			}
+		}
+
+		filterOwnerAccommodations();
+	}
+
+	function filterOwnerAccommodations() {
+		var ownerSelect = document.getElementById( 'af_cleaning_owner_select' );
+		var accommodationSelect = document.getElementById( 'af_cleaning_accommodation_id' );
+		var selectedOwnerUser = ownerSelect ? String( ownerSelect.value || '' ) : '';
+		var i;
+
+		if ( ! accommodationSelect ) {
+			return;
+		}
+
+		for ( i = 0; i < accommodationSelect.options.length; i++ ) {
+			var accommodationOption = accommodationSelect.options[ i ];
+			if ( ! accommodationOption.value ) {
+				accommodationOption.hidden = false;
+				continue;
+			}
+
+			var optionOwnerUser = String( accommodationOption.getAttribute( 'data-owner-user' ) || '' );
+			var visible = !! selectedOwnerUser && optionOwnerUser === selectedOwnerUser;
+			accommodationOption.hidden = ! visible;
+		}
+
+		if ( accommodationSelect.selectedIndex >= 0 && accommodationSelect.options[ accommodationSelect.selectedIndex ] && accommodationSelect.options[ accommodationSelect.selectedIndex ].hidden ) {
+			accommodationSelect.value = '';
+		}
+	}
+
+	function resetCleaningRequestFilters() {
+		var ownerSearch = document.getElementById( 'af_cleaning_owner_search' );
+		var ownerSelect = document.getElementById( 'af_cleaning_owner_select' );
+		var accommodationSelect = document.getElementById( 'af_cleaning_accommodation_id' );
+		var serviceSelect = document.getElementById( 'af_cleaning_service_select' );
+		var i;
+
+		if ( ownerSearch ) {
+			ownerSearch.value = '';
+		}
+
+		if ( ownerSelect ) {
+			ownerSelect.value = '';
+			for ( i = 0; i < ownerSelect.options.length; i++ ) {
+				ownerSelect.options[ i ].hidden = false;
+			}
+		}
+
+		if ( accommodationSelect ) {
+			accommodationSelect.value = '';
+			for ( i = 0; i < accommodationSelect.options.length; i++ ) {
+				if ( accommodationSelect.options[ i ].value ) {
+					accommodationSelect.options[ i ].hidden = true;
+				} else {
+					accommodationSelect.options[ i ].hidden = false;
+				}
+			}
+		}
+
+		if ( serviceSelect ) {
+			serviceSelect.value = '';
+			for ( i = 0; i < serviceSelect.options.length; i++ ) {
+				serviceSelect.options[ i ].hidden = false;
+			}
+		}
+	}
+
 	// Submit new owner contact form (admin page).
 	$( document ).on( 'submit', '#af-owner-contact-form', function ( e ) {
         e.preventDefault();

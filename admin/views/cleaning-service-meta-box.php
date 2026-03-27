@@ -25,7 +25,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 		<th><label for="af_company_ruc"><?php esc_html_e( 'RUC', 'arriendo-facil' ); ?></label></th>
 		<td>
 			<input type="text" id="af_company_ruc" name="af_company_ruc"
-				value="<?php echo esc_attr( $company_ruc ); ?>" class="regular-text" required />
+				value="<?php echo esc_attr( $company_ruc ); ?>" class="regular-text"
+				inputmode="numeric" pattern="^[0-9]{13}$" maxlength="13"
+				title="RUC must contain exactly 13 digits" required />
 		</td>
 	</tr>
 	<tr>

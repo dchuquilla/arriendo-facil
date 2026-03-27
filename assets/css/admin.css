@@ -115,3 +115,21 @@
 body.af-modal-open {
 	overflow: hidden;
 }
+
+/* Cleaning service details box (blue tone) */
+.af-cleaning-service-table {
+	background: #e8f1ff;
+	border: 1px solid #bcd3ff;
+	border-radius: 8px;
+	padding: 12px;
+}
+
+.af-cleaning-service-table th {
+	color: #123a75;
+	font-weight: 700;
+}
+
+.af-cleaning-service-table td input,
+.af-cleaning-service-table td textarea {
+	border-color: #8bb2f3;
+}

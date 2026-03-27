@@ -119,6 +119,18 @@ if ( isset( $_POST['af_test_storage_connection'] ) ) {
 	}
 }
 
+if ( isset( $_POST['af_test_owner_data'] ) ) {
+    check_admin_referer( 'af_ai_settings_nonce' );
+
+    $result = af_gemini_collect_owner_data();
+
+    if ( $result['success'] ) {
+        echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( $result['message'] ) . '</p></div>';
+    } else {
+        echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( $result['message'] ) . '</p></div>';
+    }
+}
+
 $api_url = af_settings_get_value( 'AF_AI_API_URL', 'af_ai_api_url', '' );
 $api_key = af_settings_get_value( 'AF_AI_API_KEY', 'af_ai_api_key', '' );
 
@@ -274,6 +286,7 @@ $any_storage_field_locked = $provider_locked || $access_key_locked || $secret_ke
 		<p class="submit">
 			<input type="submit" name="af_save_storage_credentials" class="button button-primary" value="<?php esc_attr_e( 'Save Credentials', 'arriendo-facil' ); ?>" />
 			<input type="submit" name="af_test_storage_connection" class="button button-secondary" value="<?php esc_attr_e( 'Test Connection', 'arriendo-facil' ); ?>" />
+			<input type="submit" name="af_test_owner_data" class="button button-secondary" value="<?php esc_attr_e( 'Test Owner Data Collection', 'arriendo-facil' ); ?>" />
 		</p>
 
 		<?php if ( $any_storage_field_locked ) : ?>

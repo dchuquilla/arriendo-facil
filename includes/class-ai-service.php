@@ -162,4 +162,65 @@ class Arriendo_Facil_AI_Service {
 			array( '%s', '%s', '%s' )
 		);
 	}
+
+	/**
+	 * Collects owner data and sends it to the Gemini AI API.
+	 *
+	 * @return array Result of the operation.
+	 */
+	function af_gemini_collect_owner_data() {
+		global $wpdb;
+
+		// Query to fetch owner data.
+		$owners = $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}owners", ARRAY_A );
+
+		if ( empty( $owners ) ) {
+			return array(
+				'success' => false,
+				'message' => __( 'No owner data found.', 'arriendo-facil' ),
+			);
+		}
+
+		// Prepare data for the Gemini AI API.
+		$api_url = get_option( 'af_ai_api_url' );
+		$api_key = get_option( 'af_ai_api_key' );
+
+		if ( empty( $api_url ) || empty( $api_key ) ) {
+			return array(
+				'success' => false,
+				'message' => __( 'Gemini API configuration is incomplete.', 'arriendo-facil' ),
+			);
+		}
+
+		$response = wp_remote_post(
+			$api_url . '/owners',
+			array(
+				'headers' => array(
+					'Authorization' => 'Bearer ' . $api_key,
+					'Content-Type'  => 'application/json',
+				),
+				'body'    => wp_json_encode( $owners ),
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return array(
+				'success' => false,
+				'message' => $response->get_error_message(),
+			);
+		}
+
+		$status_code = wp_remote_retrieve_response_code( $response );
+		if ( $status_code >= 200 && $status_code < 300 ) {
+			return array(
+				'success' => true,
+				'message' => __( 'Owner data successfully sent.', 'arriendo-facil' ),
+			);
+		}
+
+		return array(
+			'success' => false,
+			'message' => __( 'Error sending data to Gemini AI.', 'arriendo-facil' ),
+		);
+	}
 }

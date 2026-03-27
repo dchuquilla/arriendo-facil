@@ -86,13 +86,7 @@ $cleaning_services = $wpdb->get_results(
 
 			<table class="form-table" role="presentation">
 				<tr>
-					<th scope="row"><label for="af_cleaning_owner_search"><?php esc_html_e( 'Owner Name / RUC', 'arriendo-facil' ); ?></label></th>
-					<td>
-						<input type="text" id="af_cleaning_owner_search" class="regular-text" placeholder="Search owner by name or RUC" />
-					</td>
-				</tr>
-				<tr>
-					<th scope="row"><label for="af_cleaning_owner_select"><?php esc_html_e( 'Owner Name', 'arriendo-facil' ); ?></label></th>
+					<th scope="row"><label for="af_cleaning_owner_select"><?php esc_html_e( 'Owner Name / RUC', 'arriendo-facil' ); ?></label></th>
 					<td>
 						<select id="af_cleaning_owner_select" class="regular-text" required>
 							<option value=""><?php esc_html_e( 'Select owner', 'arriendo-facil' ); ?></option>

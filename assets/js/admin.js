@@ -124,7 +124,7 @@
 	// ── Create cleaning request with owner-based filtering ──────────────────
 	$( document ).on( 'click', '#af-new-cleaning-request', function () {
 		$( '#af-cleaning-request-form-card' ).show();
-		$( '#af_cleaning_owner_search' ).trigger( 'focus' );
+		$( '#af_cleaning_owner_select' ).trigger( 'focus' );
 	} );
 
 	$( document ).on( 'click', '#af-cancel-cleaning-request', function () {

@@ -26,6 +26,7 @@ class Arriendo_Facil_Cleaning_Service {
 		add_action( 'save_post_cleaning_service', array( $this, 'save_meta' ) );
 		add_action( 'wp_ajax_af_create_cleaning_request', array( $this, 'ajax_create_request' ) );
 		add_action( 'wp_ajax_af_update_cleaning_request', array( $this, 'ajax_update_request' ) );
+		add_action( 'wp_ajax_af_generate_cleaning_contract_word', array( $this, 'ajax_generate_cleaning_contract_word' ) );
 	}
 
 	/**
@@ -215,5 +216,75 @@ class Arriendo_Facil_Cleaning_Service {
 				$accommodation_id
 			)
 		);
+	}
+
+	/**
+	 * Generates a Word document with cleaning contract request text.
+	 */
+	public function ajax_generate_cleaning_contract_word() {
+		check_ajax_referer( 'af_cleaning_request_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			wp_die( esc_html__( 'Permission denied.', 'arriendo-facil' ) );
+		}
+
+		$request_id = isset( $_GET['request_id'] ) ? absint( $_GET['request_id'] ) : 0;
+		if ( ! $request_id ) {
+			wp_die( esc_html__( 'Invalid cleaning request.', 'arriendo-facil' ) );
+		}
+
+		global $wpdb;
+		$request = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT r.*, p.post_title AS accommodation_title
+				 FROM {$wpdb->prefix}af_cleaning_requests r
+				 LEFT JOIN {$wpdb->posts} p ON p.ID = r.accommodation_id
+				 WHERE r.id = %d
+				 LIMIT 1",
+				$request_id
+			)
+		);
+
+		if ( ! $request ) {
+			wp_die( esc_html__( 'Cleaning request not found.', 'arriendo-facil' ) );
+		}
+
+		$contract_text = __( 'El cliente solicita un contrato de servicio de limpieza para el inmueble indicado, con alcance y condiciones por definir entre las partes.', 'arriendo-facil' );
+
+		$ai = new Arriendo_Facil_AI_Service();
+		$ai_result = $ai->generate_cleaning_contract(
+			array(
+				'request_id'         => (int) $request->id,
+				'accommodation'      => (string) $request->accommodation_title,
+				'requested_date'     => (string) $request->requested_date,
+				'status'             => (string) $request->status,
+				'notes'              => (string) $request->notes,
+			)
+		);
+
+		if ( ! is_wp_error( $ai_result ) && ! empty( $ai_result['contract_text'] ) ) {
+			$contract_text = (string) $ai_result['contract_text'];
+		}
+
+		$file_name = 'cleaning-contract-request-' . (int) $request->id . '.doc';
+
+		nocache_headers();
+		header( 'Content-Description: File Transfer' );
+		header( 'Content-Type: application/msword; charset=utf-8' );
+		header( 'Content-Disposition: attachment; filename=' . $file_name );
+
+		$title = __( 'Contrato de Servicio de Limpieza', 'arriendo-facil' );
+
+		echo "<html><head><meta charset='utf-8'></head><body>";
+		echo '<h1>' . esc_html( $title ) . '</h1>';
+		echo '<p><strong>' . esc_html__( 'Solicitud:', 'arriendo-facil' ) . '</strong> ' . esc_html( $contract_text ) . '</p>';
+		echo '<p><strong>' . esc_html__( 'Alojamiento:', 'arriendo-facil' ) . '</strong> ' . esc_html( (string) $request->accommodation_title ) . '</p>';
+		echo '<p><strong>' . esc_html__( 'Fecha solicitada:', 'arriendo-facil' ) . '</strong> ' . esc_html( (string) $request->requested_date ) . '</p>';
+		echo '<p><strong>' . esc_html__( 'Estado:', 'arriendo-facil' ) . '</strong> ' . esc_html( (string) $request->status ) . '</p>';
+		if ( ! empty( $request->notes ) ) {
+			echo '<p><strong>' . esc_html__( 'Notas:', 'arriendo-facil' ) . '</strong> ' . nl2br( esc_html( (string) $request->notes ) ) . '</p>';
+		}
+		echo '</body></html>';
+		exit;
 	}
 }

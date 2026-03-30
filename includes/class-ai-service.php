@@ -132,6 +132,25 @@ class Arriendo_Facil_AI_Service {
 	}
 
 	/**
+	 * Generates cleaning service contract text.
+	 *
+	 * @param array $contract_data Contract context.
+	 * @return array|WP_Error Response array with 'contract_text' key, or WP_Error.
+	 */
+	public function generate_cleaning_contract( array $contract_data ) {
+		$payload = array(
+			'action' => 'generate_cleaning_contract',
+			'data'   => $contract_data,
+		);
+
+		$response = $this->request( $payload );
+
+		$this->log( 'generate_cleaning_contract', $contract_data, $response );
+
+		return $response;
+	}
+
+	/**
 	 * Sends a POST request to ChatGPT and expects JSON content in the response.
 	 *
 	 * @param array $payload Request payload.
@@ -226,6 +245,10 @@ class Arriendo_Facil_AI_Service {
 
 		if ( 'score_guest' === $action ) {
 			return "Task: Score guest suitability from 0 to 100 and summarize briefly. Return JSON with keys 'score' (number) and 'summary' (string). Input: " . wp_json_encode( $data );
+		}
+
+		if ( 'generate_cleaning_contract' === $action ) {
+			return "Task: Draft a concise professional Spanish cleaning-service contract request text. Return JSON with key 'contract_text' as plain text only. Input: " . wp_json_encode( $data );
 		}
 
 		return "Task: Analyze provided data and return JSON object. Input: " . wp_json_encode( $payload );

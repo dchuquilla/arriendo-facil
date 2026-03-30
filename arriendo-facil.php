@@ -71,10 +71,23 @@ function arriendo_facil_init() {
 add_action( 'plugins_loaded', 'arriendo_facil_init' );
 
 /**
+ * Determines if chatbot should be shown in current frontend request.
+ *
+ * @return bool
+ */
+function arriendo_facil_should_show_chatbot() {
+	if ( is_admin() ) {
+		return false;
+	}
+
+	return is_front_page() || is_home() || is_post_type_archive( 'accommodation' ) || is_singular( 'accommodation' );
+}
+
+/**
  * Enqueues frontend chatbot assets on accommodation pages.
  */
 function arriendo_facil_enqueue_chatbot_assets() {
-	if ( ! is_singular( 'accommodation' ) ) {
+	if ( ! arriendo_facil_should_show_chatbot() ) {
 		return;
 	}
 
@@ -112,9 +125,13 @@ add_action( 'wp_enqueue_scripts', 'arriendo_facil_enqueue_chatbot_assets' );
  * Renders frontend chatbot widget in accommodation pages.
  */
 function arriendo_facil_render_chatbot_widget() {
-	if ( ! is_singular( 'accommodation' ) ) {
+	static $rendered = false;
+
+	if ( $rendered || ! arriendo_facil_should_show_chatbot() ) {
 		return;
 	}
+
+	$rendered = true;
 	?>
 	<div id="af-chatbot-widget" aria-live="polite">
 		<button type="button" id="af-chatbot-toggle" aria-expanded="false" aria-controls="af-chatbot-panel">
@@ -146,3 +163,4 @@ function arriendo_facil_render_chatbot_widget() {
 	<?php
 }
 add_action( 'wp_footer', 'arriendo_facil_render_chatbot_widget' );
+add_action( 'wp_body_open', 'arriendo_facil_render_chatbot_widget' );

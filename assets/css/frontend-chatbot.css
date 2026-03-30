@@ -1,0 +1,128 @@
+#af-chatbot-widget {
+	position: fixed;
+	right: 20px;
+	bottom: 20px;
+	z-index: 9999;
+	font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
+}
+
+#af-chatbot-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 12px 16px;
+	border: 0;
+	border-radius: 999px;
+	background: linear-gradient(135deg, #0f766e, #0d9488);
+	color: #ffffff;
+	font-weight: 700;
+	cursor: pointer;
+	box-shadow: 0 12px 26px rgba(15, 118, 110, 0.35);
+}
+
+#af-chatbot-toggle:hover {
+	filter: brightness(1.04);
+}
+
+.af-chatbot-logo {
+	width: 24px;
+	height: 24px;
+	border-radius: 50%;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: #ffffff;
+	color: #0f766e;
+	font-size: 12px;
+	font-weight: 800;
+}
+
+#af-chatbot-panel {
+	width: min(380px, calc(100vw - 24px));
+	margin-top: 12px;
+	background: #ffffff;
+	border: 1px solid #dbe4e8;
+	border-radius: 14px;
+	padding: 14px;
+	box-shadow: 0 16px 38px rgba(15, 23, 42, 0.22);
+}
+
+.af-chatbot-header {
+	margin-bottom: 10px;
+}
+
+.af-chatbot-header strong {
+	display: block;
+	font-size: 16px;
+	color: #0f172a;
+}
+
+.af-chatbot-header p {
+	margin: 4px 0 0;
+	font-size: 13px;
+	color: #475569;
+}
+
+#af-chatbot-form {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 8px;
+}
+
+#af-chatbot-form input {
+	width: 100%;
+	box-sizing: border-box;
+	padding: 10px 11px;
+	border: 1px solid #cbd5e1;
+	border-radius: 8px;
+	font-size: 14px;
+}
+
+#af-chatbot-form input:focus {
+	outline: none;
+	border-color: #0d9488;
+	box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15);
+}
+
+#af-chatbot-submit {
+	margin-top: 4px;
+	border: 0;
+	border-radius: 8px;
+	padding: 10px 12px;
+	background: #0f766e;
+	color: #ffffff;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+#af-chatbot-submit[disabled] {
+	opacity: 0.7;
+	cursor: wait;
+}
+
+#af-chatbot-message {
+	min-height: 20px;
+	margin: 8px 2px 0;
+	font-size: 13px;
+}
+
+.af-chatbot-success {
+	color: #166534;
+}
+
+.af-chatbot-error {
+	color: #b91c1c;
+}
+
+@media (max-width: 640px) {
+	#af-chatbot-widget {
+		right: 12px;
+		bottom: 12px;
+	}
+
+	#af-chatbot-panel {
+		width: calc(100vw - 24px);
+		max-height: 72vh;
+		overflow-y: auto;
+	}
+}

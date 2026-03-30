@@ -69,3 +69,80 @@ function arriendo_facil_init() {
 	new Arriendo_Facil_Admin();
 }
 add_action( 'plugins_loaded', 'arriendo_facil_init' );
+
+/**
+ * Enqueues frontend chatbot assets on accommodation pages.
+ */
+function arriendo_facil_enqueue_chatbot_assets() {
+	if ( ! is_singular( 'accommodation' ) ) {
+		return;
+	}
+
+	wp_enqueue_style(
+		'af-chatbot-frontend',
+		ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/frontend-chatbot.css',
+		array(),
+		ARRIENDO_FACIL_VERSION
+	);
+
+	wp_enqueue_script(
+		'af-chatbot-frontend',
+		ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/frontend-chatbot.js',
+		array(),
+		ARRIENDO_FACIL_VERSION,
+		true
+	);
+
+	wp_localize_script(
+		'af-chatbot-frontend',
+		'afChatbot',
+		array(
+			'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
+			'nonce'         => wp_create_nonce( 'af_guest_frontend_nonce' ),
+			'successText'   => __( 'Registro enviado. Pronto nos contactaremos contigo.', 'arriendo-facil' ),
+			'errorText'     => __( 'No se pudo enviar el registro. Intenta nuevamente.', 'arriendo-facil' ),
+			'sendingText'   => __( 'Enviando...', 'arriendo-facil' ),
+			'buttonText'    => __( 'Enviar', 'arriendo-facil' ),
+		)
+	);
+}
+add_action( 'wp_enqueue_scripts', 'arriendo_facil_enqueue_chatbot_assets' );
+
+/**
+ * Renders frontend chatbot widget in accommodation pages.
+ */
+function arriendo_facil_render_chatbot_widget() {
+	if ( ! is_singular( 'accommodation' ) ) {
+		return;
+	}
+	?>
+	<div id="af-chatbot-widget" aria-live="polite">
+		<button type="button" id="af-chatbot-toggle" aria-expanded="false" aria-controls="af-chatbot-panel">
+			<span class="af-chatbot-logo" aria-hidden="true">AF</span>
+			<span><?php esc_html_e( 'Arrienda ahora', 'arriendo-facil' ); ?></span>
+		</button>
+
+		<div id="af-chatbot-panel" hidden>
+			<div class="af-chatbot-header">
+				<strong><?php esc_html_e( 'Arrienda ahora', 'arriendo-facil' ); ?></strong>
+				<p><?php esc_html_e( 'Completa tus datos y te contactamos para continuar tu arriendo.', 'arriendo-facil' ); ?></p>
+			</div>
+
+			<form id="af-chatbot-form">
+				<input type="text" name="name" placeholder="<?php esc_attr_e( 'Nombre completo', 'arriendo-facil' ); ?>" required />
+				<input type="email" name="email" placeholder="<?php esc_attr_e( 'Correo', 'arriendo-facil' ); ?>" required />
+				<input type="text" name="phone" placeholder="<?php esc_attr_e( 'Telefono', 'arriendo-facil' ); ?>" maxlength="10" required />
+				<input type="text" name="id_number" placeholder="<?php esc_attr_e( 'Documento', 'arriendo-facil' ); ?>" maxlength="10" required />
+				<input type="number" name="mascotas" placeholder="<?php esc_attr_e( 'Mascotas', 'arriendo-facil' ); ?>" min="0" max="10" required />
+				<input type="text" name="referencia_personal_1" placeholder="<?php esc_attr_e( 'Referencia personal 1', 'arriendo-facil' ); ?>" required />
+				<input type="text" name="referencia_personal_2" placeholder="<?php esc_attr_e( 'Referencia personal 2', 'arriendo-facil' ); ?>" required />
+				<input type="number" name="personas_viviran" placeholder="<?php esc_attr_e( 'Cuantas personas viviran', 'arriendo-facil' ); ?>" min="1" max="10" required />
+				<button type="submit" id="af-chatbot-submit"><?php esc_html_e( 'Enviar', 'arriendo-facil' ); ?></button>
+			</form>
+
+			<p id="af-chatbot-message"></p>
+		</div>
+	</div>
+	<?php
+}
+add_action( 'wp_footer', 'arriendo_facil_render_chatbot_widget' );

@@ -184,6 +184,16 @@ $cleaning_services = $wpdb->get_results(
 		<tbody>
 			<?php if ( $requests ) : ?>
 				<?php foreach ( $requests as $request ) : ?>
+					<?php
+					$contract_url = add_query_arg(
+						array(
+							'action'     => 'af_generate_cleaning_contract_word',
+							'nonce'      => wp_create_nonce( 'af_cleaning_request_nonce' ),
+							'request_id' => (int) $request->id,
+						),
+						admin_url( 'admin-ajax.php' )
+					);
+					?>
 					<tr>
 						<td><?php echo esc_html( $request->id ); ?></td>
 						<td><?php echo esc_html( $request->accommodation_title ?: $request->accommodation_id ); ?></td>
@@ -192,6 +202,9 @@ $cleaning_services = $wpdb->get_results(
 						<td><?php echo esc_html( $request->status ); ?></td>
 						<td><?php echo esc_html( $request->notes ); ?></td>
 						<td>
+							<a class="button button-secondary" href="<?php echo esc_url( $contract_url ); ?>" target="_blank" rel="noopener">
+								<?php esc_html_e( 'Generar contrato', 'arriendo-facil' ); ?>
+							</a>
 							<?php if ( 'pending' === $request->status || 'in_progress' === $request->status ) : ?>
 								<button type="button" class="button af-update-cleaning"
 									data-request-id="<?php echo esc_attr( $request->id ); ?>"

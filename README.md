@@ -64,14 +64,11 @@ composer install
 
 ## AI Integration
 
-The plugin communicates with an external AI API (configurable via **Arriendo Fácil → AI Settings**). The API must accept `POST` requests with a JSON body:
+The plugin communicates with OpenAI ChatGPT via the Chat Completions API. Configure your OpenAI API key in **Arriendo Fácil → AI Settings**.
 
-```json
-{
-  "action": "predict_cost | generate_document | score_guest",
-  "data": { ... }
-}
-```
+- Default endpoint used by the plugin: `https://api.openai.com/v1/chat/completions`
+- Optional override: `AI API URL` setting (advanced use)
+- Required credential: OpenAI API key
 
 Expected responses:
 

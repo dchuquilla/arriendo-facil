@@ -17,13 +17,13 @@ if ( ! defined( 'ABSPATH' ) ) {
  *  - Lease document generation
  *  - Guest scoring / management
  *
- * Communicates with an external AI API endpoint configured via
- * the plugin settings (Settings > Arriendo Fácil > AI Settings).
+ * Communicates with OpenAI Chat Completions (ChatGPT), with optional
+ * custom endpoint override from plugin settings.
  */
 class Arriendo_Facil_AI_Service {
 
 	/**
-	 * Base URL of the AI API endpoint.
+	 * Base URL override for AI API endpoint.
 	 *
 	 * @var string
 	 */
@@ -37,7 +37,21 @@ class Arriendo_Facil_AI_Service {
 	private $api_key;
 
 	/**
-	 * Constructor – loads API configuration from plugin options.
+	 * Default OpenAI chat completions endpoint.
+	 *
+	 * @var string
+	 */
+	private $default_openai_endpoint = 'https://api.openai.com/v1/chat/completions';
+
+	/**
+	 * OpenAI model used for requests.
+	 *
+	 * @var string
+	 */
+	private $model = 'gpt-4o-mini';
+
+	/**
+	 * Constructor - loads API configuration from plugin options.
 	 */
 	public function __construct() {
 		$this->api_url = $this->get_setting_value( 'AF_AI_API_URL', 'af_ai_api_url' );
@@ -118,45 +132,103 @@ class Arriendo_Facil_AI_Service {
 	}
 
 	/**
-	 * Sends a POST request to the AI API.
+	 * Sends a POST request to ChatGPT and expects JSON content in the response.
 	 *
 	 * @param array $payload Request payload.
 	 * @return array|WP_Error Decoded response array, or WP_Error on failure.
 	 */
 	private function request( array $payload ) {
-		if ( empty( $this->api_url ) ) {
-			return new WP_Error( 'no_api_url', __( 'AI API URL is not configured.', 'arriendo-facil' ) );
+		if ( empty( $this->api_key ) ) {
+			return new WP_Error( 'no_api_key', __( 'OpenAI API key is not configured.', 'arriendo-facil' ) );
 		}
 
-		$headers = array(
-			'Content-Type' => 'application/json',
-		);
-
-		if ( '' !== $this->api_key ) {
-			$headers['Authorization'] = 'Bearer ' . $this->api_key;
-		}
+		$endpoint = ! empty( $this->api_url ) ? $this->api_url : $this->default_openai_endpoint;
+		$prompt   = $this->build_action_prompt( $payload );
 
 		$args = array(
 			'method'  => 'POST',
-			'headers' => $headers,
-			'body'    => wp_json_encode( $payload ),
+			'headers' => array(
+				'Content-Type'  => 'application/json',
+				'Authorization' => 'Bearer ' . $this->api_key,
+			),
+			'body'    => wp_json_encode(
+				array(
+					'model'           => $this->model,
+					'response_format' => array( 'type' => 'json_object' ),
+					'messages'        => array(
+						array(
+							'role'    => 'system',
+							'content' => 'You are a rental management assistant. Return strictly valid JSON only.',
+						),
+						array(
+							'role'    => 'user',
+							'content' => $prompt,
+						),
+					),
+				),
+			),
 			'timeout' => 30,
 		);
 
-		$response = wp_remote_post( esc_url_raw( $this->api_url ), $args );
+		$response = wp_remote_post( esc_url_raw( $endpoint ), $args );
 
 		if ( is_wp_error( $response ) ) {
 			return $response;
 		}
 
+		$status_code = (int) wp_remote_retrieve_response_code( $response );
 		$body = wp_remote_retrieve_body( $response );
 		$data = json_decode( $body, true );
+
+		if ( $status_code < 200 || $status_code >= 300 ) {
+			$error_message = isset( $data['error']['message'] ) ? (string) $data['error']['message'] : __( 'OpenAI request failed.', 'arriendo-facil' );
+			return new WP_Error( 'openai_http_error', $error_message );
+		}
 
 		if ( null === $data ) {
 			return new WP_Error( 'invalid_response', __( 'Invalid AI API response.', 'arriendo-facil' ) );
 		}
 
-		return $data;
+		$content = '';
+		if ( isset( $data['choices'][0]['message']['content'] ) && is_string( $data['choices'][0]['message']['content'] ) ) {
+			$content = $data['choices'][0]['message']['content'];
+		}
+
+		if ( '' === $content ) {
+			return new WP_Error( 'invalid_response', __( 'Empty response from ChatGPT.', 'arriendo-facil' ) );
+		}
+
+		$parsed_content = json_decode( $content, true );
+		if ( null === $parsed_content ) {
+			return new WP_Error( 'invalid_response', __( 'ChatGPT did not return valid JSON.', 'arriendo-facil' ) );
+		}
+
+		return $parsed_content;
+	}
+
+	/**
+	 * Builds a deterministic prompt based on plugin action payload.
+	 *
+	 * @param array $payload AI action payload.
+	 * @return string
+	 */
+	private function build_action_prompt( array $payload ) {
+		$action = isset( $payload['action'] ) ? (string) $payload['action'] : '';
+		$data   = isset( $payload['data'] ) ? $payload['data'] : array();
+
+		if ( 'predict_cost' === $action ) {
+			return "Task: Predict monthly rent based on provided accommodation data. Return JSON with key 'predicted_cost' as numeric value only. Input: " . wp_json_encode( $data );
+		}
+
+		if ( 'generate_document' === $action ) {
+			return "Task: Generate a lease document URL suggestion. Return JSON with key 'document_url' as string URL. Input: " . wp_json_encode( $data );
+		}
+
+		if ( 'score_guest' === $action ) {
+			return "Task: Score guest suitability from 0 to 100 and summarize briefly. Return JSON with keys 'score' (number) and 'summary' (string). Input: " . wp_json_encode( $data );
+		}
+
+		return "Task: Analyze provided data and return JSON object. Input: " . wp_json_encode( $payload );
 	}
 
 	/**
@@ -206,45 +278,51 @@ class Arriendo_Facil_AI_Service {
 	}
 
 	/**
-	 * Sends owner data to Gemini endpoint to validate connectivity.
+	 * Sends owner data to ChatGPT endpoint to validate connectivity.
 	 *
 	 * @return array Result of the operation.
 	 */
-	public function test_gemini_owner_connection() {
+	public function test_chatgpt_owner_connection() {
 		$owners = $this->get_owner_data_for_ai();
 
 		if ( empty( $owners ) ) {
 			return array(
 				'success' => false,
-				'message' => __( 'No owner records found to test Gemini.', 'arriendo-facil' ),
+				'message' => __( 'No owner records found to test ChatGPT.', 'arriendo-facil' ),
 			);
 		}
 
-		if ( empty( $this->api_url ) ) {
+		if ( empty( $this->api_key ) ) {
 			return array(
 				'success' => false,
-				'message' => __( 'Gemini API URL is missing.', 'arriendo-facil' ),
+				'message' => __( 'OpenAI API key is missing.', 'arriendo-facil' ),
 			);
 		}
 
-		$headers = array(
-			'Content-Type' => 'application/json',
-		);
+		$endpoint = ! empty( $this->api_url ) ? $this->api_url : $this->default_openai_endpoint;
 
-		if ( '' !== $this->api_key ) {
-			$headers['Authorization'] = 'Bearer ' . $this->api_key;
-		}
+		$prompt = 'Validate ChatGPT connectivity and provide a one-line summary for these owner records: ' . wp_json_encode( $owners );
 
 		$response = wp_remote_post(
-			esc_url_raw( $this->api_url ),
+			esc_url_raw( $endpoint ),
 			array(
 				'timeout' => 20,
-				'headers' => $headers,
+				'headers' => array(
+					'Content-Type'  => 'application/json',
+					'Authorization' => 'Bearer ' . $this->api_key,
+				),
 				'body'    => wp_json_encode(
 					array(
-						'action' => 'test_owner_connection',
-						'data'   => array(
-							'owners' => $owners,
+						'model'    => $this->model,
+						'messages' => array(
+							array(
+								'role'    => 'system',
+								'content' => 'You are a concise assistant.',
+							),
+							array(
+								'role'    => 'user',
+								'content' => $prompt,
+							),
 						),
 					)
 				),
@@ -260,22 +338,23 @@ class Arriendo_Facil_AI_Service {
 
 		$status_code = wp_remote_retrieve_response_code( $response );
 		if ( $status_code >= 200 && $status_code < 300 ) {
-			$message = '' !== $this->api_key
-				? __( 'Gemini connection successful with owner payload.', 'arriendo-facil' )
-				: __( 'Gemini connection successful (without API key).', 'arriendo-facil' );
-
 			return array(
 				'success' => true,
-				'message' => $message,
+				'message' => __( 'ChatGPT connection successful with owner payload.', 'arriendo-facil' ),
 			);
 		}
+
+		$body         = wp_remote_retrieve_body( $response );
+		$decoded_body = json_decode( $body, true );
+		$error_text   = isset( $decoded_body['error']['message'] ) ? (string) $decoded_body['error']['message'] : '';
 
 		return array(
 			'success' => false,
 			'message' => sprintf(
-				/* translators: %d: HTTP status code from Gemini endpoint */
-				__( 'Gemini connection failed (HTTP %d).', 'arriendo-facil' ),
-				(int) $status_code
+				/* translators: 1: HTTP status code from ChatGPT endpoint, 2: optional error message */
+				__( 'ChatGPT connection failed (HTTP %1$d). %2$s', 'arriendo-facil' ),
+				(int) $status_code,
+				$error_text
 			),
 		);
 	}

@@ -119,7 +119,6 @@ $cleaning_services = $wpdb->get_results(
 								<option
 									value="<?php echo esc_attr( (string) $accommodation->ID ); ?>"
 									data-owner-user="<?php echo esc_attr( (string) (int) $accommodation->owner_user_id ); ?>"
-									hidden
 								>
 									<?php echo esc_html( (string) $accommodation->post_title ); ?>
 								</option>

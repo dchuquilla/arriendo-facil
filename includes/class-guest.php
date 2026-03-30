@@ -22,8 +22,91 @@ class Arriendo_Facil_Guest {
 	 */
 	public function __construct() {
 		add_action( 'wp_ajax_af_create_guest', array( $this, 'ajax_create_guest' ) );
+		add_action( 'wp_ajax_af_create_guest_frontend', array( $this, 'ajax_create_guest_frontend' ) );
+		add_action( 'wp_ajax_nopriv_af_create_guest_frontend', array( $this, 'ajax_create_guest_frontend' ) );
 		add_action( 'wp_ajax_af_get_guests', array( $this, 'ajax_get_guests' ) );
 		add_action( 'wp_ajax_af_score_guest', array( $this, 'ajax_score_guest' ) );
+	}
+
+	/**
+	 * Creates a new guest record from frontend chatbot via AJAX.
+	 */
+	public function ajax_create_guest_frontend() {
+		check_ajax_referer( 'af_guest_frontend_nonce', 'nonce' );
+
+		$name       = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
+		$email      = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
+		$phone      = isset( $_POST['phone'] ) ? sanitize_text_field( wp_unslash( $_POST['phone'] ) ) : '';
+		$id_number  = isset( $_POST['id_number'] ) ? sanitize_text_field( wp_unslash( $_POST['id_number'] ) ) : '';
+		$mascotas   = isset( $_POST['mascotas'] ) ? absint( wp_unslash( $_POST['mascotas'] ) ) : 0;
+		$referencia_personal_1 = isset( $_POST['referencia_personal_1'] ) ? sanitize_text_field( wp_unslash( $_POST['referencia_personal_1'] ) ) : '';
+		$referencia_personal_2 = isset( $_POST['referencia_personal_2'] ) ? sanitize_text_field( wp_unslash( $_POST['referencia_personal_2'] ) ) : '';
+		$personas_viviran      = isset( $_POST['personas_viviran'] ) ? absint( wp_unslash( $_POST['personas_viviran'] ) ) : 0;
+
+		$name_parts = preg_split( '/\s+/', trim( $name ) );
+		$first_name = ! empty( $name_parts[0] ) ? $name_parts[0] : '';
+		$last_name  = count( $name_parts ) > 1 ? trim( implode( ' ', array_slice( $name_parts, 1 ) ) ) : '';
+
+		if ( ! $first_name || ! $email || ! $phone || ! $id_number ) {
+			wp_send_json_error( array( 'message' => __( 'Faltan campos requeridos.', 'arriendo-facil' ) ) );
+		}
+
+		if ( ! $referencia_personal_1 || ! $referencia_personal_2 ) {
+			wp_send_json_error( array( 'message' => __( 'Debes ingresar dos referencias personales.', 'arriendo-facil' ) ) );
+		}
+
+		if ( ! is_email( $email ) ) {
+			wp_send_json_error( array( 'message' => __( 'Correo invalido.', 'arriendo-facil' ) ) );
+		}
+
+		if ( 1 !== preg_match( '/^[0-9]{1,10}$/', $phone ) ) {
+			wp_send_json_error( array( 'message' => __( 'Telefono invalido. Usa solo numeros (max 10).', 'arriendo-facil' ) ) );
+		}
+
+		if ( 1 !== preg_match( '/^[0-9]{1,10}$/', $id_number ) ) {
+			wp_send_json_error( array( 'message' => __( 'Documento invalido. Usa solo numeros (max 10).', 'arriendo-facil' ) ) );
+		}
+
+		if ( $mascotas < 0 || $mascotas > 10 ) {
+			wp_send_json_error( array( 'message' => __( 'Mascotas debe estar entre 0 y 10.', 'arriendo-facil' ) ) );
+		}
+
+		if ( $personas_viviran < 1 || $personas_viviran > 10 ) {
+			wp_send_json_error( array( 'message' => __( 'Personas debe estar entre 1 y 10.', 'arriendo-facil' ) ) );
+		}
+
+		$schema_result = $this->ensure_guest_extra_columns();
+		if ( is_wp_error( $schema_result ) ) {
+			wp_send_json_error( array( 'message' => $schema_result->get_error_message() ) );
+		}
+
+		global $wpdb;
+		$inserted = $wpdb->insert(
+			$wpdb->prefix . 'af_guests',
+			array(
+				'first_name'            => $first_name,
+				'last_name'             => $last_name,
+				'email'                 => $email,
+				'phone'                 => $phone,
+				'id_number'             => $id_number,
+				'mascotas'              => $mascotas,
+				'referencia_personal_1' => $referencia_personal_1,
+				'referencia_personal_2' => $referencia_personal_2,
+				'personas_viviran'      => $personas_viviran,
+			),
+			array( '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%d' )
+		);
+
+		if ( $inserted ) {
+			wp_send_json_success(
+				array(
+					'id'      => (int) $wpdb->insert_id,
+					'message' => __( 'Registro enviado. Pronto nos contactaremos contigo.', 'arriendo-facil' ),
+				)
+			);
+		}
+
+		wp_send_json_error( array( 'message' => __( 'No se pudo crear el invitado.', 'arriendo-facil' ) ) );
 	}
 
 	/**

@@ -180,7 +180,25 @@
 		} )
 			.done( function ( response ) {
 				if ( response && response.success ) {
-					window.location.reload();
+					var requestId = response.data && response.data.id ? parseInt( response.data.id, 10 ) : 0;
+
+					if ( requestId > 0 ) {
+						var contractUrl = afAdmin.ajaxUrl
+							+ '?action=af_generate_cleaning_contract_word'
+							+ '&nonce=' + encodeURIComponent( afAdmin.cleaningNonce || '' )
+							+ '&request_id=' + encodeURIComponent( String( requestId ) );
+
+						var win = window.open( contractUrl, '_blank' );
+
+						if ( ! win ) {
+							window.location.href = contractUrl;
+							return;
+						}
+					}
+
+					window.setTimeout( function () {
+						window.location.reload();
+					}, 350 );
 					return;
 				}
 
@@ -242,9 +260,7 @@
 	}
 
 	function filterOwnerAccommodations() {
-		var ownerSelect = document.getElementById( 'af_cleaning_owner_select' );
 		var accommodationSelect = document.getElementById( 'af_cleaning_accommodation_id' );
-		var selectedOwnerUser = ownerSelect ? String( ownerSelect.value || '' ) : '';
 		var i;
 
 		if ( ! accommodationSelect ) {
@@ -253,18 +269,7 @@
 
 		for ( i = 0; i < accommodationSelect.options.length; i++ ) {
 			var accommodationOption = accommodationSelect.options[ i ];
-			if ( ! accommodationOption.value ) {
-				accommodationOption.hidden = false;
-				continue;
-			}
-
-			var optionOwnerUser = String( accommodationOption.getAttribute( 'data-owner-user' ) || '' );
-			var visible = !! selectedOwnerUser && optionOwnerUser === selectedOwnerUser;
-			accommodationOption.hidden = ! visible;
-		}
-
-		if ( accommodationSelect.selectedIndex >= 0 && accommodationSelect.options[ accommodationSelect.selectedIndex ] && accommodationSelect.options[ accommodationSelect.selectedIndex ].hidden ) {
-			accommodationSelect.value = '';
+			accommodationOption.hidden = false;
 		}
 	}
 
@@ -289,11 +294,7 @@
 		if ( accommodationSelect ) {
 			accommodationSelect.value = '';
 			for ( i = 0; i < accommodationSelect.options.length; i++ ) {
-				if ( accommodationSelect.options[ i ].value ) {
-					accommodationSelect.options[ i ].hidden = true;
-				} else {
-					accommodationSelect.options[ i ].hidden = false;
-				}
+				accommodationSelect.options[ i ].hidden = false;
 			}
 		}
 

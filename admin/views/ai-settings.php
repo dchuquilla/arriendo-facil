@@ -124,7 +124,7 @@ if ( isset( $_POST['af_test_owner_data'] ) ) {
 
 	if ( class_exists( 'Arriendo_Facil_AI_Service' ) ) {
 		$ai_service = new Arriendo_Facil_AI_Service();
-		$result     = $ai_service->test_gemini_owner_connection();
+		$result     = $ai_service->test_chatgpt_owner_connection();
 	} else {
 		$result = array(
 			'success' => false,
@@ -187,14 +187,14 @@ $any_storage_field_locked = $provider_locked || $access_key_locked || $secret_ke
 		<table class="form-table">
 			<tr>
 				<th scope="row">
-					<label for="af_ai_api_url"><?php esc_html_e( 'AI API URL', 'arriendo-facil' ); ?></label>
+					<label for="af_ai_api_url"><?php esc_html_e( 'OpenAI API URL (optional)', 'arriendo-facil' ); ?></label>
 				</th>
 				<td>
 					<input type="url" id="af_ai_api_url" name="af_ai_api_url"
 						value="<?php echo esc_attr( $api_url ); ?>"
-						class="regular-text" placeholder="https://api.example.com/v1" <?php disabled( $ai_url_locked ); ?> />
+						class="regular-text" placeholder="https://api.openai.com/v1/chat/completions" <?php disabled( $ai_url_locked ); ?> />
 					<p class="description">
-						<?php esc_html_e( 'Base URL of the AI API endpoint.', 'arriendo-facil' ); ?>
+						<?php esc_html_e( 'Optional override endpoint. Leave empty to use OpenAI default Chat Completions endpoint.', 'arriendo-facil' ); ?>
 						<?php if ( $ai_url_locked ) : ?>
 							<br /><?php esc_html_e( 'This value is defined in wp-config.php and cannot be edited here.', 'arriendo-facil' ); ?>
 						<?php endif; ?>
@@ -203,14 +203,14 @@ $any_storage_field_locked = $provider_locked || $access_key_locked || $secret_ke
 			</tr>
 			<tr>
 				<th scope="row">
-					<label for="af_ai_api_key"><?php esc_html_e( 'AI API Key', 'arriendo-facil' ); ?></label>
+					<label for="af_ai_api_key"><?php esc_html_e( 'OpenAI API Key', 'arriendo-facil' ); ?></label>
 				</th>
 				<td>
 					<input type="password" id="af_ai_api_key" name="af_ai_api_key"
 						value="<?php echo esc_attr( $api_key ); ?>"
 						class="regular-text" autocomplete="off" <?php disabled( $ai_key_locked ); ?> />
 					<p class="description">
-						<?php esc_html_e( 'Bearer token / API key for the AI service.', 'arriendo-facil' ); ?>
+						<?php esc_html_e( 'API key for ChatGPT/OpenAI requests (required).', 'arriendo-facil' ); ?>
 						<?php if ( $ai_key_locked ) : ?>
 							<br /><?php esc_html_e( 'This value is defined in wp-config.php and cannot be edited here.', 'arriendo-facil' ); ?>
 						<?php endif; ?>
@@ -223,10 +223,10 @@ $any_storage_field_locked = $provider_locked || $access_key_locked || $secret_ke
 			<input type="submit" name="af_save_ai_settings" class="button button-primary"
 				value="<?php esc_attr_e( 'Save Settings', 'arriendo-facil' ); ?>" />
 			<input type="submit" name="af_test_owner_data" class="button button-secondary"
-				value="<?php esc_attr_e( 'Test Gemini Connection', 'arriendo-facil' ); ?>" />
+				value="<?php esc_attr_e( 'Test ChatGPT Connection', 'arriendo-facil' ); ?>" />
 		</p>
 		<p class="description">
-			<?php esc_html_e( 'This test uses AI API URL / API key and owner records. It is not related to Cloud Provider settings.', 'arriendo-facil' ); ?>
+			<?php esc_html_e( 'This test sends owner records to ChatGPT and validates OpenAI connectivity. It is not related to Cloud Provider settings.', 'arriendo-facil' ); ?>
 		</p>
 
 		<hr />

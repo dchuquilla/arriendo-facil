@@ -24,36 +24,36 @@ class AIServiceTest extends TestCase {
 	}
 
 	/**
-	 * predict_cost() should return a WP_Error when no API URL is configured.
+	 * predict_cost() should return a WP_Error when no OpenAI API key is configured.
 	 */
-	public function test_predict_cost_returns_error_when_no_api_url() {
+	public function test_predict_cost_returns_error_when_no_api_key() {
 		$service = $this->make_service();
 		$result  = $service->predict_cost( array( 'bedrooms' => 2 ) );
 
 		$this->assertTrue( is_wp_error( $result ) );
-		$this->assertSame( 'no_api_url', $result->get_error_code() );
+		$this->assertSame( 'no_api_key', $result->get_error_code() );
 	}
 
 	/**
-	 * generate_document() should return a WP_Error when no API URL is configured.
+	 * generate_document() should return a WP_Error when no OpenAI API key is configured.
 	 */
-	public function test_generate_document_returns_error_when_no_api_url() {
+	public function test_generate_document_returns_error_when_no_api_key() {
 		$service = $this->make_service();
 		$result  = $service->generate_document( array( 'lease_id' => 1 ) );
 
 		$this->assertTrue( is_wp_error( $result ) );
-		$this->assertSame( 'no_api_url', $result->get_error_code() );
+		$this->assertSame( 'no_api_key', $result->get_error_code() );
 	}
 
 	/**
-	 * score_guest() should return a WP_Error when no API URL is configured.
+	 * score_guest() should return a WP_Error when no OpenAI API key is configured.
 	 */
-	public function test_score_guest_returns_error_when_no_api_url() {
+	public function test_score_guest_returns_error_when_no_api_key() {
 		$service = $this->make_service();
 		$result  = $service->score_guest( array( 'first_name' => 'Alice', 'email' => 'alice@example.com' ) );
 
 		$this->assertTrue( is_wp_error( $result ) );
-		$this->assertSame( 'no_api_url', $result->get_error_code() );
+		$this->assertSame( 'no_api_key', $result->get_error_code() );
 	}
 
 	/**

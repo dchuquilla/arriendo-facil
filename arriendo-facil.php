@@ -116,6 +116,9 @@ function arriendo_facil_enqueue_chatbot_assets() {
 			'errorText'     => __( 'No se pudo enviar el registro. Intenta nuevamente.', 'arriendo-facil' ),
 			'sendingText'   => __( 'Enviando...', 'arriendo-facil' ),
 			'buttonText'    => __( 'Enviar', 'arriendo-facil' ),
+			'welcomeText'   => __( 'Hola, soy tu asistente de Arriendo Facil. Te hare unas preguntas rapidas para ayudarte a arrendar.', 'arriendo-facil' ),
+			'doneText'      => __( 'Perfecto, ya tengo tus datos. Estoy registrando tu solicitud...', 'arriendo-facil' ),
+			'typingText'    => __( 'Escribiendo', 'arriendo-facil' ),
 		)
 	);
 }
@@ -142,18 +145,20 @@ function arriendo_facil_render_chatbot_widget() {
 		<div id="af-chatbot-panel" hidden>
 			<div class="af-chatbot-header">
 				<strong><?php esc_html_e( 'Arrienda ahora', 'arriendo-facil' ); ?></strong>
-				<p><?php esc_html_e( 'Completa tus datos y te contactamos para continuar tu arriendo.', 'arriendo-facil' ); ?></p>
+				<p><?php esc_html_e( 'Conversemos rapido para registrar tu interes.', 'arriendo-facil' ); ?></p>
 			</div>
 
-			<form id="af-chatbot-form">
-				<input type="text" name="name" placeholder="<?php esc_attr_e( 'Nombre completo', 'arriendo-facil' ); ?>" required />
-				<input type="email" name="email" placeholder="<?php esc_attr_e( 'Correo', 'arriendo-facil' ); ?>" required />
-				<input type="text" name="phone" placeholder="<?php esc_attr_e( 'Telefono', 'arriendo-facil' ); ?>" maxlength="10" required />
-				<input type="text" name="id_number" placeholder="<?php esc_attr_e( 'Documento', 'arriendo-facil' ); ?>" maxlength="10" required />
-				<input type="number" name="mascotas" placeholder="<?php esc_attr_e( 'Mascotas', 'arriendo-facil' ); ?>" min="0" max="10" required />
-				<input type="text" name="referencia_personal_1" placeholder="<?php esc_attr_e( 'Referencia personal 1', 'arriendo-facil' ); ?>" required />
-				<input type="text" name="referencia_personal_2" placeholder="<?php esc_attr_e( 'Referencia personal 2', 'arriendo-facil' ); ?>" required />
-				<input type="number" name="personas_viviran" placeholder="<?php esc_attr_e( 'Cuantas personas viviran', 'arriendo-facil' ); ?>" min="1" max="10" required />
+			<div id="af-chatbot-messages" class="af-chatbot-messages"></div>
+
+			<div id="af-chatbot-typing" class="af-chatbot-typing" hidden>
+				<span class="af-chatbot-typing-label"><?php esc_html_e( 'Escribiendo', 'arriendo-facil' ); ?></span>
+				<span class="af-chatbot-dots" aria-hidden="true">
+					<i></i><i></i><i></i>
+				</span>
+			</div>
+
+			<form id="af-chatbot-form" autocomplete="off">
+				<input type="text" id="af-chatbot-input" placeholder="<?php esc_attr_e( 'Escribe tu respuesta', 'arriendo-facil' ); ?>" required />
 				<button type="submit" id="af-chatbot-submit"><?php esc_html_e( 'Enviar', 'arriendo-facil' ); ?></button>
 			</form>
 

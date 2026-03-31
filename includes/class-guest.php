@@ -146,10 +146,28 @@ class Arriendo_Facil_Guest {
 		);
 
 		if ( $inserted ) {
+			$guest_id = (int) $wpdb->insert_id;
+			$contract_info = $this->create_lease_contract_for_guest(
+				$guest_id,
+				array(
+					'accommodation_id'  => $accommodation_id,
+					'rental_mode'       => $rental_mode,
+					'rental_start_date' => $rental_start_date,
+					'rental_end_date'   => $rental_end_date,
+					'rental_months'     => $rental_months,
+					'rental_years'      => $rental_years,
+					'desired_price'     => $desired_price,
+					'guarantee_text'    => $guarantee_text,
+					'name'              => trim( $first_name . ' ' . $last_name ),
+					'email'             => $email,
+				)
+			);
+
 			wp_send_json_success(
 				array(
-					'id'      => (int) $wpdb->insert_id,
+					'id'      => $guest_id,
 					'message' => __( 'Registro enviado. Pronto nos contactaremos contigo.', 'arriendo-facil' ),
+					'contract' => $contract_info,
 				)
 			);
 		}
@@ -312,6 +330,119 @@ class Arriendo_Facil_Guest {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Creates a draft lease and attempts automatic contract generation.
+	 *
+	 * @param int   $guest_id Guest ID.
+	 * @param array $data Guest rental data.
+	 * @return array
+	 */
+	private function create_lease_contract_for_guest( $guest_id, array $data ) {
+		$accommodation_id = isset( $data['accommodation_id'] ) ? absint( $data['accommodation_id'] ) : 0;
+		$rental_mode      = isset( $data['rental_mode'] ) ? sanitize_key( $data['rental_mode'] ) : '';
+
+		if ( ! $accommodation_id || ! $guest_id ) {
+			return array( 'generated' => false );
+		}
+
+		$start_date = '';
+		$end_date   = '';
+		$today      = current_time( 'Y-m-d' );
+
+		if ( 'dates' === $rental_mode ) {
+			$start_date = isset( $data['rental_start_date'] ) ? sanitize_text_field( $data['rental_start_date'] ) : '';
+			$end_date   = isset( $data['rental_end_date'] ) ? sanitize_text_field( $data['rental_end_date'] ) : '';
+		} elseif ( 'months' === $rental_mode ) {
+			$months = isset( $data['rental_months'] ) ? absint( $data['rental_months'] ) : 1;
+			$start_date = $today;
+			$end_date   = gmdate( 'Y-m-d', strtotime( '+' . max( 1, $months ) . ' months', strtotime( $today ) ) );
+		} elseif ( 'years' === $rental_mode ) {
+			$years = isset( $data['rental_years'] ) ? absint( $data['rental_years'] ) : 1;
+			$start_date = $today;
+			$end_date   = gmdate( 'Y-m-d', strtotime( '+' . max( 1, $years ) . ' years', strtotime( $today ) ) );
+		}
+
+		if ( ! $start_date || ! $end_date ) {
+			return array( 'generated' => false );
+		}
+
+		$monthly_rent = $this->parse_price_amount( isset( $data['desired_price'] ) ? (string) $data['desired_price'] : '' );
+
+		global $wpdb;
+		$lease_inserted = $wpdb->insert(
+			$wpdb->prefix . 'af_leases',
+			array(
+				'accommodation_id' => $accommodation_id,
+				'guest_id'         => $guest_id,
+				'start_date'       => $start_date,
+				'end_date'         => $end_date,
+				'monthly_rent'     => $monthly_rent,
+				'status'           => 'draft',
+			),
+			array( '%d', '%d', '%s', '%s', '%f', '%s' )
+		);
+
+		if ( ! $lease_inserted ) {
+			return array( 'generated' => false );
+		}
+
+		$lease_id = (int) $wpdb->insert_id;
+
+		if ( ! class_exists( 'Arriendo_Facil_AI_Service' ) ) {
+			return array( 'generated' => false, 'lease_id' => $lease_id );
+		}
+
+		$ai = new Arriendo_Facil_AI_Service();
+		$document_result = $ai->generate_document(
+			array(
+				'lease_id'          => $lease_id,
+				'accommodation_id'  => $accommodation_id,
+				'guest_id'          => $guest_id,
+				'guest_name'        => isset( $data['name'] ) ? sanitize_text_field( $data['name'] ) : '',
+				'guest_email'       => isset( $data['email'] ) ? sanitize_email( $data['email'] ) : '',
+				'start_date'        => $start_date,
+				'end_date'          => $end_date,
+				'monthly_rent'      => $monthly_rent,
+				'rental_mode'       => $rental_mode,
+				'desired_price'     => isset( $data['desired_price'] ) ? sanitize_text_field( $data['desired_price'] ) : '',
+				'guarantee_text'    => isset( $data['guarantee_text'] ) ? sanitize_text_field( $data['guarantee_text'] ) : '',
+			)
+		);
+
+		$document_url = '';
+		if ( ! is_wp_error( $document_result ) && isset( $document_result['document_url'] ) && is_string( $document_result['document_url'] ) ) {
+			$document_url = esc_url_raw( $document_result['document_url'] );
+		}
+
+		if ( $document_url && class_exists( 'Arriendo_Facil_Lease' ) ) {
+			$lease_service = new Arriendo_Facil_Lease();
+			$lease_service->attach_document( $lease_id, $document_url );
+		}
+
+		return array(
+			'generated'    => (bool) $document_url,
+			'lease_id'     => $lease_id,
+			'document_url' => $document_url,
+		);
+	}
+
+	/**
+	 * Parses numeric amount from free-form price text.
+	 *
+	 * @param string $price_text Raw price text.
+	 * @return float
+	 */
+	private function parse_price_amount( $price_text ) {
+		$normalized = str_replace( ',', '.', (string) $price_text );
+		$numeric    = preg_replace( '/[^0-9.]/', '', $normalized );
+
+		if ( '' === $numeric ) {
+			return 0.0;
+		}
+
+		return (float) $numeric;
 	}
 
 	/**

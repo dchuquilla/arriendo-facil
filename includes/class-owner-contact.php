@@ -328,6 +328,13 @@ class Arriendo_Facil_Owner_Contact {
 			'owner_police_record_pdf'        => 'police_record',
 			'owner_additional_sensitive_pdf' => 'additional_sensitive',
 		);
+		$optional_contract_example_field = 'owner_contract_example_file';
+		$optional_contract_doc_type      = 'contract_example';
+		$allowed_contract_mimes          = array(
+			'pdf'  => 'application/pdf',
+			'doc'  => 'application/msword',
+			'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+		);
 		$selected_documents = 0;
 
 		$storage_provider = $this->get_storage_setting( 'AF_STORAGE_PROVIDER', 'af_storage_provider', 'cloudflare_r2' );
@@ -411,6 +418,62 @@ class Arriendo_Facil_Owner_Contact {
 			}
 
 			$this->uploaded_document_ids[ $doc_type ] = (int) $attachment_id;
+		}
+
+		if ( isset( $_FILES[ $optional_contract_example_field ] ) && is_array( $_FILES[ $optional_contract_example_field ] ) ) {
+			$file_data  = $_FILES[ $optional_contract_example_field ];
+			$file_name  = isset( $file_data['name'] ) ? (string) $file_data['name'] : '';
+			$file_error = isset( $file_data['error'] ) ? (int) $file_data['error'] : UPLOAD_ERR_NO_FILE;
+
+			if ( ! ( UPLOAD_ERR_NO_FILE === $file_error && '' === $file_name ) ) {
+				if ( UPLOAD_ERR_INI_SIZE === $file_error || UPLOAD_ERR_FORM_SIZE === $file_error ) {
+					$this->last_upload_error = new WP_Error( 'af_contract_example_upload_too_large', __( 'The uploaded contract example exceeds the server upload limit.', 'arriendo-facil' ) );
+					return;
+				}
+
+				if ( UPLOAD_ERR_OK !== $file_error ) {
+					$this->last_upload_error = new WP_Error( 'af_contract_example_upload_error', __( 'Could not upload contract example.', 'arriendo-facil' ) );
+					return;
+				}
+
+				if ( ! empty( $file_data['size'] ) && (int) $file_data['size'] > ( 10 * 1024 * 1024 ) ) {
+					$this->last_upload_error = new WP_Error( 'af_contract_example_upload_too_large', __( 'Contract example exceeds maximum size (10 MB).', 'arriendo-facil' ) );
+					return;
+				}
+
+				$checked = wp_check_filetype_and_ext( $file_data['tmp_name'], $file_data['name'], $allowed_contract_mimes );
+				if ( ! in_array( (string) $checked['ext'], array( 'pdf', 'doc', 'docx' ), true ) ) {
+					$this->last_upload_error = new WP_Error( 'af_contract_example_invalid_type', __( 'Contract example must be a PDF or Word file (.pdf, .doc, .docx).', 'arriendo-facil' ) );
+					return;
+				}
+
+				$attachment_id = media_handle_upload(
+					$optional_contract_example_field,
+					0,
+					array( 'post_title' => sprintf( 'owner-contact-%d-%s', (int) $contact_id, $optional_contract_doc_type ) ),
+					array(
+						'test_form' => false,
+						'mimes'     => $allowed_contract_mimes,
+					)
+				);
+
+				if ( is_wp_error( $attachment_id ) ) {
+					$this->last_upload_error = new WP_Error( 'af_contract_example_upload_failed', __( 'Could not save contract example file.', 'arriendo-facil' ) );
+					return;
+				}
+
+				update_post_meta( (int) $attachment_id, '_af_owner_contract_example', '1' );
+				update_post_meta( (int) $attachment_id, '_af_owner_contact_id', (int) $contact_id );
+				update_post_meta( (int) $attachment_id, '_af_owner_user_id', (int) $user_id );
+
+				$r2_upload = $this->upload_attachment_to_r2( (int) $attachment_id, (int) $contact_id, (string) $optional_contract_doc_type, $r2_config );
+				if ( is_wp_error( $r2_upload ) ) {
+					$this->last_upload_error = $r2_upload;
+					return;
+				}
+
+				$this->uploaded_document_ids[ $optional_contract_doc_type ] = (int) $attachment_id;
+			}
 		}
 
 		if ( $selected_documents !== count( $fields ) && ! ( $this->last_upload_error instanceof WP_Error ) ) {

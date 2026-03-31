@@ -194,6 +194,16 @@ $message = isset( $_GET['af_message'] ) ? sanitize_text_field( wp_unslash( $_GET
                         <p class="description"><?php esc_html_e( 'Only PDF files are allowed.', 'arriendo-facil' ); ?></p>
                     </td>
                 </tr>
+                <tr>
+                    <th scope="row"><?php esc_html_e( 'Ejemplo de contrato', 'arriendo-facil' ); ?></th>
+                    <td>
+                        <p>
+                            <label for="af_owner_contract_example_file"><?php esc_html_e( 'Subir archivo PDF o Word (.pdf, .doc, .docx)', 'arriendo-facil' ); ?></label><br />
+                            <input type="file" id="af_owner_contract_example_file" name="owner_contract_example_file" class="regular-text" accept="application/pdf,.pdf,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+                        </p>
+                        <p class="description"><?php esc_html_e( 'Campo opcional para adjuntar un ejemplo de contrato en PDF o Word.', 'arriendo-facil' ); ?></p>
+                    </td>
+                </tr>
             </table>
 
             <p class="submit">

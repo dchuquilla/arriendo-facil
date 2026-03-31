@@ -192,6 +192,15 @@ class Arriendo_Facil_AI_Service {
 
 		$response = wp_remote_post( esc_url_raw( $endpoint ), $args );
 
+		// If a custom endpoint returns HTML (marketing/login page), retry once with official API endpoint.
+		if ( ! is_wp_error( $response ) && $endpoint !== $this->default_openai_endpoint ) {
+			$first_body = (string) wp_remote_retrieve_body( $response );
+			if ( $this->is_probably_html_response( $first_body ) ) {
+				$response = wp_remote_post( esc_url_raw( $this->default_openai_endpoint ), $args );
+				$endpoint = $this->default_openai_endpoint;
+			}
+		}
+
 		if ( is_wp_error( $response ) ) {
 			return $response;
 		}
@@ -207,7 +216,7 @@ class Arriendo_Facil_AI_Service {
 
 		if ( null === $data ) {
 			$preview = $this->preview_body( $body );
-			return new WP_Error( 'invalid_response', sprintf( __( 'Invalid AI API response. Preview: %s', 'arriendo-facil' ), $preview ) );
+			return new WP_Error( 'invalid_response', sprintf( __( 'Invalid AI API response from endpoint %1$s. Preview: %2$s', 'arriendo-facil' ), esc_url_raw( $endpoint ), $preview ) );
 		}
 
 		$content = $this->extract_message_content( $data );
@@ -299,6 +308,25 @@ class Arriendo_Facil_AI_Service {
 		}
 
 		return $plain;
+	}
+
+	/**
+	 * Detects whether a response body looks like HTML instead of API JSON.
+	 *
+	 * @param string $text Raw response body.
+	 * @return bool
+	 */
+	private function is_probably_html_response( $text ) {
+		$sample = strtolower( (string) $text );
+
+		if ( '' === trim( $sample ) ) {
+			return false;
+		}
+
+		return false !== strpos( $sample, '<!doctype html' )
+			|| false !== strpos( $sample, '<html' )
+			|| false !== strpos( $sample, '<head' )
+			|| false !== strpos( $sample, 'openai | openai' );
 	}
 
 	/**

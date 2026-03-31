@@ -240,7 +240,7 @@ class Arriendo_Facil_AI_Service {
 		}
 
 		if ( 'generate_document' === $action ) {
-			return "Task: Generate a lease document URL suggestion. Return JSON with key 'document_url' as string URL. Input: " . wp_json_encode( $data );
+			return "Task: You are generating a complete Spanish rental contract using the provided lease/guest data. If template_text is available, keep its structure and complete placeholders with real values. If template_text is empty but template metadata exists, keep a professional Ecuador rental-contract format and include all available details from input. Return strictly JSON with keys: 'contract_text' (required, string with full contract body) and 'document_url' (optional string, use empty string if not available). Input: " . wp_json_encode( $data );
 		}
 
 		if ( 'score_guest' === $action ) {

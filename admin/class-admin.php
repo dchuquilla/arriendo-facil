@@ -247,17 +247,245 @@ class Arriendo_Facil_Admin {
 			wp_send_json_error( array( 'message' => __( 'Lease not found.', 'arriendo-facil' ) ) );
 		}
 
+		$ai_payload = $this->build_lease_ai_payload( $lease );
+
 		$ai     = new Arriendo_Facil_AI_Service();
-		$result = $ai->generate_document( (array) $lease );
+		$result = $ai->generate_document( $ai_payload );
 
 		if ( is_wp_error( $result ) ) {
 			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
 		}
 
-		if ( isset( $result['document_url'] ) ) {
-			$lease_obj->attach_document( $lease_id, $result['document_url'] );
+		$document_url = '';
+		if ( isset( $result['document_url'] ) && is_string( $result['document_url'] ) ) {
+			$document_url = esc_url_raw( $result['document_url'] );
+		}
+
+		if ( '' === $document_url && isset( $result['contract_text'] ) && is_string( $result['contract_text'] ) ) {
+			$document_url = $this->create_generated_contract_file( $lease_id, $result['contract_text'] );
+		}
+
+		if ( $document_url ) {
+			$lease_obj->attach_document( $lease_id, $document_url );
+			$result['document_url'] = $document_url;
+		} else {
+			wp_send_json_error( array( 'message' => __( 'AI did not return a usable contract document.', 'arriendo-facil' ) ) );
 		}
 
 		wp_send_json_success( $result );
+	}
+
+	/**
+	 * Builds enriched AI payload for lease document generation.
+	 *
+	 * @param object $lease Lease row object.
+	 * @return array<string,mixed>
+	 */
+	private function build_lease_ai_payload( $lease ) {
+		$lease_arr         = (array) $lease;
+		$accommodation_id  = isset( $lease_arr['accommodation_id'] ) ? absint( $lease_arr['accommodation_id'] ) : 0;
+		$guest_id          = isset( $lease_arr['guest_id'] ) ? absint( $lease_arr['guest_id'] ) : 0;
+		$owner_template    = $this->get_owner_contract_example_context( $accommodation_id );
+		$accommodation     = array(
+			'title'   => (string) get_the_title( $accommodation_id ),
+			'address' => (string) get_post_meta( $accommodation_id, '_af_address', true ),
+		);
+
+		$guest_payload = array();
+		if ( $guest_id ) {
+			global $wpdb;
+			$guest_row = $wpdb->get_row(
+				$wpdb->prepare(
+					"SELECT * FROM {$wpdb->prefix}af_guests WHERE id = %d",
+					$guest_id
+				)
+			);
+
+			if ( $guest_row ) {
+				$guest_payload = array(
+					'guest_name' => trim( (string) $guest_row->first_name . ' ' . (string) $guest_row->last_name ),
+					'guest_email' => (string) $guest_row->email,
+					'guest_phone' => (string) $guest_row->phone,
+					'guest_id_number' => (string) $guest_row->id_number,
+					'mascotas' => isset( $guest_row->mascotas ) ? absint( $guest_row->mascotas ) : 0,
+					'referencia_personal_1' => isset( $guest_row->referencia_personal_1 ) ? (string) $guest_row->referencia_personal_1 : '',
+					'referencia_personal_2' => isset( $guest_row->referencia_personal_2 ) ? (string) $guest_row->referencia_personal_2 : '',
+					'personas_viviran' => isset( $guest_row->personas_viviran ) ? absint( $guest_row->personas_viviran ) : 0,
+					'rental_mode' => isset( $guest_row->rental_mode ) ? (string) $guest_row->rental_mode : '',
+					'rental_start_date' => isset( $guest_row->rental_start_date ) ? (string) $guest_row->rental_start_date : '',
+					'rental_end_date' => isset( $guest_row->rental_end_date ) ? (string) $guest_row->rental_end_date : '',
+					'rental_months' => isset( $guest_row->rental_months ) ? absint( $guest_row->rental_months ) : 0,
+					'rental_years' => isset( $guest_row->rental_years ) ? absint( $guest_row->rental_years ) : 0,
+					'desired_price' => isset( $guest_row->desired_price ) ? (string) $guest_row->desired_price : '',
+					'guarantee_text' => isset( $guest_row->guarantee_text ) ? (string) $guest_row->guarantee_text : '',
+				);
+			}
+		}
+
+		return array_merge(
+			$lease_arr,
+			$guest_payload,
+			array(
+				'accommodation_title' => sanitize_text_field( (string) $accommodation['title'] ),
+				'accommodation_address' => sanitize_text_field( (string) $accommodation['address'] ),
+				'template_available' => ! empty( $owner_template['attachment_id'] ),
+				'template_name' => isset( $owner_template['file_name'] ) ? sanitize_text_field( (string) $owner_template['file_name'] ) : '',
+				'template_mime' => isset( $owner_template['mime_type'] ) ? sanitize_text_field( (string) $owner_template['mime_type'] ) : '',
+				'template_url' => isset( $owner_template['url'] ) ? esc_url_raw( (string) $owner_template['url'] ) : '',
+				'template_text' => isset( $owner_template['template_text'] ) ? (string) $owner_template['template_text'] : '',
+				'owner_user_id' => isset( $owner_template['owner_user_id'] ) ? absint( $owner_template['owner_user_id'] ) : 0,
+				'owner_name' => isset( $owner_template['owner_name'] ) ? sanitize_text_field( (string) $owner_template['owner_name'] ) : '',
+				'owner_email' => isset( $owner_template['owner_email'] ) ? sanitize_email( (string) $owner_template['owner_email'] ) : '',
+			)
+		);
+	}
+
+	/**
+	 * Finds latest contract example uploaded by the owner of an accommodation.
+	 *
+	 * @param int $accommodation_id Accommodation ID.
+	 * @return array<string,mixed>
+	 */
+	private function get_owner_contract_example_context( $accommodation_id ) {
+		$owner_user_id = absint( get_post_meta( $accommodation_id, '_af_owner_id', true ) );
+
+		if ( ! $owner_user_id ) {
+			return array();
+		}
+
+		$attachment_ids = get_posts(
+			array(
+				'post_type'      => 'attachment',
+				'post_status'    => 'inherit',
+				'posts_per_page' => 1,
+				'orderby'        => 'date',
+				'order'          => 'DESC',
+				'fields'         => 'ids',
+				'meta_query'     => array(
+					'relation' => 'AND',
+					array(
+						'key'   => '_af_owner_contract_example',
+						'value' => '1',
+					),
+					array(
+						'key'   => '_af_owner_user_id',
+						'value' => (string) $owner_user_id,
+					),
+				),
+			)
+		);
+
+		$attachment_id = ! empty( $attachment_ids ) ? absint( $attachment_ids[0] ) : 0;
+		if ( ! $attachment_id ) {
+			return array();
+		}
+
+		$path          = get_attached_file( $attachment_id );
+		$mime_type     = (string) get_post_mime_type( $attachment_id );
+		$template_text = $this->extract_contract_template_text( $path, $mime_type );
+		$owner_user    = get_user_by( 'id', $owner_user_id );
+
+		return array(
+			'attachment_id' => $attachment_id,
+			'owner_user_id' => $owner_user_id,
+			'owner_name'    => $owner_user ? (string) $owner_user->display_name : '',
+			'owner_email'   => $owner_user ? (string) $owner_user->user_email : '',
+			'file_name'     => $path ? wp_basename( $path ) : '',
+			'mime_type'     => $mime_type,
+			'url'           => wp_get_attachment_url( $attachment_id ),
+			'template_text' => $template_text,
+		);
+	}
+
+	/**
+	 * Extracts plain text from contract template when supported.
+	 *
+	 * @param string $file_path File path.
+	 * @param string $mime_type Mime type.
+	 * @return string
+	 */
+	private function extract_contract_template_text( $file_path, $mime_type ) {
+		if ( ! $file_path || ! file_exists( $file_path ) ) {
+			return '';
+		}
+
+		$mime_type = strtolower( (string) $mime_type );
+
+		if ( false !== strpos( $mime_type, 'text/' ) ) {
+			$content = file_get_contents( $file_path );
+			if ( false !== $content ) {
+				return $this->limit_template_text( wp_strip_all_tags( (string) $content ) );
+			}
+
+			return '';
+		}
+
+		if ( 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' === $mime_type && class_exists( 'ZipArchive' ) ) {
+			$zip = new ZipArchive();
+			if ( true === $zip->open( $file_path ) ) {
+				$xml = $zip->getFromName( 'word/document.xml' );
+				$zip->close();
+
+				if ( false !== $xml && '' !== $xml ) {
+					$text = preg_replace( '/\s+/', ' ', wp_strip_all_tags( (string) $xml ) );
+					return $this->limit_template_text( (string) $text );
+				}
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * Truncates template text before sending it to AI.
+	 *
+	 * @param string $text Raw text.
+	 * @return string
+	 */
+	private function limit_template_text( $text ) {
+		$text = trim( preg_replace( '/\s+/', ' ', (string) $text ) );
+
+		if ( '' === $text ) {
+			return '';
+		}
+
+		if ( strlen( $text ) > 8000 ) {
+			return substr( $text, 0, 8000 );
+		}
+
+		return $text;
+	}
+
+	/**
+	 * Saves AI-generated contract text into uploads and returns URL.
+	 *
+	 * @param int    $lease_id Lease ID.
+	 * @param string $contract_text Contract text.
+	 * @return string
+	 */
+	private function create_generated_contract_file( $lease_id, $contract_text ) {
+		$lease_id = absint( $lease_id );
+		if ( ! $lease_id || '' === trim( $contract_text ) ) {
+			return '';
+		}
+
+		$uploads = wp_upload_dir();
+		if ( ! empty( $uploads['error'] ) || empty( $uploads['basedir'] ) || empty( $uploads['baseurl'] ) ) {
+			return '';
+		}
+
+		$contracts_dir = trailingslashit( $uploads['basedir'] ) . 'arriendo-facil/contracts';
+		if ( ! wp_mkdir_p( $contracts_dir ) ) {
+			return '';
+		}
+
+		$file_name = sprintf( 'lease-%d-contract-admin-%s.txt', $lease_id, gmdate( 'Ymd-His' ) );
+		$file_path = trailingslashit( $contracts_dir ) . $file_name;
+
+		if ( false === file_put_contents( $file_path, (string) $contract_text . "\n" ) ) {
+			return '';
+		}
+
+		return trailingslashit( $uploads['baseurl'] ) . 'arriendo-facil/contracts/' . rawurlencode( $file_name );
 	}
 }

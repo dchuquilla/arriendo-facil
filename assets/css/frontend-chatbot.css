@@ -148,6 +148,31 @@
 	color: #ffffff;
 }
 
+.af-chatbot-options {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin: 2px 0 4px;
+}
+
+.af-chatbot-option-btn {
+	border: 1px solid #99f6e4;
+	background: #f0fdfa;
+	color: #0f766e;
+	border-radius: 999px;
+	padding: 7px 12px;
+	font-size: 12px;
+	font-weight: 700;
+	cursor: pointer;
+	transition: transform 0.12s ease, background-color 0.12s ease, border-color 0.12s ease;
+}
+
+.af-chatbot-option-btn:hover {
+	transform: translateY(-1px);
+	background: #ccfbf1;
+	border-color: #5eead4;
+}
+
 .af-chatbot-typing {
 	display: inline-flex;
 	align-items: center;
@@ -220,5 +245,10 @@
 
 	#af-chatbot-submit {
 		width: 100%;
+	}
+
+	.af-chatbot-option-btn {
+		width: 100%;
+		text-align: left;
 	}
 }

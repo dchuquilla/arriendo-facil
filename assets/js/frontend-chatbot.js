@@ -25,9 +25,16 @@
 
 		var state = {
 			started: false,
+			collecting: false,
 			currentStep: 0,
 			values: {}
 		};
+
+		var menuOptions = [
+			{ key: 'rent', label: 'Arrendar una habitacion' },
+			{ key: 'availability', label: 'Consultar disponibilidad' },
+			{ key: 'advisor', label: 'Hablar con un asesor' }
+		];
 
 		var steps = [
 			{
@@ -133,6 +140,31 @@
 			input.disabled = disabled;
 		}
 
+		function showInput(visible) {
+			if (visible) {
+				form.removeAttribute('hidden');
+				return;
+			}
+			form.setAttribute('hidden', 'hidden');
+		}
+
+		function appendOptions() {
+			var wrap = document.createElement('div');
+			wrap.className = 'af-chatbot-options';
+
+			menuOptions.forEach(function (option) {
+				var btn = document.createElement('button');
+				btn.type = 'button';
+				btn.className = 'af-chatbot-option-btn';
+				btn.setAttribute('data-option', option.key);
+				btn.textContent = option.label;
+				wrap.appendChild(btn);
+			});
+
+			messages.appendChild(wrap);
+			scrollMessagesBottom();
+		}
+
 		function askCurrentStep() {
 			var step = steps[state.currentStep];
 			if (!step) {
@@ -151,23 +183,49 @@
 
 		function startConversation() {
 			if (state.started) {
-				input.focus();
+				if (state.collecting) {
+					input.focus();
+				}
 				return;
 			}
 
 			state.started = true;
+			state.collecting = false;
 			state.currentStep = 0;
 			state.values = {};
 			messages.innerHTML = '';
 			message.textContent = '';
 			message.className = '';
+			showInput(false);
 
 			setTyping(true);
 			window.setTimeout(function () {
 				setTyping(false);
-				appendBubble(afChatbot.welcomeText || 'Hola, te ayudare a registrar tus datos.', 'bot');
-				askCurrentStep();
+				appendBubble(afChatbot.welcomeText || 'Bienvenid@ a Arriendo Facil, como podemos ayudarte?', 'bot');
+				appendOptions();
 			}, 600);
+		}
+
+		function handleMenuOption(key, label) {
+			appendBubble(label, 'user');
+
+			if ('rent' === key) {
+				state.collecting = true;
+				state.currentStep = 0;
+				state.values = {};
+				showInput(true);
+				askCurrentStep();
+				return;
+			}
+
+			if ('availability' === key) {
+				appendBubble('Te ayudamos con la disponibilidad. Puedes contarme ciudad, zona o fecha, o elegir Arrendar una habitacion para registrar tus datos.', 'bot');
+				appendOptions();
+				return;
+			}
+
+			appendBubble('Un asesor te contactara pronto. Si deseas, tambien puedes elegir Arrendar una habitacion para adelantar tu registro.', 'bot');
+			appendOptions();
 		}
 
 		function submitConversation() {
@@ -200,10 +258,12 @@
 						message.textContent = (payload.data && payload.data.message) || afChatbot.successText;
 						appendBubble(message.textContent, 'bot');
 						state.started = false;
+						state.collecting = false;
 						state.currentStep = 0;
 						state.values = {};
 						input.value = '';
 						input.placeholder = 'Escribe tu respuesta';
+						showInput(false);
 						return;
 					}
 
@@ -242,6 +302,12 @@
 				return;
 			}
 
+			if (!state.collecting) {
+				appendBubble('Elige una opcion para continuar.', 'bot');
+				appendOptions();
+				return;
+			}
+
 			var step = steps[state.currentStep];
 			if (!step) {
 				return;
@@ -275,6 +341,17 @@
 				panel.setAttribute('hidden', 'hidden');
 				toggle.setAttribute('aria-expanded', 'false');
 			}
+		});
+
+		messages.addEventListener('click', function (event) {
+			var target = event.target;
+			if (!target || !target.classList || !target.classList.contains('af-chatbot-option-btn')) {
+				return;
+			}
+
+			var optionKey = target.getAttribute('data-option') || '';
+			var optionLabel = target.textContent || '';
+			handleMenuOption(optionKey, optionLabel);
 		});
 	});
 })();

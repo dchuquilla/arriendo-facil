@@ -167,6 +167,7 @@ class Arriendo_Facil_AI_Service {
 		$args = array(
 			'method'  => 'POST',
 			'headers' => array(
+				'Accept'        => 'application/json',
 				'Content-Type'  => 'application/json',
 				'Authorization' => 'Bearer ' . $this->api_key,
 			),
@@ -197,7 +198,7 @@ class Arriendo_Facil_AI_Service {
 
 		$status_code = (int) wp_remote_retrieve_response_code( $response );
 		$body = wp_remote_retrieve_body( $response );
-		$data = json_decode( $body, true );
+		$data = $this->decode_json_flexible( $body );
 
 		if ( $status_code < 200 || $status_code >= 300 ) {
 			$error_message = isset( $data['error']['message'] ) ? (string) $data['error']['message'] : __( 'OpenAI request failed.', 'arriendo-facil' );
@@ -205,24 +206,99 @@ class Arriendo_Facil_AI_Service {
 		}
 
 		if ( null === $data ) {
-			return new WP_Error( 'invalid_response', __( 'Invalid AI API response.', 'arriendo-facil' ) );
+			$preview = $this->preview_body( $body );
+			return new WP_Error( 'invalid_response', sprintf( __( 'Invalid AI API response. Preview: %s', 'arriendo-facil' ), $preview ) );
 		}
 
-		$content = '';
-		if ( isset( $data['choices'][0]['message']['content'] ) && is_string( $data['choices'][0]['message']['content'] ) ) {
-			$content = $data['choices'][0]['message']['content'];
-		}
+		$content = $this->extract_message_content( $data );
 
 		if ( '' === $content ) {
 			return new WP_Error( 'invalid_response', __( 'Empty response from ChatGPT.', 'arriendo-facil' ) );
 		}
 
-		$parsed_content = json_decode( $content, true );
+		$parsed_content = $this->decode_json_flexible( $content );
 		if ( null === $parsed_content ) {
-			return new WP_Error( 'invalid_response', __( 'ChatGPT did not return valid JSON.', 'arriendo-facil' ) );
+			$preview = $this->preview_body( $content );
+			return new WP_Error( 'invalid_response', sprintf( __( 'ChatGPT did not return valid JSON. Preview: %s', 'arriendo-facil' ), $preview ) );
 		}
 
 		return $parsed_content;
+	}
+
+	/**
+	 * Decodes JSON with support for BOM and embedded JSON fragments.
+	 *
+	 * @param string $raw Raw text body.
+	 * @return array|null
+	 */
+	private function decode_json_flexible( $raw ) {
+		$text = trim( (string) $raw );
+
+		if ( '' === $text ) {
+			return null;
+		}
+
+		// Strip UTF-8 BOM when upstream adds it.
+		$text = preg_replace( '/^\xEF\xBB\xBF/', '', $text );
+
+		$decoded = json_decode( $text, true );
+		if ( is_array( $decoded ) ) {
+			return $decoded;
+		}
+
+		if ( preg_match( '/\{[\s\S]*\}/', $text, $matches ) ) {
+			$decoded = json_decode( $matches[0], true );
+			if ( is_array( $decoded ) ) {
+				return $decoded;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Extracts content text from OpenAI-compatible response payload.
+	 *
+	 * @param array $data Decoded response payload.
+	 * @return string
+	 */
+	private function extract_message_content( array $data ) {
+		if ( isset( $data['choices'][0]['message']['content'] ) && is_string( $data['choices'][0]['message']['content'] ) ) {
+			return trim( $data['choices'][0]['message']['content'] );
+		}
+
+		if ( isset( $data['choices'][0]['message']['content'] ) && is_array( $data['choices'][0]['message']['content'] ) ) {
+			$parts = array();
+			foreach ( $data['choices'][0]['message']['content'] as $item ) {
+				if ( is_array( $item ) && isset( $item['text'] ) && is_string( $item['text'] ) ) {
+					$parts[] = $item['text'];
+				}
+			}
+
+			return trim( implode( "\n", $parts ) );
+		}
+
+		return '';
+	}
+
+	/**
+	 * Builds a short safe preview from response text for diagnostics.
+	 *
+	 * @param string $text Raw text.
+	 * @return string
+	 */
+	private function preview_body( $text ) {
+		$plain = trim( preg_replace( '/\s+/', ' ', wp_strip_all_tags( (string) $text ) ) );
+
+		if ( '' === $plain ) {
+			return '[empty body]';
+		}
+
+		if ( strlen( $plain ) > 180 ) {
+			return substr( $plain, 0, 180 ) . '...';
+		}
+
+		return $plain;
 	}
 
 	/**

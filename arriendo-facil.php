@@ -91,18 +91,23 @@ function arriendo_facil_enqueue_chatbot_assets() {
 		return;
 	}
 
+	$chatbot_css_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/frontend-chatbot.css';
+	$chatbot_js_path  = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/frontend-chatbot.js';
+	$chatbot_css_ver  = file_exists( $chatbot_css_path ) ? (string) filemtime( $chatbot_css_path ) : ARRIENDO_FACIL_VERSION;
+	$chatbot_js_ver   = file_exists( $chatbot_js_path ) ? (string) filemtime( $chatbot_js_path ) : ARRIENDO_FACIL_VERSION;
+
 	wp_enqueue_style(
 		'af-chatbot-frontend',
 		ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/frontend-chatbot.css',
 		array(),
-		ARRIENDO_FACIL_VERSION
+		$chatbot_css_ver
 	);
 
 	wp_enqueue_script(
 		'af-chatbot-frontend',
 		ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/frontend-chatbot.js',
 		array(),
-		ARRIENDO_FACIL_VERSION,
+		$chatbot_js_ver,
 		true
 	);
 

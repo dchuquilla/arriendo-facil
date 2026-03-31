@@ -18,9 +18,8 @@
 		var submit = document.getElementById('af-chatbot-submit');
 		var message = document.getElementById('af-chatbot-message');
 		var messages = document.getElementById('af-chatbot-messages');
-		var typing = document.getElementById('af-chatbot-typing');
 
-		if (!toggle || !panel || !form || !input || !select || !submit || !message || !messages || !typing || !window.afChatbot) {
+		if (!toggle || !panel || !form || !input || !select || !submit || !message || !messages || !window.afChatbot) {
 			return;
 		}
 
@@ -42,15 +41,85 @@
 
 		var steps = [
 			{
+				key: 'name',
+				type: 'text',
+				question: 'Para comenzar, cual es tu nombre completo?',
+				placeholder: 'Ejemplo: Juan Perez',
+				validate: function (value) { return value.length >= 3; },
+				error: 'Escribe tu nombre completo.'
+			},
+			{
+				key: 'email',
+				type: 'text',
+				question: 'Cual es tu correo electronico?',
+				placeholder: 'correo@dominio.com',
+				validate: function (value) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value); },
+				error: 'Ingresa un correo valido.'
+			},
+			{
+				key: 'phone',
+				type: 'text',
+				question: 'Cual es tu telefono? (solo numeros, max 10)',
+				placeholder: '0991234567',
+				validate: function (value) { return /^[0-9]{1,10}$/.test(value); },
+				error: 'El telefono debe tener solo numeros y maximo 10 digitos.'
+			},
+			{
+				key: 'id_number',
+				type: 'text',
+				question: 'Cual es tu numero de documento? (solo numeros, max 10)',
+				placeholder: '1723456789',
+				validate: function (value) { return /^[0-9]{1,10}$/.test(value); },
+				error: 'El documento debe tener solo numeros y maximo 10 digitos.'
+			},
+			{
+				key: 'mascotas',
+				type: 'text',
+				question: 'Cuantas mascotas tienes? (0 a 10)',
+				placeholder: '0',
+				validate: function (value) {
+					var num = parseInt(value, 10);
+					return !isNaN(num) && num >= 0 && num <= 10;
+				},
+				error: 'Mascotas debe estar entre 0 y 10.'
+			},
+			{
+				key: 'referencia_personal_1',
+				type: 'text',
+				question: 'Comparte tu primera referencia personal.',
+				placeholder: 'Nombre de referencia 1',
+				validate: function (value) { return value.length >= 3; },
+				error: 'Ingresa una referencia valida.'
+			},
+			{
+				key: 'referencia_personal_2',
+				type: 'text',
+				question: 'Ahora tu segunda referencia personal.',
+				placeholder: 'Nombre de referencia 2',
+				validate: function (value) { return value.length >= 3; },
+				error: 'Ingresa una segunda referencia valida.'
+			},
+			{
+				key: 'personas_viviran',
+				type: 'text',
+				question: 'Cuantas personas viviran en la propiedad? (1 a 10)',
+				placeholder: '2',
+				validate: function (value) {
+					var num = parseInt(value, 10);
+					return !isNaN(num) && num >= 1 && num <= 10;
+				},
+				error: 'Personas debe estar entre 1 y 10.'
+			},
+			{
 				key: 'accommodation_id',
 				type: 'select',
-				question: 'Selecciona la accommodation que te interesa.',
+				question: 'Ahora selecciona la accommodation que te interesa.',
 				options: function () {
-					var options = [{ value: '', label: 'Selecciona una accommodation' }];
+					var opts = [{ value: '', label: 'Selecciona una accommodation' }];
 					accommodations.forEach(function (item) {
-						options.push({ value: String(item.id), label: item.title });
+						opts.push({ value: String(item.id), label: item.title });
 					});
-					return options;
+					return opts;
 				},
 				defaultValue: function () {
 					return currentAccommodationId > 0 ? String(currentAccommodationId) : '';
@@ -62,49 +131,9 @@
 				error: 'Selecciona una accommodation valida.'
 			},
 			{
-				key: 'name',
-				type: 'text',
-				question: 'Para comenzar, cual es tu nombre completo?',
-				placeholder: 'Ejemplo: Juan Perez',
-				validate: function (value) {
-					return value.length >= 3;
-				},
-				error: 'Escribe tu nombre completo.'
-			},
-			{
-				key: 'email',
-				type: 'text',
-				question: 'Cual es tu correo electronico?',
-				placeholder: 'correo@dominio.com',
-				validate: function (value) {
-					return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-				},
-				error: 'Ingresa un correo valido.'
-			},
-			{
-				key: 'phone',
-				type: 'text',
-				question: 'Cual es tu telefono? (solo numeros, max 10)',
-				placeholder: '0991234567',
-				validate: function (value) {
-					return /^[0-9]{1,10}$/.test(value);
-				},
-				error: 'El telefono debe tener solo numeros y maximo 10 digitos.'
-			},
-			{
-				key: 'id_number',
-				type: 'text',
-				question: 'Cual es tu numero de documento? (solo numeros, max 10)',
-				placeholder: '1723456789',
-				validate: function (value) {
-					return /^[0-9]{1,10}$/.test(value);
-				},
-				error: 'El documento debe tener solo numeros y maximo 10 digitos.'
-			},
-			{
 				key: 'rental_mode',
 				type: 'select',
-				question: 'Como deseas definir el tiempo de arriendo?',
+				question: 'Como quieres definir tu estadia?',
 				options: function () {
 					return [
 						{ value: '', label: 'Selecciona modalidad' },
@@ -123,12 +152,8 @@
 				type: 'text',
 				question: 'Desde cuando quieres arrendar? (YYYY-MM-DD)',
 				placeholder: '2026-04-01',
-				shouldAsk: function (values) {
-					return values.rental_mode === 'dates';
-				},
-				validate: function (value) {
-					return /^\d{4}-\d{2}-\d{2}$/.test(value);
-				},
+				shouldAsk: function (values) { return values.rental_mode === 'dates'; },
+				validate: function (value) { return /^\d{4}-\d{2}-\d{2}$/.test(value); },
 				error: 'Ingresa la fecha inicial en formato YYYY-MM-DD.'
 			},
 			{
@@ -136,9 +161,7 @@
 				type: 'text',
 				question: 'Hasta cuando quieres arrendar? (YYYY-MM-DD)',
 				placeholder: '2026-10-01',
-				shouldAsk: function (values) {
-					return values.rental_mode === 'dates';
-				},
+				shouldAsk: function (values) { return values.rental_mode === 'dates'; },
 				validate: function (value, values) {
 					if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
 						return false;
@@ -155,9 +178,7 @@
 				type: 'text',
 				question: 'Cuantos meses deseas arrendar?',
 				placeholder: '12',
-				shouldAsk: function (values) {
-					return values.rental_mode === 'months';
-				},
+				shouldAsk: function (values) { return values.rental_mode === 'months'; },
 				validate: function (value) {
 					var num = parseInt(value, 10);
 					return !isNaN(num) && num >= 1 && num <= 120;
@@ -169,9 +190,7 @@
 				type: 'text',
 				question: 'Cuantos anos deseas arrendar?',
 				placeholder: '2',
-				shouldAsk: function (values) {
-					return values.rental_mode === 'years';
-				},
+				shouldAsk: function (values) { return values.rental_mode === 'years'; },
 				validate: function (value) {
 					var num = parseInt(value, 10);
 					return !isNaN(num) && num >= 1 && num <= 20;
@@ -181,64 +200,18 @@
 			{
 				key: 'desired_price',
 				type: 'text',
-				question: 'Cual es el precio que tienes en mente?',
+				question: 'Que precio propones? (cualquiera)',
 				placeholder: 'Ejemplo: 350 USD',
-				validate: function (value) {
-					return value.length >= 1;
-				},
-				error: 'Ingresa el precio que tienes en mente.'
+				validate: function (value) { return value.length >= 1; },
+				error: 'Ingresa un precio.'
 			},
 			{
 				key: 'guarantee_text',
 				type: 'text',
-				question: 'Que garantia ofreces?',
+				question: 'Que garantia ofreces? (cualquiera)',
 				placeholder: 'Ejemplo: garantia de 2 meses',
-				validate: function (value) {
-					return value.length >= 1;
-				},
+				validate: function (value) { return value.length >= 1; },
 				error: 'Ingresa una garantia.'
-			},
-			{
-				key: 'mascotas',
-				type: 'text',
-				question: 'Cuantas mascotas tienes? (0 a 10)',
-				placeholder: '0',
-				validate: function (value) {
-					var num = parseInt(value, 10);
-					return !isNaN(num) && num >= 0 && num <= 10;
-				},
-				error: 'Mascotas debe estar entre 0 y 10.'
-			},
-			{
-				key: 'referencia_personal_1',
-				type: 'text',
-				question: 'Comparte tu primera referencia personal.',
-				placeholder: 'Nombre de referencia 1',
-				validate: function (value) {
-					return value.length >= 3;
-				},
-				error: 'Ingresa una referencia valida.'
-			},
-			{
-				key: 'referencia_personal_2',
-				type: 'text',
-				question: 'Ahora tu segunda referencia personal.',
-				placeholder: 'Nombre de referencia 2',
-				validate: function (value) {
-					return value.length >= 3;
-				},
-				error: 'Ingresa una segunda referencia valida.'
-			},
-			{
-				key: 'personas_viviran',
-				type: 'text',
-				question: 'Cuantas personas viviran en la propiedad? (1 a 10)',
-				placeholder: '2',
-				validate: function (value) {
-					var num = parseInt(value, 10);
-					return !isNaN(num) && num >= 1 && num <= 10;
-				},
-				error: 'Personas debe estar entre 1 y 10.'
 			}
 		];
 
@@ -254,24 +227,11 @@
 			scrollMessagesBottom();
 		}
 
-		function setTyping(visible) {
-			if (visible) {
-				typing.removeAttribute('hidden');
-			} else {
-				typing.setAttribute('hidden', 'hidden');
-			}
-			scrollMessagesBottom();
-		}
-
 		function botReply(text, callback) {
-			setTyping(true);
-			window.setTimeout(function () {
-				setTyping(false);
-				appendBubble(text, 'bot');
-				if (typeof callback === 'function') {
-					callback();
-				}
-			}, 420);
+			appendBubble(text, 'bot');
+			if (typeof callback === 'function') {
+				callback();
+			}
 		}
 
 		function setFormDisabled(disabled) {
@@ -392,7 +352,6 @@
 
 		function handleMenuOption(key, label) {
 			appendBubble(label, 'user');
-
 			if ('rent' === key) {
 				state.collecting = true;
 				state.currentStep = 0;
@@ -401,14 +360,12 @@
 				askCurrentStep();
 				return;
 			}
-
 			if ('availability' === key) {
 				botReply('Te ayudamos con la disponibilidad. Puedes contarme ciudad, zona o fecha, o elegir Arrendar una habitacion para registrar tus datos.', function () {
 					appendOptions();
 				});
 				return;
 			}
-
 			botReply('Un asesor te contactara pronto. Si deseas, tambien puedes elegir Arrendar una habitacion para adelantar tu registro.', function () {
 				appendOptions();
 			});
@@ -418,11 +375,15 @@
 			var data = new FormData();
 			data.append('action', 'af_create_guest_frontend');
 			data.append('nonce', afChatbot.nonce);
-			data.append('accommodation_id', state.values.accommodation_id || '');
 			data.append('name', state.values.name || '');
 			data.append('email', state.values.email || '');
 			data.append('phone', state.values.phone || '');
 			data.append('id_number', state.values.id_number || '');
+			data.append('mascotas', state.values.mascotas || '0');
+			data.append('referencia_personal_1', state.values.referencia_personal_1 || '');
+			data.append('referencia_personal_2', state.values.referencia_personal_2 || '');
+			data.append('personas_viviran', state.values.personas_viviran || '1');
+			data.append('accommodation_id', state.values.accommodation_id || '');
 			data.append('rental_mode', state.values.rental_mode || '');
 			data.append('rental_start_date', state.values.rental_start_date || '');
 			data.append('rental_end_date', state.values.rental_end_date || '');
@@ -430,15 +391,10 @@
 			data.append('rental_years', state.values.rental_years || '');
 			data.append('desired_price', state.values.desired_price || '');
 			data.append('guarantee_text', state.values.guarantee_text || '');
-			data.append('mascotas', state.values.mascotas || '0');
-			data.append('referencia_personal_1', state.values.referencia_personal_1 || '');
-			data.append('referencia_personal_2', state.values.referencia_personal_2 || '');
-			data.append('personas_viviran', state.values.personas_viviran || '1');
 
 			setFormDisabled(true);
 			botReply(afChatbot.doneText || 'Perfecto, ya tengo tus datos. Estoy registrando tu solicitud...');
 
-			setTyping(true);
 			fetch(afChatbot.ajaxUrl, {
 				method: 'POST',
 				body: data,
@@ -448,11 +404,13 @@
 					return response.json();
 				})
 				.then(function (payload) {
-					setTyping(false);
 					if (payload && payload.success) {
 						message.className = 'af-chatbot-success';
 						message.textContent = (payload.data && payload.data.message) || afChatbot.successText;
 						appendBubble(message.textContent, 'bot');
+						if (payload.data && payload.data.contract && payload.data.contract.generated && payload.data.contract.document_url) {
+							appendBubble('Contrato generado automaticamente.', 'bot');
+						}
 						state.started = false;
 						state.collecting = false;
 						state.currentStep = 0;
@@ -460,13 +418,11 @@
 						showForm(false);
 						return;
 					}
-
 					message.className = 'af-chatbot-error';
 					message.textContent = (payload && payload.data && payload.data.message) || afChatbot.errorText;
 					appendBubble(message.textContent, 'bot');
 				})
 				.catch(function () {
-					setTyping(false);
 					message.className = 'af-chatbot-error';
 					message.textContent = afChatbot.errorText || 'No se pudo enviar el registro.';
 					appendBubble(message.textContent, 'bot');
@@ -490,25 +446,21 @@
 
 		form.addEventListener('submit', function (event) {
 			event.preventDefault();
-
 			if (!state.started) {
 				startConversation();
 				return;
 			}
-
 			if (!state.collecting) {
 				botReply('Elige una opcion para continuar.', function () {
 					appendOptions();
 				});
 				return;
 			}
-
 			var step = getCurrentStep();
 			if (!step) {
 				submitConversation();
 				return;
 			}
-
 			var value = getStepValue(step);
 			if (!step.validate(value, state.values)) {
 				message.className = 'af-chatbot-error';
@@ -516,7 +468,6 @@
 				botReply(step.error);
 				return;
 			}
-
 			message.textContent = '';
 			message.className = '';
 			state.values[step.key] = value;

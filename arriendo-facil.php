@@ -176,10 +176,6 @@ function arriendo_facil_render_chatbot_widget() {
 
 			<div id="af-chatbot-messages" class="af-chatbot-messages"></div>
 
-			<div id="af-chatbot-typing" class="af-chatbot-typing" hidden>
-				<span class="af-chatbot-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-			</div>
-
 			<form id="af-chatbot-form" autocomplete="off">
 				<input type="text" id="af-chatbot-input" placeholder="<?php esc_attr_e( 'Escribe tu respuesta', 'arriendo-facil' ); ?>" required />
 				<select id="af-chatbot-select" hidden></select>

@@ -18,8 +18,9 @@
 		var submit = document.getElementById('af-chatbot-submit');
 		var message = document.getElementById('af-chatbot-message');
 		var messages = document.getElementById('af-chatbot-messages');
+		var typing = document.getElementById('af-chatbot-typing');
 
-		if (!toggle || !panel || !form || !input || !select || !submit || !messages || !window.afChatbot) {
+		if (!toggle || !panel || !form || !input || !select || !submit || !message || !messages || !typing || !window.afChatbot) {
 			return;
 		}
 
@@ -44,6 +45,16 @@
 				key: 'accommodation_id',
 				type: 'select',
 				question: 'Selecciona la accommodation que te interesa.',
+				options: function () {
+					var options = [{ value: '', label: 'Selecciona una accommodation' }];
+					accommodations.forEach(function (item) {
+						options.push({ value: String(item.id), label: item.title });
+					});
+					return options;
+				},
+				defaultValue: function () {
+					return currentAccommodationId > 0 ? String(currentAccommodationId) : '';
+				},
 				validate: function (value) {
 					var parsed = parseInt(value, 10);
 					return !isNaN(parsed) && parsed > 0;
@@ -89,6 +100,103 @@
 					return /^[0-9]{1,10}$/.test(value);
 				},
 				error: 'El documento debe tener solo numeros y maximo 10 digitos.'
+			},
+			{
+				key: 'rental_mode',
+				type: 'select',
+				question: 'Como deseas definir el tiempo de arriendo?',
+				options: function () {
+					return [
+						{ value: '', label: 'Selecciona modalidad' },
+						{ value: 'dates', label: 'Desde una fecha hasta otra fecha' },
+						{ value: 'months', label: 'Por meses' },
+						{ value: 'years', label: 'Por anos' }
+					];
+				},
+				validate: function (value) {
+					return value === 'dates' || value === 'months' || value === 'years';
+				},
+				error: 'Selecciona una modalidad valida.'
+			},
+			{
+				key: 'rental_start_date',
+				type: 'text',
+				question: 'Desde cuando quieres arrendar? (YYYY-MM-DD)',
+				placeholder: '2026-04-01',
+				shouldAsk: function (values) {
+					return values.rental_mode === 'dates';
+				},
+				validate: function (value) {
+					return /^\d{4}-\d{2}-\d{2}$/.test(value);
+				},
+				error: 'Ingresa la fecha inicial en formato YYYY-MM-DD.'
+			},
+			{
+				key: 'rental_end_date',
+				type: 'text',
+				question: 'Hasta cuando quieres arrendar? (YYYY-MM-DD)',
+				placeholder: '2026-10-01',
+				shouldAsk: function (values) {
+					return values.rental_mode === 'dates';
+				},
+				validate: function (value, values) {
+					if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+						return false;
+					}
+					if (!/^\d{4}-\d{2}-\d{2}$/.test(values.rental_start_date || '')) {
+						return false;
+					}
+					return new Date(value).getTime() >= new Date(values.rental_start_date).getTime();
+				},
+				error: 'La fecha final debe ser valida y mayor o igual a la fecha inicial.'
+			},
+			{
+				key: 'rental_months',
+				type: 'text',
+				question: 'Cuantos meses deseas arrendar?',
+				placeholder: '12',
+				shouldAsk: function (values) {
+					return values.rental_mode === 'months';
+				},
+				validate: function (value) {
+					var num = parseInt(value, 10);
+					return !isNaN(num) && num >= 1 && num <= 120;
+				},
+				error: 'Los meses deben estar entre 1 y 120.'
+			},
+			{
+				key: 'rental_years',
+				type: 'text',
+				question: 'Cuantos anos deseas arrendar?',
+				placeholder: '2',
+				shouldAsk: function (values) {
+					return values.rental_mode === 'years';
+				},
+				validate: function (value) {
+					var num = parseInt(value, 10);
+					return !isNaN(num) && num >= 1 && num <= 20;
+				},
+				error: 'Los anos deben estar entre 1 y 20.'
+			},
+			{
+				key: 'desired_price',
+				type: 'text',
+				question: 'Cual es el precio que tienes en mente?',
+				placeholder: 'Ejemplo: 350 USD',
+				validate: function (value) {
+					return value.length >= 1;
+				},
+				error: 'Ingresa el precio que tienes en mente.'
+			},
+			{
+				key: 'guarantee_text',
+				type: 'text',
+				question: 'Que garantia ofreces?',
+				placeholder: 'Ejemplo: garantia de 2 meses',
+				validate: function (value) {
+					return value.length >= 1;
+				},
+				error: 'Ingresa una garantia.'
 			},
 			{
 				key: 'mascotas',
@@ -146,11 +254,24 @@
 			scrollMessagesBottom();
 		}
 
-		function botReply(text, callback) {
-			appendBubble(text, 'bot');
-			if (typeof callback === 'function') {
-				callback();
+		function setTyping(visible) {
+			if (visible) {
+				typing.removeAttribute('hidden');
+			} else {
+				typing.setAttribute('hidden', 'hidden');
 			}
+			scrollMessagesBottom();
+		}
+
+		function botReply(text, callback) {
+			setTyping(true);
+			window.setTimeout(function () {
+				setTyping(false);
+				appendBubble(text, 'bot');
+				if (typeof callback === 'function') {
+					callback();
+				}
+			}, 420);
 		}
 
 		function setFormDisabled(disabled) {
@@ -167,7 +288,6 @@
 				select.focus();
 				return;
 			}
-
 			select.setAttribute('hidden', 'hidden');
 			input.removeAttribute('hidden');
 			input.focus();
@@ -184,7 +304,6 @@
 		function appendOptions() {
 			var wrap = document.createElement('div');
 			wrap.className = 'af-chatbot-options';
-
 			menuOptions.forEach(function (option) {
 				var btn = document.createElement('button');
 				btn.type = 'button';
@@ -193,29 +312,32 @@
 				btn.textContent = option.label;
 				wrap.appendChild(btn);
 			});
-
 			messages.appendChild(wrap);
 			scrollMessagesBottom();
 		}
 
-		function fillAccommodationSelect() {
+		function fillSelectOptions(options, defaultValue) {
 			select.innerHTML = '';
-
-			var placeholder = document.createElement('option');
-			placeholder.value = '';
-			placeholder.textContent = 'Selecciona una accommodation';
-			select.appendChild(placeholder);
-
-			accommodations.forEach(function (item) {
+			options.forEach(function (opt) {
 				var option = document.createElement('option');
-				option.value = String(item.id);
-				option.textContent = item.title;
+				option.value = String(opt.value);
+				option.textContent = opt.label;
 				select.appendChild(option);
 			});
-
-			if (currentAccommodationId > 0) {
-				select.value = String(currentAccommodationId);
+			if (typeof defaultValue === 'string') {
+				select.value = defaultValue;
 			}
+		}
+
+		function getCurrentStep() {
+			while (state.currentStep < steps.length) {
+				var step = steps[state.currentStep];
+				if (!step.shouldAsk || step.shouldAsk(state.values)) {
+					return step;
+				}
+				state.currentStep += 1;
+			}
+			return null;
 		}
 
 		function getStepValue(step) {
@@ -229,20 +351,22 @@
 			if ('select' !== step.type) {
 				return value;
 			}
-
 			var selected = select.options[select.selectedIndex];
 			return selected ? selected.text : value;
 		}
 
 		function askCurrentStep() {
-			var step = steps[state.currentStep];
+			var step = getCurrentStep();
 			if (!step) {
+				submitConversation();
 				return;
 			}
 
 			botReply(step.question, function () {
 				showComposer(step.type);
-				if ('text' === step.type) {
+				if ('select' === step.type) {
+					fillSelectOptions(step.options(), step.defaultValue ? step.defaultValue() : '');
+				} else {
 					input.placeholder = step.placeholder || 'Escribe tu respuesta';
 					input.value = '';
 				}
@@ -251,13 +375,8 @@
 
 		function startConversation() {
 			if (state.started) {
-				if (state.collecting) {
-					var currentStep = steps[state.currentStep];
-					showComposer(currentStep ? currentStep.type : 'text');
-				}
 				return;
 			}
-
 			state.started = true;
 			state.collecting = false;
 			state.currentStep = 0;
@@ -265,10 +384,8 @@
 			messages.innerHTML = '';
 			message.textContent = '';
 			message.className = '';
-			fillAccommodationSelect();
 			showForm(false);
-
-			botReply(afChatbot.welcomeText || 'Bienvenid@ a Arriendo Facil, como podemos ayudarte?', function () {
+			botReply(afChatbot.welcomeText || 'Buenos dias, como podemos ayudarte?', function () {
 				appendOptions();
 			});
 		}
@@ -306,6 +423,13 @@
 			data.append('email', state.values.email || '');
 			data.append('phone', state.values.phone || '');
 			data.append('id_number', state.values.id_number || '');
+			data.append('rental_mode', state.values.rental_mode || '');
+			data.append('rental_start_date', state.values.rental_start_date || '');
+			data.append('rental_end_date', state.values.rental_end_date || '');
+			data.append('rental_months', state.values.rental_months || '');
+			data.append('rental_years', state.values.rental_years || '');
+			data.append('desired_price', state.values.desired_price || '');
+			data.append('guarantee_text', state.values.guarantee_text || '');
 			data.append('mascotas', state.values.mascotas || '0');
 			data.append('referencia_personal_1', state.values.referencia_personal_1 || '');
 			data.append('referencia_personal_2', state.values.referencia_personal_2 || '');
@@ -314,6 +438,7 @@
 			setFormDisabled(true);
 			botReply(afChatbot.doneText || 'Perfecto, ya tengo tus datos. Estoy registrando tu solicitud...');
 
+			setTyping(true);
 			fetch(afChatbot.ajaxUrl, {
 				method: 'POST',
 				body: data,
@@ -323,6 +448,7 @@
 					return response.json();
 				})
 				.then(function (payload) {
+					setTyping(false);
 					if (payload && payload.success) {
 						message.className = 'af-chatbot-success';
 						message.textContent = (payload.data && payload.data.message) || afChatbot.successText;
@@ -331,8 +457,6 @@
 						state.collecting = false;
 						state.currentStep = 0;
 						state.values = {};
-						input.value = '';
-						select.value = '';
 						showForm(false);
 						return;
 					}
@@ -342,6 +466,7 @@
 					appendBubble(message.textContent, 'bot');
 				})
 				.catch(function () {
+					setTyping(false);
 					message.className = 'af-chatbot-error';
 					message.textContent = afChatbot.errorText || 'No se pudo enviar el registro.';
 					appendBubble(message.textContent, 'bot');
@@ -378,13 +503,14 @@
 				return;
 			}
 
-			var step = steps[state.currentStep];
+			var step = getCurrentStep();
 			if (!step) {
+				submitConversation();
 				return;
 			}
 
 			var value = getStepValue(step);
-			if (!step.validate(value)) {
+			if (!step.validate(value, state.values)) {
 				message.className = 'af-chatbot-error';
 				message.textContent = step.error;
 				botReply(step.error);
@@ -396,20 +522,7 @@
 			state.values[step.key] = value;
 			appendBubble(getStepLabel(step, value), 'user');
 			state.currentStep += 1;
-
-			if (state.currentStep >= steps.length) {
-				submitConversation();
-				return;
-			}
-
 			askCurrentStep();
-		});
-
-		input.addEventListener('keydown', function (event) {
-			if ('Escape' === event.key) {
-				panel.setAttribute('hidden', 'hidden');
-				toggle.setAttribute('aria-expanded', 'false');
-			}
 		});
 
 		messages.addEventListener('click', function (event) {
@@ -417,10 +530,7 @@
 			if (!target || !target.classList || !target.classList.contains('af-chatbot-option-btn')) {
 				return;
 			}
-
-			var optionKey = target.getAttribute('data-option') || '';
-			var optionLabel = target.textContent || '';
-			handleMenuOption(optionKey, optionLabel);
+			handleMenuOption(target.getAttribute('data-option') || '', target.textContent || '');
 		});
 
 		document.addEventListener('click', function (event) {
@@ -428,7 +538,6 @@
 			if (!widget || panel.hasAttribute('hidden')) {
 				return;
 			}
-
 			if (!widget.contains(event.target)) {
 				panel.setAttribute('hidden', 'hidden');
 				toggle.setAttribute('aria-expanded', 'false');

@@ -116,7 +116,7 @@ function arriendo_facil_enqueue_chatbot_assets() {
 			'errorText'     => __( 'No se pudo enviar el registro. Intenta nuevamente.', 'arriendo-facil' ),
 			'sendingText'   => __( 'Enviando...', 'arriendo-facil' ),
 			'buttonText'    => __( 'Enviar', 'arriendo-facil' ),
-			'welcomeText'   => __( 'Hola, soy tu asistente de Arriendo Facil. Te hare unas preguntas rapidas para ayudarte a arrendar.', 'arriendo-facil' ),
+			'welcomeText'   => __( 'Bienvenid@ a Arriendo Facil, como podemos ayudarte?', 'arriendo-facil' ),
 			'doneText'      => __( 'Perfecto, ya tengo tus datos. Estoy registrando tu solicitud...', 'arriendo-facil' ),
 			'typingText'    => __( 'Escribiendo', 'arriendo-facil' ),
 		)
@@ -144,8 +144,7 @@ function arriendo_facil_render_chatbot_widget() {
 
 		<div id="af-chatbot-panel" hidden>
 			<div class="af-chatbot-header">
-				<strong><?php esc_html_e( 'Arrienda ahora', 'arriendo-facil' ); ?></strong>
-				<p><?php esc_html_e( 'Conversemos rapido para registrar tu interes.', 'arriendo-facil' ); ?></p>
+				<strong><?php esc_html_e( 'Asistente Arriendo Facil', 'arriendo-facil' ); ?></strong>
 			</div>
 
 			<div id="af-chatbot-messages" class="af-chatbot-messages"></div>

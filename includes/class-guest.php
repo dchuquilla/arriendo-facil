@@ -38,6 +38,7 @@ class Arriendo_Facil_Guest {
 		$email      = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
 		$phone      = isset( $_POST['phone'] ) ? sanitize_text_field( wp_unslash( $_POST['phone'] ) ) : '';
 		$id_number  = isset( $_POST['id_number'] ) ? sanitize_text_field( wp_unslash( $_POST['id_number'] ) ) : '';
+		$accommodation_id = isset( $_POST['accommodation_id'] ) ? absint( wp_unslash( $_POST['accommodation_id'] ) ) : 0;
 		$mascotas   = isset( $_POST['mascotas'] ) ? absint( wp_unslash( $_POST['mascotas'] ) ) : 0;
 		$referencia_personal_1 = isset( $_POST['referencia_personal_1'] ) ? sanitize_text_field( wp_unslash( $_POST['referencia_personal_1'] ) ) : '';
 		$referencia_personal_2 = isset( $_POST['referencia_personal_2'] ) ? sanitize_text_field( wp_unslash( $_POST['referencia_personal_2'] ) ) : '';
@@ -49,6 +50,10 @@ class Arriendo_Facil_Guest {
 
 		if ( ! $first_name || ! $email || ! $phone || ! $id_number ) {
 			wp_send_json_error( array( 'message' => __( 'Faltan campos requeridos.', 'arriendo-facil' ) ) );
+		}
+
+		if ( ! $accommodation_id || 'accommodation' !== get_post_type( $accommodation_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'Debes seleccionar una accommodation valida.', 'arriendo-facil' ) ) );
 		}
 
 		if ( ! $referencia_personal_1 || ! $referencia_personal_2 ) {
@@ -89,12 +94,13 @@ class Arriendo_Facil_Guest {
 				'email'                 => $email,
 				'phone'                 => $phone,
 				'id_number'             => $id_number,
+				'accommodation_id'      => $accommodation_id,
 				'mascotas'              => $mascotas,
 				'referencia_personal_1' => $referencia_personal_1,
 				'referencia_personal_2' => $referencia_personal_2,
 				'personas_viviran'      => $personas_viviran,
 			),
-			array( '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%d' )
+			array( '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%d' )
 		);
 
 		if ( $inserted ) {
@@ -123,6 +129,7 @@ class Arriendo_Facil_Guest {
 		$email      = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
 		$phone      = isset( $_POST['phone'] ) ? sanitize_text_field( wp_unslash( $_POST['phone'] ) ) : '';
 		$id_number  = isset( $_POST['id_number'] ) ? sanitize_text_field( wp_unslash( $_POST['id_number'] ) ) : '';
+		$accommodation_id = isset( $_POST['accommodation_id'] ) ? absint( wp_unslash( $_POST['accommodation_id'] ) ) : 0;
 		$mascotas   = isset( $_POST['mascotas'] ) ? absint( wp_unslash( $_POST['mascotas'] ) ) : 0;
 		$referencia_personal_1 = isset( $_POST['referencia_personal_1'] ) ? sanitize_text_field( wp_unslash( $_POST['referencia_personal_1'] ) ) : '';
 		$referencia_personal_2 = isset( $_POST['referencia_personal_2'] ) ? sanitize_text_field( wp_unslash( $_POST['referencia_personal_2'] ) ) : '';
@@ -134,6 +141,10 @@ class Arriendo_Facil_Guest {
 
 		if ( ! $first_name || ! $email || ! $phone || ! $id_number ) {
 			wp_send_json_error( array( 'message' => __( 'Missing required fields.', 'arriendo-facil' ) ) );
+		}
+
+		if ( $accommodation_id && 'accommodation' !== get_post_type( $accommodation_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'Invalid accommodation ID.', 'arriendo-facil' ) ) );
 		}
 
 		if ( ! $referencia_personal_1 || ! $referencia_personal_2 ) {
@@ -174,12 +185,13 @@ class Arriendo_Facil_Guest {
 				'email'      => $email,
 				'phone'      => $phone,
 				'id_number'  => $id_number,
+				'accommodation_id' => $accommodation_id,
 				'mascotas'   => $mascotas,
 				'referencia_personal_1' => $referencia_personal_1,
 				'referencia_personal_2' => $referencia_personal_2,
 				'personas_viviran'      => $personas_viviran,
 			),
-			array( '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%d' )
+			array( '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%d' )
 		);
 
 		if ( $inserted ) {
@@ -211,6 +223,7 @@ class Arriendo_Facil_Guest {
 
 		$table = $wpdb->prefix . 'af_guests';
 		$columns = array(
+			'accommodation_id'      => 'ALTER TABLE ' . $table . ' ADD COLUMN accommodation_id BIGINT(20) UNSIGNED DEFAULT NULL',
 			'mascotas'             => 'ALTER TABLE ' . $table . ' ADD COLUMN mascotas TINYINT UNSIGNED DEFAULT NULL',
 			'referencia_personal_1'=> 'ALTER TABLE ' . $table . ' ADD COLUMN referencia_personal_1 VARCHAR(255) DEFAULT NULL',
 			'referencia_personal_2'=> 'ALTER TABLE ' . $table . ' ADD COLUMN referencia_personal_2 VARCHAR(255) DEFAULT NULL',

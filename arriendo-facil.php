@@ -111,6 +111,27 @@ function arriendo_facil_enqueue_chatbot_assets() {
 		true
 	);
 
+	$accommodation_posts = get_posts(
+		array(
+			'post_type'      => 'accommodation',
+			'post_status'    => 'publish',
+			'numberposts'    => 50,
+			'orderby'        => 'date',
+			'order'          => 'DESC',
+			'suppress_filters' => false,
+		)
+	);
+
+	$accommodations = array();
+	foreach ( $accommodation_posts as $accommodation_post ) {
+		$accommodations[] = array(
+			'id'    => (int) $accommodation_post->ID,
+			'title' => get_the_title( $accommodation_post->ID ),
+		);
+	}
+
+	$current_accommodation_id = is_singular( 'accommodation' ) ? (int) get_queried_object_id() : 0;
+
 	wp_localize_script(
 		'af-chatbot-frontend',
 		'afChatbot',
@@ -123,7 +144,8 @@ function arriendo_facil_enqueue_chatbot_assets() {
 			'buttonText'    => __( 'Enviar', 'arriendo-facil' ),
 			'welcomeText'   => __( 'Bienvenid@ a Arriendo Facil, como podemos ayudarte?', 'arriendo-facil' ),
 			'doneText'      => __( 'Perfecto, ya tengo tus datos. Estoy registrando tu solicitud...', 'arriendo-facil' ),
-			'typingText'    => __( 'Escribiendo', 'arriendo-facil' ),
+			'accommodations' => $accommodations,
+			'currentAccommodationId' => $current_accommodation_id,
 		)
 	);
 }
@@ -155,7 +177,6 @@ function arriendo_facil_render_chatbot_widget() {
 			<div id="af-chatbot-messages" class="af-chatbot-messages"></div>
 
 			<div id="af-chatbot-typing" class="af-chatbot-typing" hidden>
-				<span class="af-chatbot-typing-label"><?php esc_html_e( 'Escribiendo', 'arriendo-facil' ); ?></span>
 				<span class="af-chatbot-dots" aria-hidden="true">
 					<i></i><i></i><i></i>
 				</span>
@@ -163,6 +184,7 @@ function arriendo_facil_render_chatbot_widget() {
 
 			<form id="af-chatbot-form" autocomplete="off">
 				<input type="text" id="af-chatbot-input" placeholder="<?php esc_attr_e( 'Escribe tu respuesta', 'arriendo-facil' ); ?>" required />
+				<select id="af-chatbot-select" hidden></select>
 				<button type="submit" id="af-chatbot-submit"><?php esc_html_e( 'Enviar', 'arriendo-facil' ); ?></button>
 			</form>
 

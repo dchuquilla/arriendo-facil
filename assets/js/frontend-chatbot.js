@@ -353,5 +353,17 @@
 			var optionLabel = target.textContent || '';
 			handleMenuOption(optionKey, optionLabel);
 		});
+
+		document.addEventListener('click', function (event) {
+			var widget = document.getElementById('af-chatbot-widget');
+			if (!widget || panel.hasAttribute('hidden')) {
+				return;
+			}
+
+			if (!widget.contains(event.target)) {
+				panel.setAttribute('hidden', 'hidden');
+				toggle.setAttribute('aria-expanded', 'false');
+			}
+		});
 	});
 })();

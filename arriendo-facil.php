@@ -142,7 +142,7 @@ function arriendo_facil_enqueue_chatbot_assets() {
 			'errorText'     => __( 'No se pudo enviar el registro. Intenta nuevamente.', 'arriendo-facil' ),
 			'sendingText'   => __( 'Enviando...', 'arriendo-facil' ),
 			'buttonText'    => __( 'Enviar', 'arriendo-facil' ),
-			'welcomeText'   => __( 'Bienvenid@ a Arriendo Facil, como podemos ayudarte?', 'arriendo-facil' ),
+			'welcomeText'   => __( 'Buenos dias, como podemos ayudarte?', 'arriendo-facil' ),
 			'doneText'      => __( 'Perfecto, ya tengo tus datos. Estoy registrando tu solicitud...', 'arriendo-facil' ),
 			'accommodations' => $accommodations,
 			'currentAccommodationId' => $current_accommodation_id,
@@ -166,7 +166,7 @@ function arriendo_facil_render_chatbot_widget() {
 	<div id="af-chatbot-widget" aria-live="polite">
 		<button type="button" id="af-chatbot-toggle" aria-expanded="false" aria-controls="af-chatbot-panel">
 			<span class="af-chatbot-logo" aria-hidden="true">AF</span>
-			<span><?php esc_html_e( 'Arrienda ahora', 'arriendo-facil' ); ?></span>
+			<span><?php esc_html_e( 'CHATBOT', 'arriendo-facil' ); ?></span>
 		</button>
 
 		<div id="af-chatbot-panel" hidden>
@@ -175,12 +175,6 @@ function arriendo_facil_render_chatbot_widget() {
 			</div>
 
 			<div id="af-chatbot-messages" class="af-chatbot-messages"></div>
-
-			<div id="af-chatbot-typing" class="af-chatbot-typing" hidden>
-				<span class="af-chatbot-dots" aria-hidden="true">
-					<i></i><i></i><i></i>
-				</span>
-			</div>
 
 			<form id="af-chatbot-form" autocomplete="off">
 				<input type="text" id="af-chatbot-input" placeholder="<?php esc_attr_e( 'Escribe tu respuesta', 'arriendo-facil' ); ?>" required />

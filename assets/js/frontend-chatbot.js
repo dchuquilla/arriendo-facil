@@ -18,9 +18,8 @@
 		var submit = document.getElementById('af-chatbot-submit');
 		var message = document.getElementById('af-chatbot-message');
 		var messages = document.getElementById('af-chatbot-messages');
-		var typing = document.getElementById('af-chatbot-typing');
 
-		if (!toggle || !panel || !form || !input || !select || !submit || !messages || !typing || !window.afChatbot) {
+		if (!toggle || !panel || !form || !input || !select || !submit || !messages || !window.afChatbot) {
 			return;
 		}
 
@@ -147,24 +146,11 @@
 			scrollMessagesBottom();
 		}
 
-		function setTyping(visible) {
-			if (visible) {
-				typing.removeAttribute('hidden');
-			} else {
-				typing.setAttribute('hidden', 'hidden');
-			}
-			scrollMessagesBottom();
-		}
-
 		function botReply(text, callback) {
-			setTyping(true);
-			window.setTimeout(function () {
-				setTyping(false);
-				appendBubble(text, 'bot');
-				if (typeof callback === 'function') {
-					callback();
-				}
-			}, 520);
+			appendBubble(text, 'bot');
+			if (typeof callback === 'function') {
+				callback();
+			}
 		}
 
 		function setFormDisabled(disabled) {
@@ -328,7 +314,6 @@
 			setFormDisabled(true);
 			botReply(afChatbot.doneText || 'Perfecto, ya tengo tus datos. Estoy registrando tu solicitud...');
 
-			setTyping(true);
 			fetch(afChatbot.ajaxUrl, {
 				method: 'POST',
 				body: data,
@@ -338,7 +323,6 @@
 					return response.json();
 				})
 				.then(function (payload) {
-					setTyping(false);
 					if (payload && payload.success) {
 						message.className = 'af-chatbot-success';
 						message.textContent = (payload.data && payload.data.message) || afChatbot.successText;
@@ -358,7 +342,6 @@
 					appendBubble(message.textContent, 'bot');
 				})
 				.catch(function () {
-					setTyping(false);
 					message.className = 'af-chatbot-error';
 					message.textContent = afChatbot.errorText || 'No se pudo enviar el registro.';
 					appendBubble(message.textContent, 'bot');

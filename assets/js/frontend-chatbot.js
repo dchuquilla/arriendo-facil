@@ -30,7 +30,8 @@
 			started: false,
 			collecting: false,
 			currentStep: 0,
-			values: {}
+			values: {},
+			lastSubmitFailed: false
 		};
 
 		var menuOptions = [
@@ -59,18 +60,18 @@
 			{
 				key: 'phone',
 				type: 'text',
-				question: 'Cual es tu telefono? (solo numeros, max 10)',
+				question: 'Cual es tu telefono? (solo numeros, 10 digitos)',
 				placeholder: '0991234567',
-				validate: function (value) { return /^[0-9]{1,10}$/.test(value); },
-				error: 'El telefono debe tener solo numeros y maximo 10 digitos.'
+				validate: function (value) { return /^[0-9]{10}$/.test(value); },
+				error: 'El telefono debe tener exactamente 10 digitos numericos.'
 			},
 			{
 				key: 'id_number',
 				type: 'text',
-				question: 'Cual es tu numero de documento? (solo numeros, max 10)',
+				question: 'Cual es tu cedula? (solo numeros, 10 digitos)',
 				placeholder: '1723456789',
-				validate: function (value) { return /^[0-9]{1,10}$/.test(value); },
-				error: 'El documento debe tener solo numeros y maximo 10 digitos.'
+				validate: function (value) { return /^[0-9]{10}$/.test(value); },
+				error: 'La cedula debe tener exactamente 10 digitos numericos.'
 			},
 			{
 				key: 'mascotas',
@@ -114,6 +115,9 @@
 				key: 'accommodation_id',
 				type: 'select',
 				question: 'Ahora selecciona la accommodation que te interesa.',
+				shouldAsk: function () {
+					return !(currentAccommodationId > 0);
+				},
 				options: function () {
 					var opts = [{ value: '', label: 'Selecciona una accommodation' }];
 					accommodations.forEach(function (item) {
@@ -341,6 +345,10 @@
 			state.collecting = false;
 			state.currentStep = 0;
 			state.values = {};
+			state.lastSubmitFailed = false;
+			if (currentAccommodationId > 0) {
+				state.values.accommodation_id = String(currentAccommodationId);
+			}
 			messages.innerHTML = '';
 			message.textContent = '';
 			message.className = '';
@@ -393,6 +401,7 @@
 			data.append('guarantee_text', state.values.guarantee_text || '');
 
 			setFormDisabled(true);
+			state.lastSubmitFailed = false;
 			botReply(afChatbot.doneText || 'Perfecto, ya tengo tus datos. Estoy registrando tu solicitud...');
 
 			fetch(afChatbot.ajaxUrl, {
@@ -415,17 +424,22 @@
 						state.collecting = false;
 						state.currentStep = 0;
 						state.values = {};
+						state.lastSubmitFailed = false;
 						showForm(false);
 						return;
 					}
+					state.lastSubmitFailed = true;
 					message.className = 'af-chatbot-error';
 					message.textContent = (payload && payload.data && payload.data.message) || afChatbot.errorText;
 					appendBubble(message.textContent, 'bot');
+					appendBubble('Puedes intentar de nuevo con Enviar, o cerrar y abrir el chat para reiniciar.', 'bot');
 				})
 				.catch(function () {
+					state.lastSubmitFailed = true;
 					message.className = 'af-chatbot-error';
 					message.textContent = afChatbot.errorText || 'No se pudo enviar el registro.';
 					appendBubble(message.textContent, 'bot');
+					appendBubble('Error de conexion. Puedes reintentar con Enviar en este mismo chat.', 'bot');
 				})
 				.finally(function () {
 					setFormDisabled(false);
@@ -471,6 +485,7 @@
 			message.textContent = '';
 			message.className = '';
 			state.values[step.key] = value;
+			state.lastSubmitFailed = false;
 			appendBubble(getStepLabel(step, value), 'user');
 			state.currentStep += 1;
 			askCurrentStep();

@@ -89,9 +89,7 @@ function arriendo_facil_should_show_chatbot() {
 		return false;
 	}
 
-	$status = strtolower( trim( (string) get_post_meta( $accommodation_id, '_af_status', true ) ) );
-
-	return in_array( $status, array( 'available', 'disponible' ), true );
+	return true;
 }
 
 /**

@@ -63,6 +63,11 @@ class Arriendo_Facil_Guest {
 			wp_send_json_error( array( 'message' => __( 'Debes seleccionar una accommodation valida.', 'arriendo-facil' ) ) );
 		}
 
+		$accommodation_status = strtolower( (string) get_post_meta( $accommodation_id, '_af_status', true ) );
+		if ( 'available' !== $accommodation_status ) {
+			wp_send_json_error( array( 'message' => __( 'La habitacion seleccionada no esta disponible.', 'arriendo-facil' ) ) );
+		}
+
 		if ( ! in_array( $rental_mode, array( 'dates', 'months', 'years' ), true ) ) {
 			wp_send_json_error( array( 'message' => __( 'Debes indicar modalidad de arriendo valida.', 'arriendo-facil' ) ) );
 		}
@@ -99,12 +104,12 @@ class Arriendo_Facil_Guest {
 			wp_send_json_error( array( 'message' => __( 'Correo invalido.', 'arriendo-facil' ) ) );
 		}
 
-		if ( 1 !== preg_match( '/^[0-9]{1,10}$/', $phone ) ) {
-			wp_send_json_error( array( 'message' => __( 'Telefono invalido. Usa solo numeros (max 10).', 'arriendo-facil' ) ) );
+		if ( 1 !== preg_match( '/^[0-9]{10}$/', $phone ) ) {
+			wp_send_json_error( array( 'message' => __( 'Telefono invalido. Debe tener exactamente 10 digitos numericos.', 'arriendo-facil' ) ) );
 		}
 
-		if ( 1 !== preg_match( '/^[0-9]{1,10}$/', $id_number ) ) {
-			wp_send_json_error( array( 'message' => __( 'Documento invalido. Usa solo numeros (max 10).', 'arriendo-facil' ) ) );
+		if ( 1 !== preg_match( '/^[0-9]{10}$/', $id_number ) ) {
+			wp_send_json_error( array( 'message' => __( 'Documento invalido. La cedula debe tener exactamente 10 digitos numericos.', 'arriendo-facil' ) ) );
 		}
 
 		if ( $mascotas < 0 || $mascotas > 10 ) {

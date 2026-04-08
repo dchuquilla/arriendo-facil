@@ -76,20 +76,7 @@ add_action( 'plugins_loaded', 'arriendo_facil_init' );
  * @return bool
  */
 function arriendo_facil_should_show_chatbot() {
-	if ( is_admin() ) {
-		return false;
-	}
-
-	if ( ! is_singular( 'accommodation' ) ) {
-		return false;
-	}
-
-	$accommodation_id = (int) get_queried_object_id();
-	if ( ! $accommodation_id ) {
-		return false;
-	}
-
-	return true;
+	return ! is_admin();
 }
 
 /**
@@ -128,6 +115,24 @@ function arriendo_facil_enqueue_chatbot_assets() {
 			'id'    => $current_accommodation_id,
 			'title' => get_the_title( $current_accommodation_id ),
 		);
+	} else {
+		$accommodation_posts = get_posts(
+			array(
+				'post_type'      => 'accommodation',
+				'post_status'    => 'publish',
+				'posts_per_page' => -1,
+				'orderby'        => 'title',
+				'order'          => 'ASC',
+				'fields'         => 'ids',
+			)
+		);
+
+		foreach ( $accommodation_posts as $accommodation_post_id ) {
+			$accommodations[] = array(
+				'id'    => (int) $accommodation_post_id,
+				'title' => get_the_title( $accommodation_post_id ),
+			);
+		}
 	}
 
 	wp_localize_script(

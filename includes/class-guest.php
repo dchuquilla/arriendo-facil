@@ -63,8 +63,8 @@ class Arriendo_Facil_Guest {
 			wp_send_json_error( array( 'message' => __( 'Debes seleccionar una accommodation valida.', 'arriendo-facil' ) ) );
 		}
 
-		$accommodation_status = strtolower( (string) get_post_meta( $accommodation_id, '_af_status', true ) );
-		if ( 'available' !== $accommodation_status ) {
+		$accommodation_status = strtolower( trim( (string) get_post_meta( $accommodation_id, '_af_status', true ) ) );
+		if ( ! in_array( $accommodation_status, array( 'available', 'disponible' ), true ) ) {
 			wp_send_json_error( array( 'message' => __( 'La habitacion seleccionada no esta disponible.', 'arriendo-facil' ) ) );
 		}
 

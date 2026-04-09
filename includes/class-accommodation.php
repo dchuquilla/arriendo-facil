@@ -23,7 +23,6 @@ class Arriendo_Facil_Accommodation {
 		add_action( 'init', array( $this, 'register_post_type' ) );
 		add_action( 'add_meta_boxes', array( $this, 'add_meta_boxes' ) );
 		add_action( 'save_post_accommodation', array( $this, 'save_meta' ) );
-		add_action( 'template_redirect', array( $this, 'start_frontend_output_rewrite' ), 1 );
 		add_shortcode( 'af_propiedad_destacada', array( $this, 'render_featured_accommodation_shortcode' ) );
 		add_shortcode( 'propiedad_destacada', array( $this, 'render_featured_accommodation_shortcode' ) );
 		add_shortcode( 'af_propiedades_gestion', array( $this, 'render_managed_accommodations_shortcode' ) );
@@ -327,45 +326,4 @@ class Arriendo_Facil_Accommodation {
 		return (string) $content . $replacement;
 	}
 
-	/**
-	 * Starts output buffering to rewrite stale builder/theme sections after rendering.
-	 */
-	public function start_frontend_output_rewrite() {
-		if ( is_admin() || wp_doing_ajax() || wp_is_json_request() ) {
-			return;
-		}
-
-		if ( is_feed() || is_robots() || is_trackback() ) {
-			return;
-		}
-
-		ob_start( array( $this, 'rewrite_frontend_output' ) );
-	}
-
-	/**
-	 * Rewrites rendered frontend HTML to ensure accommodations are shown in target sections.
-	 *
-	 * @param string $html Full page HTML.
-	 * @return string
-	 */
-	public function rewrite_frontend_output( $html ) {
-		$buffer = (string) $html;
-
-		if ( false === stripos( $buffer, 'Propiedad destacada' ) && false === stripos( $buffer, 'Propiedades bajo nuestra' ) ) {
-			return $buffer;
-		}
-
-		$buffer = preg_replace( '/<a[^>]*>\s*Quiero\s+rentabilizar[^<]*<\/a>/iu', '', $buffer );
-		$buffer = preg_replace( '/<button[^>]*>\s*Quiero\s+rentabilizar[^<]*<\/button>/iu', '', (string) $buffer );
-
-		if ( false !== stripos( $buffer, 'Propiedad destacada' ) ) {
-			$buffer = $this->replace_section_after_heading( $buffer, 'Propiedad\s+destacada', $this->render_featured_accommodation_shortcode() );
-		}
-
-		if ( false !== stripos( $buffer, 'Propiedades bajo nuestra' ) ) {
-			$buffer = $this->replace_section_after_heading( $buffer, 'Propiedades\s+bajo\s+nuestra\s+gesti[oó]n', $this->render_managed_accommodations_shortcode() );
-		}
-
-		return (string) $buffer;
-	}
 }

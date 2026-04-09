@@ -76,7 +76,22 @@ add_action( 'plugins_loaded', 'arriendo_facil_init' );
  * @return bool
  */
 function arriendo_facil_should_show_chatbot() {
-	return ! is_admin();
+	if ( is_admin() ) {
+		return false;
+	}
+
+	if ( is_singular( 'accommodation' ) ) {
+		return true;
+	}
+
+	if ( isset( $_GET['p'] ) ) {
+		$post_id = absint( wp_unslash( $_GET['p'] ) );
+		if ( $post_id > 0 && 'accommodation' === get_post_type( $post_id ) ) {
+			return true;
+		}
+	}
+
+	return false;
 }
 
 /**

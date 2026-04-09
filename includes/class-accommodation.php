@@ -145,7 +145,7 @@ class Arriendo_Facil_Accommodation {
 		$accommodations = get_posts(
 			array(
 				'post_type'      => 'accommodation',
-				'post_status'    => array( 'publish', 'private', 'pending', 'draft' ),
+				'post_status'    => 'publish',
 				'posts_per_page' => -1,
 				'orderby'        => 'date',
 				'order'          => 'DESC',
@@ -269,11 +269,15 @@ class Arriendo_Facil_Accommodation {
 	 * @return string
 	 */
 	public function inject_managed_accommodations_in_content( $content ) {
-		if ( is_admin() ) {
+		if ( is_admin() || ! is_page() || ! is_main_query() || ! in_the_loop() ) {
 			return $content;
 		}
 
 		$raw_content = (string) $content;
+		if ( false !== strpos( $raw_content, 'af-managed-accommodations' ) || false !== strpos( $raw_content, 'af-featured-accommodation' ) ) {
+			return $raw_content;
+		}
+
 		$has_managed_heading = false !== stripos( $raw_content, 'Propiedades bajo nuestra' );
 		$has_featured_heading = false !== stripos( $raw_content, 'Propiedad destacada' );
 
@@ -286,24 +290,34 @@ class Arriendo_Facil_Accommodation {
 
 		if ( $has_featured_heading ) {
 			$featured_html = $this->render_featured_accommodation_shortcode();
-			if ( preg_match( '/(<h[1-6][^>]*>[^<]*Propiedad\s+destacada[^<]*<\/h[1-6]>)/iu', $clean_content, $matches ) ) {
-				$heading = (string) $matches[1];
-				$clean_content = str_replace( $heading, $heading . $featured_html, $clean_content );
-			} else {
-				$clean_content .= $featured_html;
-			}
+			$clean_content = $this->replace_section_after_heading( $clean_content, 'Propiedad\s+destacada', $featured_html );
 		}
 
 		if ( $has_managed_heading ) {
 			$list_html = $this->render_managed_accommodations_shortcode();
-			if ( preg_match( '/(<h[1-6][^>]*>[^<]*Propiedades\s+bajo\s+nuestra\s+gesti[oó]n[^<]*<\/h[1-6]>)/iu', $clean_content, $matches ) ) {
-				$heading = (string) $matches[1];
-				$clean_content = str_replace( $heading, $heading . $list_html, $clean_content );
-			} else {
-				$clean_content .= $list_html;
-			}
+			$clean_content = $this->replace_section_after_heading( $clean_content, 'Propiedades\s+bajo\s+nuestra\s+gesti[oó]n', $list_html );
 		}
 
 		return $clean_content;
+	}
+
+	/**
+	 * Replaces content section after a heading with controlled markup.
+	 *
+	 * @param string $content Full HTML content.
+	 * @param string $heading_pattern Heading text regex (without delimiters).
+	 * @param string $replacement Replacement section HTML.
+	 * @return string
+	 */
+	private function replace_section_after_heading( $content, $heading_pattern, $replacement ) {
+		$pattern = '/(<h[1-6][^>]*>[^<]*' . $heading_pattern . '[^<]*<\/h[1-6]>)([\s\S]*?)(?=<h[1-6][^>]*>|$)/iu';
+
+		$updated = preg_replace( $pattern, '$1' . $replacement, (string) $content, 1 );
+
+		if ( is_string( $updated ) && '' !== $updated ) {
+			return $updated;
+		}
+
+		return (string) $content . $replacement;
 	}
 }

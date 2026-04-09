@@ -80,15 +80,17 @@ function arriendo_facil_should_show_chatbot() {
 		return false;
 	}
 
-	if ( is_singular( 'accommodation' ) ) {
+	if ( is_singular() || is_post_type_archive( 'accommodation' ) ) {
 		return true;
 	}
 
-	if ( isset( $_GET['p'] ) ) {
-		$post_id = absint( wp_unslash( $_GET['p'] ) );
-		if ( $post_id > 0 && 'accommodation' === get_post_type( $post_id ) ) {
-			return true;
-		}
+	if ( isset( $_GET['p'] ) && absint( wp_unslash( $_GET['p'] ) ) > 0 ) {
+		return true;
+	}
+
+	$request_uri = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
+	if ( '' !== $request_uri && false !== strpos( strtolower( $request_uri ), 'accommodations' ) ) {
+		return true;
 	}
 
 	return false;

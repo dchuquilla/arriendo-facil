@@ -76,7 +76,7 @@ add_action( 'plugins_loaded', 'arriendo_facil_init' );
  * @return bool
  */
 function arriendo_facil_should_show_chatbot() {
-	return ! is_admin() && is_singular( 'accommodation' );
+	return ! is_admin();
 }
 
 /**

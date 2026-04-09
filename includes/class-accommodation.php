@@ -23,6 +23,8 @@ class Arriendo_Facil_Accommodation {
 		add_action( 'init', array( $this, 'register_post_type' ) );
 		add_action( 'add_meta_boxes', array( $this, 'add_meta_boxes' ) );
 		add_action( 'save_post_accommodation', array( $this, 'save_meta' ) );
+		add_shortcode( 'af_propiedad_destacada', array( $this, 'render_featured_accommodation_shortcode' ) );
+		add_shortcode( 'propiedad_destacada', array( $this, 'render_featured_accommodation_shortcode' ) );
 		add_shortcode( 'af_propiedades_gestion', array( $this, 'render_managed_accommodations_shortcode' ) );
 		add_shortcode( 'propiedades_bajo_gestion', array( $this, 'render_managed_accommodations_shortcode' ) );
 		add_shortcode( 'accommodations', array( $this, 'render_managed_accommodations_shortcode' ) );
@@ -202,33 +204,106 @@ class Arriendo_Facil_Accommodation {
 	}
 
 	/**
+	 * Renders one featured accommodation (latest published).
+	 *
+	 * @return string
+	 */
+	public function render_featured_accommodation_shortcode() {
+		$accommodations = get_posts(
+			array(
+				'post_type'      => 'accommodation',
+				'post_status'    => 'publish',
+				'posts_per_page' => 1,
+				'orderby'        => 'date',
+				'order'          => 'DESC',
+			)
+		);
+
+		if ( empty( $accommodations ) ) {
+			return '<p>' . esc_html__( 'No hay accommodation disponible para destacar.', 'arriendo-facil' ) . '</p>';
+		}
+
+		$accommodation = $accommodations[0];
+		$address       = (string) get_post_meta( $accommodation->ID, '_af_address', true );
+		$bedrooms      = (int) get_post_meta( $accommodation->ID, '_af_bedrooms', true );
+		$bathrooms     = (int) get_post_meta( $accommodation->ID, '_af_bathrooms', true );
+		$monthly_rent  = (string) get_post_meta( $accommodation->ID, '_af_monthly_rent', true );
+		$details_url   = get_permalink( $accommodation->ID );
+
+		ob_start();
+		?>
+		<article class="af-featured-accommodation" aria-live="polite">
+			<?php if ( has_post_thumbnail( $accommodation->ID ) ) : ?>
+				<div class="af-featured-accommodation-image">
+					<a href="<?php echo esc_url( $details_url ); ?>">
+						<?php echo get_the_post_thumbnail( $accommodation->ID, 'large' ); ?>
+					</a>
+				</div>
+			<?php endif; ?>
+			<div class="af-featured-accommodation-content">
+				<h3>
+					<a href="<?php echo esc_url( $details_url ); ?>"><?php echo esc_html( get_the_title( $accommodation->ID ) ); ?></a>
+				</h3>
+				<?php if ( '' !== $address ) : ?>
+					<p><?php echo esc_html( $address ); ?></p>
+				<?php endif; ?>
+				<ul>
+					<li><?php echo esc_html( sprintf( __( 'Dormitorios: %d', 'arriendo-facil' ), $bedrooms ) ); ?></li>
+					<li><?php echo esc_html( sprintf( __( 'Banos: %d', 'arriendo-facil' ), $bathrooms ) ); ?></li>
+					<?php if ( '' !== trim( $monthly_rent ) ) : ?>
+						<li><?php echo esc_html( sprintf( __( 'Renta mensual: %s', 'arriendo-facil' ), $monthly_rent ) ); ?></li>
+					<?php endif; ?>
+				</ul>
+				<a class="button" href="<?php echo esc_url( $details_url ); ?>"><?php esc_html_e( 'Ver detalles', 'arriendo-facil' ); ?></a>
+			</div>
+		</article>
+		<?php
+
+		return (string) ob_get_clean();
+	}
+
+	/**
 	 * Replaces/augments managed-properties section in page content when detected.
 	 *
 	 * @param string $content Original content.
 	 * @return string
 	 */
 	public function inject_managed_accommodations_in_content( $content ) {
-		if ( is_admin() || ! is_main_query() || ! in_the_loop() ) {
+		if ( is_admin() ) {
 			return $content;
 		}
 
-		if ( false === stripos( (string) $content, 'Propiedades bajo nuestra' ) ) {
-			return $content;
+		$raw_content = (string) $content;
+		$has_managed_heading = false !== stripos( $raw_content, 'Propiedades bajo nuestra' );
+		$has_featured_heading = false !== stripos( $raw_content, 'Propiedad destacada' );
+
+		if ( ! $has_managed_heading && ! $has_featured_heading ) {
+			return $raw_content;
 		}
 
-		$list_html = $this->render_managed_accommodations_shortcode();
-		if ( '' === trim( wp_strip_all_tags( $list_html ) ) ) {
-			return $content;
-		}
-
-		$clean_content = preg_replace( '/<a[^>]*>\s*Quiero\s+rentabilizar[^<]*<\/a>/iu', '', (string) $content );
+		$clean_content = preg_replace( '/<a[^>]*>\s*Quiero\s+rentabilizar[^<]*<\/a>/iu', '', $raw_content );
 		$clean_content = preg_replace( '/<button[^>]*>\s*Quiero\s+rentabilizar[^<]*<\/button>/iu', '', (string) $clean_content );
 
-		if ( preg_match( '/(<h[1-6][^>]*>[^<]*Propiedades\s+bajo\s+nuestra\s+gesti[oó]n[^<]*<\/h[1-6]>)/iu', $clean_content, $matches ) ) {
-			$heading = (string) $matches[1];
-			return str_replace( $heading, $heading . $list_html, $clean_content );
+		if ( $has_featured_heading ) {
+			$featured_html = $this->render_featured_accommodation_shortcode();
+			if ( preg_match( '/(<h[1-6][^>]*>[^<]*Propiedad\s+destacada[^<]*<\/h[1-6]>)/iu', $clean_content, $matches ) ) {
+				$heading = (string) $matches[1];
+				$clean_content = str_replace( $heading, $heading . $featured_html, $clean_content );
+			} else {
+				$clean_content .= $featured_html;
+			}
 		}
 
-		return $clean_content . $list_html;
+		if ( $has_managed_heading ) {
+			$list_html = $this->render_managed_accommodations_shortcode();
+			if ( preg_match( '/(<h[1-6][^>]*>[^<]*Propiedades\s+bajo\s+nuestra\s+gesti[oó]n[^<]*<\/h[1-6]>)/iu', $clean_content, $matches ) ) {
+				$heading = (string) $matches[1];
+				$clean_content = str_replace( $heading, $heading . $list_html, $clean_content );
+			} else {
+				$clean_content .= $list_html;
+			}
+		}
+
+		return $clean_content;
 	}
 }

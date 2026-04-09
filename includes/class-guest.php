@@ -64,6 +64,10 @@ class Arriendo_Facil_Guest {
 		}
 
 		$accommodation_status = strtolower( trim( (string) get_post_meta( $accommodation_id, '_af_status', true ) ) );
+		if ( '' === $accommodation_status ) {
+			$accommodation_status = 'available';
+		}
+
 		if ( ! in_array( $accommodation_status, array( 'available', 'disponible' ), true ) ) {
 			wp_send_json_error( array( 'message' => __( 'La habitacion seleccionada no esta disponible.', 'arriendo-facil' ) ) );
 		}
@@ -451,6 +455,10 @@ class Arriendo_Facil_Guest {
 			$generated_contract_text = $ai_payload['template_text'];
 		}
 
+		if ( '' === $generated_contract_text ) {
+			$generated_contract_text = $this->build_fallback_contract_text( $ai_payload );
+		}
+
 		$document_url = '';
 		if ( ! is_wp_error( $document_result ) && isset( $document_result['document_url'] ) && is_string( $document_result['document_url'] ) ) {
 			$document_url = esc_url_raw( $document_result['document_url'] );
@@ -474,6 +482,35 @@ class Arriendo_Facil_Guest {
 			'document_url' => $document_url,
 			'template_used' => ! empty( $owner_contract_example['attachment_id'] ),
 			'template_attachment_id' => isset( $owner_contract_example['attachment_id'] ) ? (int) $owner_contract_example['attachment_id'] : 0,
+		);
+	}
+
+	/**
+	 * Builds a deterministic fallback contract text when AI is unavailable.
+	 *
+	 * @param array $payload Lease and guest context.
+	 * @return string
+	 */
+	private function build_fallback_contract_text( array $payload ) {
+		$guest_name   = isset( $payload['guest_name'] ) ? sanitize_text_field( (string) $payload['guest_name'] ) : '';
+		$guest_id     = isset( $payload['guest_id_number'] ) ? sanitize_text_field( (string) $payload['guest_id_number'] ) : '';
+		$owner_name   = isset( $payload['owner_name'] ) ? sanitize_text_field( (string) $payload['owner_name'] ) : '';
+		$property     = isset( $payload['accommodation_title'] ) ? sanitize_text_field( (string) $payload['accommodation_title'] ) : '';
+		$address      = isset( $payload['accommodation_address'] ) ? sanitize_text_field( (string) $payload['accommodation_address'] ) : '';
+		$start_date   = isset( $payload['start_date'] ) ? sanitize_text_field( (string) $payload['start_date'] ) : '';
+		$end_date     = isset( $payload['end_date'] ) ? sanitize_text_field( (string) $payload['end_date'] ) : '';
+		$monthly_rent = isset( $payload['monthly_rent'] ) ? (float) $payload['monthly_rent'] : 0.0;
+
+		return sprintf(
+			"CONTRATO DE ARRENDAMIENTO\n\nArrendador: %s\nArrendatario: %s\nDocumento arrendatario: %s\nInmueble: %s\nDireccion: %s\nFecha inicio: %s\nFecha fin: %s\nCanon mensual: %.2f\n\nLas partes acuerdan el arriendo del inmueble descrito para uso habitacional, cumpliendo las obligaciones de pago mensual, cuidado del bien y normativa aplicable. Este documento se genera como respaldo operativo del registro en Arriendo Facil.",
+			$owner_name,
+			$guest_name,
+			$guest_id,
+			$property,
+			$address,
+			$start_date,
+			$end_date,
+			$monthly_rent
 		);
 	}
 

@@ -23,6 +23,7 @@ class Arriendo_Facil_Accommodation {
 		add_action( 'init', array( $this, 'register_post_type' ) );
 		add_action( 'add_meta_boxes', array( $this, 'add_meta_boxes' ) );
 		add_action( 'save_post_accommodation', array( $this, 'save_meta' ) );
+		add_shortcode( 'af_propiedades_gestion', array( $this, 'render_managed_accommodations_shortcode' ) );
 	}
 
 	/**
@@ -128,5 +129,72 @@ class Arriendo_Facil_Accommodation {
 				update_post_meta( $post_id, $key, call_user_func( $sanitize_cb, wp_unslash( $_POST[ $form_key ] ) ) );
 			}
 		}
+	}
+
+	/**
+	 * Renders accommodations under management using existing accommodation posts.
+	 *
+	 * @return string
+	 */
+	public function render_managed_accommodations_shortcode() {
+		$accommodations = get_posts(
+			array(
+				'post_type'      => 'accommodation',
+				'post_status'    => 'publish',
+				'posts_per_page' => -1,
+				'orderby'        => 'date',
+				'order'          => 'DESC',
+			)
+		);
+
+		ob_start();
+		?>
+		<div class="af-managed-accommodations" aria-live="polite">
+			<?php if ( ! empty( $accommodations ) ) : ?>
+				<?php foreach ( $accommodations as $accommodation ) : ?>
+					<?php
+					$address      = (string) get_post_meta( $accommodation->ID, '_af_address', true );
+					$bedrooms     = (int) get_post_meta( $accommodation->ID, '_af_bedrooms', true );
+					$bathrooms    = (int) get_post_meta( $accommodation->ID, '_af_bathrooms', true );
+					$monthly_rent = (string) get_post_meta( $accommodation->ID, '_af_monthly_rent', true );
+					$details_url  = get_permalink( $accommodation->ID );
+					?>
+					<article class="af-managed-accommodation-card">
+						<?php if ( has_post_thumbnail( $accommodation->ID ) ) : ?>
+							<div class="af-managed-accommodation-image">
+								<a href="<?php echo esc_url( $details_url ); ?>">
+									<?php echo get_the_post_thumbnail( $accommodation->ID, 'large' ); ?>
+								</a>
+							</div>
+						<?php endif; ?>
+
+						<div class="af-managed-accommodation-content">
+							<h3 class="af-managed-accommodation-title">
+								<a href="<?php echo esc_url( $details_url ); ?>"><?php echo esc_html( get_the_title( $accommodation->ID ) ); ?></a>
+							</h3>
+
+							<?php if ( '' !== $address ) : ?>
+								<p class="af-managed-accommodation-address"><?php echo esc_html( $address ); ?></p>
+							<?php endif; ?>
+
+							<ul class="af-managed-accommodation-meta">
+								<li><?php echo esc_html( sprintf( __( 'Dormitorios: %d', 'arriendo-facil' ), $bedrooms ) ); ?></li>
+								<li><?php echo esc_html( sprintf( __( 'Banos: %d', 'arriendo-facil' ), $bathrooms ) ); ?></li>
+								<?php if ( '' !== trim( $monthly_rent ) ) : ?>
+									<li><?php echo esc_html( sprintf( __( 'Renta mensual: %s', 'arriendo-facil' ), $monthly_rent ) ); ?></li>
+								<?php endif; ?>
+							</ul>
+
+							<a class="button" href="<?php echo esc_url( $details_url ); ?>"><?php esc_html_e( 'Ver detalles', 'arriendo-facil' ); ?></a>
+						</div>
+					</article>
+				<?php endforeach; ?>
+			<?php else : ?>
+				<p><?php esc_html_e( 'No hay accommodations disponibles por el momento.', 'arriendo-facil' ); ?></p>
+			<?php endif; ?>
+		</div>
+		<?php
+
+		return (string) ob_get_clean();
 	}
 }

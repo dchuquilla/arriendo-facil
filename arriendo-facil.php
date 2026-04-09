@@ -76,7 +76,7 @@ add_action( 'plugins_loaded', 'arriendo_facil_init' );
  * @return bool
  */
 function arriendo_facil_should_show_chatbot() {
-	return ! is_admin();
+	return ! is_admin() && is_singular( 'accommodation' );
 }
 
 /**
@@ -111,10 +111,17 @@ function arriendo_facil_enqueue_chatbot_assets() {
 	$accommodations           = array();
 
 	if ( $current_accommodation_id ) {
+		$current_status = strtolower( trim( (string) get_post_meta( $current_accommodation_id, '_af_status', true ) ) );
+		if ( '' === $current_status ) {
+			$current_status = 'available';
+		}
+
+		if ( in_array( $current_status, array( 'available', 'disponible' ), true ) ) {
 		$accommodations[] = array(
 			'id'    => $current_accommodation_id,
 			'title' => get_the_title( $current_accommodation_id ),
 		);
+		}
 	} else {
 		$accommodation_posts = get_posts(
 			array(
@@ -128,6 +135,15 @@ function arriendo_facil_enqueue_chatbot_assets() {
 		);
 
 		foreach ( $accommodation_posts as $accommodation_post_id ) {
+			$status = strtolower( trim( (string) get_post_meta( $accommodation_post_id, '_af_status', true ) ) );
+			if ( '' === $status ) {
+				$status = 'available';
+			}
+
+			if ( ! in_array( $status, array( 'available', 'disponible' ), true ) ) {
+				continue;
+			}
+
 			$accommodations[] = array(
 				'id'    => (int) $accommodation_post_id,
 				'title' => get_the_title( $accommodation_post_id ),

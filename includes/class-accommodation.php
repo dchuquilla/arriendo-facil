@@ -28,8 +28,8 @@ class Arriendo_Facil_Accommodation {
 		add_shortcode( 'af_propiedades_gestion', array( $this, 'render_managed_accommodations_shortcode' ) );
 		add_shortcode( 'propiedades_bajo_gestion', array( $this, 'render_managed_accommodations_shortcode' ) );
 		add_shortcode( 'accommodations', array( $this, 'render_managed_accommodations_shortcode' ) );
-		add_filter( 'the_content', array( $this, 'inject_managed_accommodations_in_content' ), 30 );
-		add_filter( 'elementor/frontend/the_content', array( $this, 'inject_managed_accommodations_in_content' ), 30 );
+		add_filter( 'the_content', array( $this, 'inject_managed_accommodations_in_content' ), 999 );
+		add_filter( 'elementor/frontend/the_content', array( $this, 'inject_managed_accommodations_in_content' ), 999 );
 	}
 
 	/**
@@ -213,7 +213,7 @@ class Arriendo_Facil_Accommodation {
 		$accommodations = get_posts(
 			array(
 				'post_type'      => 'accommodation',
-				'post_status'    => array( 'publish', 'private', 'pending', 'draft' ),
+				'post_status'    => 'publish',
 				'posts_per_page' => -1,
 				'orderby'        => 'date',
 				'order'          => 'DESC',
@@ -274,7 +274,7 @@ class Arriendo_Facil_Accommodation {
 	 * @return string
 	 */
 	public function inject_managed_accommodations_in_content( $content ) {
-		if ( is_admin() || ! is_page() || ! is_main_query() || ! in_the_loop() ) {
+		if ( is_admin() ) {
 			return $content;
 		}
 
@@ -292,6 +292,7 @@ class Arriendo_Facil_Accommodation {
 
 		$clean_content = preg_replace( '/<a[^>]*>\s*Quiero\s+rentabilizar[^<]*<\/a>/iu', '', $raw_content );
 		$clean_content = preg_replace( '/<button[^>]*>\s*Quiero\s+rentabilizar[^<]*<\/button>/iu', '', (string) $clean_content );
+		$clean_content = preg_replace( '/<p[^>]*>\s*\x{00BF}?Eres\s+propietario\?[^<]*<\/p>/iu', '', (string) $clean_content );
 
 		if ( $has_featured_heading ) {
 			$featured_html = $this->render_featured_accommodation_shortcode();

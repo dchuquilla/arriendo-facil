@@ -84,6 +84,8 @@ class Arriendo_Facil_Accommodation {
 		$query->set( 'post_type', 'accommodation' );
 		$query->set( 'post_status', 'publish' );
 		$query->set( 'ignore_sticky_posts', true );
+		$query->set( 'posts_per_page', -1 );
+		$query->set( 'nopaging', true );
 		if ( ! $query->get( 'orderby' ) ) {
 			$query->set( 'orderby', 'date' );
 		}

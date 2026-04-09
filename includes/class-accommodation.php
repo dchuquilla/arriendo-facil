@@ -23,12 +23,14 @@ class Arriendo_Facil_Accommodation {
 		add_action( 'init', array( $this, 'register_post_type' ) );
 		add_action( 'add_meta_boxes', array( $this, 'add_meta_boxes' ) );
 		add_action( 'save_post_accommodation', array( $this, 'save_meta' ) );
+		add_action( 'template_redirect', array( $this, 'start_frontend_output_rewrite' ), 1 );
 		add_shortcode( 'af_propiedad_destacada', array( $this, 'render_featured_accommodation_shortcode' ) );
 		add_shortcode( 'propiedad_destacada', array( $this, 'render_featured_accommodation_shortcode' ) );
 		add_shortcode( 'af_propiedades_gestion', array( $this, 'render_managed_accommodations_shortcode' ) );
 		add_shortcode( 'propiedades_bajo_gestion', array( $this, 'render_managed_accommodations_shortcode' ) );
 		add_shortcode( 'accommodations', array( $this, 'render_managed_accommodations_shortcode' ) );
 		add_filter( 'the_content', array( $this, 'inject_managed_accommodations_in_content' ), 30 );
+		add_filter( 'elementor/frontend/the_content', array( $this, 'inject_managed_accommodations_in_content' ), 30 );
 	}
 
 	/**
@@ -212,8 +214,8 @@ class Arriendo_Facil_Accommodation {
 		$accommodations = get_posts(
 			array(
 				'post_type'      => 'accommodation',
-				'post_status'    => 'publish',
-				'posts_per_page' => 1,
+				'post_status'    => array( 'publish', 'private', 'pending', 'draft' ),
+				'posts_per_page' => -1,
 				'orderby'        => 'date',
 				'order'          => 'DESC',
 			)
@@ -223,40 +225,44 @@ class Arriendo_Facil_Accommodation {
 			return '<p>' . esc_html__( 'No hay accommodation disponible para destacar.', 'arriendo-facil' ) . '</p>';
 		}
 
-		$accommodation = $accommodations[0];
-		$address       = (string) get_post_meta( $accommodation->ID, '_af_address', true );
-		$bedrooms      = (int) get_post_meta( $accommodation->ID, '_af_bedrooms', true );
-		$bathrooms     = (int) get_post_meta( $accommodation->ID, '_af_bathrooms', true );
-		$monthly_rent  = (string) get_post_meta( $accommodation->ID, '_af_monthly_rent', true );
-		$details_url   = get_permalink( $accommodation->ID );
-
 		ob_start();
 		?>
-		<article class="af-featured-accommodation" aria-live="polite">
-			<?php if ( has_post_thumbnail( $accommodation->ID ) ) : ?>
-				<div class="af-featured-accommodation-image">
-					<a href="<?php echo esc_url( $details_url ); ?>">
-						<?php echo get_the_post_thumbnail( $accommodation->ID, 'large' ); ?>
-					</a>
-				</div>
-			<?php endif; ?>
-			<div class="af-featured-accommodation-content">
-				<h3>
-					<a href="<?php echo esc_url( $details_url ); ?>"><?php echo esc_html( get_the_title( $accommodation->ID ) ); ?></a>
-				</h3>
-				<?php if ( '' !== $address ) : ?>
-					<p><?php echo esc_html( $address ); ?></p>
-				<?php endif; ?>
-				<ul>
-					<li><?php echo esc_html( sprintf( __( 'Dormitorios: %d', 'arriendo-facil' ), $bedrooms ) ); ?></li>
-					<li><?php echo esc_html( sprintf( __( 'Banos: %d', 'arriendo-facil' ), $bathrooms ) ); ?></li>
-					<?php if ( '' !== trim( $monthly_rent ) ) : ?>
-						<li><?php echo esc_html( sprintf( __( 'Renta mensual: %s', 'arriendo-facil' ), $monthly_rent ) ); ?></li>
+		<div class="af-featured-accommodations" aria-live="polite">
+			<?php foreach ( $accommodations as $accommodation ) : ?>
+				<?php
+				$address      = (string) get_post_meta( $accommodation->ID, '_af_address', true );
+				$bedrooms     = (int) get_post_meta( $accommodation->ID, '_af_bedrooms', true );
+				$bathrooms    = (int) get_post_meta( $accommodation->ID, '_af_bathrooms', true );
+				$monthly_rent = (string) get_post_meta( $accommodation->ID, '_af_monthly_rent', true );
+				$details_url  = get_permalink( $accommodation->ID );
+				?>
+				<article class="af-featured-accommodation">
+					<?php if ( has_post_thumbnail( $accommodation->ID ) ) : ?>
+						<div class="af-featured-accommodation-image">
+							<a href="<?php echo esc_url( $details_url ); ?>">
+								<?php echo get_the_post_thumbnail( $accommodation->ID, 'large' ); ?>
+							</a>
+						</div>
 					<?php endif; ?>
-				</ul>
-				<a class="button" href="<?php echo esc_url( $details_url ); ?>"><?php esc_html_e( 'Ver detalles', 'arriendo-facil' ); ?></a>
-			</div>
-		</article>
+					<div class="af-featured-accommodation-content">
+						<h3>
+							<a href="<?php echo esc_url( $details_url ); ?>"><?php echo esc_html( get_the_title( $accommodation->ID ) ); ?></a>
+						</h3>
+						<?php if ( '' !== $address ) : ?>
+							<p><?php echo esc_html( $address ); ?></p>
+						<?php endif; ?>
+						<ul>
+							<li><?php echo esc_html( sprintf( __( 'Dormitorios: %d', 'arriendo-facil' ), $bedrooms ) ); ?></li>
+							<li><?php echo esc_html( sprintf( __( 'Banos: %d', 'arriendo-facil' ), $bathrooms ) ); ?></li>
+							<?php if ( '' !== trim( $monthly_rent ) ) : ?>
+								<li><?php echo esc_html( sprintf( __( 'Renta mensual: %s', 'arriendo-facil' ), $monthly_rent ) ); ?></li>
+							<?php endif; ?>
+						</ul>
+						<a class="button" href="<?php echo esc_url( $details_url ); ?>"><?php esc_html_e( 'Ver detalles', 'arriendo-facil' ); ?></a>
+					</div>
+				</article>
+			<?php endforeach; ?>
+		</div>
 		<?php
 
 		return (string) ob_get_clean();
@@ -319,5 +325,47 @@ class Arriendo_Facil_Accommodation {
 		}
 
 		return (string) $content . $replacement;
+	}
+
+	/**
+	 * Starts output buffering to rewrite stale builder/theme sections after rendering.
+	 */
+	public function start_frontend_output_rewrite() {
+		if ( is_admin() || wp_doing_ajax() || wp_is_json_request() ) {
+			return;
+		}
+
+		if ( is_feed() || is_robots() || is_trackback() ) {
+			return;
+		}
+
+		ob_start( array( $this, 'rewrite_frontend_output' ) );
+	}
+
+	/**
+	 * Rewrites rendered frontend HTML to ensure accommodations are shown in target sections.
+	 *
+	 * @param string $html Full page HTML.
+	 * @return string
+	 */
+	public function rewrite_frontend_output( $html ) {
+		$buffer = (string) $html;
+
+		if ( false === stripos( $buffer, 'Propiedad destacada' ) && false === stripos( $buffer, 'Propiedades bajo nuestra' ) ) {
+			return $buffer;
+		}
+
+		$buffer = preg_replace( '/<a[^>]*>\s*Quiero\s+rentabilizar[^<]*<\/a>/iu', '', $buffer );
+		$buffer = preg_replace( '/<button[^>]*>\s*Quiero\s+rentabilizar[^<]*<\/button>/iu', '', (string) $buffer );
+
+		if ( false !== stripos( $buffer, 'Propiedad destacada' ) ) {
+			$buffer = $this->replace_section_after_heading( $buffer, 'Propiedad\s+destacada', $this->render_featured_accommodation_shortcode() );
+		}
+
+		if ( false !== stripos( $buffer, 'Propiedades bajo nuestra' ) ) {
+			$buffer = $this->replace_section_after_heading( $buffer, 'Propiedades\s+bajo\s+nuestra\s+gesti[oó]n', $this->render_managed_accommodations_shortcode() );
+		}
+
+		return (string) $buffer;
 	}
 }

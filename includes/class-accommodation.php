@@ -46,16 +46,38 @@ class Arriendo_Facil_Accommodation {
 			return;
 		}
 
-		if ( ! $query->is_main_query() || ( ! $query->is_home() && ! $query->is_front_page() ) ) {
+		if ( wp_doing_ajax() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) ) {
+			return;
+		}
+
+		$home_request = is_front_page() || is_home();
+		if ( ! $home_request ) {
+			$request_uri = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
+			$path        = strtolower( (string) wp_parse_url( $request_uri, PHP_URL_PATH ) );
+			$path        = trim( $path, '/' );
+			$home_request = '' === $path;
+		}
+
+		if ( ! $home_request ) {
+			return;
+		}
+
+		if ( $query->is_singular() || $query->get( 'page_id' ) || $query->get( 'pagename' ) ) {
 			return;
 		}
 
 		$post_type = $query->get( 'post_type' );
+		$is_posts_query = false;
+
 		if ( is_array( $post_type ) ) {
-			if ( ! in_array( 'post', $post_type, true ) ) {
-				return;
-			}
-		} elseif ( ! empty( $post_type ) && 'post' !== $post_type ) {
+			$is_posts_query = in_array( 'post', $post_type, true );
+		} elseif ( empty( $post_type ) ) {
+			$is_posts_query = true;
+		} else {
+			$is_posts_query = 'post' === $post_type;
+		}
+
+		if ( ! $is_posts_query ) {
 			return;
 		}
 

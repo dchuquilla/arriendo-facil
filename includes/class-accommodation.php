@@ -24,6 +24,9 @@ class Arriendo_Facil_Accommodation {
 		add_action( 'add_meta_boxes', array( $this, 'add_meta_boxes' ) );
 		add_action( 'save_post_accommodation', array( $this, 'save_meta' ) );
 		add_shortcode( 'af_propiedades_gestion', array( $this, 'render_managed_accommodations_shortcode' ) );
+		add_shortcode( 'propiedades_bajo_gestion', array( $this, 'render_managed_accommodations_shortcode' ) );
+		add_shortcode( 'accommodations', array( $this, 'render_managed_accommodations_shortcode' ) );
+		add_filter( 'the_content', array( $this, 'inject_managed_accommodations_in_content' ), 30 );
 	}
 
 	/**
@@ -140,7 +143,7 @@ class Arriendo_Facil_Accommodation {
 		$accommodations = get_posts(
 			array(
 				'post_type'      => 'accommodation',
-				'post_status'    => 'publish',
+				'post_status'    => array( 'publish', 'private', 'pending', 'draft' ),
 				'posts_per_page' => -1,
 				'orderby'        => 'date',
 				'order'          => 'DESC',
@@ -196,5 +199,36 @@ class Arriendo_Facil_Accommodation {
 		<?php
 
 		return (string) ob_get_clean();
+	}
+
+	/**
+	 * Replaces/augments managed-properties section in page content when detected.
+	 *
+	 * @param string $content Original content.
+	 * @return string
+	 */
+	public function inject_managed_accommodations_in_content( $content ) {
+		if ( is_admin() || ! is_main_query() || ! in_the_loop() ) {
+			return $content;
+		}
+
+		if ( false === stripos( (string) $content, 'Propiedades bajo nuestra' ) ) {
+			return $content;
+		}
+
+		$list_html = $this->render_managed_accommodations_shortcode();
+		if ( '' === trim( wp_strip_all_tags( $list_html ) ) ) {
+			return $content;
+		}
+
+		$clean_content = preg_replace( '/<a[^>]*>\s*Quiero\s+rentabilizar[^<]*<\/a>/iu', '', (string) $content );
+		$clean_content = preg_replace( '/<button[^>]*>\s*Quiero\s+rentabilizar[^<]*<\/button>/iu', '', (string) $clean_content );
+
+		if ( preg_match( '/(<h[1-6][^>]*>[^<]*Propiedades\s+bajo\s+nuestra\s+gesti[oó]n[^<]*<\/h[1-6]>)/iu', $clean_content, $matches ) ) {
+			$heading = (string) $matches[1];
+			return str_replace( $heading, $heading . $list_html, $clean_content );
+		}
+
+		return $clean_content . $list_html;
 	}
 }

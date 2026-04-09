@@ -111,17 +111,10 @@ function arriendo_facil_enqueue_chatbot_assets() {
 	$accommodations           = array();
 
 	if ( $current_accommodation_id ) {
-		$current_status = strtolower( trim( (string) get_post_meta( $current_accommodation_id, '_af_status', true ) ) );
-		if ( '' === $current_status ) {
-			$current_status = 'available';
-		}
-
-		if ( in_array( $current_status, array( 'available', 'disponible' ), true ) ) {
 		$accommodations[] = array(
 			'id'    => $current_accommodation_id,
 			'title' => get_the_title( $current_accommodation_id ),
 		);
-		}
 	} else {
 		$accommodation_posts = get_posts(
 			array(
@@ -135,15 +128,6 @@ function arriendo_facil_enqueue_chatbot_assets() {
 		);
 
 		foreach ( $accommodation_posts as $accommodation_post_id ) {
-			$status = strtolower( trim( (string) get_post_meta( $accommodation_post_id, '_af_status', true ) ) );
-			if ( '' === $status ) {
-				$status = 'available';
-			}
-
-			if ( ! in_array( $status, array( 'available', 'disponible' ), true ) ) {
-				continue;
-			}
-
 			$accommodations[] = array(
 				'id'    => (int) $accommodation_post_id,
 				'title' => get_the_title( $accommodation_post_id ),
@@ -169,6 +153,43 @@ function arriendo_facil_enqueue_chatbot_assets() {
 	);
 }
 add_action( 'wp_enqueue_scripts', 'arriendo_facil_enqueue_chatbot_assets' );
+
+/**
+ * Removes legacy owner-rentability CTA from frontend markup.
+ */
+function arriendo_facil_remove_rentabilizar_cta() {
+	if ( is_admin() ) {
+		return;
+	}
+
+	$script = "(function(){
+		function shouldRemove(el){
+			if(!el){ return false; }
+			var text = (el.textContent || '').toLowerCase().replace(/\s+/g,' ').trim();
+			return text.indexOf('quiero rentabilizar mi propiedad') !== -1 || text.indexOf('quiero rentabilizar') !== -1;
+		}
+
+		function removeNodes(){
+			var nodes = document.querySelectorAll('a,button');
+			for(var i=0; i<nodes.length; i++){
+				if(shouldRemove(nodes[i])){
+					nodes[i].remove();
+				}
+			}
+		}
+
+		if(document.readyState === 'loading'){
+			document.addEventListener('DOMContentLoaded', removeNodes);
+		}else{
+			removeNodes();
+		}
+	})();";
+
+	wp_register_script( 'af-frontend-cleanup', '', array(), ARRIENDO_FACIL_VERSION, true );
+	wp_enqueue_script( 'af-frontend-cleanup' );
+	wp_add_inline_script( 'af-frontend-cleanup', $script );
+}
+add_action( 'wp_enqueue_scripts', 'arriendo_facil_remove_rentabilizar_cta', 30 );
 
 /**
  * Renders frontend chatbot widget in accommodation pages.

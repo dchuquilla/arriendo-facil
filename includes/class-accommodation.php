@@ -23,13 +23,51 @@ class Arriendo_Facil_Accommodation {
 		add_action( 'init', array( $this, 'register_post_type' ) );
 		add_action( 'add_meta_boxes', array( $this, 'add_meta_boxes' ) );
 		add_action( 'save_post_accommodation', array( $this, 'save_meta' ) );
+		add_action( 'pre_get_posts', array( $this, 'force_home_queries_to_accommodations' ) );
 		add_shortcode( 'af_propiedad_destacada', array( $this, 'render_featured_accommodation_shortcode' ) );
 		add_shortcode( 'propiedad_destacada', array( $this, 'render_featured_accommodation_shortcode' ) );
 		add_shortcode( 'af_propiedades_gestion', array( $this, 'render_managed_accommodations_shortcode' ) );
 		add_shortcode( 'propiedades_bajo_gestion', array( $this, 'render_managed_accommodations_shortcode' ) );
 		add_shortcode( 'accommodations', array( $this, 'render_managed_accommodations_shortcode' ) );
+		add_filter( 'the_content', array( $this, 'append_single_accommodation_details' ), 20 );
+		add_filter( 'elementor/frontend/the_content', array( $this, 'append_single_accommodation_details' ), 20 );
 		add_filter( 'the_content', array( $this, 'inject_managed_accommodations_in_content' ), 999 );
 		add_filter( 'elementor/frontend/the_content', array( $this, 'inject_managed_accommodations_in_content' ), 999 );
+	}
+
+	/**
+	 * Ensures homepage post-based queries display accommodations instead.
+	 *
+	 * @param WP_Query $query Query instance.
+	 * @return void
+	 */
+	public function force_home_queries_to_accommodations( $query ) {
+		if ( is_admin() || ! $query instanceof WP_Query ) {
+			return;
+		}
+
+		if ( ! $query->is_main_query() || ( ! $query->is_home() && ! $query->is_front_page() ) ) {
+			return;
+		}
+
+		$post_type = $query->get( 'post_type' );
+		if ( is_array( $post_type ) ) {
+			if ( ! in_array( 'post', $post_type, true ) ) {
+				return;
+			}
+		} elseif ( ! empty( $post_type ) && 'post' !== $post_type ) {
+			return;
+		}
+
+		$query->set( 'post_type', 'accommodation' );
+		$query->set( 'post_status', 'publish' );
+		$query->set( 'ignore_sticky_posts', true );
+		if ( ! $query->get( 'orderby' ) ) {
+			$query->set( 'orderby', 'date' );
+		}
+		if ( ! $query->get( 'order' ) ) {
+			$query->set( 'order', 'DESC' );
+		}
 	}
 
 	/**
@@ -265,6 +303,61 @@ class Arriendo_Facil_Accommodation {
 		<?php
 
 		return (string) ob_get_clean();
+	}
+
+	/**
+	 * Appends accommodation metadata in singular detail pages.
+	 *
+	 * @param string $content Current post content.
+	 * @return string
+	 */
+	public function append_single_accommodation_details( $content ) {
+		if ( is_admin() || ! is_singular( 'accommodation' ) || ! is_main_query() || ! in_the_loop() ) {
+			return $content;
+		}
+
+		if ( false !== strpos( (string) $content, 'af-accommodation-details' ) ) {
+			return $content;
+		}
+
+		$post_id = get_the_ID();
+		if ( ! $post_id ) {
+			return $content;
+		}
+
+		$address      = (string) get_post_meta( $post_id, '_af_address', true );
+		$bedrooms     = (int) get_post_meta( $post_id, '_af_bedrooms', true );
+		$bathrooms    = (int) get_post_meta( $post_id, '_af_bathrooms', true );
+		$monthly_rent = (string) get_post_meta( $post_id, '_af_monthly_rent', true );
+		$status       = (string) get_post_meta( $post_id, '_af_status', true );
+
+		$details = array();
+		if ( '' !== trim( $address ) ) {
+			$details[] = sprintf( '<li><strong>%s</strong> %s</li>', esc_html__( 'Direccion:', 'arriendo-facil' ), esc_html( $address ) );
+		}
+		if ( $bedrooms > 0 ) {
+			$details[] = sprintf( '<li><strong>%s</strong> %d</li>', esc_html__( 'Dormitorios:', 'arriendo-facil' ), $bedrooms );
+		}
+		if ( $bathrooms > 0 ) {
+			$details[] = sprintf( '<li><strong>%s</strong> %d</li>', esc_html__( 'Banos:', 'arriendo-facil' ), $bathrooms );
+		}
+		if ( '' !== trim( $monthly_rent ) ) {
+			$details[] = sprintf( '<li><strong>%s</strong> %s</li>', esc_html__( 'Renta mensual:', 'arriendo-facil' ), esc_html( $monthly_rent ) );
+		}
+		if ( '' !== trim( $status ) ) {
+			$details[] = sprintf( '<li><strong>%s</strong> %s</li>', esc_html__( 'Estado:', 'arriendo-facil' ), esc_html( $status ) );
+		}
+
+		if ( empty( $details ) ) {
+			return $content;
+		}
+
+		$details_html = '<section class="af-accommodation-details" aria-label="' . esc_attr__( 'Detalles del alojamiento', 'arriendo-facil' ) . '">';
+		$details_html .= '<h3>' . esc_html__( 'Informacion del alojamiento', 'arriendo-facil' ) . '</h3>';
+		$details_html .= '<ul>' . implode( '', $details ) . '</ul>';
+		$details_html .= '</section>';
+
+		return (string) $content . $details_html;
 	}
 
 	/**

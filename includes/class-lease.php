@@ -231,15 +231,13 @@ class Arriendo_Facil_Lease {
 		if ( isset( $meta['provider'], $meta['object_key'] ) && 'cloudflare_r2' === $meta['provider'] && '' !== trim( (string) $meta['object_key'] ) ) {
 			$presigned_url = $this->build_r2_presigned_get_url( (string) $meta['object_key'], 600 );
 			if ( ! is_wp_error( $presigned_url ) && is_string( $presigned_url ) && '' !== $presigned_url ) {
-				wp_safe_redirect( $presigned_url );
-				exit;
+				$this->redirect_to_contract_url( $presigned_url );
 			}
 		}
 
 		$document_url = isset( $lease->document_url ) ? esc_url_raw( (string) $lease->document_url ) : '';
 		if ( '' !== $document_url ) {
-			wp_safe_redirect( $document_url );
-			exit;
+			$this->redirect_to_contract_url( $document_url );
 		}
 
 		wp_die( esc_html__( 'Contract document is not available.', 'arriendo-facil' ), 404 );
@@ -384,5 +382,21 @@ class Arriendo_Facil_Lease {
 		$k_service = hash_hmac( 'sha256', $service, $k_region, true );
 
 		return hash_hmac( 'sha256', 'aws4_request', $k_service, true );
+	}
+
+	/**
+	 * Redirects to contract URL allowing signed external storage links.
+	 *
+	 * @param string $url Target URL.
+	 * @return void
+	 */
+	private function redirect_to_contract_url( $url ) {
+		$target_url = esc_url_raw( (string) $url );
+		if ( '' === $target_url ) {
+			wp_die( esc_html__( 'Invalid contract URL.', 'arriendo-facil' ), 400 );
+		}
+
+		wp_redirect( $target_url, 302, 'Arriendo Facil' );
+		exit;
 	}
 }

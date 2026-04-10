@@ -127,29 +127,30 @@ function arriendo_facil_enqueue_chatbot_assets() {
 	$current_accommodation_id = is_singular( 'accommodation' ) ? (int) get_queried_object_id() : 0;
 	$accommodations           = array();
 
-	if ( $current_accommodation_id ) {
-		$accommodations[] = array(
-			'id'    => $current_accommodation_id,
-			'title' => get_the_title( $current_accommodation_id ),
-		);
-	} else {
-		$accommodation_posts = get_posts(
-			array(
-				'post_type'      => 'accommodation',
-				'post_status'    => 'publish',
-				'posts_per_page' => -1,
-				'orderby'        => 'title',
-				'order'          => 'ASC',
-				'fields'         => 'ids',
-			)
-		);
+	$accommodation_posts = get_posts(
+		array(
+			'post_type'      => 'accommodation',
+			'post_status'    => 'publish',
+			'posts_per_page' => -1,
+			'orderby'        => 'title',
+			'order'          => 'ASC',
+			'fields'         => 'ids',
+		)
+	);
 
-		foreach ( $accommodation_posts as $accommodation_post_id ) {
-			$accommodations[] = array(
-				'id'    => (int) $accommodation_post_id,
-				'title' => get_the_title( $accommodation_post_id ),
-			);
+	if ( $current_accommodation_id && in_array( $current_accommodation_id, $accommodation_posts, true ) ) {
+		$current_index = array_search( $current_accommodation_id, $accommodation_posts, true );
+		if ( false !== $current_index ) {
+			unset( $accommodation_posts[ $current_index ] );
+			array_unshift( $accommodation_posts, $current_accommodation_id );
 		}
+	}
+
+	foreach ( $accommodation_posts as $accommodation_post_id ) {
+		$accommodations[] = array(
+			'id'    => (int) $accommodation_post_id,
+			'title' => get_the_title( $accommodation_post_id ),
+		);
 	}
 
 	wp_localize_script(

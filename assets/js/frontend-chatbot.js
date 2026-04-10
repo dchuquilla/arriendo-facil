@@ -115,9 +115,7 @@
 				key: 'accommodation_id',
 				type: 'select',
 				question: 'Ahora selecciona la accommodation que te interesa.',
-				shouldAsk: function () {
-					return !(currentAccommodationId > 0);
-				},
+				shouldAsk: function () { return true; },
 				options: function () {
 					var opts = [{ value: '', label: 'Selecciona una accommodation' }];
 					accommodations.forEach(function (item) {

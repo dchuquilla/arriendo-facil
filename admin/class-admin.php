@@ -457,7 +457,7 @@ class Arriendo_Facil_Admin {
 	}
 
 	/**
-	 * Saves AI-generated contract text into uploads and returns URL.
+	 * Saves AI-generated contract into DOCX and returns secure URL.
 	 *
 	 * @param int    $lease_id Lease ID.
 	 * @param string $contract_text Contract text.
@@ -479,13 +479,266 @@ class Arriendo_Facil_Admin {
 			return '';
 		}
 
-		$file_name = sprintf( 'lease-%d-contract-admin-%s.txt', $lease_id, gmdate( 'Ymd-His' ) );
+		$file_name = sprintf( 'lease-%d-contract-admin-%s.docx', $lease_id, gmdate( 'Ymd-His' ) );
 		$file_path = trailingslashit( $contracts_dir ) . $file_name;
-
-		if ( false === file_put_contents( $file_path, (string) $contract_text . "\n" ) ) {
+		if ( ! $this->write_contract_docx_file( $file_path, $contract_text ) ) {
 			return '';
 		}
 
-		return trailingslashit( $uploads['baseurl'] ) . 'arriendo-facil/contracts/' . rawurlencode( $file_name );
+		$local_url     = trailingslashit( $uploads['baseurl'] ) . 'arriendo-facil/contracts/' . rawurlencode( $file_name );
+		$document_url  = $local_url;
+		$storage_meta  = array(
+			'provider'  => 'local',
+			'file_name' => $file_name,
+			'local_url' => $local_url,
+			'mime_type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+		);
+
+		$storage_provider = $this->get_storage_setting( 'AF_STORAGE_PROVIDER', 'af_storage_provider', 'cloudflare_r2' );
+		if ( 'cloudflare_r2' === $storage_provider ) {
+			$r2_config = $this->get_r2_config();
+			if ( ! is_wp_error( $r2_config ) ) {
+				$contents = file_get_contents( $file_path );
+				if ( false !== $contents ) {
+					$object_key = sprintf( 'lease-contracts/%d/%s', $lease_id, sanitize_file_name( $file_name ) );
+					$upload     = $this->upload_contents_to_r2(
+						$contents,
+						$object_key,
+						'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+						$r2_config
+					);
+					if ( ! is_wp_error( $upload ) ) {
+						$document_url = add_query_arg(
+							array(
+								'action'   => 'af_download_lease_contract',
+								'lease_id' => $lease_id,
+							),
+							admin_url( 'admin-ajax.php' )
+						);
+						$storage_meta = array(
+							'provider'   => 'cloudflare_r2',
+							'object_key' => $object_key,
+							'file_name'  => $file_name,
+							'local_url'  => $local_url,
+							'mime_type'  => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+						);
+					}
+				}
+			}
+		}
+
+		if ( class_exists( 'Arriendo_Facil_Lease' ) ) {
+			$lease_service = new Arriendo_Facil_Lease();
+			$lease_service->set_contract_storage_meta( $lease_id, $storage_meta );
+		}
+
+		return $document_url;
+	}
+
+	/**
+	 * Writes a minimal DOCX file from plain contract text.
+	 *
+	 * @param string $file_path Destination path.
+	 * @param string $contract_text Contract text.
+	 * @return bool
+	 */
+	private function write_contract_docx_file( $file_path, $contract_text ) {
+		if ( ! class_exists( 'ZipArchive' ) ) {
+			return false;
+		}
+
+		$zip = new ZipArchive();
+		if ( true !== $zip->open( $file_path, ZipArchive::CREATE | ZipArchive::OVERWRITE ) ) {
+			return false;
+		}
+
+		$escaped_lines = array();
+		$lines         = preg_split( '/\r\n|\r|\n/', (string) $contract_text );
+		if ( ! is_array( $lines ) ) {
+			$lines = array( (string) $contract_text );
+		}
+
+		foreach ( $lines as $line ) {
+			$line = trim( (string) $line );
+			if ( '' === $line ) {
+				$escaped_lines[] = '<w:p/>';
+				continue;
+			}
+
+			$escaped_lines[] = '<w:p><w:r><w:t xml:space="preserve">' . esc_xml( $line ) . '</w:t></w:r></w:p>';
+		}
+
+		if ( empty( $escaped_lines ) ) {
+			$escaped_lines[] = '<w:p><w:r><w:t xml:space="preserve">Contrato</w:t></w:r></w:p>';
+		}
+
+		$document_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+			. '<w:document xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:wp14="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:w10="urn:schemas-microsoft-com:office:word" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml" xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup" xmlns:wpi="http://schemas.microsoft.com/office/word/2010/wordprocessingInk" xmlns:wne="http://schemas.microsoft.com/office/word/2006/wordml" xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" mc:Ignorable="w14 w15 wp14">'
+			. '<w:body>' . implode( '', $escaped_lines ) . '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr></w:body></w:document>';
+
+		$content_types_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+			. '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+			. '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+			. '<Default Extension="xml" ContentType="application/xml"/>'
+			. '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+			. '</Types>';
+
+		$rels_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+			. '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+			. '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>'
+			. '</Relationships>';
+
+		$doc_rels_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+			. '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>';
+
+		$zip->addFromString( '[Content_Types].xml', $content_types_xml );
+		$zip->addFromString( '_rels/.rels', $rels_xml );
+		$zip->addFromString( 'word/document.xml', $document_xml );
+		$zip->addFromString( 'word/_rels/document.xml.rels', $doc_rels_xml );
+
+		return $zip->close();
+	}
+
+	/**
+	 * Reads storage setting with constant priority.
+	 *
+	 * @param string $constant_name Constant name.
+	 * @param string $option_name Option name.
+	 * @param string $default Default value.
+	 * @return string
+	 */
+	private function get_storage_setting( $constant_name, $option_name, $default = '' ) {
+		if ( defined( $constant_name ) ) {
+			$value = constant( $constant_name );
+			if ( is_string( $value ) && '' !== trim( $value ) ) {
+				return trim( $value );
+			}
+		}
+
+		return trim( (string) get_option( $option_name, $default ) );
+	}
+
+	/**
+	 * Loads and validates Cloudflare R2 credentials.
+	 *
+	 * @return array|WP_Error
+	 */
+	private function get_r2_config() {
+		$access_key = $this->get_storage_setting( 'AF_R2_ACCESS_KEY_ID', 'af_r2_access_key_id', '' );
+		$secret_key = $this->get_storage_setting( 'AF_R2_SECRET_ACCESS_KEY', 'af_r2_secret_access_key', '' );
+		$endpoint   = untrailingslashit( $this->get_storage_setting( 'AF_R2_ENDPOINT_URL', 'af_r2_endpoint_url', '' ) );
+		$bucket     = $this->get_storage_setting( 'AF_R2_BUCKET_NAME', 'af_r2_bucket_name', '' );
+
+		if ( '' === $access_key || '' === $secret_key || '' === $endpoint || '' === $bucket ) {
+			return new WP_Error( 'af_r2_missing_config', __( 'Missing Cloudflare R2 credentials. Check Settings > Cloud Provider.', 'arriendo-facil' ) );
+		}
+
+		$parsed = wp_parse_url( $endpoint );
+		$host   = isset( $parsed['host'] ) ? (string) $parsed['host'] : '';
+		$scheme = isset( $parsed['scheme'] ) ? (string) $parsed['scheme'] : '';
+
+		if ( '' === $host || '' === $scheme ) {
+			return new WP_Error( 'af_r2_invalid_endpoint', __( 'Invalid Cloudflare R2 endpoint URL.', 'arriendo-facil' ) );
+		}
+
+		return array(
+			'access_key' => $access_key,
+			'secret_key' => $secret_key,
+			'endpoint'   => $scheme . '://' . $host,
+			'host'       => $host,
+			'bucket'     => $bucket,
+			'region'     => 'auto',
+			'service'    => 's3',
+		);
+	}
+
+	/**
+	 * Uploads raw contents to Cloudflare R2 using SigV4.
+	 *
+	 * @param string $contents File contents.
+	 * @param string $object_key Object key path.
+	 * @param string $mime_type Mime type.
+	 * @param array  $r2_config Parsed R2 config.
+	 * @return true|WP_Error
+	 */
+	private function upload_contents_to_r2( $contents, $object_key, $mime_type, array $r2_config ) {
+		$payload_hash   = hash( 'sha256', $contents );
+		$amz_date       = gmdate( 'Ymd\\THis\\Z' );
+		$date_stamp     = gmdate( 'Ymd' );
+		$canonical_uri  = '/' . rawurlencode( $r2_config['bucket'] ) . '/' . str_replace( '%2F', '/', rawurlencode( (string) $object_key ) );
+
+		$canonical_headers =
+			'host:' . $r2_config['host'] . "\n"
+			. 'x-amz-content-sha256:' . $payload_hash . "\n"
+			. 'x-amz-date:' . $amz_date . "\n";
+		$signed_headers = 'host;x-amz-content-sha256;x-amz-date';
+
+		$canonical_request =
+			"PUT\n"
+			. $canonical_uri . "\n"
+			. "\n"
+			. $canonical_headers . "\n"
+			. $signed_headers . "\n"
+			. $payload_hash;
+
+		$credential_scope = $date_stamp . '/' . $r2_config['region'] . '/' . $r2_config['service'] . '/aws4_request';
+		$string_to_sign   =
+			'AWS4-HMAC-SHA256' . "\n"
+			. $amz_date . "\n"
+			. $credential_scope . "\n"
+			. hash( 'sha256', $canonical_request );
+
+		$signing_key = $this->get_aws_v4_signing_key( $r2_config['secret_key'], $date_stamp, $r2_config['region'], $r2_config['service'] );
+		$signature   = hash_hmac( 'sha256', $string_to_sign, $signing_key );
+
+		$authorization =
+			'AWS4-HMAC-SHA256 '
+			. 'Credential=' . $r2_config['access_key'] . '/' . $credential_scope . ', '
+			. 'SignedHeaders=' . $signed_headers . ', '
+			. 'Signature=' . $signature;
+
+		$response = wp_remote_request(
+			$r2_config['endpoint'] . $canonical_uri,
+			array(
+				'method'  => 'PUT',
+				'timeout' => 45,
+				'headers' => array(
+					'Host'                 => $r2_config['host'],
+					'Content-Type'         => $mime_type,
+					'x-amz-date'           => $amz_date,
+					'x-amz-content-sha256' => $payload_hash,
+					'Authorization'        => $authorization,
+				),
+				'body' => $contents,
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		$status_code = (int) wp_remote_retrieve_response_code( $response );
+		if ( $status_code < 200 || $status_code >= 300 ) {
+			return new WP_Error( 'af_r2_upload_failed', __( 'Cloudflare R2 rejected the generated contract file.', 'arriendo-facil' ) );
+		}
+
+		return true;
+	}
+
+	/**
+	 * Builds AWS Signature V4 signing key.
+	 *
+	 * @param string $secret_key Secret key.
+	 * @param string $date_stamp Date stamp.
+	 * @param string $region Region.
+	 * @param string $service Service.
+	 * @return string
+	 */
+	private function get_aws_v4_signing_key( $secret_key, $date_stamp, $region, $service ) {
+		$k_date    = hash_hmac( 'sha256', $date_stamp, 'AWS4' . $secret_key, true );
+		$k_region  = hash_hmac( 'sha256', $region, $k_date, true );
+		$k_service = hash_hmac( 'sha256', $service, $k_region, true );
+
+		return hash_hmac( 'sha256', 'aws4_request', $k_service, true );
 	}
 }

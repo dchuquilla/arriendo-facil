@@ -78,20 +78,15 @@ $leases = $wpdb->get_results(
 										<?php echo esc_html( sprintf( __( 'Active version: v%d (%d total)', 'arriendo-facil' ), max( 1, $active_version ), $versions_count ) ); ?>
 									</div>
 								<?php endif; ?>
-							<?php endif; ?>
-
-							<?php if ( ! $lease->document_url && 0 === $versions_count ) : ?>
-								<button type="button" class="button af-generate-document"
-									data-lease-id="<?php echo esc_attr( $lease->id ); ?>">
-									<?php esc_html_e( 'Generate (AI)', 'arriendo-facil' ); ?>
-								</button>
+							<?php else : ?>
+								<span style="color:#777;"><?php esc_html_e( 'No contract yet. It is generated from chatbot flow.', 'arriendo-facil' ); ?></span>
 							<?php endif; ?>
 						</td>
 						<td>
-							<button type="button" class="button af-generate-document"
-								data-lease-id="<?php echo esc_attr( $lease->id ); ?>">
-								<?php echo esc_html( $versions_count > 0 ? __( 'Generate New Version', 'arriendo-facil' ) : __( 'Generate (AI)', 'arriendo-facil' ) ); ?>
-							</button>
+							<form class="af-upload-lease-version-form" data-lease-id="<?php echo esc_attr( $lease->id ); ?>" enctype="multipart/form-data" style="display:inline-flex; align-items:center; gap:8px; margin-right:8px;">
+								<input type="file" name="lease_contract_file" accept=".doc,.docx" required />
+								<button type="submit" class="button button-secondary"><?php esc_html_e( 'Upload New Version', 'arriendo-facil' ); ?></button>
+							</form>
 							<button type="button" class="button af-change-lease-status"
 								data-lease-id="<?php echo esc_attr( $lease->id ); ?>"
 								data-status="active">

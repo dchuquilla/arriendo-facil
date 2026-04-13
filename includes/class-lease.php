@@ -26,6 +26,88 @@ class Arriendo_Facil_Lease {
 		add_action( 'wp_ajax_af_get_leases', array( $this, 'ajax_get_leases' ) );
 		add_action( 'wp_ajax_af_download_lease_contract', array( $this, 'ajax_download_lease_contract' ) );
 		add_action( 'wp_ajax_af_upload_lease_contract_version', array( $this, 'ajax_upload_lease_contract_version' ) );
+		add_action( 'wp_ajax_af_approve_lease_contract', array( $this, 'ajax_approve_lease_contract' ) );
+	}
+
+	/**
+	 * Approves active lease contract version and generates protected PDF.
+	 */
+	public function ajax_approve_lease_contract() {
+		check_ajax_referer( 'af_lease_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$lease_id = isset( $_POST['lease_id'] ) ? absint( wp_unslash( $_POST['lease_id'] ) ) : 0;
+		if ( ! $lease_id || ! $this->get_lease( $lease_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'Invalid lease ID.', 'arriendo-facil' ) ), 400 );
+		}
+
+		$pdf_password = isset( $_POST['pdf_password'] ) ? sanitize_text_field( wp_unslash( $_POST['pdf_password'] ) ) : '';
+		if ( strlen( $pdf_password ) < 6 ) {
+			wp_send_json_error( array( 'message' => __( 'PDF password must have at least 6 characters.', 'arriendo-facil' ) ), 400 );
+		}
+
+		$versions_data = $this->get_contract_versions( $lease_id );
+		$active_version = isset( $versions_data['active_version'] ) ? absint( $versions_data['active_version'] ) : 0;
+		$version_entry  = $this->find_version_entry( $versions_data['versions'], $active_version );
+
+		if ( ! is_array( $version_entry ) ) {
+			wp_send_json_error( array( 'message' => __( 'No contract version found to approve.', 'arriendo-facil' ) ), 400 );
+		}
+
+		$source = $this->read_contract_version_source( $version_entry );
+		if ( is_wp_error( $source ) ) {
+			wp_send_json_error( array( 'message' => $source->get_error_message() ), 400 );
+		}
+
+		$contract_text = $this->extract_text_from_contract_binary(
+			isset( $source['contents'] ) ? (string) $source['contents'] : '',
+			isset( $source['mime_type'] ) ? (string) $source['mime_type'] : ''
+		);
+
+		if ( '' === trim( $contract_text ) ) {
+			wp_send_json_error( array( 'message' => __( 'Could not read contract text from the active version. Upload a DOCX version and try again.', 'arriendo-facil' ) ), 400 );
+		}
+
+		$approved_pdf = $this->create_approved_pdf_for_version(
+			$lease_id,
+			isset( $version_entry['version'] ) ? absint( $version_entry['version'] ) : 1,
+			$contract_text,
+			$pdf_password
+		);
+
+		if ( is_wp_error( $approved_pdf ) ) {
+			wp_send_json_error( array( 'message' => $approved_pdf->get_error_message() ), 500 );
+		}
+
+		$saved = $this->set_approved_pdf_for_version(
+			$lease_id,
+			isset( $version_entry['version'] ) ? absint( $version_entry['version'] ) : 1,
+			$approved_pdf
+		);
+
+		if ( ! $saved ) {
+			wp_send_json_error( array( 'message' => __( 'Could not save approved PDF metadata.', 'arriendo-facil' ) ), 500 );
+		}
+
+		$this->attach_document(
+			$lease_id,
+			add_query_arg(
+				array(
+					'action'   => 'af_download_lease_contract',
+					'lease_id' => $lease_id,
+				),
+				admin_url( 'admin-ajax.php' )
+			)
+		);
+
+		wp_send_json_success(
+			array(
+				'message' => __( 'Document approved. Protected PDF is now active for view/download.', 'arriendo-facil' ),
+			)
+		);
 	}
 
 	/**
@@ -420,6 +502,19 @@ class Arriendo_Facil_Lease {
 					continue;
 				}
 
+				$approved_pdf = array();
+				if ( isset( $entry['approved_pdf'] ) && is_array( $entry['approved_pdf'] ) ) {
+					$approved_pdf = array(
+						'provider'   => isset( $entry['approved_pdf']['provider'] ) ? sanitize_key( (string) $entry['approved_pdf']['provider'] ) : '',
+						'object_key' => isset( $entry['approved_pdf']['object_key'] ) ? sanitize_text_field( (string) $entry['approved_pdf']['object_key'] ) : '',
+						'mime_type'  => isset( $entry['approved_pdf']['mime_type'] ) ? sanitize_text_field( (string) $entry['approved_pdf']['mime_type'] ) : 'application/pdf',
+						'file_name'  => isset( $entry['approved_pdf']['file_name'] ) ? sanitize_file_name( (string) $entry['approved_pdf']['file_name'] ) : '',
+						'local_url'  => isset( $entry['approved_pdf']['local_url'] ) ? esc_url_raw( (string) $entry['approved_pdf']['local_url'] ) : '',
+						'approved_at' => isset( $entry['approved_pdf']['approved_at'] ) ? sanitize_text_field( (string) $entry['approved_pdf']['approved_at'] ) : '',
+						'approved_by' => isset( $entry['approved_pdf']['approved_by'] ) ? absint( $entry['approved_pdf']['approved_by'] ) : 0,
+					);
+				}
+
 				$versions[] = array(
 					'version'    => isset( $entry['version'] ) ? absint( $entry['version'] ) : 0,
 					'provider'   => isset( $entry['provider'] ) ? sanitize_key( (string) $entry['provider'] ) : '',
@@ -429,6 +524,7 @@ class Arriendo_Facil_Lease {
 					'local_url'  => isset( $entry['local_url'] ) ? esc_url_raw( (string) $entry['local_url'] ) : '',
 					'created_at' => isset( $entry['created_at'] ) ? sanitize_text_field( (string) $entry['created_at'] ) : '',
 					'created_by' => isset( $entry['created_by'] ) ? absint( $entry['created_by'] ) : 0,
+					'approved_pdf' => $approved_pdf,
 				);
 			}
 
@@ -480,6 +576,23 @@ class Arriendo_Facil_Lease {
 		if ( ! $version_entry ) {
 			$active_version = isset( $versions_data['active_version'] ) ? absint( $versions_data['active_version'] ) : 0;
 			$version_entry  = $this->find_version_entry( $versions_data['versions'], $active_version );
+		}
+
+		if ( is_array( $version_entry ) && isset( $version_entry['approved_pdf'] ) && is_array( $version_entry['approved_pdf'] ) ) {
+			$approved_provider   = isset( $version_entry['approved_pdf']['provider'] ) ? sanitize_key( (string) $version_entry['approved_pdf']['provider'] ) : '';
+			$approved_object_key = isset( $version_entry['approved_pdf']['object_key'] ) ? sanitize_text_field( (string) $version_entry['approved_pdf']['object_key'] ) : '';
+			$approved_local_url  = isset( $version_entry['approved_pdf']['local_url'] ) ? esc_url_raw( (string) $version_entry['approved_pdf']['local_url'] ) : '';
+
+			if ( 'cloudflare_r2' === $approved_provider && '' !== $approved_object_key ) {
+				$presigned_url = $this->build_r2_presigned_get_url( $approved_object_key, 600 );
+				if ( ! is_wp_error( $presigned_url ) && is_string( $presigned_url ) && '' !== $presigned_url ) {
+					$this->redirect_to_contract_url( $presigned_url );
+				}
+			}
+
+			if ( '' !== $approved_local_url ) {
+				$this->redirect_to_contract_url( $approved_local_url );
+			}
 		}
 
 		if ( is_array( $version_entry ) && isset( $version_entry['provider'], $version_entry['object_key'] ) && 'cloudflare_r2' === $version_entry['provider'] && '' !== trim( (string) $version_entry['object_key'] ) ) {
@@ -760,5 +873,497 @@ class Arriendo_Facil_Lease {
 
 		wp_redirect( $target_url, 302, 'Arriendo Facil' );
 		exit;
+	}
+
+	/**
+	 * Reads source bytes for a version from R2 or local URL.
+	 *
+	 * @param array $version_entry Version metadata.
+	 * @return array|WP_Error
+	 */
+	private function read_contract_version_source( array $version_entry ) {
+		$provider   = isset( $version_entry['provider'] ) ? sanitize_key( (string) $version_entry['provider'] ) : '';
+		$object_key = isset( $version_entry['object_key'] ) ? sanitize_text_field( (string) $version_entry['object_key'] ) : '';
+		$local_url  = isset( $version_entry['local_url'] ) ? esc_url_raw( (string) $version_entry['local_url'] ) : '';
+		$mime_type  = isset( $version_entry['mime_type'] ) ? sanitize_text_field( (string) $version_entry['mime_type'] ) : '';
+
+		if ( 'cloudflare_r2' === $provider && '' !== $object_key ) {
+			$download_url = $this->build_r2_presigned_get_url( $object_key, 300 );
+			if ( is_wp_error( $download_url ) ) {
+				return $download_url;
+			}
+
+			$response = wp_remote_get(
+				$download_url,
+				array(
+					'timeout' => 45,
+				)
+			);
+
+			if ( is_wp_error( $response ) ) {
+				return $response;
+			}
+
+			$status = (int) wp_remote_retrieve_response_code( $response );
+			if ( $status < 200 || $status >= 300 ) {
+				return new WP_Error( 'af_lease_source_download_failed', __( 'Could not download active contract version from private storage.', 'arriendo-facil' ) );
+			}
+
+			$body = wp_remote_retrieve_body( $response );
+			if ( ! is_string( $body ) || '' === $body ) {
+				return new WP_Error( 'af_lease_source_empty', __( 'Downloaded contract is empty.', 'arriendo-facil' ) );
+			}
+
+			return array(
+				'contents'  => $body,
+				'mime_type' => $mime_type,
+			);
+		}
+
+		if ( '' !== $local_url ) {
+			$path = $this->resolve_upload_url_to_path( $local_url );
+			if ( '' !== $path && file_exists( $path ) ) {
+				$contents = file_get_contents( $path );
+				if ( false !== $contents && '' !== $contents ) {
+					return array(
+						'contents'  => $contents,
+						'mime_type' => $mime_type,
+					);
+				}
+			}
+		}
+
+		return new WP_Error( 'af_lease_source_unavailable', __( 'Could not access active contract version source file.', 'arriendo-facil' ) );
+	}
+
+	/**
+	 * Converts DOCX/text contract binary to plain text.
+	 *
+	 * @param string $contents Binary file contents.
+	 * @param string $mime_type Source mime type.
+	 * @return string
+	 */
+	private function extract_text_from_contract_binary( $contents, $mime_type ) {
+		$mime_type = strtolower( (string) $mime_type );
+		$contents  = (string) $contents;
+
+		if ( '' === $contents ) {
+			return '';
+		}
+
+		if ( false !== strpos( $mime_type, 'text/' ) ) {
+			$text = wp_strip_all_tags( $contents );
+			$text = preg_replace( '/\s+\n/', "\n", (string) $text );
+			return trim( (string) $text );
+		}
+
+		if ( 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' === $mime_type && class_exists( 'ZipArchive' ) ) {
+			$temp_file = wp_tempnam( 'af-lease-docx' );
+			if ( ! $temp_file ) {
+				return '';
+			}
+
+			file_put_contents( $temp_file, $contents );
+			$zip = new ZipArchive();
+			if ( true !== $zip->open( $temp_file ) ) {
+				@unlink( $temp_file );
+				return '';
+			}
+
+			$xml = $zip->getFromName( 'word/document.xml' );
+			$zip->close();
+			@unlink( $temp_file );
+
+			if ( false === $xml || '' === $xml ) {
+				return '';
+			}
+
+			$prepared = str_replace( array( '</w:p>', '</w:tr>', '</w:tbl>' ), "\n", (string) $xml );
+			$text     = wp_strip_all_tags( $prepared );
+			$text     = html_entity_decode( (string) $text, ENT_QUOTES, 'UTF-8' );
+			$text     = preg_replace( "/\r\n|\r/", "\n", (string) $text );
+			$text     = preg_replace( '/\n{3,}/', "\n\n", (string) $text );
+
+			return trim( (string) $text );
+		}
+
+		// Legacy .doc binaries are not consistently parseable without external libraries.
+		return '';
+	}
+
+	/**
+	 * Creates protected PDF for an approved lease contract version.
+	 *
+	 * @param int    $lease_id Lease ID.
+	 * @param int    $version Version number.
+	 * @param string $contract_text Contract text.
+	 * @param string $pdf_password User password for PDF opening.
+	 * @return array|WP_Error
+	 */
+	private function create_approved_pdf_for_version( $lease_id, $version, $contract_text, $pdf_password ) {
+		$uploads = wp_upload_dir();
+		if ( ! empty( $uploads['error'] ) || empty( $uploads['basedir'] ) || empty( $uploads['baseurl'] ) ) {
+			return new WP_Error( 'af_lease_pdf_uploads_unavailable', __( 'WordPress uploads directory is not available.', 'arriendo-facil' ) );
+		}
+
+		$approved_dir = trailingslashit( $uploads['basedir'] ) . 'arriendo-facil/contracts-approved';
+		if ( ! wp_mkdir_p( $approved_dir ) ) {
+			return new WP_Error( 'af_lease_pdf_dir_failed', __( 'Could not create approved contracts directory.', 'arriendo-facil' ) );
+		}
+
+		$file_name = sprintf( 'lease-%d-v%d-approved-%s.pdf', absint( $lease_id ), absint( $version ), gmdate( 'Ymd-His' ) );
+		$file_path = trailingslashit( $approved_dir ) . $file_name;
+
+		$written = $this->write_password_protected_pdf_file( $file_path, (string) $contract_text, (string) $pdf_password );
+		if ( ! $written ) {
+			return new WP_Error( 'af_lease_pdf_write_failed', __( 'Could not generate protected PDF document.', 'arriendo-facil' ) );
+		}
+
+		$local_url    = trailingslashit( $uploads['baseurl'] ) . 'arriendo-facil/contracts-approved/' . rawurlencode( $file_name );
+		$approved_pdf = array(
+			'provider'   => 'local',
+			'object_key' => '',
+			'mime_type'  => 'application/pdf',
+			'file_name'  => $file_name,
+			'local_url'  => $local_url,
+			'approved_at' => current_time( 'mysql' ),
+			'approved_by' => get_current_user_id(),
+		);
+
+		$storage_provider = $this->get_storage_setting( 'AF_STORAGE_PROVIDER', 'af_storage_provider', 'cloudflare_r2' );
+		if ( 'cloudflare_r2' === $storage_provider ) {
+			$r2_config = $this->get_r2_config();
+			if ( ! is_wp_error( $r2_config ) ) {
+				$pdf_contents = file_get_contents( $file_path );
+				if ( false !== $pdf_contents && '' !== $pdf_contents ) {
+					$object_key = sprintf( 'lease-contracts/%d/v%d/approved/%s', absint( $lease_id ), absint( $version ), sanitize_file_name( $file_name ) );
+					$upload_r2  = $this->upload_contents_to_r2( $pdf_contents, $object_key, 'application/pdf', $r2_config );
+
+					if ( ! is_wp_error( $upload_r2 ) ) {
+						$approved_pdf['provider']   = 'cloudflare_r2';
+						$approved_pdf['object_key'] = $object_key;
+					}
+				}
+			}
+		}
+
+		return $approved_pdf;
+	}
+
+	/**
+	 * Stores approved PDF metadata in a specific version.
+	 *
+	 * @param int   $lease_id Lease ID.
+	 * @param int   $version Version number.
+	 * @param array $approved_pdf Approved PDF metadata.
+	 * @return bool
+	 */
+	private function set_approved_pdf_for_version( $lease_id, $version, array $approved_pdf ) {
+		$option_name = $this->get_contract_storage_option_name( $lease_id );
+		$stored      = get_option( $option_name, false );
+
+		if ( is_array( $stored ) && isset( $stored['provider'] ) && ! isset( $stored['versions'] ) ) {
+			$legacy_created_at = isset( $stored['updated_at'] ) ? sanitize_text_field( (string) $stored['updated_at'] ) : current_time( 'mysql' );
+			$stored            = array(
+				'active_version' => 1,
+				'versions'       => array(
+					array(
+						'version'    => 1,
+						'provider'   => sanitize_key( (string) ( $stored['provider'] ?? '' ) ),
+						'object_key' => sanitize_text_field( (string) ( $stored['object_key'] ?? '' ) ),
+						'mime_type'  => sanitize_text_field( (string) ( $stored['mime_type'] ?? '' ) ),
+						'file_name'  => sanitize_file_name( (string) ( $stored['file_name'] ?? '' ) ),
+						'local_url'  => esc_url_raw( (string) ( $stored['local_url'] ?? '' ) ),
+						'created_at' => $legacy_created_at,
+						'created_by' => absint( $stored['created_by'] ?? 0 ),
+					),
+				),
+			);
+		}
+
+		if ( ! is_array( $stored ) || ! isset( $stored['versions'] ) || ! is_array( $stored['versions'] ) ) {
+			return false;
+		}
+
+		$version = absint( $version );
+		if ( $version < 1 ) {
+			return false;
+		}
+
+		$clean_approved_pdf = array(
+			'provider'   => isset( $approved_pdf['provider'] ) ? sanitize_key( (string) $approved_pdf['provider'] ) : 'local',
+			'object_key' => isset( $approved_pdf['object_key'] ) ? sanitize_text_field( (string) $approved_pdf['object_key'] ) : '',
+			'mime_type'  => 'application/pdf',
+			'file_name'  => isset( $approved_pdf['file_name'] ) ? sanitize_file_name( (string) $approved_pdf['file_name'] ) : '',
+			'local_url'  => isset( $approved_pdf['local_url'] ) ? esc_url_raw( (string) $approved_pdf['local_url'] ) : '',
+			'approved_at' => current_time( 'mysql' ),
+			'approved_by' => get_current_user_id(),
+		);
+
+		$updated = false;
+		foreach ( $stored['versions'] as $index => $entry ) {
+			if ( ! is_array( $entry ) ) {
+				continue;
+			}
+
+			if ( isset( $entry['version'] ) && absint( $entry['version'] ) === $version ) {
+				$stored['versions'][ $index ]['approved_pdf'] = $clean_approved_pdf;
+				$updated = true;
+				break;
+			}
+		}
+
+		if ( ! $updated ) {
+			return false;
+		}
+
+		return update_option( $option_name, $stored, false );
+	}
+
+	/**
+	 * Resolves a local uploads URL to absolute file path.
+	 *
+	 * @param string $url File URL.
+	 * @return string
+	 */
+	private function resolve_upload_url_to_path( $url ) {
+		$uploads = wp_upload_dir();
+		$baseurl = isset( $uploads['baseurl'] ) ? trailingslashit( (string) $uploads['baseurl'] ) : '';
+		$basedir = isset( $uploads['basedir'] ) ? trailingslashit( (string) $uploads['basedir'] ) : '';
+
+		if ( '' === $baseurl || '' === $basedir ) {
+			return '';
+		}
+
+		$clean_url = esc_url_raw( (string) $url );
+		if ( 0 !== strpos( $clean_url, $baseurl ) ) {
+			return '';
+		}
+
+		$relative = ltrim( substr( $clean_url, strlen( $baseurl ) ), '/' );
+		if ( '' === $relative ) {
+			return '';
+		}
+
+		$relative = str_replace( array( '../', '..\\' ), '', $relative );
+
+		return $basedir . $relative;
+	}
+
+	/**
+	 * Writes a password-protected PDF with print-only permission.
+	 *
+	 * @param string $file_path Destination file path.
+	 * @param string $text Document text.
+	 * @param string $user_password User/open password.
+	 * @return bool
+	 */
+	private function write_password_protected_pdf_file( $file_path, $text, $user_password ) {
+		$lines = $this->split_text_for_pdf( $text, 95 );
+		if ( empty( $lines ) ) {
+			$lines = array( 'Contrato aprobado' );
+		}
+
+		$lines_per_page = 44;
+		$pages          = array_chunk( $lines, $lines_per_page );
+		if ( empty( $pages ) ) {
+			$pages = array( array( 'Contrato aprobado' ) );
+		}
+
+		$objects   = array();
+		$catalog_n = 1;
+		$pages_n   = 2;
+		$font_n    = 3;
+
+		$page_refs = array();
+		$next_obj  = 4;
+
+		foreach ( $pages as $page_lines ) {
+			$page_n    = $next_obj;
+			$content_n = $next_obj + 1;
+			$page_refs[] = $page_n;
+			$next_obj += 2;
+
+			$stream = "BT\n/F1 10 Tf\n50 790 Td\n";
+			$index  = 0;
+			foreach ( $page_lines as $line ) {
+				$escaped = $this->escape_pdf_text( (string) $line );
+				if ( 0 === $index ) {
+					$stream .= '(' . $escaped . ") Tj\n";
+				} else {
+					$stream .= "0 -16 Td\n(" . $escaped . ") Tj\n";
+				}
+				$index++;
+			}
+			$stream .= "ET\n";
+
+			$objects[ $page_n ] = '<< /Type /Page /Parent ' . $pages_n . ' 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ' . $font_n . ' 0 R >> >> /Contents ' . $content_n . ' 0 R >>';
+			$objects[ $content_n ] = array(
+				'stream' => $stream,
+			);
+		}
+
+		$objects[ $catalog_n ] = '<< /Type /Catalog /Pages ' . $pages_n . ' 0 R >>';
+		$objects[ $pages_n ]   = '<< /Type /Pages /Kids [' . implode( ' ', array_map( static function ( $n ) { return $n . ' 0 R'; }, $page_refs ) ) . '] /Count ' . count( $page_refs ) . ' >>';
+		$objects[ $font_n ]    = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>';
+
+		$encrypt_n = $next_obj;
+		$max_obj   = $encrypt_n;
+
+		$owner_password = wp_generate_password( 24, true, true );
+		$protection     = 196; // Print allowed, modify/copy/annotate denied.
+		$p_value        = -( ( $protection ^ 255 ) + 1 );
+		$id_hex         = md5( uniqid( 'af-lease-pdf-', true ) );
+		$id_binary      = hex2bin( $id_hex );
+
+		$padding = "\x28\xBF\x4E\x5E\x4E\x75\x8A\x41\x64\x00\x4E\x56\xFF\xFA\x01\x08\x2E\x2E\x00\xB6\xD0\x68\x3E\x80\x2F\x0C\xA9\xFE\x64\x53\x69\x7A";
+		$user_pad  = substr( (string) $user_password . $padding, 0, 32 );
+		$owner_pad = substr( (string) $owner_password . $padding, 0, 32 );
+
+		$owner_key = substr( md5( $owner_pad, true ), 0, 5 );
+		$o_value   = $this->pdf_rc4( $owner_key, $user_pad );
+
+		$enc_key = substr( md5( $user_pad . $o_value . pack( 'V', $p_value ) . $id_binary, true ), 0, 5 );
+		$u_value = $this->pdf_rc4( $enc_key, $padding );
+
+		foreach ( $objects as $obj_num => $obj_data ) {
+			if ( ! is_array( $obj_data ) || ! isset( $obj_data['stream'] ) ) {
+				continue;
+			}
+
+			$obj_key = substr( md5( $enc_key . pack( 'V', (int) $obj_num ), true ), 0, 10 );
+			$objects[ $obj_num ]['stream'] = $this->pdf_rc4( $obj_key, (string) $obj_data['stream'] );
+		}
+
+		$objects[ $encrypt_n ] = '<< /Filter /Standard /V 1 /R 2 /O <' . bin2hex( $o_value ) . '> /U <' . bin2hex( $u_value ) . '> /P ' . $p_value . ' >>';
+
+		ksort( $objects );
+
+		$pdf      = "%PDF-1.4\n%\xE2\xE3\xCF\xD3\n";
+		$offsets  = array( 0 );
+		$position = strlen( $pdf );
+
+		for ( $i = 1; $i <= $max_obj; $i++ ) {
+			$offsets[ $i ] = $position;
+			$body = '';
+
+			if ( isset( $objects[ $i ] ) && is_array( $objects[ $i ] ) && isset( $objects[ $i ]['stream'] ) ) {
+				$stream_data = (string) $objects[ $i ]['stream'];
+				$body = '<< /Length ' . strlen( $stream_data ) . ' >>' . "\nstream\n" . $stream_data . "endstream";
+			} elseif ( isset( $objects[ $i ] ) ) {
+				$body = (string) $objects[ $i ];
+			}
+
+			$obj_text = $i . " 0 obj\n" . $body . "\nendobj\n";
+			$pdf     .= $obj_text;
+			$position += strlen( $obj_text );
+		}
+
+		$xref_position = strlen( $pdf );
+		$pdf .= 'xref' . "\n";
+		$pdf .= '0 ' . ( $max_obj + 1 ) . "\n";
+		$pdf .= "0000000000 65535 f \n";
+
+		for ( $i = 1; $i <= $max_obj; $i++ ) {
+			$pdf .= sprintf( "%010d 00000 n \n", isset( $offsets[ $i ] ) ? (int) $offsets[ $i ] : 0 );
+		}
+
+		$pdf .= 'trailer' . "\n";
+		$pdf .= '<< /Size ' . ( $max_obj + 1 ) . ' /Root ' . $catalog_n . ' 0 R /Encrypt ' . $encrypt_n . ' 0 R /ID [<' . $id_hex . '><' . $id_hex . '>] >>' . "\n";
+		$pdf .= 'startxref' . "\n";
+		$pdf .= $xref_position . "\n";
+		$pdf .= '%%EOF';
+
+		return false !== file_put_contents( $file_path, $pdf );
+	}
+
+	/**
+	 * Escapes text content for PDF literals.
+	 *
+	 * @param string $text Text.
+	 * @return string
+	 */
+	private function escape_pdf_text( $text ) {
+		$text = str_replace( array( "\\", '(', ')' ), array( '\\\\', '\\(', '\\)' ), (string) $text );
+		$text = preg_replace( '/[^\x20-\x7E]/', '?', (string) $text );
+
+		return (string) $text;
+	}
+
+	/**
+	 * Splits text into line-safe chunks for generated PDF pages.
+	 *
+	 * @param string $text Full text.
+	 * @param int    $max_len Maximum line length.
+	 * @return array<int,string>
+	 */
+	private function split_text_for_pdf( $text, $max_len ) {
+		$max_len = max( 30, absint( $max_len ) );
+		$input_lines = preg_split( '/\r\n|\r|\n/', (string) $text );
+		if ( ! is_array( $input_lines ) ) {
+			$input_lines = array( (string) $text );
+		}
+
+		$out = array();
+		foreach ( $input_lines as $line ) {
+			$line = trim( (string) $line );
+			if ( '' === $line ) {
+				$out[] = '';
+				continue;
+			}
+
+			while ( strlen( $line ) > $max_len ) {
+				$chunk = substr( $line, 0, $max_len );
+				$cut   = strrpos( $chunk, ' ' );
+				if ( false === $cut || $cut < (int) floor( $max_len * 0.5 ) ) {
+					$cut = $max_len;
+				}
+
+				$out[] = trim( substr( $line, 0, $cut ) );
+				$line  = ltrim( substr( $line, $cut ) );
+			}
+
+			$out[] = $line;
+		}
+
+		return $out;
+	}
+
+	/**
+	 * RC4 helper for PDF encryption.
+	 *
+	 * @param string $key Encryption key.
+	 * @param string $data Data to encrypt.
+	 * @return string
+	 */
+	private function pdf_rc4( $key, $data ) {
+		$key_length = strlen( (string) $key );
+		$data       = (string) $data;
+		$state      = range( 0, 255 );
+		$j          = 0;
+
+		for ( $i = 0; $i < 256; $i++ ) {
+			$j = ( $j + $state[ $i ] + ord( $key[ $i % $key_length ] ) ) % 256;
+			$tmp = $state[ $i ];
+			$state[ $i ] = $state[ $j ];
+			$state[ $j ] = $tmp;
+		}
+
+		$i = 0;
+		$j = 0;
+		$result = '';
+		$data_length = strlen( $data );
+
+		for ( $y = 0; $y < $data_length; $y++ ) {
+			$i = ( $i + 1 ) % 256;
+			$j = ( $j + $state[ $i ] ) % 256;
+			$tmp = $state[ $i ];
+			$state[ $i ] = $state[ $j ];
+			$state[ $j ] = $tmp;
+			$k = $state[ ( $state[ $i ] + $state[ $j ] ) % 256 ];
+			$result .= chr( ord( $data[ $y ] ) ^ $k );
+		}
+
+		return $result;
 	}
 }

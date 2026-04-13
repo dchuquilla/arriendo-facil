@@ -63,6 +63,57 @@
 			} );
 	} );
 
+	// ── Upload manual lease version (.doc/.docx) ───────────────────────────
+	$( document ).on( 'submit', '.af-upload-lease-version-form', function ( event ) {
+		event.preventDefault();
+
+		var formEl = this;
+		var leaseId = parseInt( String( formEl.getAttribute( 'data-lease-id' ) || '0' ), 10 );
+		var fileInput = formEl.querySelector( 'input[type="file"][name="lease_contract_file"]' );
+		var submitBtn = formEl.querySelector( 'button[type="submit"]' );
+
+		if ( ! leaseId || ! fileInput || ! fileInput.files || ! fileInput.files[0] ) {
+			alert( 'Selecciona un archivo Word (.doc o .docx).' );
+			return;
+		}
+
+		if ( submitBtn ) {
+			submitBtn.disabled = true;
+		}
+
+		var data = new FormData();
+		data.append( 'action', 'af_upload_lease_contract_version' );
+		data.append( 'nonce', afAdmin.leaseNonce );
+		data.append( 'lease_id', String( leaseId ) );
+		data.append( 'lease_contract_file', fileInput.files[0] );
+
+		fetch( afAdmin.ajaxUrl, {
+			method: 'POST',
+			credentials: 'same-origin',
+			body: data,
+		} )
+			.then( function ( response ) {
+				return response.json();
+			} )
+			.then( function ( payload ) {
+				if ( payload && payload.success ) {
+					alert( ( payload.data && payload.data.message ) ? payload.data.message : 'Nueva version subida correctamente.' );
+					window.location.reload();
+					return;
+				}
+
+				alert( payload && payload.data && payload.data.message ? payload.data.message : 'No se pudo subir la nueva version.' );
+			} )
+			.catch( function () {
+				alert( 'Request failed.' );
+			} )
+			.finally( function () {
+				if ( submitBtn ) {
+					submitBtn.disabled = false;
+				}
+			} );
+	} );
+
 	// ── Change lease status ─────────────────────────────────────────────────
 	$( document ).on( 'click', '.af-change-lease-status', function () {
 		var $btn = $( this );

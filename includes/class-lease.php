@@ -25,6 +25,133 @@ class Arriendo_Facil_Lease {
 		add_action( 'wp_ajax_af_update_lease', array( $this, 'ajax_update_lease' ) );
 		add_action( 'wp_ajax_af_get_leases', array( $this, 'ajax_get_leases' ) );
 		add_action( 'wp_ajax_af_download_lease_contract', array( $this, 'ajax_download_lease_contract' ) );
+		add_action( 'wp_ajax_af_upload_lease_contract_version', array( $this, 'ajax_upload_lease_contract_version' ) );
+	}
+
+	/**
+	 * Uploads a manually edited Word file as a new contract version.
+	 */
+	public function ajax_upload_lease_contract_version() {
+		check_ajax_referer( 'af_lease_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$lease_id = isset( $_POST['lease_id'] ) ? absint( wp_unslash( $_POST['lease_id'] ) ) : 0;
+		if ( ! $lease_id || ! $this->get_lease( $lease_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'Invalid lease ID.', 'arriendo-facil' ) ), 400 );
+		}
+
+		if ( ! isset( $_FILES['lease_contract_file'] ) || ! is_array( $_FILES['lease_contract_file'] ) ) {
+			wp_send_json_error( array( 'message' => __( 'You must upload a Word file (.doc or .docx).', 'arriendo-facil' ) ), 400 );
+		}
+
+		$file_data = $_FILES['lease_contract_file'];
+		$file_error = isset( $file_data['error'] ) ? (int) $file_data['error'] : UPLOAD_ERR_NO_FILE;
+		if ( UPLOAD_ERR_OK !== $file_error ) {
+			wp_send_json_error( array( 'message' => __( 'Could not upload the selected file.', 'arriendo-facil' ) ), 400 );
+		}
+
+		if ( ! empty( $file_data['size'] ) && (int) $file_data['size'] > ( 12 * 1024 * 1024 ) ) {
+			wp_send_json_error( array( 'message' => __( 'Word file exceeds maximum size (12 MB).', 'arriendo-facil' ) ), 400 );
+		}
+
+		$allowed_mimes = array(
+			'doc'  => 'application/msword',
+			'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+		);
+
+		$checked = wp_check_filetype_and_ext( $file_data['tmp_name'], $file_data['name'], $allowed_mimes );
+		if ( ! in_array( (string) $checked['ext'], array( 'doc', 'docx' ), true ) ) {
+			wp_send_json_error( array( 'message' => __( 'Only Word files are allowed (.doc, .docx).', 'arriendo-facil' ) ), 400 );
+		}
+
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		$upload = wp_handle_upload(
+			$file_data,
+			array(
+				'test_form' => false,
+				'mimes'     => $allowed_mimes,
+			)
+		);
+
+		if ( ! is_array( $upload ) || isset( $upload['error'] ) ) {
+			$error_msg = is_array( $upload ) && isset( $upload['error'] ) ? (string) $upload['error'] : __( 'Could not save the uploaded Word file.', 'arriendo-facil' );
+			wp_send_json_error( array( 'message' => $error_msg ) );
+		}
+
+		$file_path = isset( $upload['file'] ) ? (string) $upload['file'] : '';
+		$file_url  = isset( $upload['url'] ) ? esc_url_raw( (string) $upload['url'] ) : '';
+		if ( '' === $file_path || ! file_exists( $file_path ) ) {
+			wp_send_json_error( array( 'message' => __( 'Uploaded file is missing on server.', 'arriendo-facil' ) ) );
+		}
+
+		$versions_data = $this->get_contract_versions( $lease_id );
+		$next_version  = count( isset( $versions_data['versions'] ) && is_array( $versions_data['versions'] ) ? $versions_data['versions'] : array() ) + 1;
+
+		$final_document_url = $file_url;
+		$storage_meta       = array(
+			'provider'  => 'local',
+			'file_name' => wp_basename( $file_path ),
+			'local_url' => $file_url,
+			'mime_type' => (string) $checked['type'],
+		);
+
+		$storage_provider = $this->get_storage_setting( 'AF_STORAGE_PROVIDER', 'af_storage_provider', 'cloudflare_r2' );
+		if ( 'cloudflare_r2' === $storage_provider ) {
+			$r2_config = $this->get_r2_config();
+			if ( ! is_wp_error( $r2_config ) ) {
+				$contents = file_get_contents( $file_path );
+				if ( false !== $contents ) {
+					$safe_name  = sanitize_file_name( wp_basename( $file_path ) );
+					$object_key = sprintf( 'lease-contracts/%d/v%d/%s', $lease_id, $next_version, $safe_name );
+					$upload_r2  = $this->upload_contents_to_r2(
+						$contents,
+						$object_key,
+						'' !== (string) $checked['type'] ? (string) $checked['type'] : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+						$r2_config
+					);
+
+					if ( ! is_wp_error( $upload_r2 ) ) {
+						$final_document_url = add_query_arg(
+							array(
+								'action'   => 'af_download_lease_contract',
+								'lease_id' => $lease_id,
+							),
+							admin_url( 'admin-ajax.php' )
+						);
+						$storage_meta = array(
+							'provider'   => 'cloudflare_r2',
+							'object_key' => $object_key,
+							'file_name'  => $safe_name,
+							'local_url'  => $file_url,
+							'mime_type'  => '' !== (string) $checked['type'] ? (string) $checked['type'] : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+						);
+					}
+				}
+			}
+		}
+
+		$this->set_contract_storage_meta( $lease_id, $storage_meta );
+		$this->attach_document(
+			$lease_id,
+			add_query_arg(
+				array(
+					'action'   => 'af_download_lease_contract',
+					'lease_id' => $lease_id,
+				),
+				admin_url( 'admin-ajax.php' )
+			)
+		);
+
+		wp_send_json_success(
+			array(
+				'message' => sprintf( __( 'Uploaded as version v%d.', 'arriendo-facil' ), $next_version ),
+				'version' => $next_version,
+				'url'     => $final_document_url,
+			)
+		);
 	}
 
 	/**
@@ -527,6 +654,79 @@ class Arriendo_Facil_Lease {
 		$signature   = hash_hmac( 'sha256', $string_to_sign, $signing_key );
 
 		return $r2_config['endpoint'] . $canonical_uri . '?' . $canonical_query . '&X-Amz-Signature=' . rawurlencode( $signature );
+	}
+
+	/**
+	 * Uploads raw contents to Cloudflare R2 using SigV4.
+	 *
+	 * @param string $contents File contents.
+	 * @param string $object_key Object key path.
+	 * @param string $mime_type Mime type.
+	 * @param array  $r2_config Parsed R2 config.
+	 * @return true|WP_Error
+	 */
+	private function upload_contents_to_r2( $contents, $object_key, $mime_type, array $r2_config ) {
+		$payload_hash   = hash( 'sha256', $contents );
+		$amz_date       = gmdate( 'Ymd\\THis\\Z' );
+		$date_stamp     = gmdate( 'Ymd' );
+		$canonical_uri  = '/' . rawurlencode( $r2_config['bucket'] ) . '/' . str_replace( '%2F', '/', rawurlencode( (string) $object_key ) );
+
+		$canonical_headers =
+			'host:' . $r2_config['host'] . "\n"
+			. 'x-amz-content-sha256:' . $payload_hash . "\n"
+			. 'x-amz-date:' . $amz_date . "\n";
+		$signed_headers = 'host;x-amz-content-sha256;x-amz-date';
+
+		$canonical_request =
+			"PUT\n"
+			. $canonical_uri . "\n"
+			. "\n"
+			. $canonical_headers . "\n"
+			. $signed_headers . "\n"
+			. $payload_hash;
+
+		$credential_scope = $date_stamp . '/' . $r2_config['region'] . '/' . $r2_config['service'] . '/aws4_request';
+		$string_to_sign   =
+			'AWS4-HMAC-SHA256' . "\n"
+			. $amz_date . "\n"
+			. $credential_scope . "\n"
+			. hash( 'sha256', $canonical_request );
+
+		$signing_key = $this->get_aws_v4_signing_key( $r2_config['secret_key'], $date_stamp, $r2_config['region'], $r2_config['service'] );
+		$signature   = hash_hmac( 'sha256', $string_to_sign, $signing_key );
+
+		$authorization =
+			'AWS4-HMAC-SHA256 '
+			. 'Credential=' . $r2_config['access_key'] . '/' . $credential_scope . ', '
+			. 'SignedHeaders=' . $signed_headers . ', '
+			. 'Signature=' . $signature;
+
+		$response = wp_remote_request(
+			$r2_config['endpoint'] . $canonical_uri,
+			array(
+				'method'  => 'PUT',
+				'timeout' => 45,
+				'headers' => array(
+					'Host'                 => $r2_config['host'],
+					'Content-Type'         => $mime_type,
+					'x-amz-date'           => $amz_date,
+					'x-amz-content-sha256' => $payload_hash,
+					'Authorization'        => $authorization,
+				),
+				'body' => $contents,
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		$status_code = (int) wp_remote_retrieve_response_code( $response );
+		if ( $status_code < 200 || $status_code >= 300 ) {
+			return new WP_Error( 'af_r2_upload_failed', __( 'Cloudflare R2 rejected the uploaded contract file.', 'arriendo-facil' ) );
+		}
+
+		return true;
 	}
 
 	/**

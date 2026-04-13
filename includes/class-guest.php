@@ -436,6 +436,9 @@ class Arriendo_Facil_Guest {
 			'owner_email'       => isset( $owner_contract_example['owner_email'] ) ? sanitize_email( (string) $owner_contract_example['owner_email'] ) : '',
 		);
 
+		$ai_payload['legal_requirements'] = $this->get_contract_legal_requirements();
+		$ai_payload['legal_template_base'] = $this->build_legal_contract_template( $ai_payload, '' );
+
 		$ai = new Arriendo_Facil_AI_Service();
 		$document_result = $ai->generate_document( $ai_payload );
 
@@ -451,6 +454,8 @@ class Arriendo_Facil_Guest {
 		if ( '' === $generated_contract_text ) {
 			$generated_contract_text = $this->build_fallback_contract_text( $ai_payload );
 		}
+
+		$generated_contract_text = $this->normalize_generated_legal_contract_text( $generated_contract_text, $ai_payload );
 
 		$document_url = '';
 		if ( ! is_wp_error( $document_result ) && isset( $document_result['document_url'] ) && is_string( $document_result['document_url'] ) ) {
@@ -485,26 +490,144 @@ class Arriendo_Facil_Guest {
 	 * @return string
 	 */
 	private function build_fallback_contract_text( array $payload ) {
-		$guest_name   = isset( $payload['guest_name'] ) ? sanitize_text_field( (string) $payload['guest_name'] ) : '';
-		$guest_id     = isset( $payload['guest_id_number'] ) ? sanitize_text_field( (string) $payload['guest_id_number'] ) : '';
-		$owner_name   = isset( $payload['owner_name'] ) ? sanitize_text_field( (string) $payload['owner_name'] ) : '';
-		$property     = isset( $payload['accommodation_title'] ) ? sanitize_text_field( (string) $payload['accommodation_title'] ) : '';
-		$address      = isset( $payload['accommodation_address'] ) ? sanitize_text_field( (string) $payload['accommodation_address'] ) : '';
-		$start_date   = isset( $payload['start_date'] ) ? sanitize_text_field( (string) $payload['start_date'] ) : '';
-		$end_date     = isset( $payload['end_date'] ) ? sanitize_text_field( (string) $payload['end_date'] ) : '';
-		$monthly_rent = isset( $payload['monthly_rent'] ) ? (float) $payload['monthly_rent'] : 0.0;
+		return $this->build_legal_contract_template( $payload, '' );
+	}
 
-		return sprintf(
-			"CONTRATO DE ARRENDAMIENTO\n\nArrendador: %s\nArrendatario: %s\nDocumento arrendatario: %s\nInmueble: %s\nDireccion: %s\nFecha inicio: %s\nFecha fin: %s\nCanon mensual: %.2f\n\nLas partes acuerdan el arriendo del inmueble descrito para uso habitacional, cumpliendo las obligaciones de pago mensual, cuidado del bien y normativa aplicable. Este documento se genera como respaldo operativo del registro en Arriendo Facil.",
-			$owner_name,
-			$guest_name,
-			$guest_id,
-			$property,
-			$address,
-			$start_date,
-			$end_date,
-			$monthly_rent
+	/**
+	 * Provides legal requirements used to guide AI contract drafting.
+	 *
+	 * @return array<int,string>
+	 */
+	private function get_contract_legal_requirements() {
+		return array(
+			'Use formal Ecuador rental-contract language suitable for legal review.',
+			'Keep numbered clauses with clear obligations for both parties.',
+			'Include parties identification (full name and ID number placeholders).',
+			'Include lease object, term, monthly rent, payment method and due date.',
+			'Include deposit/guarantee clause and property use restrictions.',
+			'Include maintenance and utilities responsibilities.',
+			'Include termination causes and penalties for breach.',
+			'Include jurisdiction and applicable law clause.',
+			'Include signature block for landlord and tenant with ID and signature lines.',
 		);
+	}
+
+	/**
+	 * Builds a legal base template used by chatbot-generated contracts.
+	 *
+	 * @param array  $payload Lease and guest context.
+	 * @param string $extra_clauses Optional extra clauses text.
+	 * @return string
+	 */
+	private function build_legal_contract_template( array $payload, $extra_clauses = '' ) {
+		$owner_name      = isset( $payload['owner_name'] ) ? sanitize_text_field( (string) $payload['owner_name'] ) : '________________________';
+		$owner_id        = isset( $payload['owner_id_number'] ) ? sanitize_text_field( (string) $payload['owner_id_number'] ) : '________________________';
+		$guest_name      = isset( $payload['guest_name'] ) ? sanitize_text_field( (string) $payload['guest_name'] ) : '________________________';
+		$guest_id        = isset( $payload['guest_id_number'] ) ? sanitize_text_field( (string) $payload['guest_id_number'] ) : '________________________';
+		$property        = isset( $payload['accommodation_title'] ) ? sanitize_text_field( (string) $payload['accommodation_title'] ) : '________________________';
+		$address         = isset( $payload['accommodation_address'] ) ? sanitize_text_field( (string) $payload['accommodation_address'] ) : '________________________';
+		$start_date      = isset( $payload['start_date'] ) ? sanitize_text_field( (string) $payload['start_date'] ) : '________________________';
+		$end_date        = isset( $payload['end_date'] ) ? sanitize_text_field( (string) $payload['end_date'] ) : '________________________';
+		$monthly_rent    = isset( $payload['monthly_rent'] ) ? number_format( (float) $payload['monthly_rent'], 2, '.', '' ) : '0.00';
+		$desired_price   = isset( $payload['desired_price'] ) ? sanitize_text_field( (string) $payload['desired_price'] ) : '';
+		$guarantee_text  = isset( $payload['guarantee_text'] ) ? sanitize_text_field( (string) $payload['guarantee_text'] ) : 'Garantia equivalente a _____ meses de canon.';
+
+		if ( '' !== trim( $desired_price ) ) {
+			$monthly_rent = $desired_price;
+		}
+
+		$city_and_date = sprintf( 'Quito, %s', current_time( 'Y-m-d' ) );
+		$extra_clauses = trim( (string) $extra_clauses );
+
+		$contract = "CONTRATO DE ARRENDAMIENTO\n";
+		$contract .= "\n";
+		$contract .= "Entre los comparecientes, por una parte " . $owner_name . " (ARRENDADOR), con cedula/RUC " . $owner_id . ", y por otra parte " . $guest_name . " (ARRENDATARIO), con cedula " . $guest_id . ", se celebra el presente contrato de arrendamiento de conformidad con la normativa ecuatoriana aplicable.\n";
+		$contract .= "\n";
+		$contract .= "CLAUSULA PRIMERA - OBJETO\n";
+		$contract .= "El ARRENDADOR da en arrendamiento al ARRENDATARIO el inmueble identificado como " . $property . ", ubicado en " . $address . ".\n";
+		$contract .= "\n";
+		$contract .= "CLAUSULA SEGUNDA - PLAZO\n";
+		$contract .= "El plazo de vigencia del presente contrato inicia el " . $start_date . " y termina el " . $end_date . ".\n";
+		$contract .= "\n";
+		$contract .= "CLAUSULA TERCERA - CANON Y FORMA DE PAGO\n";
+		$contract .= "El canon de arrendamiento acordado es de USD " . $monthly_rent . " mensuales, pagaderos dentro de los primeros cinco dias de cada mes, por el medio acordado por las partes.\n";
+		$contract .= "\n";
+		$contract .= "CLAUSULA CUARTA - GARANTIA\n";
+		$contract .= $guarantee_text . "\n";
+		$contract .= "\n";
+		$contract .= "CLAUSULA QUINTA - DESTINO Y USO\n";
+		$contract .= "El inmueble sera destinado exclusivamente para uso habitacional del ARRENDATARIO y su nucleo autorizado, quedando prohibido subarrendar o cambiar el destino sin autorizacion escrita del ARRENDADOR.\n";
+		$contract .= "\n";
+		$contract .= "CLAUSULA SEXTA - OBLIGACIONES DE LAS PARTES\n";
+		$contract .= "El ARRENDATARIO se obliga al pago puntual del canon, cuidado del inmueble y servicios basicos que le correspondan. El ARRENDADOR se obliga a mantener la posesion pacifica y atender reparaciones estructurales que legalmente le correspondan.\n";
+		$contract .= "\n";
+		$contract .= "CLAUSULA SEPTIMA - TERMINACION\n";
+		$contract .= "El contrato podra darse por terminado por vencimiento del plazo, mutuo acuerdo o incumplimiento de obligaciones contractuales y legales, conforme normativa aplicable.\n";
+		$contract .= "\n";
+		$contract .= "CLAUSULA OCTAVA - JURISDICCION Y LEY APLICABLE\n";
+		$contract .= "Para todos los efectos legales, las partes se someten a la jurisdiccion de los jueces competentes del Ecuador y a la Ley de Inquilinato y normas conexas vigentes.\n";
+
+		if ( '' !== $extra_clauses ) {
+			$contract .= "\n";
+			$contract .= "CLAUSULA NOVENA - DISPOSICIONES ADICIONALES\n";
+			$contract .= $extra_clauses . "\n";
+		}
+
+		$contract .= "\n";
+		$contract .= "En constancia de conformidad, las partes suscriben el presente contrato en dos ejemplares del mismo tenor.\n";
+		$contract .= "\n";
+		$contract .= $city_and_date . "\n";
+		$contract .= "\n";
+		$contract .= "FIRMAS\n";
+		$contract .= "\n";
+		$contract .= "ARRENDADOR: ________________________\n";
+		$contract .= "Nombre: " . $owner_name . "\n";
+		$contract .= "Cedula/RUC: " . $owner_id . "\n";
+		$contract .= "\n";
+		$contract .= "ARRENDATARIO: ________________________\n";
+		$contract .= "Nombre: " . $guest_name . "\n";
+		$contract .= "Cedula: " . $guest_id . "\n";
+
+		return $contract;
+	}
+
+	/**
+	 * Ensures generated contract text keeps legal format requirements.
+	 *
+	 * @param string $contract_text Raw contract text from AI.
+	 * @param array  $payload Lease and guest context.
+	 * @return string
+	 */
+	private function normalize_generated_legal_contract_text( $contract_text, array $payload ) {
+		$contract_text = trim( preg_replace( '/\s+\n/', "\n", (string) $contract_text ) );
+		if ( '' === $contract_text ) {
+			return $this->build_legal_contract_template( $payload, '' );
+		}
+
+		$lower_text = strtolower( $contract_text );
+		$has_title  = false !== strpos( $lower_text, 'contrato de arrendamiento' );
+		$has_clause = false !== strpos( $lower_text, 'clausula' );
+		$has_sign   = false !== strpos( $lower_text, 'firma' ) || false !== strpos( $lower_text, 'arrendatario:' );
+
+		if ( ! $has_title || ! $has_clause || strlen( $contract_text ) < 700 ) {
+			return $this->build_legal_contract_template( $payload, $contract_text );
+		}
+
+		if ( ! $has_sign ) {
+			$signature_block = "\n\nFIRMAS\n\nARRENDADOR: ________________________\nNombre: "
+				. ( isset( $payload['owner_name'] ) ? sanitize_text_field( (string) $payload['owner_name'] ) : '________________________' )
+				. "\nCedula/RUC: "
+				. ( isset( $payload['owner_id_number'] ) ? sanitize_text_field( (string) $payload['owner_id_number'] ) : '________________________' )
+				. "\n\nARRENDATARIO: ________________________\nNombre: "
+				. ( isset( $payload['guest_name'] ) ? sanitize_text_field( (string) $payload['guest_name'] ) : '________________________' )
+				. "\nCedula: "
+				. ( isset( $payload['guest_id_number'] ) ? sanitize_text_field( (string) $payload['guest_id_number'] ) : '________________________' )
+				. "\n";
+
+			$contract_text .= $signature_block;
+		}
+
+		return $contract_text;
 	}
 
 	/**

@@ -344,7 +344,7 @@ class Arriendo_Facil_AI_Service {
 		}
 
 		if ( 'generate_document' === $action ) {
-			return "Task: You are generating a complete Spanish rental contract using the provided lease/guest data. If template_text is available, keep its structure and complete placeholders with real values. If template_text is empty but template metadata exists, keep a professional Ecuador rental-contract format and include all available details from input. Return strictly JSON with keys: 'contract_text' (required, string with full contract body) and 'document_url' (optional string, use empty string if not available). Input: " . wp_json_encode( $data );
+			return "Task: Generate a complete Spanish rental contract in Ecuador legal style. Always output a legally structured contract with numbered clauses and formal language. Use legal_template_base as the mandatory base structure. Respect legal_requirements and include all required sections: parties identification, object, term, rent/payment, guarantee, obligations, termination, jurisdiction, and signature blocks for landlord and tenant with ID fields. If template_text is available, integrate its strongest parts without removing mandatory sections. Return strictly JSON with keys: 'contract_text' (required, string with full contract body) and 'document_url' (optional string, use empty string if not available). Input: " . wp_json_encode( $data );
 		}
 
 		if ( 'score_guest' === $action ) {

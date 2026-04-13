@@ -182,21 +182,76 @@ body.post-type-cleaning_service .page-title-action:focus {
 	min-width: 320px;
 }
 
-.af-upload-lease-version-form {
+.af-lease-actions-stack {
 	display: flex;
-	flex-wrap: wrap;
+	flex-direction: column;
 	align-items: center;
 	gap: 8px;
-	margin-bottom: 8px;
 }
 
-.af-upload-lease-version-form input[type="file"] {
-	max-width: 180px;
-	font-size: 12px;
+.af-lease-actions-stack .button {
+	width: 100%;
+	justify-content: center;
 }
 
 .af-lease-activate-button {
 	margin-top: 2px;
+}
+
+.af-lease-upload-modal .af-modal__dialog {
+	width: min(560px, calc(100% - 32px));
+}
+
+.af-lease-upload-help {
+	margin: 0 0 4px;
+	font-weight: 600;
+}
+
+.af-lease-upload-rules {
+	margin: 0 0 14px;
+	font-size: 12px;
+	color: #646970;
+}
+
+.af-lease-upload-picker {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px;
+	padding: 12px;
+	border: 1px dashed #8c8f94;
+	border-radius: 6px;
+	background: #f8f9fa;
+}
+
+.af-lease-upload-file-name {
+	font-size: 12px;
+	color: #3c434a;
+	max-width: 320px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.af-lease-upload-feedback {
+	min-height: 20px;
+	margin: 10px 0 0;
+	font-size: 13px;
+}
+
+.af-lease-upload-feedback-success {
+	color: #1d6c00;
+}
+
+.af-lease-upload-feedback-error {
+	color: #b32d2e;
+}
+
+.af-lease-upload-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	margin-top: 14px;
 }
 
 @media (max-width: 1200px) {
@@ -204,7 +259,11 @@ body.post-type-cleaning_service .page-title-action:focus {
 		min-width: 260px;
 	}
 
-	.af-upload-lease-version-form input[type="file"] {
-		max-width: 150px;
+	.af-lease-actions-stack .button {
+		width: auto;
+	}
+
+	.af-lease-upload-file-name {
+		max-width: 220px;
 	}
 }

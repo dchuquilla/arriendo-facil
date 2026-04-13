@@ -63,56 +63,169 @@
 			} );
 	} );
 
-	// ── Upload manual lease version (.doc/.docx) ───────────────────────────
-	$( document ).on( 'submit', '.af-upload-lease-version-form', function ( event ) {
-		event.preventDefault();
+	// ── Upload manual lease version (.doc/.docx) via modal ─────────────────
+	( function setupLeaseUploadModal() {
+		var modalEl = document.getElementById( 'af-lease-upload-modal' );
+		var titleEl = document.getElementById( 'af-lease-upload-modal-title' );
+		var fileInputEl = document.getElementById( 'af-lease-upload-file' );
+		var fileNameEl = document.getElementById( 'af-lease-upload-file-name' );
+		var feedbackEl = document.getElementById( 'af-lease-upload-feedback' );
+		var selectBtnEl = document.getElementById( 'af-lease-upload-select-btn' );
+		var submitBtnEl = document.getElementById( 'af-lease-upload-submit' );
 
-		var formEl = this;
-		var leaseId = parseInt( String( formEl.getAttribute( 'data-lease-id' ) || '0' ), 10 );
-		var fileInput = formEl.querySelector( 'input[type="file"][name="lease_contract_file"]' );
-		var submitBtn = formEl.querySelector( 'button[type="submit"]' );
+		var state = {
+			leaseId: 0,
+			nextVersion: 0,
+			file: null,
+		};
 
-		if ( ! leaseId || ! fileInput || ! fileInput.files || ! fileInput.files[0] ) {
-			alert( 'Selecciona un archivo Word (.doc o .docx).' );
+		function resetModalState() {
+			state.leaseId = 0;
+			state.nextVersion = 0;
+			state.file = null;
+
+			if ( fileInputEl ) {
+				fileInputEl.value = '';
+			}
+
+			if ( titleEl ) {
+				titleEl.textContent = 'Upload New Contract Version';
+			}
+
+			if ( fileNameEl ) {
+				fileNameEl.textContent = 'No file selected.';
+			}
+
+			if ( feedbackEl ) {
+				feedbackEl.textContent = '';
+				feedbackEl.className = 'af-lease-upload-feedback';
+			}
+
+			if ( submitBtnEl ) {
+				submitBtnEl.disabled = true;
+				submitBtnEl.textContent = 'Upload Version';
+			}
+		}
+
+		function closeModal() {
+			if ( ! modalEl ) {
+				return;
+			}
+
+			modalEl.setAttribute( 'hidden', 'hidden' );
+			document.body.classList.remove( 'af-modal-open' );
+			resetModalState();
+		}
+
+		function openModal( leaseId, nextVersion ) {
+			if ( ! modalEl ) {
+				return;
+			}
+
+			state.leaseId = leaseId;
+			state.nextVersion = nextVersion;
+
+			if ( titleEl ) {
+				titleEl.textContent = 'Upload contract version v' + String( nextVersion );
+			}
+
+			modalEl.removeAttribute( 'hidden' );
+			document.body.classList.add( 'af-modal-open' );
+		}
+
+		if ( ! modalEl || !fileInputEl || !fileNameEl || !feedbackEl || !selectBtnEl || !submitBtnEl ) {
 			return;
 		}
 
-		if ( submitBtn ) {
-			submitBtn.disabled = true;
-		}
+		$( document ).on( 'click', '.af-open-upload-version-modal', function () {
+			var leaseId = parseInt( String( this.getAttribute( 'data-lease-id' ) || '0' ), 10 );
+			var nextVersion = parseInt( String( this.getAttribute( 'data-next-version' ) || '1' ), 10 );
+			if ( ! leaseId ) {
+				return;
+			}
 
-		var data = new FormData();
-		data.append( 'action', 'af_upload_lease_contract_version' );
-		data.append( 'nonce', afAdmin.leaseNonce );
-		data.append( 'lease_id', String( leaseId ) );
-		data.append( 'lease_contract_file', fileInput.files[0] );
+			openModal( leaseId, nextVersion > 0 ? nextVersion : 1 );
+		} );
 
-		fetch( afAdmin.ajaxUrl, {
-			method: 'POST',
-			credentials: 'same-origin',
-			body: data,
-		} )
-			.then( function ( response ) {
-				return response.json();
-			} )
-			.then( function ( payload ) {
-				if ( payload && payload.success ) {
-					alert( ( payload.data && payload.data.message ) ? payload.data.message : 'Nueva version subida correctamente.' );
-					window.location.reload();
-					return;
-				}
+		$( document ).on( 'click', '[data-af-close-upload-modal]', function () {
+			closeModal();
+		} );
 
-				alert( payload && payload.data && payload.data.message ? payload.data.message : 'No se pudo subir la nueva version.' );
+		document.addEventListener( 'keydown', function ( event ) {
+			if ( 'Escape' === event.key && modalEl && !modalEl.hasAttribute( 'hidden' ) ) {
+				closeModal();
+			}
+		} );
+
+		selectBtnEl.addEventListener( 'click', function () {
+			fileInputEl.click();
+		} );
+
+		fileInputEl.addEventListener( 'change', function () {
+			var file = fileInputEl.files && fileInputEl.files[0] ? fileInputEl.files[0] : null;
+			state.file = file;
+
+			if ( file ) {
+				fileNameEl.textContent = file.name;
+				submitBtnEl.disabled = false;
+				feedbackEl.textContent = '';
+				feedbackEl.className = 'af-lease-upload-feedback';
+				return;
+			}
+
+			fileNameEl.textContent = 'No file selected.';
+			submitBtnEl.disabled = true;
+		} );
+
+		submitBtnEl.addEventListener( 'click', function () {
+			if ( ! state.leaseId || ! state.file ) {
+				feedbackEl.textContent = 'Select a Word file first (.doc or .docx).';
+				feedbackEl.className = 'af-lease-upload-feedback af-lease-upload-feedback-error';
+				return;
+			}
+
+			submitBtnEl.disabled = true;
+			submitBtnEl.textContent = 'Uploading...';
+			feedbackEl.textContent = '';
+			feedbackEl.className = 'af-lease-upload-feedback';
+
+			var data = new FormData();
+			data.append( 'action', 'af_upload_lease_contract_version' );
+			data.append( 'nonce', afAdmin.leaseNonce );
+			data.append( 'lease_id', String( state.leaseId ) );
+			data.append( 'lease_contract_file', state.file );
+
+			fetch( afAdmin.ajaxUrl, {
+				method: 'POST',
+				credentials: 'same-origin',
+				body: data,
 			} )
-			.catch( function () {
-				alert( 'Request failed.' );
-			} )
-			.finally( function () {
-				if ( submitBtn ) {
-					submitBtn.disabled = false;
-				}
-			} );
-	} );
+				.then( function ( response ) {
+					return response.json();
+				} )
+				.then( function ( payload ) {
+					if ( payload && payload.success ) {
+						feedbackEl.textContent = ( payload.data && payload.data.message ) ? payload.data.message : 'Version uploaded successfully.';
+						feedbackEl.className = 'af-lease-upload-feedback af-lease-upload-feedback-success';
+						window.setTimeout( function () {
+							window.location.reload();
+						}, 500 );
+						return;
+					}
+
+					feedbackEl.textContent = payload && payload.data && payload.data.message ? payload.data.message : 'Could not upload the new version.';
+					feedbackEl.className = 'af-lease-upload-feedback af-lease-upload-feedback-error';
+					submitBtnEl.disabled = false;
+					submitBtnEl.textContent = 'Upload Version';
+				} )
+				.catch( function () {
+					feedbackEl.textContent = 'Request failed.';
+					feedbackEl.className = 'af-lease-upload-feedback af-lease-upload-feedback-error';
+					submitBtnEl.disabled = false;
+					submitBtnEl.textContent = 'Upload Version';
+				} );
+		} );
+	} )();
 
 	// ── Change lease status ─────────────────────────────────────────────────
 	$( document ).on( 'click', '.af-change-lease-status', function () {

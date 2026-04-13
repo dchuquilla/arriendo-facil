@@ -24,13 +24,13 @@ $leases = $wpdb->get_results(
 <div class="wrap">
 	<h1><?php esc_html_e( 'Leases', 'arriendo-facil' ); ?></h1>
 
-	<div class="af-lease-actions" style="margin-bottom: 16px;">
+	<div class="af-lease-actions">
 		<button type="button" class="button button-primary" id="af-new-lease">
 			<?php esc_html_e( '+ New Lease', 'arriendo-facil' ); ?>
 		</button>
 	</div>
 
-	<table class="wp-list-table widefat fixed striped">
+	<table class="wp-list-table widefat fixed striped af-leases-table">
 		<thead>
 			<tr>
 				<th><?php esc_html_e( 'ID', 'arriendo-facil' ); ?></th>
@@ -60,7 +60,7 @@ $leases = $wpdb->get_results(
 						admin_url( 'admin-ajax.php' )
 					);
 					?>
-					<tr>
+					<tr class="af-lease-row">
 						<td><?php echo esc_html( $lease->id ); ?></td>
 						<td><?php echo esc_html( $lease->accommodation_title ?: $lease->accommodation_id ); ?></td>
 						<td><?php echo esc_html( $lease->guest_id ); ?></td>
@@ -68,26 +68,26 @@ $leases = $wpdb->get_results(
 						<td><?php echo esc_html( $lease->end_date ); ?></td>
 						<td><?php echo esc_html( number_format( (float) $lease->monthly_rent, 2 ) ); ?></td>
 						<td><?php echo esc_html( $lease->status ); ?></td>
-						<td>
+						<td class="af-lease-document-cell">
 							<?php if ( $versions_count > 0 || $lease->document_url ) : ?>
-								<a href="<?php echo esc_url( $download_active ); ?>" target="_blank">
+								<a class="af-lease-view-link" href="<?php echo esc_url( $download_active ); ?>" target="_blank">
 									<?php esc_html_e( 'View', 'arriendo-facil' ); ?>
 								</a>
 								<?php if ( $versions_count > 0 ) : ?>
-									<div style="margin-top:6px; font-size:12px; color:#555;">
+									<div class="af-lease-version-meta">
 										<?php echo esc_html( sprintf( __( 'Active version: v%d (%d total)', 'arriendo-facil' ), max( 1, $active_version ), $versions_count ) ); ?>
 									</div>
 								<?php endif; ?>
 							<?php else : ?>
-								<span style="color:#777;"><?php esc_html_e( 'No contract yet. It is generated from chatbot flow.', 'arriendo-facil' ); ?></span>
+								<span class="af-lease-empty-document"><?php esc_html_e( 'No contract yet. It is generated from chatbot flow.', 'arriendo-facil' ); ?></span>
 							<?php endif; ?>
 						</td>
-						<td>
-							<form class="af-upload-lease-version-form" data-lease-id="<?php echo esc_attr( $lease->id ); ?>" enctype="multipart/form-data" style="display:inline-flex; align-items:center; gap:8px; margin-right:8px;">
+						<td class="af-lease-actions-cell">
+							<form class="af-upload-lease-version-form" data-lease-id="<?php echo esc_attr( $lease->id ); ?>" enctype="multipart/form-data">
 								<input type="file" name="lease_contract_file" accept=".doc,.docx" required />
 								<button type="submit" class="button button-secondary"><?php esc_html_e( 'Upload New Version', 'arriendo-facil' ); ?></button>
 							</form>
-							<button type="button" class="button af-change-lease-status"
+							<button type="button" class="button af-change-lease-status af-lease-activate-button"
 								data-lease-id="<?php echo esc_attr( $lease->id ); ?>"
 								data-status="active">
 								<?php esc_html_e( 'Activate', 'arriendo-facil' ); ?>

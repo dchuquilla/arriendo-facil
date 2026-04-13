@@ -228,6 +228,65 @@
 	} )();
 
 	// ── Change lease status ─────────────────────────────────────────────────
+	$( document ).on( 'click', '.af-approve-lease-document', function () {
+		var $btn = $( this );
+		var leaseId = parseInt( String( $btn.data( 'lease-id' ) || 0 ), 10 );
+		var activeVersion = parseInt( String( $btn.data( 'active-version' ) || 1 ), 10 );
+
+		if ( ! leaseId ) {
+			alert( 'Invalid lease.' );
+			return;
+		}
+
+		var pwd = window.prompt( 'Set password for approved PDF (min 6 chars):' );
+		if ( null === pwd ) {
+			return;
+		}
+
+		pwd = String( pwd || '' ).trim();
+		if ( pwd.length < 6 ) {
+			alert( 'Password must have at least 6 characters.' );
+			return;
+		}
+
+		var confirmPwd = window.prompt( 'Confirm PDF password:' );
+		if ( null === confirmPwd ) {
+			return;
+		}
+
+		if ( String( confirmPwd ) !== pwd ) {
+			alert( 'Password confirmation does not match.' );
+			return;
+		}
+
+		if ( ! window.confirm( 'Approve active version v' + activeVersion + ' and convert to protected PDF?' ) ) {
+			return;
+		}
+
+		$btn.prop( 'disabled', true ).text( 'Approving...' );
+
+		$.post( afAdmin.ajaxUrl, {
+			action: 'af_approve_lease_contract',
+			nonce: afAdmin.leaseNonce,
+			lease_id: leaseId,
+			pdf_password: pwd,
+		} )
+			.done( function ( response ) {
+				if ( response && response.success ) {
+					alert( response.data && response.data.message ? response.data.message : 'Document approved successfully.' );
+					window.location.reload();
+				} else {
+					alert( response && response.data && response.data.message ? response.data.message : 'Could not approve document.' );
+				}
+			} )
+			.fail( function () {
+				alert( 'Request failed.' );
+			} )
+			.always( function () {
+				$btn.prop( 'disabled', false ).text( 'Approve Document' );
+			} );
+	} );
+
 	$( document ).on( 'click', '.af-change-lease-status', function () {
 		var $btn = $( this );
 		var leaseId = $btn.data( 'lease-id' );

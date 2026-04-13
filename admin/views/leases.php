@@ -53,6 +53,20 @@ $leases = $wpdb->get_results(
 					$versions        = isset( $versions_data['versions'] ) && is_array( $versions_data['versions'] ) ? $versions_data['versions'] : array();
 					$versions_count  = count( $versions );
 					$next_version    = $versions_count + 1;
+					$active_entry    = null;
+					if ( $versions_count > 0 ) {
+						foreach ( $versions as $version_row ) {
+							if ( isset( $version_row['version'] ) && (int) $version_row['version'] === max( 1, $active_version ) ) {
+								$active_entry = $version_row;
+								break;
+							}
+						}
+
+						if ( ! is_array( $active_entry ) ) {
+							$active_entry = end( $versions );
+						}
+					}
+					$has_approved_pdf = is_array( $active_entry ) && isset( $active_entry['approved_pdf'] ) && is_array( $active_entry['approved_pdf'] ) && ! empty( $active_entry['approved_pdf']['file_name'] );
 					$download_active = add_query_arg(
 						array(
 							'action'   => 'af_download_lease_contract',
@@ -78,6 +92,11 @@ $leases = $wpdb->get_results(
 									<div class="af-lease-version-meta">
 										<?php echo esc_html( sprintf( __( 'Active version: v%d (%d total)', 'arriendo-facil' ), max( 1, $active_version ), $versions_count ) ); ?>
 									</div>
+									<?php if ( $has_approved_pdf ) : ?>
+										<div class="af-lease-version-meta">
+											<?php esc_html_e( 'Security: Approved PDF active (read/print only).', 'arriendo-facil' ); ?>
+										</div>
+									<?php endif; ?>
 								<?php endif; ?>
 							<?php else : ?>
 								<span class="af-lease-empty-document"><?php esc_html_e( 'No contract yet. It is generated from chatbot flow.', 'arriendo-facil' ); ?></span>
@@ -90,6 +109,13 @@ $leases = $wpdb->get_results(
 									data-next-version="<?php echo esc_attr( $next_version ); ?>">
 									<?php echo esc_html( sprintf( __( 'Upload v%d', 'arriendo-facil' ), $next_version ) ); ?>
 								</button>
+								<?php if ( $versions_count > 0 || $lease->document_url ) : ?>
+									<button type="button" class="button button-primary af-approve-lease-document"
+										data-lease-id="<?php echo esc_attr( $lease->id ); ?>"
+										data-active-version="<?php echo esc_attr( max( 1, $active_version ) ); ?>">
+										<?php esc_html_e( 'Approve Document', 'arriendo-facil' ); ?>
+									</button>
+								<?php endif; ?>
 							<button type="button" class="button af-change-lease-status af-lease-activate-button"
 								data-lease-id="<?php echo esc_attr( $lease->id ); ?>"
 								data-status="active">

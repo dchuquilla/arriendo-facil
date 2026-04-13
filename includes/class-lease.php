@@ -180,13 +180,58 @@ class Arriendo_Facil_Lease {
 			'file_name'  => isset( $meta['file_name'] ) ? sanitize_file_name( (string) $meta['file_name'] ) : '',
 			'local_url'  => isset( $meta['local_url'] ) ? esc_url_raw( (string) $meta['local_url'] ) : '',
 			'updated_at' => current_time( 'mysql' ),
+			'created_by' => get_current_user_id(),
 		);
 
-		if ( false === get_option( $option_name, false ) ) {
-			return add_option( $option_name, $clean_meta, '', false );
+		$stored = get_option( $option_name, false );
+
+		// Backward compatibility: migrate legacy flat metadata into versioned structure.
+		if ( is_array( $stored ) && isset( $stored['provider'] ) && ! isset( $stored['versions'] ) ) {
+			$legacy_created_at = isset( $stored['updated_at'] ) ? sanitize_text_field( (string) $stored['updated_at'] ) : current_time( 'mysql' );
+			$stored            = array(
+				'active_version' => 1,
+				'versions'       => array(
+					array(
+						'version'    => 1,
+						'provider'   => sanitize_key( (string) ( $stored['provider'] ?? '' ) ),
+						'object_key' => sanitize_text_field( (string) ( $stored['object_key'] ?? '' ) ),
+						'mime_type'  => sanitize_text_field( (string) ( $stored['mime_type'] ?? '' ) ),
+						'file_name'  => sanitize_file_name( (string) ( $stored['file_name'] ?? '' ) ),
+						'local_url'  => esc_url_raw( (string) ( $stored['local_url'] ?? '' ) ),
+						'created_at' => $legacy_created_at,
+						'created_by' => absint( $stored['created_by'] ?? 0 ),
+					),
+				),
+			);
 		}
 
-		return update_option( $option_name, $clean_meta, false );
+		if ( ! is_array( $stored ) || ! isset( $stored['versions'] ) || ! is_array( $stored['versions'] ) ) {
+			$stored = array(
+				'active_version' => 0,
+				'versions'       => array(),
+			);
+		}
+
+		$next_version = count( $stored['versions'] ) + 1;
+		$new_version  = array(
+			'version'    => $next_version,
+			'provider'   => $clean_meta['provider'],
+			'object_key' => $clean_meta['object_key'],
+			'mime_type'  => $clean_meta['mime_type'],
+			'file_name'  => $clean_meta['file_name'],
+			'local_url'  => $clean_meta['local_url'],
+			'created_at' => $clean_meta['updated_at'],
+			'created_by' => absint( $clean_meta['created_by'] ),
+		);
+
+		$stored['versions'][]    = $new_version;
+		$stored['active_version'] = $next_version;
+
+		if ( false === get_option( $option_name, false ) ) {
+			return add_option( $option_name, $stored, '', false );
+		}
+
+		return update_option( $option_name, $stored, false );
 	}
 
 	/**
@@ -206,7 +251,82 @@ class Arriendo_Facil_Lease {
 			return array();
 		}
 
+		// If already versioned, expose active version fields for compatibility.
+		if ( isset( $meta['versions'] ) && is_array( $meta['versions'] ) ) {
+			$active_version_number = isset( $meta['active_version'] ) ? absint( $meta['active_version'] ) : 0;
+			$active_version        = $this->find_version_entry( $meta['versions'], $active_version_number );
+			if ( ! $active_version && ! empty( $meta['versions'] ) ) {
+				$active_version = end( $meta['versions'] );
+			}
+
+			if ( is_array( $active_version ) ) {
+				$meta['provider']   = isset( $active_version['provider'] ) ? sanitize_key( (string) $active_version['provider'] ) : '';
+				$meta['object_key'] = isset( $active_version['object_key'] ) ? sanitize_text_field( (string) $active_version['object_key'] ) : '';
+				$meta['mime_type']  = isset( $active_version['mime_type'] ) ? sanitize_text_field( (string) $active_version['mime_type'] ) : '';
+				$meta['file_name']  = isset( $active_version['file_name'] ) ? sanitize_file_name( (string) $active_version['file_name'] ) : '';
+				$meta['local_url']  = isset( $active_version['local_url'] ) ? esc_url_raw( (string) $active_version['local_url'] ) : '';
+			}
+		}
+
 		return $meta;
+	}
+
+	/**
+	 * Returns normalized contract versions and active version.
+	 *
+	 * @param int $lease_id Lease ID.
+	 * @return array<string,mixed>
+	 */
+	public function get_contract_versions( $lease_id ) {
+		$meta = $this->get_contract_storage_meta( $lease_id );
+		if ( empty( $meta ) ) {
+			return array(
+				'active_version' => 0,
+				'versions'       => array(),
+			);
+		}
+
+		if ( isset( $meta['versions'] ) && is_array( $meta['versions'] ) ) {
+			$versions = array();
+			foreach ( $meta['versions'] as $entry ) {
+				if ( ! is_array( $entry ) ) {
+					continue;
+				}
+
+				$versions[] = array(
+					'version'    => isset( $entry['version'] ) ? absint( $entry['version'] ) : 0,
+					'provider'   => isset( $entry['provider'] ) ? sanitize_key( (string) $entry['provider'] ) : '',
+					'object_key' => isset( $entry['object_key'] ) ? sanitize_text_field( (string) $entry['object_key'] ) : '',
+					'mime_type'  => isset( $entry['mime_type'] ) ? sanitize_text_field( (string) $entry['mime_type'] ) : '',
+					'file_name'  => isset( $entry['file_name'] ) ? sanitize_file_name( (string) $entry['file_name'] ) : '',
+					'local_url'  => isset( $entry['local_url'] ) ? esc_url_raw( (string) $entry['local_url'] ) : '',
+					'created_at' => isset( $entry['created_at'] ) ? sanitize_text_field( (string) $entry['created_at'] ) : '',
+					'created_by' => isset( $entry['created_by'] ) ? absint( $entry['created_by'] ) : 0,
+				);
+			}
+
+			return array(
+				'active_version' => isset( $meta['active_version'] ) ? absint( $meta['active_version'] ) : 0,
+				'versions'       => $versions,
+			);
+		}
+
+		// Legacy flat structure -> virtual v1.
+		return array(
+			'active_version' => 1,
+			'versions'       => array(
+				array(
+					'version'    => 1,
+					'provider'   => isset( $meta['provider'] ) ? sanitize_key( (string) $meta['provider'] ) : '',
+					'object_key' => isset( $meta['object_key'] ) ? sanitize_text_field( (string) $meta['object_key'] ) : '',
+					'mime_type'  => isset( $meta['mime_type'] ) ? sanitize_text_field( (string) $meta['mime_type'] ) : '',
+					'file_name'  => isset( $meta['file_name'] ) ? sanitize_file_name( (string) $meta['file_name'] ) : '',
+					'local_url'  => isset( $meta['local_url'] ) ? esc_url_raw( (string) $meta['local_url'] ) : '',
+					'created_at' => isset( $meta['updated_at'] ) ? sanitize_text_field( (string) $meta['updated_at'] ) : '',
+					'created_by' => isset( $meta['created_by'] ) ? absint( $meta['created_by'] ) : 0,
+				),
+			),
+		);
 	}
 
 	/**
@@ -227,12 +347,23 @@ class Arriendo_Facil_Lease {
 			wp_die( esc_html__( 'Lease not found.', 'arriendo-facil' ), 404 );
 		}
 
-		$meta = $this->get_contract_storage_meta( $lease_id );
-		if ( isset( $meta['provider'], $meta['object_key'] ) && 'cloudflare_r2' === $meta['provider'] && '' !== trim( (string) $meta['object_key'] ) ) {
-			$presigned_url = $this->build_r2_presigned_get_url( (string) $meta['object_key'], 600 );
+		$requested_version = isset( $_GET['version'] ) ? absint( wp_unslash( $_GET['version'] ) ) : 0;
+		$versions_data     = $this->get_contract_versions( $lease_id );
+		$version_entry     = $this->find_version_entry( $versions_data['versions'], $requested_version );
+		if ( ! $version_entry ) {
+			$active_version = isset( $versions_data['active_version'] ) ? absint( $versions_data['active_version'] ) : 0;
+			$version_entry  = $this->find_version_entry( $versions_data['versions'], $active_version );
+		}
+
+		if ( is_array( $version_entry ) && isset( $version_entry['provider'], $version_entry['object_key'] ) && 'cloudflare_r2' === $version_entry['provider'] && '' !== trim( (string) $version_entry['object_key'] ) ) {
+			$presigned_url = $this->build_r2_presigned_get_url( (string) $version_entry['object_key'], 600 );
 			if ( ! is_wp_error( $presigned_url ) && is_string( $presigned_url ) && '' !== $presigned_url ) {
 				$this->redirect_to_contract_url( $presigned_url );
 			}
+		}
+
+		if ( is_array( $version_entry ) && isset( $version_entry['local_url'] ) && '' !== trim( (string) $version_entry['local_url'] ) ) {
+			$this->redirect_to_contract_url( (string) $version_entry['local_url'] );
 		}
 
 		$document_url = isset( $lease->document_url ) ? esc_url_raw( (string) $lease->document_url ) : '';
@@ -251,6 +382,37 @@ class Arriendo_Facil_Lease {
 	 */
 	private function get_contract_storage_option_name( $lease_id ) {
 		return 'af_lease_contract_storage_' . absint( $lease_id );
+	}
+
+	/**
+	 * Finds a version entry by version number.
+	 *
+	 * @param array $versions Version list.
+	 * @param int   $version  Version number.
+	 * @return array|null
+	 */
+	private function find_version_entry( $versions, $version ) {
+		if ( ! is_array( $versions ) || empty( $versions ) ) {
+			return null;
+		}
+
+		$version = absint( $version );
+		if ( $version < 1 ) {
+			$last = end( $versions );
+			return is_array( $last ) ? $last : null;
+		}
+
+		foreach ( $versions as $entry ) {
+			if ( ! is_array( $entry ) ) {
+				continue;
+			}
+
+			if ( isset( $entry['version'] ) && absint( $entry['version'] ) === $version ) {
+				return $entry;
+			}
+		}
+
+		return null;
 	}
 
 	/**

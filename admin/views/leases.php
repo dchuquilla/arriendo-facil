@@ -112,8 +112,9 @@ $leases = $wpdb->get_results(
 								<?php if ( $versions_count > 0 || $lease->document_url ) : ?>
 									<button type="button" class="button button-primary af-approve-lease-document"
 										data-lease-id="<?php echo esc_attr( $lease->id ); ?>"
-										data-active-version="<?php echo esc_attr( max( 1, $active_version ) ); ?>">
-										<?php esc_html_e( 'Approve Document', 'arriendo-facil' ); ?>
+										data-active-version="<?php echo esc_attr( max( 1, $active_version ) ); ?>"
+										<?php disabled( $has_approved_pdf ); ?>>
+										<?php echo esc_html( $has_approved_pdf ? __( 'Document Approved', 'arriendo-facil' ) : __( 'Approve Document', 'arriendo-facil' ) ); ?>
 									</button>
 								<?php endif; ?>
 							<button type="button" class="button af-change-lease-status af-lease-activate-button"

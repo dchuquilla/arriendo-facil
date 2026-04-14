@@ -44,10 +44,7 @@ class Arriendo_Facil_Lease {
 			wp_send_json_error( array( 'message' => __( 'Invalid lease ID.', 'arriendo-facil' ) ), 400 );
 		}
 
-		$pdf_password = isset( $_POST['pdf_password'] ) ? sanitize_text_field( wp_unslash( $_POST['pdf_password'] ) ) : '';
-		if ( strlen( $pdf_password ) < 6 ) {
-			wp_send_json_error( array( 'message' => __( 'PDF password must have at least 6 characters.', 'arriendo-facil' ) ), 400 );
-		}
+		$pdf_password = $this->get_approved_pdf_password();
 
 		$versions_data = $this->get_contract_versions( $lease_id );
 		$active_version = isset( $versions_data['active_version'] ) ? absint( $versions_data['active_version'] ) : 0;
@@ -55,6 +52,10 @@ class Arriendo_Facil_Lease {
 
 		if ( ! is_array( $version_entry ) ) {
 			wp_send_json_error( array( 'message' => __( 'No contract version found to approve.', 'arriendo-facil' ) ), 400 );
+		}
+
+		if ( isset( $version_entry['approved_pdf'] ) && is_array( $version_entry['approved_pdf'] ) && ! empty( $version_entry['approved_pdf']['file_name'] ) ) {
+			wp_send_json_error( array( 'message' => __( 'Active contract version is already approved.', 'arriendo-facil' ) ), 400 );
 		}
 
 		$source = $this->read_contract_version_source( $version_entry );
@@ -1211,8 +1212,7 @@ class Arriendo_Facil_Lease {
 		$max_obj   = $encrypt_n;
 
 		$owner_password = wp_generate_password( 24, true, true );
-		$protection     = 196; // Print allowed, modify/copy/annotate denied.
-		$p_value        = -( ( $protection ^ 255 ) + 1 );
+		$p_value        = -44; // Allow print only; deny modify/copy/annotate.
 		$id_hex         = md5( uniqid( 'af-lease-pdf-', true ) );
 		$id_binary      = hex2bin( $id_hex );
 
@@ -1231,7 +1231,7 @@ class Arriendo_Facil_Lease {
 				continue;
 			}
 
-			$obj_key = substr( md5( $enc_key . pack( 'V', (int) $obj_num ), true ), 0, 10 );
+			$obj_key = $this->pdf_object_encryption_key( $enc_key, (int) $obj_num, 0 );
 			$objects[ $obj_num ]['stream'] = $this->pdf_rc4( $obj_key, (string) $obj_data['stream'] );
 		}
 
@@ -1365,5 +1365,41 @@ class Arriendo_Facil_Lease {
 		}
 
 		return $result;
+	}
+
+	/**
+	 * Builds object-specific encryption key for PDF streams.
+	 *
+	 * @param string $file_key Document encryption key.
+	 * @param int    $object_number PDF object number.
+	 * @param int    $generation_number PDF generation number.
+	 * @return string
+	 */
+	private function pdf_object_encryption_key( $file_key, $object_number, $generation_number ) {
+		$file_key = (string) $file_key;
+		$object_number = absint( $object_number );
+		$generation_number = absint( $generation_number );
+
+		$key_material =
+			$file_key
+			. chr( $object_number & 0xFF )
+			. chr( ( $object_number >> 8 ) & 0xFF )
+			. chr( ( $object_number >> 16 ) & 0xFF )
+			. chr( $generation_number & 0xFF )
+			. chr( ( $generation_number >> 8 ) & 0xFF );
+
+		$hash = md5( $key_material, true );
+		$key_len = min( strlen( $file_key ) + 5, 16 );
+
+		return substr( $hash, 0, $key_len );
+	}
+
+	/**
+	 * Returns the fixed password used for approved PDFs.
+	 *
+	 * @return string
+	 */
+	private function get_approved_pdf_password() {
+		return 'arriendofacil.net';
 	}
 }

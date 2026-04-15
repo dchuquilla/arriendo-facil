@@ -16,6 +16,9 @@
 		var input = document.getElementById('af-chatbot-input');
 		var select = document.getElementById('af-chatbot-select');
 		var submit = document.getElementById('af-chatbot-submit');
+			var formControls = null;
+			var backButton = null;
+			var cancelButton = null;
 		var message = document.getElementById('af-chatbot-message');
 		var messages = document.getElementById('af-chatbot-messages');
 
@@ -31,20 +34,22 @@
 			collecting: false,
 			currentStep: 0,
 			values: {},
-			lastSubmitFailed: false
+				lastSubmitFailed: false,
+				isSubmitting: false,
+				activeRequestController: null
 		};
 
 		var menuOptions = [
-			{ key: 'rent', label: 'Arrendar una habitacion' },
+				{ key: 'rent', label: 'Quiero arrendar (soy inquilino)' },
 			{ key: 'availability', label: 'Consultar disponibilidad' },
-			{ key: 'advisor', label: 'Hablar con un asesor' }
+				{ key: 'advisor', label: 'Hablar con un asesor' }
 		];
 
 		var steps = [
 			{
 				key: 'name',
 				type: 'text',
-				question: 'Para comenzar, cual es tu nombre completo?',
+				question: 'Empecemos con tus datos como inquilino. Cual es tu nombre completo?',
 				placeholder: 'Ejemplo: Juan Perez',
 				validate: function (value) { return value.length >= 3; },
 				error: 'Escribe tu nombre completo.'
@@ -52,7 +57,7 @@
 			{
 				key: 'email',
 				type: 'text',
-				question: 'Cual es tu correo electronico?',
+				question: 'Cual es tu correo electronico para enviarte informacion del arriendo?',
 				placeholder: 'correo@dominio.com',
 				validate: function (value) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value); },
 				error: 'Ingresa un correo valido.'
@@ -60,7 +65,7 @@
 			{
 				key: 'phone',
 				type: 'text',
-				question: 'Cual es tu telefono? (solo numeros, 10 digitos)',
+				question: 'Cual es tu numero de celular en Ecuador? (10 digitos, sin espacios ni guiones)',
 				placeholder: '0991234567',
 				validate: function (value) { return /^[0-9]{10}$/.test(value); },
 				error: 'El telefono debe tener exactamente 10 digitos numericos.'
@@ -68,7 +73,7 @@
 			{
 				key: 'id_number',
 				type: 'text',
-				question: 'Cual es tu cedula? (solo numeros, 10 digitos)',
+				question: 'Ingresa tu numero de cedula (10 digitos, solo numeros).',
 				placeholder: '1723456789',
 				validate: function (value) { return /^[0-9]{10}$/.test(value); },
 				error: 'La cedula debe tener exactamente 10 digitos numericos.'
@@ -76,7 +81,7 @@
 			{
 				key: 'mascotas',
 				type: 'text',
-				question: 'Cuantas mascotas tienes? (0 a 10)',
+				question: 'Cuantas mascotas vivirian contigo en la propiedad? (0 a 10)',
 				placeholder: '0',
 				validate: function (value) {
 					var num = parseInt(value, 10);
@@ -87,23 +92,23 @@
 			{
 				key: 'referencia_personal_1',
 				type: 'text',
-				question: 'Comparte tu primera referencia personal.',
-				placeholder: 'Nombre de referencia 1',
-				validate: function (value) { return value.length >= 3; },
-				error: 'Ingresa una referencia valida.'
+				question: 'Primera referencia personal: escribe nombre y celular de alguien que pueda dar referencias tuyas.',
+				placeholder: 'Ejemplo: Ana Perez - 0991234567',
+				validate: function (value) { return value.length >= 8; },
+				error: 'Ingresa una referencia mas completa (nombre y contacto).'
 			},
 			{
 				key: 'referencia_personal_2',
 				type: 'text',
-				question: 'Ahora tu segunda referencia personal.',
-				placeholder: 'Nombre de referencia 2',
-				validate: function (value) { return value.length >= 3; },
-				error: 'Ingresa una segunda referencia valida.'
+				question: 'Segunda referencia personal: escribe nombre y celular de otra persona distinta.',
+				placeholder: 'Ejemplo: Carlos Ruiz - 0987654321',
+				validate: function (value) { return value.length >= 8; },
+				error: 'Ingresa la segunda referencia con nombre y contacto.'
 			},
 			{
 				key: 'personas_viviran',
 				type: 'text',
-				question: 'Cuantas personas viviran en la propiedad? (1 a 10)',
+				question: 'Contandote a ti, cuantas personas vivirian en la propiedad? (1 a 10)',
 				placeholder: '2',
 				validate: function (value) {
 					var num = parseInt(value, 10);
@@ -114,10 +119,10 @@
 			{
 				key: 'accommodation_id',
 				type: 'select',
-				question: 'Ahora selecciona la accommodation que te interesa.',
+				question: 'Selecciona la propiedad o habitacion que te interesa arrendar.',
 				shouldAsk: function () { return true; },
 				options: function () {
-					var opts = [{ value: '', label: 'Selecciona una accommodation' }];
+					var opts = [{ value: '', label: 'Selecciona una opcion' }];
 					accommodations.forEach(function (item) {
 						opts.push({ value: String(item.id), label: item.title });
 					});
@@ -135,13 +140,13 @@
 			{
 				key: 'rental_mode',
 				type: 'select',
-				question: 'Como quieres definir tu estadia?',
+				question: 'Como prefieres indicar el tiempo de arriendo?',
 				options: function () {
 					return [
-						{ value: '', label: 'Selecciona modalidad' },
-						{ value: 'dates', label: 'Desde una fecha hasta otra fecha' },
-						{ value: 'months', label: 'Por meses' },
-						{ value: 'years', label: 'Por anos' }
+						{ value: '', label: 'Selecciona una modalidad' },
+						{ value: 'dates', label: 'Por fechas exactas (inicio y fin)' },
+						{ value: 'months', label: 'Por cantidad de meses' },
+						{ value: 'years', label: 'Por cantidad de anos' }
 					];
 				},
 				validate: function (value) {
@@ -152,7 +157,7 @@
 			{
 				key: 'rental_start_date',
 				type: 'text',
-				question: 'Desde cuando quieres arrendar? (YYYY-MM-DD)',
+				question: 'Fecha de inicio del arriendo (formato YYYY-MM-DD).',
 				placeholder: '2026-04-01',
 				shouldAsk: function (values) { return values.rental_mode === 'dates'; },
 				validate: function (value) { return /^\d{4}-\d{2}-\d{2}$/.test(value); },
@@ -161,7 +166,7 @@
 			{
 				key: 'rental_end_date',
 				type: 'text',
-				question: 'Hasta cuando quieres arrendar? (YYYY-MM-DD)',
+				question: 'Fecha de fin del arriendo (formato YYYY-MM-DD).',
 				placeholder: '2026-10-01',
 				shouldAsk: function (values) { return values.rental_mode === 'dates'; },
 				validate: function (value, values) {
@@ -178,7 +183,7 @@
 			{
 				key: 'rental_months',
 				type: 'text',
-				question: 'Cuantos meses deseas arrendar?',
+				question: 'Cuantos meses quieres arrendar la propiedad?',
 				placeholder: '12',
 				shouldAsk: function (values) { return values.rental_mode === 'months'; },
 				validate: function (value) {
@@ -190,7 +195,7 @@
 			{
 				key: 'rental_years',
 				type: 'text',
-				question: 'Cuantos anos deseas arrendar?',
+				question: 'Cuantos anos quieres arrendar la propiedad?',
 				placeholder: '2',
 				shouldAsk: function (values) { return values.rental_mode === 'years'; },
 				validate: function (value) {
@@ -202,20 +207,34 @@
 			{
 				key: 'desired_price',
 				type: 'text',
-				question: 'Que precio propones? (cualquiera)',
-				placeholder: 'Ejemplo: 350 USD',
-				validate: function (value) { return value.length >= 1; },
-				error: 'Ingresa un precio.'
+				question: 'Cual es tu presupuesto mensual aproximado para el arriendo?',
+				placeholder: 'Ejemplo: 350 USD al mes',
+				validate: function (value) { return value.length >= 2; },
+				error: 'Ingresa un presupuesto aproximado.'
 			},
 			{
 				key: 'guarantee_text',
 				type: 'text',
-				question: 'Que garantia ofreces? (cualquiera)',
-				placeholder: 'Ejemplo: garantia de 2 meses',
-				validate: function (value) { return value.length >= 1; },
-				error: 'Ingresa una garantia.'
+				question: 'Como puedes garantizar el pago? (ejemplo: deposito, garante, rol de pagos, certificado laboral)',
+				placeholder: 'Ejemplo: Deposito de 2 meses + certificado laboral',
+				validate: function (value) { return value.length >= 5; },
+				error: 'Describe la garantia con un poco mas de detalle.'
 			}
 		];
+
+			function normalizeCommand(value) {
+				return String(value || '').toLowerCase().trim();
+			}
+
+			function isBackCommand(value) {
+				var command = normalizeCommand(value);
+				return command === 'volver' || command === 'atras' || command === 'regresar';
+			}
+
+			function isCancelCommand(value) {
+				var command = normalizeCommand(value);
+				return command === 'cancelar' || command === 'cancel' || command === 'salir' || command === 'reiniciar';
+			}
 
 		function scrollMessagesBottom() {
 			messages.scrollTop = messages.scrollHeight;
@@ -241,7 +260,47 @@
 			submit.textContent = disabled ? (afChatbot.sendingText || 'Enviando...') : (afChatbot.buttonText || 'Enviar');
 			input.disabled = disabled;
 			select.disabled = disabled;
+				if (backButton) {
+					backButton.disabled = disabled;
+				}
+				if (cancelButton) {
+					cancelButton.disabled = false;
+					cancelButton.textContent = state.isSubmitting ? 'Cancelar envio' : 'Cancelar';
+				}
 		}
+
+			function ensureFormControls() {
+				if (formControls) {
+					return;
+				}
+
+				formControls = document.createElement('div');
+				formControls.className = 'af-chatbot-form-controls';
+
+				backButton = document.createElement('button');
+				backButton.type = 'button';
+				backButton.id = 'af-chatbot-back';
+				backButton.className = 'af-chatbot-secondary';
+				backButton.textContent = 'Volver';
+
+				cancelButton = document.createElement('button');
+				cancelButton.type = 'button';
+				cancelButton.id = 'af-chatbot-cancel';
+				cancelButton.className = 'af-chatbot-secondary';
+				cancelButton.textContent = 'Cancelar';
+
+				formControls.appendChild(backButton);
+				formControls.appendChild(cancelButton);
+				form.insertAdjacentElement('afterend', formControls);
+
+				backButton.addEventListener('click', function () {
+					goToPreviousStep();
+				});
+
+				cancelButton.addEventListener('click', function () {
+					cancelCurrentOperation();
+				});
+			}
 
 		function showComposer(type) {
 			if ('select' === type) {
@@ -256,11 +315,14 @@
 		}
 
 		function showForm(visible) {
+				ensureFormControls();
 			if (visible) {
 				form.removeAttribute('hidden');
+					formControls.removeAttribute('hidden');
 				return;
 			}
 			form.setAttribute('hidden', 'hidden');
+				formControls.setAttribute('hidden', 'hidden');
 		}
 
 		function appendOptions() {
@@ -326,6 +388,8 @@
 
 			botReply(step.question, function () {
 				showComposer(step.type);
+					message.className = '';
+					message.textContent = 'Tip: escribe "volver" para regresar un paso o "cancelar" para reiniciar.';
 				if ('select' === step.type) {
 					fillSelectOptions(step.options(), step.defaultValue ? step.defaultValue() : '');
 				} else {
@@ -351,33 +415,151 @@
 			message.textContent = '';
 			message.className = '';
 			showForm(false);
-			botReply(afChatbot.welcomeText || 'Buenos dias, como podemos ayudarte?', function () {
-				appendOptions();
-			});
-		}
+				botReply(afChatbot.welcomeText || 'Hola, soy el asistente de Arriendo Facil. Te ayudo a registrar tu solicitud de arriendo.', function () {
+					botReply('Este chatbot es solo para personas que quieren arrendar (inquilinos).', function () {
+						appendOptions();
+					});
+				});
+			}
 
-		function handleMenuOption(key, label) {
-			appendBubble(label, 'user');
-			if ('rent' === key) {
-				state.collecting = true;
+			function resetCollectionState() {
+				state.collecting = false;
 				state.currentStep = 0;
 				state.values = {};
-				showForm(true);
-				askCurrentStep();
-				return;
+				state.lastSubmitFailed = false;
+				state.isSubmitting = false;
+				state.activeRequestController = null;
+				if (currentAccommodationId > 0) {
+					state.values.accommodation_id = String(currentAccommodationId);
+				}
 			}
-			if ('availability' === key) {
-				botReply('Te ayudamos con la disponibilidad. Puedes contarme ciudad, zona o fecha, o elegir Arrendar una habitacion para registrar tus datos.', function () {
+
+			function cancelCurrentOperation() {
+				if (state.isSubmitting && state.activeRequestController) {
+					state.activeRequestController.abort();
+				}
+
+				resetCollectionState();
+				setFormDisabled(false);
+				showForm(false);
+				message.className = '';
+				message.textContent = '';
+				botReply('Operacion cancelada. Cuando quieras, puedes iniciar nuevamente.', function () {
 					appendOptions();
 				});
-				return;
 			}
-			botReply('Un asesor te contactara pronto. Si deseas, tambien puedes elegir Arrendar una habitacion para adelantar tu registro.', function () {
+
+			function clearDependentValues(stepKey) {
+				if ('rental_mode' !== stepKey) {
+					return;
+				}
+				delete state.values.rental_start_date;
+				delete state.values.rental_end_date;
+				delete state.values.rental_months;
+				delete state.values.rental_years;
+			}
+
+			function goToPreviousStep() {
+				if (!state.collecting || state.isSubmitting) {
+					botReply('No puedo regresar mientras se esta enviando. Usa "Cancelar envio" si deseas detenerlo.');
+					return;
+				}
+
+				var fromIndex = state.currentStep;
+				if (!getCurrentStep()) {
+					fromIndex = steps.length;
+				}
+
+				var index = fromIndex - 1;
+				while (index >= 0) {
+					var candidate = steps[index];
+					var wasAsked = !candidate.shouldAsk || candidate.shouldAsk(state.values);
+					if (wasAsked && typeof state.values[candidate.key] !== 'undefined') {
+						break;
+					}
+					index -= 1;
+				}
+
+				if (index < 0) {
+					botReply('Estas en la primera pregunta. Si quieres, usa "Cancelar" para reiniciar.');
+					return;
+				}
+
+				clearDependentValues(steps[index].key);
+				delete state.values[steps[index].key];
+				state.currentStep = index;
+				botReply('Listo, regresamos un paso.');
+				askCurrentStep();
+			}
+
+			function findFirstInvalidStep() {
+				for (var i = 0; i < steps.length; i += 1) {
+					var step = steps[i];
+					if (step.shouldAsk && !step.shouldAsk(state.values)) {
+						continue;
+					}
+
+					var value = state.values[step.key] || '';
+					if (!step.validate(value, state.values)) {
+						return { index: i, error: step.error };
+					}
+				}
+
+				return null;
+			}
+
+			function handleInlineCommands(rawValue) {
+				if (isCancelCommand(rawValue)) {
+					appendBubble(rawValue, 'user');
+					cancelCurrentOperation();
+					return true;
+				}
+
+				if (isBackCommand(rawValue)) {
+					appendBubble(rawValue, 'user');
+					goToPreviousStep();
+					return true;
+				}
+
+				return false;
+			}
+
+			function handleMenuOption(key, label) {
+				appendBubble(label, 'user');
+				if ('rent' === key) {
+					state.collecting = true;
+					state.currentStep = 0;
+					state.values = {};
+					if (currentAccommodationId > 0) {
+						state.values.accommodation_id = String(currentAccommodationId);
+					}
+					showForm(true);
+					botReply('Perfecto. Vamos paso a paso. Si te equivocas, puedes usar "Volver" o escribir "cancelar" para reiniciar.');
+					askCurrentStep();
+					return;
+				}
+				if ('availability' === key) {
+					botReply('Te ayudo con disponibilidad. Si quieres registrar una solicitud completa de arriendo, elige "Quiero arrendar (soy inquilino)".', function () {
+						appendOptions();
+					});
+					return;
+				}
+				botReply('Un asesor te contactara pronto. Si deseas, tambien puedes elegir "Quiero arrendar (soy inquilino)" para adelantar tu registro.', function () {
 				appendOptions();
 			});
 		}
 
 		function submitConversation() {
+				var validationError = findFirstInvalidStep();
+				if (validationError) {
+					state.currentStep = validationError.index;
+					message.className = 'af-chatbot-error';
+					message.textContent = validationError.error;
+					botReply('Hay un dato pendiente o invalido. Regresaremos a esa pregunta para corregirlo.');
+					askCurrentStep();
+					return;
+				}
+
 			var data = new FormData();
 			data.append('action', 'af_create_guest_frontend');
 			data.append('nonce', afChatbot.nonce);
@@ -398,6 +580,8 @@
 			data.append('desired_price', state.values.desired_price || '');
 			data.append('guarantee_text', state.values.guarantee_text || '');
 
+				state.isSubmitting = true;
+				state.activeRequestController = new AbortController();
 			setFormDisabled(true);
 			state.lastSubmitFailed = false;
 			botReply(afChatbot.doneText || 'Perfecto, ya tengo tus datos. Estoy registrando tu solicitud...');
@@ -405,10 +589,13 @@
 			fetch(afChatbot.ajaxUrl, {
 				method: 'POST',
 				body: data,
-				credentials: 'same-origin'
+					credentials: 'same-origin',
+					signal: state.activeRequestController.signal
 			})
 				.then(function (response) {
-					return response.json();
+						return response.json().catch(function () {
+							return null;
+						});
 				})
 				.then(function (payload) {
 					if (payload && payload.success) {
@@ -418,11 +605,8 @@
 						if (payload.data && payload.data.contract && payload.data.contract.generated && payload.data.contract.document_url) {
 							appendBubble('Contrato generado automaticamente.', 'bot');
 						}
-						state.started = false;
-						state.collecting = false;
-						state.currentStep = 0;
-						state.values = {};
-						state.lastSubmitFailed = false;
+							state.started = false;
+							resetCollectionState();
 						showForm(false);
 						return;
 					}
@@ -430,16 +614,24 @@
 					message.className = 'af-chatbot-error';
 					message.textContent = (payload && payload.data && payload.data.message) || afChatbot.errorText;
 					appendBubble(message.textContent, 'bot');
-					appendBubble('Puedes intentar de nuevo con Enviar, o cerrar y abrir el chat para reiniciar.', 'bot');
+						appendBubble('Puedes corregir datos con "Volver", reintentar con Enviar o escribir "cancelar" para reiniciar.', 'bot');
 				})
-				.catch(function () {
+					.catch(function (error) {
+						if (error && error.name === 'AbortError') {
+							message.className = '';
+							message.textContent = '';
+							appendBubble('Envio cancelado por ti. Puedes continuar corrigiendo datos o reiniciar.', 'bot');
+							return;
+						}
 					state.lastSubmitFailed = true;
 					message.className = 'af-chatbot-error';
 					message.textContent = afChatbot.errorText || 'No se pudo enviar el registro.';
 					appendBubble(message.textContent, 'bot');
-					appendBubble('Error de conexion. Puedes reintentar con Enviar en este mismo chat.', 'bot');
+						appendBubble('Error de conexion. Puedes reintentar con Enviar, volver un paso o cancelar.', 'bot');
 				})
 				.finally(function () {
+						state.isSubmitting = false;
+						state.activeRequestController = null;
 					setFormDisabled(false);
 				});
 		}
@@ -462,6 +654,10 @@
 				startConversation();
 				return;
 			}
+				if (state.isSubmitting) {
+					botReply('Tu solicitud se esta enviando. Puedes usar "Cancelar envio" si deseas detenerla.');
+					return;
+				}
 			if (!state.collecting) {
 				botReply('Elige una opcion para continuar.', function () {
 					appendOptions();
@@ -474,6 +670,12 @@
 				return;
 			}
 			var value = getStepValue(step);
+				if (handleInlineCommands(value)) {
+					if ('select' !== step.type) {
+						input.value = '';
+					}
+					return;
+				}
 			if (!step.validate(value, state.values)) {
 				message.className = 'af-chatbot-error';
 				message.textContent = step.error;
@@ -483,6 +685,7 @@
 			message.textContent = '';
 			message.className = '';
 			state.values[step.key] = value;
+				clearDependentValues(step.key);
 			state.lastSubmitFailed = false;
 			appendBubble(getStepLabel(step, value), 'user');
 			state.currentStep += 1;

@@ -546,7 +546,7 @@ class Arriendo_Facil_Guest {
 		}
 
 		if ( '' === $document_url && '' !== $generated_contract_text ) {
-			$generated_file_url = $this->create_generated_contract_file( $lease_id, $generated_contract_text );
+			$generated_file_url = $this->create_generated_contract_file( $lease_id, $generated_contract_text, $ai_payload );
 			if ( $generated_file_url ) {
 				$document_url = $generated_file_url;
 			}
@@ -607,6 +607,8 @@ class Arriendo_Facil_Guest {
 		$owner_id        = isset( $payload['owner_id_number'] ) ? sanitize_text_field( (string) $payload['owner_id_number'] ) : '________________________';
 		$guest_name      = isset( $payload['guest_name'] ) ? sanitize_text_field( (string) $payload['guest_name'] ) : '________________________';
 		$guest_id        = isset( $payload['guest_id_number'] ) ? sanitize_text_field( (string) $payload['guest_id_number'] ) : '________________________';
+		$guest_phone     = isset( $payload['guest_phone'] ) ? sanitize_text_field( (string) $payload['guest_phone'] ) : '________________________';
+		$guest_email     = isset( $payload['guest_email'] ) ? sanitize_email( (string) $payload['guest_email'] ) : '________________________';
 		$property        = isset( $payload['accommodation_title'] ) ? sanitize_text_field( (string) $payload['accommodation_title'] ) : '________________________';
 		$address         = isset( $payload['accommodation_address'] ) ? sanitize_text_field( (string) $payload['accommodation_address'] ) : '________________________';
 		$start_date      = isset( $payload['start_date'] ) ? sanitize_text_field( (string) $payload['start_date'] ) : '________________________';
@@ -614,6 +616,10 @@ class Arriendo_Facil_Guest {
 		$monthly_rent    = isset( $payload['monthly_rent'] ) ? number_format( (float) $payload['monthly_rent'], 2, '.', '' ) : '0.00';
 		$desired_price   = isset( $payload['desired_price'] ) ? sanitize_text_field( (string) $payload['desired_price'] ) : '';
 		$guarantee_text  = isset( $payload['guarantee_text'] ) ? sanitize_text_field( (string) $payload['guarantee_text'] ) : 'Garantia equivalente a _____ meses de canon.';
+		$mascotas        = isset( $payload['mascotas'] ) ? absint( $payload['mascotas'] ) : 0;
+		$personas        = isset( $payload['personas_viviran'] ) ? absint( $payload['personas_viviran'] ) : 0;
+		$reference_1     = isset( $payload['referencia_personal_1'] ) ? sanitize_text_field( (string) $payload['referencia_personal_1'] ) : '________________________';
+		$reference_2     = isset( $payload['referencia_personal_2'] ) ? sanitize_text_field( (string) $payload['referencia_personal_2'] ) : '________________________';
 
 		if ( '' !== trim( $desired_price ) ) {
 			$monthly_rent = $desired_price;
@@ -649,10 +655,13 @@ class Arriendo_Facil_Guest {
 		$contract .= "\n";
 		$contract .= "CLAUSULA OCTAVA - JURISDICCION Y LEY APLICABLE\n";
 		$contract .= "Para todos los efectos legales, las partes se someten a la jurisdiccion de los jueces competentes del Ecuador y a la Ley de Inquilinato y normas conexas vigentes.\n";
+		$contract .= "\n";
+		$contract .= "CLAUSULA NOVENA - DATOS DECLARADOS POR EL ARRENDATARIO\n";
+		$contract .= "Celular del arrendatario: " . $guest_phone . ". Correo electronico: " . $guest_email . ". Numero de personas que habitaran el inmueble: " . $personas . ". Numero de mascotas declaradas: " . $mascotas . ". Referencia personal 1: " . $reference_1 . ". Referencia personal 2: " . $reference_2 . ".\n";
 
 		if ( '' !== $extra_clauses ) {
 			$contract .= "\n";
-			$contract .= "CLAUSULA NOVENA - DISPOSICIONES ADICIONALES\n";
+			$contract .= "CLAUSULA DECIMA - DISPOSICIONES ADICIONALES\n";
 			$contract .= $extra_clauses . "\n";
 		}
 
@@ -834,9 +843,10 @@ class Arriendo_Facil_Guest {
 	 *
 	 * @param int    $lease_id Lease ID.
 	 * @param string $contract_text Contract body.
+	 * @param array  $payload Lease and guest context used for formatting.
 	 * @return string
 	 */
-	private function create_generated_contract_file( $lease_id, $contract_text ) {
+	private function create_generated_contract_file( $lease_id, $contract_text, array $payload = array() ) {
 		$lease_id = absint( $lease_id );
 		if ( ! $lease_id || '' === trim( $contract_text ) ) {
 			return '';
@@ -855,7 +865,7 @@ class Arriendo_Facil_Guest {
 		$file_name = sprintf( 'lease-%d-contract-%s.docx', $lease_id, gmdate( 'Ymd-His' ) );
 		$file_path = trailingslashit( $contracts_dir ) . $file_name;
 
-		if ( ! $this->write_contract_docx_file( $file_path, $contract_text ) ) {
+		if ( ! $this->write_contract_docx_file( $file_path, $contract_text, $payload ) ) {
 			return '';
 		}
 
@@ -915,9 +925,10 @@ class Arriendo_Facil_Guest {
 	 *
 	 * @param string $file_path Destination file path.
 	 * @param string $contract_text Contract text.
+	 * @param array  $payload Lease and guest context for visual formatting.
 	 * @return bool
 	 */
-	private function write_contract_docx_file( $file_path, $contract_text ) {
+	private function write_contract_docx_file( $file_path, $contract_text, array $payload = array() ) {
 		if ( ! class_exists( 'ZipArchive' ) ) {
 			return false;
 		}
@@ -927,36 +938,66 @@ class Arriendo_Facil_Guest {
 			return false;
 		}
 
-		$escaped_lines = array();
-		$lines         = preg_split( '/\r\n|\r|\n/', (string) $contract_text );
-		if ( ! is_array( $lines ) ) {
-			$lines = array( (string) $contract_text );
+		$paragraphs = $this->build_contract_docx_paragraphs( $contract_text, $payload );
+		if ( empty( $paragraphs ) ) {
+			$paragraphs = array(
+				array(
+					'text'  => 'Contrato',
+					'bold'  => false,
+					'align' => 'left',
+				),
+			);
 		}
 
-		foreach ( $lines as $line ) {
-			$line = trim( (string) $line );
-			if ( '' === $line ) {
-				$escaped_lines[] = '<w:p/>';
+		$doc_paragraphs_xml = '';
+		foreach ( $paragraphs as $paragraph ) {
+			$text  = isset( $paragraph['text'] ) ? (string) $paragraph['text'] : '';
+			$bold  = ! empty( $paragraph['bold'] );
+			$align = isset( $paragraph['align'] ) ? (string) $paragraph['align'] : 'left';
+
+			if ( '' === $text ) {
+				$doc_paragraphs_xml .= '<w:p/>';
 				continue;
 			}
 
-			$escaped_lines[] = '<w:p><w:r><w:t xml:space="preserve">' . esc_xml( $line ) . '</w:t></w:r></w:p>';
-		}
+			$paragraph_properties = '';
+			if ( in_array( $align, array( 'left', 'center', 'right', 'both' ), true ) ) {
+				$paragraph_properties .= '<w:jc w:val="' . esc_attr( $align ) . '"/>';
+			}
 
-		if ( empty( $escaped_lines ) ) {
-			$escaped_lines[] = '<w:p><w:r><w:t xml:space="preserve">Contrato</w:t></w:r></w:p>';
+			$run_properties = '';
+			if ( $bold ) {
+				$run_properties = '<w:rPr><w:b/><w:bCs/></w:rPr>';
+			}
+
+			$doc_paragraphs_xml .= '<w:p>';
+			if ( '' !== $paragraph_properties ) {
+				$doc_paragraphs_xml .= '<w:pPr>' . $paragraph_properties . '</w:pPr>';
+			}
+			$doc_paragraphs_xml .= '<w:r>' . $run_properties . '<w:t xml:space="preserve">' . esc_xml( $text ) . '</w:t></w:r>';
+			$doc_paragraphs_xml .= '</w:p>';
 		}
 
 		$document_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
 			. '<w:document xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:wp14="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:w10="urn:schemas-microsoft-com:office:word" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml" xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup" xmlns:wpi="http://schemas.microsoft.com/office/word/2010/wordprocessingInk" xmlns:wne="http://schemas.microsoft.com/office/word/2006/wordml" xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" mc:Ignorable="w14 w15 wp14">'
-			. '<w:body>' . implode( '', $escaped_lines ) . '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr></w:body></w:document>';
+			. '<w:body>' . $doc_paragraphs_xml . '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/><w:cols w:space="720"/></w:sectPr></w:body></w:document>';
 
 		$content_types_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
 			. '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
 			. '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
 			. '<Default Extension="xml" ContentType="application/xml"/>'
+			. '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>'
 			. '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
 			. '</Types>';
+
+		$styles_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+			. '<w:styles xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" mc:Ignorable="">'
+			. '<w:docDefaults>'
+			. '<w:rPrDefault><w:rPr><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr></w:rPrDefault>'
+			. '<w:pPrDefault><w:pPr><w:spacing w:after="160" w:line="278" w:lineRule="auto"/></w:pPr></w:pPrDefault>'
+			. '</w:docDefaults>'
+			. '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>'
+			. '</w:styles>';
 
 		$rels_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
 			. '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
@@ -964,14 +1005,153 @@ class Arriendo_Facil_Guest {
 			. '</Relationships>';
 
 		$doc_rels_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-			. '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>';
+			. '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+			. '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
+			. '</Relationships>';
 
 		$zip->addFromString( '[Content_Types].xml', $content_types_xml );
 		$zip->addFromString( '_rels/.rels', $rels_xml );
 		$zip->addFromString( 'word/document.xml', $document_xml );
+		$zip->addFromString( 'word/styles.xml', $styles_xml );
 		$zip->addFromString( 'word/_rels/document.xml.rels', $doc_rels_xml );
 
 		return $zip->close();
+	}
+
+	/**
+	 * Builds DOCX paragraphs with formatting close to contract reference.
+	 *
+	 * @param string $contract_text Contract text.
+	 * @param array  $payload Lease and guest context.
+	 * @return array<int,array<string,mixed>>
+	 */
+	private function build_contract_docx_paragraphs( $contract_text, array $payload = array() ) {
+		$paragraphs = array();
+		$lines      = preg_split( '/\r\n|\r|\n/', (string) $contract_text );
+
+		if ( ! is_array( $lines ) ) {
+			$lines = array( (string) $contract_text );
+		}
+
+		$has_title = false;
+		$has_date  = false;
+
+		foreach ( $lines as $raw_line ) {
+			$line = trim( (string) $raw_line );
+
+			if ( '' === $line ) {
+				$paragraphs[] = array(
+					'text'  => '',
+					'bold'  => false,
+					'align' => 'left',
+				);
+				continue;
+			}
+
+			$upper_line = strtoupper( $line );
+			$is_title   = false !== strpos( $upper_line, 'CONTRATO DE ARRENDAMIENTO' );
+			$is_clause  = 0 === strpos( $upper_line, 'CLAUSULA ' );
+			$is_sign    = in_array( $upper_line, array( 'ARRENDADOR', 'ARRENDATARIO', 'FIRMAS' ), true );
+
+			if ( ! $has_title && $is_title ) {
+				$paragraphs[] = array(
+					'text'  => 'CONTRATO DE ARRENDAMIENTO',
+					'bold'  => true,
+					'align' => 'center',
+				);
+				$has_title = true;
+				continue;
+			}
+
+			if ( ! $has_date && 0 === strpos( $line, 'Quito,' ) ) {
+				$paragraphs[] = array(
+					'text'  => $this->format_contract_date_line( $line ),
+					'bold'  => false,
+					'align' => 'right',
+				);
+				$has_date = true;
+				continue;
+			}
+
+			$paragraphs[] = array(
+				'text'  => $line,
+				'bold'  => $is_clause || $is_sign,
+				'align' => 'left',
+			);
+		}
+
+		if ( ! $has_title ) {
+			array_unshift(
+				$paragraphs,
+				array(
+					'text'  => 'CONTRATO DE ARRENDAMIENTO',
+					'bold'  => true,
+					'align' => 'center',
+				),
+				array(
+					'text'  => $this->format_contract_date_line( '' ),
+					'bold'  => false,
+					'align' => 'right',
+				),
+				array(
+					'text'  => '',
+					'bold'  => false,
+					'align' => 'left',
+				)
+			);
+		} elseif ( ! $has_date ) {
+			array_splice(
+				$paragraphs,
+				1,
+				0,
+				array(
+					array(
+						'text'  => $this->format_contract_date_line( '' ),
+						'bold'  => false,
+						'align' => 'right',
+					),
+					array(
+						'text'  => '',
+						'bold'  => false,
+						'align' => 'left',
+					),
+				)
+			);
+		}
+
+		return $paragraphs;
+	}
+
+	/**
+	 * Formats contract date line as "Quito, d de mes, Y".
+	 *
+	 * @param string $line Raw date line.
+	 * @return string
+	 */
+	private function format_contract_date_line( $line ) {
+		$timestamp = current_time( 'timestamp' );
+
+		$months = array(
+			1  => 'enero',
+			2  => 'febrero',
+			3  => 'marzo',
+			4  => 'abril',
+			5  => 'mayo',
+			6  => 'junio',
+			7  => 'julio',
+			8  => 'agosto',
+			9  => 'septiembre',
+			10 => 'octubre',
+			11 => 'noviembre',
+			12 => 'diciembre',
+		);
+
+		$day        = (int) gmdate( 'j', $timestamp );
+		$month_idx  = (int) gmdate( 'n', $timestamp );
+		$year       = (string) gmdate( 'Y', $timestamp );
+		$month_name = isset( $months[ $month_idx ] ) ? $months[ $month_idx ] : gmdate( 'F', $timestamp );
+
+		return sprintf( 'Quito, %d de %s, %s', $day, $month_name, $year );
 	}
 
 	/**

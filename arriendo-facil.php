@@ -163,8 +163,8 @@ function arriendo_facil_enqueue_chatbot_assets() {
 			'errorText'     => __( 'No se pudo enviar el registro. Intenta nuevamente.', 'arriendo-facil' ),
 			'sendingText'   => __( 'Enviando...', 'arriendo-facil' ),
 			'buttonText'    => __( 'Enviar', 'arriendo-facil' ),
-			'welcomeText'   => __( 'Buenos dias, como podemos ayudarte?', 'arriendo-facil' ),
-			'doneText'      => __( 'Perfecto, ya tengo tus datos. Estoy registrando tu solicitud...', 'arriendo-facil' ),
+			'welcomeText'   => __( 'Hola, soy el asistente de Arriendo Facil. Te ayudo a registrar tu solicitud de arriendo.', 'arriendo-facil' ),
+			'doneText'      => __( 'Perfecto, ya tengo tus datos. Estoy enviando tu solicitud de arriendo...', 'arriendo-facil' ),
 			'accommodations' => $accommodations,
 			'currentAccommodationId' => $current_accommodation_id,
 		)

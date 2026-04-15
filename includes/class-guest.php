@@ -60,13 +60,13 @@ class Arriendo_Facil_Guest {
 		}
 
 		if ( ! $accommodation_id || 'accommodation' !== get_post_type( $accommodation_id ) ) {
-			wp_send_json_error( array( 'message' => __( 'Debes seleccionar una accommodation valida.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'Debes seleccionar una propiedad o habitacion valida.', 'arriendo-facil' ) ) );
 		}
 
 		// Allow registration for any accommodation status; operational review is handled later.
 
 		if ( ! in_array( $rental_mode, array( 'dates', 'months', 'years' ), true ) ) {
-			wp_send_json_error( array( 'message' => __( 'Debes indicar modalidad de arriendo valida.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'Debes indicar una modalidad de arriendo valida.', 'arriendo-facil' ) ) );
 		}
 
 		if ( 'dates' === $rental_mode ) {
@@ -90,11 +90,11 @@ class Arriendo_Facil_Guest {
 		}
 
 		if ( '' === $desired_price || '' === $guarantee_text ) {
-			wp_send_json_error( array( 'message' => __( 'Debes ingresar precio y garantia.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'Debes ingresar tu presupuesto y como garantizas el pago.', 'arriendo-facil' ) ) );
 		}
 
 		if ( ! $referencia_personal_1 || ! $referencia_personal_2 ) {
-			wp_send_json_error( array( 'message' => __( 'Debes ingresar dos referencias personales.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'Debes ingresar dos referencias personales con nombre y contacto.', 'arriendo-facil' ) ) );
 		}
 
 		if ( ! is_email( $email ) ) {
@@ -180,7 +180,7 @@ class Arriendo_Facil_Guest {
 			);
 		}
 
-		wp_send_json_error( array( 'message' => __( 'No se pudo crear el invitado.', 'arriendo-facil' ) ) );
+		wp_send_json_error( array( 'message' => __( 'No se pudo registrar tu solicitud de arriendo.', 'arriendo-facil' ) ) );
 	}
 
 	/**

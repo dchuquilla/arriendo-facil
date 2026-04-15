@@ -213,6 +213,10 @@
 	color: #b91c1c;
 }
 
+.af-chatbot-hint {
+	color: #334155;
+}
+
 @media (max-width: 640px) {
 	#af-chatbot-widget {
 		right: 12px;

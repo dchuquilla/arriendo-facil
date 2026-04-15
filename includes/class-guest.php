@@ -47,8 +47,20 @@ class Arriendo_Facil_Guest {
 		$desired_price     = isset( $_POST['desired_price'] ) ? sanitize_text_field( wp_unslash( $_POST['desired_price'] ) ) : '';
 		$guarantee_text    = isset( $_POST['guarantee_text'] ) ? sanitize_text_field( wp_unslash( $_POST['guarantee_text'] ) ) : '';
 		$mascotas   = isset( $_POST['mascotas'] ) ? absint( wp_unslash( $_POST['mascotas'] ) ) : 0;
-		$referencia_personal_1 = isset( $_POST['referencia_personal_1'] ) ? sanitize_text_field( wp_unslash( $_POST['referencia_personal_1'] ) ) : '';
-		$referencia_personal_2 = isset( $_POST['referencia_personal_2'] ) ? sanitize_text_field( wp_unslash( $_POST['referencia_personal_2'] ) ) : '';
+		$reference_1_name  = isset( $_POST['reference_1_name'] ) ? $this->normalize_reference_name( wp_unslash( $_POST['reference_1_name'] ) ) : '';
+		$reference_1_phone = isset( $_POST['reference_1_phone'] ) ? $this->normalize_reference_phone( wp_unslash( $_POST['reference_1_phone'] ) ) : '';
+		$reference_2_name  = isset( $_POST['reference_2_name'] ) ? $this->normalize_reference_name( wp_unslash( $_POST['reference_2_name'] ) ) : '';
+		$reference_2_phone = isset( $_POST['reference_2_phone'] ) ? $this->normalize_reference_phone( wp_unslash( $_POST['reference_2_phone'] ) ) : '';
+		$referencia_personal_1 = $this->build_reference_entry( $reference_1_name, $reference_1_phone );
+		$referencia_personal_2 = $this->build_reference_entry( $reference_2_name, $reference_2_phone );
+
+		if ( '' === $referencia_personal_1 ) {
+			$referencia_personal_1 = isset( $_POST['referencia_personal_1'] ) ? sanitize_text_field( wp_unslash( $_POST['referencia_personal_1'] ) ) : '';
+		}
+
+		if ( '' === $referencia_personal_2 ) {
+			$referencia_personal_2 = isset( $_POST['referencia_personal_2'] ) ? sanitize_text_field( wp_unslash( $_POST['referencia_personal_2'] ) ) : '';
+		}
 		$personas_viviran      = isset( $_POST['personas_viviran'] ) ? absint( wp_unslash( $_POST['personas_viviran'] ) ) : 0;
 
 		$name_parts = preg_split( '/\s+/', trim( $name ) );
@@ -95,6 +107,10 @@ class Arriendo_Facil_Guest {
 
 		if ( ! $referencia_personal_1 || ! $referencia_personal_2 ) {
 			wp_send_json_error( array( 'message' => __( 'Debes ingresar dos referencias personales con nombre y contacto.', 'arriendo-facil' ) ) );
+		}
+
+		if ( ! $this->is_valid_reference_entry( $referencia_personal_1 ) || ! $this->is_valid_reference_entry( $referencia_personal_2 ) ) {
+			wp_send_json_error( array( 'message' => __( 'Cada referencia debe incluir nombre y celular de 10 digitos (ejemplo: Ana Perez - 0991234567).', 'arriendo-facil' ) ) );
 		}
 
 		if ( ! is_email( $email ) ) {
@@ -181,6 +197,73 @@ class Arriendo_Facil_Guest {
 		}
 
 		wp_send_json_error( array( 'message' => __( 'No se pudo registrar tu solicitud de arriendo.', 'arriendo-facil' ) ) );
+	}
+
+	/**
+	 * Normalizes reference name.
+	 *
+	 * @param string $name Raw reference name.
+	 * @return string
+	 */
+	private function normalize_reference_name( $name ) {
+		$name = sanitize_text_field( (string) $name );
+		$name = preg_replace( '/\s+/', ' ', trim( $name ) );
+
+		return is_string( $name ) ? $name : '';
+	}
+
+	/**
+	 * Normalizes reference phone by keeping digits only.
+	 *
+	 * @param string $phone Raw reference phone.
+	 * @return string
+	 */
+	private function normalize_reference_phone( $phone ) {
+		$phone = preg_replace( '/\D+/', '', (string) $phone );
+
+		return is_string( $phone ) ? $phone : '';
+	}
+
+	/**
+	 * Builds storage text for a reference entry.
+	 *
+	 * @param string $name Reference name.
+	 * @param string $phone Reference phone.
+	 * @return string
+	 */
+	private function build_reference_entry( $name, $phone ) {
+		$name  = $this->normalize_reference_name( $name );
+		$phone = $this->normalize_reference_phone( $phone );
+
+		if ( '' === $name || '' === $phone ) {
+			return '';
+		}
+
+		return $name . ' - ' . $phone;
+	}
+
+	/**
+	 * Validates reference storage format.
+	 *
+	 * @param string $reference Stored reference text.
+	 * @return bool
+	 */
+	private function is_valid_reference_entry( $reference ) {
+		$reference = sanitize_text_field( (string) $reference );
+		$parts     = preg_split( '/\s*-\s*/', $reference, 2 );
+
+		if ( ! is_array( $parts ) || count( $parts ) < 2 ) {
+			return false;
+		}
+
+		$name  = $this->normalize_reference_name( $parts[0] );
+		$phone = $this->normalize_reference_phone( $parts[1] );
+
+		if ( strlen( $name ) < 3 || strlen( $name ) > 80 ) {
+			return false;
+		}
+
+		return 1 === preg_match( '/^0[0-9]{9}$/', $phone );
 	}
 
 	/**

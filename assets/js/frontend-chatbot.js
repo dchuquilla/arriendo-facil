@@ -90,20 +90,56 @@
 				error: 'Mascotas debe estar entre 0 y 10.'
 			},
 			{
-				key: 'referencia_personal_1',
+				key: 'reference_1_name',
 				type: 'text',
-				question: 'Primera referencia personal: escribe nombre y celular de alguien que pueda dar referencias tuyas.',
-				placeholder: 'Ejemplo: Ana Perez - 0991234567',
-				validate: function (value) { return value.length >= 8; },
-				error: 'Ingresa una referencia mas completa (nombre y contacto).'
+				question: 'Primera referencia personal: escribe solo el nombre completo.',
+				placeholder: 'Ejemplo: Ana Perez',
+				helperText: 'Esta referencia debe ser una persona que pueda confirmar tu perfil como inquilino.',
+				validate: function (value) {
+					return /^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'.,\-\s]{2,79}$/.test(value);
+				},
+				error: 'Ingresa un nombre valido (solo letras y minimo 3 caracteres).'
 			},
 			{
-				key: 'referencia_personal_2',
+				key: 'reference_1_phone',
 				type: 'text',
-				question: 'Segunda referencia personal: escribe nombre y celular de otra persona distinta.',
-				placeholder: 'Ejemplo: Carlos Ruiz - 0987654321',
-				validate: function (value) { return value.length >= 8; },
-				error: 'Ingresa la segunda referencia con nombre y contacto.'
+				question: 'Ahora escribe el celular de esa primera referencia.',
+				placeholder: 'Ejemplo: 0991234567',
+				helperText: 'Acepta formatos como: 0991234567, 099 123 4567 o 099-123-4567. Siempre deben ser 10 digitos.',
+				validate: function (value) {
+					var digits = normalizePhoneDigits(value);
+					return /^0[0-9]{9}$/.test(digits);
+				},
+				error: 'El celular de la referencia debe tener 10 digitos y empezar con 0.'
+			},
+			{
+				key: 'reference_2_name',
+				type: 'text',
+				question: 'Segunda referencia personal: escribe solo el nombre completo.',
+				placeholder: 'Ejemplo: Carlos Ruiz',
+				helperText: 'Debe ser una persona distinta a la referencia anterior.',
+				validate: function (value, values) {
+					if (!/^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'.,\-\s]{2,79}$/.test(value)) {
+						return false;
+					}
+					return normalizeText(value) !== normalizeText(values.reference_1_name || '');
+				},
+				error: 'Ingresa un nombre valido y diferente al de la primera referencia.'
+			},
+			{
+				key: 'reference_2_phone',
+				type: 'text',
+				question: 'Ahora escribe el celular de la segunda referencia.',
+				placeholder: 'Ejemplo: 0987654321',
+				helperText: 'Puedes escribirlo con espacios o guiones; el sistema limpia el formato.',
+				validate: function (value, values) {
+					var digits = normalizePhoneDigits(value);
+					if (!/^0[0-9]{9}$/.test(digits)) {
+						return false;
+					}
+					return digits !== normalizePhoneDigits(values.reference_1_phone || '');
+				},
+				error: 'El celular debe tener 10 digitos y ser distinto al de la primera referencia.'
 			},
 			{
 				key: 'personas_viviran',
@@ -221,6 +257,14 @@
 				error: 'Describe la garantia con un poco mas de detalle.'
 			}
 		];
+
+			function normalizeText(value) {
+				return String(value || '').toLowerCase().trim().replace(/\s+/g, ' ');
+			}
+
+			function normalizePhoneDigits(value) {
+				return String(value || '').replace(/\D+/g, '');
+			}
 
 			function normalizeCommand(value) {
 				return String(value || '').toLowerCase().trim();
@@ -388,8 +432,8 @@
 
 			botReply(step.question, function () {
 				showComposer(step.type);
-					message.className = '';
-					message.textContent = 'Tip: escribe "volver" para regresar un paso o "cancelar" para reiniciar.';
+					message.className = 'af-chatbot-hint';
+					message.textContent = step.helperText ? step.helperText : '';
 				if ('select' === step.type) {
 					fillSelectOptions(step.options(), step.defaultValue ? step.defaultValue() : '');
 				} else {
@@ -561,6 +605,10 @@
 				}
 
 			var data = new FormData();
+			var reference1Phone = normalizePhoneDigits(state.values.reference_1_phone || '');
+			var reference2Phone = normalizePhoneDigits(state.values.reference_2_phone || '');
+			var reference1Text = ((state.values.reference_1_name || '').trim() + ' - ' + reference1Phone).trim();
+			var reference2Text = ((state.values.reference_2_name || '').trim() + ' - ' + reference2Phone).trim();
 			data.append('action', 'af_create_guest_frontend');
 			data.append('nonce', afChatbot.nonce);
 			data.append('name', state.values.name || '');
@@ -568,8 +616,12 @@
 			data.append('phone', state.values.phone || '');
 			data.append('id_number', state.values.id_number || '');
 			data.append('mascotas', state.values.mascotas || '0');
-			data.append('referencia_personal_1', state.values.referencia_personal_1 || '');
-			data.append('referencia_personal_2', state.values.referencia_personal_2 || '');
+			data.append('reference_1_name', state.values.reference_1_name || '');
+			data.append('reference_1_phone', reference1Phone);
+			data.append('reference_2_name', state.values.reference_2_name || '');
+			data.append('reference_2_phone', reference2Phone);
+			data.append('referencia_personal_1', reference1Text);
+			data.append('referencia_personal_2', reference2Text);
 			data.append('personas_viviran', state.values.personas_viviran || '1');
 			data.append('accommodation_id', state.values.accommodation_id || '');
 			data.append('rental_mode', state.values.rental_mode || '');
@@ -580,8 +632,8 @@
 			data.append('desired_price', state.values.desired_price || '');
 			data.append('guarantee_text', state.values.guarantee_text || '');
 
-				state.isSubmitting = true;
-				state.activeRequestController = new AbortController();
+			state.isSubmitting = true;
+			state.activeRequestController = new AbortController();
 			setFormDisabled(true);
 			state.lastSubmitFailed = false;
 			botReply(afChatbot.doneText || 'Perfecto, ya tengo tus datos. Estoy registrando tu solicitud...');
@@ -654,10 +706,10 @@
 				startConversation();
 				return;
 			}
-				if (state.isSubmitting) {
-					botReply('Tu solicitud se esta enviando. Puedes usar "Cancelar envio" si deseas detenerla.');
-					return;
-				}
+			if (state.isSubmitting) {
+				botReply('Tu solicitud se esta enviando. Puedes usar "Cancelar envio" si deseas detenerla.');
+				return;
+			}
 			if (!state.collecting) {
 				botReply('Elige una opcion para continuar.', function () {
 					appendOptions();
@@ -670,12 +722,12 @@
 				return;
 			}
 			var value = getStepValue(step);
-				if (handleInlineCommands(value)) {
-					if ('select' !== step.type) {
-						input.value = '';
-					}
-					return;
+			if (handleInlineCommands(value)) {
+				if ('select' !== step.type) {
+					input.value = '';
 				}
+				return;
+			}
 			if (!step.validate(value, state.values)) {
 				message.className = 'af-chatbot-error';
 				message.textContent = step.error;
@@ -685,7 +737,13 @@
 			message.textContent = '';
 			message.className = '';
 			state.values[step.key] = value;
-				clearDependentValues(step.key);
+			clearDependentValues(step.key);
+			if (step.key === 'reference_1_name' || step.key === 'reference_2_name') {
+				state.values[step.key] = value.replace(/\s+/g, ' ').trim();
+			}
+			if (step.key === 'reference_1_phone' || step.key === 'reference_2_phone') {
+				state.values[step.key] = normalizePhoneDigits(value);
+			}
 			state.lastSubmitFailed = false;
 			appendBubble(getStepLabel(step, value), 'user');
 			state.currentStep += 1;

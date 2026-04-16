@@ -60,6 +60,7 @@ add_filter( 'wp_max_upload_size', 'arriendo_facil_max_upload_size' );
  */
 function arriendo_facil_init() {
 	load_plugin_textdomain( 'arriendo-facil', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
+	Arriendo_Facil_Activator::ensure_owner_role();
 
 	new Arriendo_Facil_Accommodation();
 	new Arriendo_Facil_Cleaning_Service();

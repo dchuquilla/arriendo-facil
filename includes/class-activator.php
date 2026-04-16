@@ -17,12 +17,93 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Arriendo_Facil_Activator {
 
 	/**
+	 * Ensures the owner role exists with required capabilities.
+	 *
+	 * @return void
+	 */
+	public static function ensure_owner_role() {
+		$role = get_role( 'af_owner' );
+
+		if ( ! $role ) {
+			$role = add_role(
+				'af_owner',
+				__( 'Property Owner', 'arriendo-facil' ),
+				array(
+					'read'                 => true,
+					'upload_files'         => true,
+					'edit_posts'           => true,
+					'edit_published_posts' => true,
+					'publish_posts'        => true,
+					'delete_posts'         => true,
+				)
+			);
+		}
+
+		if ( $role instanceof WP_Role ) {
+			$required_caps = array(
+				'read',
+				'upload_files',
+				'edit_posts',
+				'edit_published_posts',
+				'publish_posts',
+				'delete_posts',
+			);
+
+			foreach ( $required_caps as $cap ) {
+				if ( ! $role->has_cap( $cap ) ) {
+					$role->add_cap( $cap );
+				}
+			}
+		}
+
+		self::sync_existing_owner_users_to_role();
+	}
+
+	/**
+	 * Migrates existing owner users to af_owner role.
+	 *
+	 * @return void
+	 */
+	private static function sync_existing_owner_users_to_role() {
+		global $wpdb;
+
+		$owner_user_ids = $wpdb->get_col(
+			"SELECT DISTINCT wp_user_id FROM {$wpdb->prefix}af_owner_contacts WHERE wp_user_id IS NOT NULL AND wp_user_id > 0"
+		);
+
+		if ( ! is_array( $owner_user_ids ) || empty( $owner_user_ids ) ) {
+			return;
+		}
+
+		foreach ( $owner_user_ids as $owner_user_id ) {
+			$owner_user_id = absint( $owner_user_id );
+			if ( ! $owner_user_id ) {
+				continue;
+			}
+
+			$user = get_userdata( $owner_user_id );
+			if ( ! $user instanceof WP_User ) {
+				continue;
+			}
+
+			$roles = isset( $user->roles ) && is_array( $user->roles ) ? $user->roles : array();
+			if ( in_array( 'administrator', $roles, true ) || in_array( 'af_owner', $roles, true ) ) {
+				continue;
+			}
+
+			$user->set_role( 'af_owner' );
+		}
+	}
+
+	/**
 	 * Runs on plugin activation.
 	 *
 	 * Creates custom database tables for leases, cleaning services,
 	 * owner contacts and AI logs.
 	 */
 	public static function activate() {
+		self::ensure_owner_role();
+
 		global $wpdb;
 		$charset_collate = $wpdb->get_charset_collate();
 

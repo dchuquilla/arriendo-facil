@@ -10,6 +10,8 @@
  * @var float   $monthly_rent Current monthly rent meta value.
  * @var int     $owner_id     Current owner user ID meta value.
  * @var string  $status       Current accommodation status meta value.
+ * @var array   $owner_options Available owner options.
+ * @var bool    $is_owner_user Whether current editor is an owner role.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -60,8 +62,19 @@ $statuses = array(
 	<tr>
 		<th><label for="af_owner_id"><?php esc_html_e( 'Owner (User ID)', 'arriendo-facil' ); ?></label></th>
 		<td>
-			<input type="number" id="af_owner_id" name="af_owner_id" min="0"
-				value="<?php echo esc_attr( $owner_id ); ?>" class="small-text" />
+			<?php if ( $is_owner_user ) : ?>
+				<input type="hidden" id="af_owner_id" name="af_owner_id" value="<?php echo esc_attr( get_current_user_id() ); ?>" />
+				<p><?php esc_html_e( 'This accommodation will be linked to your owner account automatically.', 'arriendo-facil' ); ?></p>
+			<?php else : ?>
+				<select id="af_owner_id" name="af_owner_id" class="regular-text">
+					<option value="0"><?php esc_html_e( 'Select owner', 'arriendo-facil' ); ?></option>
+					<?php foreach ( $owner_options as $owner_option ) : ?>
+						<option value="<?php echo esc_attr( (string) $owner_option['id'] ); ?>" <?php selected( (int) $owner_id, (int) $owner_option['id'] ); ?>>
+							<?php echo esc_html( (string) $owner_option['label'] ); ?>
+						</option>
+					<?php endforeach; ?>
+				</select>
+			<?php endif; ?>
 		</td>
 	</tr>
 	<tr>

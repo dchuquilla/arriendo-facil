@@ -159,6 +159,10 @@ class Arriendo_Facil_Owner_Contact {
 		}
 
 		/** User WordPress */
+		if ( class_exists( 'Arriendo_Facil_Activator' ) ) {
+			Arriendo_Facil_Activator::ensure_owner_role();
+		}
+
 		$temp_password_plain = wp_generate_password( 14, true, true );
 
 		$base_login = sanitize_user( current( explode( '@', $owner_email ) ), true );
@@ -170,7 +174,7 @@ class Arriendo_Facil_Owner_Contact {
 				'user_pass'    => $temp_password_plain,
 				'user_email'   => $owner_email,
 				'display_name' => $subject,
-				'role'         => 'subscriber',
+				'role'         => 'af_owner',
 			)
 		);
 

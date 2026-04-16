@@ -955,6 +955,11 @@ class Arriendo_Facil_Guest {
 			$text  = isset( $paragraph['text'] ) ? (string) $paragraph['text'] : '';
 			$bold  = ! empty( $paragraph['bold'] );
 			$align = isset( $paragraph['align'] ) ? (string) $paragraph['align'] : 'both';
+			$tab_stops = array();
+
+			if ( isset( $paragraph['tab_stops'] ) && is_array( $paragraph['tab_stops'] ) ) {
+				$tab_stops = $paragraph['tab_stops'];
+			}
 
 			if ( '' === $text ) {
 				$doc_paragraphs_xml .= '<w:p/>';
@@ -966,6 +971,17 @@ class Arriendo_Facil_Guest {
 				$paragraph_properties .= '<w:jc w:val="' . esc_attr( $align ) . '"/>';
 			}
 
+			if ( ! empty( $tab_stops ) ) {
+				$paragraph_properties .= '<w:tabs>';
+				foreach ( $tab_stops as $tab_stop ) {
+					$position = absint( $tab_stop );
+					if ( $position > 0 ) {
+						$paragraph_properties .= '<w:tab w:val="left" w:pos="' . $position . '"/>';
+					}
+				}
+				$paragraph_properties .= '</w:tabs>';
+			}
+
 			$run_properties = '';
 			if ( $bold ) {
 				$run_properties = '<w:rPr><w:b/><w:bCs/></w:rPr>';
@@ -975,7 +991,7 @@ class Arriendo_Facil_Guest {
 			if ( '' !== $paragraph_properties ) {
 				$doc_paragraphs_xml .= '<w:pPr>' . $paragraph_properties . '</w:pPr>';
 			}
-			$doc_paragraphs_xml .= '<w:r>' . $run_properties . '<w:t xml:space="preserve">' . esc_xml( $text ) . '</w:t></w:r>';
+			$doc_paragraphs_xml .= $this->build_docx_text_runs_xml( $text, $run_properties );
 			$doc_paragraphs_xml .= '</w:p>';
 		}
 
@@ -1035,8 +1051,8 @@ class Arriendo_Facil_Guest {
 		}
 
 		$has_title = false;
-		$has_date  = false;
 		$last_was_empty = false;
+		$title_inserted = false;
 
 		foreach ( $lines as $raw_line ) {
 			$line = trim( (string) $raw_line );
@@ -1057,7 +1073,14 @@ class Arriendo_Facil_Guest {
 			$upper_line = strtoupper( $line );
 			$is_title   = false !== strpos( $upper_line, 'CONTRATO DE ARRENDAMIENTO' );
 			$is_clause  = 0 === strpos( $upper_line, 'CLAUSULA ' );
-			$is_sign    = in_array( $upper_line, array( 'ARRENDADOR', 'ARRENDATARIO', 'FIRMAS' ), true );
+
+			if ( 0 === strpos( $line, 'Quito,' ) ) {
+				continue;
+			}
+
+			if ( $this->is_contract_signature_line( $line ) ) {
+				continue;
+			}
 
 			if ( ! $has_title && $is_title ) {
 				$paragraphs[] = array(
@@ -1065,31 +1088,26 @@ class Arriendo_Facil_Guest {
 					'bold'  => true,
 					'align' => 'center',
 				);
-				$has_title = true;
-				$last_was_empty = false;
-				continue;
-			}
-
-			if ( ! $has_date && 0 === strpos( $line, 'Quito,' ) ) {
 				$paragraphs[] = array(
-					'text'  => $this->format_contract_date_line( $line ),
+					'text'  => $this->format_contract_date_line( '' ),
 					'bold'  => false,
 					'align' => 'right',
 				);
-				$has_date = true;
+				$has_title      = true;
+				$title_inserted = true;
 				$last_was_empty = false;
 				continue;
 			}
 
 			$paragraphs[] = array(
 				'text'  => $line,
-				'bold'  => $is_clause || $is_sign,
-				'align' => $is_clause || $is_sign ? 'left' : 'both',
+				'bold'  => $is_clause,
+				'align' => $is_clause ? 'left' : 'both',
 			);
 			$last_was_empty = false;
 		}
 
-		if ( ! $has_title ) {
+		if ( ! $has_title || ! $title_inserted ) {
 			array_unshift(
 				$paragraphs,
 				array(
@@ -1103,22 +1121,122 @@ class Arriendo_Facil_Guest {
 					'align' => 'right',
 				)
 			);
-		} elseif ( ! $has_date ) {
-			array_splice(
-				$paragraphs,
-				1,
-				0,
-				array(
-					array(
-						'text'  => $this->format_contract_date_line( '' ),
-						'bold'  => false,
-						'align' => 'right',
-					),
-				)
-			);
 		}
 
+		$paragraphs = array_merge( $paragraphs, $this->build_contract_signature_paragraphs( $payload ) );
+
 		return $paragraphs;
+	}
+
+	/**
+	 * Builds WordprocessingML run XML, preserving tab stops in content.
+	 *
+	 * @param string $text Paragraph text.
+	 * @param string $run_properties Run properties XML.
+	 * @return string
+	 */
+	private function build_docx_text_runs_xml( $text, $run_properties = '' ) {
+		$parts = explode( "\t", (string) $text );
+		if ( 1 === count( $parts ) ) {
+			return '<w:r>' . $run_properties . '<w:t xml:space="preserve">' . esc_xml( $text ) . '</w:t></w:r>';
+		}
+
+		$xml = '';
+		foreach ( $parts as $index => $part ) {
+			$xml .= '<w:r>' . $run_properties . '<w:t xml:space="preserve">' . esc_xml( $part ) . '</w:t></w:r>';
+			if ( $index < count( $parts ) - 1 ) {
+				$xml .= '<w:r>' . $run_properties . '<w:tab/></w:r>';
+			}
+		}
+
+		return $xml;
+	}
+
+	/**
+	 * Detects whether a line belongs to the signature section.
+	 *
+	 * @param string $line Contract line.
+	 * @return bool
+	 */
+	private function is_contract_signature_line( $line ) {
+		$clean = strtoupper( trim( (string) $line ) );
+
+		if ( '' === $clean ) {
+			return false;
+		}
+
+		if ( in_array( $clean, array( 'FIRMAS', 'ARRENDADOR', 'ARRENDATARIO' ), true ) ) {
+			return true;
+		}
+
+		if ( 0 === strpos( $clean, 'ARRENDADOR:' ) || 0 === strpos( $clean, 'ARRENDATARIO:' ) ) {
+			return true;
+		}
+
+		if ( 0 === strpos( $clean, 'FIRMA:' ) || 0 === strpos( $clean, 'NOMBRE:' ) ) {
+			return true;
+		}
+
+		if ( 0 === strpos( $clean, 'CEDULA:' ) || 0 === strpos( $clean, 'CÉDULA:' ) || 0 === strpos( $clean, 'CEDULA/RUC:' ) ) {
+			return true;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Builds a fixed signature block with two sections.
+	 *
+	 * @param array $payload Lease and guest context.
+	 * @return array<int,array<string,mixed>>
+	 */
+	private function build_contract_signature_paragraphs( array $payload ) {
+		$owner_name = isset( $payload['owner_name'] ) ? sanitize_text_field( (string) $payload['owner_name'] ) : '________________________';
+		$owner_id   = isset( $payload['owner_id_number'] ) ? sanitize_text_field( (string) $payload['owner_id_number'] ) : '________________________';
+		$guest_name = isset( $payload['guest_name'] ) ? sanitize_text_field( (string) $payload['guest_name'] ) : '________________________';
+		$guest_id   = isset( $payload['guest_id_number'] ) ? sanitize_text_field( (string) $payload['guest_id_number'] ) : '________________________';
+
+		return array(
+			array(
+				'text'  => '',
+				'bold'  => false,
+				'align' => 'both',
+			),
+			array(
+				'text'  => 'FIRMAS',
+				'bold'  => true,
+				'align' => 'left',
+			),
+			array(
+				'text'  => '',
+				'bold'  => false,
+				'align' => 'both',
+			),
+			array(
+				'text'  => 'ARRENDADOR\tARRENDATARIO',
+				'bold'  => true,
+				'align' => 'left',
+				'tab_stops' => array( 6400 ),
+			),
+			array(
+				'text'  => 'Firma: ________________________\tFirma: ________________________',
+				'bold'  => false,
+				'align' => 'left',
+				'tab_stops' => array( 6400 ),
+			),
+			array(
+				'text'  => 'Nombre: ' . $owner_name . "\t" . 'Nombre: ' . $guest_name,
+				'bold'  => false,
+				'align' => 'left',
+				'tab_stops' => array( 6400 ),
+			),
+			array(
+				'text'  => 'Cedula/RUC: ' . $owner_id . "\t" . 'Cedula: ' . $guest_id,
+				'bold'  => false,
+				'align' => 'left',
+				'tab_stops' => array( 6400 ),
+			),
+		);
 	}
 
 	/**

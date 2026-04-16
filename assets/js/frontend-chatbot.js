@@ -131,7 +131,7 @@
 				type: 'text',
 				question: 'Ahora escribe el celular de la segunda referencia.',
 				placeholder: 'Ejemplo: 0987654321',
-				helperText: 'Puedes escribirlo con espacios o guiones; el sistema limpia el formato.',
+				helperText: 'Acepta formatos como: 0991234567, 099 123 4567 o 099-123-4567. Siempre deben ser 10 digitos.',
 				validate: function (value, values) {
 					var digits = normalizePhoneDigits(value);
 					if (!/^0[0-9]{9}$/.test(digits)) {

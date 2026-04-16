@@ -584,6 +584,7 @@ class Arriendo_Facil_Guest {
 	private function get_contract_legal_requirements() {
 		return array(
 			'Use formal Ecuador rental-contract language suitable for legal review.',
+			'Align legal wording with Ecuador regulations applicable in 2026, including Ley de Inquilinato and relevant Civil Code provisions.',
 			'Keep numbered clauses with clear obligations for both parties.',
 			'Include parties identification (full name and ID number placeholders).',
 			'Include lease object, term, monthly rent, payment method and due date.',
@@ -953,7 +954,7 @@ class Arriendo_Facil_Guest {
 		foreach ( $paragraphs as $paragraph ) {
 			$text  = isset( $paragraph['text'] ) ? (string) $paragraph['text'] : '';
 			$bold  = ! empty( $paragraph['bold'] );
-			$align = isset( $paragraph['align'] ) ? (string) $paragraph['align'] : 'left';
+			$align = isset( $paragraph['align'] ) ? (string) $paragraph['align'] : 'both';
 
 			if ( '' === $text ) {
 				$doc_paragraphs_xml .= '<w:p/>';
@@ -993,8 +994,8 @@ class Arriendo_Facil_Guest {
 		$styles_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
 			. '<w:styles xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" mc:Ignorable="">'
 			. '<w:docDefaults>'
-			. '<w:rPrDefault><w:rPr><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr></w:rPrDefault>'
-			. '<w:pPrDefault><w:pPr><w:spacing w:after="160" w:line="278" w:lineRule="auto"/></w:pPr></w:pPrDefault>'
+			. '<w:rPrDefault><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr></w:rPrDefault>'
+			. '<w:pPrDefault><w:pPr><w:spacing w:before="0" w:after="160" w:line="360" w:lineRule="auto"/><w:jc w:val="both"/></w:pPr></w:pPrDefault>'
 			. '</w:docDefaults>'
 			. '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>'
 			. '</w:styles>';
@@ -1019,7 +1020,7 @@ class Arriendo_Facil_Guest {
 	}
 
 	/**
-	 * Builds DOCX paragraphs with formatting close to contract reference.
+	 * Builds DOCX paragraphs using strict contract format rules.
 	 *
 	 * @param string $contract_text Contract text.
 	 * @param array  $payload Lease and guest context.
@@ -1035,16 +1036,21 @@ class Arriendo_Facil_Guest {
 
 		$has_title = false;
 		$has_date  = false;
+		$last_was_empty = false;
 
 		foreach ( $lines as $raw_line ) {
 			$line = trim( (string) $raw_line );
 
 			if ( '' === $line ) {
+				if ( $last_was_empty ) {
+					continue;
+				}
 				$paragraphs[] = array(
 					'text'  => '',
 					'bold'  => false,
-					'align' => 'left',
+					'align' => 'both',
 				);
+				$last_was_empty = true;
 				continue;
 			}
 
@@ -1060,6 +1066,7 @@ class Arriendo_Facil_Guest {
 					'align' => 'center',
 				);
 				$has_title = true;
+				$last_was_empty = false;
 				continue;
 			}
 
@@ -1070,14 +1077,16 @@ class Arriendo_Facil_Guest {
 					'align' => 'right',
 				);
 				$has_date = true;
+				$last_was_empty = false;
 				continue;
 			}
 
 			$paragraphs[] = array(
 				'text'  => $line,
 				'bold'  => $is_clause || $is_sign,
-				'align' => 'left',
+				'align' => $is_clause || $is_sign ? 'left' : 'both',
 			);
+			$last_was_empty = false;
 		}
 
 		if ( ! $has_title ) {
@@ -1092,11 +1101,6 @@ class Arriendo_Facil_Guest {
 					'text'  => $this->format_contract_date_line( '' ),
 					'bold'  => false,
 					'align' => 'right',
-				),
-				array(
-					'text'  => '',
-					'bold'  => false,
-					'align' => 'left',
 				)
 			);
 		} elseif ( ! $has_date ) {
@@ -1110,11 +1114,6 @@ class Arriendo_Facil_Guest {
 						'bold'  => false,
 						'align' => 'right',
 					),
-					array(
-						'text'  => '',
-						'bold'  => false,
-						'align' => 'left',
-					),
 				)
 			);
 		}
@@ -1123,7 +1122,7 @@ class Arriendo_Facil_Guest {
 	}
 
 	/**
-	 * Formats contract date line as "Quito, d de mes, Y".
+	 * Formats contract date line as "Quito, d de mes de Y".
 	 *
 	 * @param string $line Raw date line.
 	 * @return string
@@ -1151,7 +1150,7 @@ class Arriendo_Facil_Guest {
 		$year       = (string) gmdate( 'Y', $timestamp );
 		$month_name = isset( $months[ $month_idx ] ) ? $months[ $month_idx ] : gmdate( 'F', $timestamp );
 
-		return sprintf( 'Quito, %d de %s, %s', $day, $month_name, $year );
+		return sprintf( 'Quito, %d de %s de %s', $day, $month_name, $year );
 	}
 
 	/**

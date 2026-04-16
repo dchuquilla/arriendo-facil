@@ -42,7 +42,12 @@ class Arriendo_Facil_Accommodation {
 	 * @return void
 	 */
 	public function force_home_queries_to_accommodations( $query ) {
-		if ( is_admin() || ! $query instanceof WP_Query ) {
+		if ( ! $query instanceof WP_Query ) {
+			return;
+		}
+
+		if ( is_admin() ) {
+			$this->restrict_admin_accommodation_queries_to_owner( $query );
 			return;
 		}
 
@@ -86,6 +91,12 @@ class Arriendo_Facil_Accommodation {
 		$query->set( 'ignore_sticky_posts', true );
 		$query->set( 'posts_per_page', -1 );
 		$query->set( 'nopaging', true );
+
+		$featured_tax_query = $this->get_featured_tax_query();
+		if ( ! empty( $featured_tax_query ) ) {
+			$query->set( 'tax_query', $featured_tax_query );
+		}
+
 		if ( ! $query->get( 'orderby' ) ) {
 			$query->set( 'orderby', 'date' );
 		}
@@ -125,6 +136,7 @@ class Arriendo_Facil_Accommodation {
 			'hierarchical'       => false,
 			'menu_position'      => null,
 			'supports'           => array( 'title', 'editor', 'thumbnail', 'excerpt' ),
+			'taxonomies'         => array( 'post_tag' ),
 			'show_in_rest'       => true,
 		);
 
@@ -159,6 +171,8 @@ class Arriendo_Facil_Accommodation {
 		$monthly_rent = get_post_meta( $post->ID, '_af_monthly_rent', true );
 		$owner_id    = get_post_meta( $post->ID, '_af_owner_id', true );
 		$status      = get_post_meta( $post->ID, '_af_status', true );
+		$owner_options = $this->get_owner_user_options();
+		$is_owner_user = $this->is_owner_user( get_current_user_id() );
 
 		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/accommodation-meta-box.php';
 	}
@@ -169,16 +183,25 @@ class Arriendo_Facil_Accommodation {
 	 * @param int $post_id Post ID.
 	 */
 	public function save_meta( $post_id ) {
-		if ( ! isset( $_POST['af_accommodation_nonce'] ) ) {
-			return;
-		}
-		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['af_accommodation_nonce'] ) ), 'af_save_accommodation_meta' ) ) {
-			return;
-		}
 		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
 			return;
 		}
 		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+			return;
+		}
+
+		$current_user_id = get_current_user_id();
+		$is_owner_user   = $this->is_owner_user( $current_user_id );
+
+		// Keep owner/accommodation link consistent even when nonce payload is missing.
+		if ( $is_owner_user ) {
+			update_post_meta( $post_id, '_af_owner_id', $current_user_id );
+		}
+
+		if ( ! isset( $_POST['af_accommodation_nonce'] ) ) {
+			return;
+		}
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['af_accommodation_nonce'] ) ), 'af_save_accommodation_meta' ) ) {
 			return;
 		}
 
@@ -187,7 +210,6 @@ class Arriendo_Facil_Accommodation {
 			'_af_bedrooms'     => 'absint',
 			'_af_bathrooms'    => 'absint',
 			'_af_monthly_rent' => 'floatval',
-			'_af_owner_id'     => 'absint',
 			'_af_status'       => 'sanitize_text_field',
 		);
 
@@ -197,6 +219,10 @@ class Arriendo_Facil_Accommodation {
 				update_post_meta( $post_id, $key, call_user_func( $sanitize_cb, wp_unslash( $_POST[ $form_key ] ) ) );
 			}
 		}
+
+		if ( ! $is_owner_user && isset( $_POST['af_owner_id'] ) ) {
+			update_post_meta( $post_id, '_af_owner_id', absint( wp_unslash( $_POST['af_owner_id'] ) ) );
+		}
 	}
 
 	/**
@@ -205,6 +231,8 @@ class Arriendo_Facil_Accommodation {
 	 * @return string
 	 */
 	public function render_managed_accommodations_shortcode() {
+		$featured_tax_query = $this->get_featured_tax_query();
+
 		$accommodations = get_posts(
 			array(
 				'post_type'      => 'accommodation',
@@ -212,6 +240,7 @@ class Arriendo_Facil_Accommodation {
 				'posts_per_page' => -1,
 				'orderby'        => 'date',
 				'order'          => 'DESC',
+				'tax_query'      => $featured_tax_query,
 			)
 		);
 
@@ -272,6 +301,8 @@ class Arriendo_Facil_Accommodation {
 	 * @return string
 	 */
 	public function render_featured_accommodation_shortcode() {
+		$featured_tax_query = $this->get_featured_tax_query();
+
 		$accommodations = get_posts(
 			array(
 				'post_type'      => 'accommodation',
@@ -279,6 +310,7 @@ class Arriendo_Facil_Accommodation {
 				'posts_per_page' => -1,
 				'orderby'        => 'date',
 				'order'          => 'DESC',
+				'tax_query'      => $featured_tax_query,
 			)
 		);
 
@@ -442,6 +474,147 @@ class Arriendo_Facil_Accommodation {
 		}
 
 		return (string) $content . $replacement;
+	}
+
+	/**
+	 * Restricts admin accommodation listings to the current owner.
+	 *
+	 * @param WP_Query $query Query object.
+	 * @return void
+	 */
+	private function restrict_admin_accommodation_queries_to_owner( $query ) {
+		if ( ! is_admin() || wp_doing_ajax() || ! $query->is_main_query() ) {
+			return;
+		}
+
+		$current_user_id = get_current_user_id();
+		if ( ! $this->is_owner_user( $current_user_id ) ) {
+			return;
+		}
+
+		$post_type = $query->get( 'post_type' );
+		if ( 'accommodation' !== $post_type && ! ( is_array( $post_type ) && in_array( 'accommodation', $post_type, true ) ) ) {
+			return;
+		}
+
+		$query->set(
+			'meta_query',
+			array(
+				array(
+					'key'   => '_af_owner_id',
+					'value' => $current_user_id,
+				),
+			)
+		);
+	}
+
+	/**
+	 * Returns featured-taxonomy query (tagged accommodations).
+	 *
+	 * @return array
+	 */
+	private function get_featured_tax_query() {
+		$terms = get_terms(
+			array(
+				'taxonomy'   => 'post_tag',
+				'slug'       => array( 'destacada', 'featured' ),
+				'hide_empty' => false,
+				'fields'     => 'ids',
+			)
+		);
+
+		if ( is_wp_error( $terms ) || empty( $terms ) ) {
+			return array();
+		}
+
+		$featured_tax_query = array(
+			array(
+				'taxonomy' => 'post_tag',
+				'field'    => 'term_id',
+				'terms'    => array_map( 'absint', $terms ),
+			),
+		);
+
+		$has_featured_accommodations = get_posts(
+			array(
+				'post_type'      => 'accommodation',
+				'post_status'    => 'publish',
+				'posts_per_page' => 1,
+				'fields'         => 'ids',
+				'tax_query'      => $featured_tax_query,
+			)
+		);
+
+		if ( empty( $has_featured_accommodations ) ) {
+			return array();
+		}
+
+		return $featured_tax_query;
+	}
+
+	/**
+	 * Returns whether a user is an owner user.
+	 *
+	 * @param int $user_id User ID.
+	 * @return bool
+	 */
+	private function is_owner_user( $user_id ) {
+		$user = get_user_by( 'id', absint( $user_id ) );
+		if ( ! $user ) {
+			return false;
+		}
+
+		$roles = isset( $user->roles ) && is_array( $user->roles ) ? $user->roles : array();
+
+		return in_array( 'af_owner', $roles, true );
+	}
+
+	/**
+	 * Returns owner options for assignment dropdown.
+	 *
+	 * @return array<int,array<string,mixed>>
+	 */
+	private function get_owner_user_options() {
+		global $wpdb;
+
+		$owner_user_ids = $wpdb->get_col(
+			"SELECT DISTINCT wp_user_id FROM {$wpdb->prefix}af_owner_contacts WHERE wp_user_id IS NOT NULL AND wp_user_id > 0"
+		);
+
+		$role_owner_users = get_users(
+			array(
+				'role'   => 'af_owner',
+				'fields' => 'ID',
+			)
+		);
+
+		if ( is_array( $role_owner_users ) ) {
+			$owner_user_ids = array_merge( is_array( $owner_user_ids ) ? $owner_user_ids : array(), $role_owner_users );
+		}
+
+		$owner_user_ids = array_values( array_unique( array_map( 'absint', is_array( $owner_user_ids ) ? $owner_user_ids : array() ) ) );
+
+		if ( empty( $owner_user_ids ) ) {
+			return array();
+		}
+
+		$users = get_users(
+			array(
+				'include' => $owner_user_ids,
+				'orderby' => 'display_name',
+				'order'   => 'ASC',
+			)
+		);
+
+		$options = array();
+		foreach ( $users as $user ) {
+			$options[] = array(
+				'id'    => (int) $user->ID,
+				'label' => (string) $user->display_name . ' (' . (string) $user->user_email . ')',
+			);
+		}
+
+		return $options;
 	}
 
 }

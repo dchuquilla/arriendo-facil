@@ -347,6 +347,7 @@ class Arriendo_Facil_Admin {
 	 * @return array<string,mixed>
 	 */
 	private function get_owner_contract_example_context( $accommodation_id ) {
+		$accommodation_id = absint( $accommodation_id );
 		$owner_user_id = absint( get_post_meta( $accommodation_id, '_af_owner_id', true ) );
 
 		if ( ! $owner_user_id ) {
@@ -378,6 +379,27 @@ class Arriendo_Facil_Admin {
 		$attachment_id = ! empty( $attachment_ids ) ? absint( $attachment_ids[0] ) : 0;
 		if ( ! $attachment_id ) {
 			return array();
+		}
+
+		return $this->build_contract_template_context_from_attachment( $attachment_id, $owner_user_id );
+	}
+
+	/**
+	 * Builds standardized contract template context from an attachment.
+	 *
+	 * @param int $attachment_id Attachment ID.
+	 * @param int $fallback_owner_user_id Owner user fallback ID.
+	 * @return array<string,mixed>
+	 */
+	private function build_contract_template_context_from_attachment( $attachment_id, $fallback_owner_user_id = 0 ) {
+		$attachment_id = absint( $attachment_id );
+		if ( ! $attachment_id || 'attachment' !== get_post_type( $attachment_id ) ) {
+			return array();
+		}
+
+		$owner_user_id = absint( get_post_meta( $attachment_id, '_af_owner_user_id', true ) );
+		if ( ! $owner_user_id ) {
+			$owner_user_id = absint( $fallback_owner_user_id );
 		}
 
 		$path          = get_attached_file( $attachment_id );

@@ -481,6 +481,13 @@ class Arriendo_Facil_Guest {
 
 		$lease_id = (int) $wpdb->insert_id;
 
+		$this->send_tenant_processing_email(
+			isset( $data['email'] ) ? sanitize_email( (string) $data['email'] ) : '',
+			isset( $data['name'] ) ? sanitize_text_field( (string) $data['name'] ) : '',
+			$accommodation_id,
+			$lease_id
+		);
+
 		if ( ! class_exists( 'Arriendo_Facil_AI_Service' ) ) {
 			return array( 'generated' => false, 'lease_id' => $lease_id );
 		}
@@ -730,6 +737,7 @@ class Arriendo_Facil_Guest {
 	 * @return array<string,mixed>
 	 */
 	private function get_owner_contract_example_context( $accommodation_id ) {
+		$accommodation_id = absint( $accommodation_id );
 		$owner_user_id = absint( get_post_meta( $accommodation_id, '_af_owner_id', true ) );
 
 		if ( ! $owner_user_id ) {
@@ -763,6 +771,27 @@ class Arriendo_Facil_Guest {
 			return array();
 		}
 
+		return $this->build_contract_template_context_from_attachment( $attachment_id, $owner_user_id );
+	}
+
+	/**
+	 * Builds standardized contract template context from an attachment.
+	 *
+	 * @param int $attachment_id Attachment ID.
+	 * @param int $fallback_owner_user_id Owner user fallback ID.
+	 * @return array<string,mixed>
+	 */
+	private function build_contract_template_context_from_attachment( $attachment_id, $fallback_owner_user_id = 0 ) {
+		$attachment_id = absint( $attachment_id );
+		if ( ! $attachment_id || 'attachment' !== get_post_type( $attachment_id ) ) {
+			return array();
+		}
+
+		$owner_user_id = absint( get_post_meta( $attachment_id, '_af_owner_user_id', true ) );
+		if ( ! $owner_user_id ) {
+			$owner_user_id = absint( $fallback_owner_user_id );
+		}
+
 		$path          = get_attached_file( $attachment_id );
 		$mime_type     = (string) get_post_mime_type( $attachment_id );
 		$template_text = $this->extract_contract_template_text( $path, $mime_type );
@@ -778,6 +807,41 @@ class Arriendo_Facil_Guest {
 			'url'           => wp_get_attachment_url( $attachment_id ),
 			'template_text' => $template_text,
 		);
+	}
+
+	/**
+	 * Sends processing-notification email to tenant after chatbot registration.
+	 *
+	 * @param string $tenant_email Tenant email.
+	 * @param string $tenant_name Tenant full name.
+	 * @param int    $accommodation_id Accommodation ID.
+	 * @param int    $lease_id Lease ID.
+	 * @return void
+	 */
+	private function send_tenant_processing_email( $tenant_email, $tenant_name, $accommodation_id, $lease_id ) {
+		$tenant_email = sanitize_email( (string) $tenant_email );
+		if ( ! is_email( $tenant_email ) ) {
+			return;
+		}
+
+		$tenant_name = sanitize_text_field( (string) $tenant_name );
+		$tenant_name = '' !== trim( $tenant_name ) ? $tenant_name : __( 'arrendatario', 'arriendo-facil' );
+
+		$accommodation_title = (string) get_the_title( absint( $accommodation_id ) );
+		if ( '' === trim( $accommodation_title ) ) {
+			$accommodation_title = __( 'la propiedad solicitada', 'arriendo-facil' );
+		}
+
+		$subject = __( 'Estamos procesando tu solicitud de arriendo', 'arriendo-facil' );
+		$message = sprintf(
+			/* translators: 1: tenant name, 2: accommodation title, 3: lease ID */
+			__( "Hola %1$s,\n\nRecibimos tu solicitud de arriendo para %2$s.\n\nTu contrato se encuentra en procesamiento y nuestro equipo revisara la informacion pronto.\n\nNumero de solicitud: %3$d\n\nGracias por usar Arriendo Facil.", 'arriendo-facil' ),
+			$tenant_name,
+			$accommodation_title,
+			absint( $lease_id )
+		);
+
+		wp_mail( $tenant_email, $subject, $message );
 	}
 
 	/**

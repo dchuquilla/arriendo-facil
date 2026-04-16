@@ -485,7 +485,14 @@ class Arriendo_Facil_Owner_Contact {
 			return;
 		}
 
-		if ( count( $this->uploaded_document_ids ) !== $selected_documents && ! ( $this->last_upload_error instanceof WP_Error ) ) {
+		$required_uploaded = 0;
+		foreach ( $fields as $required_doc_type ) {
+			if ( isset( $this->uploaded_document_ids[ $required_doc_type ] ) ) {
+				$required_uploaded++;
+			}
+		}
+
+		if ( $required_uploaded !== count( $fields ) && ! ( $this->last_upload_error instanceof WP_Error ) ) {
 			$this->last_upload_error = new WP_Error( 'af_pdf_upload_incomplete', __( 'One or more selected PDFs were not uploaded to Cloudflare R2.', 'arriendo-facil' ) );
 		}
 	}

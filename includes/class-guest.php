@@ -187,27 +187,35 @@ class Arriendo_Facil_Guest {
 
 		if ( $inserted ) {
 			$guest_id = (int) $wpdb->insert_id;
-			$contract_info = $this->create_lease_contract_for_guest(
-				$guest_id,
-				array(
-					'accommodation_id'  => $accommodation_id,
-					'rental_mode'       => $rental_mode,
-					'rental_start_date' => $rental_start_date,
-					'rental_end_date'   => $rental_end_date,
-					'rental_months'     => $rental_months,
-					'rental_years'      => $rental_years,
-					'desired_price'     => $desired_price,
-					'guarantee_text'    => $guarantee_text,
-					'phone'             => $phone,
-					'id_number'         => $id_number,
-					'mascotas'          => $mascotas,
-					'referencia_personal_1' => $referencia_personal_1,
-					'referencia_personal_2' => $referencia_personal_2,
-					'personas_viviran'  => $personas_viviran,
-					'name'              => trim( $first_name . ' ' . $last_name ),
-					'email'             => $email,
-				)
-			);
+			try {
+				$contract_info = $this->create_lease_contract_for_guest(
+					$guest_id,
+					array(
+						'accommodation_id'  => $accommodation_id,
+						'rental_mode'       => $rental_mode,
+						'rental_start_date' => $rental_start_date,
+						'rental_end_date'   => $rental_end_date,
+						'rental_months'     => $rental_months,
+						'rental_years'      => $rental_years,
+						'desired_price'     => $desired_price,
+						'guarantee_text'    => $guarantee_text,
+						'phone'             => $phone,
+						'id_number'         => $id_number,
+						'mascotas'          => $mascotas,
+						'referencia_personal_1' => $referencia_personal_1,
+						'referencia_personal_2' => $referencia_personal_2,
+						'personas_viviran'  => $personas_viviran,
+						'name'              => trim( $first_name . ' ' . $last_name ),
+						'email'             => $email,
+					)
+				);
+			} catch ( Throwable $throwable ) {
+				error_log( 'Arriendo Facil lease auto-generation error: ' . $throwable->getMessage() );
+				$contract_info = array(
+					'generated' => false,
+					'error'     => 'lease_generation_failed',
+				);
+			}
 
 			wp_send_json_success(
 				array(
@@ -532,6 +540,7 @@ class Arriendo_Facil_Guest {
 		}
 
 		$owner_contract_example = $this->get_owner_contract_example_context( $accommodation_id );
+		$owner_template_exists  = ! empty( $owner_contract_example['attachment_id'] );
 		$accommodation_address  = (string) get_post_meta( $accommodation_id, '_af_address', true );
 		$accommodation_title    = (string) get_the_title( $accommodation_id );
 
@@ -568,33 +577,55 @@ class Arriendo_Facil_Guest {
 		$ai_payload['legal_requirements'] = $this->get_contract_legal_requirements();
 		$ai_payload['legal_template_base'] = $this->build_legal_contract_template( $ai_payload, '' );
 
-		$ai = new Arriendo_Facil_AI_Service();
-		$document_result = $ai->generate_document( $ai_payload );
+		$document_result = new WP_Error( 'af_ai_not_executed', __( 'AI document generation was not executed.', 'arriendo-facil' ) );
+		try {
+			$ai = new Arriendo_Facil_AI_Service();
+			$document_result = $ai->generate_document( $ai_payload );
+		} catch ( Throwable $throwable ) {
+			error_log( 'Arriendo Facil AI document generation exception: ' . $throwable->getMessage() );
+			$document_result = new WP_Error( 'af_ai_exception', __( 'AI document generation failed unexpectedly.', 'arriendo-facil' ) );
+		}
 
 		$generated_contract_text = '';
-		if ( ! is_wp_error( $document_result ) && isset( $document_result['contract_text'] ) && is_string( $document_result['contract_text'] ) ) {
-			$generated_contract_text = trim( wp_strip_all_tags( $document_result['contract_text'] ) );
-		}
 
-		if ( '' === $generated_contract_text && isset( $ai_payload['template_text'] ) && is_string( $ai_payload['template_text'] ) && '' !== trim( $ai_payload['template_text'] ) ) {
-			$generated_contract_text = $ai_payload['template_text'];
-		}
+		// Strict business rule: if owner template exists, always build the final contract from that template.
+		if ( $owner_template_exists ) {
+			if ( isset( $ai_payload['template_text'] ) && is_string( $ai_payload['template_text'] ) && '' !== trim( $ai_payload['template_text'] ) ) {
+				$generated_contract_text = $this->fill_owner_template_with_lease_data( $ai_payload['template_text'], $ai_payload );
+			}
 
-		if ( '' === $generated_contract_text ) {
-			$generated_contract_text = $this->build_fallback_contract_text( $ai_payload );
+			if ( '' === $generated_contract_text && isset( $ai_payload['template_text'] ) && is_string( $ai_payload['template_text'] ) ) {
+				$generated_contract_text = trim( (string) $ai_payload['template_text'] );
+			}
+
+			if ( '' === $generated_contract_text ) {
+				$generated_contract_text = $this->build_owner_template_unreadable_fallback_text( $ai_payload );
+			}
+		} else {
+			if ( ! is_wp_error( $document_result ) && isset( $document_result['contract_text'] ) && is_string( $document_result['contract_text'] ) ) {
+				$generated_contract_text = trim( wp_strip_all_tags( $document_result['contract_text'] ) );
+			}
+
+			if ( '' === $generated_contract_text ) {
+				$generated_contract_text = $this->build_fallback_contract_text( $ai_payload );
+			}
 		}
 
 		$generated_contract_text = $this->normalize_generated_legal_contract_text( $generated_contract_text, $ai_payload );
 
 		$document_url = '';
-		if ( ! is_wp_error( $document_result ) && isset( $document_result['document_url'] ) && is_string( $document_result['document_url'] ) ) {
+		if ( ! $owner_template_exists && ! is_wp_error( $document_result ) && isset( $document_result['document_url'] ) && is_string( $document_result['document_url'] ) ) {
 			$document_url = esc_url_raw( $document_result['document_url'] );
 		}
 
 		if ( '' === $document_url && '' !== $generated_contract_text ) {
-			$generated_file_url = $this->create_generated_contract_file( $lease_id, $generated_contract_text, $ai_payload );
-			if ( $generated_file_url ) {
-				$document_url = $generated_file_url;
+			try {
+				$generated_file_url = $this->create_generated_contract_file( $lease_id, $generated_contract_text, $ai_payload );
+				if ( $generated_file_url ) {
+					$document_url = $generated_file_url;
+				}
+			} catch ( Throwable $throwable ) {
+				error_log( 'Arriendo Facil contract file generation exception: ' . $throwable->getMessage() );
 			}
 		}
 
@@ -610,6 +641,47 @@ class Arriendo_Facil_Guest {
 			'template_used' => ! empty( $owner_contract_example['attachment_id'] ),
 			'template_attachment_id' => isset( $owner_contract_example['attachment_id'] ) ? (int) $owner_contract_example['attachment_id'] : 0,
 		);
+	}
+
+	/**
+	 * Builds owner-template fallback text when attachment exists but no readable text was extracted.
+	 *
+	 * @param array $payload Lease and guest context.
+	 * @return string
+	 */
+	private function build_owner_template_unreadable_fallback_text( array $payload ) {
+		$owner_name   = isset( $payload['owner_name'] ) ? sanitize_text_field( (string) $payload['owner_name'] ) : 'Propietario';
+		$guest_name   = isset( $payload['guest_name'] ) ? sanitize_text_field( (string) $payload['guest_name'] ) : 'Arrendatario';
+		$guest_id     = isset( $payload['guest_id_number'] ) ? sanitize_text_field( (string) $payload['guest_id_number'] ) : 'N/D';
+		$property     = isset( $payload['accommodation_title'] ) ? sanitize_text_field( (string) $payload['accommodation_title'] ) : 'Inmueble';
+		$address      = isset( $payload['accommodation_address'] ) ? sanitize_text_field( (string) $payload['accommodation_address'] ) : '';
+		$start_date   = isset( $payload['start_date'] ) ? sanitize_text_field( (string) $payload['start_date'] ) : '';
+		$end_date     = isset( $payload['end_date'] ) ? sanitize_text_field( (string) $payload['end_date'] ) : '';
+		$rent_value   = isset( $payload['monthly_rent'] ) ? number_format( (float) $payload['monthly_rent'], 2, '.', '' ) : '';
+		$template_url = isset( $payload['template_url'] ) ? esc_url_raw( (string) $payload['template_url'] ) : '';
+
+		$text  = "PLANTILLA DE CONTRATO DEL OWNER (SIN TEXTO EXTRAIBLE)\n";
+		$text .= "\n";
+		$text .= "Este contrato se genero usando el documento del owner como fuente obligatoria.\n";
+		if ( '' !== $template_url ) {
+			$text .= "Referencia de plantilla owner: " . $template_url . "\n";
+		}
+		$text .= "\n";
+		$text .= "Datos para completar en la plantilla:\n";
+		$text .= "Arrendador: " . $owner_name . "\n";
+		$text .= "Arrendatario: " . $guest_name . " (Cedula: " . $guest_id . ")\n";
+		$text .= "Inmueble: " . $property . "\n";
+		if ( '' !== $address ) {
+			$text .= "Direccion: " . $address . "\n";
+		}
+		if ( '' !== $start_date || '' !== $end_date ) {
+			$text .= "Plazo: " . $start_date . " a " . $end_date . "\n";
+		}
+		if ( '' !== $rent_value ) {
+			$text .= "Canon mensual: USD " . $rent_value . "\n";
+		}
+
+		return trim( $text );
 	}
 
 	/**
@@ -743,10 +815,33 @@ class Arriendo_Facil_Guest {
 			return $this->build_legal_contract_template( $payload, '' );
 		}
 
+		$has_owner_template = ! empty( $payload['template_available'] )
+			&& isset( $payload['template_text'] )
+			&& is_string( $payload['template_text'] )
+			&& '' !== trim( $payload['template_text'] );
+
 		$lower_text = strtolower( $contract_text );
 		$has_title  = false !== strpos( $lower_text, 'contrato de arrendamiento' );
 		$has_clause = false !== strpos( $lower_text, 'clausula' );
 		$has_sign   = false !== strpos( $lower_text, 'firma' ) || false !== strpos( $lower_text, 'arrendatario:' );
+
+		if ( $has_owner_template ) {
+			if ( ! $has_sign ) {
+				$signature_block = "\n\nFIRMAS\n\nARRENDADOR: ________________________\nNombre: "
+					. ( isset( $payload['owner_name'] ) ? sanitize_text_field( (string) $payload['owner_name'] ) : '________________________' )
+					. "\nCedula/RUC: "
+					. ( isset( $payload['owner_id_number'] ) ? sanitize_text_field( (string) $payload['owner_id_number'] ) : '________________________' )
+					. "\n\nARRENDATARIO: ________________________\nNombre: "
+					. ( isset( $payload['guest_name'] ) ? sanitize_text_field( (string) $payload['guest_name'] ) : '________________________' )
+					. "\nCedula: "
+					. ( isset( $payload['guest_id_number'] ) ? sanitize_text_field( (string) $payload['guest_id_number'] ) : '________________________' )
+					. "\n";
+
+				$contract_text .= $signature_block;
+			}
+
+			return $contract_text;
+		}
 
 		if ( ! $has_title || ! $has_clause || strlen( $contract_text ) < 700 ) {
 			return $this->build_legal_contract_template( $payload, $contract_text );
@@ -767,6 +862,98 @@ class Arriendo_Facil_Guest {
 		}
 
 		return $contract_text;
+	}
+
+	/**
+	 * Fills common owner-template placeholders with lease and guest values.
+	 *
+	 * @param string $template_text Owner template raw text.
+	 * @param array  $payload Lease and guest context.
+	 * @return string
+	 */
+	private function fill_owner_template_with_lease_data( $template_text, array $payload ) {
+		$template_text = trim( (string) $template_text );
+		if ( '' === $template_text ) {
+			return '';
+		}
+
+		$field_values = array(
+			'owner_name'            => isset( $payload['owner_name'] ) ? sanitize_text_field( (string) $payload['owner_name'] ) : '',
+			'owner_email'           => isset( $payload['owner_email'] ) ? sanitize_email( (string) $payload['owner_email'] ) : '',
+			'owner_id_number'       => isset( $payload['owner_id_number'] ) ? sanitize_text_field( (string) $payload['owner_id_number'] ) : '',
+			'guest_name'            => isset( $payload['guest_name'] ) ? sanitize_text_field( (string) $payload['guest_name'] ) : '',
+			'guest_email'           => isset( $payload['guest_email'] ) ? sanitize_email( (string) $payload['guest_email'] ) : '',
+			'guest_phone'           => isset( $payload['guest_phone'] ) ? sanitize_text_field( (string) $payload['guest_phone'] ) : '',
+			'guest_id_number'       => isset( $payload['guest_id_number'] ) ? sanitize_text_field( (string) $payload['guest_id_number'] ) : '',
+			'accommodation_title'   => isset( $payload['accommodation_title'] ) ? sanitize_text_field( (string) $payload['accommodation_title'] ) : '',
+			'accommodation_address' => isset( $payload['accommodation_address'] ) ? sanitize_text_field( (string) $payload['accommodation_address'] ) : '',
+			'start_date'            => isset( $payload['start_date'] ) ? sanitize_text_field( (string) $payload['start_date'] ) : '',
+			'end_date'              => isset( $payload['end_date'] ) ? sanitize_text_field( (string) $payload['end_date'] ) : '',
+			'monthly_rent'          => isset( $payload['monthly_rent'] ) ? number_format( (float) $payload['monthly_rent'], 2, '.', '' ) : '',
+			'desired_price'         => isset( $payload['desired_price'] ) ? sanitize_text_field( (string) $payload['desired_price'] ) : '',
+			'guarantee_text'        => isset( $payload['guarantee_text'] ) ? sanitize_text_field( (string) $payload['guarantee_text'] ) : '',
+			'current_date'          => current_time( 'Y-m-d' ),
+		);
+
+		if ( '' === $field_values['monthly_rent'] && '' !== $field_values['desired_price'] ) {
+			$field_values['monthly_rent'] = $field_values['desired_price'];
+		}
+
+		$aliases = array(
+			'owner_name' => array( 'owner_name', 'owner', 'landlord_name', 'nombre_arrendador', 'arrendador_nombre', 'propietario_nombre', 'nombre_propietario' ),
+			'owner_email' => array( 'owner_email', 'landlord_email', 'correo_arrendador', 'email_arrendador', 'correo_propietario', 'email_propietario' ),
+			'owner_id_number' => array( 'owner_id', 'owner_id_number', 'landlord_id', 'cedula_arrendador', 'ruc_arrendador', 'cedula_propietario', 'id_propietario' ),
+			'guest_name' => array( 'guest_name', 'tenant_name', 'nombre_arrendatario', 'arrendatario_nombre', 'inquilino_nombre', 'nombre_inquilino' ),
+			'guest_email' => array( 'guest_email', 'tenant_email', 'correo_arrendatario', 'email_arrendatario', 'correo_inquilino', 'email_inquilino' ),
+			'guest_phone' => array( 'guest_phone', 'tenant_phone', 'telefono_arrendatario', 'celular_arrendatario', 'telefono_inquilino', 'celular_inquilino' ),
+			'guest_id_number' => array( 'guest_id', 'guest_id_number', 'tenant_id', 'cedula_arrendatario', 'id_arrendatario', 'cedula_inquilino', 'id_inquilino' ),
+			'accommodation_title' => array( 'property_name', 'accommodation_title', 'nombre_inmueble', 'inmueble', 'propiedad', 'nombre_propiedad' ),
+			'accommodation_address' => array( 'property_address', 'accommodation_address', 'direccion_inmueble', 'direccion_propiedad', 'direccion' ),
+			'start_date' => array( 'start_date', 'lease_start', 'fecha_inicio', 'fecha_inicio_arriendo', 'inicio_contrato' ),
+			'end_date' => array( 'end_date', 'lease_end', 'fecha_fin', 'fecha_fin_arriendo', 'fin_contrato' ),
+			'monthly_rent' => array( 'monthly_rent', 'rent', 'canon', 'canon_mensual', 'valor_arriendo', 'precio_mensual' ),
+			'guarantee_text' => array( 'guarantee', 'guarantee_text', 'garantia', 'detalle_garantia' ),
+			'current_date' => array( 'current_date', 'fecha_actual', 'fecha_hoy' ),
+		);
+
+		$token_map = array();
+		foreach ( $aliases as $field_key => $tokens ) {
+			$value = isset( $field_values[ $field_key ] ) ? (string) $field_values[ $field_key ] : '';
+			if ( '' === $value ) {
+				continue;
+			}
+
+			foreach ( $tokens as $token ) {
+				$normalized = strtolower( preg_replace( '/[^a-z0-9]/', '', (string) $token ) );
+				if ( '' !== $normalized ) {
+					$token_map[ $normalized ] = $value;
+				}
+			}
+		}
+
+		$filled = preg_replace_callback(
+			'/\{\{\s*([a-zA-Z0-9_\-\s]+)\s*\}\}|\[\[\s*([a-zA-Z0-9_\-\s]+)\s*\]\]|<<\s*([a-zA-Z0-9_\-\s]+)\s*>>/',
+			static function ( $matches ) use ( $token_map ) {
+				$raw = '';
+				if ( ! empty( $matches[1] ) ) {
+					$raw = (string) $matches[1];
+				} elseif ( ! empty( $matches[2] ) ) {
+					$raw = (string) $matches[2];
+				} elseif ( ! empty( $matches[3] ) ) {
+					$raw = (string) $matches[3];
+				}
+
+				$key = strtolower( preg_replace( '/[^a-z0-9]/', '', $raw ) );
+				if ( '' !== $key && isset( $token_map[ $key ] ) ) {
+					return $token_map[ $key ];
+				}
+
+				return $matches[0];
+			},
+			$template_text
+		);
+
+		return trim( (string) $filled );
 	}
 
 	/**
@@ -896,6 +1083,7 @@ class Arriendo_Facil_Guest {
 		}
 
 		$mime_type = strtolower( (string) $mime_type );
+		$extension = strtolower( (string) pathinfo( (string) $file_path, PATHINFO_EXTENSION ) );
 
 		if ( false !== strpos( $mime_type, 'text/' ) ) {
 			$content = file_get_contents( $file_path );
@@ -906,20 +1094,150 @@ class Arriendo_Facil_Guest {
 			return '';
 		}
 
-		if ( 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' === $mime_type && class_exists( 'ZipArchive' ) ) {
-			$zip = new ZipArchive();
-			if ( true === $zip->open( $file_path ) ) {
-				$xml = $zip->getFromName( 'word/document.xml' );
-				$zip->close();
+		if ( 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' === $mime_type || 'docx' === $extension ) {
+			if ( class_exists( 'ZipArchive' ) ) {
+				$zip = new ZipArchive();
+				if ( true === $zip->open( $file_path ) ) {
+					$xml = $zip->getFromName( 'word/document.xml' );
+					$zip->close();
 
-				if ( false !== $xml && '' !== $xml ) {
-					$text = preg_replace( '/\s+/', ' ', wp_strip_all_tags( (string) $xml ) );
-					return $this->limit_template_text( (string) $text );
+					if ( false !== $xml && '' !== $xml ) {
+						$text = preg_replace( '/\s+/', ' ', wp_strip_all_tags( (string) $xml ) );
+						return $this->limit_template_text( (string) $text );
+					}
+				}
+			}
+
+			return '';
+		}
+
+		if ( false !== strpos( $mime_type, 'application/pdf' ) || 'pdf' === $extension ) {
+			return $this->limit_template_text( $this->extract_text_from_pdf_file( $file_path ) );
+		}
+
+		if ( false !== strpos( $mime_type, 'application/msword' ) || 'doc' === $extension ) {
+			return $this->limit_template_text( $this->extract_text_from_legacy_doc_file( $file_path ) );
+		}
+
+		$content = file_get_contents( $file_path );
+		if ( false !== $content ) {
+			$fallback_text = preg_replace( '/[^\x09\x0A\x0D\x20-\x7E]/', ' ', (string) $content );
+			return $this->limit_template_text( (string) $fallback_text );
+		}
+
+		return '';
+	}
+
+	/**
+	 * Extracts readable text from a PDF file using basic stream parsing.
+	 *
+	 * @param string $file_path PDF path.
+	 * @return string
+	 */
+	private function extract_text_from_pdf_file( $file_path ) {
+		$content = file_get_contents( $file_path );
+		if ( false === $content || '' === $content ) {
+			return '';
+		}
+
+		$buffers = array( (string) $content );
+		if ( preg_match_all( '/stream(.*?)endstream/s', (string) $content, $stream_matches ) ) {
+			foreach ( $stream_matches[1] as $stream ) {
+				$stream = ltrim( (string) $stream, "\r\n" );
+				$stream = rtrim( $stream, "\r\n" );
+
+				$decoded = @gzuncompress( $stream );
+				if ( false === $decoded ) {
+					$decoded = @gzinflate( $stream );
+				}
+
+				$buffers[] = ( false !== $decoded && '' !== $decoded ) ? (string) $decoded : $stream;
+			}
+		}
+
+		$text_chunks = array();
+		foreach ( $buffers as $buffer ) {
+			if ( preg_match_all( '/\((.*?)\)\s*Tj/s', (string) $buffer, $matches ) ) {
+				foreach ( $matches[1] as $token ) {
+					$decoded_token = $this->decode_pdf_text_token( (string) $token );
+					if ( '' !== $decoded_token ) {
+						$text_chunks[] = $decoded_token;
+					}
+				}
+			}
+
+			if ( preg_match_all( '/\[(.*?)\]\s*TJ/s', (string) $buffer, $matches ) ) {
+				foreach ( $matches[1] as $array_body ) {
+					if ( preg_match_all( '/\((.*?)\)/s', (string) $array_body, $token_matches ) ) {
+						foreach ( $token_matches[1] as $token ) {
+							$decoded_token = $this->decode_pdf_text_token( (string) $token );
+							if ( '' !== $decoded_token ) {
+								$text_chunks[] = $decoded_token;
+							}
+						}
+					}
 				}
 			}
 		}
 
-		return '';
+		if ( empty( $text_chunks ) ) {
+			return '';
+		}
+
+		return trim( preg_replace( '/\s+/', ' ', implode( ' ', $text_chunks ) ) );
+	}
+
+	/**
+	 * Decodes escaped PDF text token content.
+	 *
+	 * @param string $token Token text.
+	 * @return string
+	 */
+	private function decode_pdf_text_token( $token ) {
+		$token = preg_replace_callback(
+			'/\\\\([0-7]{1,3})/',
+			static function ( $matches ) {
+				return chr( octdec( $matches[1] ) );
+			},
+			(string) $token
+		);
+
+		$token = strtr(
+			(string) $token,
+			array(
+				'\\n'   => "\n",
+				'\\r'   => "\r",
+				'\\t'   => "\t",
+				'\\b'   => '',
+				'\\f'   => '',
+				'\\('   => '(',
+				'\\)'   => ')',
+				'\\\\' => '\\',
+			)
+		);
+
+		$token = wp_strip_all_tags( $token );
+		$token = preg_replace( '/[^\x09\x0A\x0D\x20-\x7E]/', ' ', (string) $token );
+
+		return trim( (string) $token );
+	}
+
+	/**
+	 * Extracts rough text from legacy .doc binary file.
+	 *
+	 * @param string $file_path DOC path.
+	 * @return string
+	 */
+	private function extract_text_from_legacy_doc_file( $file_path ) {
+		$content = file_get_contents( $file_path );
+		if ( false === $content || '' === $content ) {
+			return '';
+		}
+
+		$text = preg_replace( '/[^\x09\x0A\x0D\x20-\x7E]/', ' ', (string) $content );
+		$text = preg_replace( '/\s+/', ' ', (string) $text );
+
+		return trim( (string) $text );
 	}
 
 	/**
@@ -968,9 +1286,16 @@ class Arriendo_Facil_Guest {
 
 		$file_name = sprintf( 'lease-%d-contract-%s.docx', $lease_id, gmdate( 'Ymd-His' ) );
 		$file_path = trailingslashit( $contracts_dir ) . $file_name;
+		$mime_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
 		if ( ! $this->write_contract_docx_file( $file_path, $contract_text, $payload ) ) {
-			return '';
+			$file_name = sprintf( 'lease-%d-contract-%s.doc', $lease_id, gmdate( 'Ymd-His' ) );
+			$file_path = trailingslashit( $contracts_dir ) . $file_name;
+			$mime_type = 'application/msword';
+
+			if ( ! $this->write_contract_doc_fallback_file( $file_path, $contract_text ) ) {
+				return '';
+			}
 		}
 
 		$local_url     = trailingslashit( $uploads['baseurl'] ) . 'arriendo-facil/contracts/' . rawurlencode( $file_name );
@@ -979,7 +1304,7 @@ class Arriendo_Facil_Guest {
 			'provider'  => 'local',
 			'file_name' => $file_name,
 			'local_url' => $local_url,
-			'mime_type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+			'mime_type' => $mime_type,
 		);
 
 		$storage_provider = $this->get_storage_setting( 'AF_STORAGE_PROVIDER', 'af_storage_provider', 'cloudflare_r2' );
@@ -992,7 +1317,7 @@ class Arriendo_Facil_Guest {
 					$upload     = $this->upload_contents_to_r2(
 						$contents,
 						$object_key,
-						'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+						$mime_type,
 						$r2_config
 					);
 
@@ -1009,7 +1334,7 @@ class Arriendo_Facil_Guest {
 							'object_key' => $object_key,
 							'file_name'  => $file_name,
 							'local_url'  => $local_url,
-							'mime_type'  => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+							'mime_type'  => $mime_type,
 						);
 					}
 				}
@@ -1022,6 +1347,39 @@ class Arriendo_Facil_Guest {
 		}
 
 		return $document_url;
+	}
+
+	/**
+	 * Writes a fallback MS Word-compatible HTML document when DOCX is unavailable.
+	 *
+	 * @param string $file_path Destination file path.
+	 * @param string $contract_text Contract text.
+	 * @return bool
+	 */
+	private function write_contract_doc_fallback_file( $file_path, $contract_text ) {
+		$lines = preg_split( '/\r\n|\r|\n/', (string) $contract_text );
+		if ( ! is_array( $lines ) ) {
+			$lines = array( (string) $contract_text );
+		}
+
+		$body = '';
+		foreach ( $lines as $line ) {
+			$line = trim( (string) $line );
+			if ( '' === $line ) {
+				$body .= '<p>&nbsp;</p>';
+				continue;
+			}
+
+			$body .= '<p>' . esc_html( $line ) . '</p>';
+		}
+
+		if ( '' === $body ) {
+			$body = '<p>Contrato</p>';
+		}
+
+		$html = '<html><head><meta charset="UTF-8"></head><body style="font-family:Times New Roman, serif; font-size:12pt;">' . $body . '</body></html>';
+
+		return false !== file_put_contents( $file_path, $html );
 	}
 
 	/**

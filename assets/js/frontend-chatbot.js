@@ -645,12 +645,28 @@
 					signal: state.activeRequestController.signal
 			})
 				.then(function (response) {
-						return response.json().catch(function () {
-							return null;
-						});
+					return response.text().then(function (rawText) {
+						var payload = null;
+						var text = String(rawText || '').trim();
+
+						if (text) {
+							try {
+								payload = JSON.parse(text);
+							} catch (parseError) {
+								payload = null;
+							}
+						}
+
+						return {
+							ok: response.ok,
+							status: response.status,
+							payload: payload
+						};
+					});
 				})
-				.then(function (payload) {
-					if (payload && payload.success) {
+				.then(function (result) {
+					var payload = result && result.payload ? result.payload : null;
+					if (result && result.ok && payload && payload.success) {
 						message.className = 'af-chatbot-success';
 						message.textContent = (payload.data && payload.data.message) || afChatbot.successText;
 						appendBubble(message.textContent, 'bot');
@@ -662,9 +678,23 @@
 						showForm(false);
 						return;
 					}
+
+					var errorMessage = (payload && payload.data && payload.data.message) ? payload.data.message : '';
+					if (!errorMessage && result) {
+						if (result.status === 403) {
+							errorMessage = 'Tu sesion expiro. Recarga la pagina y vuelve a intentarlo.';
+						} else if (result.status === 400) {
+							errorMessage = 'Faltan datos obligatorios o hay un formato invalido. Revisa tus respuestas.';
+						} else if (result.status === 413) {
+							errorMessage = 'La solicitud es demasiado grande para el servidor.';
+						} else if (result.status >= 500) {
+							errorMessage = 'Error interno del servidor. Intenta nuevamente en unos minutos.';
+						}
+					}
+
 					state.lastSubmitFailed = true;
 					message.className = 'af-chatbot-error';
-					message.textContent = (payload && payload.data && payload.data.message) || afChatbot.errorText;
+					message.textContent = errorMessage || afChatbot.errorText;
 					appendBubble(message.textContent, 'bot');
 						appendBubble('Puedes corregir datos con "Volver", reintentar con Enviar o escribir "cancelar" para reiniciar.', 'bot');
 				})

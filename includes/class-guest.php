@@ -32,7 +32,14 @@ class Arriendo_Facil_Guest {
 	 * Creates a new guest record from frontend chatbot via AJAX.
 	 */
 	public function ajax_create_guest_frontend() {
-		check_ajax_referer( 'af_guest_frontend_nonce', 'nonce' );
+		if ( false === check_ajax_referer( 'af_guest_frontend_nonce', 'nonce', false ) ) {
+			wp_send_json_error(
+				array(
+					'message' => __( 'Tu sesion expiro. Recarga la pagina y vuelve a intentarlo.', 'arriendo-facil' ),
+				),
+				403
+			);
+		}
 
 		$name       = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
 		$email      = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';

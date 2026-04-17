@@ -432,6 +432,7 @@ class Arriendo_Facil_Admin {
 		}
 
 		$mime_type = strtolower( (string) $mime_type );
+		$extension = strtolower( (string) pathinfo( (string) $file_path, PATHINFO_EXTENSION ) );
 
 		if ( false !== strpos( $mime_type, 'text/' ) ) {
 			$content = file_get_contents( $file_path );
@@ -442,20 +443,150 @@ class Arriendo_Facil_Admin {
 			return '';
 		}
 
-		if ( 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' === $mime_type && class_exists( 'ZipArchive' ) ) {
-			$zip = new ZipArchive();
-			if ( true === $zip->open( $file_path ) ) {
-				$xml = $zip->getFromName( 'word/document.xml' );
-				$zip->close();
+		if ( 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' === $mime_type || 'docx' === $extension ) {
+			if ( class_exists( 'ZipArchive' ) ) {
+				$zip = new ZipArchive();
+				if ( true === $zip->open( $file_path ) ) {
+					$xml = $zip->getFromName( 'word/document.xml' );
+					$zip->close();
 
-				if ( false !== $xml && '' !== $xml ) {
-					$text = preg_replace( '/\s+/', ' ', wp_strip_all_tags( (string) $xml ) );
-					return $this->limit_template_text( (string) $text );
+					if ( false !== $xml && '' !== $xml ) {
+						$text = preg_replace( '/\s+/', ' ', wp_strip_all_tags( (string) $xml ) );
+						return $this->limit_template_text( (string) $text );
+					}
+				}
+			}
+
+			return '';
+		}
+
+		if ( false !== strpos( $mime_type, 'application/pdf' ) || 'pdf' === $extension ) {
+			return $this->limit_template_text( $this->extract_text_from_pdf_file( $file_path ) );
+		}
+
+		if ( false !== strpos( $mime_type, 'application/msword' ) || 'doc' === $extension ) {
+			return $this->limit_template_text( $this->extract_text_from_legacy_doc_file( $file_path ) );
+		}
+
+		$content = file_get_contents( $file_path );
+		if ( false !== $content ) {
+			$fallback_text = preg_replace( '/[^\x09\x0A\x0D\x20-\x7E]/', ' ', (string) $content );
+			return $this->limit_template_text( (string) $fallback_text );
+		}
+
+		return '';
+	}
+
+	/**
+	 * Extracts readable text from a PDF file using basic stream parsing.
+	 *
+	 * @param string $file_path PDF path.
+	 * @return string
+	 */
+	private function extract_text_from_pdf_file( $file_path ) {
+		$content = file_get_contents( $file_path );
+		if ( false === $content || '' === $content ) {
+			return '';
+		}
+
+		$buffers = array( (string) $content );
+		if ( preg_match_all( '/stream(.*?)endstream/s', (string) $content, $stream_matches ) ) {
+			foreach ( $stream_matches[1] as $stream ) {
+				$stream = ltrim( (string) $stream, "\r\n" );
+				$stream = rtrim( $stream, "\r\n" );
+
+				$decoded = @gzuncompress( $stream );
+				if ( false === $decoded ) {
+					$decoded = @gzinflate( $stream );
+				}
+
+				$buffers[] = ( false !== $decoded && '' !== $decoded ) ? (string) $decoded : $stream;
+			}
+		}
+
+		$text_chunks = array();
+		foreach ( $buffers as $buffer ) {
+			if ( preg_match_all( '/\((.*?)\)\s*Tj/s', (string) $buffer, $matches ) ) {
+				foreach ( $matches[1] as $token ) {
+					$decoded_token = $this->decode_pdf_text_token( (string) $token );
+					if ( '' !== $decoded_token ) {
+						$text_chunks[] = $decoded_token;
+					}
+				}
+			}
+
+			if ( preg_match_all( '/\[(.*?)\]\s*TJ/s', (string) $buffer, $matches ) ) {
+				foreach ( $matches[1] as $array_body ) {
+					if ( preg_match_all( '/\((.*?)\)/s', (string) $array_body, $token_matches ) ) {
+						foreach ( $token_matches[1] as $token ) {
+							$decoded_token = $this->decode_pdf_text_token( (string) $token );
+							if ( '' !== $decoded_token ) {
+								$text_chunks[] = $decoded_token;
+							}
+						}
+					}
 				}
 			}
 		}
 
-		return '';
+		if ( empty( $text_chunks ) ) {
+			return '';
+		}
+
+		return trim( preg_replace( '/\s+/', ' ', implode( ' ', $text_chunks ) ) );
+	}
+
+	/**
+	 * Decodes escaped PDF text token content.
+	 *
+	 * @param string $token Token text.
+	 * @return string
+	 */
+	private function decode_pdf_text_token( $token ) {
+		$token = preg_replace_callback(
+			'/\\\\([0-7]{1,3})/',
+			static function ( $matches ) {
+				return chr( octdec( $matches[1] ) );
+			},
+			(string) $token
+		);
+
+		$token = strtr(
+			(string) $token,
+			array(
+				'\\n'   => "\n",
+				'\\r'   => "\r",
+				'\\t'   => "\t",
+				'\\b'   => '',
+				'\\f'   => '',
+				'\\('   => '(',
+				'\\)'   => ')',
+				'\\\\' => '\\',
+			)
+		);
+
+		$token = wp_strip_all_tags( $token );
+		$token = preg_replace( '/[^\x09\x0A\x0D\x20-\x7E]/', ' ', (string) $token );
+
+		return trim( (string) $token );
+	}
+
+	/**
+	 * Extracts rough text from legacy .doc binary file.
+	 *
+	 * @param string $file_path DOC path.
+	 * @return string
+	 */
+	private function extract_text_from_legacy_doc_file( $file_path ) {
+		$content = file_get_contents( $file_path );
+		if ( false === $content || '' === $content ) {
+			return '';
+		}
+
+		$text = preg_replace( '/[^\x09\x0A\x0D\x20-\x7E]/', ' ', (string) $content );
+		$text = preg_replace( '/\s+/', ' ', (string) $text );
+
+		return trim( (string) $text );
 	}
 
 	/**
@@ -503,8 +634,14 @@ class Arriendo_Facil_Admin {
 
 		$file_name = sprintf( 'lease-%d-contract-admin-%s.docx', $lease_id, gmdate( 'Ymd-His' ) );
 		$file_path = trailingslashit( $contracts_dir ) . $file_name;
+		$mime_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 		if ( ! $this->write_contract_docx_file( $file_path, $contract_text ) ) {
-			return '';
+			$file_name = sprintf( 'lease-%d-contract-admin-%s.doc', $lease_id, gmdate( 'Ymd-His' ) );
+			$file_path = trailingslashit( $contracts_dir ) . $file_name;
+			$mime_type = 'application/msword';
+			if ( ! $this->write_contract_doc_fallback_file( $file_path, $contract_text ) ) {
+				return '';
+			}
 		}
 
 		$local_url     = trailingslashit( $uploads['baseurl'] ) . 'arriendo-facil/contracts/' . rawurlencode( $file_name );
@@ -513,7 +650,7 @@ class Arriendo_Facil_Admin {
 			'provider'  => 'local',
 			'file_name' => $file_name,
 			'local_url' => $local_url,
-			'mime_type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+			'mime_type' => $mime_type,
 		);
 
 		$storage_provider = $this->get_storage_setting( 'AF_STORAGE_PROVIDER', 'af_storage_provider', 'cloudflare_r2' );
@@ -526,7 +663,7 @@ class Arriendo_Facil_Admin {
 					$upload     = $this->upload_contents_to_r2(
 						$contents,
 						$object_key,
-						'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+						$mime_type,
 						$r2_config
 					);
 					if ( ! is_wp_error( $upload ) ) {
@@ -542,7 +679,7 @@ class Arriendo_Facil_Admin {
 							'object_key' => $object_key,
 							'file_name'  => $file_name,
 							'local_url'  => $local_url,
-							'mime_type'  => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+							'mime_type'  => $mime_type,
 						);
 					}
 				}
@@ -555,6 +692,39 @@ class Arriendo_Facil_Admin {
 		}
 
 		return $document_url;
+	}
+
+	/**
+	 * Writes a fallback MS Word-compatible HTML document when DOCX is unavailable.
+	 *
+	 * @param string $file_path Destination path.
+	 * @param string $contract_text Contract text.
+	 * @return bool
+	 */
+	private function write_contract_doc_fallback_file( $file_path, $contract_text ) {
+		$lines = preg_split( '/\r\n|\r|\n/', (string) $contract_text );
+		if ( ! is_array( $lines ) ) {
+			$lines = array( (string) $contract_text );
+		}
+
+		$body = '';
+		foreach ( $lines as $line ) {
+			$line = trim( (string) $line );
+			if ( '' === $line ) {
+				$body .= '<p>&nbsp;</p>';
+				continue;
+			}
+
+			$body .= '<p>' . esc_html( $line ) . '</p>';
+		}
+
+		if ( '' === $body ) {
+			$body = '<p>Contrato</p>';
+		}
+
+		$html = '<html><head><meta charset="UTF-8"></head><body style="font-family:Times New Roman, serif; font-size:12pt;">' . $body . '</body></html>';
+
+		return false !== file_put_contents( $file_path, $html );
 	}
 
 	/**

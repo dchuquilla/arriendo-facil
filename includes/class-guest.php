@@ -139,6 +139,21 @@ class Arriendo_Facil_Guest {
 		}
 
 		global $wpdb;
+		$existing_guest_id = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT id FROM {$wpdb->prefix}af_guests WHERE email = %s LIMIT 1",
+				$email
+			)
+		);
+
+		if ( $existing_guest_id > 0 ) {
+			wp_send_json_error(
+				array(
+					'message' => __( 'Ya existe una solicitud con ese correo. Si necesitas actualizar tus datos, contactanos para ayudarte.', 'arriendo-facil' ),
+				)
+			);
+		}
+
 		$inserted = $wpdb->insert(
 			$wpdb->prefix . 'af_guests',
 			array(
@@ -196,7 +211,24 @@ class Arriendo_Facil_Guest {
 			);
 		}
 
-		wp_send_json_error( array( 'message' => __( 'No se pudo registrar tu solicitud de arriendo.', 'arriendo-facil' ) ) );
+		$db_error = isset( $wpdb->last_error ) ? trim( (string) $wpdb->last_error ) : '';
+		if ( '' !== $db_error && false !== stripos( $db_error, 'duplicate' ) && false !== stripos( $db_error, 'email' ) ) {
+			wp_send_json_error(
+				array(
+					'message' => __( 'Ya existe una solicitud con ese correo. Si necesitas actualizar tus datos, contactanos para ayudarte.', 'arriendo-facil' ),
+				)
+			);
+		}
+
+		if ( '' !== $db_error ) {
+			error_log( 'Arriendo Facil guest registration DB error: ' . $db_error );
+		}
+
+		wp_send_json_error(
+			array(
+				'message' => __( 'No se pudo registrar tu solicitud de arriendo. Intenta nuevamente en unos minutos.', 'arriendo-facil' ),
+			)
+		);
 	}
 
 	/**

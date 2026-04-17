@@ -43,6 +43,94 @@ class Arriendo_Facil_Owner_Contact {
 		add_action( 'admin_post_af_disable_owner_account', array( $this, 'handle_disable_owner_account_post' ) );
 		add_action( 'after_password_reset', array( $this, 'handle_owner_password_reset' ), 10, 2 );
 		add_filter( 'authenticate', array( $this, 'block_disabled_owner_login' ), 30, 3 );
+		add_action( 'delete_user', array( $this, 'handle_owner_user_deleted' ), 10, 3 );
+		add_action( 'wpmu_delete_user', array( $this, 'handle_owner_user_deleted_network' ), 10, 1 );
+	}
+
+	/**
+	 * Handles owner cleanup when a user is permanently deleted.
+	 *
+	 * @param int         $user_id  Deleted user ID.
+	 * @param int|false   $reassign Reassign target user ID.
+	 * @param WP_User|nil $user     Deleted user object when available.
+	 * @return void
+	 */
+	public function handle_owner_user_deleted( $user_id, $reassign = false, $user = null ) {
+		$user_id = absint( $user_id );
+		if ( ! $user_id ) {
+			return;
+		}
+
+		$owner_email = '';
+		if ( $user instanceof WP_User && ! empty( $user->user_email ) ) {
+			$owner_email = sanitize_email( (string) $user->user_email );
+		}
+
+		$this->delete_owner_related_accommodations_and_contacts( $user_id, $owner_email );
+	}
+
+	/**
+	 * Handles owner cleanup for multisite deletion hook.
+	 *
+	 * @param int $user_id Deleted user ID.
+	 * @return void
+	 */
+	public function handle_owner_user_deleted_network( $user_id ) {
+		$user_id = absint( $user_id );
+		if ( ! $user_id ) {
+			return;
+		}
+
+		$this->delete_owner_related_accommodations_and_contacts( $user_id, '' );
+	}
+
+	/**
+	 * Deletes accommodations and owner-contact rows linked to a removed owner user.
+	 *
+	 * @param int    $user_id Deleted owner user ID.
+	 * @param string $owner_email Optional owner email.
+	 * @return void
+	 */
+	private function delete_owner_related_accommodations_and_contacts( $user_id, $owner_email = '' ) {
+		global $wpdb;
+
+		$accommodation_ids = get_posts(
+			array(
+				'post_type'      => 'accommodation',
+				'post_status'    => array( 'publish', 'draft', 'pending', 'private', 'future', 'trash' ),
+				'posts_per_page' => -1,
+				'fields'         => 'ids',
+				'meta_query'     => array(
+					array(
+						'key'   => '_af_owner_id',
+						'value' => (string) absint( $user_id ),
+					),
+				),
+			)
+		);
+
+		if ( ! empty( $accommodation_ids ) ) {
+			foreach ( $accommodation_ids as $accommodation_id ) {
+				wp_delete_post( absint( $accommodation_id ), true );
+			}
+		}
+
+		$table = $wpdb->prefix . 'af_owner_contacts';
+		$wpdb->query(
+			$wpdb->prepare(
+				"DELETE FROM {$table} WHERE wp_user_id = %d",
+				$user_id
+			)
+		);
+
+		if ( '' !== trim( $owner_email ) ) {
+			$wpdb->query(
+				$wpdb->prepare(
+					"DELETE FROM {$table} WHERE owner_email = %s",
+					$owner_email
+				)
+			);
+		}
 	}
 
 	/**

@@ -104,6 +104,11 @@ $leases = $wpdb->get_results(
 						</td>
 						<td class="af-lease-actions-cell">
 							<div class="af-lease-actions-stack">
+								<?php if ( ! $versions_count && ! $lease->document_url ) : ?>
+									<button type="button" class="button button-primary af-generate-document" data-lease-id="<?php echo esc_attr( $lease->id ); ?>">
+										<?php esc_html_e( 'Generate Contract', 'arriendo-facil' ); ?>
+									</button>
+								<?php endif; ?>
 								<button type="button" class="button button-secondary af-open-upload-version-modal"
 									data-lease-id="<?php echo esc_attr( $lease->id ); ?>"
 									data-next-version="<?php echo esc_attr( $next_version ); ?>">

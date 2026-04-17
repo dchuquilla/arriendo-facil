@@ -248,28 +248,54 @@ class Arriendo_Facil_Admin {
 		}
 
 		$ai_payload = $this->build_lease_ai_payload( $lease );
+		$owner_template_exists = ! empty( $ai_payload['template_available'] );
 
-		$ai     = new Arriendo_Facil_AI_Service();
-		$result = $ai->generate_document( $ai_payload );
-
-		if ( is_wp_error( $result ) ) {
-			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
+		$result = new WP_Error( 'af_ai_not_executed', __( 'AI document generation was not executed.', 'arriendo-facil' ) );
+		try {
+			$ai     = new Arriendo_Facil_AI_Service();
+			$result = $ai->generate_document( $ai_payload );
+		} catch ( Throwable $throwable ) {
+			error_log( 'Arriendo Facil admin AI document generation exception: ' . $throwable->getMessage() );
+			$result = new WP_Error( 'af_ai_exception', __( 'AI document generation failed unexpectedly.', 'arriendo-facil' ) );
 		}
 
 		$document_url = '';
-		if ( isset( $result['document_url'] ) && is_string( $result['document_url'] ) ) {
+		if ( ! $owner_template_exists && ! is_wp_error( $result ) && isset( $result['document_url'] ) && is_string( $result['document_url'] ) ) {
 			$document_url = esc_url_raw( $result['document_url'] );
 		}
 
-		if ( '' === $document_url && isset( $result['contract_text'] ) && is_string( $result['contract_text'] ) ) {
-			$document_url = $this->create_generated_contract_file( $lease_id, $result['contract_text'] );
+		$generated_contract_text = '';
+		if ( $owner_template_exists ) {
+			if ( isset( $ai_payload['template_text'] ) && is_string( $ai_payload['template_text'] ) && '' !== trim( $ai_payload['template_text'] ) ) {
+				$generated_contract_text = $this->fill_owner_template_with_lease_data( $ai_payload['template_text'], $ai_payload );
+			}
+
+			if ( '' === $generated_contract_text && isset( $ai_payload['template_text'] ) && is_string( $ai_payload['template_text'] ) ) {
+				$generated_contract_text = trim( (string) $ai_payload['template_text'] );
+			}
+
+			if ( '' === $generated_contract_text ) {
+				$generated_contract_text = $this->build_owner_template_unreadable_fallback_text( $ai_payload );
+			}
+		} else {
+			if ( ! is_wp_error( $result ) && isset( $result['contract_text'] ) && is_string( $result['contract_text'] ) ) {
+				$generated_contract_text = trim( wp_strip_all_tags( $result['contract_text'] ) );
+			}
+		}
+
+		if ( '' === $document_url && '' !== $generated_contract_text ) {
+			$document_url = $this->create_generated_contract_file( $lease_id, $generated_contract_text );
+		}
+
+		if ( '' === $document_url && '' !== $generated_contract_text ) {
+			$document_url = $this->create_last_resort_contract_file( $lease_id, $generated_contract_text );
 		}
 
 		if ( $document_url ) {
-			$lease_obj->attach_document( $lease_id, $document_url );
+			$this->force_attach_lease_document( $lease_id, $document_url );
 			$result['document_url'] = $document_url;
 		} else {
-			wp_send_json_error( array( 'message' => __( 'AI did not return a usable contract document.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'Could not generate a usable contract document for this lease.', 'arriendo-facil' ) ) );
 		}
 
 		wp_send_json_success( $result );
@@ -338,6 +364,192 @@ class Arriendo_Facil_Admin {
 				'owner_email' => isset( $owner_template['owner_email'] ) ? sanitize_email( (string) $owner_template['owner_email'] ) : '',
 			)
 		);
+	}
+
+	/**
+	 * Fills common owner-template placeholders with lease and guest values.
+	 *
+	 * @param string $template_text Owner template raw text.
+	 * @param array  $payload Lease and guest context.
+	 * @return string
+	 */
+	private function fill_owner_template_with_lease_data( $template_text, array $payload ) {
+		$template_text = trim( (string) $template_text );
+		if ( '' === $template_text ) {
+			return '';
+		}
+
+		$field_values = array(
+			'owner_name'            => isset( $payload['owner_name'] ) ? sanitize_text_field( (string) $payload['owner_name'] ) : '',
+			'owner_email'           => isset( $payload['owner_email'] ) ? sanitize_email( (string) $payload['owner_email'] ) : '',
+			'owner_id_number'       => isset( $payload['owner_id_number'] ) ? sanitize_text_field( (string) $payload['owner_id_number'] ) : '',
+			'guest_name'            => isset( $payload['guest_name'] ) ? sanitize_text_field( (string) $payload['guest_name'] ) : '',
+			'guest_email'           => isset( $payload['guest_email'] ) ? sanitize_email( (string) $payload['guest_email'] ) : '',
+			'guest_phone'           => isset( $payload['guest_phone'] ) ? sanitize_text_field( (string) $payload['guest_phone'] ) : '',
+			'guest_id_number'       => isset( $payload['guest_id_number'] ) ? sanitize_text_field( (string) $payload['guest_id_number'] ) : '',
+			'accommodation_title'   => isset( $payload['accommodation_title'] ) ? sanitize_text_field( (string) $payload['accommodation_title'] ) : '',
+			'accommodation_address' => isset( $payload['accommodation_address'] ) ? sanitize_text_field( (string) $payload['accommodation_address'] ) : '',
+			'start_date'            => isset( $payload['start_date'] ) ? sanitize_text_field( (string) $payload['start_date'] ) : '',
+			'end_date'              => isset( $payload['end_date'] ) ? sanitize_text_field( (string) $payload['end_date'] ) : '',
+			'monthly_rent'          => isset( $payload['monthly_rent'] ) ? number_format( (float) $payload['monthly_rent'], 2, '.', '' ) : '',
+			'desired_price'         => isset( $payload['desired_price'] ) ? sanitize_text_field( (string) $payload['desired_price'] ) : '',
+			'guarantee_text'        => isset( $payload['guarantee_text'] ) ? sanitize_text_field( (string) $payload['guarantee_text'] ) : '',
+			'current_date'          => current_time( 'Y-m-d' ),
+		);
+
+		if ( '' === $field_values['monthly_rent'] && '' !== $field_values['desired_price'] ) {
+			$field_values['monthly_rent'] = $field_values['desired_price'];
+		}
+
+		$aliases = array(
+			'owner_name' => array( 'owner_name', 'owner', 'landlord_name', 'nombre_arrendador', 'arrendador_nombre', 'propietario_nombre', 'nombre_propietario' ),
+			'owner_email' => array( 'owner_email', 'landlord_email', 'correo_arrendador', 'email_arrendador', 'correo_propietario', 'email_propietario' ),
+			'owner_id_number' => array( 'owner_id', 'owner_id_number', 'landlord_id', 'cedula_arrendador', 'ruc_arrendador', 'cedula_propietario', 'id_propietario' ),
+			'guest_name' => array( 'guest_name', 'tenant_name', 'nombre_arrendatario', 'arrendatario_nombre', 'inquilino_nombre', 'nombre_inquilino' ),
+			'guest_email' => array( 'guest_email', 'tenant_email', 'correo_arrendatario', 'email_arrendatario', 'correo_inquilino', 'email_inquilino' ),
+			'guest_phone' => array( 'guest_phone', 'tenant_phone', 'telefono_arrendatario', 'celular_arrendatario', 'telefono_inquilino', 'celular_inquilino' ),
+			'guest_id_number' => array( 'guest_id', 'guest_id_number', 'tenant_id', 'cedula_arrendatario', 'id_arrendatario', 'cedula_inquilino', 'id_inquilino' ),
+			'accommodation_title' => array( 'property_name', 'accommodation_title', 'nombre_inmueble', 'inmueble', 'propiedad', 'nombre_propiedad' ),
+			'accommodation_address' => array( 'property_address', 'accommodation_address', 'direccion_inmueble', 'direccion_propiedad', 'direccion' ),
+			'start_date' => array( 'start_date', 'lease_start', 'fecha_inicio', 'fecha_inicio_arriendo', 'inicio_contrato' ),
+			'end_date' => array( 'end_date', 'lease_end', 'fecha_fin', 'fecha_fin_arriendo', 'fin_contrato' ),
+			'monthly_rent' => array( 'monthly_rent', 'rent', 'canon', 'canon_mensual', 'valor_arriendo', 'precio_mensual' ),
+			'guarantee_text' => array( 'guarantee', 'guarantee_text', 'garantia', 'detalle_garantia' ),
+			'current_date' => array( 'current_date', 'fecha_actual', 'fecha_hoy' ),
+		);
+
+		$token_map = array();
+		foreach ( $aliases as $field_key => $tokens ) {
+			$value = isset( $field_values[ $field_key ] ) ? (string) $field_values[ $field_key ] : '';
+			if ( '' === $value ) {
+				continue;
+			}
+
+			foreach ( $tokens as $token ) {
+				$normalized = strtolower( preg_replace( '/[^a-z0-9]/', '', (string) $token ) );
+				if ( '' !== $normalized ) {
+					$token_map[ $normalized ] = $value;
+				}
+			}
+		}
+
+		$filled = preg_replace_callback(
+			'/\{\{\s*([a-zA-Z0-9_\-\s]+)\s*\}\}|\[\[\s*([a-zA-Z0-9_\-\s]+)\s*\]\]|<<\s*([a-zA-Z0-9_\-\s]+)\s*>>/',
+			static function ( $matches ) use ( $token_map ) {
+				$raw = '';
+				if ( ! empty( $matches[1] ) ) {
+					$raw = (string) $matches[1];
+				} elseif ( ! empty( $matches[2] ) ) {
+					$raw = (string) $matches[2];
+				} elseif ( ! empty( $matches[3] ) ) {
+					$raw = (string) $matches[3];
+				}
+
+				$key = strtolower( preg_replace( '/[^a-z0-9]/', '', $raw ) );
+				if ( '' !== $key && isset( $token_map[ $key ] ) ) {
+					return $token_map[ $key ];
+				}
+
+				return $matches[0];
+			},
+			$template_text
+		);
+
+		return trim( (string) $filled );
+	}
+
+	/**
+	 * Builds owner-template fallback text when attachment exists but no readable text was extracted.
+	 *
+	 * @param array $payload Lease and guest context.
+	 * @return string
+	 */
+	private function build_owner_template_unreadable_fallback_text( array $payload ) {
+		$owner_name   = isset( $payload['owner_name'] ) ? sanitize_text_field( (string) $payload['owner_name'] ) : 'Propietario';
+		$guest_name   = isset( $payload['guest_name'] ) ? sanitize_text_field( (string) $payload['guest_name'] ) : 'Arrendatario';
+		$guest_id     = isset( $payload['guest_id_number'] ) ? sanitize_text_field( (string) $payload['guest_id_number'] ) : 'N/D';
+		$property     = isset( $payload['accommodation_title'] ) ? sanitize_text_field( (string) $payload['accommodation_title'] ) : 'Inmueble';
+		$address      = isset( $payload['accommodation_address'] ) ? sanitize_text_field( (string) $payload['accommodation_address'] ) : '';
+		$start_date   = isset( $payload['start_date'] ) ? sanitize_text_field( (string) $payload['start_date'] ) : '';
+		$end_date     = isset( $payload['end_date'] ) ? sanitize_text_field( (string) $payload['end_date'] ) : '';
+		$rent_value   = isset( $payload['monthly_rent'] ) ? number_format( (float) $payload['monthly_rent'], 2, '.', '' ) : '';
+		$template_url = isset( $payload['template_url'] ) ? esc_url_raw( (string) $payload['template_url'] ) : '';
+
+		$text  = "PLANTILLA DE CONTRATO DEL OWNER (SIN TEXTO EXTRAIBLE)\n\n";
+		$text .= "Este contrato se genero usando el documento del owner como fuente obligatoria.\n";
+		if ( '' !== $template_url ) {
+			$text .= "Referencia de plantilla owner: " . $template_url . "\n";
+		}
+		$text .= "\nDatos para completar en la plantilla:\n";
+		$text .= "Arrendador: " . $owner_name . "\n";
+		$text .= "Arrendatario: " . $guest_name . " (Cedula: " . $guest_id . ")\n";
+		$text .= "Inmueble: " . $property . "\n";
+		if ( '' !== $address ) {
+			$text .= "Direccion: " . $address . "\n";
+		}
+		if ( '' !== $start_date || '' !== $end_date ) {
+			$text .= "Plazo: " . $start_date . " a " . $end_date . "\n";
+		}
+		if ( '' !== $rent_value ) {
+			$text .= "Canon mensual: USD " . $rent_value . "\n";
+		}
+
+		return trim( $text );
+	}
+
+	/**
+	 * Creates a plain-text fallback file when DOC/DOCX generation failed.
+	 *
+	 * @param int    $lease_id Lease ID.
+	 * @param string $contract_text Contract text.
+	 * @return string
+	 */
+	private function create_last_resort_contract_file( $lease_id, $contract_text ) {
+		$lease_id = absint( $lease_id );
+		$text     = trim( (string) $contract_text );
+
+		if ( ! $lease_id || '' === $text ) {
+			return '';
+		}
+
+		$file_name = sprintf( 'lease-%d-contract-admin-%s.txt', $lease_id, gmdate( 'Ymd-His' ) );
+		$upload    = wp_upload_bits( $file_name, null, $text );
+
+		if ( ! is_array( $upload ) || ! empty( $upload['error'] ) || empty( $upload['url'] ) ) {
+			return '';
+		}
+
+		return esc_url_raw( (string) $upload['url'] );
+	}
+
+	/**
+	 * Persists lease document URL with primary and fallback DB update.
+	 *
+	 * @param int    $lease_id Lease ID.
+	 * @param string $document_url Document URL.
+	 * @return void
+	 */
+	private function force_attach_lease_document( $lease_id, $document_url ) {
+		$lease_id     = absint( $lease_id );
+		$document_url = esc_url_raw( (string) $document_url );
+
+		if ( ! $lease_id || '' === $document_url ) {
+			return;
+		}
+
+		$lease_obj = new Arriendo_Facil_Lease();
+		$attached  = (bool) $lease_obj->attach_document( $lease_id, $document_url );
+
+		if ( ! $attached ) {
+			global $wpdb;
+			$wpdb->update(
+				$wpdb->prefix . 'af_leases',
+				array( 'document_url' => $document_url ),
+				array( 'id' => $lease_id ),
+				array( '%s' ),
+				array( '%d' )
+			);
+		}
 	}
 
 	/**

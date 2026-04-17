@@ -629,9 +629,15 @@ class Arriendo_Facil_Guest {
 			}
 		}
 
-		if ( $document_url && class_exists( 'Arriendo_Facil_Lease' ) ) {
-			$lease_service = new Arriendo_Facil_Lease();
-			$lease_service->attach_document( $lease_id, $document_url );
+		if ( '' === $document_url && '' !== $generated_contract_text ) {
+			$last_resort_url = $this->create_last_resort_contract_file( $lease_id, $generated_contract_text );
+			if ( $last_resort_url ) {
+				$document_url = $last_resort_url;
+			}
+		}
+
+		if ( $document_url ) {
+			$this->force_attach_lease_document( $lease_id, $document_url );
 		}
 
 		return array(
@@ -682,6 +688,64 @@ class Arriendo_Facil_Guest {
 		}
 
 		return trim( $text );
+	}
+
+	/**
+	 * Creates a plain-text fallback file when DOC/DOCX generation failed.
+	 *
+	 * @param int    $lease_id Lease ID.
+	 * @param string $contract_text Contract text.
+	 * @return string
+	 */
+	private function create_last_resort_contract_file( $lease_id, $contract_text ) {
+		$lease_id = absint( $lease_id );
+		$text     = trim( (string) $contract_text );
+
+		if ( ! $lease_id || '' === $text ) {
+			return '';
+		}
+
+		$file_name = sprintf( 'lease-%d-contract-%s.txt', $lease_id, gmdate( 'Ymd-His' ) );
+		$upload    = wp_upload_bits( $file_name, null, $text );
+
+		if ( ! is_array( $upload ) || ! empty( $upload['error'] ) || empty( $upload['url'] ) ) {
+			return '';
+		}
+
+		return esc_url_raw( (string) $upload['url'] );
+	}
+
+	/**
+	 * Persists lease document URL with primary and fallback DB update.
+	 *
+	 * @param int    $lease_id Lease ID.
+	 * @param string $document_url Document URL.
+	 * @return void
+	 */
+	private function force_attach_lease_document( $lease_id, $document_url ) {
+		$lease_id     = absint( $lease_id );
+		$document_url = esc_url_raw( (string) $document_url );
+
+		if ( ! $lease_id || '' === $document_url ) {
+			return;
+		}
+
+		$attached = false;
+		if ( class_exists( 'Arriendo_Facil_Lease' ) ) {
+			$lease_service = new Arriendo_Facil_Lease();
+			$attached      = (bool) $lease_service->attach_document( $lease_id, $document_url );
+		}
+
+		if ( ! $attached ) {
+			global $wpdb;
+			$wpdb->update(
+				$wpdb->prefix . 'af_leases',
+				array( 'document_url' => $document_url ),
+				array( 'id' => $lease_id ),
+				array( '%s' ),
+				array( '%d' )
+			);
+		}
 	}
 
 	/**

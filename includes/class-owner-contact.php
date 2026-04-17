@@ -335,7 +335,6 @@ class Arriendo_Facil_Owner_Contact {
 		$optional_contract_example_field = 'owner_contract_example_file';
 		$optional_contract_doc_type      = 'contract_example';
 		$allowed_contract_mimes          = array(
-			'pdf'  => 'application/pdf',
 			'doc'  => 'application/msword',
 			'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 		);
@@ -446,8 +445,8 @@ class Arriendo_Facil_Owner_Contact {
 				}
 
 				$checked = wp_check_filetype_and_ext( $file_data['tmp_name'], $file_data['name'], $allowed_contract_mimes );
-				if ( ! in_array( (string) $checked['ext'], array( 'pdf', 'doc', 'docx' ), true ) ) {
-					$this->last_upload_error = new WP_Error( 'af_contract_example_invalid_type', __( 'Contract example must be a PDF or Word file (.pdf, .doc, .docx).', 'arriendo-facil' ) );
+				if ( ! in_array( (string) $checked['ext'], array( 'doc', 'docx' ), true ) ) {
+					$this->last_upload_error = new WP_Error( 'af_contract_example_invalid_type', __( 'Contract example must be a Word file (.doc, .docx).', 'arriendo-facil' ) );
 					return;
 				}
 

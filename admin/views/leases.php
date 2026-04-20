@@ -48,6 +48,14 @@ $leases = $wpdb->get_results(
 			<?php if ( $leases ) : ?>
 				<?php foreach ( $leases as $lease ) : ?>
 					<?php
+					if ( $lease_service && empty( $lease->document_url ) ) {
+						$lease_service->ensure_lease_document_available( (int) $lease->id );
+						$refreshed_lease = $lease_service->get_lease( (int) $lease->id );
+						if ( $refreshed_lease ) {
+							$lease = $refreshed_lease;
+						}
+					}
+
 					$versions_data   = $lease_service ? $lease_service->get_contract_versions( (int) $lease->id ) : array( 'active_version' => 0, 'versions' => array() );
 					$active_version  = isset( $versions_data['active_version'] ) ? (int) $versions_data['active_version'] : 0;
 					$versions        = isset( $versions_data['versions'] ) && is_array( $versions_data['versions'] ) ? $versions_data['versions'] : array();
@@ -104,11 +112,6 @@ $leases = $wpdb->get_results(
 						</td>
 						<td class="af-lease-actions-cell">
 							<div class="af-lease-actions-stack">
-								<?php if ( ! $versions_count && ! $lease->document_url ) : ?>
-									<button type="button" class="button button-primary af-generate-document" data-lease-id="<?php echo esc_attr( $lease->id ); ?>">
-										<?php esc_html_e( 'Generate Contract', 'arriendo-facil' ); ?>
-									</button>
-								<?php endif; ?>
 								<button type="button" class="button button-secondary af-open-upload-version-modal"
 									data-lease-id="<?php echo esc_attr( $lease->id ); ?>"
 									data-next-version="<?php echo esc_attr( $next_version ); ?>">

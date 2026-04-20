@@ -423,7 +423,6 @@ class Arriendo_Facil_Owner_Contact {
 		$optional_contract_example_field = 'owner_contract_example_file';
 		$optional_contract_doc_type      = 'contract_example';
 		$allowed_contract_mimes          = array(
-			'doc'  => 'application/msword',
 			'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 		);
 		$selected_documents = 0;
@@ -515,6 +514,7 @@ class Arriendo_Facil_Owner_Contact {
 			$file_data  = $_FILES[ $optional_contract_example_field ];
 			$file_name  = isset( $file_data['name'] ) ? (string) $file_data['name'] : '';
 			$file_error = isset( $file_data['error'] ) ? (int) $file_data['error'] : UPLOAD_ERR_NO_FILE;
+			$detected_placeholders = array();
 
 			if ( ! ( UPLOAD_ERR_NO_FILE === $file_error && '' === $file_name ) ) {
 				if ( UPLOAD_ERR_INI_SIZE === $file_error || UPLOAD_ERR_FORM_SIZE === $file_error ) {
@@ -533,8 +533,18 @@ class Arriendo_Facil_Owner_Contact {
 				}
 
 				$checked = wp_check_filetype_and_ext( $file_data['tmp_name'], $file_data['name'], $allowed_contract_mimes );
-				if ( ! in_array( (string) $checked['ext'], array( 'doc', 'docx' ), true ) ) {
-					$this->last_upload_error = new WP_Error( 'af_contract_example_invalid_type', __( 'Contract example must be a Word file (.doc, .docx).', 'arriendo-facil' ) );
+				if ( 'docx' !== (string) $checked['ext'] ) {
+					$this->last_upload_error = new WP_Error( 'af_contract_example_invalid_type', __( 'Contract template must be a DOCX file (.docx).', 'arriendo-facil' ) );
+					return;
+				}
+
+				$detected_placeholders = $this->extract_owner_contract_placeholders_from_docx( (string) $file_data['tmp_name'] );
+
+				if ( empty( $detected_placeholders ) ) {
+					$this->last_upload_error = new WP_Error(
+						'af_contract_example_no_placeholders',
+						__( 'The DOCX template does not include readable placeholders. Add placeholders like {{guest_name}} or {{guest_id_number}} and try again.', 'arriendo-facil' )
+					);
 					return;
 				}
 
@@ -556,6 +566,7 @@ class Arriendo_Facil_Owner_Contact {
 				update_post_meta( (int) $attachment_id, '_af_owner_contract_example', '1' );
 				update_post_meta( (int) $attachment_id, '_af_owner_contact_id', (int) $contact_id );
 				update_post_meta( (int) $attachment_id, '_af_owner_user_id', (int) $user_id );
+				update_post_meta( (int) $attachment_id, '_af_owner_contract_placeholders', wp_json_encode( array_values( $detected_placeholders ) ) );
 
 				$r2_upload = $this->upload_attachment_to_r2( (int) $attachment_id, (int) $contact_id, (string) $optional_contract_doc_type, $r2_config );
 				if ( is_wp_error( $r2_upload ) ) {
@@ -582,6 +593,87 @@ class Arriendo_Facil_Owner_Contact {
 		if ( $required_uploaded !== count( $fields ) && ! ( $this->last_upload_error instanceof WP_Error ) ) {
 			$this->last_upload_error = new WP_Error( 'af_pdf_upload_incomplete', __( 'One or more selected PDFs were not uploaded to Cloudflare R2.', 'arriendo-facil' ) );
 		}
+	}
+
+	/**
+	 * Extracts placeholders from a DOCX template.
+	 *
+	 * Supports tokens like {{token}}, [[token]] and <<token>>.
+	 *
+	 * @param string $file_path Path to the DOCX file.
+	 * @return array<int,string>
+	 */
+	private function extract_owner_contract_placeholders_from_docx( $file_path ) {
+		$file_path = (string) $file_path;
+		if ( '' === $file_path || ! file_exists( $file_path ) || ! class_exists( 'ZipArchive' ) ) {
+			return array();
+		}
+
+		$zip = new ZipArchive();
+		if ( true !== $zip->open( $file_path ) ) {
+			return array();
+		}
+
+		$documents_to_scan = array();
+		for ( $index = 0; $index < $zip->numFiles; $index++ ) {
+			$name = (string) $zip->getNameIndex( $index );
+			if ( '' === $name ) {
+				continue;
+			}
+
+			if ( 1 === preg_match( '#^word/(document|header[0-9]+|footer[0-9]+)\.xml$#i', $name ) ) {
+				$documents_to_scan[] = $name;
+			}
+		}
+
+		$found_placeholders = array();
+		foreach ( $documents_to_scan as $document_path ) {
+			$xml = $zip->getFromName( $document_path );
+			if ( false === $xml || '' === $xml ) {
+				continue;
+			}
+
+			// Convert XML runs to flat text so placeholders split across tags are still detected.
+			$searchable_text = html_entity_decode( wp_strip_all_tags( (string) $xml ), ENT_QUOTES | ENT_XML1, 'UTF-8' );
+
+			if ( preg_match_all( '/\{\{\s*([a-zA-Z0-9_\-\s]+)\s*\}\}|\[\[\s*([a-zA-Z0-9_\-\s]+)\s*\]\]|<<\s*([a-zA-Z0-9_\-\s]+)\s*>>/', (string) $searchable_text, $matches, PREG_SET_ORDER ) ) {
+				foreach ( $matches as $match ) {
+					$raw_token = '';
+					if ( ! empty( $match[1] ) ) {
+						$raw_token = (string) $match[1];
+					} elseif ( ! empty( $match[2] ) ) {
+						$raw_token = (string) $match[2];
+					} elseif ( ! empty( $match[3] ) ) {
+						$raw_token = (string) $match[3];
+					}
+
+					$normalized = $this->normalize_contract_placeholder_token( $raw_token );
+					if ( '' !== $normalized ) {
+						$found_placeholders[ $normalized ] = $normalized;
+					}
+				}
+			}
+		}
+
+		$zip->close();
+
+		return array_values( $found_placeholders );
+	}
+
+	/**
+	 * Normalizes placeholder token to snake_case comparable value.
+	 *
+	 * @param string $token Raw token.
+	 * @return string
+	 */
+	private function normalize_contract_placeholder_token( $token ) {
+		$token = strtolower( trim( (string) $token ) );
+		$token = str_replace( '-', '_', $token );
+		$token = preg_replace( '/\s+/', '_', $token );
+		$token = preg_replace( '/[^a-z0-9_]/', '', (string) $token );
+		$token = preg_replace( '/_+/', '_', (string) $token );
+
+		return trim( (string) $token, '_' );
 	}
 
 	/**

@@ -198,10 +198,10 @@ $message = isset( $_GET['af_message'] ) ? sanitize_text_field( wp_unslash( $_GET
                     <th scope="row"><?php esc_html_e( 'Ejemplo de contrato', 'arriendo-facil' ); ?></th>
                     <td>
                         <p>
-                            <label for="af_owner_contract_example_file"><?php esc_html_e( 'Subir archivo Word (.doc, .docx)', 'arriendo-facil' ); ?></label><br />
-                            <input type="file" id="af_owner_contract_example_file" name="owner_contract_example_file" class="regular-text" accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+                            <label for="af_owner_contract_example_file"><?php esc_html_e( 'Subir plantilla Word (.docx)', 'arriendo-facil' ); ?></label><br />
+                            <input type="file" id="af_owner_contract_example_file" name="owner_contract_example_file" class="regular-text" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
                         </p>
-                        <p class="description"><?php esc_html_e( 'Campo opcional para adjuntar un ejemplo de contrato en Word.', 'arriendo-facil' ); ?></p>
+                        <p class="description"><?php esc_html_e( 'Campo opcional. La plantilla debe incluir placeholders en formato {{campo}} (por ejemplo: {{guest_name}}, {{guest_id_number}}, {{owner_name}}). El sistema completara automaticamente los campos detectados en la plantilla.', 'arriendo-facil' ); ?></p>
                     </td>
                 </tr>
             </table>

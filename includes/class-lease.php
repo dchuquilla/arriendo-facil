@@ -370,6 +370,75 @@ class Arriendo_Facil_Lease {
 	}
 
 	/**
+	 * Ensures a lease has a downloadable document URL.
+	 *
+	 * Creates a simple fallback contract text file if no version/document exists.
+	 *
+	 * @param int $lease_id Lease ID.
+	 * @return bool
+	 */
+	public function ensure_lease_document_available( $lease_id ) {
+		$lease_id = absint( $lease_id );
+		if ( ! $lease_id ) {
+			return false;
+		}
+
+		$versions_data = $this->get_contract_versions( $lease_id );
+		$has_versions  = isset( $versions_data['versions'] ) && is_array( $versions_data['versions'] ) && ! empty( $versions_data['versions'] );
+		if ( $has_versions ) {
+			return true;
+		}
+
+		$lease = $this->get_lease( $lease_id );
+		if ( ! $lease ) {
+			return false;
+		}
+
+		$current_document_url = isset( $lease->document_url ) ? esc_url_raw( (string) $lease->document_url ) : '';
+		if ( '' !== $current_document_url ) {
+			return true;
+		}
+
+		$fallback_text = $this->build_minimal_fallback_contract_text( $lease );
+		$file_name     = sprintf( 'lease-%d-autofallback-%s.txt', $lease_id, gmdate( 'Ymd-His' ) );
+		$upload        = wp_upload_bits( $file_name, null, $fallback_text );
+
+		if ( ! is_array( $upload ) || ! empty( $upload['error'] ) || empty( $upload['url'] ) ) {
+			return false;
+		}
+
+		return $this->attach_document( $lease_id, esc_url_raw( (string) $upload['url'] ) );
+	}
+
+	/**
+	 * Builds a minimal fallback contract body for visibility when generation fails.
+	 *
+	 * @param object $lease Lease row.
+	 * @return string
+	 */
+	private function build_minimal_fallback_contract_text( $lease ) {
+		$lease_id          = isset( $lease->id ) ? absint( $lease->id ) : 0;
+		$accommodation_id  = isset( $lease->accommodation_id ) ? absint( $lease->accommodation_id ) : 0;
+		$guest_id          = isset( $lease->guest_id ) ? absint( $lease->guest_id ) : 0;
+		$start_date        = isset( $lease->start_date ) ? sanitize_text_field( (string) $lease->start_date ) : '';
+		$end_date          = isset( $lease->end_date ) ? sanitize_text_field( (string) $lease->end_date ) : '';
+		$monthly_rent      = isset( $lease->monthly_rent ) ? number_format( (float) $lease->monthly_rent, 2, '.', '' ) : '0.00';
+		$accommodation     = $accommodation_id ? (string) get_the_title( $accommodation_id ) : '';
+
+		$text  = "CONTRATO DE ARRENDAMIENTO - RESPALDO AUTOMATICO\n\n";
+		$text .= "Lease ID: " . $lease_id . "\n";
+		$text .= "Alojamiento: " . ( '' !== trim( $accommodation ) ? $accommodation : (string) $accommodation_id ) . "\n";
+		$text .= "Guest ID: " . $guest_id . "\n";
+		$text .= "Inicio: " . $start_date . "\n";
+		$text .= "Fin: " . $end_date . "\n";
+		$text .= "Canon mensual: USD " . $monthly_rent . "\n\n";
+		$text .= "Nota: Este archivo se genero automaticamente porque el contrato principal no estuvo disponible en ese momento.\n";
+		$text .= "Fecha de generacion: " . current_time( 'Y-m-d H:i:s' ) . "\n";
+
+		return $text;
+	}
+
+	/**
 	 * Saves storage metadata for a lease contract.
 	 *
 	 * @param int   $lease_id Lease ID.

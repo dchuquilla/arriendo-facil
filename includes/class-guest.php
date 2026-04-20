@@ -535,10 +535,6 @@ class Arriendo_Facil_Guest {
 			$lease_id
 		);
 
-		if ( ! class_exists( 'Arriendo_Facil_AI_Service' ) ) {
-			return array( 'generated' => false, 'lease_id' => $lease_id );
-		}
-
 		$owner_contract_example = $this->get_owner_contract_example_context( $accommodation_id );
 		$owner_template_exists  = ! empty( $owner_contract_example['attachment_id'] );
 		$accommodation_address  = (string) get_post_meta( $accommodation_id, '_af_address', true );
@@ -578,12 +574,14 @@ class Arriendo_Facil_Guest {
 		$ai_payload['legal_template_base'] = $this->build_legal_contract_template( $ai_payload, '' );
 
 		$document_result = new WP_Error( 'af_ai_not_executed', __( 'AI document generation was not executed.', 'arriendo-facil' ) );
-		try {
-			$ai = new Arriendo_Facil_AI_Service();
-			$document_result = $ai->generate_document( $ai_payload );
-		} catch ( Throwable $throwable ) {
-			error_log( 'Arriendo Facil AI document generation exception: ' . $throwable->getMessage() );
-			$document_result = new WP_Error( 'af_ai_exception', __( 'AI document generation failed unexpectedly.', 'arriendo-facil' ) );
+		if ( class_exists( 'Arriendo_Facil_AI_Service' ) ) {
+			try {
+				$ai = new Arriendo_Facil_AI_Service();
+				$document_result = $ai->generate_document( $ai_payload );
+			} catch ( Throwable $throwable ) {
+				error_log( 'Arriendo Facil AI document generation exception: ' . $throwable->getMessage() );
+				$document_result = new WP_Error( 'af_ai_exception', __( 'AI document generation failed unexpectedly.', 'arriendo-facil' ) );
+			}
 		}
 
 		$document_url = '';

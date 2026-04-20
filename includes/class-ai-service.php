@@ -151,6 +151,25 @@ class Arriendo_Facil_AI_Service {
 	}
 
 	/**
+	 * Maps semantic labels from owner template to canonical lease fields.
+	 *
+	 * @param array $template_context Template context payload.
+	 * @return array|WP_Error Response array with key 'field_map'.
+	 */
+	public function map_template_fields( array $template_context ) {
+		$payload = array(
+			'action' => 'map_template_fields',
+			'data'   => $template_context,
+		);
+
+		$response = $this->request( $payload );
+
+		$this->log( 'map_template_fields', $template_context, $response );
+
+		return $response;
+	}
+
+	/**
 	 * Sends a POST request to ChatGPT and expects JSON content in the response.
 	 *
 	 * @param array $payload Request payload.
@@ -353,6 +372,10 @@ class Arriendo_Facil_AI_Service {
 
 		if ( 'generate_cleaning_contract' === $action ) {
 			return "Task: Draft a concise professional Spanish cleaning-service contract request text. Return JSON with key 'contract_text' as plain text only. Input: " . wp_json_encode( $data );
+		}
+
+		if ( 'map_template_fields' === $action ) {
+			return "Task: Analyze owner lease-template labels and map each detected label to one canonical key when possible. Use only these canonical keys: owner_name, owner_email, owner_id_number, guest_name, guest_email, guest_phone, guest_id_number, accommodation_title, accommodation_address, start_date, end_date, monthly_rent, guarantee_text, current_date. Return strictly JSON with key 'field_map' as an object where each key is the original detected label and each value is one canonical key from the list. If a label has no confident mapping, do not include it. Input: " . wp_json_encode( $data );
 		}
 
 		return "Task: Analyze provided data and return JSON object. Input: " . wp_json_encode( $payload );

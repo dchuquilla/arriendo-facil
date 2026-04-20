@@ -586,6 +586,11 @@ class Arriendo_Facil_Guest {
 			$document_result = new WP_Error( 'af_ai_exception', __( 'AI document generation failed unexpectedly.', 'arriendo-facil' ) );
 		}
 
+		$document_url = '';
+		if ( $owner_template_exists ) {
+			$document_url = $this->create_filled_contract_from_owner_template( $lease_id, $owner_contract_example, $ai_payload );
+		}
+
 		$generated_contract_text = '';
 
 		// Strict business rule: if owner template exists, always build the final contract from that template.
@@ -613,8 +618,7 @@ class Arriendo_Facil_Guest {
 
 		$generated_contract_text = $this->normalize_generated_legal_contract_text( $generated_contract_text, $ai_payload );
 
-		$document_url = '';
-		if ( ! $owner_template_exists && ! is_wp_error( $document_result ) && isset( $document_result['document_url'] ) && is_string( $document_result['document_url'] ) ) {
+		if ( '' === $document_url && ! $owner_template_exists && ! is_wp_error( $document_result ) && isset( $document_result['document_url'] ) && is_string( $document_result['document_url'] ) ) {
 			$document_url = esc_url_raw( $document_result['document_url'] );
 		}
 
@@ -636,6 +640,10 @@ class Arriendo_Facil_Guest {
 			}
 		}
 
+		if ( '' === $document_url && $owner_template_exists && ! empty( $owner_contract_example['url'] ) ) {
+			$document_url = esc_url_raw( (string) $owner_contract_example['url'] );
+		}
+
 		if ( $document_url ) {
 			$this->force_attach_lease_document( $lease_id, $document_url );
 		}
@@ -647,6 +655,498 @@ class Arriendo_Facil_Guest {
 			'template_used' => ! empty( $owner_contract_example['attachment_id'] ),
 			'template_attachment_id' => isset( $owner_contract_example['attachment_id'] ) ? (int) $owner_contract_example['attachment_id'] : 0,
 		);
+	}
+
+	/**
+	 * Creates a lease document from owner's DOCX template preserving layout/styles.
+	 *
+	 * @param int   $lease_id Lease ID.
+	 * @param array $owner_template Owner template context.
+	 * @param array $payload Lease payload.
+	 * @return string
+	 */
+	private function create_filled_contract_from_owner_template( $lease_id, array $owner_template, array $payload ) {
+		$lease_id       = absint( $lease_id );
+		$attachment_id  = isset( $owner_template['attachment_id'] ) ? absint( $owner_template['attachment_id'] ) : 0;
+		$template_path  = $attachment_id ? get_attached_file( $attachment_id ) : '';
+		$template_mime  = isset( $owner_template['mime_type'] ) ? strtolower( (string) $owner_template['mime_type'] ) : '';
+		$template_ext   = strtolower( (string) pathinfo( (string) $template_path, PATHINFO_EXTENSION ) );
+
+		if ( ! $lease_id || ! $attachment_id || ! $template_path || ! file_exists( $template_path ) ) {
+			return '';
+		}
+
+		if ( 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' !== $template_mime && 'docx' !== $template_ext ) {
+			return '';
+		}
+
+		$uploads = wp_upload_dir();
+		if ( ! empty( $uploads['error'] ) || empty( $uploads['basedir'] ) || empty( $uploads['baseurl'] ) ) {
+			return '';
+		}
+
+		$contracts_dir = trailingslashit( $uploads['basedir'] ) . 'arriendo-facil/contracts';
+		if ( ! wp_mkdir_p( $contracts_dir ) ) {
+			return '';
+		}
+
+		$file_name = sprintf( 'lease-%d-owner-template-%s.docx', $lease_id, gmdate( 'Ymd-His' ) );
+		$file_path = trailingslashit( $contracts_dir ) . $file_name;
+
+		if ( ! @copy( $template_path, $file_path ) ) {
+			return '';
+		}
+
+		$this->replace_docx_template_tokens_in_place( $file_path, $payload );
+		$this->replace_docx_semantic_label_blanks_in_place( $file_path, $owner_template, $payload );
+
+		$mime_type    = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+		$local_url    = trailingslashit( $uploads['baseurl'] ) . 'arriendo-facil/contracts/' . rawurlencode( $file_name );
+		$document_url = $local_url;
+		$storage_meta = array(
+			'provider'  => 'local',
+			'file_name' => $file_name,
+			'local_url' => $local_url,
+			'mime_type' => $mime_type,
+		);
+
+		$storage_provider = $this->get_storage_setting( 'AF_STORAGE_PROVIDER', 'af_storage_provider', 'cloudflare_r2' );
+		if ( 'cloudflare_r2' === $storage_provider ) {
+			$r2_config = $this->get_r2_config();
+			if ( ! is_wp_error( $r2_config ) ) {
+				$contents = file_get_contents( $file_path );
+				if ( false !== $contents ) {
+					$object_key = sprintf( 'lease-contracts/%d/%s', $lease_id, sanitize_file_name( $file_name ) );
+					$upload     = $this->upload_contents_to_r2( $contents, $object_key, $mime_type, $r2_config );
+					if ( ! is_wp_error( $upload ) ) {
+						$document_url = add_query_arg(
+							array(
+								'action'   => 'af_download_lease_contract',
+								'lease_id' => $lease_id,
+							),
+							admin_url( 'admin-ajax.php' )
+						);
+						$storage_meta = array(
+							'provider'   => 'cloudflare_r2',
+							'object_key' => $object_key,
+							'file_name'  => $file_name,
+							'local_url'  => $local_url,
+							'mime_type'  => $mime_type,
+						);
+					}
+				}
+			}
+		}
+
+		if ( class_exists( 'Arriendo_Facil_Lease' ) ) {
+			$lease_service = new Arriendo_Facil_Lease();
+			$lease_service->set_contract_storage_meta( $lease_id, $storage_meta );
+		}
+
+		return $document_url;
+	}
+
+	/**
+	 * Replaces known token formats inside DOCX XML parts without altering layout.
+	 *
+	 * @param string $docx_path Absolute DOCX path.
+	 * @param array  $payload Lease payload.
+	 * @return void
+	 */
+	private function replace_docx_template_tokens_in_place( $docx_path, array $payload ) {
+		if ( ! class_exists( 'ZipArchive' ) || ! $docx_path || ! file_exists( $docx_path ) ) {
+			return;
+		}
+
+		$token_map = $this->build_owner_template_token_map( $payload );
+		if ( empty( $token_map ) ) {
+			return;
+		}
+
+		$zip = new ZipArchive();
+		if ( true !== $zip->open( $docx_path ) ) {
+			return;
+		}
+
+		for ( $index = 0; $index < $zip->numFiles; $index++ ) {
+			$entry_name = (string) $zip->getNameIndex( $index );
+			if ( 1 !== preg_match( '#^word/(document|header[0-9]+|footer[0-9]+)\.xml$#i', $entry_name ) ) {
+				continue;
+			}
+
+			$xml = $zip->getFromName( $entry_name );
+			if ( false === $xml || '' === $xml ) {
+				continue;
+			}
+
+			$updated_xml = preg_replace_callback(
+				'/\{\{\s*([a-zA-Z0-9_\-\s]+)\s*\}\}|\[\[\s*([a-zA-Z0-9_\-\s]+)\s*\]\]|<<\s*([a-zA-Z0-9_\-\s]+)\s*>>/',
+				function ( $matches ) use ( $token_map ) {
+					$raw_token = '';
+					if ( ! empty( $matches[1] ) ) {
+						$raw_token = (string) $matches[1];
+					} elseif ( ! empty( $matches[2] ) ) {
+						$raw_token = (string) $matches[2];
+					} elseif ( ! empty( $matches[3] ) ) {
+						$raw_token = (string) $matches[3];
+					}
+
+					$normalized = $this->normalize_contract_placeholder_token( $raw_token );
+					if ( '' !== $normalized && isset( $token_map[ $normalized ] ) ) {
+						return esc_xml( (string) $token_map[ $normalized ] );
+					}
+
+					return $matches[0];
+				},
+				(string) $xml
+			);
+
+			if ( is_string( $updated_xml ) && $updated_xml !== $xml ) {
+				$zip->addFromString( $entry_name, $updated_xml );
+			}
+		}
+
+		$zip->close();
+	}
+
+	/**
+	 * Completes blank fields identified by semantic labels in DOCX template.
+	 *
+	 * @param string $docx_path DOCX path.
+	 * @param array  $owner_template Owner template context.
+	 * @param array  $payload Lease payload.
+	 * @return void
+	 */
+	private function replace_docx_semantic_label_blanks_in_place( $docx_path, array $owner_template, array $payload ) {
+		if ( ! class_exists( 'ZipArchive' ) || ! $docx_path || ! file_exists( $docx_path ) ) {
+			return;
+		}
+
+		$label_value_map = $this->build_semantic_label_value_map( $owner_template, $payload );
+		if ( empty( $label_value_map ) ) {
+			return;
+		}
+
+		$zip = new ZipArchive();
+		if ( true !== $zip->open( $docx_path ) ) {
+			return;
+		}
+
+		for ( $index = 0; $index < $zip->numFiles; $index++ ) {
+			$entry_name = (string) $zip->getNameIndex( $index );
+			if ( 1 !== preg_match( '#^word/(document|header[0-9]+|footer[0-9]+)\.xml$#i', $entry_name ) ) {
+				continue;
+			}
+
+			$xml = $zip->getFromName( $entry_name );
+			if ( false === $xml || '' === $xml ) {
+				continue;
+			}
+
+			$updated_xml = $this->replace_semantic_blanks_in_docx_xml( (string) $xml, $label_value_map );
+			if ( $updated_xml !== $xml ) {
+				$zip->addFromString( $entry_name, $updated_xml );
+			}
+		}
+
+		$zip->close();
+	}
+
+	/**
+	 * Replaces blank placeholders associated to labels in a Word XML fragment.
+	 *
+	 * @param string $xml XML content.
+	 * @param array  $label_value_map Label-to-value mapping.
+	 * @return string
+	 */
+	private function replace_semantic_blanks_in_docx_xml( $xml, array $label_value_map ) {
+		$updated = (string) $xml;
+
+		foreach ( $label_value_map as $label => $value ) {
+			$clean_label = trim( (string) $label );
+			$clean_value = trim( (string) $value );
+
+			if ( '' === $clean_label || '' === $clean_value ) {
+				continue;
+			}
+
+			$label_pattern = preg_quote( $clean_label, '/' );
+			$value_xml     = esc_xml( $clean_value );
+
+			$pattern_same_node = '/(<w:t[^>]*>\s*' . $label_pattern . '\s*[:\-]?\s*)(_{3,}|\.{3,}|[\x{2026}]{2,})(\s*<\/w:t>)/iu';
+			$replacement_same_node = '$1' . $value_xml . '$3';
+			$updated = preg_replace( $pattern_same_node, $replacement_same_node, $updated );
+
+			$pattern_next_node = '/(<w:t[^>]*>\s*' . $label_pattern . '\s*[:\-]?\s*<\/w:t>\s*<w:t[^>]*>)(_{3,}|\.{3,}|[\x{2026}]{2,})(\s*<\/w:t>)/iu';
+			$replacement_next_node = '$1' . $value_xml . '$3';
+			$updated = preg_replace( $pattern_next_node, $replacement_next_node, $updated );
+		}
+
+		return (string) $updated;
+	}
+
+	/**
+	 * Builds semantic mapping between template labels and payload values.
+	 *
+	 * @param array $owner_template Owner template context.
+	 * @param array $payload Lease payload.
+	 * @return array<string,string>
+	 */
+	private function build_semantic_label_value_map( array $owner_template, array $payload ) {
+		$template_text = isset( $owner_template['template_text'] ) ? (string) $owner_template['template_text'] : '';
+		$template_text = trim( $template_text );
+		if ( '' === $template_text ) {
+			return array();
+		}
+
+		$canonical_values = $this->get_canonical_contract_value_map( $payload );
+		$labels           = $this->extract_semantic_candidate_labels( $template_text );
+		if ( empty( $labels ) ) {
+			return array();
+		}
+
+		$field_map = array();
+		foreach ( $labels as $label ) {
+			$canonical_key = $this->infer_canonical_key_from_label( $label );
+			if ( '' !== $canonical_key ) {
+				$field_map[ $label ] = $canonical_key;
+			}
+		}
+
+		if ( class_exists( 'Arriendo_Facil_AI_Service' ) ) {
+			try {
+				$ai_service = new Arriendo_Facil_AI_Service();
+				$ai_result  = $ai_service->map_template_fields(
+					array(
+						'template_text'     => $template_text,
+						'candidate_labels'  => $labels,
+						'allowed_canonical' => array_keys( $canonical_values ),
+					)
+				);
+
+				if ( ! is_wp_error( $ai_result ) && isset( $ai_result['field_map'] ) && is_array( $ai_result['field_map'] ) ) {
+					foreach ( $ai_result['field_map'] as $label => $canonical_key ) {
+						$label         = (string) $label;
+						$canonical_key = sanitize_key( (string) $canonical_key );
+						if ( '' !== $label && isset( $canonical_values[ $canonical_key ] ) ) {
+							$field_map[ $label ] = $canonical_key;
+						}
+					}
+				}
+			} catch ( Throwable $throwable ) {
+				error_log( 'Arriendo Facil semantic label mapping error: ' . $throwable->getMessage() );
+			}
+		}
+
+		$label_value_map = array();
+		foreach ( $field_map as $label => $canonical_key ) {
+			if ( isset( $canonical_values[ $canonical_key ] ) ) {
+				$value = trim( (string) $canonical_values[ $canonical_key ] );
+				if ( '' !== $value ) {
+					$label_value_map[ (string) $label ] = $value;
+				}
+			}
+		}
+
+		return $label_value_map;
+	}
+
+	/**
+	 * Returns canonical payload values used for semantic completion.
+	 *
+	 * @param array $payload Lease payload.
+	 * @return array<string,string>
+	 */
+	private function get_canonical_contract_value_map( array $payload ) {
+		$monthly_rent = isset( $payload['monthly_rent'] ) ? number_format( (float) $payload['monthly_rent'], 2, '.', '' ) : '';
+		if ( '' === $monthly_rent && isset( $payload['desired_price'] ) ) {
+			$monthly_rent = sanitize_text_field( (string) $payload['desired_price'] );
+		}
+
+		return array(
+			'owner_name'            => isset( $payload['owner_name'] ) ? sanitize_text_field( (string) $payload['owner_name'] ) : '',
+			'owner_email'           => isset( $payload['owner_email'] ) ? sanitize_email( (string) $payload['owner_email'] ) : '',
+			'owner_id_number'       => isset( $payload['owner_id_number'] ) ? sanitize_text_field( (string) $payload['owner_id_number'] ) : '',
+			'guest_name'            => isset( $payload['guest_name'] ) ? sanitize_text_field( (string) $payload['guest_name'] ) : '',
+			'guest_email'           => isset( $payload['guest_email'] ) ? sanitize_email( (string) $payload['guest_email'] ) : '',
+			'guest_phone'           => isset( $payload['guest_phone'] ) ? sanitize_text_field( (string) $payload['guest_phone'] ) : '',
+			'guest_id_number'       => isset( $payload['guest_id_number'] ) ? sanitize_text_field( (string) $payload['guest_id_number'] ) : '',
+			'accommodation_title'   => isset( $payload['accommodation_title'] ) ? sanitize_text_field( (string) $payload['accommodation_title'] ) : '',
+			'accommodation_address' => isset( $payload['accommodation_address'] ) ? sanitize_text_field( (string) $payload['accommodation_address'] ) : '',
+			'start_date'            => isset( $payload['start_date'] ) ? sanitize_text_field( (string) $payload['start_date'] ) : '',
+			'end_date'              => isset( $payload['end_date'] ) ? sanitize_text_field( (string) $payload['end_date'] ) : '',
+			'monthly_rent'          => $monthly_rent,
+			'guarantee_text'        => isset( $payload['guarantee_text'] ) ? sanitize_text_field( (string) $payload['guarantee_text'] ) : '',
+			'current_date'          => current_time( 'Y-m-d' ),
+		);
+	}
+
+	/**
+	 * Extracts probable field labels from template text.
+	 *
+	 * @param string $template_text Plain template text.
+	 * @return array<int,string>
+	 */
+	private function extract_semantic_candidate_labels( $template_text ) {
+		$template_text = (string) $template_text;
+		if ( '' === trim( $template_text ) ) {
+			return array();
+		}
+
+		$labels = array();
+		if ( preg_match_all( '/([A-Za-zÁÉÍÓÚÑáéíóúñ\(\)\/\-\s]{3,70})\s*:/u', $template_text, $matches ) ) {
+			foreach ( $matches[1] as $raw_label ) {
+				$label = trim( preg_replace( '/\s+/', ' ', (string) $raw_label ) );
+				if ( '' !== $label && strlen( $label ) >= 3 && strlen( $label ) <= 70 ) {
+					$labels[ $label ] = $label;
+				}
+			}
+		}
+
+		return array_values( $labels );
+	}
+
+	/**
+	 * Infers canonical key from a human label using local heuristics.
+	 *
+	 * @param string $label Field label.
+	 * @return string
+	 */
+	private function infer_canonical_key_from_label( $label ) {
+		$label_norm = strtolower( trim( (string) $label ) );
+
+		if ( false !== strpos( $label_norm, 'arrendador' ) || false !== strpos( $label_norm, 'propietario' ) ) {
+			if ( false !== strpos( $label_norm, 'correo' ) || false !== strpos( $label_norm, 'email' ) ) {
+				return 'owner_email';
+			}
+			if ( false !== strpos( $label_norm, 'cedula' ) || false !== strpos( $label_norm, 'ruc' ) || false !== strpos( $label_norm, 'identificacion' ) ) {
+				return 'owner_id_number';
+			}
+			return 'owner_name';
+		}
+
+		if ( false !== strpos( $label_norm, 'arrendatario' ) || false !== strpos( $label_norm, 'inquilino' ) || false !== strpos( $label_norm, 'tenant' ) ) {
+			if ( false !== strpos( $label_norm, 'correo' ) || false !== strpos( $label_norm, 'email' ) ) {
+				return 'guest_email';
+			}
+			if ( false !== strpos( $label_norm, 'telefono' ) || false !== strpos( $label_norm, 'celular' ) ) {
+				return 'guest_phone';
+			}
+			if ( false !== strpos( $label_norm, 'cedula' ) || false !== strpos( $label_norm, 'identificacion' ) ) {
+				return 'guest_id_number';
+			}
+			return 'guest_name';
+		}
+
+		if ( false !== strpos( $label_norm, 'direccion' ) ) {
+			return 'accommodation_address';
+		}
+
+		if ( false !== strpos( $label_norm, 'inmueble' ) || false !== strpos( $label_norm, 'propiedad' ) ) {
+			return 'accommodation_title';
+		}
+
+		if ( false !== strpos( $label_norm, 'inicio' ) || false !== strpos( $label_norm, 'desde' ) ) {
+			return 'start_date';
+		}
+
+		if ( false !== strpos( $label_norm, 'fin' ) || false !== strpos( $label_norm, 'hasta' ) ) {
+			return 'end_date';
+		}
+
+		if ( false !== strpos( $label_norm, 'canon' ) || false !== strpos( $label_norm, 'renta' ) || false !== strpos( $label_norm, 'valor' ) || false !== strpos( $label_norm, 'precio' ) ) {
+			return 'monthly_rent';
+		}
+
+		if ( false !== strpos( $label_norm, 'garantia' ) ) {
+			return 'guarantee_text';
+		}
+
+		if ( false !== strpos( $label_norm, 'fecha' ) ) {
+			return 'current_date';
+		}
+
+		return '';
+	}
+
+	/**
+	 * Builds normalized token map from lease payload.
+	 *
+	 * @param array $payload Lease payload.
+	 * @return array<string,string>
+	 */
+	private function build_owner_template_token_map( array $payload ) {
+		$field_values = array(
+			'owner_name'            => isset( $payload['owner_name'] ) ? sanitize_text_field( (string) $payload['owner_name'] ) : '',
+			'owner_email'           => isset( $payload['owner_email'] ) ? sanitize_email( (string) $payload['owner_email'] ) : '',
+			'owner_id_number'       => isset( $payload['owner_id_number'] ) ? sanitize_text_field( (string) $payload['owner_id_number'] ) : '',
+			'guest_name'            => isset( $payload['guest_name'] ) ? sanitize_text_field( (string) $payload['guest_name'] ) : '',
+			'guest_email'           => isset( $payload['guest_email'] ) ? sanitize_email( (string) $payload['guest_email'] ) : '',
+			'guest_phone'           => isset( $payload['guest_phone'] ) ? sanitize_text_field( (string) $payload['guest_phone'] ) : '',
+			'guest_id_number'       => isset( $payload['guest_id_number'] ) ? sanitize_text_field( (string) $payload['guest_id_number'] ) : '',
+			'accommodation_title'   => isset( $payload['accommodation_title'] ) ? sanitize_text_field( (string) $payload['accommodation_title'] ) : '',
+			'accommodation_address' => isset( $payload['accommodation_address'] ) ? sanitize_text_field( (string) $payload['accommodation_address'] ) : '',
+			'start_date'            => isset( $payload['start_date'] ) ? sanitize_text_field( (string) $payload['start_date'] ) : '',
+			'end_date'              => isset( $payload['end_date'] ) ? sanitize_text_field( (string) $payload['end_date'] ) : '',
+			'monthly_rent'          => isset( $payload['monthly_rent'] ) ? number_format( (float) $payload['monthly_rent'], 2, '.', '' ) : '',
+			'desired_price'         => isset( $payload['desired_price'] ) ? sanitize_text_field( (string) $payload['desired_price'] ) : '',
+			'guarantee_text'        => isset( $payload['guarantee_text'] ) ? sanitize_text_field( (string) $payload['guarantee_text'] ) : '',
+			'current_date'          => current_time( 'Y-m-d' ),
+		);
+
+		if ( '' === $field_values['monthly_rent'] && '' !== $field_values['desired_price'] ) {
+			$field_values['monthly_rent'] = $field_values['desired_price'];
+		}
+
+		$aliases = array(
+			'owner_name' => array( 'owner_name', 'owner', 'landlord_name', 'nombre_arrendador', 'arrendador_nombre', 'propietario_nombre', 'nombre_propietario' ),
+			'owner_email' => array( 'owner_email', 'landlord_email', 'correo_arrendador', 'email_arrendador', 'correo_propietario', 'email_propietario' ),
+			'owner_id_number' => array( 'owner_id', 'owner_id_number', 'landlord_id', 'cedula_arrendador', 'ruc_arrendador', 'cedula_propietario', 'id_propietario' ),
+			'guest_name' => array( 'guest_name', 'tenant_name', 'nombre_arrendatario', 'arrendatario_nombre', 'inquilino_nombre', 'nombre_inquilino' ),
+			'guest_email' => array( 'guest_email', 'tenant_email', 'correo_arrendatario', 'email_arrendatario', 'correo_inquilino', 'email_inquilino' ),
+			'guest_phone' => array( 'guest_phone', 'tenant_phone', 'telefono_arrendatario', 'celular_arrendatario', 'telefono_inquilino', 'celular_inquilino' ),
+			'guest_id_number' => array( 'guest_id', 'guest_id_number', 'tenant_id', 'cedula_arrendatario', 'id_arrendatario', 'cedula_inquilino', 'id_inquilino' ),
+			'accommodation_title' => array( 'property_name', 'accommodation_title', 'nombre_inmueble', 'inmueble', 'propiedad', 'nombre_propiedad' ),
+			'accommodation_address' => array( 'property_address', 'accommodation_address', 'direccion_inmueble', 'direccion_propiedad', 'direccion' ),
+			'start_date' => array( 'start_date', 'lease_start', 'fecha_inicio', 'fecha_inicio_arriendo', 'inicio_contrato' ),
+			'end_date' => array( 'end_date', 'lease_end', 'fecha_fin', 'fecha_fin_arriendo', 'fin_contrato' ),
+			'monthly_rent' => array( 'monthly_rent', 'rent', 'canon', 'canon_mensual', 'valor_arriendo', 'precio_mensual' ),
+			'guarantee_text' => array( 'guarantee', 'guarantee_text', 'garantia', 'detalle_garantia' ),
+			'current_date' => array( 'current_date', 'fecha_actual', 'fecha_hoy' ),
+		);
+
+		$token_map = array();
+		foreach ( $aliases as $field_key => $tokens ) {
+			$value = isset( $field_values[ $field_key ] ) ? (string) $field_values[ $field_key ] : '';
+			if ( '' === $value ) {
+				continue;
+			}
+
+			foreach ( $tokens as $token ) {
+				$normalized = $this->normalize_contract_placeholder_token( (string) $token );
+				if ( '' !== $normalized ) {
+					$token_map[ $normalized ] = $value;
+				}
+			}
+		}
+
+		return $token_map;
+	}
+
+	/**
+	 * Normalizes template token names to snake_case.
+	 *
+	 * @param string $token Token label.
+	 * @return string
+	 */
+	private function normalize_contract_placeholder_token( $token ) {
+		$token = strtolower( trim( (string) $token ) );
+		$token = str_replace( '-', '_', $token );
+		$token = preg_replace( '/\s+/', '_', $token );
+		$token = preg_replace( '/[^a-z0-9_]/', '', (string) $token );
+		$token = preg_replace( '/_+/', '_', (string) $token );
+
+		return trim( (string) $token, '_' );
 	}
 
 	/**
@@ -1031,7 +1531,20 @@ class Arriendo_Facil_Guest {
 		$owner_user_id = absint( get_post_meta( $accommodation_id, '_af_owner_id', true ) );
 
 		if ( ! $owner_user_id ) {
-			return array();
+			global $wpdb;
+			$owner_user_id = (int) $wpdb->get_var(
+				"SELECT CAST(meta_value AS UNSIGNED)
+				 FROM {$wpdb->postmeta}
+				 WHERE meta_key = '_af_owner_user_id'
+				   AND meta_value IS NOT NULL
+				   AND meta_value <> ''
+				 ORDER BY meta_id DESC
+				 LIMIT 1"
+			);
+
+			if ( ! $owner_user_id ) {
+				return array();
+			}
 		}
 
 		$attachment_ids = get_posts(

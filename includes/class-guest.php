@@ -669,22 +669,42 @@ class Arriendo_Facil_Guest {
 		$template_path  = $attachment_id ? get_attached_file( $attachment_id ) : '';
 		$template_mime  = isset( $owner_template['mime_type'] ) ? strtolower( (string) $owner_template['mime_type'] ) : '';
 		$template_ext   = strtolower( (string) pathinfo( (string) $template_path, PATHINFO_EXTENSION ) );
+		$tmp_downloaded  = false;
 
-		if ( ! $lease_id || ! $attachment_id || ! $template_path || ! file_exists( $template_path ) ) {
+		if ( ! $lease_id || ! $attachment_id ) {
 			return '';
 		}
 
+		// If local file is missing, download from R2.
+		if ( ! $template_path || ! file_exists( $template_path ) ) {
+			$template_path = $this->download_owner_template_from_r2( $attachment_id );
+			if ( ! $template_path ) {
+				return '';
+			}
+			$tmp_downloaded = true;
+			$template_ext   = strtolower( (string) pathinfo( $template_path, PATHINFO_EXTENSION ) );
+		}
+
 		if ( 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' !== $template_mime && 'docx' !== $template_ext ) {
+			if ( $tmp_downloaded ) {
+				@unlink( $template_path );
+			}
 			return '';
 		}
 
 		$uploads = wp_upload_dir();
 		if ( ! empty( $uploads['error'] ) || empty( $uploads['basedir'] ) || empty( $uploads['baseurl'] ) ) {
+			if ( $tmp_downloaded ) {
+				@unlink( $template_path );
+			}
 			return '';
 		}
 
 		$contracts_dir = trailingslashit( $uploads['basedir'] ) . 'arriendo-facil/contracts';
 		if ( ! wp_mkdir_p( $contracts_dir ) ) {
+			if ( $tmp_downloaded ) {
+				@unlink( $template_path );
+			}
 			return '';
 		}
 
@@ -692,7 +712,14 @@ class Arriendo_Facil_Guest {
 		$file_path = trailingslashit( $contracts_dir ) . $file_name;
 
 		if ( ! @copy( $template_path, $file_path ) ) {
+			if ( $tmp_downloaded ) {
+				@unlink( $template_path );
+			}
 			return '';
+		}
+
+		if ( $tmp_downloaded ) {
+			@unlink( $template_path );
 		}
 
 		$this->replace_docx_template_tokens_in_place( $file_path, $payload );
@@ -777,6 +804,9 @@ class Arriendo_Facil_Guest {
 				continue;
 			}
 
+			// Flatten split runs: Word sometimes splits placeholders across multiple <w:t> nodes.
+			$flattened_xml = $this->flatten_split_placeholder_runs( (string) $xml );
+
 			$updated_xml = preg_replace_callback(
 				'/\{\{\s*([a-zA-Z0-9_\-\s]+)\s*\}\}|\[\[\s*([a-zA-Z0-9_\-\s]+)\s*\]\]|<<\s*([a-zA-Z0-9_\-\s]+)\s*>>/',
 				function ( $matches ) use ( $token_map ) {
@@ -796,15 +826,56 @@ class Arriendo_Facil_Guest {
 
 					return $matches[0];
 				},
-				(string) $xml
+				$flattened_xml
 			);
 
-			if ( is_string( $updated_xml ) && $updated_xml !== $xml ) {
+			if ( is_string( $updated_xml ) && $updated_xml !== (string) $xml ) {
 				$zip->addFromString( $entry_name, $updated_xml );
 			}
 		}
 
 		$zip->close();
+	}
+
+	/**
+	 * Flattens adjacent <w:r> runs that split a placeholder across multiple <w:t> nodes.
+	 *
+	 * @param string $xml Word XML content.
+	 * @return string
+	 */
+	private function flatten_split_placeholder_runs( $xml ) {
+		$result = preg_replace_callback(
+			'#(<w:p\b[^>]*>)(.*?)(</w:p>)#si',
+			function ( $p_match ) {
+				$inner = $p_match[2];
+				$full_text = '';
+				preg_match_all( '#<w:t[^>]*>(.*?)</w:t>#si', $inner, $t_matches );
+				if ( ! empty( $t_matches[1] ) ) {
+					$full_text = implode( '', $t_matches[1] );
+				}
+
+				if ( ! preg_match( '/\{\{[^}]+\}\}|\[\[[^\]]+\]\]|<<[^>]+>>/', $full_text ) ) {
+					return $p_match[0];
+				}
+
+				$merged = preg_replace_callback(
+					'#(<w:r\b[^>]*>\s*(?:<w:rPr>.*?</w:rPr>\s*)?)<w:t[^>]*>([^<]*)</w:t>\s*</w:r>(?:\s*<w:r\b[^>]*>\s*(?:<w:rPr>.*?</w:rPr>\s*)?<w:t[^>]*>([^<]*)</w:t>\s*</w:r>)+#si',
+					function ( $run_match ) {
+						preg_match_all( '#<w:t[^>]*>([^<]*)</w:t>#si', $run_match[0], $texts );
+						$combined = implode( '', $texts[1] );
+						preg_match( '#(<w:r\b[^>]*>\s*(?:<w:rPr>.*?</w:rPr>\s*)?)#si', $run_match[0], $first_run );
+						$run_start = isset( $first_run[1] ) ? $first_run[1] : '<w:r>';
+						return $run_start . '<w:t xml:space="preserve">' . $combined . '</w:t></w:r>';
+					},
+					$inner
+				);
+
+				return $p_match[1] . $merged . $p_match[3];
+			},
+			(string) $xml
+		);
+
+		return is_string( $result ) ? $result : (string) $xml;
 	}
 
 	/**
@@ -2305,6 +2376,107 @@ class Arriendo_Facil_Guest {
 		$month_name = isset( $months[ $month_idx ] ) ? $months[ $month_idx ] : gmdate( 'F', $timestamp );
 
 		return sprintf( 'Quito, %d de %s de %s', $day, $month_name, $year );
+	}
+
+	/**
+	 * Downloads the owner contract template DOCX from R2 to a local temp file.
+	 *
+	 * @param int $attachment_id Attachment ID.
+	 * @return string|false Local temp file path or false on failure.
+	 */
+	private function download_owner_template_from_r2( $attachment_id ) {
+		$attachment_id = absint( $attachment_id );
+		if ( ! $attachment_id ) {
+			return false;
+		}
+
+		$object_key = (string) get_post_meta( $attachment_id, '_af_r2_object_key', true );
+		if ( '' === trim( $object_key ) ) {
+			return false;
+		}
+
+		$r2_config = $this->get_r2_config();
+		if ( is_wp_error( $r2_config ) ) {
+			return false;
+		}
+
+		$object_key   = ltrim( $object_key, '/' );
+		$amz_date     = gmdate( 'Ymd\\THis\\Z' );
+		$date_stamp   = gmdate( 'Ymd' );
+		$scope        = $date_stamp . '/' . $r2_config['region'] . '/' . $r2_config['service'] . '/aws4_request';
+		$canonical_uri = '/' . rawurlencode( $r2_config['bucket'] ) . '/' . str_replace( '%2F', '/', rawurlencode( $object_key ) );
+
+		$canonical_headers =
+			'host:' . $r2_config['host'] . "\n"
+			. 'x-amz-content-sha256:UNSIGNED-PAYLOAD' . "\n"
+			. 'x-amz-date:' . $amz_date . "\n";
+		$signed_headers = 'host;x-amz-content-sha256;x-amz-date';
+
+		$canonical_request =
+			"GET\n"
+			. $canonical_uri . "\n"
+			. "\n"
+			. $canonical_headers . "\n"
+			. $signed_headers . "\n"
+			. 'UNSIGNED-PAYLOAD';
+
+		$string_to_sign =
+			'AWS4-HMAC-SHA256' . "\n"
+			. $amz_date . "\n"
+			. $scope . "\n"
+			. hash( 'sha256', $canonical_request );
+
+		$signing_key = $this->get_aws_v4_signing_key( $r2_config['secret_key'], $date_stamp, $r2_config['region'], $r2_config['service'] );
+		$signature   = hash_hmac( 'sha256', $string_to_sign, $signing_key );
+
+		$authorization =
+			'AWS4-HMAC-SHA256 '
+			. 'Credential=' . $r2_config['access_key'] . '/' . $scope . ', '
+			. 'SignedHeaders=' . $signed_headers . ', '
+			. 'Signature=' . $signature;
+
+		$url = $r2_config['endpoint'] . $canonical_uri;
+
+		$response = wp_remote_get(
+			$url,
+			array(
+				'timeout' => 60,
+				'headers' => array(
+					'Host'                 => $r2_config['host'],
+					'x-amz-date'           => $amz_date,
+					'x-amz-content-sha256' => 'UNSIGNED-PAYLOAD',
+					'Authorization'        => $authorization,
+				),
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			error_log( 'Arriendo Facil R2 template download error: ' . $response->get_error_message() );
+			return false;
+		}
+
+		$status_code = (int) wp_remote_retrieve_response_code( $response );
+		if ( $status_code < 200 || $status_code >= 300 ) {
+			error_log( 'Arriendo Facil R2 template download HTTP ' . $status_code );
+			return false;
+		}
+
+		$body = wp_remote_retrieve_body( $response );
+		if ( '' === $body ) {
+			return false;
+		}
+
+		$tmp_file = wp_tempnam( 'af_owner_template_' . $attachment_id . '.docx' );
+		if ( ! $tmp_file ) {
+			return false;
+		}
+
+		if ( false === file_put_contents( $tmp_file, $body ) ) {
+			@unlink( $tmp_file );
+			return false;
+		}
+
+		return $tmp_file;
 	}
 
 	/**

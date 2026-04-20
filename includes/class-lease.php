@@ -400,14 +400,26 @@ class Arriendo_Facil_Lease {
 		}
 
 		$fallback_text = $this->build_minimal_fallback_contract_text( $lease );
-		$file_name     = sprintf( 'lease-%d-autofallback-%s.txt', $lease_id, gmdate( 'Ymd-His' ) );
-		$upload        = wp_upload_bits( $file_name, null, $fallback_text );
 
-		if ( ! is_array( $upload ) || ! empty( $upload['error'] ) || empty( $upload['url'] ) ) {
+		$uploads = wp_upload_dir();
+		if ( ! empty( $uploads['error'] ) || empty( $uploads['basedir'] ) || empty( $uploads['baseurl'] ) ) {
 			return false;
 		}
 
-		return $this->attach_document( $lease_id, esc_url_raw( (string) $upload['url'] ) );
+		$contracts_dir = trailingslashit( $uploads['basedir'] ) . 'arriendo-facil/contracts';
+		if ( ! wp_mkdir_p( $contracts_dir ) ) {
+			return false;
+		}
+
+		$file_name = sprintf( 'lease-%d-autofallback-%s.docx', $lease_id, gmdate( 'Ymd-His' ) );
+		$file_path = trailingslashit( $contracts_dir ) . $file_name;
+
+		if ( ! $this->write_fallback_contract_docx( $file_path, $fallback_text ) ) {
+			return false;
+		}
+
+		$file_url = esc_url_raw( trailingslashit( $uploads['baseurl'] ) . 'arriendo-facil/contracts/' . rawurlencode( $file_name ) );
+		return $this->attach_document( $lease_id, $file_url );
 	}
 
 	/**
@@ -436,6 +448,101 @@ class Arriendo_Facil_Lease {
 		$text .= "Fecha de generacion: " . current_time( 'Y-m-d H:i:s' ) . "\n";
 
 		return $text;
+	}
+
+	/**
+	 * Writes a formatted DOCX fallback contract file.
+	 *
+	 * @param string $file_path Destination file path.
+	 * @param string $contract_text Contract text content.
+	 * @return bool
+	 */
+	private function write_fallback_contract_docx( $file_path, $contract_text ) {
+		if ( ! class_exists( 'ZipArchive' ) ) {
+			return false;
+		}
+
+		$zip = new ZipArchive();
+		if ( true !== $zip->open( $file_path, ZipArchive::CREATE | ZipArchive::OVERWRITE ) ) {
+			return false;
+		}
+
+		$lines = preg_split( '/\r\n|\r|\n/', (string) $contract_text );
+		if ( ! is_array( $lines ) ) {
+			$lines = array( (string) $contract_text );
+		}
+
+		$doc_paragraphs_xml = '';
+		$first_line = true;
+		foreach ( $lines as $line ) {
+			$line = trim( (string) $line );
+			if ( '' === $line ) {
+				$doc_paragraphs_xml .= '<w:p/>';
+				continue;
+			}
+
+			$upper = strtoupper( $line );
+			$is_title  = $first_line || false !== strpos( $upper, 'CONTRATO DE ARRENDAMIENTO' );
+			$is_clause = 0 === strpos( $upper, 'CLAUSULA ' );
+			$first_line = false;
+
+			$ppr = '';
+			$rpr = '';
+			if ( $is_title ) {
+				$ppr = '<w:pPr><w:jc w:val="center"/></w:pPr>';
+				$rpr = '<w:rPr><w:b/><w:bCs/><w:sz w:val="28"/><w:szCs w:val="28"/></w:rPr>';
+			} elseif ( $is_clause ) {
+				$ppr = '<w:pPr><w:jc w:val="left"/></w:pPr>';
+				$rpr = '<w:rPr><w:b/><w:bCs/></w:rPr>';
+			} else {
+				$ppr = '<w:pPr><w:jc w:val="both"/></w:pPr>';
+			}
+
+			$doc_paragraphs_xml .= '<w:p>' . $ppr . '<w:r>' . $rpr . '<w:t xml:space="preserve">' . esc_xml( $line ) . '</w:t></w:r></w:p>';
+		}
+
+		if ( '' === $doc_paragraphs_xml ) {
+			$doc_paragraphs_xml = '<w:p><w:r><w:t xml:space="preserve">Contrato</w:t></w:r></w:p>';
+		}
+
+		$document_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+			. '<w:document xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:wp14="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:w10="urn:schemas-microsoft-com:office:word" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml" xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup" xmlns:wpi="http://schemas.microsoft.com/office/word/2010/wordprocessingInk" xmlns:wne="http://schemas.microsoft.com/office/word/2006/wordml" xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" mc:Ignorable="w14 w15 wp14">'
+			. '<w:body>' . $doc_paragraphs_xml . '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/><w:cols w:space="720"/></w:sectPr></w:body></w:document>';
+
+		$content_types_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+			. '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+			. '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+			. '<Default Extension="xml" ContentType="application/xml"/>'
+			. '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>'
+			. '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+			. '</Types>';
+
+		$styles_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+			. '<w:styles xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" mc:Ignorable="">'
+			. '<w:docDefaults>'
+			. '<w:rPrDefault><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr></w:rPrDefault>'
+			. '<w:pPrDefault><w:pPr><w:spacing w:before="0" w:after="160" w:line="360" w:lineRule="auto"/><w:jc w:val="both"/></w:pPr></w:pPrDefault>'
+			. '</w:docDefaults>'
+			. '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>'
+			. '</w:styles>';
+
+		$rels_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+			. '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+			. '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>'
+			. '</Relationships>';
+
+		$doc_rels_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+			. '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+			. '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
+			. '</Relationships>';
+
+		$zip->addFromString( '[Content_Types].xml', $content_types_xml );
+		$zip->addFromString( '_rels/.rels', $rels_xml );
+		$zip->addFromString( 'word/document.xml', $document_xml );
+		$zip->addFromString( 'word/styles.xml', $styles_xml );
+		$zip->addFromString( 'word/_rels/document.xml.rels', $doc_rels_xml );
+
+		return $zip->close();
 	}
 
 	/**

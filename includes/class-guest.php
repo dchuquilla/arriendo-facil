@@ -1738,49 +1738,28 @@ class Arriendo_Facil_Guest {
 				'align' => 'both',
 			),
 			array(
-				'text'  => 'ARRENDADOR',
+				'text'  => 'ARRENDADOR\tARRENDATARIO',
 				'bold'  => true,
 				'align' => 'left',
+				'tab_stops' => array( 6400 ),
 			),
 			array(
-				'text'  => 'Firma: ________________________',
+				'text'  => 'Firma: ________________________\tFirma: ________________________',
 				'bold'  => false,
 				'align' => 'left',
+				'tab_stops' => array( 6400 ),
 			),
 			array(
-				'text'  => 'Nombre: ' . $owner_name,
+				'text'  => 'Nombre: ' . $owner_name . "\t" . 'Nombre: ' . $guest_name,
 				'bold'  => false,
 				'align' => 'left',
+				'tab_stops' => array( 6400 ),
 			),
 			array(
-				'text'  => 'Cedula/RUC: ' . $owner_id,
+				'text'  => 'Cedula/RUC: ' . $owner_id . "\t" . 'Cedula: ' . $guest_id,
 				'bold'  => false,
 				'align' => 'left',
-			),
-			array(
-				'text'  => '',
-				'bold'  => false,
-				'align' => 'both',
-			),
-			array(
-				'text'  => 'ARRENDATARIO',
-				'bold'  => true,
-				'align' => 'left',
-			),
-			array(
-				'text'  => 'Firma: ________________________',
-				'bold'  => false,
-				'align' => 'left',
-			),
-			array(
-				'text'  => 'Nombre: ' . $guest_name,
-				'bold'  => false,
-				'align' => 'left',
-			),
-			array(
-				'text'  => 'Cedula: ' . $guest_id,
-				'bold'  => false,
-				'align' => 'left',
+				'tab_stops' => array( 6400 ),
 			),
 		);
 	}

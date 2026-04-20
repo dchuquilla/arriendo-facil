@@ -76,9 +76,7 @@ class Arriendo_Facil_Lease {
 			$lease_id,
 			isset( $version_entry['version'] ) ? absint( $version_entry['version'] ) : 1,
 			$contract_text,
-			$pdf_password,
-			isset( $source['contents'] ) ? (string) $source['contents'] : '',
-			isset( $source['mime_type'] ) ? (string) $source['mime_type'] : ''
+			$pdf_password
 		);
 
 		if ( is_wp_error( $approved_pdf ) ) {
@@ -995,94 +993,15 @@ class Arriendo_Facil_Lease {
 	}
 
 	/**
-	 * Extracts paragraph-level formatting from DOCX for PDF rendering.
-	 *
-	 * @param string $contents Binary file contents.
-	 * @param string $mime_type Source mime type.
-	 * @return array<int,array<string,mixed>>
-	 */
-	private function extract_pdf_paragraphs_from_contract_binary( $contents, $mime_type ) {
-		$mime_type = strtolower( (string) $mime_type );
-		$contents  = (string) $contents;
-
-		if ( '' === $contents ) {
-			return array();
-		}
-
-		if ( 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' !== $mime_type || ! class_exists( 'ZipArchive' ) ) {
-			return array();
-		}
-
-		$temp_file = wp_tempnam( 'af-lease-pdf-docx' );
-		if ( ! $temp_file ) {
-			return array();
-		}
-
-		file_put_contents( $temp_file, $contents );
-		$zip = new ZipArchive();
-		if ( true !== $zip->open( $temp_file ) ) {
-			@unlink( $temp_file );
-			return array();
-		}
-
-		$xml = $zip->getFromName( 'word/document.xml' );
-		$zip->close();
-		@unlink( $temp_file );
-
-		if ( false === $xml || '' === $xml ) {
-			return array();
-		}
-
-		$paragraphs = array();
-		if ( ! preg_match_all( '/<w:p\b[^>]*>.*?<\/w:p>/s', (string) $xml, $paragraph_matches ) ) {
-			return array();
-		}
-
-		foreach ( $paragraph_matches[0] as $p_xml ) {
-			$align = 'left';
-			if ( preg_match( '/<w:jc\s+w:val="([a-z]+)"\s*\/>/i', $p_xml, $align_match ) ) {
-				$candidate = strtolower( (string) $align_match[1] );
-				if ( in_array( $candidate, array( 'left', 'center', 'right', 'both' ), true ) ) {
-					$align = $candidate;
-				}
-			}
-
-			$bold = false;
-			if ( preg_match( '/<w:b(\s+[^>]*)?\/>/i', $p_xml ) || preg_match( '/<w:bCs(\s+[^>]*)?\/>/i', $p_xml ) ) {
-				$bold = true;
-			}
-
-			$with_tabs = str_replace( '<w:tab/>', "\t", (string) $p_xml );
-			$text = '';
-			if ( preg_match_all( '/<w:t\b[^>]*>(.*?)<\/w:t>/s', $with_tabs, $text_matches ) ) {
-				$text = implode( '', $text_matches[1] );
-			}
-
-			$text = html_entity_decode( (string) $text, ENT_QUOTES, 'UTF-8' );
-			$text = preg_replace( '/\s+$/u', '', (string) $text );
-
-			$paragraphs[] = array(
-				'text'  => (string) $text,
-				'bold'  => $bold,
-				'align' => $align,
-			);
-		}
-
-		return $paragraphs;
-	}
-
-	/**
 	 * Creates protected PDF for an approved lease contract version.
 	 *
 	 * @param int    $lease_id Lease ID.
 	 * @param int    $version Version number.
 	 * @param string $contract_text Contract text.
 	 * @param string $pdf_password User password for PDF opening.
-	 * @param string $source_contents Source file contents.
-	 * @param string $source_mime_type Source mime type.
 	 * @return array|WP_Error
 	 */
-	private function create_approved_pdf_for_version( $lease_id, $version, $contract_text, $pdf_password, $source_contents = '', $source_mime_type = '' ) {
+	private function create_approved_pdf_for_version( $lease_id, $version, $contract_text, $pdf_password ) {
 		$uploads = wp_upload_dir();
 		if ( ! empty( $uploads['error'] ) || empty( $uploads['basedir'] ) || empty( $uploads['baseurl'] ) ) {
 			return new WP_Error( 'af_lease_pdf_uploads_unavailable', __( 'WordPress uploads directory is not available.', 'arriendo-facil' ) );
@@ -1096,8 +1015,7 @@ class Arriendo_Facil_Lease {
 		$file_name = sprintf( 'lease-%d-v%d-approved-%s.pdf', absint( $lease_id ), absint( $version ), gmdate( 'Ymd-His' ) );
 		$file_path = trailingslashit( $approved_dir ) . $file_name;
 
-		$paragraphs = $this->extract_pdf_paragraphs_from_contract_binary( (string) $source_contents, (string) $source_mime_type );
-		$written    = $this->write_password_protected_pdf_file( $file_path, (string) $contract_text, (string) $pdf_password, $paragraphs );
+		$written = $this->write_password_protected_pdf_file( $file_path, (string) $contract_text, (string) $pdf_password );
 		if ( ! $written ) {
 			return new WP_Error( 'af_lease_pdf_write_failed', __( 'Could not generate protected PDF document.', 'arriendo-facil' ) );
 		}
@@ -1239,111 +1157,48 @@ class Arriendo_Facil_Lease {
 	 * @param string $file_path Destination file path.
 	 * @param string $text Document text.
 	 * @param string $user_password User/open password.
-	 * @param array  $paragraphs Optional pre-parsed paragraphs with style data.
 	 * @return bool
 	 */
-	private function write_password_protected_pdf_file( $file_path, $text, $user_password, array $paragraphs = array() ) {
-		$font_size       = 10;
-		$line_height     = 16;
-		$left_margin     = 50;
-		$right_limit     = 545;
-		$max_chars       = 95;
-		$lines_per_page  = 44;
-
-		$render_lines = array();
-
-		if ( ! empty( $paragraphs ) ) {
-			foreach ( $paragraphs as $paragraph ) {
-				$p_text  = isset( $paragraph['text'] ) ? trim( (string) $paragraph['text'] ) : '';
-				$p_bold  = ! empty( $paragraph['bold'] );
-				$p_align = isset( $paragraph['align'] ) ? sanitize_key( (string) $paragraph['align'] ) : 'left';
-
-				if ( '' === $p_text ) {
-					$render_lines[] = array(
-						'text'  => '',
-						'bold'  => false,
-						'align' => 'left',
-					);
-					continue;
-				}
-
-				$wrapped = $this->split_text_for_pdf( $p_text, $max_chars );
-				foreach ( $wrapped as $w_line ) {
-					$render_lines[] = array(
-						'text'  => (string) $w_line,
-						'bold'  => $p_bold,
-						'align' => in_array( $p_align, array( 'left', 'center', 'right', 'both' ), true ) ? $p_align : 'left',
-					);
-				}
-			}
-		} else {
-			$lines = $this->split_text_for_pdf( $text, $max_chars );
-			if ( empty( $lines ) ) {
-				$lines = array( 'Contrato aprobado' );
-			}
-
-			foreach ( $lines as $line ) {
-				$render_lines[] = array(
-					'text'  => (string) $line,
-					'bold'  => false,
-					'align' => 'left',
-				);
-			}
+	private function write_password_protected_pdf_file( $file_path, $text, $user_password ) {
+		$lines = $this->split_text_for_pdf( $text, 95 );
+		if ( empty( $lines ) ) {
+			$lines = array( 'Contrato aprobado' );
 		}
 
-		if ( empty( $render_lines ) ) {
-			$render_lines[] = array(
-				'text'  => 'Contrato aprobado',
-				'bold'  => false,
-				'align' => 'left',
-			);
-		}
-
-		$pages = array_chunk( $render_lines, $lines_per_page );
+		$lines_per_page = 44;
+		$pages          = array_chunk( $lines, $lines_per_page );
 		if ( empty( $pages ) ) {
-			$pages = array( $render_lines );
+			$pages = array( array( 'Contrato aprobado' ) );
 		}
 
-		$objects     = array();
-		$catalog_n   = 1;
-		$pages_n     = 2;
-		$font_reg_n  = 3;
-		$font_bold_n = 4;
+		$objects   = array();
+		$catalog_n = 1;
+		$pages_n   = 2;
+		$font_n    = 3;
 
 		$page_refs = array();
-		$next_obj  = 5;
+		$next_obj  = 4;
 
 		foreach ( $pages as $page_lines ) {
-			$page_n      = $next_obj;
-			$content_n   = $next_obj + 1;
+			$page_n    = $next_obj;
+			$content_n = $next_obj + 1;
 			$page_refs[] = $page_n;
-			$next_obj   += 2;
+			$next_obj += 2;
 
-			$stream = '';
-			$y      = 790;
-
-			foreach ( $page_lines as $line_item ) {
-				$line_text  = isset( $line_item['text'] ) ? (string) $line_item['text'] : '';
-				$line_bold  = ! empty( $line_item['bold'] );
-				$line_align = isset( $line_item['align'] ) ? (string) $line_item['align'] : 'left';
-
-				if ( '' === trim( $line_text ) ) {
-					$y -= $line_height;
-					continue;
+			$stream = "BT\n/F1 10 Tf\n50 790 Td\n";
+			$index  = 0;
+			foreach ( $page_lines as $line ) {
+				$escaped = $this->escape_pdf_text( (string) $line );
+				if ( 0 === $index ) {
+					$stream .= '(' . $escaped . ") Tj\n";
+				} else {
+					$stream .= "0 -16 Td\n(" . $escaped . ") Tj\n";
 				}
-
-				$escaped = $this->escape_pdf_text( $line_text );
-				$x       = $this->calculate_pdf_line_x( $line_text, $line_align, $font_size, $left_margin, $right_limit );
-				$font_id = $line_bold ? 'F2' : 'F1';
-
-				$stream .= "BT\n/" . $font_id . ' ' . $font_size . " Tf\n";
-				$stream .= sprintf( "1 0 0 1 %.2f %.2f Tm\n", $x, $y );
-				$stream .= '(' . $escaped . ") Tj\nET\n";
-
-				$y -= $line_height;
+				$index++;
 			}
+			$stream .= "ET\n";
 
-			$objects[ $page_n ] = '<< /Type /Page /Parent ' . $pages_n . ' 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ' . $font_reg_n . ' 0 R /F2 ' . $font_bold_n . ' 0 R >> >> /Contents ' . $content_n . ' 0 R >>';
+			$objects[ $page_n ] = '<< /Type /Page /Parent ' . $pages_n . ' 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ' . $font_n . ' 0 R >> >> /Contents ' . $content_n . ' 0 R >>';
 			$objects[ $content_n ] = array(
 				'stream' => $stream,
 			);
@@ -1351,8 +1206,7 @@ class Arriendo_Facil_Lease {
 
 		$objects[ $catalog_n ] = '<< /Type /Catalog /Pages ' . $pages_n . ' 0 R >>';
 		$objects[ $pages_n ]   = '<< /Type /Pages /Kids [' . implode( ' ', array_map( static function ( $n ) { return $n . ' 0 R'; }, $page_refs ) ) . '] /Count ' . count( $page_refs ) . ' >>';
-		$objects[ $font_reg_n ]  = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>';
-		$objects[ $font_bold_n ] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>';
+		$objects[ $font_n ]    = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>';
 
 		$encrypt_n = $next_obj;
 		$max_obj   = $encrypt_n;
@@ -1421,48 +1275,6 @@ class Arriendo_Facil_Lease {
 		$pdf .= '%%EOF';
 
 		return false !== file_put_contents( $file_path, $pdf );
-	}
-
-	/**
-	 * Calculates X position for a PDF line based on alignment.
-	 *
-	 * @param string $text Line text.
-	 * @param string $align left|center|right|both.
-	 * @param int    $font_size Font size.
-	 * @param int    $left_margin Left margin in points.
-	 * @param int    $right_limit Right edge in points.
-	 * @return float
-	 */
-	private function calculate_pdf_line_x( $text, $align, $font_size, $left_margin, $right_limit ) {
-		$align       = sanitize_key( (string) $align );
-		$left_margin = (float) $left_margin;
-		$right_limit = (float) $right_limit;
-		$text_width  = $this->estimate_pdf_text_width( (string) $text, (int) $font_size );
-
-		if ( 'right' === $align ) {
-			return max( $left_margin, $right_limit - $text_width );
-		}
-
-		if ( 'center' === $align ) {
-			$content_width = max( 0, $right_limit - $left_margin );
-			return $left_margin + max( 0, ( $content_width - $text_width ) / 2 );
-		}
-
-		return $left_margin;
-	}
-
-	/**
-	 * Estimates PDF text width in points for simple alignment calculations.
-	 *
-	 * @param string $text Line text.
-	 * @param int    $font_size Font size.
-	 * @return float
-	 */
-	private function estimate_pdf_text_width( $text, $font_size ) {
-		$font_size = max( 8, absint( $font_size ) );
-		$length = function_exists( 'mb_strlen' ) ? mb_strlen( (string) $text, 'UTF-8' ) : strlen( (string) $text );
-
-		return (float) $length * ( (float) $font_size * 0.5 );
 	}
 
 	/**

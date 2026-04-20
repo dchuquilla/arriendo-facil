@@ -201,7 +201,7 @@ $message = isset( $_GET['af_message'] ) ? sanitize_text_field( wp_unslash( $_GET
                             <label for="af_owner_contract_example_file"><?php esc_html_e( 'Subir plantilla Word (.docx)', 'arriendo-facil' ); ?></label><br />
                             <input type="file" id="af_owner_contract_example_file" name="owner_contract_example_file" class="regular-text" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
                         </p>
-                        <p class="description"><?php esc_html_e( 'Campo opcional. La plantilla debe incluir placeholders en formato {{campo}} (por ejemplo: {{guest_name}}, {{guest_id_number}}, {{owner_name}}). El sistema completara automaticamente los campos detectados en la plantilla.', 'arriendo-facil' ); ?></p>
+                        <p class="description"><?php esc_html_e( 'Campo opcional. Puedes subir la plantilla del owner con su estructura y campos propios. No se rechaza por un formato fijo de campos.', 'arriendo-facil' ); ?></p>
                     </td>
                 </tr>
             </table>

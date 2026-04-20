@@ -540,14 +540,6 @@ class Arriendo_Facil_Owner_Contact {
 
 				$detected_placeholders = $this->extract_owner_contract_placeholders_from_docx( (string) $file_data['tmp_name'] );
 
-				if ( empty( $detected_placeholders ) ) {
-					$this->last_upload_error = new WP_Error(
-						'af_contract_example_no_placeholders',
-						__( 'The DOCX template does not include readable placeholders. Add placeholders like {{guest_name}} or {{guest_id_number}} and try again.', 'arriendo-facil' )
-					);
-					return;
-				}
-
 				$attachment_id = media_handle_upload(
 					$optional_contract_example_field,
 					0,
@@ -566,7 +558,11 @@ class Arriendo_Facil_Owner_Contact {
 				update_post_meta( (int) $attachment_id, '_af_owner_contract_example', '1' );
 				update_post_meta( (int) $attachment_id, '_af_owner_contact_id', (int) $contact_id );
 				update_post_meta( (int) $attachment_id, '_af_owner_user_id', (int) $user_id );
-				update_post_meta( (int) $attachment_id, '_af_owner_contract_placeholders', wp_json_encode( array_values( $detected_placeholders ) ) );
+				if ( ! empty( $detected_placeholders ) ) {
+					update_post_meta( (int) $attachment_id, '_af_owner_contract_placeholders', wp_json_encode( array_values( $detected_placeholders ) ) );
+				} else {
+					delete_post_meta( (int) $attachment_id, '_af_owner_contract_placeholders' );
+				}
 
 				$r2_upload = $this->upload_attachment_to_r2( (int) $attachment_id, (int) $contact_id, (string) $optional_contract_doc_type, $r2_config );
 				if ( is_wp_error( $r2_upload ) ) {

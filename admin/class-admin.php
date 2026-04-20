@@ -1170,7 +1170,7 @@ class Arriendo_Facil_Admin {
 	}
 
 	/**
-	 * Creates a plain-text fallback file when DOC/DOCX generation failed.
+	 * Creates a DOCX fallback file when primary DOC/DOCX generation failed.
 	 *
 	 * @param int    $lease_id Lease ID.
 	 * @param string $contract_text Contract text.
@@ -1184,14 +1184,24 @@ class Arriendo_Facil_Admin {
 			return '';
 		}
 
-		$file_name = sprintf( 'lease-%d-contract-admin-%s.txt', $lease_id, gmdate( 'Ymd-His' ) );
-		$upload    = wp_upload_bits( $file_name, null, $text );
-
-		if ( ! is_array( $upload ) || ! empty( $upload['error'] ) || empty( $upload['url'] ) ) {
+		$uploads = wp_upload_dir();
+		if ( ! empty( $uploads['error'] ) || empty( $uploads['basedir'] ) || empty( $uploads['baseurl'] ) ) {
 			return '';
 		}
 
-		return esc_url_raw( (string) $upload['url'] );
+		$contracts_dir = trailingslashit( $uploads['basedir'] ) . 'arriendo-facil/contracts';
+		if ( ! wp_mkdir_p( $contracts_dir ) ) {
+			return '';
+		}
+
+		$file_name = sprintf( 'lease-%d-fallback-admin-%s.docx', $lease_id, gmdate( 'Ymd-His' ) );
+		$file_path = trailingslashit( $contracts_dir ) . $file_name;
+
+		if ( ! $this->write_contract_docx_file( $file_path, $text ) ) {
+			return '';
+		}
+
+		return esc_url_raw( trailingslashit( $uploads['baseurl'] ) . 'arriendo-facil/contracts/' . rawurlencode( $file_name ) );
 	}
 
 	/**
@@ -1628,36 +1638,73 @@ class Arriendo_Facil_Admin {
 			return false;
 		}
 
-		$escaped_lines = array();
-		$lines         = preg_split( '/\r\n|\r|\n/', (string) $contract_text );
-		if ( ! is_array( $lines ) ) {
-			$lines = array( (string) $contract_text );
+		$paragraphs = $this->build_contract_docx_paragraphs( $contract_text );
+		if ( empty( $paragraphs ) ) {
+			$paragraphs = array(
+				array( 'text' => 'Contrato', 'bold' => false, 'align' => 'left' ),
+			);
 		}
 
-		foreach ( $lines as $line ) {
-			$line = trim( (string) $line );
-			if ( '' === $line ) {
-				$escaped_lines[] = '<w:p/>';
+		$doc_paragraphs_xml = '';
+		foreach ( $paragraphs as $paragraph ) {
+			$text  = isset( $paragraph['text'] ) ? (string) $paragraph['text'] : '';
+			$bold  = ! empty( $paragraph['bold'] );
+			$align = isset( $paragraph['align'] ) ? (string) $paragraph['align'] : 'both';
+
+			if ( '' === $text ) {
+				$doc_paragraphs_xml .= '<w:p/>';
 				continue;
 			}
 
-			$escaped_lines[] = '<w:p><w:r><w:t xml:space="preserve">' . esc_xml( $line ) . '</w:t></w:r></w:p>';
-		}
+			$paragraph_properties = '';
+			if ( in_array( $align, array( 'left', 'center', 'right', 'both' ), true ) ) {
+				$paragraph_properties .= '<w:jc w:val="' . esc_attr( $align ) . '"/>';
+			}
 
-		if ( empty( $escaped_lines ) ) {
-			$escaped_lines[] = '<w:p><w:r><w:t xml:space="preserve">Contrato</w:t></w:r></w:p>';
+			if ( isset( $paragraph['tab_stops'] ) && is_array( $paragraph['tab_stops'] ) ) {
+				$paragraph_properties .= '<w:tabs>';
+				foreach ( $paragraph['tab_stops'] as $tab_stop ) {
+					$position = absint( $tab_stop );
+					if ( $position > 0 ) {
+						$paragraph_properties .= '<w:tab w:val="left" w:pos="' . $position . '"/>';
+					}
+				}
+				$paragraph_properties .= '</w:tabs>';
+			}
+
+			$run_properties = '';
+			if ( $bold ) {
+				$run_properties = '<w:rPr><w:b/><w:bCs/></w:rPr>';
+			}
+
+			$doc_paragraphs_xml .= '<w:p>';
+			if ( '' !== $paragraph_properties ) {
+				$doc_paragraphs_xml .= '<w:pPr>' . $paragraph_properties . '</w:pPr>';
+			}
+			$doc_paragraphs_xml .= $this->build_docx_text_runs_xml( $text, $run_properties );
+			$doc_paragraphs_xml .= '</w:p>';
 		}
 
 		$document_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
 			. '<w:document xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:wp14="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:w10="urn:schemas-microsoft-com:office:word" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml" xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup" xmlns:wpi="http://schemas.microsoft.com/office/word/2010/wordprocessingInk" xmlns:wne="http://schemas.microsoft.com/office/word/2006/wordml" xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" mc:Ignorable="w14 w15 wp14">'
-			. '<w:body>' . implode( '', $escaped_lines ) . '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr></w:body></w:document>';
+			. '<w:body>' . $doc_paragraphs_xml . '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/><w:cols w:space="720"/></w:sectPr></w:body></w:document>';
 
 		$content_types_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
 			. '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
 			. '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
 			. '<Default Extension="xml" ContentType="application/xml"/>'
+			. '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>'
 			. '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
 			. '</Types>';
+
+		$styles_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+			. '<w:styles xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" mc:Ignorable="">'
+			. '<w:docDefaults>'
+			. '<w:rPrDefault><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr></w:rPrDefault>'
+			. '<w:pPrDefault><w:pPr><w:spacing w:before="0" w:after="160" w:line="360" w:lineRule="auto"/><w:jc w:val="both"/></w:pPr></w:pPrDefault>'
+			. '</w:docDefaults>'
+			. '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>'
+			. '</w:styles>';
 
 		$rels_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
 			. '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
@@ -1665,14 +1712,192 @@ class Arriendo_Facil_Admin {
 			. '</Relationships>';
 
 		$doc_rels_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-			. '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>';
+			. '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+			. '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
+			. '</Relationships>';
 
 		$zip->addFromString( '[Content_Types].xml', $content_types_xml );
 		$zip->addFromString( '_rels/.rels', $rels_xml );
 		$zip->addFromString( 'word/document.xml', $document_xml );
+		$zip->addFromString( 'word/styles.xml', $styles_xml );
 		$zip->addFromString( 'word/_rels/document.xml.rels', $doc_rels_xml );
 
 		return $zip->close();
+	}
+
+	/**
+	 * Builds DOCX paragraphs using strict contract format rules.
+	 *
+	 * @param string $contract_text Contract text.
+	 * @return array<int,array<string,mixed>>
+	 */
+	private function build_contract_docx_paragraphs( $contract_text ) {
+		$paragraphs = array();
+		$lines      = preg_split( '/\r\n|\r|\n/', (string) $contract_text );
+		if ( ! is_array( $lines ) ) {
+			$lines = array( (string) $contract_text );
+		}
+
+		$has_title      = false;
+		$last_was_empty = false;
+		$title_inserted = false;
+
+		foreach ( $lines as $raw_line ) {
+			$line = trim( (string) $raw_line );
+
+			if ( '' === $line ) {
+				if ( $last_was_empty ) {
+					continue;
+				}
+				$paragraphs[]   = array( 'text' => '', 'bold' => false, 'align' => 'both' );
+				$last_was_empty = true;
+				continue;
+			}
+
+			$upper_line = strtoupper( $line );
+			$is_title   = false !== strpos( $upper_line, 'CONTRATO DE ARRENDAMIENTO' );
+			$is_clause  = 0 === strpos( $upper_line, 'CLAUSULA ' );
+			$last_was_empty = false;
+
+			if ( 0 === strpos( $line, 'Quito,' ) ) {
+				continue;
+			}
+
+			if ( $this->is_contract_signature_line( $line ) ) {
+				continue;
+			}
+
+			if ( ! $has_title && $is_title ) {
+				$paragraphs[] = array( 'text' => 'CONTRATO DE ARRENDAMIENTO', 'bold' => true, 'align' => 'center' );
+				$paragraphs[] = array( 'text' => $this->format_contract_date_line( '' ), 'bold' => false, 'align' => 'right' );
+				$has_title      = true;
+				$title_inserted = true;
+				continue;
+			}
+
+			$paragraphs[] = array(
+				'text'  => $line,
+				'bold'  => $is_clause,
+				'align' => $is_clause ? 'left' : 'both',
+			);
+		}
+
+		if ( ! $has_title || ! $title_inserted ) {
+			array_unshift(
+				$paragraphs,
+				array( 'text' => 'CONTRATO DE ARRENDAMIENTO', 'bold' => true, 'align' => 'center' ),
+				array( 'text' => $this->format_contract_date_line( '' ), 'bold' => false, 'align' => 'right' )
+			);
+		}
+
+		$paragraphs = array_merge( $paragraphs, $this->build_contract_signature_paragraphs() );
+		return $paragraphs;
+	}
+
+	/**
+	 * Builds WordprocessingML run XML, preserving tab stops in content.
+	 *
+	 * @param string $text Paragraph text.
+	 * @param string $run_properties Run properties XML.
+	 * @return string
+	 */
+	private function build_docx_text_runs_xml( $text, $run_properties = '' ) {
+		$parts = explode( "\t", (string) $text );
+		if ( 1 === count( $parts ) ) {
+			return '<w:r>' . $run_properties . '<w:t xml:space="preserve">' . esc_xml( $text ) . '</w:t></w:r>';
+		}
+
+		$xml = '';
+		foreach ( $parts as $index => $part ) {
+			$xml .= '<w:r>' . $run_properties . '<w:t xml:space="preserve">' . esc_xml( $part ) . '</w:t></w:r>';
+			if ( $index < count( $parts ) - 1 ) {
+				$xml .= '<w:r>' . $run_properties . '<w:tab/></w:r>';
+			}
+		}
+		return $xml;
+	}
+
+	/**
+	 * Detects whether a line belongs to the signature section.
+	 *
+	 * @param string $line Contract line.
+	 * @return bool
+	 */
+	private function is_contract_signature_line( $line ) {
+		$clean = strtoupper( trim( (string) $line ) );
+		if ( '' === $clean ) {
+			return false;
+		}
+		if ( in_array( $clean, array( 'FIRMAS', 'ARRENDADOR', 'ARRENDATARIO' ), true ) ) {
+			return true;
+		}
+		if ( 0 === strpos( $clean, 'ARRENDADOR:' ) || 0 === strpos( $clean, 'ARRENDATARIO:' ) ) {
+			return true;
+		}
+		if ( 0 === strpos( $clean, 'FIRMA:' ) || 0 === strpos( $clean, 'NOMBRE:' ) ) {
+			return true;
+		}
+		if ( 0 === strpos( $clean, 'CEDULA:' ) || 0 === strpos( $clean, 'CÉDULA:' ) || 0 === strpos( $clean, 'CEDULA/RUC:' ) ) {
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Builds a fixed signature block with two sections.
+	 *
+	 * @return array<int,array<string,mixed>>
+	 */
+	private function build_contract_signature_paragraphs() {
+		return array(
+			array( 'text' => '', 'bold' => false, 'align' => 'both' ),
+			array( 'text' => 'FIRMAS', 'bold' => true, 'align' => 'left' ),
+			array( 'text' => '', 'bold' => false, 'align' => 'both' ),
+			array(
+				'text'      => 'ARRENDADOR' . "\t" . 'ARRENDATARIO',
+				'bold'      => true,
+				'align'     => 'left',
+				'tab_stops' => array( 6400 ),
+			),
+			array(
+				'text'      => 'Firma: ________________________' . "\t" . 'Firma: ________________________',
+				'bold'      => false,
+				'align'     => 'left',
+				'tab_stops' => array( 6400 ),
+			),
+			array(
+				'text'      => 'Nombre: ________________________' . "\t" . 'Nombre: ________________________',
+				'bold'      => false,
+				'align'     => 'left',
+				'tab_stops' => array( 6400 ),
+			),
+			array(
+				'text'      => 'Cédula: ________________________' . "\t" . 'Cédula: ________________________',
+				'bold'      => false,
+				'align'     => 'left',
+				'tab_stops' => array( 6400 ),
+			),
+		);
+	}
+
+	/**
+	 * Formats the contract date line in Spanish.
+	 *
+	 * @param string $line Original line (unused, always rebuilds).
+	 * @return string
+	 */
+	private function format_contract_date_line( $line ) {
+		$timestamp = current_time( 'timestamp' );
+		$months    = array(
+			1 => 'enero', 2 => 'febrero', 3 => 'marzo', 4 => 'abril',
+			5 => 'mayo', 6 => 'junio', 7 => 'julio', 8 => 'agosto',
+			9 => 'septiembre', 10 => 'octubre', 11 => 'noviembre', 12 => 'diciembre',
+		);
+		$day        = (int) gmdate( 'j', $timestamp );
+		$month_idx  = (int) gmdate( 'n', $timestamp );
+		$year       = (string) gmdate( 'Y', $timestamp );
+		$month_name = isset( $months[ $month_idx ] ) ? $months[ $month_idx ] : gmdate( 'F', $timestamp );
+		return sprintf( 'Quito, %d de %s de %s', $day, $month_name, $year );
 	}
 
 	/**

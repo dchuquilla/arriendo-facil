@@ -1260,7 +1260,7 @@ class Arriendo_Facil_Guest {
 	}
 
 	/**
-	 * Creates a plain-text fallback file when DOC/DOCX generation failed.
+	 * Creates a DOCX fallback file when primary DOC/DOCX generation failed.
 	 *
 	 * @param int    $lease_id Lease ID.
 	 * @param string $contract_text Contract text.
@@ -1274,14 +1274,24 @@ class Arriendo_Facil_Guest {
 			return '';
 		}
 
-		$file_name = sprintf( 'lease-%d-contract-%s.txt', $lease_id, gmdate( 'Ymd-His' ) );
-		$upload    = wp_upload_bits( $file_name, null, $text );
-
-		if ( ! is_array( $upload ) || ! empty( $upload['error'] ) || empty( $upload['url'] ) ) {
+		$uploads = wp_upload_dir();
+		if ( ! empty( $uploads['error'] ) || empty( $uploads['basedir'] ) || empty( $uploads['baseurl'] ) ) {
 			return '';
 		}
 
-		return esc_url_raw( (string) $upload['url'] );
+		$contracts_dir = trailingslashit( $uploads['basedir'] ) . 'arriendo-facil/contracts';
+		if ( ! wp_mkdir_p( $contracts_dir ) ) {
+			return '';
+		}
+
+		$file_name = sprintf( 'lease-%d-fallback-%s.docx', $lease_id, gmdate( 'Ymd-His' ) );
+		$file_path = trailingslashit( $contracts_dir ) . $file_name;
+
+		if ( ! $this->write_contract_docx_file( $file_path, $text, array() ) ) {
+			return '';
+		}
+
+		return esc_url_raw( trailingslashit( $uploads['baseurl'] ) . 'arriendo-facil/contracts/' . rawurlencode( $file_name ) );
 	}
 
 	/**

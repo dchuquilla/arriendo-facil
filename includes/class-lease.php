@@ -399,6 +399,12 @@ class Arriendo_Facil_Lease {
 			return true;
 		}
 
+		// Priority rule: when an owner template exists for this accommodation,
+		// generate and attach that document before any auto-fallback file.
+		if ( $this->try_attach_owner_template_document( $lease ) ) {
+			return true;
+		}
+
 		$fallback_text = $this->build_minimal_fallback_contract_text( $lease );
 
 		$uploads = wp_upload_dir();
@@ -420,6 +426,98 @@ class Arriendo_Facil_Lease {
 
 		$file_url = esc_url_raw( trailingslashit( $uploads['baseurl'] ) . 'arriendo-facil/contracts/' . rawurlencode( $file_name ) );
 		return $this->attach_document( $lease_id, $file_url );
+	}
+
+	/**
+	 * Attempts to generate and attach lease document from owner DOCX template.
+	 *
+	 * @param object $lease Lease row object.
+	 * @return bool
+	 */
+	private function try_attach_owner_template_document( $lease ) {
+		if ( ! $lease || ! class_exists( 'Arriendo_Facil_Guest' ) ) {
+			return false;
+		}
+
+		$lease_id         = isset( $lease->id ) ? absint( $lease->id ) : 0;
+		$accommodation_id = isset( $lease->accommodation_id ) ? absint( $lease->accommodation_id ) : 0;
+		$guest_id         = isset( $lease->guest_id ) ? absint( $lease->guest_id ) : 0;
+
+		if ( ! $lease_id || ! $accommodation_id ) {
+			return false;
+		}
+
+		try {
+			$guest_service = new Arriendo_Facil_Guest();
+
+			$ref_get_context = new ReflectionMethod( 'Arriendo_Facil_Guest', 'get_owner_contract_example_context' );
+			$ref_get_context->setAccessible( true );
+			$owner_template = $ref_get_context->invoke( $guest_service, $accommodation_id );
+
+			if ( ! is_array( $owner_template ) || empty( $owner_template['attachment_id'] ) ) {
+				return false;
+			}
+
+			global $wpdb;
+			$guest_row = null;
+			if ( $guest_id ) {
+				$guest_row = $wpdb->get_row(
+					$wpdb->prepare(
+						"SELECT * FROM {$wpdb->prefix}af_guests WHERE id = %d LIMIT 1",
+						$guest_id
+					)
+				);
+			}
+
+			$owner_id_number = '';
+			$owner_user_id   = isset( $owner_template['owner_user_id'] ) ? absint( $owner_template['owner_user_id'] ) : 0;
+			if ( $owner_user_id ) {
+				$owner_id_number = (string) $wpdb->get_var(
+					$wpdb->prepare(
+						"SELECT owner_id FROM {$wpdb->prefix}af_owner_contacts WHERE wp_user_id = %d ORDER BY id DESC LIMIT 1",
+						$owner_user_id
+					)
+				);
+			}
+
+			$payload = array(
+				'owner_name'            => isset( $owner_template['owner_name'] ) ? sanitize_text_field( (string) $owner_template['owner_name'] ) : '',
+				'owner_email'           => isset( $owner_template['owner_email'] ) ? sanitize_email( (string) $owner_template['owner_email'] ) : '',
+				'owner_id_number'       => sanitize_text_field( $owner_id_number ),
+				'guest_name'            => $guest_row ? sanitize_text_field( trim( (string) $guest_row->first_name . ' ' . (string) $guest_row->last_name ) ) : 'INQUILINO',
+				'guest_email'           => $guest_row ? sanitize_email( (string) $guest_row->email ) : '',
+				'guest_phone'           => $guest_row ? sanitize_text_field( (string) $guest_row->phone ) : '',
+				'guest_id_number'       => $guest_row ? sanitize_text_field( (string) $guest_row->id_number ) : '',
+				'accommodation_title'   => sanitize_text_field( (string) get_the_title( $accommodation_id ) ),
+				'accommodation_address' => sanitize_text_field( (string) get_post_meta( $accommodation_id, '_af_address', true ) ),
+				'start_date'            => isset( $lease->start_date ) ? sanitize_text_field( (string) $lease->start_date ) : '',
+				'end_date'              => isset( $lease->end_date ) ? sanitize_text_field( (string) $lease->end_date ) : '',
+				'monthly_rent'          => isset( $lease->monthly_rent ) ? (float) $lease->monthly_rent : 0.0,
+				'desired_price'         => '',
+				'guarantee_text'        => ( $guest_row && isset( $guest_row->guarantee_text ) ) ? sanitize_text_field( (string) $guest_row->guarantee_text ) : '',
+				'template_available'    => true,
+				'template_text'         => isset( $owner_template['template_text'] ) ? (string) $owner_template['template_text'] : '',
+			);
+
+			$ref_create = new ReflectionMethod( 'Arriendo_Facil_Guest', 'create_filled_contract_from_owner_template' );
+			$ref_create->setAccessible( true );
+			$document_url = (string) $ref_create->invoke( $guest_service, $lease_id, $owner_template, $payload );
+
+			if ( '' === $document_url ) {
+				return false;
+			}
+
+			$ref_attach = new ReflectionMethod( 'Arriendo_Facil_Guest', 'force_attach_lease_document' );
+			$ref_attach->setAccessible( true );
+			$ref_attach->invoke( $guest_service, $lease_id, $document_url );
+
+			$lease_after = $this->get_lease( $lease_id );
+			$attached_url = $lease_after && isset( $lease_after->document_url ) ? esc_url_raw( (string) $lease_after->document_url ) : '';
+			return '' !== $attached_url;
+		} catch ( Throwable $throwable ) {
+			error_log( 'Arriendo Facil owner-template auto-attach failed: ' . $throwable->getMessage() );
+			return false;
+		}
 	}
 
 	/**

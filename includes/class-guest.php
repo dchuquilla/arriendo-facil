@@ -839,6 +839,10 @@ class Arriendo_Facil_Guest {
 				$flattened_xml
 			);
 
+			if ( is_string( $updated_xml ) ) {
+				$updated_xml = $this->replace_instruction_bracket_placeholders_in_xml( $updated_xml, $payload );
+			}
+
 			if ( is_string( $updated_xml ) && $updated_xml !== (string) $xml ) {
 				$zip->addFromString( $entry_name, $updated_xml );
 			}
@@ -864,7 +868,7 @@ class Arriendo_Facil_Guest {
 					$full_text = implode( '', $t_matches[1] );
 				}
 
-				if ( ! preg_match( '/\{\{[^}]+\}\}|\[\[[^\]]+\]\]|<<[^>]+>>/', $full_text ) ) {
+				if ( ! preg_match( '/\{\{[^}]+\}\}|\[\[[^\]]+\]\]|<<[^>]+>>|\[[^\]]+\]/', $full_text ) ) {
 					return $p_match[0];
 				}
 
@@ -1226,6 +1230,152 @@ class Arriendo_Facil_Guest {
 		$token = preg_replace( '/_+/', '_', (string) $token );
 
 		return trim( (string) $token, '_' );
+	}
+
+	/**
+	 * Replaces single-bracket instruction placeholders like [indicar fecha] in XML text runs.
+	 *
+	 * @param string $xml XML content.
+	 * @param array  $payload Lease payload.
+	 * @return string
+	 */
+	private function replace_instruction_bracket_placeholders_in_xml( $xml, array $payload ) {
+		$updated = preg_replace_callback(
+			'/\[(?!\[)([^\]\r\n]{2,180})\](?!\])/u',
+			function ( $matches ) use ( $payload ) {
+				$raw_instruction = isset( $matches[1] ) ? trim( (string) $matches[1] ) : '';
+				if ( '' === $raw_instruction ) {
+					return $matches[0];
+				}
+
+				$replacement = $this->get_instruction_placeholder_replacement( $raw_instruction, $payload );
+				if ( '' === $replacement ) {
+					return $matches[0];
+				}
+
+				return esc_xml( $replacement );
+			},
+			(string) $xml
+		);
+
+		return is_string( $updated ) ? $updated : (string) $xml;
+	}
+
+	/**
+	 * Resolves value for instruction placeholders from a phrase like "indicar fecha".
+	 *
+	 * @param string $instruction Placeholder instruction text.
+	 * @param array  $payload Lease payload.
+	 * @return string
+	 */
+	private function get_instruction_placeholder_replacement( $instruction, array $payload ) {
+		$normalized = $this->normalize_contract_instruction_text( $instruction );
+		if ( '' === $normalized ) {
+			return '';
+		}
+
+		if ( false !== strpos( $normalized, 'opcion a' ) || false !== strpos( $normalized, 'opcion b' ) || false !== strpos( $normalized, 'opcion c' ) ) {
+			return '';
+		}
+
+		$values = array(
+			'owner_name' => isset( $payload['owner_name'] ) ? sanitize_text_field( (string) $payload['owner_name'] ) : '',
+			'owner_email' => isset( $payload['owner_email'] ) ? sanitize_email( (string) $payload['owner_email'] ) : '',
+			'owner_id' => isset( $payload['owner_id_number'] ) ? sanitize_text_field( (string) $payload['owner_id_number'] ) : '',
+			'guest_name' => isset( $payload['guest_name'] ) ? sanitize_text_field( (string) $payload['guest_name'] ) : '',
+			'guest_email' => isset( $payload['guest_email'] ) ? sanitize_email( (string) $payload['guest_email'] ) : '',
+			'guest_phone' => isset( $payload['guest_phone'] ) ? sanitize_text_field( (string) $payload['guest_phone'] ) : '',
+			'guest_id' => isset( $payload['guest_id_number'] ) ? sanitize_text_field( (string) $payload['guest_id_number'] ) : '',
+			'accommodation_title' => isset( $payload['accommodation_title'] ) ? sanitize_text_field( (string) $payload['accommodation_title'] ) : '',
+			'accommodation_address' => isset( $payload['accommodation_address'] ) ? sanitize_text_field( (string) $payload['accommodation_address'] ) : '',
+			'start_date' => isset( $payload['start_date'] ) ? sanitize_text_field( (string) $payload['start_date'] ) : '',
+			'end_date' => isset( $payload['end_date'] ) ? sanitize_text_field( (string) $payload['end_date'] ) : '',
+			'monthly_rent' => isset( $payload['monthly_rent'] ) ? number_format( (float) $payload['monthly_rent'], 2, '.', '' ) : '',
+			'current_date' => current_time( 'Y-m-d' ),
+		);
+
+		if ( '' === $values['monthly_rent'] && isset( $payload['desired_price'] ) ) {
+			$values['monthly_rent'] = sanitize_text_field( (string) $payload['desired_price'] );
+		}
+
+		if ( false !== strpos( $normalized, 'correo' ) || false !== strpos( $normalized, 'email' ) ) {
+			if ( false !== strpos( $normalized, 'arrendador' ) || false !== strpos( $normalized, 'propietario' ) ) {
+				return $values['owner_email'];
+			}
+			return $values['guest_email'];
+		}
+
+		if ( false !== strpos( $normalized, 'telefono' ) || false !== strpos( $normalized, 'celular' ) ) {
+			return $values['guest_phone'];
+		}
+
+		if ( false !== strpos( $normalized, 'cedula' ) || false !== strpos( $normalized, 'identidad' ) || false !== strpos( $normalized, 'ruc' ) || false !== strpos( $normalized, 'dni' ) ) {
+			if ( false !== strpos( $normalized, 'arrendador' ) || false !== strpos( $normalized, 'propietario' ) ) {
+				return $values['owner_id'];
+			}
+			return $values['guest_id'];
+		}
+
+		if ( false !== strpos( $normalized, 'arrendador' ) || false !== strpos( $normalized, 'propietario' ) ) {
+			return $values['owner_name'];
+		}
+
+		if ( false !== strpos( $normalized, 'arrendatario' ) || false !== strpos( $normalized, 'inquilino' ) ) {
+			return $values['guest_name'];
+		}
+
+		if ( false !== strpos( $normalized, 'direccion' ) ) {
+			return $values['accommodation_address'];
+		}
+
+		if ( false !== strpos( $normalized, 'inmueble' ) || false !== strpos( $normalized, 'propiedad' ) || false !== strpos( $normalized, 'departamento' ) ) {
+			return $values['accommodation_title'];
+		}
+
+		if ( false !== strpos( $normalized, 'fecha' ) ) {
+			if ( false !== strpos( $normalized, 'inicio' ) || false !== strpos( $normalized, 'entrada en vigor' ) ) {
+				return $values['start_date'];
+			}
+			if ( false !== strpos( $normalized, 'fin' ) || false !== strpos( $normalized, 'finalizacion' ) || false !== strpos( $normalized, 'terminacion' ) ) {
+				return $values['end_date'];
+			}
+			return $values['current_date'];
+		}
+
+		if ( false !== strpos( $normalized, 'canon' ) || false !== strpos( $normalized, 'renta' ) || false !== strpos( $normalized, 'importe' ) || false !== strpos( $normalized, 'cantidad' ) || false !== strpos( $normalized, 'valor' ) || false !== strpos( $normalized, 'dolar' ) ) {
+			return $values['monthly_rent'];
+		}
+
+		if ( false !== strpos( $normalized, 'ciudad' ) ) {
+			return 'Quito';
+		}
+
+		return '';
+	}
+
+	/**
+	 * Normalizes instruction text from DOCX placeholders.
+	 *
+	 * @param string $text Instruction text.
+	 * @return string
+	 */
+	private function normalize_contract_instruction_text( $text ) {
+		$text = strtolower( trim( (string) $text ) );
+		$text = strtr(
+			$text,
+			array(
+				'á' => 'a',
+				'é' => 'e',
+				'í' => 'i',
+				'ó' => 'o',
+				'ú' => 'u',
+				'ü' => 'u',
+				'ñ' => 'n',
+			)
+		);
+		$text = preg_replace( '/\s+/', ' ', $text );
+
+		return trim( (string) $text );
 	}
 
 	/**

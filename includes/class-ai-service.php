@@ -363,7 +363,27 @@ class Arriendo_Facil_AI_Service {
 		}
 
 		if ( 'generate_document' === $action ) {
-			return "Task: Generate a complete Spanish rental contract in Ecuador legal style. Priority rules: (1) If template_available is true and template_text is present, use that owner template as the primary base, preserve its structure/order/wording as much as possible, and fill its placeholders/blank fields with lease and tenant data from input. Do not ignore owner template when it is provided. (2) Only when owner template is missing or unusable, build from legal_template_base and legal_requirements. Always include mandatory legal data: parties identification, lease object, term, rent/payment, guarantee, obligations, termination, jurisdiction, and signature data. Return strictly JSON with keys: 'contract_text' (required, full contract text) and 'document_url' (optional string, use empty string if not available). Input: " . wp_json_encode( $data );
+			$template_content = ( ! empty( $data['template_available'] ) && isset( $data['template_text'] ) && '' !== trim( (string) $data['template_text'] ) )
+				? (string) $data['template_text']
+				: 'null';
+
+			$reservation_data = $data;
+			unset( $reservation_data['template_text'] );
+
+			return "Eres un Asistente Legal Automatizado integrado en una plataforma de reservas de inmuebles. Tu función es generar o completar contratos de arrendamiento con precisión absoluta.\n\n"
+				. "### LÓGICA DE ACTUACIÓN:\n"
+				. "1. ESCENARIO A (Plantilla existente): Si se proporciona una [PLANTILLA], completa los espacios marcados o puntos suspensivos (......) usando exclusivamente los [DATOS_RESERVA]. Mantén el formato, negrillas y estructura original intactos.\n"
+				. "2. ESCENARIO B (Sin plantilla): Si [PLANTILLA] es null o está vacío, redacta un contrato de arrendamiento estándar, formal y profesional basado en los [DATOS_RESERVA], usando la plantilla base incluida en legal_template_base si está disponible, incluyendo cláusulas de Objeto, Plazo, Canon, Garantía y Firmas conforme a la normativa ecuatoriana vigente 2026.\n\n"
+				. "### REGLAS CRÍTICAS:\n"
+				. "- NO parafrasees el texto legal existente en el Escenario A.\n"
+				. "- Los datos insertados deben integrarse de forma natural y profesional.\n"
+				. "- No incluyas introducciones, saludos ni comentarios. La salida debe ser directamente el cuerpo del documento dentro del JSON.\n"
+				. "- Si el documento original tiene tablas o líneas de firma, presérvalas.\n"
+				. "- Devuelve ÚNICAMENTE JSON estrictamente válido con las claves: 'contract_text' (requerido, texto completo del contrato) y 'document_url' (cadena vacía \"\").\n\n"
+				. "### DATOS_RESERVA:\n"
+				. wp_json_encode( $reservation_data ) . "\n\n"
+				. "### PLANTILLA:\n"
+				. $template_content;
 		}
 
 		if ( 'score_guest' === $action ) {

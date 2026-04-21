@@ -1344,16 +1344,22 @@ class Arriendo_Facil_Guest {
 	 */
 	private function get_contract_legal_requirements() {
 		return array(
-			'Use formal Ecuador rental-contract language suitable for legal review.',
-			'Align legal wording with Ecuador regulations applicable in 2026, including Ley de Inquilinato and relevant Civil Code provisions.',
-			'Keep numbered clauses with clear obligations for both parties.',
-			'Include parties identification (full name and ID number placeholders).',
-			'Include lease object, term, monthly rent, payment method and due date.',
-			'Include deposit/guarantee clause and property use restrictions.',
-			'Include maintenance and utilities responsibilities.',
-			'Include termination causes and penalties for breach.',
-			'Include jurisdiction and applicable law clause.',
-			'Include signature block for landlord and tenant with ID and signature lines.',
+			'Usa lenguaje juridico formal ecuatoriano apto para revision legal y vigente al 2026.',
+			'Fundamenta el contrato en el Codigo Civil del Ecuador Arts. 1857-1948 (Del Arrendamiento), la Ley de Inquilinato y el Codigo Organico General de Procesos (COGEP).',
+			'Incluye clausulas numeradas con titulos en mayusculas y obligaciones claras para ambas partes.',
+			'Identifica a las partes con nombre completo, numero de cedula/RUC, celular y correo.',
+			'Clausula de objeto: descripcion del inmueble (nombre y direccion completa).',
+			'Clausula de plazo: fecha de inicio, fecha de fin, condicion de prorroga automatica con aviso de 30 dias.',
+			'Clausula de canon: valor mensual en USD, dia maximo de pago (primeros 5 dias del mes), interes de mora del 1% mensual por retraso.',
+			'Clausula de garantia: tipo y monto de garantia, plazo de devolucion (15 dias habiles tras verificacion).',
+			'Clausula de destino: uso exclusivo habitacional, numero de personas y mascotas, prohibicion de subarriendo.',
+			'Clausula de servicios: agua, luz, gas e internet a cargo del arrendatario; predial y administracion a cargo del arrendador salvo pacto.',
+			'Clausula de obligaciones del arrendatario: pago puntual, conservacion del inmueble, prohibicion de modificaciones sin autorizacion.',
+			'Clausula de obligaciones del arrendador: posesion pacifica, reparaciones estructurales (Art. 1937 CC).',
+			'Clausula de terminacion: vencimiento, mutuo acuerdo, incumplimiento, desahucio conforme COGEP, caso fortuito.',
+			'Clausula de referencias personales del arrendatario.',
+			'Clausula de jurisdiccion: jueces competentes del Ecuador, renuncia a domicilio y fuero especial.',
+			'Bloque de firmas con lineas para firma, nombre completo y cedula de arrendador y arrendatario.',
 		);
 	}
 
@@ -1377,7 +1383,7 @@ class Arriendo_Facil_Guest {
 		$end_date        = isset( $payload['end_date'] ) ? sanitize_text_field( (string) $payload['end_date'] ) : '________________________';
 		$monthly_rent    = isset( $payload['monthly_rent'] ) ? number_format( (float) $payload['monthly_rent'], 2, '.', '' ) : '0.00';
 		$desired_price   = isset( $payload['desired_price'] ) ? sanitize_text_field( (string) $payload['desired_price'] ) : '';
-		$guarantee_text  = isset( $payload['guarantee_text'] ) ? sanitize_text_field( (string) $payload['guarantee_text'] ) : 'Garantia equivalente a _____ meses de canon.';
+		$guarantee_text  = isset( $payload['guarantee_text'] ) ? sanitize_text_field( (string) $payload['guarantee_text'] ) : 'Garantia equivalente a dos (2) meses del canon de arrendamiento.';
 		$mascotas        = isset( $payload['mascotas'] ) ? absint( $payload['mascotas'] ) : 0;
 		$personas        = isset( $payload['personas_viviran'] ) ? absint( $payload['personas_viviran'] ) : 0;
 		$reference_1     = isset( $payload['referencia_personal_1'] ) ? sanitize_text_field( (string) $payload['referencia_personal_1'] ) : '________________________';
@@ -1390,55 +1396,73 @@ class Arriendo_Facil_Guest {
 		$city_and_date = sprintf( 'Quito, %s', current_time( 'Y-m-d' ) );
 		$extra_clauses = trim( (string) $extra_clauses );
 
-		$contract = "CONTRATO DE ARRENDAMIENTO\n";
-		$contract .= "\n";
-		$contract .= "Entre los comparecientes, por una parte " . $owner_name . " (ARRENDADOR), con cedula/RUC " . $owner_id . ", y por otra parte " . $guest_name . " (ARRENDATARIO), con cedula " . $guest_id . ", se celebra el presente contrato de arrendamiento de conformidad con la normativa ecuatoriana aplicable.\n";
-		$contract .= "\n";
-		$contract .= "CLAUSULA PRIMERA - OBJETO\n";
-		$contract .= "El ARRENDADOR da en arrendamiento al ARRENDATARIO el inmueble identificado como " . $property . ", ubicado en " . $address . ".\n";
-		$contract .= "\n";
-		$contract .= "CLAUSULA SEGUNDA - PLAZO\n";
-		$contract .= "El plazo de vigencia del presente contrato inicia el " . $start_date . " y termina el " . $end_date . ".\n";
-		$contract .= "\n";
-		$contract .= "CLAUSULA TERCERA - CANON Y FORMA DE PAGO\n";
-		$contract .= "El canon de arrendamiento acordado es de USD " . $monthly_rent . " mensuales, pagaderos dentro de los primeros cinco dias de cada mes, por el medio acordado por las partes.\n";
-		$contract .= "\n";
-		$contract .= "CLAUSULA CUARTA - GARANTIA\n";
-		$contract .= $guarantee_text . "\n";
-		$contract .= "\n";
-		$contract .= "CLAUSULA QUINTA - DESTINO Y USO\n";
-		$contract .= "El inmueble sera destinado exclusivamente para uso habitacional del ARRENDATARIO y su nucleo autorizado, quedando prohibido subarrendar o cambiar el destino sin autorizacion escrita del ARRENDADOR.\n";
-		$contract .= "\n";
-		$contract .= "CLAUSULA SEXTA - OBLIGACIONES DE LAS PARTES\n";
-		$contract .= "El ARRENDATARIO se obliga al pago puntual del canon, cuidado del inmueble y servicios basicos que le correspondan. El ARRENDADOR se obliga a mantener la posesion pacifica y atender reparaciones estructurales que legalmente le correspondan.\n";
-		$contract .= "\n";
-		$contract .= "CLAUSULA SEPTIMA - TERMINACION\n";
-		$contract .= "El contrato podra darse por terminado por vencimiento del plazo, mutuo acuerdo o incumplimiento de obligaciones contractuales y legales, conforme normativa aplicable.\n";
-		$contract .= "\n";
-		$contract .= "CLAUSULA OCTAVA - JURISDICCION Y LEY APLICABLE\n";
-		$contract .= "Para todos los efectos legales, las partes se someten a la jurisdiccion de los jueces competentes del Ecuador y a la Ley de Inquilinato y normas conexas vigentes.\n";
-		$contract .= "\n";
-		$contract .= "CLAUSULA NOVENA - DATOS DECLARADOS POR EL ARRENDATARIO\n";
-		$contract .= "Celular del arrendatario: " . $guest_phone . ". Correo electronico: " . $guest_email . ". Numero de personas que habitaran el inmueble: " . $personas . ". Numero de mascotas declaradas: " . $mascotas . ". Referencia personal 1: " . $reference_1 . ". Referencia personal 2: " . $reference_2 . ".\n";
-
-		if ( '' !== $extra_clauses ) {
-			$contract .= "\n";
-			$contract .= "CLAUSULA DECIMA - DISPOSICIONES ADICIONALES\n";
-			$contract .= $extra_clauses . "\n";
-		}
-
-		$contract .= "\n";
-		$contract .= "En constancia de conformidad, las partes suscriben el presente contrato en dos ejemplares del mismo tenor.\n";
+		$contract  = "CONTRATO DE ARRENDAMIENTO DE INMUEBLE\n";
+		$contract .= "(Conforme al Codigo Civil del Ecuador, Arts. 1857-1948, y la Ley de Inquilinato vigente con sus reformas)\n";
 		$contract .= "\n";
 		$contract .= $city_and_date . "\n";
 		$contract .= "\n";
+		$contract .= "COMPARECIENTES\n";
+		$contract .= "\n";
+		$contract .= "En la ciudad de Quito, Republica del Ecuador, comparecen a la celebracion del presente contrato:\n";
+		$contract .= "ARRENDADOR: " . $owner_name . ", con numero de cedula de ciudadania o RUC: " . $owner_id . ", en calidad de propietario o representante autorizado del inmueble que se describe en este instrumento (en adelante \"EL ARRENDADOR\").\n";
+		$contract .= "ARRENDATARIO: " . $guest_name . ", con numero de cedula de ciudadania: " . $guest_id . ", celular: " . $guest_phone . ", correo electronico: " . $guest_email . " (en adelante \"EL ARRENDATARIO\").\n";
+		$contract .= "\n";
+		$contract .= "Las partes, libres y voluntariamente, convienen en celebrar el presente CONTRATO DE ARRENDAMIENTO, sujeto a las siguientes clausulas:\n";
+		$contract .= "\n";
+		$contract .= "CLAUSULA PRIMERA - OBJETO DEL CONTRATO\n";
+		$contract .= "EL ARRENDADOR da en arrendamiento a EL ARRENDATARIO el inmueble denominado \"" . $property . "\", ubicado en " . $address . ", Republica del Ecuador. EL ARRENDATARIO declara conocer el estado actual del inmueble y aceptarlo en las condiciones en que se encuentra, comprometiendose a restituirlo en iguales condiciones al termino del contrato, salvo el deterioro proveniente del uso normal y legitimo.\n";
+		$contract .= "\n";
+		$contract .= "CLAUSULA SEGUNDA - PLAZO\n";
+		$contract .= "El plazo de vigencia del presente contrato es de " . $start_date . " hasta el " . $end_date . ". Vencido el plazo, si ninguna de las partes notifica por escrito su voluntad de terminar el contrato con al menos treinta (30) dias de anticipacion, el contrato se entendera prorrogado automaticamente por periodos iguales, conforme lo dispuesto en el Art. 1885 del Codigo Civil ecuatoriano.\n";
+		$contract .= "\n";
+		$contract .= "CLAUSULA TERCERA - CANON DE ARRENDAMIENTO Y FORMA DE PAGO\n";
+		$contract .= "Las partes acuerdan un canon mensual de arrendamiento de USD " . $monthly_rent . " (dolares de los Estados Unidos de America), pagadero dentro de los primeros cinco (5) dias de cada mes calendario. El pago debera realizarse mediante transferencia bancaria, deposito o el medio que mutuamente convengan las partes por escrito. El retraso en el pago generara un interes de mora del 1% mensual sobre el valor adeudado, conforme lo permite la normativa civil ecuatoriana.\n";
+		$contract .= "\n";
+		$contract .= "CLAUSULA CUARTA - GARANTIA\n";
+		$contract .= "Como garantia del cumplimiento de las obligaciones contractuales, EL ARRENDATARIO entrega: " . $guarantee_text . ". Dicha garantia sera devuelta al termino del contrato, previa verificacion del estado del inmueble y la ausencia de valores pendientes de pago, en un plazo no mayor a quince (15) dias habiles.\n";
+		$contract .= "\n";
+		$contract .= "CLAUSULA QUINTA - DESTINO Y USO DEL INMUEBLE\n";
+		$contract .= "El inmueble objeto de este contrato sera destinado unica y exclusivamente para uso habitacional de EL ARRENDATARIO y su nucleo familiar autorizado, compuesto por " . $personas . " persona(s) y " . $mascotas . " mascota(s) declarada(s). Queda expresamente prohibido subarrendar total o parcialmente el inmueble, ceder este contrato o cambiar el destino del bien sin autorizacion previa y escrita de EL ARRENDADOR.\n";
+		$contract .= "\n";
+		$contract .= "CLAUSULA SEXTA - SERVICIOS BASICOS Y GASTOS\n";
+		$contract .= "Los servicios de energia electrica, agua potable, telefonia, internet y gas domiciliario seran de cargo exclusivo de EL ARRENDATARIO durante la vigencia del contrato. El impuesto predial y los gastos de administracion del inmueble (si aplican) corresponden a EL ARRENDADOR, salvo pacto expreso en contrario.\n";
+		$contract .= "\n";
+		$contract .= "CLAUSULA SEPTIMA - OBLIGACIONES DE EL ARRENDATARIO\n";
+		$contract .= "EL ARRENDATARIO se obliga a: (a) Pagar puntualmente el canon en la forma convenida; (b) Mantener el inmueble en buen estado de conservacion y limpieza; (c) No realizar obras ni modificaciones sin autorizacion escrita de EL ARRENDADOR; (d) Notificar de inmediato cualquier dano o averia que requiera reparacion urgente; (e) Permitir el acceso al inmueble de EL ARRENDADOR o sus representantes para inspeccion, con aviso previo de al menos 24 horas; (f) Cumplir las normas de convivencia del sector y el reglamento de la propiedad horizontal si aplica.\n";
+		$contract .= "\n";
+		$contract .= "CLAUSULA OCTAVA - OBLIGACIONES DE EL ARRENDADOR\n";
+		$contract .= "EL ARRENDADOR se obliga a: (a) Mantener al ARRENDATARIO en el uso pacifico del inmueble durante la vigencia del contrato; (b) Efectuar las reparaciones locativas que le correspondan conforme al Art. 1937 del Codigo Civil; (c) No perturbar la posesion del ARRENDATARIO; (d) Entregar el inmueble en condiciones habitables.\n";
+		$contract .= "\n";
+		$contract .= "CLAUSULA NOVENA - TERMINACION DEL CONTRATO\n";
+		$contract .= "El presente contrato terminara por: (a) Vencimiento del plazo acordado; (b) Mutuo acuerdo de las partes, por escrito; (c) Incumplimiento grave de las obligaciones contractuales o legales por cualquiera de las partes; (d) Desahucio conforme al procedimiento establecido en la Ley de Inquilinato y el Codigo Organico General de Procesos (COGEP); (e) Destruccion o inhabilitacion del inmueble por caso fortuito o fuerza mayor. En caso de desahucio voluntario, EL ARRENDATARIO debera notificar con al menos treinta (30) dias de anticipacion.\n";
+		$contract .= "\n";
+		$contract .= "CLAUSULA DECIMA - REFERENCIAS PERSONALES DEL ARRENDATARIO\n";
+		$contract .= "EL ARRENDATARIO declara como referencias personales: Referencia 1: " . $reference_1 . ". Referencia 2: " . $reference_2 . ".\n";
+
+		if ( '' !== $extra_clauses ) {
+			$contract .= "\n";
+			$contract .= "CLAUSULA DECIMA PRIMERA - DISPOSICIONES ADICIONALES\n";
+			$contract .= $extra_clauses . "\n";
+			$next_clause = 'DECIMA SEGUNDA';
+		} else {
+			$next_clause = 'DECIMA PRIMERA';
+		}
+
+		$contract .= "\n";
+		$contract .= "CLAUSULA " . $next_clause . " - JURISDICCION, COMPETENCIA Y LEY APLICABLE\n";
+		$contract .= "Para todos los efectos legales derivados del presente contrato, las partes se someten expresamente a la jurisdiccion y competencia de los jueces y tribunales de la Republica del Ecuador, con sede en la ciudad pactada, y se regiran por el Codigo Civil (Arts. 1857-1948), la Ley de Inquilinato, el Codigo Organico General de Procesos (COGEP) y las demas normas conexas vigentes en 2026. Las partes renuncian expresamente a domicilio y fuero especial.\n";
+		$contract .= "\n";
+		$contract .= "En fe de lo cual, las partes suscriben el presente contrato en dos (2) ejemplares de igual tenor y valor legal, en la fecha indicada en el encabezado.\n";
+		$contract .= "\n";
 		$contract .= "FIRMAS\n";
 		$contract .= "\n";
-		$contract .= "ARRENDADOR: ________________________\n";
+		$contract .= "EL ARRENDADOR:\n";
+		$contract .= "Firma: ________________________\n";
 		$contract .= "Nombre: " . $owner_name . "\n";
 		$contract .= "Cedula/RUC: " . $owner_id . "\n";
 		$contract .= "\n";
-		$contract .= "ARRENDATARIO: ________________________\n";
+		$contract .= "EL ARRENDATARIO:\n";
+		$contract .= "Firma: ________________________\n";
 		$contract .= "Nombre: " . $guest_name . "\n";
 		$contract .= "Cedula: " . $guest_id . "\n";
 
@@ -2282,11 +2306,15 @@ class Arriendo_Facil_Guest {
 			return false;
 		}
 
-		if ( in_array( $clean, array( 'FIRMAS', 'ARRENDADOR', 'ARRENDATARIO' ), true ) ) {
+		if ( in_array( $clean, array( 'FIRMAS', 'ARRENDADOR', 'ARRENDATARIO', 'EL ARRENDADOR', 'EL ARRENDATARIO' ), true ) ) {
 			return true;
 		}
 
 		if ( 0 === strpos( $clean, 'ARRENDADOR:' ) || 0 === strpos( $clean, 'ARRENDATARIO:' ) ) {
+			return true;
+		}
+
+		if ( 0 === strpos( $clean, 'EL ARRENDADOR' ) || 0 === strpos( $clean, 'EL ARRENDATARIO' ) ) {
 			return true;
 		}
 

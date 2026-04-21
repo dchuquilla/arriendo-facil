@@ -279,8 +279,14 @@ class Arriendo_Facil_Admin {
 			}
 
 			if ( '' === $document_url && $owner_template_exists ) {
+				if ( ! is_wp_error( $result ) && isset( $result['contract_text'] ) && is_string( $result['contract_text'] ) && '' !== trim( $result['contract_text'] ) ) {
+					$generated_contract_text = trim( wp_strip_all_tags( $result['contract_text'] ) );
+				}
+
 				if ( isset( $ai_payload['template_text'] ) && is_string( $ai_payload['template_text'] ) && '' !== trim( $ai_payload['template_text'] ) ) {
-					$generated_contract_text = $this->fill_owner_template_with_lease_data( $ai_payload['template_text'], $ai_payload );
+					if ( '' === $generated_contract_text ) {
+						$generated_contract_text = $this->fill_owner_template_with_lease_data( $ai_payload['template_text'], $ai_payload );
+					}
 				}
 
 				if ( '' === $generated_contract_text && isset( $ai_payload['template_text'] ) && is_string( $ai_payload['template_text'] ) ) {
@@ -326,6 +332,7 @@ class Arriendo_Facil_Admin {
 		$accommodation_id  = isset( $lease_arr['accommodation_id'] ) ? absint( $lease_arr['accommodation_id'] ) : 0;
 		$guest_id          = isset( $lease_arr['guest_id'] ) ? absint( $lease_arr['guest_id'] ) : 0;
 		$owner_template    = $this->get_owner_contract_example_context( $accommodation_id );
+		$owner_id_number   = $this->get_owner_identification_number( isset( $owner_template['owner_user_id'] ) ? absint( $owner_template['owner_user_id'] ) : 0 );
 		$accommodation     = array(
 			'title'   => (string) get_the_title( $accommodation_id ),
 			'address' => (string) get_post_meta( $accommodation_id, '_af_address', true ),
@@ -376,6 +383,7 @@ class Arriendo_Facil_Admin {
 				'owner_user_id' => isset( $owner_template['owner_user_id'] ) ? absint( $owner_template['owner_user_id'] ) : 0,
 				'owner_name' => isset( $owner_template['owner_name'] ) ? sanitize_text_field( (string) $owner_template['owner_name'] ) : '',
 				'owner_email' => isset( $owner_template['owner_email'] ) ? sanitize_email( (string) $owner_template['owner_email'] ) : '',
+				'owner_id_number' => $owner_id_number,
 			)
 		);
 	}
@@ -398,6 +406,7 @@ class Arriendo_Facil_Admin {
 		$tmp_downloaded  = false;
 
 		if ( ! $lease_id || ! $attachment_id ) {
+			error_log( 'Arriendo Facil admin owner-template generation skipped: missing lease_id or attachment_id.' );
 			return '';
 		}
 
@@ -405,6 +414,7 @@ class Arriendo_Facil_Admin {
 		if ( ! $template_path || ! file_exists( $template_path ) ) {
 			$template_path = $this->download_owner_template_from_r2( $attachment_id );
 			if ( ! $template_path ) {
+				error_log( 'Arriendo Facil admin owner-template generation failed: template file not found locally and R2 download failed. attachment_id=' . $attachment_id );
 				return '';
 			}
 			$tmp_downloaded = true;
@@ -415,6 +425,7 @@ class Arriendo_Facil_Admin {
 			if ( $tmp_downloaded ) {
 				@unlink( $template_path );
 			}
+			error_log( 'Arriendo Facil admin owner-template generation failed: template is not DOCX. attachment_id=' . $attachment_id . ', mime=' . $template_mime . ', ext=' . $template_ext );
 			return '';
 		}
 
@@ -423,6 +434,7 @@ class Arriendo_Facil_Admin {
 			if ( $tmp_downloaded ) {
 				@unlink( $template_path );
 			}
+			error_log( 'Arriendo Facil admin owner-template generation failed: wp_upload_dir unavailable.' );
 			return '';
 		}
 
@@ -431,6 +443,7 @@ class Arriendo_Facil_Admin {
 			if ( $tmp_downloaded ) {
 				@unlink( $template_path );
 			}
+			error_log( 'Arriendo Facil admin owner-template generation failed: cannot create contracts dir.' );
 			return '';
 		}
 
@@ -441,6 +454,7 @@ class Arriendo_Facil_Admin {
 			if ( $tmp_downloaded ) {
 				@unlink( $template_path );
 			}
+			error_log( 'Arriendo Facil admin owner-template generation failed: cannot copy template to destination. source=' . $template_path . ', dest=' . $file_path );
 			return '';
 		}
 
@@ -1131,40 +1145,46 @@ class Arriendo_Facil_Admin {
 	}
 
 	/**
-	 * Builds owner-template fallback text when attachment exists but no readable text was extracted.
+	 * Builds a legal fallback contract when owner template cannot be read.
 	 *
 	 * @param array $payload Lease and guest context.
 	 * @return string
 	 */
 	private function build_owner_template_unreadable_fallback_text( array $payload ) {
-		$owner_name   = isset( $payload['owner_name'] ) ? sanitize_text_field( (string) $payload['owner_name'] ) : 'Propietario';
-		$guest_name   = isset( $payload['guest_name'] ) ? sanitize_text_field( (string) $payload['guest_name'] ) : 'Arrendatario';
-		$guest_id     = isset( $payload['guest_id_number'] ) ? sanitize_text_field( (string) $payload['guest_id_number'] ) : 'N/D';
-		$property     = isset( $payload['accommodation_title'] ) ? sanitize_text_field( (string) $payload['accommodation_title'] ) : 'Inmueble';
-		$address      = isset( $payload['accommodation_address'] ) ? sanitize_text_field( (string) $payload['accommodation_address'] ) : '';
-		$start_date   = isset( $payload['start_date'] ) ? sanitize_text_field( (string) $payload['start_date'] ) : '';
-		$end_date     = isset( $payload['end_date'] ) ? sanitize_text_field( (string) $payload['end_date'] ) : '';
-		$rent_value   = isset( $payload['monthly_rent'] ) ? number_format( (float) $payload['monthly_rent'], 2, '.', '' ) : '';
-		$template_url = isset( $payload['template_url'] ) ? esc_url_raw( (string) $payload['template_url'] ) : '';
+		$owner_name     = isset( $payload['owner_name'] ) ? sanitize_text_field( (string) $payload['owner_name'] ) : '________________________';
+		$owner_id       = isset( $payload['owner_id_number'] ) ? sanitize_text_field( (string) $payload['owner_id_number'] ) : '________________________';
+		$guest_name     = isset( $payload['guest_name'] ) ? sanitize_text_field( (string) $payload['guest_name'] ) : '________________________';
+		$guest_id       = isset( $payload['guest_id_number'] ) ? sanitize_text_field( (string) $payload['guest_id_number'] ) : '________________________';
+		$guest_phone    = isset( $payload['guest_phone'] ) ? sanitize_text_field( (string) $payload['guest_phone'] ) : '________________________';
+		$guest_email    = isset( $payload['guest_email'] ) ? sanitize_email( (string) $payload['guest_email'] ) : '________________________';
+		$property       = isset( $payload['accommodation_title'] ) ? sanitize_text_field( (string) $payload['accommodation_title'] ) : '________________________';
+		$address        = isset( $payload['accommodation_address'] ) ? sanitize_text_field( (string) $payload['accommodation_address'] ) : '________________________';
+		$start_date     = isset( $payload['start_date'] ) ? sanitize_text_field( (string) $payload['start_date'] ) : '________________________';
+		$end_date       = isset( $payload['end_date'] ) ? sanitize_text_field( (string) $payload['end_date'] ) : '________________________';
+		$monthly_rent   = isset( $payload['monthly_rent'] ) ? number_format( (float) $payload['monthly_rent'], 2, '.', '' ) : '0.00';
+		$guarantee_text = isset( $payload['guarantee_text'] ) ? sanitize_text_field( (string) $payload['guarantee_text'] ) : 'Garantia equivalente a dos (2) meses del canon de arrendamiento.';
 
-		$text  = "PLANTILLA DE CONTRATO DEL OWNER (SIN TEXTO EXTRAIBLE)\n\n";
-		$text .= "Este contrato se genero usando el documento del owner como fuente obligatoria.\n";
-		if ( '' !== $template_url ) {
-			$text .= "Referencia de plantilla owner: " . $template_url . "\n";
-		}
-		$text .= "\nDatos para completar en la plantilla:\n";
-		$text .= "Arrendador: " . $owner_name . "\n";
-		$text .= "Arrendatario: " . $guest_name . " (Cedula: " . $guest_id . ")\n";
-		$text .= "Inmueble: " . $property . "\n";
-		if ( '' !== $address ) {
-			$text .= "Direccion: " . $address . "\n";
-		}
-		if ( '' !== $start_date || '' !== $end_date ) {
-			$text .= "Plazo: " . $start_date . " a " . $end_date . "\n";
-		}
-		if ( '' !== $rent_value ) {
-			$text .= "Canon mensual: USD " . $rent_value . "\n";
-		}
+		$text  = "CONTRATO DE ARRENDAMIENTO DE INMUEBLE\n";
+		$text .= "(Conforme al Codigo Civil del Ecuador, Arts. 1857-1948, y la Ley de Inquilinato vigente con sus reformas)\n\n";
+		$text .= sprintf( "Quito, %s\n\n", current_time( 'Y-m-d' ) );
+		$text .= "CLAUSULA PRIMERA - COMPARECIENTES\n";
+		$text .= "ARRENDADOR: " . $owner_name . " (Cedula/RUC: " . $owner_id . ")\n";
+		$text .= "ARRENDATARIO: " . $guest_name . " (Cedula: " . $guest_id . ", Celular: " . $guest_phone . ", Correo: " . $guest_email . ")\n\n";
+		$text .= "CLAUSULA SEGUNDA - OBJETO\n";
+		$text .= "El ARRENDADOR da en arrendamiento el inmueble \"" . $property . "\", ubicado en " . $address . ".\n\n";
+		$text .= "CLAUSULA TERCERA - PLAZO\n";
+		$text .= "El plazo contractual inicia el " . $start_date . " y termina el " . $end_date . ".\n\n";
+		$text .= "CLAUSULA CUARTA - CANON\n";
+		$text .= "El canon mensual es USD " . $monthly_rent . ", pagadero dentro de los primeros cinco (5) dias de cada mes.\n\n";
+		$text .= "CLAUSULA QUINTA - GARANTIA\n";
+		$text .= $guarantee_text . "\n\n";
+		$text .= "CLAUSULA SEXTA - OBLIGACIONES Y TERMINACION\n";
+		$text .= "Las partes se obligan conforme la Ley de Inquilinato, Codigo Civil y COGEP vigentes. El contrato podra terminar por vencimiento, mutuo acuerdo o incumplimiento.\n\n";
+		$text .= "CLAUSULA SEPTIMA - JURISDICCION\n";
+		$text .= "Las partes se someten a los jueces competentes del Ecuador.\n\n";
+		$text .= "FIRMAS\n\n";
+		$text .= "ARRENDADOR: ________________________\nNombre: " . $owner_name . "\nCedula/RUC: " . $owner_id . "\n\n";
+		$text .= "ARRENDATARIO: ________________________\nNombre: " . $guest_name . "\nCedula: " . $guest_id . "\n";
 
 		return trim( $text );
 	}
@@ -1242,9 +1262,10 @@ class Arriendo_Facil_Admin {
 	 */
 	private function get_owner_contract_example_context( $accommodation_id ) {
 		$accommodation_id = absint( $accommodation_id );
-		$owner_user_id = absint( get_post_meta( $accommodation_id, '_af_owner_id', true ) );
+		$owner_user_id = $this->resolve_accommodation_owner_user_id( $accommodation_id );
 
 		if ( ! $owner_user_id ) {
+			error_log( 'Arriendo Facil admin owner-template lookup: accommodation has no resolved owner. accommodation_id=' . $accommodation_id );
 			return array();
 		}
 
@@ -1272,10 +1293,71 @@ class Arriendo_Facil_Admin {
 
 		$attachment_id = ! empty( $attachment_ids ) ? absint( $attachment_ids[0] ) : 0;
 		if ( ! $attachment_id ) {
+			error_log( 'Arriendo Facil admin owner-template lookup: no owner contract attachment found. accommodation_id=' . $accommodation_id . ', owner_user_id=' . $owner_user_id );
 			return array();
 		}
 
 		return $this->build_contract_template_context_from_attachment( $attachment_id, $owner_user_id );
+	}
+
+	/**
+	 * Resolves owner user ID for an accommodation with safe fallbacks.
+	 *
+	 * @param int $accommodation_id Accommodation ID.
+	 * @return int
+	 */
+	private function resolve_accommodation_owner_user_id( $accommodation_id ) {
+		$accommodation_id = absint( $accommodation_id );
+		if ( ! $accommodation_id ) {
+			return 0;
+		}
+
+		$owner_user_id = absint( get_post_meta( $accommodation_id, '_af_owner_id', true ) );
+		if ( $owner_user_id > 0 ) {
+			return $owner_user_id;
+		}
+
+		$legacy_owner_user_id = absint( get_post_meta( $accommodation_id, '_af_owner_user_id', true ) );
+		if ( $legacy_owner_user_id > 0 ) {
+			return $legacy_owner_user_id;
+		}
+
+		$post = get_post( $accommodation_id );
+		if ( $post && ! empty( $post->post_author ) ) {
+			$post_author_id = absint( $post->post_author );
+			if ( $post_author_id > 0 ) {
+				$author = get_user_by( 'id', $post_author_id );
+				if ( $author && in_array( 'af_owner', (array) $author->roles, true ) ) {
+					return $post_author_id;
+				}
+			}
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Returns owner identification number from owner contacts table.
+	 *
+	 * @param int $owner_user_id Owner user ID.
+	 * @return string
+	 */
+	private function get_owner_identification_number( $owner_user_id ) {
+		$owner_user_id = absint( $owner_user_id );
+		if ( ! $owner_user_id ) {
+			return '';
+		}
+
+		global $wpdb;
+		$table_name = $wpdb->prefix . 'af_owner_contacts';
+		$owner_id   = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT owner_id FROM {$table_name} WHERE wp_user_id = %d ORDER BY id DESC LIMIT 1",
+				$owner_user_id
+			)
+		);
+
+		return sanitize_text_field( (string) $owner_id );
 	}
 
 	/**

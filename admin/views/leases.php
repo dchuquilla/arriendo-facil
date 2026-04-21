@@ -49,10 +49,16 @@ $leases = $wpdb->get_results(
 				<?php foreach ( $leases as $lease ) : ?>
 					<?php
 					if ( $lease_service && empty( $lease->document_url ) ) {
+						$saved_accommodation_title = isset( $lease->accommodation_title ) ? $lease->accommodation_title : null;
 						$lease_service->ensure_lease_document_available( (int) $lease->id );
 						$refreshed_lease = $lease_service->get_lease( (int) $lease->id );
 						if ( $refreshed_lease ) {
 							$lease = $refreshed_lease;
+							if ( null !== $saved_accommodation_title ) {
+								$lease->accommodation_title = $saved_accommodation_title;
+							} else {
+								$lease->accommodation_title = isset( $lease->accommodation_id ) ? get_the_title( (int) $lease->accommodation_id ) : '';
+							}
 						}
 					}
 
@@ -85,7 +91,7 @@ $leases = $wpdb->get_results(
 					?>
 					<tr class="af-lease-row">
 						<td><?php echo esc_html( $lease->id ); ?></td>
-						<td><?php echo esc_html( $lease->accommodation_title ?: $lease->accommodation_id ); ?></td>
+							<td><?php echo esc_html( ( isset( $lease->accommodation_title ) ? $lease->accommodation_title : null ) ?: ( isset( $lease->accommodation_id ) ? get_the_title( (int) $lease->accommodation_id ) : '' ) ?: $lease->accommodation_id ); ?></td>
 						<td><?php echo esc_html( $lease->guest_id ); ?></td>
 						<td><?php echo esc_html( $lease->start_date ); ?></td>
 						<td><?php echo esc_html( $lease->end_date ); ?></td>

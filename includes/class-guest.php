@@ -537,6 +537,7 @@ class Arriendo_Facil_Guest {
 
 		$owner_contract_example = $this->get_owner_contract_example_context( $accommodation_id );
 		$owner_template_exists  = ! empty( $owner_contract_example['attachment_id'] );
+		$owner_id_number        = $this->get_owner_identification_number( isset( $owner_contract_example['owner_user_id'] ) ? absint( $owner_contract_example['owner_user_id'] ) : 0 );
 		$accommodation_address  = (string) get_post_meta( $accommodation_id, '_af_address', true );
 		$accommodation_title    = (string) get_the_title( $accommodation_id );
 
@@ -568,6 +569,7 @@ class Arriendo_Facil_Guest {
 			'owner_user_id'     => isset( $owner_contract_example['owner_user_id'] ) ? absint( $owner_contract_example['owner_user_id'] ) : 0,
 			'owner_name'        => isset( $owner_contract_example['owner_name'] ) ? sanitize_text_field( (string) $owner_contract_example['owner_name'] ) : '',
 			'owner_email'       => isset( $owner_contract_example['owner_email'] ) ? sanitize_email( (string) $owner_contract_example['owner_email'] ) : '',
+			'owner_id_number'   => $owner_id_number,
 		);
 
 		$ai_payload['legal_requirements'] = $this->get_contract_legal_requirements();
@@ -593,16 +595,22 @@ class Arriendo_Facil_Guest {
 
 		// Strict business rule: if owner template exists, always build the final contract from that template.
 		if ( $owner_template_exists ) {
-			if ( isset( $ai_payload['template_text'] ) && is_string( $ai_payload['template_text'] ) && '' !== trim( $ai_payload['template_text'] ) ) {
+			// Try AI-filled result first (only when template text is available).
+			if ( ! is_wp_error( $document_result ) && isset( $document_result['contract_text'] ) && is_string( $document_result['contract_text'] ) && '' !== trim( $document_result['contract_text'] ) ) {
+				$generated_contract_text = trim( wp_strip_all_tags( $document_result['contract_text'] ) );
+			}
+
+			if ( '' === $generated_contract_text && isset( $ai_payload['template_text'] ) && is_string( $ai_payload['template_text'] ) && '' !== trim( $ai_payload['template_text'] ) ) {
 				$generated_contract_text = $this->fill_owner_template_with_lease_data( $ai_payload['template_text'], $ai_payload );
 			}
 
-			if ( '' === $generated_contract_text && isset( $ai_payload['template_text'] ) && is_string( $ai_payload['template_text'] ) ) {
+			if ( '' === $generated_contract_text && isset( $ai_payload['template_text'] ) && is_string( $ai_payload['template_text'] ) && '' !== trim( $ai_payload['template_text'] ) ) {
 				$generated_contract_text = trim( (string) $ai_payload['template_text'] );
 			}
 
+			// When template file cannot be read (R2 unavailable, corrupt, etc.) generate a full legal contract as fallback.
 			if ( '' === $generated_contract_text ) {
-				$generated_contract_text = $this->build_owner_template_unreadable_fallback_text( $ai_payload );
+				$generated_contract_text = $this->build_legal_contract_template( $ai_payload, '' );
 			}
 		} else {
 			if ( ! is_wp_error( $document_result ) && isset( $document_result['contract_text'] ) && is_string( $document_result['contract_text'] ) ) {
@@ -638,10 +646,6 @@ class Arriendo_Facil_Guest {
 			}
 		}
 
-		if ( '' === $document_url && $owner_template_exists && ! empty( $owner_contract_example['url'] ) ) {
-			$document_url = esc_url_raw( (string) $owner_contract_example['url'] );
-		}
-
 		if ( $document_url ) {
 			$this->force_attach_lease_document( $lease_id, $document_url );
 		}
@@ -672,6 +676,7 @@ class Arriendo_Facil_Guest {
 		$tmp_downloaded  = false;
 
 		if ( ! $lease_id || ! $attachment_id ) {
+			error_log( 'Arriendo Facil owner-template generation skipped: missing lease_id or attachment_id.' );
 			return '';
 		}
 
@@ -679,6 +684,7 @@ class Arriendo_Facil_Guest {
 		if ( ! $template_path || ! file_exists( $template_path ) ) {
 			$template_path = $this->download_owner_template_from_r2( $attachment_id );
 			if ( ! $template_path ) {
+				error_log( 'Arriendo Facil owner-template generation failed: template file not found locally and R2 download failed. attachment_id=' . $attachment_id );
 				return '';
 			}
 			$tmp_downloaded = true;
@@ -689,6 +695,7 @@ class Arriendo_Facil_Guest {
 			if ( $tmp_downloaded ) {
 				@unlink( $template_path );
 			}
+			error_log( 'Arriendo Facil owner-template generation failed: template is not DOCX. attachment_id=' . $attachment_id . ', mime=' . $template_mime . ', ext=' . $template_ext );
 			return '';
 		}
 
@@ -697,6 +704,7 @@ class Arriendo_Facil_Guest {
 			if ( $tmp_downloaded ) {
 				@unlink( $template_path );
 			}
+			error_log( 'Arriendo Facil owner-template generation failed: wp_upload_dir unavailable.' );
 			return '';
 		}
 
@@ -705,6 +713,7 @@ class Arriendo_Facil_Guest {
 			if ( $tmp_downloaded ) {
 				@unlink( $template_path );
 			}
+			error_log( 'Arriendo Facil owner-template generation failed: cannot create contracts dir.' );
 			return '';
 		}
 
@@ -715,6 +724,7 @@ class Arriendo_Facil_Guest {
 			if ( $tmp_downloaded ) {
 				@unlink( $template_path );
 			}
+			error_log( 'Arriendo Facil owner-template generation failed: cannot copy template to destination. source=' . $template_path . ', dest=' . $file_path );
 			return '';
 		}
 
@@ -1631,23 +1641,11 @@ class Arriendo_Facil_Guest {
 	 */
 	private function get_owner_contract_example_context( $accommodation_id ) {
 		$accommodation_id = absint( $accommodation_id );
-		$owner_user_id = absint( get_post_meta( $accommodation_id, '_af_owner_id', true ) );
+		$owner_user_id = $this->resolve_accommodation_owner_user_id( $accommodation_id );
 
 		if ( ! $owner_user_id ) {
-			global $wpdb;
-			$owner_user_id = (int) $wpdb->get_var(
-				"SELECT CAST(meta_value AS UNSIGNED)
-				 FROM {$wpdb->postmeta}
-				 WHERE meta_key = '_af_owner_user_id'
-				   AND meta_value IS NOT NULL
-				   AND meta_value <> ''
-				 ORDER BY meta_id DESC
-				 LIMIT 1"
-			);
-
-			if ( ! $owner_user_id ) {
-				return array();
-			}
+			error_log( 'Arriendo Facil owner-template lookup: accommodation has no resolved owner. accommodation_id=' . $accommodation_id );
+			return array();
 		}
 
 		$attachment_ids = get_posts(
@@ -1674,10 +1672,71 @@ class Arriendo_Facil_Guest {
 
 		$attachment_id = ! empty( $attachment_ids ) ? absint( $attachment_ids[0] ) : 0;
 		if ( ! $attachment_id ) {
+			error_log( 'Arriendo Facil owner-template lookup: no owner contract attachment found. accommodation_id=' . $accommodation_id . ', owner_user_id=' . $owner_user_id );
 			return array();
 		}
 
 		return $this->build_contract_template_context_from_attachment( $attachment_id, $owner_user_id );
+	}
+
+	/**
+	 * Resolves owner user ID for an accommodation with safe fallbacks.
+	 *
+	 * @param int $accommodation_id Accommodation ID.
+	 * @return int
+	 */
+	private function resolve_accommodation_owner_user_id( $accommodation_id ) {
+		$accommodation_id = absint( $accommodation_id );
+		if ( ! $accommodation_id ) {
+			return 0;
+		}
+
+		$owner_user_id = absint( get_post_meta( $accommodation_id, '_af_owner_id', true ) );
+		if ( $owner_user_id > 0 ) {
+			return $owner_user_id;
+		}
+
+		$legacy_owner_user_id = absint( get_post_meta( $accommodation_id, '_af_owner_user_id', true ) );
+		if ( $legacy_owner_user_id > 0 ) {
+			return $legacy_owner_user_id;
+		}
+
+		$post = get_post( $accommodation_id );
+		if ( $post && ! empty( $post->post_author ) ) {
+			$post_author_id = absint( $post->post_author );
+			if ( $post_author_id > 0 ) {
+				$author = get_user_by( 'id', $post_author_id );
+				if ( $author && in_array( 'af_owner', (array) $author->roles, true ) ) {
+					return $post_author_id;
+				}
+			}
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Returns owner identification number from owner contacts table.
+	 *
+	 * @param int $owner_user_id Owner user ID.
+	 * @return string
+	 */
+	private function get_owner_identification_number( $owner_user_id ) {
+		$owner_user_id = absint( $owner_user_id );
+		if ( ! $owner_user_id ) {
+			return '';
+		}
+
+		global $wpdb;
+		$table_name = $wpdb->prefix . 'af_owner_contacts';
+		$owner_id   = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT owner_id FROM {$table_name} WHERE wp_user_id = %d ORDER BY id DESC LIMIT 1",
+				$owner_user_id
+			)
+		);
+
+		return sanitize_text_field( (string) $owner_id );
 	}
 
 	/**

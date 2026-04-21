@@ -429,23 +429,124 @@ class Arriendo_Facil_Lease {
 	 * @return string
 	 */
 	private function build_minimal_fallback_contract_text( $lease ) {
-		$lease_id          = isset( $lease->id ) ? absint( $lease->id ) : 0;
-		$accommodation_id  = isset( $lease->accommodation_id ) ? absint( $lease->accommodation_id ) : 0;
-		$guest_id          = isset( $lease->guest_id ) ? absint( $lease->guest_id ) : 0;
-		$start_date        = isset( $lease->start_date ) ? sanitize_text_field( (string) $lease->start_date ) : '';
-		$end_date          = isset( $lease->end_date ) ? sanitize_text_field( (string) $lease->end_date ) : '';
-		$monthly_rent      = isset( $lease->monthly_rent ) ? number_format( (float) $lease->monthly_rent, 2, '.', '' ) : '0.00';
-		$accommodation     = $accommodation_id ? (string) get_the_title( $accommodation_id ) : '';
+		$accommodation_id = isset( $lease->accommodation_id ) ? absint( $lease->accommodation_id ) : 0;
+		$guest_id         = isset( $lease->guest_id ) ? absint( $lease->guest_id ) : 0;
+		$start_date       = isset( $lease->start_date ) ? sanitize_text_field( (string) $lease->start_date ) : '';
+		$end_date         = isset( $lease->end_date ) ? sanitize_text_field( (string) $lease->end_date ) : '';
+		$monthly_rent_raw = isset( $lease->monthly_rent ) ? (float) $lease->monthly_rent : 0.0;
 
-		$text  = "CONTRATO DE ARRENDAMIENTO - RESPALDO AUTOMATICO\n\n";
-		$text .= "Lease ID: " . $lease_id . "\n";
-		$text .= "Alojamiento: " . ( '' !== trim( $accommodation ) ? $accommodation : (string) $accommodation_id ) . "\n";
-		$text .= "Guest ID: " . $guest_id . "\n";
-		$text .= "Inicio: " . $start_date . "\n";
-		$text .= "Fin: " . $end_date . "\n";
-		$text .= "Canon mensual: USD " . $monthly_rent . "\n\n";
-		$text .= "Nota: Este archivo se genero automaticamente porque el contrato principal no estuvo disponible en ese momento.\n";
-		$text .= "Fecha de generacion: " . current_time( 'Y-m-d H:i:s' ) . "\n";
+		// Build full payload to generate a proper legal contract.
+		$accommodation_title   = $accommodation_id ? (string) get_the_title( $accommodation_id ) : '________________________';
+		$accommodation_address = $accommodation_id ? (string) get_post_meta( $accommodation_id, '_af_address', true ) : '________________________';
+
+		$owner_name      = '________________________';
+		$owner_id_number = '________________________';
+		$owner_email     = '';
+		if ( $accommodation_id ) {
+			$owner_user_id = absint( get_post_meta( $accommodation_id, '_af_owner_id', true ) );
+			if ( $owner_user_id ) {
+				$owner_user = get_user_by( 'id', $owner_user_id );
+				if ( $owner_user ) {
+					$owner_name  = (string) $owner_user->display_name;
+					$owner_email = (string) $owner_user->user_email;
+				}
+			}
+		}
+
+		$guest_name      = '________________________';
+		$guest_email     = '';
+		$guest_phone     = '';
+		$guest_id_number = '________________________';
+		$guarantee_text  = 'Garantia equivalente a dos (2) meses del canon de arrendamiento.';
+		if ( $guest_id ) {
+			global $wpdb;
+			$guest_row = $wpdb->get_row(
+				$wpdb->prepare(
+					"SELECT * FROM {$wpdb->prefix}af_guests WHERE id = %d LIMIT 1",
+					$guest_id
+				)
+			);
+			if ( $guest_row ) {
+				$guest_name      = trim( (string) $guest_row->first_name . ' ' . (string) $guest_row->last_name );
+				$guest_email     = (string) $guest_row->email;
+				$guest_phone     = (string) $guest_row->phone;
+				$guest_id_number = (string) $guest_row->id_number;
+				if ( ! empty( $guest_row->guarantee_text ) ) {
+					$guarantee_text = (string) $guest_row->guarantee_text;
+				}
+			}
+		}
+
+		$payload = array(
+			'owner_name'            => $owner_name,
+			'owner_email'           => $owner_email,
+			'owner_id_number'       => $owner_id_number,
+			'guest_name'            => $guest_name,
+			'guest_email'           => $guest_email,
+			'guest_phone'           => $guest_phone,
+			'guest_id_number'       => $guest_id_number,
+			'accommodation_title'   => $accommodation_title,
+			'accommodation_address' => $accommodation_address,
+			'start_date'            => $start_date,
+			'end_date'              => $end_date,
+			'monthly_rent'          => $monthly_rent_raw,
+			'guarantee_text'        => $guarantee_text,
+			'mascotas'              => 0,
+			'personas_viviran'      => 0,
+			'referencia_personal_1' => '________________________',
+			'referencia_personal_2' => '________________________',
+		);
+
+		// Try AI generation first.
+		if ( class_exists( 'Arriendo_Facil_AI_Service' ) ) {
+			try {
+				$ai_payload_full = array_merge( $payload, array(
+					'template_available' => false,
+					'template_text'      => '',
+				) );
+				$ai = new Arriendo_Facil_AI_Service();
+				$result = $ai->generate_document( $ai_payload_full );
+				if ( ! is_wp_error( $result ) && isset( $result['contract_text'] ) && '' !== trim( (string) $result['contract_text'] ) ) {
+					return trim( wp_strip_all_tags( (string) $result['contract_text'] ) );
+				}
+			} catch ( Throwable $throwable ) {
+				error_log( 'Arriendo Facil lease auto-repair AI error: ' . $throwable->getMessage() );
+			}
+		}
+
+		// Inline legal contract fallback (Ecuador 2026).
+		$rent_formatted = number_format( $monthly_rent_raw, 2, '.', '' );
+		$city_and_date  = sprintf( 'Quito, %s', current_time( 'Y-m-d' ) );
+
+		$text  = "CONTRATO DE ARRENDAMIENTO DE INMUEBLE\n";
+		$text .= "(Conforme al Codigo Civil del Ecuador, Arts. 1857-1948, y la Ley de Inquilinato vigente con sus reformas)\n";
+		$text .= "\n" . $city_and_date . "\n";
+		$text .= "\nCOMPARECIENTES\n";
+		$text .= "\nARRENDADOR: " . $owner_name . "\nARRENDATARIO: " . $guest_name . " (Cedula: " . $guest_id_number . ", Celular: " . $guest_phone . ", Correo: " . $guest_email . ")\n";
+		$text .= "\nCLAUSULA PRIMERA - OBJETO DEL CONTRATO\n";
+		$text .= "El ARRENDADOR da en arrendamiento el inmueble \"" . $accommodation_title . "\", ubicado en " . $accommodation_address . ".\n";
+		$text .= "\nCLAUSULA SEGUNDA - PLAZO\n";
+		$text .= "Vigencia: " . $start_date . " hasta el " . $end_date . ". Prorroga automatica de 30 dias salvo aviso previo escrito.\n";
+		$text .= "\nCLAUSULA TERCERA - CANON Y FORMA DE PAGO\n";
+		$text .= "Canon mensual: USD " . $rent_formatted . ", pagadero dentro de los primeros cinco (5) dias de cada mes. Mora del 1% mensual por retraso.\n";
+		$text .= "\nCLAUSULA CUARTA - GARANTIA\n";
+		$text .= $guarantee_text . "\n";
+		$text .= "\nCLAUSULA QUINTA - DESTINO Y USO\n";
+		$text .= "Uso exclusivo habitacional. Prohibido subarrendar sin autorizacion escrita del ARRENDADOR.\n";
+		$text .= "\nCLAUSULA SEXTA - SERVICIOS BASICOS\n";
+		$text .= "Energia, agua, telefonia, internet y gas a cargo del ARRENDATARIO. Predial y administracion a cargo del ARRENDADOR.\n";
+		$text .= "\nCLAUSULA SEPTIMA - OBLIGACIONES DEL ARRENDATARIO\n";
+		$text .= "Pago puntual, conservacion del inmueble, no modificar sin autorizacion, permitir inspecciones con 24 h de aviso.\n";
+		$text .= "\nCLAUSULA OCTAVA - OBLIGACIONES DEL ARRENDADOR\n";
+		$text .= "Garantizar la posesion pacifica y atender reparaciones estructurales (Art. 1937 CC).\n";
+		$text .= "\nCLAUSULA NOVENA - TERMINACION\n";
+		$text .= "Por vencimiento, mutuo acuerdo, incumplimiento o desahucio conforme COGEP. Aviso de 30 dias para desahucio voluntario.\n";
+		$text .= "\nCLAUSULA DECIMA - JURISDICCION\n";
+		$text .= "Jueces competentes del Ecuador. Ley de Inquilinato, Codigo Civil Arts. 1857-1948 y COGEP vigentes 2026. Renuncia a domicilio y fuero especial.\n";
+		$text .= "\nEn fe de lo cual las partes suscriben el presente contrato en dos ejemplares.\n";
+		$text .= "\nFIRMAS\n";
+		$text .= "\nARRENDADOR: ________________________\nNombre: " . $owner_name . "\nCedula/RUC: " . $owner_id_number . "\n";
+		$text .= "\nARRENDATARIO: ________________________\nNombre: " . $guest_name . "\nCedula: " . $guest_id_number . "\n";
 
 		return $text;
 	}

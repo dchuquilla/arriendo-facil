@@ -734,6 +734,7 @@ class Arriendo_Facil_Guest {
 
 		$this->replace_docx_template_tokens_in_place( $file_path, $payload );
 		$this->replace_docx_semantic_label_blanks_in_place( $file_path, $owner_template, $payload );
+		$this->fill_docx_blank_fields_in_place( $file_path, $payload );
 
 		$mime_type    = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 		$local_url    = trailingslashit( $uploads['baseurl'] ) . 'arriendo-facil/contracts/' . rawurlencode( $file_name );
@@ -1376,6 +1377,263 @@ class Arriendo_Facil_Guest {
 		$text = preg_replace( '/\s+/', ' ', $text );
 
 		return trim( (string) $text );
+	}
+
+	/**
+	 * Fills blank fields (_____ or .....) in a DOCX template by detecting labeled blanks at paragraph level.
+	 * Handles the most common template format: label text followed by blank underscores/dots.
+	 *
+	 * @param string $docx_path Absolute path to the DOCX file.
+	 * @param array  $payload   Lease payload with guest, owner, and property data.
+	 * @return void
+	 */
+	private function fill_docx_blank_fields_in_place( $docx_path, array $payload ) {
+		if ( ! class_exists( 'ZipArchive' ) || ! $docx_path || ! file_exists( $docx_path ) ) {
+			return;
+		}
+
+		$label_map = $this->build_label_blank_fill_map( $payload );
+		if ( empty( $label_map ) ) {
+			return;
+		}
+
+		$zip = new ZipArchive();
+		if ( true !== $zip->open( $docx_path ) ) {
+			return;
+		}
+
+		for ( $i = 0; $i < $zip->numFiles; $i++ ) {
+			$entry = (string) $zip->getNameIndex( $i );
+			if ( 1 !== preg_match( '#^word/(document|header[0-9]+|footer[0-9]+)\.xml$#i', $entry ) ) {
+				continue;
+			}
+
+			$xml = $zip->getFromName( $entry );
+			if ( false === $xml || '' === $xml ) {
+				continue;
+			}
+
+			$updated = preg_replace_callback(
+				'#<w:p\b[^>]*>.*?</w:p>#si',
+				function ( $match ) use ( $label_map ) {
+					return $this->apply_label_blank_fill_in_paragraph( $match[0], $label_map );
+				},
+				(string) $xml
+			);
+
+			if ( is_string( $updated ) && $updated !== (string) $xml ) {
+				$zip->addFromString( $entry, $updated );
+			}
+		}
+
+		$zip->close();
+	}
+
+	/**
+	 * Processes a single <w:p> element to fill the first labeled blank found.
+	 *
+	 * @param string $para_xml  Full <w:p>...</w:p> XML string.
+	 * @param array  $label_map Ordered label (lowercase) => value map.
+	 * @return string
+	 */
+	private function apply_label_blank_fill_in_paragraph( $para_xml, array $label_map ) {
+		// Extract all <w:t> node XML and their decoded text content.
+		preg_match_all( '#<w:t(?:\s[^>]*)?>.*?</w:t>#si', $para_xml, $node_matches );
+		if ( empty( $node_matches[0] ) ) {
+			return $para_xml;
+		}
+
+		// Reconstruct full paragraph text.
+		$full_text = '';
+		foreach ( $node_matches[0] as $node ) {
+			preg_match( '#<w:t[^>]*>(.*?)</w:t>#si', $node, $inner );
+			$full_text .= isset( $inner[1] ) ? html_entity_decode( (string) $inner[1], ENT_XML1 | ENT_QUOTES, 'UTF-8' ) : '';
+		}
+
+		// Only process paragraphs that contain blank markers.
+		if ( ! preg_match( '/_{3,}|\.{5,}/', $full_text ) ) {
+			return $para_xml;
+		}
+
+		// Normalize paragraph text for label matching.
+		$full_lower = mb_strtolower( $full_text );
+		$full_lower = strtr(
+			$full_lower,
+			array(
+				'á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o',
+				'ú' => 'u', 'ü' => 'u', 'ñ' => 'n',
+			)
+		);
+
+		// Find the first matching label.
+		$replacement_value = null;
+		foreach ( $label_map as $label => $value ) {
+			if ( false !== mb_strpos( $full_lower, $label ) ) {
+				$replacement_value = $value;
+				break;
+			}
+		}
+
+		if ( null === $replacement_value ) {
+			return $para_xml;
+		}
+
+		// Replace the first <w:t> node containing blank markers.
+		$replaced = false;
+		$updated  = preg_replace_callback(
+			'#(<w:t(?:\s[^>]*)?>)(.*?)(</w:t>)#si',
+			function ( $m ) use ( $replacement_value, &$replaced ) {
+				if ( $replaced ) {
+					return $m[0];
+				}
+				$node_text = html_entity_decode( (string) $m[2], ENT_XML1 | ENT_QUOTES, 'UTF-8' );
+				if ( preg_match( '/_{3,}|\.{5,}/', $node_text ) ) {
+					$filled = preg_replace( '/_{3,}|\.{5,}/', $replacement_value, $node_text, 1 );
+					if ( is_string( $filled ) && $filled !== $node_text ) {
+						$replaced = true;
+						$open_tag = preg_replace( '/\s+xml:space="[^"]*"/', '', $m[1] );
+						$open_tag = rtrim( substr( $open_tag, 0, -1 ) ) . ' xml:space="preserve">';
+						return $open_tag . esc_xml( (string) $filled ) . $m[3];
+					}
+				}
+				return $m[0];
+			},
+			$para_xml
+		);
+
+		return is_string( $updated ) ? $updated : $para_xml;
+	}
+
+	/**
+	 * Builds an ordered label => value map for DOCX blank field filling.
+	 * More specific labels are listed first to prevent partial-keyword mis-matches.
+	 *
+	 * @param array $payload Lease payload.
+	 * @return array<string,string>
+	 */
+	private function build_label_blank_fill_map( array $payload ) {
+		$monthly_rent = isset( $payload['monthly_rent'] ) ? number_format( (float) $payload['monthly_rent'], 2, '.', '' ) : '';
+		if ( '' === $monthly_rent && isset( $payload['desired_price'] ) ) {
+			$monthly_rent = sanitize_text_field( (string) $payload['desired_price'] );
+		}
+
+		$values = array(
+			'owner_name'            => isset( $payload['owner_name'] ) ? sanitize_text_field( (string) $payload['owner_name'] ) : '',
+			'owner_id'              => isset( $payload['owner_id_number'] ) ? sanitize_text_field( (string) $payload['owner_id_number'] ) : '',
+			'owner_email'           => isset( $payload['owner_email'] ) ? sanitize_email( (string) $payload['owner_email'] ) : '',
+			'guest_name'            => isset( $payload['guest_name'] ) ? sanitize_text_field( (string) $payload['guest_name'] ) : '',
+			'guest_id'              => isset( $payload['guest_id_number'] ) ? sanitize_text_field( (string) $payload['guest_id_number'] ) : '',
+			'guest_phone'           => isset( $payload['guest_phone'] ) ? sanitize_text_field( (string) $payload['guest_phone'] ) : '',
+			'guest_email'           => isset( $payload['guest_email'] ) ? sanitize_email( (string) $payload['guest_email'] ) : '',
+			'accommodation_address' => isset( $payload['accommodation_address'] ) ? sanitize_text_field( (string) $payload['accommodation_address'] ) : '',
+			'accommodation_title'   => isset( $payload['accommodation_title'] ) ? sanitize_text_field( (string) $payload['accommodation_title'] ) : '',
+			'start_date'            => isset( $payload['start_date'] ) ? sanitize_text_field( (string) $payload['start_date'] ) : '',
+			'end_date'              => isset( $payload['end_date'] ) ? sanitize_text_field( (string) $payload['end_date'] ) : '',
+			'monthly_rent'          => $monthly_rent,
+			'guarantee_text'        => isset( $payload['guarantee_text'] ) ? sanitize_text_field( (string) $payload['guarantee_text'] ) : '',
+			'current_date'          => current_time( 'Y-m-d' ),
+		);
+
+		// Ordered most-specific to least-specific; first match wins per paragraph.
+		$patterns = array(
+			// Owner - specific.
+			array( 'nombre del arrendador',          'owner_name' ),
+			array( 'nombre propietario',             'owner_name' ),
+			array( 'cedula del arrendador',          'owner_id' ),
+			array( 'c.i. del arrendador',            'owner_id' ),
+			array( 'ci del arrendador',              'owner_id' ),
+			array( 'ruc del arrendador',             'owner_id' ),
+			array( 'cedula arrendador',              'owner_id' ),
+			array( 'correo del arrendador',          'owner_email' ),
+			array( 'correo arrendador',              'owner_email' ),
+			array( 'correo del propietario',         'owner_email' ),
+			// Guest - specific.
+			array( 'nombre del arrendatario',        'guest_name' ),
+			array( 'nombre del inquilino',           'guest_name' ),
+			array( 'nombre arrendatario',            'guest_name' ),
+			array( 'nombre inquilino',               'guest_name' ),
+			array( 'cedula del arrendatario',        'guest_id' ),
+			array( 'cedula del inquilino',           'guest_id' ),
+			array( 'c.i. del arrendatario',          'guest_id' ),
+			array( 'ci del arrendatario',            'guest_id' ),
+			array( 'cedula de ciudadania',           'guest_id' ),
+			array( 'cedula arrendatario',            'guest_id' ),
+			array( 'cedula inquilino',               'guest_id' ),
+			array( 'numero de cedula',               'guest_id' ),
+			array( 'numero de identificacion',       'guest_id' ),
+			array( 'documento de identidad',         'guest_id' ),
+			array( 'telefono del arrendatario',      'guest_phone' ),
+			array( 'celular del arrendatario',       'guest_phone' ),
+			array( 'telefono del inquilino',         'guest_phone' ),
+			array( 'celular del inquilino',          'guest_phone' ),
+			array( 'telefono arrendatario',          'guest_phone' ),
+			array( 'celular arrendatario',           'guest_phone' ),
+			array( 'correo del arrendatario',        'guest_email' ),
+			array( 'correo arrendatario',            'guest_email' ),
+			array( 'correo inquilino',               'guest_email' ),
+			array( 'email arrendatario',             'guest_email' ),
+			array( 'email inquilino',                'guest_email' ),
+			// Property.
+			array( 'direccion del inmueble',         'accommodation_address' ),
+			array( 'direccion de la propiedad',      'accommodation_address' ),
+			array( 'direccion del bien inmueble',    'accommodation_address' ),
+			array( 'ubicacion del inmueble',         'accommodation_address' ),
+			array( 'nombre del inmueble',            'accommodation_title' ),
+			array( 'nombre de la propiedad',         'accommodation_title' ),
+			array( 'nombre del bien',                'accommodation_title' ),
+			// Dates.
+			array( 'fecha de inicio del contrato',   'start_date' ),
+			array( 'fecha de inicio del arriendo',   'start_date' ),
+			array( 'fecha de inicio',                'start_date' ),
+			array( 'inicio del contrato',            'start_date' ),
+			array( 'fecha inicio',                   'start_date' ),
+			array( 'fecha de fin del contrato',      'end_date' ),
+			array( 'fecha de terminacion',           'end_date' ),
+			array( 'fecha de termino',               'end_date' ),
+			array( 'fecha de vencimiento',           'end_date' ),
+			array( 'fecha de fin',                   'end_date' ),
+			array( 'fin del contrato',               'end_date' ),
+			array( 'fecha fin',                      'end_date' ),
+			// Rent.
+			array( 'canon mensual de arrendamiento', 'monthly_rent' ),
+			array( 'valor del canon',                'monthly_rent' ),
+			array( 'canon de arrendamiento',         'monthly_rent' ),
+			array( 'valor mensual del arriendo',     'monthly_rent' ),
+			array( 'valor del arriendo',             'monthly_rent' ),
+			array( 'canon mensual',                  'monthly_rent' ),
+			array( 'valor mensual',                  'monthly_rent' ),
+			array( 'renta mensual',                  'monthly_rent' ),
+			array( 'precio mensual',                 'monthly_rent' ),
+			// Guarantee.
+			array( 'garantia del contrato',          'guarantee_text' ),
+			array( 'detalle de garantia',            'guarantee_text' ),
+			array( 'tipo de garantia',               'guarantee_text' ),
+			array( 'garantia',                       'guarantee_text' ),
+			// Generic (least specific - checked last).
+			array( 'propietario',                    'owner_name' ),
+			array( 'arrendador',                     'owner_name' ),
+			array( 'arrendatario',                   'guest_name' ),
+			array( 'inquilino',                      'guest_name' ),
+			array( 'cedula',                         'guest_id' ),
+			array( 'telefono',                       'guest_phone' ),
+			array( 'celular',                        'guest_phone' ),
+			array( 'direccion',                      'accommodation_address' ),
+			array( 'inmueble',                       'accommodation_title' ),
+		);
+
+		$map = array();
+		foreach ( $patterns as $pair ) {
+			$label = strtr(
+				mb_strtolower( (string) $pair[0] ),
+				array( 'á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ü' => 'u', 'ñ' => 'n' )
+			);
+			$key = (string) $pair[1];
+			if ( ! isset( $map[ $label ] ) && isset( $values[ $key ] ) && '' !== $values[ $key ] ) {
+				$map[ $label ] = $values[ $key ];
+			}
+		}
+
+		return $map;
 	}
 
 	/**

@@ -1170,7 +1170,7 @@ class Arriendo_Facil_Admin {
 			$full_text .= isset( $inner[1] ) ? html_entity_decode( (string) $inner[1], ENT_XML1 | ENT_QUOTES, 'UTF-8' ) : '';
 		}
 
-		if ( ! preg_match( '/_{3,}|\.{5,}/', $full_text ) ) {
+		if ( ! preg_match( '/_{3,}|\.{5,}|[\x{2026}]{2,}/u', $full_text ) ) {
 			return $para_xml;
 		}
 
@@ -1199,8 +1199,8 @@ class Arriendo_Facil_Admin {
 					return $m[0];
 				}
 				$node_text = html_entity_decode( (string) $m[2], ENT_XML1 | ENT_QUOTES, 'UTF-8' );
-				if ( preg_match( '/_{3,}|\.{5,}/', $node_text ) ) {
-					$filled = preg_replace( '/_{3,}|\.{5,}/', $replacement_value, $node_text, 1 );
+				if ( preg_match( '/_{3,}|\.{5,}|[\x{2026}]{2,}/u', $node_text ) ) {
+					$filled = preg_replace( '/_{3,}|\.{5,}|[\x{2026}]{2,}/u', $replacement_value, $node_text, 1 );
 					if ( is_string( $filled ) && $filled !== $node_text ) {
 						$replaced = true;
 						$open_tag = preg_replace( '/\s+xml:space="[^"]*"/', '', $m[1] );
@@ -1319,6 +1319,13 @@ class Arriendo_Facil_Admin {
 			array( 'detalle de garantia',            'guarantee_text' ),
 			array( 'tipo de garantia',               'guarantee_text' ),
 			array( 'garantia',                       'guarantee_text' ),
+			// Contextual phrases used by owner contracts with free-form text and dotted lines.
+			array( 'y por otra parte',               'guest_name' ),
+			array( 'parte a la que en adelante se le denominara como el arrendatario', 'guest_name' ),
+			array( 'representada por',               'guest_name' ),
+			array( 'autoriza a',                     'guest_name' ),
+			array( 'manifiesta que se somete',       'guest_name' ),
+			array( 'pagara por la utilizacion',      'guest_name' ),
 			// Generic (least specific - checked last).
 			array( 'propietario',                    'owner_name' ),
 			array( 'arrendador',                     'owner_name' ),

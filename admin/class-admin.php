@@ -450,21 +450,54 @@ class Arriendo_Facil_Admin {
 		$file_name = sprintf( 'lease-%d-owner-template-%s.docx', $lease_id, gmdate( 'Ymd-His' ) );
 		$file_path = trailingslashit( $contracts_dir ) . $file_name;
 
-		if ( ! @copy( $template_path, $file_path ) ) {
+		// Phase 1: PHPWord TemplateProcessor using the pre-processed template (preferred).
+		$phpword_success    = false;
+		$processed_tpl_path = (string) get_post_meta( $attachment_id, '_af_processed_template_path', true );
+
+		// Auto-migrate legacy owner templates that predate processed placeholder copies.
+		if ( '' === $processed_tpl_path
+			&& class_exists( 'Arriendo_Facil_DOCX_Template_Processor' )
+		) {
+			$ai_svc        = class_exists( 'Arriendo_Facil_AI_Service' ) ? new Arriendo_Facil_AI_Service() : null;
+			$tpl_proc      = new Arriendo_Facil_DOCX_Template_Processor();
+			$processed_new = $tpl_proc->process_owner_template( $template_path, $ai_svc );
+			if ( '' !== $processed_new && file_exists( $processed_new ) ) {
+				$processed_tpl_path = $processed_new;
+				update_post_meta( $attachment_id, '_af_processed_template_path', $processed_tpl_path );
+			}
+		}
+
+		if ( '' !== $processed_tpl_path
+			&& file_exists( $processed_tpl_path )
+			&& class_exists( 'Arriendo_Facil_DOCX_Template_Processor' )
+		) {
+			$tpl_proc = new Arriendo_Facil_DOCX_Template_Processor();
+			if ( $tpl_proc->fill_template( $processed_tpl_path, $file_path, $payload ) ) {
+				$phpword_success = true;
+				if ( $tmp_downloaded ) {
+					@unlink( $template_path );
+				}
+			}
+		}
+
+		// Phase 2: Legacy copy + in-place token/blank replacement (fallback).
+		if ( ! $phpword_success ) {
+			if ( ! @copy( $template_path, $file_path ) ) {
+				if ( $tmp_downloaded ) {
+					@unlink( $template_path );
+				}
+				error_log( 'Arriendo Facil admin owner-template generation failed: cannot copy template to destination. source=' . $template_path . ', dest=' . $file_path );
+				return '';
+			}
+
 			if ( $tmp_downloaded ) {
 				@unlink( $template_path );
 			}
-			error_log( 'Arriendo Facil admin owner-template generation failed: cannot copy template to destination. source=' . $template_path . ', dest=' . $file_path );
-			return '';
-		}
 
-		if ( $tmp_downloaded ) {
-			@unlink( $template_path );
+			$this->replace_docx_template_tokens_in_place( $file_path, $payload );
+			$this->replace_docx_semantic_label_blanks_in_place( $file_path, $owner_template, $payload );
+			$this->fill_docx_blank_fields_in_place( $file_path, $payload );
 		}
-
-		$this->replace_docx_template_tokens_in_place( $file_path, $payload );
-		$this->replace_docx_semantic_label_blanks_in_place( $file_path, $owner_template, $payload );
-		$this->fill_docx_blank_fields_in_place( $file_path, $payload );
 
 		$mime_type    = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 		$local_url    = trailingslashit( $uploads['baseurl'] ) . 'arriendo-facil/contracts/' . rawurlencode( $file_name );

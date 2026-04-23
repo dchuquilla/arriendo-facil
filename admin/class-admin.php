@@ -812,7 +812,7 @@ class Arriendo_Facil_Admin {
 	 */
 	private function extract_semantic_candidate_labels( $text ) {
 		$labels = array();
-		if ( preg_match_all( '/([A-ZÁÉÍÓÚÑa-záéíóúñ][A-ZÁÉÍÓÚÑa-záéíóúñ\s\/]{2,40})\s*[:\-]?\s*(?:_{3,}|\.{3,}|[\x{2026}]{2,})/', $text, $matches ) ) {
+		if ( preg_match_all( '/([A-ZÁÉÍÓÚÑa-záéíóúñ][A-ZÁÉÍÓÚÑa-záéíóúñ\s\/]{2,40})\s*[:\-]?\s*(?:_{3,}|\.{3,}|[\x{2026}]{2,})/u', $text, $matches ) ) {
 			foreach ( $matches[1] as $label ) {
 				$trimmed = trim( (string) $label );
 				if ( '' !== $trimmed ) {
@@ -1114,6 +1114,11 @@ class Arriendo_Facil_Admin {
 			return;
 		}
 
+		$value_map = $this->build_blank_fill_value_map( $payload );
+		if ( empty( $value_map ) ) {
+			return;
+		}
+
 		$label_map = $this->build_label_blank_fill_map( $payload );
 		if ( empty( $label_map ) ) {
 			return;
@@ -1137,8 +1142,8 @@ class Arriendo_Facil_Admin {
 
 			$updated = preg_replace_callback(
 				'#<w:p\b[^>]*>.*?</w:p>#si',
-				function ( $match ) use ( $label_map ) {
-					return $this->apply_label_blank_fill_in_paragraph( $match[0], $label_map );
+				function ( $match ) use ( $label_map, $value_map ) {
+					return $this->apply_label_blank_fill_in_paragraph( $match[0], $label_map, $value_map );
 				},
 				(string) $xml
 			);
@@ -1152,13 +1157,14 @@ class Arriendo_Facil_Admin {
 	}
 
 	/**
-	 * Processes a single <w:p> element to fill the first labeled blank found.
+	 * Processes a single <w:p> element and fills blank markers.
 	 *
 	 * @param string $para_xml  Full <w:p>...</w:p> XML string.
 	 * @param array  $label_map Ordered label (normalized lowercase) => value map.
+	 * @param array  $value_map Canonical key => value map.
 	 * @return string
 	 */
-	private function apply_label_blank_fill_in_paragraph( $para_xml, array $label_map ) {
+	private function apply_label_blank_fill_in_paragraph( $para_xml, array $label_map, array $value_map ) {
 		preg_match_all( '#<w:t(?:\s[^>]*)?>.*?</w:t>#si', $para_xml, $node_matches );
 		if ( empty( $node_matches[0] ) ) {
 			return $para_xml;
@@ -1174,39 +1180,64 @@ class Arriendo_Facil_Admin {
 			return $para_xml;
 		}
 
-		$full_lower = strtr(
-			mb_strtolower( $full_text ),
-			array( 'á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ü' => 'u', 'ñ' => 'n' )
-		);
-
-		$replacement_value = null;
-		foreach ( $label_map as $label => $value ) {
-			if ( false !== mb_strpos( $full_lower, $label ) ) {
-				$replacement_value = $value;
-				break;
-			}
-		}
-
-		if ( null === $replacement_value ) {
+		$blank_count = $this->count_blank_markers( $full_text );
+		if ( $blank_count <= 0 ) {
 			return $para_xml;
 		}
 
-		$replaced = false;
+		$replacement_values = array();
+		$ai_sequence = $this->get_ai_blank_key_sequence_for_line( $full_text, $blank_count, $value_map );
+		if ( ! empty( $ai_sequence ) ) {
+			foreach ( $ai_sequence as $canonical_key ) {
+				if ( isset( $value_map[ $canonical_key ] ) && '' !== trim( (string) $value_map[ $canonical_key ] ) ) {
+					$replacement_values[] = (string) $value_map[ $canonical_key ];
+				}
+			}
+		}
+
+		if ( empty( $replacement_values ) ) {
+			$replacement_values = $this->infer_blank_values_from_line( $full_text, $blank_count, $value_map );
+		}
+
+		if ( empty( $replacement_values ) ) {
+			$full_lower = strtr(
+				mb_strtolower( $full_text ),
+				array( 'á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ü' => 'u', 'ñ' => 'n' )
+			);
+			$replacement_value = null;
+			foreach ( $label_map as $label => $value ) {
+				if ( false !== mb_strpos( $full_lower, $label ) ) {
+					$replacement_value = $value;
+					break;
+				}
+			}
+			if ( null === $replacement_value ) {
+				return $para_xml;
+			}
+			for ( $i = 0; $i < $blank_count; $i++ ) {
+				$replacement_values[] = (string) $replacement_value;
+			}
+		}
+
+		$replace_index = 0;
 		$updated  = preg_replace_callback(
 			'#(<w:t(?:\s[^>]*)?>)(.*?)(</w:t>)#si',
-			function ( $m ) use ( $replacement_value, &$replaced ) {
-				if ( $replaced ) {
-					return $m[0];
-				}
-				$node_text = html_entity_decode( (string) $m[2], ENT_XML1 | ENT_QUOTES, 'UTF-8' );
-				if ( preg_match( '/_{3,}|\.{5,}|[\x{2026}]{2,}/u', $node_text ) ) {
-					$filled = preg_replace( '/_{3,}|\.{5,}|[\x{2026}]{2,}/u', $replacement_value, $node_text, 1 );
-					if ( is_string( $filled ) && $filled !== $node_text ) {
-						$replaced = true;
-						$open_tag = preg_replace( '/\s+xml:space="[^"]*"/', '', $m[1] );
-						$open_tag = rtrim( substr( $open_tag, 0, -1 ) ) . ' xml:space="preserve">';
-						return $open_tag . esc_xml( (string) $filled ) . $m[3];
+			function ( $m ) use ( $replacement_values, &$replace_index ) {
+				$original_text = html_entity_decode( (string) $m[2], ENT_XML1 | ENT_QUOTES, 'UTF-8' );
+				$node_text = $original_text;
+				while ( $replace_index < count( $replacement_values ) && preg_match( '/_{3,}|\.{5,}|[\x{2026}]{2,}/u', $node_text ) ) {
+					$next_value = (string) $replacement_values[ $replace_index ];
+					$filled     = preg_replace( '/_{3,}|\.{5,}|[\x{2026}]{2,}/u', $next_value, $node_text, 1 );
+					if ( ! is_string( $filled ) || $filled === $node_text ) {
+						break;
 					}
+					$node_text = $filled;
+					$replace_index++;
+				}
+				if ( $node_text !== $original_text ) {
+					$open_tag = preg_replace( '/\s+xml:space="[^"]*"/', '', $m[1] );
+					$open_tag = rtrim( substr( $open_tag, 0, -1 ) ) . ' xml:space="preserve">';
+					return $open_tag . esc_xml( (string) $node_text ) . $m[3];
 				}
 				return $m[0];
 			},
@@ -1214,6 +1245,181 @@ class Arriendo_Facil_Admin {
 		);
 
 		return is_string( $updated ) ? $updated : $para_xml;
+	}
+
+	/**
+	 * Counts blank markers in a plain text string.
+	 *
+	 * @param string $text Text to inspect.
+	 * @return int
+	 */
+	private function count_blank_markers( $text ) {
+		$matches = array();
+		preg_match_all( '/_{3,}|\.{5,}|[\x{2026}]{2,}/u', (string) $text, $matches );
+
+		return isset( $matches[0] ) ? count( $matches[0] ) : 0;
+	}
+
+	/**
+	 * Uses AI to resolve a line-by-line ordered blank key sequence.
+	 *
+	 * @param string $line_text Line text containing blanks.
+	 * @param int    $blank_count Number of blanks in line.
+	 * @param array  $value_map Canonical key => value map.
+	 * @return array<int,string>
+	 */
+	private function get_ai_blank_key_sequence_for_line( $line_text, $blank_count, array $value_map ) {
+		$line_text   = trim( (string) $line_text );
+		$blank_count = absint( $blank_count );
+		if ( '' === $line_text || $blank_count <= 0 || ! class_exists( 'Arriendo_Facil_AI_Service' ) ) {
+			return array();
+		}
+
+		$allowed = array();
+		foreach ( $value_map as $key => $value ) {
+			if ( '' !== trim( (string) $value ) ) {
+				$allowed[] = sanitize_key( (string) $key );
+			}
+		}
+		if ( empty( $allowed ) ) {
+			return array();
+		}
+
+		$cache_key = md5( strtolower( $line_text ) . '|' . $blank_count . '|' . implode( ',', $allowed ) );
+		static $cache = array();
+		if ( isset( $cache[ $cache_key ] ) && is_array( $cache[ $cache_key ] ) ) {
+			return $cache[ $cache_key ];
+		}
+
+		try {
+			$ai_result = ( new Arriendo_Facil_AI_Service() )->map_template_line_blanks(
+				array(
+					'lines' => array(
+						array(
+							'id'          => 'line_1',
+							'text'        => $line_text,
+							'blank_count' => $blank_count,
+						),
+					),
+					'allowed_canonical' => array_values( array_unique( $allowed ) ),
+				)
+			);
+
+			if ( ! is_wp_error( $ai_result ) && isset( $ai_result['line_map']['line_1'] ) && is_array( $ai_result['line_map']['line_1'] ) ) {
+				$keys = array();
+				foreach ( $ai_result['line_map']['line_1'] as $raw_key ) {
+					$key = sanitize_key( (string) $raw_key );
+					if ( '' !== $key && in_array( $key, $allowed, true ) ) {
+						$keys[] = $key;
+					}
+				}
+				if ( ! empty( $keys ) ) {
+					$cache[ $cache_key ] = $keys;
+					return $keys;
+				}
+			}
+		} catch ( Throwable $throwable ) {
+			error_log( 'Arriendo Facil admin AI line blank mapping error: ' . $throwable->getMessage() );
+		}
+
+		$cache[ $cache_key ] = array();
+		return array();
+	}
+
+	/**
+	 * Builds canonical values available for blank completion.
+	 *
+	 * @param array $payload Lease payload.
+	 * @return array<string,string>
+	 */
+	private function build_blank_fill_value_map( array $payload ) {
+		$monthly_rent = isset( $payload['monthly_rent'] ) ? number_format( (float) $payload['monthly_rent'], 2, '.', '' ) : '';
+		if ( '' === $monthly_rent && isset( $payload['desired_price'] ) ) {
+			$monthly_rent = sanitize_text_field( (string) $payload['desired_price'] );
+		}
+
+		$current_date = (string) current_time( 'Y-m-d' );
+		$current_parts = explode( '-', $current_date );
+		$current_year  = isset( $current_parts[0] ) ? $current_parts[0] : '';
+		$current_month = isset( $current_parts[1] ) ? $current_parts[1] : '';
+		$current_day   = isset( $current_parts[2] ) ? $current_parts[2] : '';
+
+		return array(
+			'owner_name'            => isset( $payload['owner_name'] ) ? sanitize_text_field( (string) $payload['owner_name'] ) : '',
+			'owner_email'           => isset( $payload['owner_email'] ) ? sanitize_email( (string) $payload['owner_email'] ) : '',
+			'owner_id_number'       => isset( $payload['owner_id_number'] ) ? sanitize_text_field( (string) $payload['owner_id_number'] ) : '',
+			'guest_name'            => isset( $payload['guest_name'] ) ? sanitize_text_field( (string) $payload['guest_name'] ) : '',
+			'guest_email'           => isset( $payload['guest_email'] ) ? sanitize_email( (string) $payload['guest_email'] ) : '',
+			'guest_phone'           => isset( $payload['guest_phone'] ) ? sanitize_text_field( (string) $payload['guest_phone'] ) : '',
+			'guest_id_number'       => isset( $payload['guest_id_number'] ) ? sanitize_text_field( (string) $payload['guest_id_number'] ) : '',
+			'accommodation_title'   => isset( $payload['accommodation_title'] ) ? sanitize_text_field( (string) $payload['accommodation_title'] ) : '',
+			'accommodation_address' => isset( $payload['accommodation_address'] ) ? sanitize_text_field( (string) $payload['accommodation_address'] ) : '',
+			'start_date'            => isset( $payload['start_date'] ) ? sanitize_text_field( (string) $payload['start_date'] ) : '',
+			'end_date'              => isset( $payload['end_date'] ) ? sanitize_text_field( (string) $payload['end_date'] ) : '',
+			'monthly_rent'          => $monthly_rent,
+			'guarantee_text'        => isset( $payload['guarantee_text'] ) ? sanitize_text_field( (string) $payload['guarantee_text'] ) : '',
+			'rental_years'          => isset( $payload['rental_years'] ) ? (string) absint( $payload['rental_years'] ) : '',
+			'current_date'          => $current_date,
+			'current_day'           => (string) $current_day,
+			'current_month'         => (string) $current_month,
+			'current_year'          => (string) $current_year,
+		);
+	}
+
+	/**
+	 * Infers blank replacements from local line context when AI mapping is unavailable.
+	 *
+	 * @param string $line_text Full line text.
+	 * @param int    $blank_count Number of blanks.
+	 * @param array  $value_map Canonical key => value map.
+	 * @return array<int,string>
+	 */
+	private function infer_blank_values_from_line( $line_text, $blank_count, array $value_map ) {
+		$parts = preg_split( '/(_{3,}|\.{5,}|[\x{2026}]{2,})/u', (string) $line_text );
+		if ( ! is_array( $parts ) || count( $parts ) < 2 ) {
+			return array();
+		}
+
+		$results = array();
+		for ( $i = 0; $i < $blank_count; $i++ ) {
+			$before = isset( $parts[ $i ] ) ? (string) $parts[ $i ] : '';
+			$after  = isset( $parts[ $i + 1 ] ) ? (string) $parts[ $i + 1 ] : '';
+			$ctx = strtr(
+				mb_strtolower( $before . ' ' . $after ),
+				array( 'á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ü' => 'u', 'ñ' => 'n' )
+			);
+
+			$key = '';
+			if ( false !== strpos( $ctx, 'consignado con el numero' ) || false !== strpos( $ctx, 'numero de' ) || false !== strpos( $ctx, 'cedula' ) ) {
+				$key = 'guest_id_number';
+			} elseif ( false !== strpos( $ctx, 'ubicado en' ) || false !== strpos( $ctx, 'situada en' ) || false !== strpos( $ctx, 'calle' ) || false !== strpos( $ctx, 'direccion' ) ) {
+				$key = 'accommodation_address';
+			} elseif ( false !== strpos( $ctx, 'propietario de' ) || false !== strpos( $ctx, 'local, materia de arriendo' ) || false !== strpos( $ctx, 'dedicarlo a' ) ) {
+				$key = 'accommodation_title';
+			} elseif ( false !== strpos( $ctx, 'cantidad de' ) && false !== strpos( $ctx, 'garantia' ) ) {
+				$key = 'guarantee_text';
+			} elseif ( false !== strpos( $ctx, 'usd por mes' ) || false !== strpos( $ctx, 'canon' ) || false !== strpos( $ctx, 'valor' ) ) {
+				$key = 'monthly_rent';
+			} elseif ( false !== strpos( $ctx, 'plazo de este contrato es de' ) || false !== strpos( $ctx, 'anos' ) ) {
+				$key = 'rental_years';
+			} elseif ( false !== strpos( $ctx, 'de' ) && false !== strpos( $ctx, 'del' ) ) {
+				if ( 0 === $i ) {
+					$key = 'current_day';
+				} elseif ( 1 === $i ) {
+					$key = 'current_month';
+				} else {
+					$key = 'current_year';
+				}
+			} elseif ( false !== strpos( $ctx, 'arrendatario' ) || false !== strpos( $ctx, 'senor' ) || false !== strpos( $ctx, 'como arrendatario' ) ) {
+				$key = 'guest_name';
+			}
+
+			if ( '' !== $key && isset( $value_map[ $key ] ) && '' !== trim( (string) $value_map[ $key ] ) ) {
+				$results[] = (string) $value_map[ $key ];
+			}
+		}
+
+		return $results;
 	}
 
 	/**

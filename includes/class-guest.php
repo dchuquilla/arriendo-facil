@@ -724,13 +724,11 @@ class Arriendo_Facil_Guest {
 		$phpword_success    = false;
 		$processed_tpl_path = (string) get_post_meta( $attachment_id, '_af_processed_template_path', true );
 
-		// Auto-migrate legacy owner templates that predate processed placeholder copies.
-		if ( '' === $processed_tpl_path
-			&& class_exists( 'Arriendo_Facil_DOCX_Template_Processor' )
-		) {
-			$ai_svc        = class_exists( 'Arriendo_Facil_AI_Service' ) ? new Arriendo_Facil_AI_Service() : null;
+		// Always refresh the processed owner template from the original DOCX before fill.
+		// This avoids reusing older placeholder mappings that may have been inferred incorrectly.
+		if ( class_exists( 'Arriendo_Facil_DOCX_Template_Processor' ) ) {
 			$tpl_proc      = new Arriendo_Facil_DOCX_Template_Processor();
-			$processed_new = $tpl_proc->process_owner_template( $template_path, $ai_svc );
+			$processed_new = $tpl_proc->process_owner_template( $template_path, null, $processed_tpl_path );
 			if ( '' !== $processed_new && file_exists( $processed_new ) ) {
 				$processed_tpl_path = $processed_new;
 				update_post_meta( $attachment_id, '_af_processed_template_path', $processed_tpl_path );

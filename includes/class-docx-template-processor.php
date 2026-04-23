@@ -135,7 +135,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 		}
 
 		// Step 4: Resolve blank occurrences → ordered placeholder names.
-		$ordered_placeholders = $this->resolve_blank_to_placeholder_order( $blank_paragraphs, $ai_service );
+		$ordered_placeholders = $this->resolve_blank_to_placeholder_order( (string) $doc_xml );
 
 		// Step 5: Inject placeholders into the XML.
 		$doc_xml = $this->inject_placeholders( $doc_xml, $ordered_placeholders );
@@ -176,6 +176,15 @@ class Arriendo_Facil_DOCX_Template_Processor {
 		try {
 			$processor = new \PhpOffice\PhpWord\TemplateProcessor( $template_path );
 			$values    = $this->build_placeholder_values( $payload );
+
+			if ( method_exists( $processor, 'getVariables' ) ) {
+				foreach ( $processor->getVariables() as $template_var ) {
+					$template_var = (string) $template_var;
+					if ( '' !== $template_var && ! isset( $values[ $template_var ] ) ) {
+						$values[ $template_var ] = '________________________';
+					}
+				}
+			}
 
 			foreach ( $values as $key => $value ) {
 				$processor->setValue( $key, htmlspecialchars( (string) $value, ENT_COMPAT, 'UTF-8' ) );
@@ -289,119 +298,161 @@ class Arriendo_Facil_DOCX_Template_Processor {
 
 	/**
 	 * Resolves blank occurrences → ordered list of placeholder names.
+	 * Uses local context around each blank and prefers leaving ambiguous fields empty.
 	 *
-	 * Uses AI (map_template_line_blanks) when available; falls back to
-	 * keyword-based heuristics per blank.
-	 *
-	 * @param array                          $blank_paragraphs Output of extract_paragraphs_with_blanks().
-	 * @param Arriendo_Facil_AI_Service|null $ai_service
+	 * @param string $doc_xml Raw word/document.xml content.
 	 * @return list<string> One placeholder name per blank, in document order.
 	 */
-	private function resolve_blank_to_placeholder_order( array $blank_paragraphs, $ai_service ) {
-		if ( empty( $blank_paragraphs ) ) {
-			return array();
+	private function resolve_blank_to_placeholder_order( $doc_xml ) {
+		$flat_text = $this->extract_flat_text_from_doc_xml( $doc_xml );
+		$ordered   = array();
+
+		if ( '' === $flat_text ) {
+			return $ordered;
 		}
 
-		// Build the input for map_template_line_blanks.
-		$lines = array();
-		foreach ( $blank_paragraphs as $para_id => $info ) {
-			$lines[] = array(
-				'id'          => $para_id,
-				'text'        => substr( $info['text'], 0, 300 ),
-				'blank_count' => $info['blank_count'],
-			);
+		if ( ! preg_match_all( '/_{3,}|\.{5,}/', $flat_text, $matches, PREG_OFFSET_CAPTURE ) ) {
+			return $ordered;
 		}
 
-		$ai_line_map = array();
-
-		if ( $ai_service ) {
-			try {
-				$response = $ai_service->map_template_line_blanks(
-					array(
-						'lines'             => $lines,
-						'allowed_canonical' => array_keys( self::CANONICAL_TO_PLACEHOLDER ),
-					)
-				);
-
-				if ( ! is_wp_error( $response )
-					&& isset( $response['line_map'] )
-					&& is_array( $response['line_map'] )
-				) {
-					$ai_line_map = $response['line_map'];
-				}
-			} catch ( \Throwable $e ) {
-				error_log( 'Arriendo Facil DOCX processor AI blank mapping failed: ' . $e->getMessage() );
-			}
-		}
-
-		// Convert per-paragraph canonical keys → globally ordered placeholder names.
-		$ordered = array();
-
-		foreach ( $blank_paragraphs as $para_id => $info ) {
-			$para_mapping = isset( $ai_line_map[ $para_id ] ) && is_array( $ai_line_map[ $para_id ] )
-				? $ai_line_map[ $para_id ]
-				: array();
-
-			for ( $i = 0; $i < $info['blank_count']; $i++ ) {
-				$canonical = isset( $para_mapping[ $i ] ) ? trim( (string) $para_mapping[ $i ] ) : '';
-
-				if ( '' !== $canonical && isset( self::CANONICAL_TO_PLACEHOLDER[ $canonical ] ) ) {
-					$ordered[] = self::CANONICAL_TO_PLACEHOLDER[ $canonical ];
-				} else {
-					// Rule-based fallback for this specific blank.
-					$ordered[] = $this->infer_placeholder_from_context( $info['text'], $i );
-				}
-			}
+		foreach ( $matches[0] as $blank_index => $match ) {
+			$blank_text = (string) $match[0];
+			$offset     = (int) $match[1];
+			$before     = substr( $flat_text, max( 0, $offset - 140 ), min( 140, $offset ) );
+			$after      = substr( $flat_text, $offset + strlen( $blank_text ), 180 );
+			$ordered[]  = $this->infer_placeholder_from_context( $before, $after, $blank_index );
 		}
 
 		return $ordered;
 	}
 
 	/**
-	 * Infers a placeholder name from paragraph text and blank position using
-	 * keyword proximity rules. Used as fallback when AI is unavailable.
+	 * Infers a placeholder name from local before/after context around one blank.
+	 * Ambiguous blanks stay as CAMPO_* so they render empty in the final contract.
 	 *
-	 * @param string $text      Paragraph plain text.
-	 * @param int    $blank_idx Which blank within this paragraph (0-based).
+	 * @param string $before    Text immediately before the blank.
+	 * @param string $after     Text immediately after the blank.
+	 * @param int    $blank_idx Global blank index.
 	 * @return string Placeholder name.
 	 */
-	private function infer_placeholder_from_context( $text, $blank_idx ) {
-		$lower = strtolower( (string) $text );
+	private function infer_placeholder_from_context( $before, $after, $blank_idx ) {
+		$before = $this->normalize_context_text( $before );
+		$after  = $this->normalize_context_text( $after );
 
-		$rules = array(
-			'arrendatario'  => 'ARRENDATARIO',
-			'inquilino'     => 'ARRENDATARIO',
-			'arrendador'    => 'ARRENDADOR',
-			'propietario'   => 'ARRENDADOR',
-			'cedula'        => 0 === $blank_idx ? 'CEDULA_ARRENDADOR' : 'CEDULA_ARRENDATARIO',
-			'canon'         => 'CANON',
-			'valor'         => 'CANON',
-			'renta'         => 'CANON',
-			'desde'         => 'FECHA_INICIO',
-			'inicio'        => 'FECHA_INICIO',
-			'hasta'         => 'FECHA_FIN',
-			'fin del'       => 'FECHA_FIN',
-			'direccion'     => 'DIRECCION',
-			'inmueble'      => 'INMUEBLE',
-			'propiedad'     => 'INMUEBLE',
-			'garantia'      => 'GARANTIA',
-			'telefono'      => 'TELEFONO',
-			'email'         => 'EMAIL',
-			'correo'        => 'EMAIL',
-			'referencia'    => 0 === $blank_idx ? 'REFERENCIA_1' : 'REFERENCIA_2',
-		);
+		if ( false !== strpos( $before, 'como arrendador, el senor' ) ) {
+			return 'ARRENDADOR';
+		}
 
-		foreach ( $rules as $keyword => $placeholder ) {
-			if ( false !== strpos( $lower, $keyword ) ) {
-				return $placeholder;
-			}
+		if ( false !== strpos( $before, 'como arrendatario el senor' ) ) {
+			return 'ARRENDATARIO';
+		}
+
+		if ( false !== strpos( $before, 'el senor' ) && false !== strpos( $after, 'propietario de' ) ) {
+			return 'ARRENDADOR';
+		}
+
+		if ( false !== strpos( $before, 'propietario de' ) && false !== strpos( $after, 'situada en' ) ) {
+			return 'INMUEBLE';
+		}
+
+		if ( false !== strpos( $before, 'situada en' ) && false !== strpos( $after, 'de esta ciudad' ) ) {
+			return 'DIRECCION';
+		}
+
+		if ( false !== strpos( $after, 'en calidad de arrendador' ) ) {
+			return 'ARRENDADOR';
+		}
+
+		if ( false !== strpos( $before, 'da y entrega en arrendamiento al senor' ) ) {
+			return 'ARRENDATARIO';
+		}
+
+		if ( false !== strpos( $after, 'consignado con el numero' ) ) {
+			return 'CAMPO_' . $blank_idx;
+		}
+
+		if ( false !== strpos( $before, 'consignado con el numero' ) ) {
+			return 'CEDULA_ARRENDATARIO';
+		}
+
+		if ( false !== strpos( $before, 'ubicado en' ) && false !== strpos( $after, 'antes descrita' ) ) {
+			return 'INMUEBLE';
+		}
+
+		if ( false !== strpos( $before, 'calle' ) ) {
+			return 'DIRECCION';
+		}
+
+		if ( false !== strpos( $before, 'arrendatario senor' ) ) {
+			return 'ARRENDATARIO';
+		}
+
+		if ( false !== strpos( $before, 'dedicarlo a' ) ) {
+			return 'CAMPO_' . $blank_idx;
+		}
+
+		if ( false !== strpos( $before, 'y da en garantia, la cantidad de' ) ) {
+			return 'GARANTIA';
+		}
+
+		if ( false !== strpos( $before, 'la cantidad de' ) && false !== strpos( $after, 'usd por mes' ) ) {
+			return 'CANON';
+		}
+
+		if ( false !== strpos( $before, 'siguientes accesorios' ) ) {
+			return 'CAMPO_' . $blank_idx;
+		}
+
+		if ( false !== strpos( $before, 'chapas con' ) && false !== strpos( $after, 'llaves' ) ) {
+			return 'CAMPO_' . $blank_idx;
+		}
+
+		if ( false !== strpos( $before, 'servicios basico' ) ) {
+			return 'CAMPO_' . $blank_idx;
+		}
+
+		if ( false !== strpos( $before, 'jueces competentes de la ciudad de' ) ) {
+			return 'CAMPO_' . $blank_idx;
 		}
 
 		return 'CAMPO_' . $blank_idx;
 	}
 
 	/**
-	 * Replaces blank sequences (3+ underscores) inside <w:t> XML elements with
+	 * Extracts flat readable text from DOCX XML by concatenating text runs.
+	 *
+	 * @param string $doc_xml Raw XML.
+	 * @return string
+	 */
+	private function extract_flat_text_from_doc_xml( $doc_xml ) {
+		$text = '';
+		if ( preg_match_all( '/<w:t(?:[^>]*)>([^<]*)<\/w:t>/', (string) $doc_xml, $matches ) ) {
+			$text = implode( '', $matches[1] );
+		}
+
+		return html_entity_decode( (string) $text, ENT_QUOTES | ENT_XML1, 'UTF-8' );
+	}
+
+	/**
+	 * Normalizes nearby context text for reliable rule matching.
+	 *
+	 * @param string $text Raw text.
+	 * @return string
+	 */
+	private function normalize_context_text( $text ) {
+		$text = (string) $text;
+		if ( function_exists( 'remove_accents' ) ) {
+			$text = remove_accents( $text );
+		}
+
+		$text = strtolower( $text );
+		$text = preg_replace( '/\s+/', ' ', $text );
+
+		return trim( (string) $text );
+	}
+
+	/**
+	 * Replaces blank sequences (underscores or long dots) inside <w:t> XML elements with
 	 * ${PLACEHOLDER} tokens, consuming the ordered placeholder list in document order.
 	 *
 	 * @param string       $doc_xml              Raw word/document.xml.
@@ -423,7 +474,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 				$close   = $m[3];
 
 				$new_content = (string) preg_replace_callback(
-					'/_{3,}/',
+					'/_{3,}|\.{5,}/',
 					function () use ( &$counter, $ordered_placeholders ) {
 						$ph = isset( $ordered_placeholders[ $counter ] )
 							? $ordered_placeholders[ $counter ]

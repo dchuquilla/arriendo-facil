@@ -339,6 +339,14 @@ class Arriendo_Facil_DOCX_Template_Processor {
 		$before = $this->normalize_context_text( $before );
 		$after  = $this->normalize_context_text( $after );
 
+		if ( false !== strpos( $after, 'que en adelante se denominara el arrendador' ) ) {
+			return 'ARRENDADOR';
+		}
+
+		if ( false !== strpos( $after, 'que en adelante se denominara el arrendatario' ) ) {
+			return 'ARRENDATARIO';
+		}
+
 		if ( false !== strpos( $before, 'como arrendador, el senor' ) ) {
 			return 'ARRENDADOR';
 		}
@@ -385,6 +393,10 @@ class Arriendo_Facil_DOCX_Template_Processor {
 
 		if ( false !== strpos( $before, 'arrendatario senor' ) ) {
 			return 'ARRENDATARIO';
+		}
+
+		if ( false !== strpos( $before, 'plazo de este contrato es de' ) && false !== strpos( $after, 'anos' ) ) {
+			return 'CAMPO_' . $blank_idx;
 		}
 
 		if ( false !== strpos( $before, 'dedicarlo a' ) ) {

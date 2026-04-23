@@ -564,6 +564,23 @@ class Arriendo_Facil_Owner_Contact {
 					delete_post_meta( (int) $attachment_id, '_af_owner_contract_placeholders' );
 				}
 
+				// Process owner template: detect blank fields, inject ${PLACEHOLDER} markers,
+				// and save a processed DOCX copy used by PHPWord TemplateProcessor at contract
+				// generation time. This runs once per upload so generation is always reliable.
+				if ( class_exists( 'Arriendo_Facil_DOCX_Template_Processor' ) ) {
+					$raw_tpl_path = get_attached_file( (int) $attachment_id );
+					if ( $raw_tpl_path && file_exists( $raw_tpl_path ) ) {
+						$ai_svc        = class_exists( 'Arriendo_Facil_AI_Service' ) ? new Arriendo_Facil_AI_Service() : null;
+						$tpl_processor = new Arriendo_Facil_DOCX_Template_Processor();
+						$processed_path = $tpl_processor->process_owner_template( $raw_tpl_path, $ai_svc );
+						if ( '' !== $processed_path ) {
+							update_post_meta( (int) $attachment_id, '_af_processed_template_path', $processed_path );
+						} else {
+							delete_post_meta( (int) $attachment_id, '_af_processed_template_path' );
+						}
+					}
+				}
+
 				$r2_upload = $this->upload_attachment_to_r2( (int) $attachment_id, (int) $contact_id, (string) $optional_contract_doc_type, $r2_config );
 				if ( is_wp_error( $r2_upload ) ) {
 					$this->last_upload_error = $r2_upload;

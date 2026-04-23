@@ -1384,33 +1384,38 @@ class Arriendo_Facil_Admin {
 		for ( $i = 0; $i < $blank_count; $i++ ) {
 			$before = isset( $parts[ $i ] ) ? (string) $parts[ $i ] : '';
 			$after  = isset( $parts[ $i + 1 ] ) ? (string) $parts[ $i + 1 ] : '';
-			$ctx = strtr(
-				mb_strtolower( $before . ' ' . $after ),
+			$before_norm = strtr(
+				mb_strtolower( $before ),
 				array( 'á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ü' => 'u', 'ñ' => 'n' )
 			);
+			$after_norm = strtr(
+				mb_strtolower( $after ),
+				array( 'á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ü' => 'u', 'ñ' => 'n' )
+			);
+			$ctx = $before_norm . ' ' . $after_norm;
 
 			$key = '';
-			if ( false !== strpos( $ctx, 'consignado con el numero' ) || false !== strpos( $ctx, 'numero de' ) || false !== strpos( $ctx, 'cedula' ) ) {
-				$key = 'guest_id_number';
-			} elseif ( false !== strpos( $ctx, 'ubicado en' ) || false !== strpos( $ctx, 'situada en' ) || false !== strpos( $ctx, 'calle' ) || false !== strpos( $ctx, 'direccion' ) ) {
-				$key = 'accommodation_address';
-			} elseif ( false !== strpos( $ctx, 'propietario de' ) || false !== strpos( $ctx, 'local, materia de arriendo' ) || false !== strpos( $ctx, 'dedicarlo a' ) ) {
+			if ( preg_match( '/senor\s*$/u', trim( $before_norm ) ) && false !== strpos( $after_norm, 'arrendador' ) ) {
+				$key = 'owner_name';
+			} elseif ( preg_match( '/senor\s*$/u', trim( $before_norm ) ) && false !== strpos( $after_norm, 'arrendatario' ) ) {
+				$key = 'guest_name';
+			} elseif ( false !== strpos( $before_norm, 'como arrendador, el senor' ) ) {
+				$key = 'owner_name';
+			} elseif ( false !== strpos( $before_norm, 'como arrendatario el senor' ) || false !== strpos( $before_norm, 'al senor' ) || false !== strpos( $before_norm, 'arrendatario senor' ) ) {
+				$key = 'guest_name';
+			} elseif ( false !== strpos( $before_norm, 'propietario de' ) ) {
 				$key = 'accommodation_title';
-			} elseif ( false !== strpos( $ctx, 'cantidad de' ) && false !== strpos( $ctx, 'garantia' ) ) {
+			} elseif ( false !== strpos( $before_norm, 'situada en' ) || false !== strpos( $before_norm, 'ubicado en' ) || false !== strpos( $before_norm, 'calle' ) || false !== strpos( $before_norm, 'direccion' ) ) {
+				$key = 'accommodation_address';
+			} elseif ( false !== strpos( $before_norm, 'consignado con el numero' ) || false !== strpos( $after_norm, 'consignado con el numero' ) || false !== strpos( $before_norm, 'cedula' ) || false !== strpos( $after_norm, 'cedula' ) ) {
+				$key = 'guest_id_number';
+			} elseif ( false !== strpos( $before_norm, 'cantidad de' ) && ( false !== strpos( $after_norm, 'garantia' ) || false !== strpos( $after_norm, 'usd que obliga' ) ) ) {
 				$key = 'guarantee_text';
-			} elseif ( false !== strpos( $ctx, 'usd por mes' ) || false !== strpos( $ctx, 'canon' ) || false !== strpos( $ctx, 'valor' ) ) {
+			} elseif ( false !== strpos( $before_norm, 'cantidad de' ) && false !== strpos( $after_norm, 'usd por mes' ) ) {
 				$key = 'monthly_rent';
-			} elseif ( false !== strpos( $ctx, 'plazo de este contrato es de' ) || false !== strpos( $ctx, 'anos' ) ) {
+			} elseif ( false !== strpos( $before_norm, 'plazo de este contrato es de' ) && false !== strpos( $after_norm, 'anos' ) ) {
 				$key = 'rental_years';
-			} elseif ( false !== strpos( $ctx, 'de' ) && false !== strpos( $ctx, 'del' ) ) {
-				if ( 0 === $i ) {
-					$key = 'current_day';
-				} elseif ( 1 === $i ) {
-					$key = 'current_month';
-				} else {
-					$key = 'current_year';
-				}
-			} elseif ( false !== strpos( $ctx, 'arrendatario' ) || false !== strpos( $ctx, 'senor' ) || false !== strpos( $ctx, 'como arrendatario' ) ) {
+			} elseif ( false !== strpos( $ctx, 'arrendatario' ) && false !== strpos( $ctx, 'senor' ) ) {
 				$key = 'guest_name';
 			}
 

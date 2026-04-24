@@ -402,6 +402,27 @@ class Arriendo_Facil_DOCX_Template_Processor {
 	private function infer_placeholder_from_context( $before, $after, $blank_idx ) {
 		$before = $this->normalize_context_text( $before );
 		$after  = $this->normalize_context_text( $after );
+		$context = trim( $before . ' ' . $after );
+
+		if ( 1 === preg_match( '/como\s+arrendatario\s+el\s+senor\s*$/', $before ) ) {
+			return 'ARRENDATARIO';
+		}
+
+		if ( 1 === preg_match( '/y\s+el\s+senor\s*$/', $before ) && false !== strpos( $after, 'arrendatario' ) ) {
+			return 'ARRENDATARIO';
+		}
+
+		if ( 1 === preg_match( '/arrendamiento\s+al\s+senor\s*$/', $before ) ) {
+			return 'ARRENDATARIO';
+		}
+
+		if ( false !== strpos( $before, 'arrendamiento al senor' ) && false !== strpos( $after, 'consignado con el numero' ) ) {
+			return 'ARRENDATARIO';
+		}
+
+		if ( false !== strpos( $after, 'propietario de' ) ) {
+			return 'ARRENDADOR';
+		}
 
 		if ( false !== strpos( $after, 'que en adelante se denominara el arrendador' ) ) {
 			return 'ARRENDADOR';
@@ -491,7 +512,80 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			return 'CAMPO_' . $blank_idx;
 		}
 
+		$keyword_guess = $this->infer_placeholder_by_keywords( $context );
+		if ( '' !== $keyword_guess ) {
+			return $keyword_guess;
+		}
+
 		return 'CAMPO_' . $blank_idx;
+	}
+
+	/**
+	 * Performs a conservative keyword-based inference for unknown blank contexts.
+	 *
+	 * @param string $context Normalized local context around the blank.
+	 * @return string Placeholder name or empty string if uncertain.
+	 */
+	private function infer_placeholder_by_keywords( $context ) {
+		$context = (string) $context;
+		if ( '' === $context ) {
+			return '';
+		}
+
+		if ( false !== strpos( $context, 'arrendador' ) && false !== strpos( $context, 'arrendatario' ) ) {
+			return '';
+		}
+
+		$rules = array(
+			'CEDULA_ARRENDATARIO' => array( 'cedula', 'identificacion', 'documento', 'arrendatario', 'inquilino' ),
+			'CEDULA_ARRENDADOR'   => array( 'cedula', 'identificacion', 'documento', 'arrendador', 'propietario' ),
+			'ARRENDATARIO'        => array( 'arrendatario', 'inquilino', 'locatario', 'tomador' ),
+			'ARRENDADOR'          => array( 'arrendador', 'propietario', 'dador', 'locador' ),
+			'CANON'               => array( 'canon', 'renta', 'mensualidad', 'valor', 'monto', 'precio', 'usd', 'dolar' ),
+			'FECHA_INICIO'        => array( 'fecha de inicio', 'iniciara', 'inicio', 'desde', 'comienza', 'vigencia desde' ),
+			'FECHA_FIN'           => array( 'fecha de fin', 'hasta', 'termina', 'vencimiento', 'fin de contrato' ),
+			'DIRECCION'           => array( 'direccion', 'calle', 'avenida', 'sector', 'parroquia', 'canton', 'provincia', 'ubicada en' ),
+			'INMUEBLE'            => array( 'inmueble', 'departamento', 'casa', 'local', 'oficina', 'propiedad', 'predio', 'bien' ),
+			'GARANTIA'            => array( 'garantia', 'deposito', 'fianza', 'caucion' ),
+			'TELEFONO'            => array( 'telefono', 'celular', 'movil', 'contacto' ),
+			'EMAIL'               => array( 'correo', 'email', 'e-mail' ),
+			'FECHA_ACTUAL'        => array( 'fecha actual', 'suscribe', 'firma en', 'celebrado en' ),
+		);
+
+		$scores = array();
+		foreach ( $rules as $placeholder => $keywords ) {
+			$score = 0;
+			foreach ( $keywords as $keyword ) {
+				if ( false !== strpos( $context, $keyword ) ) {
+					$score++;
+				}
+			}
+
+			if ( $score > 0 ) {
+				$scores[ $placeholder ] = $score;
+			}
+		}
+
+		if ( empty( $scores ) ) {
+			return '';
+		}
+
+		arsort( $scores );
+		$top_keys   = array_keys( $scores );
+		$top_key    = isset( $top_keys[0] ) ? (string) $top_keys[0] : '';
+		$top_score  = isset( $scores[ $top_key ] ) ? (int) $scores[ $top_key ] : 0;
+		$next_key   = isset( $top_keys[1] ) ? (string) $top_keys[1] : '';
+		$next_score = '' !== $next_key && isset( $scores[ $next_key ] ) ? (int) $scores[ $next_key ] : 0;
+
+		if ( $top_score < 2 ) {
+			return '';
+		}
+
+		if ( $top_score === $next_score ) {
+			return '';
+		}
+
+		return $top_key;
 	}
 
 	/**
@@ -521,8 +615,10 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			$text = remove_accents( $text );
 		}
 
+		$text = str_replace( "\xC2\xA0", ' ', $text );
 		$text = strtolower( $text );
-		$text = preg_replace( '/\s+/', ' ', $text );
+		$text = str_replace( array( '~', "'", '"' ), '', $text );
+		$text = preg_replace( '/\s+/u', ' ', $text );
 
 		return trim( (string) $text );
 	}
@@ -538,6 +634,11 @@ class Arriendo_Facil_DOCX_Template_Processor {
 	private function inject_placeholders( $doc_xml, array $ordered_placeholders ) {
 		if ( empty( $ordered_placeholders ) ) {
 			return $doc_xml;
+		}
+
+		$dom_result = $this->inject_placeholders_with_dom( $doc_xml, $ordered_placeholders );
+		if ( '' !== $dom_result ) {
+			return $dom_result;
 		}
 
 		$counter = 0;
@@ -565,6 +666,143 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			},
 			(string) $doc_xml
 		);
+	}
+
+	/**
+	 * Injects placeholders by traversing text runs with DOM so blank sequences
+	 * split across multiple <w:t> nodes are still replaced.
+	 *
+	 * @param string       $doc_xml              Raw word/document.xml.
+	 * @param list<string> $ordered_placeholders Placeholder names in document order.
+	 * @return string Updated XML or empty string when DOM path cannot be applied.
+	 */
+	private function inject_placeholders_with_dom( $doc_xml, array $ordered_placeholders ) {
+		if ( ! class_exists( 'DOMDocument' ) || ! class_exists( 'DOMXPath' ) ) {
+			return '';
+		}
+
+		$dom = new DOMDocument();
+		if ( ! @$dom->loadXML( (string) $doc_xml, LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING ) ) {
+			return '';
+		}
+
+		$xpath = new DOMXPath( $dom );
+		$xpath->registerNamespace( 'w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main' );
+		$text_nodes = $xpath->query( '//w:t' );
+
+		if ( ! $text_nodes || 0 === $text_nodes->length ) {
+			return '';
+		}
+
+		$nodes = array();
+		foreach ( $text_nodes as $node ) {
+			$nodes[] = $node;
+		}
+
+		$entries = array();
+		$nodes_chars = array();
+		foreach ( $nodes as $node_index => $node ) {
+			$text = (string) $node->textContent;
+			$chars = preg_split( '//u', $text, -1, PREG_SPLIT_NO_EMPTY );
+			if ( ! is_array( $chars ) ) {
+				$chars = array();
+			}
+
+			$nodes_chars[ $node_index ] = $chars;
+			foreach ( $chars as $char_index => $char ) {
+				$entries[] = array(
+					'node' => $node_index,
+					'char' => $char_index,
+					'text' => $char,
+				);
+			}
+		}
+
+		if ( empty( $entries ) ) {
+			return '';
+		}
+
+		$replace_at = array();
+		$remove_at  = array();
+		$counter    = 0;
+		$total      = count( $entries );
+		$i          = 0;
+
+		while ( $i < $total ) {
+			$char = $entries[ $i ]['text'];
+			if ( ! $this->is_blank_marker_char( $char ) ) {
+				$i++;
+				continue;
+			}
+
+			$start      = $i;
+			$blank_count = 1;
+			$j          = $i + 1;
+
+			while ( $j < $total ) {
+				$next_char = $entries[ $j ]['text'];
+				if ( $this->is_blank_marker_char( $next_char ) ) {
+					$blank_count++;
+					$j++;
+					continue;
+				}
+
+				if ( preg_match( '/\s/u', $next_char ) ) {
+					$j++;
+					continue;
+				}
+
+				break;
+			}
+
+			if ( $blank_count >= 3 ) {
+				$placeholder = isset( $ordered_placeholders[ $counter ] )
+					? (string) $ordered_placeholders[ $counter ]
+					: ( 'CAMPO_' . $counter );
+				$counter++;
+				$replace_at[ $start ] = '${' . $placeholder . '}';
+				for ( $k = $start; $k < $j; $k++ ) {
+					$remove_at[ $k ] = true;
+				}
+				$remove_at[ $start ] = false;
+			}
+
+			$i = $j;
+		}
+
+		if ( empty( $replace_at ) ) {
+			return '';
+		}
+
+		foreach ( $entries as $entry_index => $entry ) {
+			$node_index = (int) $entry['node'];
+			$char_index = (int) $entry['char'];
+
+			if ( isset( $replace_at[ $entry_index ] ) ) {
+				$nodes_chars[ $node_index ][ $char_index ] = $replace_at[ $entry_index ];
+				continue;
+			}
+
+			if ( ! empty( $remove_at[ $entry_index ] ) ) {
+				$nodes_chars[ $node_index ][ $char_index ] = '';
+			}
+		}
+
+		foreach ( $nodes as $node_index => $node ) {
+			$node->nodeValue = implode( '', $nodes_chars[ $node_index ] );
+		}
+
+		return (string) $dom->saveXML( $dom->documentElement );
+	}
+
+	/**
+	 * Checks whether a character is a supported blank marker.
+	 *
+	 * @param string $char One UTF-8 character.
+	 * @return bool
+	 */
+	private function is_blank_marker_char( $char ) {
+		return '_' === $char || '.' === $char || '…' === $char;
 	}
 
 	// ─────────────────────────────────────────────────────────────────────────

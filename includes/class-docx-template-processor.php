@@ -170,6 +170,22 @@ class Arriendo_Facil_DOCX_Template_Processor {
 		}
 
 		if ( ! class_exists( '\PhpOffice\PhpWord\TemplateProcessor' ) ) {
+			$autoload_candidates = array(
+				defined( 'ARRIENDO_FACIL_PLUGIN_DIR' ) ? trailingslashit( ARRIENDO_FACIL_PLUGIN_DIR ) . 'vendor/autoload.php' : '',
+				dirname( __DIR__ ) . '/vendor/autoload.php',
+			);
+
+			foreach ( $autoload_candidates as $autoload_file ) {
+				if ( $autoload_file && file_exists( $autoload_file ) ) {
+					require_once $autoload_file;
+					if ( class_exists( '\PhpOffice\PhpWord\TemplateProcessor' ) ) {
+						break;
+					}
+				}
+			}
+		}
+
+		if ( ! class_exists( '\PhpOffice\PhpWord\TemplateProcessor' ) ) {
 			error_log( 'Arriendo Facil DOCX processor fill_template: PhpOffice\PhpWord not available.' );
 			return false;
 		}

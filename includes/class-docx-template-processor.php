@@ -329,7 +329,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			return $ordered;
 		}
 
-		if ( ! preg_match_all( '/_{3,}|\.{5,}|…{3,}/u', $flat_text, $matches, PREG_OFFSET_CAPTURE ) ) {
+		if ( ! preg_match_all( '/_{3,}|\.{5,}|…{3,}|\t+/u', $flat_text, $matches, PREG_OFFSET_CAPTURE ) ) {
 			return $ordered;
 		}
 
@@ -464,6 +464,22 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			return 'CAMPO_' . $blank_idx;
 		}
 
+		if ( false !== strpos( $after, 'con cedula de ciudadania n' ) ) {
+			if ( false !== strpos( $before, 'srta' ) || false !== strpos( $before, 'sra' ) || false !== strpos( $before, 'arrendamiento a la' ) ) {
+				return 'ARRENDATARIO';
+			}
+
+			return 'ARRENDADOR';
+		}
+
+		if ( false !== strpos( $before, 'cedula de ciudadania n' ) && false !== strpos( $after, 'arrendador' ) ) {
+			return 'CEDULA_ARRENDADOR';
+		}
+
+		if ( false !== strpos( $before, 'cedula de ciudadania n' ) && false !== strpos( $after, 'arrendatario' ) ) {
+			return 'CEDULA_ARRENDATARIO';
+		}
+
 		if ( false !== strpos( $before, 'consignado con el numero' ) ) {
 			return 'CEDULA_ARRENDATARIO';
 		}
@@ -595,12 +611,18 @@ class Arriendo_Facil_DOCX_Template_Processor {
 	 * @return string
 	 */
 	private function extract_flat_text_from_doc_xml( $doc_xml ) {
-		$text = '';
-		if ( preg_match_all( '/<w:t(?:[^>]*)>([^<]*)<\/w:t>/', (string) $doc_xml, $matches ) ) {
-			$text = implode( '', $matches[1] );
+		$chunks = array();
+		if ( preg_match_all( '/<w:t(?:[^>]*)>([^<]*)<\/w:t>|<w:tab(?:[^>]*)\/>/u', (string) $doc_xml, $matches, PREG_SET_ORDER ) ) {
+			foreach ( $matches as $match ) {
+				if ( isset( $match[1] ) && '' !== $match[1] ) {
+					$chunks[] = html_entity_decode( (string) $match[1], ENT_QUOTES | ENT_XML1, 'UTF-8' );
+				} else {
+					$chunks[] = "\t";
+				}
+			}
 		}
 
-		return html_entity_decode( (string) $text, ENT_QUOTES | ENT_XML1, 'UTF-8' );
+		return implode( '', $chunks );
 	}
 
 	/**
@@ -688,7 +710,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 
 		$xpath = new DOMXPath( $dom );
 		$xpath->registerNamespace( 'w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main' );
-		$text_nodes = $xpath->query( '//w:t' );
+		$text_nodes = $xpath->query( '//w:t|//w:tab' );
 
 		if ( ! $text_nodes || 0 === $text_nodes->length ) {
 			return '';
@@ -701,7 +723,21 @@ class Arriendo_Facil_DOCX_Template_Processor {
 
 		$entries = array();
 		$nodes_chars = array();
+		$node_kind = array();
 		foreach ( $nodes as $node_index => $node ) {
+			$local_name = (string) $node->localName;
+			if ( 'tab' === $local_name ) {
+				$node_kind[ $node_index ] = 'tab';
+				$entries[] = array(
+					'node' => $node_index,
+					'char' => 0,
+					'text' => "\t",
+					'kind' => 'tab',
+				);
+				continue;
+			}
+
+			$node_kind[ $node_index ] = 'text';
 			$text = (string) $node->textContent;
 			$chars = preg_split( '//u', $text, -1, PREG_SPLIT_NO_EMPTY );
 			if ( ! is_array( $chars ) ) {
@@ -714,6 +750,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 					'node' => $node_index,
 					'char' => $char_index,
 					'text' => $char,
+					'kind' => 'text',
 				);
 			}
 		}
@@ -724,6 +761,8 @@ class Arriendo_Facil_DOCX_Template_Processor {
 
 		$replace_at = array();
 		$remove_at  = array();
+		$tab_replace_nodes = array();
+		$tab_remove_nodes  = array();
 		$counter    = 0;
 		$total      = count( $entries );
 		$i          = 0;
@@ -755,7 +794,10 @@ class Arriendo_Facil_DOCX_Template_Processor {
 				break;
 			}
 
-			if ( $blank_count >= 3 ) {
+			$start_char = isset( $entries[ $start ]['text'] ) ? (string) $entries[ $start ]['text'] : '';
+			$min_count  = "\t" === $start_char ? 1 : 3;
+
+			if ( $blank_count >= $min_count ) {
 				$placeholder = isset( $ordered_placeholders[ $counter ] )
 					? (string) $ordered_placeholders[ $counter ]
 					: ( 'CAMPO_' . $counter );
@@ -777,6 +819,20 @@ class Arriendo_Facil_DOCX_Template_Processor {
 		foreach ( $entries as $entry_index => $entry ) {
 			$node_index = (int) $entry['node'];
 			$char_index = (int) $entry['char'];
+			$kind       = isset( $entry['kind'] ) ? (string) $entry['kind'] : 'text';
+
+			if ( 'tab' === $kind ) {
+				if ( isset( $replace_at[ $entry_index ] ) ) {
+					$tab_replace_nodes[ $node_index ] = (string) $replace_at[ $entry_index ];
+					continue;
+				}
+
+				if ( ! empty( $remove_at[ $entry_index ] ) ) {
+					$tab_remove_nodes[ $node_index ] = true;
+				}
+
+				continue;
+			}
 
 			if ( isset( $replace_at[ $entry_index ] ) ) {
 				$nodes_chars[ $node_index ][ $char_index ] = $replace_at[ $entry_index ];
@@ -789,7 +845,31 @@ class Arriendo_Facil_DOCX_Template_Processor {
 		}
 
 		foreach ( $nodes as $node_index => $node ) {
-			$node->nodeValue = implode( '', $nodes_chars[ $node_index ] );
+			if ( isset( $node_kind[ $node_index ] ) && 'text' === $node_kind[ $node_index ] ) {
+				$node->nodeValue = implode( '', $nodes_chars[ $node_index ] );
+			}
+		}
+
+		foreach ( $nodes as $node_index => $node ) {
+			if ( ! isset( $node_kind[ $node_index ] ) || 'tab' !== $node_kind[ $node_index ] ) {
+				continue;
+			}
+
+			$parent = $node->parentNode;
+			if ( ! $parent ) {
+				continue;
+			}
+
+			if ( isset( $tab_replace_nodes[ $node_index ] ) ) {
+				$text_node = $dom->createElementNS( 'http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'w:t' );
+				$text_node->appendChild( $dom->createTextNode( $tab_replace_nodes[ $node_index ] ) );
+				$parent->replaceChild( $text_node, $node );
+				continue;
+			}
+
+			if ( isset( $tab_remove_nodes[ $node_index ] ) ) {
+				$parent->removeChild( $node );
+			}
 		}
 
 		return (string) $dom->saveXML( $dom->documentElement );
@@ -802,7 +882,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 	 * @return bool
 	 */
 	private function is_blank_marker_char( $char ) {
-		return '_' === $char || '.' === $char || '…' === $char;
+		return '_' === $char || '.' === $char || '…' === $char || "\t" === $char;
 	}
 
 	// ─────────────────────────────────────────────────────────────────────────

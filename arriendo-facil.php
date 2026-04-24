@@ -17,6 +17,11 @@ define( 'ARRIENDO_FACIL_VERSION', '1.0.0' );
 define( 'ARRIENDO_FACIL_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ARRIENDO_FACIL_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
+$af_composer_autoload = ARRIENDO_FACIL_PLUGIN_DIR . 'vendor/autoload.php';
+if ( file_exists( $af_composer_autoload ) ) {
+	require_once $af_composer_autoload;
+}
+
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-activator.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-cleaning-service.php';

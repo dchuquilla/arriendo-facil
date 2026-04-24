@@ -589,6 +589,9 @@ class Arriendo_Facil_Guest {
 		$document_url = '';
 		if ( $owner_template_exists ) {
 			$document_url = $this->create_filled_contract_from_owner_template( $lease_id, $owner_contract_example, $ai_payload );
+			if ( '' === $document_url && isset( $owner_contract_example['url'] ) && is_string( $owner_contract_example['url'] ) ) {
+				$document_url = esc_url_raw( (string) $owner_contract_example['url'] );
+			}
 		}
 
 		$generated_contract_text = '';
@@ -628,7 +631,7 @@ class Arriendo_Facil_Guest {
 			$document_url = esc_url_raw( $document_result['document_url'] );
 		}
 
-		if ( '' === $document_url && '' !== $generated_contract_text ) {
+		if ( '' === $document_url && ! $owner_template_exists && '' !== $generated_contract_text ) {
 			try {
 				$generated_file_url = $this->create_generated_contract_file( $lease_id, $generated_contract_text, $ai_payload );
 				if ( $generated_file_url ) {
@@ -639,7 +642,7 @@ class Arriendo_Facil_Guest {
 			}
 		}
 
-		if ( '' === $document_url && '' !== $generated_contract_text ) {
+		if ( '' === $document_url && ! $owner_template_exists && '' !== $generated_contract_text ) {
 			$last_resort_url = $this->create_last_resort_contract_file( $lease_id, $generated_contract_text );
 			if ( $last_resort_url ) {
 				$document_url = $last_resort_url;

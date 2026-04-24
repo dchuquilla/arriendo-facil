@@ -405,6 +405,11 @@ class Arriendo_Facil_Lease {
 			return true;
 		}
 
+		$owner_template_url = $this->get_owner_template_url_for_lease( $lease );
+		if ( '' !== $owner_template_url ) {
+			return $this->attach_document( $lease_id, $owner_template_url );
+		}
+
 		$fallback_text = $this->build_minimal_fallback_contract_text( $lease );
 
 		$uploads = wp_upload_dir();
@@ -518,6 +523,37 @@ class Arriendo_Facil_Lease {
 			error_log( 'Arriendo Facil owner-template auto-attach failed: ' . $throwable->getMessage() );
 			return false;
 		}
+	}
+
+	/**
+	 * Returns the owner template URL for this lease when available.
+	 *
+	 * @param object $lease Lease row object.
+	 * @return string
+	 */
+	private function get_owner_template_url_for_lease( $lease ) {
+		if ( ! $lease || ! class_exists( 'Arriendo_Facil_Guest' ) ) {
+			return '';
+		}
+
+		$accommodation_id = isset( $lease->accommodation_id ) ? absint( $lease->accommodation_id ) : 0;
+		if ( ! $accommodation_id ) {
+			return '';
+		}
+
+		try {
+			$guest_service = new Arriendo_Facil_Guest();
+			$ref_get_context = new ReflectionMethod( 'Arriendo_Facil_Guest', 'get_owner_contract_example_context' );
+			$ref_get_context->setAccessible( true );
+			$owner_template = $ref_get_context->invoke( $guest_service, $accommodation_id );
+			if ( is_array( $owner_template ) && isset( $owner_template['url'] ) && is_string( $owner_template['url'] ) ) {
+				return esc_url_raw( (string) $owner_template['url'] );
+			}
+		} catch ( Throwable $throwable ) {
+			error_log( 'Arriendo Facil owner-template URL lookup failed: ' . $throwable->getMessage() );
+		}
+
+		return '';
 	}
 
 	/**

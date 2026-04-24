@@ -262,12 +262,16 @@ class Arriendo_Facil_Admin {
 		}
 
 		$document_url = '';
+		$owner_template = array();
 
 		// When owner template exists, copy the original DOCX and fill tokens in-place
 		// to preserve all formatting, styles, tables, etc.
 		if ( $owner_template_exists ) {
 			$owner_template = $this->get_owner_contract_example_context( isset( $lease->accommodation_id ) ? absint( $lease->accommodation_id ) : 0 );
 			$document_url   = $this->create_filled_contract_from_owner_template( $lease_id, $owner_template, $ai_payload );
+			if ( '' === $document_url && isset( $owner_template['url'] ) && is_string( $owner_template['url'] ) ) {
+				$document_url = esc_url_raw( (string) $owner_template['url'] );
+			}
 		}
 
 		// Text-based fallback only when the DOCX copy did not succeed.
@@ -302,11 +306,11 @@ class Arriendo_Facil_Admin {
 				}
 			}
 
-			if ( '' === $document_url && '' !== $generated_contract_text ) {
+			if ( '' === $document_url && ! $owner_template_exists && '' !== $generated_contract_text ) {
 				$document_url = $this->create_generated_contract_file( $lease_id, $generated_contract_text );
 			}
 
-			if ( '' === $document_url && '' !== $generated_contract_text ) {
+			if ( '' === $document_url && ! $owner_template_exists && '' !== $generated_contract_text ) {
 				$document_url = $this->create_last_resort_contract_file( $lease_id, $generated_contract_text );
 			}
 		}

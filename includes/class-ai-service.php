@@ -189,6 +189,25 @@ class Arriendo_Facil_AI_Service {
 	}
 
 	/**
+	 * Runs an agent-style mapping for DOCX blanks with stricter legal-template rules.
+	 *
+	 * @param array $line_context Context payload with blank occurrences and allowed keys.
+	 * @return array|WP_Error Response array with key 'line_map'.
+	 */
+	public function map_template_word_agent( array $line_context ) {
+		$payload = array(
+			'action' => 'map_template_word_agent',
+			'data'   => $line_context,
+		);
+
+		$response = $this->request( $payload );
+
+		$this->log( 'map_template_word_agent', $line_context, $response );
+
+		return $response;
+	}
+
+	/**
 	 * Sends a POST request to ChatGPT and expects JSON content in the response.
 	 *
 	 * @param array $payload Request payload.
@@ -435,6 +454,28 @@ class Arriendo_Facil_AI_Service {
 				. "CLAVES CANONICAS PERMITIDAS:\n"
 				. implode( ', ', isset( $data['allowed_canonical'] ) && is_array( $data['allowed_canonical'] ) ? $data['allowed_canonical'] : array() )
 				. "\n\nDATOS:\n"
+				. wp_json_encode( $data );
+		}
+
+		if ( 'map_template_word_agent' === $action ) {
+			return "### AGENT WORD: MAPEO DE BLANCOS DOCX ###\n"
+				. "Rol: Eres un agente experto en plantillas de contrato DOCX para arrendamiento en Ecuador.\n"
+				. "Objetivo: mapear cada blank a una sola clave canonica permitida sin reescribir el contrato.\n\n"
+				. "Reglas estrictas:\n"
+				. "1) No inventar: si no hay certeza alta, devolver \"\" para ese blank.\n"
+				. "2) No mezclar roles: arrendador != arrendatario.\n"
+				. "3) Priorizar senales fuertes de contexto:\n"
+				. "   - 'cedula'/'ciudadania' cerca del blank => owner_id_number o guest_id_number segun rol cercano.\n"
+				. "   - 'sr.'/'srta.'/'sra.' junto a rol => owner_name o guest_name segun texto legal.\n"
+				. "   - 'canon', 'usd por mes', 'renta' => monthly_rent.\n"
+				. "   - 'ubicada en', 'calle', 'direccion' => accommodation_address.\n"
+				. "   - 'inmueble', 'departamento', 'casa' => accommodation_title.\n"
+				. "4) Plantillas DOCX pueden tener blanks por tabs (\\t): tratarlos como campos válidos.\n"
+				. "5) Salida: SOLO JSON válido con forma exacta {\"line_map\": {\"blank_0\": [\"canonical_key\"], ...}}.\n"
+				. "6) canonical_key solo puede ser una de las permitidas abajo.\n\n"
+				. "Claves permitidas:\n"
+				. implode( ', ', isset( $data['allowed_canonical'] ) && is_array( $data['allowed_canonical'] ) ? $data['allowed_canonical'] : array() )
+				. "\n\nEntrada:\n"
 				. wp_json_encode( $data );
 		}
 

@@ -339,29 +339,58 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			$offset     = (int) $match[1];
 			$before     = substr( $flat_text, max( 0, $offset - 140 ), min( 140, $offset ) );
 			$after      = substr( $flat_text, $offset + strlen( $blank_text ), 180 );
+			$blank_type = 'other';
+			if ( false !== strpos( $blank_text, "\t" ) ) {
+				$blank_type = 'tab';
+			} elseif ( false !== strpos( $blank_text, '_' ) ) {
+				$blank_type = 'underscore';
+			} elseif ( false !== strpos( $blank_text, '.' ) || false !== strpos( $blank_text, '…' ) ) {
+				$blank_type = 'dots';
+			}
+
 			$ai_lines[] = array(
 				'id'          => 'blank_' . $blank_index,
 				'text'        => $before . ' <<<BLANK>>> ' . $after,
 				'blank_count' => 1,
+				'blank_type'  => $blank_type,
 			);
 		}
 
 		if ( $ai_service && ! empty( $ai_lines ) ) {
 			try {
-				$ai_result = $ai_service->map_template_line_blanks(
+				$agent_payload = array(
+					'contract_text'     => $flat_text,
+					'reservation_data'  => $reservation_data,
+					'lines'             => $ai_lines,
+					'allowed_canonical' => array_keys( self::CANONICAL_TO_PLACEHOLDER ),
+				);
+
+				if ( method_exists( $ai_service, 'map_template_word_agent' ) ) {
+					$agent_result = $ai_service->map_template_word_agent( $agent_payload );
+					if ( ! is_wp_error( $agent_result )
+						&& isset( $agent_result['line_map'] )
+						&& is_array( $agent_result['line_map'] )
+					) {
+						$ai_line_map = $agent_result['line_map'];
+					}
+				}
+
+				if ( empty( $ai_line_map ) ) {
+					$ai_result = $ai_service->map_template_line_blanks(
 					array(
 						'contract_text'     => $flat_text,
 						'reservation_data'  => $reservation_data,
 						'lines'             => $ai_lines,
 						'allowed_canonical' => array_keys( self::CANONICAL_TO_PLACEHOLDER ),
 					)
-				);
+					);
 
-				if ( ! is_wp_error( $ai_result )
-					&& isset( $ai_result['line_map'] )
-					&& is_array( $ai_result['line_map'] )
-				) {
-					$ai_line_map = $ai_result['line_map'];
+					if ( ! is_wp_error( $ai_result )
+						&& isset( $ai_result['line_map'] )
+						&& is_array( $ai_result['line_map'] )
+					) {
+						$ai_line_map = $ai_result['line_map'];
+					}
 				}
 			} catch ( \Throwable $throwable ) {
 				error_log( 'Arriendo Facil DOCX processor AI mapping exception: ' . $throwable->getMessage() );

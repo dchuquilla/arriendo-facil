@@ -727,8 +727,9 @@ class Arriendo_Facil_Guest {
 		// Always refresh the processed owner template from the original DOCX before fill.
 		// This avoids reusing older placeholder mappings that may have been inferred incorrectly.
 		if ( class_exists( 'Arriendo_Facil_DOCX_Template_Processor' ) ) {
+			$ai_svc        = class_exists( 'Arriendo_Facil_AI_Service' ) ? new Arriendo_Facil_AI_Service() : null;
 			$tpl_proc      = new Arriendo_Facil_DOCX_Template_Processor();
-			$processed_new = $tpl_proc->process_owner_template( $template_path, null, $processed_tpl_path );
+			$processed_new = $tpl_proc->process_owner_template( $template_path, $ai_svc, $processed_tpl_path, $payload );
 			if ( '' !== $processed_new && file_exists( $processed_new ) ) {
 				$processed_tpl_path = $processed_new;
 				update_post_meta( $attachment_id, '_af_processed_template_path', $processed_tpl_path );
@@ -748,23 +749,12 @@ class Arriendo_Facil_Guest {
 			}
 		}
 
-		// Phase 2: Legacy copy + in-place token/blank replacement (fallback).
 		if ( ! $phpword_success ) {
-			if ( ! @copy( $template_path, $file_path ) ) {
-				if ( $tmp_downloaded ) {
-					@unlink( $template_path );
-				}
-				error_log( 'Arriendo Facil owner-template generation failed: cannot copy template to destination. source=' . $template_path . ', dest=' . $file_path );
-				return '';
-			}
-
 			if ( $tmp_downloaded ) {
 				@unlink( $template_path );
 			}
-
-			$this->replace_docx_template_tokens_in_place( $file_path, $payload );
-			$this->replace_docx_semantic_label_blanks_in_place( $file_path, $owner_template, $payload );
-			$this->fill_docx_blank_fields_in_place( $file_path, $payload );
+			error_log( 'Arriendo Facil owner-template generation failed: PHPWord fill could not produce a contract from the owner template.' );
+			return '';
 		}
 
 		$mime_type    = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';

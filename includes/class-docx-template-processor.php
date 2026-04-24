@@ -90,9 +90,10 @@ class Arriendo_Facil_DOCX_Template_Processor {
 	 * @param string                          $source_path Absolute path to the original DOCX.
 	 * @param Arriendo_Facil_AI_Service|null  $ai_service  Optional AI service for blank detection.
 	 * @param string                          $output_path Destination path. Auto-generated if ''.
+	 * @param array<string,mixed>             $reservation_data Chatbot/lease data used to disambiguate blanks.
 	 * @return string Absolute path to the processed DOCX, or '' on failure.
 	 */
-	public function process_owner_template( $source_path, $ai_service = null, $output_path = '' ) {
+	public function process_owner_template( $source_path, $ai_service = null, $output_path = '', array $reservation_data = array() ) {
 		$source_path = (string) $source_path;
 
 		if ( '' === $source_path || ! file_exists( $source_path ) || ! class_exists( 'ZipArchive' ) ) {
@@ -135,7 +136,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 		}
 
 		// Step 4: Resolve blank occurrences → ordered placeholder names.
-		$ordered_placeholders = $this->resolve_blank_to_placeholder_order( (string) $doc_xml );
+		$ordered_placeholders = $this->resolve_blank_to_placeholder_order( (string) $doc_xml, $ai_service, $reservation_data );
 
 		// Step 5: Inject placeholders into the XML.
 		$doc_xml = $this->inject_placeholders( $doc_xml, $ordered_placeholders );
@@ -303,9 +304,10 @@ class Arriendo_Facil_DOCX_Template_Processor {
 	 * @param string $doc_xml Raw word/document.xml content.
 	 * @return list<string> One placeholder name per blank, in document order.
 	 */
-	private function resolve_blank_to_placeholder_order( $doc_xml ) {
+	private function resolve_blank_to_placeholder_order( $doc_xml, $ai_service = null, array $reservation_data = array() ) {
 		$flat_text = $this->extract_flat_text_from_doc_xml( $doc_xml );
 		$ordered   = array();
+		$ai_line_map = array();
 
 		if ( '' === $flat_text ) {
 			return $ordered;
@@ -315,12 +317,58 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			return $ordered;
 		}
 
+		$ai_lines = array();
 		foreach ( $matches[0] as $blank_index => $match ) {
 			$blank_text = (string) $match[0];
 			$offset     = (int) $match[1];
 			$before     = substr( $flat_text, max( 0, $offset - 140 ), min( 140, $offset ) );
 			$after      = substr( $flat_text, $offset + strlen( $blank_text ), 180 );
-			$ordered[]  = $this->infer_placeholder_from_context( $before, $after, $blank_index );
+			$ai_lines[] = array(
+				'id'          => 'blank_' . $blank_index,
+				'text'        => $before . ' <<<BLANK>>> ' . $after,
+				'blank_count' => 1,
+			);
+		}
+
+		if ( $ai_service && ! empty( $ai_lines ) ) {
+			try {
+				$ai_result = $ai_service->map_template_line_blanks(
+					array(
+						'contract_text'     => $flat_text,
+						'reservation_data'  => $reservation_data,
+						'lines'             => $ai_lines,
+						'allowed_canonical' => array_keys( self::CANONICAL_TO_PLACEHOLDER ),
+					)
+				);
+
+				if ( ! is_wp_error( $ai_result )
+					&& isset( $ai_result['line_map'] )
+					&& is_array( $ai_result['line_map'] )
+				) {
+					$ai_line_map = $ai_result['line_map'];
+				}
+			} catch ( \Throwable $throwable ) {
+				error_log( 'Arriendo Facil DOCX processor AI mapping exception: ' . $throwable->getMessage() );
+			}
+		}
+
+		foreach ( $matches[0] as $blank_index => $match ) {
+			$blank_text = (string) $match[0];
+			$offset     = (int) $match[1];
+			$before     = substr( $flat_text, max( 0, $offset - 140 ), min( 140, $offset ) );
+			$after      = substr( $flat_text, $offset + strlen( $blank_text ), 180 );
+
+			$ai_key = '';
+			if ( isset( $ai_line_map[ 'blank_' . $blank_index ] ) && is_array( $ai_line_map[ 'blank_' . $blank_index ] ) ) {
+				$ai_key = isset( $ai_line_map[ 'blank_' . $blank_index ][0] ) ? trim( (string) $ai_line_map[ 'blank_' . $blank_index ][0] ) : '';
+			}
+
+			if ( '' !== $ai_key && isset( self::CANONICAL_TO_PLACEHOLDER[ $ai_key ] ) ) {
+				$ordered[] = self::CANONICAL_TO_PLACEHOLDER[ $ai_key ];
+				continue;
+			}
+
+			$ordered[] = $this->infer_placeholder_from_context( $before, $after, $blank_index );
 		}
 
 		return $ordered;

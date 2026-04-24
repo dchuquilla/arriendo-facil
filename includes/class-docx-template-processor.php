@@ -260,7 +260,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 	}
 
 	/**
-	 * Extracts paragraphs that contain blank sequences (3+ underscores or 5+ dots)
+	 * Extracts paragraphs that contain blank sequences (underscores, dots or ellipsis)
 	 * in document order.
 	 *
 	 * @param string $doc_xml Raw word/document.xml.
@@ -282,7 +282,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			}
 
 			$text        = html_entity_decode( $text, ENT_QUOTES | ENT_XML1, 'UTF-8' );
-			$blank_count = (int) preg_match_all( '/_{3,}|\.{5,}/', $text );
+			$blank_count = (int) preg_match_all( '/_{3,}|\.{5,}|…{3,}/u', $text );
 
 			if ( $blank_count > 0 ) {
 				$result[ 'para_' . $para_idx ] = array(
@@ -313,7 +313,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			return $ordered;
 		}
 
-		if ( ! preg_match_all( '/_{3,}|\.{5,}/', $flat_text, $matches, PREG_OFFSET_CAPTURE ) ) {
+		if ( ! preg_match_all( '/_{3,}|\.{5,}|…{3,}/u', $flat_text, $matches, PREG_OFFSET_CAPTURE ) ) {
 			return $ordered;
 		}
 
@@ -512,7 +512,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 	}
 
 	/**
-	 * Replaces blank sequences (underscores or long dots) inside <w:t> XML elements with
+	 * Replaces blank sequences (underscores, long dots or ellipsis) inside <w:t> XML elements with
 	 * ${PLACEHOLDER} tokens, consuming the ordered placeholder list in document order.
 	 *
 	 * @param string       $doc_xml              Raw word/document.xml.
@@ -534,7 +534,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 				$close   = $m[3];
 
 				$new_content = (string) preg_replace_callback(
-					'/_{3,}|\.{5,}/',
+					'/_{3,}|\.{5,}|…{3,}/u',
 					function () use ( &$counter, $ordered_placeholders ) {
 						$ph = isset( $ordered_placeholders[ $counter ] )
 							? $ordered_placeholders[ $counter ]

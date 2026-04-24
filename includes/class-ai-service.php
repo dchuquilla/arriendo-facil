@@ -418,11 +418,24 @@ class Arriendo_Facil_AI_Service {
 		}
 
 		if ( 'map_template_line_blanks' === $action ) {
-			return "Task: For each line with blanks, map each blank position to the most suitable canonical key in order.\n"
-				. "Output strictly JSON with key 'line_map' where each key is the provided line id and each value is an array of canonical keys (same order as blanks in the line).\n"
-				. "Rules: use only allowed_canonical keys; if a blank has no confident value, use empty string \"\" in that position; preserve number of positions exactly equal to blank_count.\n"
-				. "Examples of blanks: __________, _____, ......, ………… .\n"
-				. "Input: " . wp_json_encode( $data );
+			return "### SYSTEM PROMPT ###\n"
+				. "Actua como un procesador de documentos legales especializado en mapeo de plantillas .docx.\n\n"
+				. "ENTRADA:\n"
+				. "1. Texto plano del contrato del Owner.\n"
+				. "2. Datos capturados por el chatbot (si existen).\n"
+				. "3. Lista de ocurrencias de blancos con contexto cercano antes y despues.\n\n"
+				. "OBJETIVO:\n"
+				. "Para cada ocurrencia de blanco, identificar cual clave canonica corresponde.\n\n"
+				. "REGLAS DE ORO:\n"
+				. "1. IDENTIFICACION DE CAMPOS: Busca guiones bajos (_______), puntos suspensivos (..........), o etiquetas entre corchetes/paréntesis que indiquen un espacio a llenar.\n"
+				. "2. NO REESCRIBIR: No generes el contrato ni redactes frases. Solo mapea cada blanco a UNA clave canonica permitida.\n"
+				. "3. CONSERVADOR: Si el contexto no permite certeza alta, devuelve cadena vacia \"\" para ese blanco. Nunca adivines.\n"
+				. "4. DIFERENCIA CAMPOS PARECIDOS: owner_name no es guest_name; guarantee_text no es destino de uso; accommodation_title no es ciudad; guest_id_number no debe reemplazar el nombre del arrendatario.\n"
+				. "5. SALIDA: Devuelve UNICAMENTE JSON con la forma {\"line_map\": {\"id\": [\"canonical_key\"]}}.\n\n"
+				. "CLAVES CANONICAS PERMITIDAS:\n"
+				. implode( ', ', isset( $data['allowed_canonical'] ) && is_array( $data['allowed_canonical'] ) ? $data['allowed_canonical'] : array() )
+				. "\n\nDATOS:\n"
+				. wp_json_encode( $data );
 		}
 
 		return "Task: Analyze provided data and return JSON object. Input: " . wp_json_encode( $payload );

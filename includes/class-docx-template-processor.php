@@ -499,20 +499,16 @@ class Arriendo_Facil_DOCX_Template_Processor {
 				$ai_confidence = isset( $ai_line_map[ 'blank_' . $blank_index ][1] ) ? trim( strtoupper( (string) $ai_line_map[ 'blank_' . $blank_index ][1] ) ) : '';
 			}
 
-			// Only use AI mapping if confidence is HIGH or mapping is empty (meaning AI found nothing).
+			// Prioritize HIGH-confidence AI mapping.
+			// For MEDIUM/NONE, fall back to context rules (conservative approach).
 			$use_ai_mapping = '' !== $ai_key && isset( self::CANONICAL_TO_PLACEHOLDER[ $ai_key ] ) && ( 'HIGH' === $ai_confidence );
+
 			if ( $use_ai_mapping ) {
 				$ordered[] = self::CANONICAL_TO_PLACEHOLDER[ $ai_key ];
-				continue;
+			} else {
+				// Use context rules for LOW confidence or AI mapping empty.
+				$ordered[] = $this->infer_placeholder_from_context( $before, $after, $blank_index );
 			}
-
-			// If AI mapping exists but confidence is MEDIUM or NONE, skip and use context rules.
-			if ( '' !== $ai_key && 'HIGH' !== $ai_confidence ) {
-				// Log that we're skipping low-confidence AI mapping.
-				continue;
-			}
-
-			$ordered[] = $this->infer_placeholder_from_context( $before, $after, $blank_index );
 		}
 
 		return $ordered;

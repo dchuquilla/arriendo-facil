@@ -97,12 +97,14 @@ class Arriendo_Facil_DOCX_Template_Processor {
 		$source_path = (string) $source_path;
 
 		if ( '' === $source_path || ! file_exists( $source_path ) || ! class_exists( 'ZipArchive' ) ) {
+			$this->log_docx_event( 'process_owner_template_failed', array( 'reason' => 'source_invalid' ) );
 			return '';
 		}
 
 		// Read word/document.xml from the original DOCX.
 		$zip = new ZipArchive();
 		if ( true !== $zip->open( $source_path ) ) {
+			$this->log_docx_event( 'process_owner_template_failed', array( 'reason' => 'zip_open_failed' ) );
 			return '';
 		}
 
@@ -110,6 +112,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 		$zip->close();
 
 		if ( false === $doc_xml || '' === trim( (string) $doc_xml ) ) {
+			$this->log_docx_event( 'process_owner_template_failed', array( 'reason' => 'document_xml_empty' ) );
 			return '';
 		}
 
@@ -121,6 +124,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			if ( '' === $output_path ) {
 				$output_path = $this->generate_output_path( $source_path );
 			}
+			$this->log_docx_event( 'process_owner_template_skipped', array( 'reason' => 'already_has_placeholders' ) );
 			return $this->write_processed_docx( $source_path, $doc_xml, $output_path );
 		}
 
@@ -132,7 +136,13 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			if ( '' === $output_path ) {
 				$output_path = $this->generate_output_path( $source_path );
 			}
+			$this->log_docx_event( 'process_owner_template_no_blanks', array( 'reason' => 'no_blanks_detected' ) );
 			return $this->write_processed_docx( $source_path, $doc_xml, $output_path );
+		}
+
+		$blank_count = 0;
+		foreach ( $blank_paragraphs as $para_info ) {
+			$blank_count += isset( $para_info['blank_count'] ) ? (int) $para_info['blank_count'] : 0;
 		}
 
 		// Step 4: Resolve blank occurrences → ordered placeholder names.
@@ -146,7 +156,16 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			$output_path = $this->generate_output_path( $source_path );
 		}
 
-		return $this->write_processed_docx( $source_path, $doc_xml, $output_path );
+		$result = $this->write_processed_docx( $source_path, $doc_xml, $output_path );
+		if ( '' !== $result ) {
+			$this->log_docx_event( 'process_owner_template_success', array(
+				'blanks_detected'       => $blank_count,
+				'placeholders_injected' => count( $ordered_placeholders ),
+				'output_path'           => $result,
+			) );
+		}
+
+		return $result;
 	}
 
 	/**
@@ -165,7 +184,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 		$output_path   = (string) $output_path;
 
 		if ( '' === $template_path || ! file_exists( $template_path ) ) {
-			error_log( 'Arriendo Facil DOCX processor fill_template: template not found – ' . $template_path );
+			$this->log_docx_event( 'fill_template_failed', array( 'reason' => 'template_not_found', 'path' => $template_path ) );
 			return false;
 		}
 
@@ -186,7 +205,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 		}
 
 		if ( ! class_exists( '\PhpOffice\PhpWord\TemplateProcessor' ) ) {
-			error_log( 'Arriendo Facil DOCX processor fill_template: PhpOffice\PhpWord not available.' );
+			$this->log_docx_event( 'fill_template_failed', array( 'reason' => 'phpword_not_available' ) );
 			return false;
 		}
 
@@ -194,24 +213,50 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			$processor = new \PhpOffice\PhpWord\TemplateProcessor( $template_path );
 			$values    = $this->build_placeholder_values( $payload );
 
+			$template_vars = array();
 			if ( method_exists( $processor, 'getVariables' ) ) {
 				foreach ( $processor->getVariables() as $template_var ) {
 					$template_var = (string) $template_var;
-					if ( '' !== $template_var && ! isset( $values[ $template_var ] ) ) {
-						$values[ $template_var ] = '...............';
+					if ( '' !== $template_var ) {
+						$template_vars[] = $template_var;
+						if ( ! isset( $values[ $template_var ] ) ) {
+							$values[ $template_var ] = '...............';
+						}
 					}
 				}
 			}
 
+			$vars_set = 0;
+			$vars_blank = 0;
 			foreach ( $values as $key => $value ) {
-				$processor->setValue( $key, htmlspecialchars( (string) $value, ENT_COMPAT, 'UTF-8' ) );
+				$value_str = (string) $value;
+				$processor->setValue( $key, htmlspecialchars( $value_str, ENT_COMPAT, 'UTF-8' ) );
+				if ( '...............' !== $value_str ) {
+					$vars_set++;
+				} else {
+					$vars_blank++;
+				}
 			}
 
 			$processor->saveAs( $output_path );
 
-			return file_exists( $output_path ) && filesize( $output_path ) > 0;
+			$success = file_exists( $output_path ) && filesize( $output_path ) > 0;
+			if ( $success ) {
+				$lease_id = isset( $payload['lease_id'] ) ? (int) $payload['lease_id'] : 0;
+				$this->log_docx_event( 'fill_template_success', array(
+					'lease_id'       => $lease_id,
+					'vars_total'     => count( $values ),
+					'vars_set'       => $vars_set,
+					'vars_blank'     => $vars_blank,
+					'output_size'    => filesize( $output_path ),
+				) );
+			} else {
+				$this->log_docx_event( 'fill_template_failed', array( 'reason' => 'output_file_invalid' ) );
+			}
+
+			return $success;
 		} catch ( \Throwable $e ) {
-			error_log( 'Arriendo Facil DOCX processor fill_template exception: ' . $e->getMessage() );
+			$this->log_docx_event( 'fill_template_exception', array( 'error' => $e->getMessage() ) );
 			return false;
 		}
 	}
@@ -229,7 +274,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 		$blank = '...............';
 		$rent  = isset( $payload['monthly_rent'] ) ? number_format( (float) $payload['monthly_rent'], 2, '.', '' ) : '';
 
-		return array(
+		$values = array(
 			'ARRENDATARIO'        => $this->val( $payload, 'guest_name', $blank ),
 			'CEDULA_ARRENDATARIO' => $this->val( $payload, 'guest_id_number', $blank ),
 			'TELEFONO'            => $this->val( $payload, 'guest_phone', $blank ),
@@ -250,11 +295,41 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			'REFERENCIA_2'        => $this->val( $payload, 'referencia_personal_2', $blank ),
 			'FECHA_ACTUAL'        => gmdate( 'd/m/Y' ),
 		);
+
+		$missing_fields = array();
+		foreach ( $values as $placeholder => $value ) {
+			if ( $blank === $value ) {
+				$missing_fields[] = $placeholder;
+			}
+		}
+
+		if ( ! empty( $missing_fields ) ) {
+			$lease_id = isset( $payload['lease_id'] ) ? (int) $payload['lease_id'] : 0;
+			$this->log_docx_event( 'placeholder_values_missing_fields', array(
+				'lease_id'        => $lease_id,
+				'missing_count'   => count( $missing_fields ),
+				'missing_fields'  => $missing_fields,
+			) );
+		}
+
+		return $values;
 	}
 
 	// ─────────────────────────────────────────────────────────────────────────
 	// Private – template processing helpers
 	// ─────────────────────────────────────────────────────────────────────────
+
+	/**
+	 * Centralizes DOCX processing event logging with structured context.
+	 *
+	 * @param string $event_type Event identifier.
+	 * @param array  $context    Event context.
+	 * @return void
+	 */
+	private function log_docx_event( $event_type, array $context = array() ) {
+		$context_str = ! empty( $context ) ? ' | ' . wp_json_encode( $context ) : '';
+		error_log( 'Arriendo Facil DOCX: ' . $event_type . $context_str );
+	}
 
 	/**
 	 * Converts legacy {{TOKEN}} and [[TOKEN]] patterns in the XML to ${CANONICAL}.
@@ -404,12 +479,22 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			$after      = substr( $flat_text, $offset + strlen( $blank_text ), 180 );
 
 			$ai_key = '';
+			$ai_confidence = '';
 			if ( isset( $ai_line_map[ 'blank_' . $blank_index ] ) && is_array( $ai_line_map[ 'blank_' . $blank_index ] ) ) {
 				$ai_key = isset( $ai_line_map[ 'blank_' . $blank_index ][0] ) ? trim( (string) $ai_line_map[ 'blank_' . $blank_index ][0] ) : '';
+				$ai_confidence = isset( $ai_line_map[ 'blank_' . $blank_index ][1] ) ? trim( strtoupper( (string) $ai_line_map[ 'blank_' . $blank_index ][1] ) ) : '';
 			}
 
-			if ( '' !== $ai_key && isset( self::CANONICAL_TO_PLACEHOLDER[ $ai_key ] ) ) {
+			// Only use AI mapping if confidence is HIGH or mapping is empty (meaning AI found nothing).
+			$use_ai_mapping = '' !== $ai_key && isset( self::CANONICAL_TO_PLACEHOLDER[ $ai_key ] ) && ( 'HIGH' === $ai_confidence );
+			if ( $use_ai_mapping ) {
 				$ordered[] = self::CANONICAL_TO_PLACEHOLDER[ $ai_key ];
+				continue;
+			}
+
+			// If AI mapping exists but confidence is MEDIUM or NONE, skip and use context rules.
+			if ( '' !== $ai_key && 'HIGH' !== $ai_confidence ) {
+				// Log that we're skipping low-confidence AI mapping.
 				continue;
 			}
 

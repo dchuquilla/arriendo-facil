@@ -541,6 +541,12 @@ class Arriendo_Facil_Guest {
 		$accommodation_address  = (string) get_post_meta( $accommodation_id, '_af_address', true );
 		$accommodation_title    = (string) get_the_title( $accommodation_id );
 
+		if ( $owner_template_exists ) {
+			error_log( 'Arriendo Facil contract generation: owner template detected for lease_id=' . $lease_id . ', attachment_id=' . $owner_contract_example['attachment_id'] . ', owner_name=' . ( isset( $owner_contract_example['owner_name'] ) ? $owner_contract_example['owner_name'] : 'unknown' ) );
+		} else {
+			error_log( 'Arriendo Facil contract generation: no owner template found for lease_id=' . $lease_id . ', accommodation_id=' . $accommodation_id . '; will use AI generation' );
+		}
+
 		$ai_payload = array(
 			'lease_id'          => $lease_id,
 			'accommodation_id'  => $accommodation_id,
@@ -708,14 +714,22 @@ class Arriendo_Facil_Guest {
 		$phpword_success    = false;
 		$processed_tpl_path = (string) get_post_meta( $attachment_id, '_af_processed_template_path', true );
 
-		// Always refresh the processed owner template from the original DOCX before fill.
-		// This avoids reusing older placeholder mappings that may have been inferred incorrectly.
-		if ( class_exists( 'Arriendo_Facil_DOCX_Template_Processor' ) ) {
-			$tpl_proc      = new Arriendo_Facil_DOCX_Template_Processor();
-			$processed_new = $tpl_proc->process_owner_template( $template_path, null, $processed_tpl_path, $payload );
-			if ( '' !== $processed_new && file_exists( $processed_new ) ) {
-				$processed_tpl_path = $processed_new;
-				update_post_meta( $attachment_id, '_af_processed_template_path', $processed_tpl_path );
+		// Check if cached processed template exists and is valid.
+		// Only reprocess if cache is missing or file doesn't exist locally.
+		$use_cached = false;
+		if ( '' !== $processed_tpl_path && file_exists( $processed_tpl_path ) ) {
+			$use_cached = true;
+			error_log( 'Arriendo Facil owner-template generation: using cached processed template for lease_id=' . $lease_id . ', attachment_id=' . $attachment_id );
+		} else {
+			// Reprocess only if cache is missing or invalid.
+			if ( class_exists( 'Arriendo_Facil_DOCX_Template_Processor' ) ) {
+				$tpl_proc      = new Arriendo_Facil_DOCX_Template_Processor();
+				$processed_new = $tpl_proc->process_owner_template( $template_path, null, $processed_tpl_path, $payload );
+				if ( '' !== $processed_new && file_exists( $processed_new ) ) {
+					$processed_tpl_path = $processed_new;
+					update_post_meta( $attachment_id, '_af_processed_template_path', $processed_tpl_path );
+					error_log( 'Arriendo Facil owner-template generation: generated and cached processed template for lease_id=' . $lease_id . ', attachment_id=' . $attachment_id );
+				}
 			}
 		}
 
@@ -726,9 +740,19 @@ class Arriendo_Facil_Guest {
 			$tpl_proc = new Arriendo_Facil_DOCX_Template_Processor();
 			if ( $tpl_proc->fill_template( $processed_tpl_path, $file_path, $payload ) ) {
 				$phpword_success = true;
+				error_log( 'Arriendo Facil owner-template generation: fill_template succeeded for lease_id=' . $lease_id );
+
+				// Validate that critical fields were actually filled.
+				$validation = $this->validate_filled_contract( $file_path, $lease_id );
+				if ( ! $validation['valid'] ) {
+					error_log( 'Arriendo Facil owner-template generation: contract validation failed for lease_id=' . $lease_id . ', missing_count=' . $validation['missing_count'] . '; may trigger fallback' );
+				}
+
 				if ( $tmp_downloaded ) {
 					@unlink( $template_path );
 				}
+			} else {
+				error_log( 'Arriendo Facil owner-template generation: fill_template failed for lease_id=' . $lease_id . ', attachment_id=' . $attachment_id );
 			}
 		}
 
@@ -784,6 +808,75 @@ class Arriendo_Facil_Guest {
 		}
 
 		return $document_url;
+	}
+
+	/**
+	 * Validates that a filled DOCX contract contains critical lease fields.
+	 *
+	 * Returns validation result with count of missing critical fields.
+	 * If 4+ critical fields are missing, contract may need fallback.
+	 *
+	 * @param string $file_path Path to the filled DOCX.
+	 * @param int    $lease_id  Lease ID for logging.
+	 * @return array { valid: bool, missing_count: int, missing_fields: array }
+	 */
+	private function validate_filled_contract( $file_path, $lease_id ) {
+		$file_path = (string) $file_path;
+		$lease_id  = absint( $lease_id );
+
+		if ( ! $file_path || ! file_exists( $file_path ) || ! class_exists( 'ZipArchive' ) ) {
+			error_log( 'Arriendo Facil contract validation: file not found or ZipArchive not available. lease_id=' . $lease_id . ', path=' . $file_path );
+			return array( 'valid' => false, 'missing_count' => 99, 'missing_fields' => array() );
+		}
+
+		$critical_fields = array(
+			'ARRENDATARIO'        => 'guest_name',
+			'CEDULA_ARRENDATARIO' => 'guest_id_number',
+			'ARRENDADOR'          => 'owner_name',
+			'CANON'               => 'monthly_rent',
+			'FECHA_INICIO'        => 'start_date',
+			'DIRECCION'           => 'accommodation_address',
+		);
+
+		$blank_marker = '...............';
+		$missing_fields = array();
+
+		try {
+			$zip = new ZipArchive();
+			if ( true !== $zip->open( $file_path ) ) {
+				error_log( 'Arriendo Facil contract validation: cannot open DOCX. lease_id=' . $lease_id );
+				return array( 'valid' => false, 'missing_count' => 99, 'missing_fields' => array() );
+			}
+
+			$xml = $zip->getFromName( 'word/document.xml' );
+			$zip->close();
+
+			if ( false === $xml || '' === $xml ) {
+				error_log( 'Arriendo Facil contract validation: document.xml not found. lease_id=' . $lease_id );
+				return array( 'valid' => false, 'missing_count' => 99, 'missing_fields' => array() );
+			}
+
+			$text = wp_strip_all_tags( (string) $xml );
+			foreach ( $critical_fields as $placeholder => $field_name ) {
+				if ( false === strpos( $text, $placeholder ) || false !== strpos( $text, '${' . $placeholder . '}' ) || false !== strpos( $text, $blank_marker ) ) {
+					$missing_fields[] = $field_name . '(' . $placeholder . ')';
+				}
+			}
+
+			$missing_count = count( $missing_fields );
+			$valid = $missing_count < 4;
+
+			error_log( 'Arriendo Facil contract validation: lease_id=' . $lease_id . ', missing_count=' . $missing_count . ', valid=' . ( $valid ? 'true' : 'false' ) . ', missing_fields=[' . implode( ', ', $missing_fields ) . ']' );
+
+			return array(
+				'valid'          => $valid,
+				'missing_count'  => $missing_count,
+				'missing_fields' => $missing_fields,
+			);
+		} catch ( \Throwable $e ) {
+			error_log( 'Arriendo Facil contract validation exception: ' . $e->getMessage() . ' lease_id=' . $lease_id );
+			return array( 'valid' => false, 'missing_count' => 99, 'missing_fields' => array() );
+		}
 	}
 
 	/**

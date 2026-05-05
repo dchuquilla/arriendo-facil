@@ -187,14 +187,14 @@ $any_storage_field_locked = $provider_locked || $access_key_locked || $secret_ke
 		<table class="form-table">
 			<tr>
 				<th scope="row">
-					<label for="af_ai_api_url"><?php esc_html_e( 'OpenAI API URL (optional)', 'arriendo-facil' ); ?></label>
+					<label for="af_ai_api_url"><?php esc_html_e( 'Claude API URL (optional)', 'arriendo-facil' ); ?></label>
 				</th>
 				<td>
 					<input type="url" id="af_ai_api_url" name="af_ai_api_url"
 						value="<?php echo esc_attr( $api_url ); ?>"
-						class="regular-text" placeholder="https://api.openai.com/v1/chat/completions" <?php disabled( $ai_url_locked ); ?> />
+						class="regular-text" placeholder="https://api.anthropic.com/v1/messages" <?php disabled( $ai_url_locked ); ?> />
 					<p class="description">
-						<?php esc_html_e( 'Optional override endpoint. Leave empty to use OpenAI default Chat Completions endpoint.', 'arriendo-facil' ); ?>
+						<?php esc_html_e( 'Optional override endpoint. Leave empty to use Claude default Messages endpoint.', 'arriendo-facil' ); ?>
 						<?php if ( $ai_url_locked ) : ?>
 							<br /><?php esc_html_e( 'This value is defined in wp-config.php and cannot be edited here.', 'arriendo-facil' ); ?>
 						<?php endif; ?>
@@ -203,14 +203,14 @@ $any_storage_field_locked = $provider_locked || $access_key_locked || $secret_ke
 			</tr>
 			<tr>
 				<th scope="row">
-					<label for="af_ai_api_key"><?php esc_html_e( 'OpenAI API Key', 'arriendo-facil' ); ?></label>
+					<label for="af_ai_api_key"><?php esc_html_e( 'Claude API Key', 'arriendo-facil' ); ?></label>
 				</th>
 				<td>
 					<input type="password" id="af_ai_api_key" name="af_ai_api_key"
 						value="<?php echo esc_attr( $api_key ); ?>"
 						class="regular-text" autocomplete="off" <?php disabled( $ai_key_locked ); ?> />
 					<p class="description">
-						<?php esc_html_e( 'API key for ChatGPT/OpenAI requests (required).', 'arriendo-facil' ); ?>
+						<?php esc_html_e( 'API key for Claude/Anthropic requests (required).', 'arriendo-facil' ); ?>
 						<?php if ( $ai_key_locked ) : ?>
 							<br /><?php esc_html_e( 'This value is defined in wp-config.php and cannot be edited here.', 'arriendo-facil' ); ?>
 						<?php endif; ?>
@@ -223,10 +223,10 @@ $any_storage_field_locked = $provider_locked || $access_key_locked || $secret_ke
 			<input type="submit" name="af_save_ai_settings" class="button button-primary"
 				value="<?php esc_attr_e( 'Save Settings', 'arriendo-facil' ); ?>" />
 			<input type="submit" name="af_test_owner_data" class="button button-secondary"
-				value="<?php esc_attr_e( 'Test ChatGPT Connection', 'arriendo-facil' ); ?>" />
+				value="<?php esc_attr_e( 'Test Claude Connection', 'arriendo-facil' ); ?>" />
 		</p>
 		<p class="description">
-			<?php esc_html_e( 'This test sends owner records to ChatGPT and validates OpenAI connectivity. It is not related to Cloud Provider settings.', 'arriendo-facil' ); ?>
+			<?php esc_html_e( 'This test sends owner records to Claude and validates Anthropic connectivity. It is not related to Cloud Provider settings.', 'arriendo-facil' ); ?>
 		</p>
 
 		<hr />

@@ -198,7 +198,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 				foreach ( $processor->getVariables() as $template_var ) {
 					$template_var = (string) $template_var;
 					if ( '' !== $template_var && ! isset( $values[ $template_var ] ) ) {
-						$values[ $template_var ] = '________________________';
+						$values[ $template_var ] = '...............';
 					}
 				}
 			}
@@ -226,7 +226,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 	 * @return array<string,string> Placeholder name => display value.
 	 */
 	public function build_placeholder_values( array $payload ) {
-		$blank = '________________________';
+		$blank = '...............';
 		$rent  = isset( $payload['monthly_rent'] ) ? number_format( (float) $payload['monthly_rent'], 2, '.', '' ) : '';
 
 		return array(

@@ -24,7 +24,7 @@ class AIServiceTest extends TestCase {
 	}
 
 	/**
-	 * predict_cost() should return a WP_Error when no OpenAI API key is configured.
+	 * predict_cost() should return a WP_Error when no Claude API key is configured.
 	 */
 	public function test_predict_cost_returns_error_when_no_api_key() {
 		$service = $this->make_service();
@@ -35,7 +35,7 @@ class AIServiceTest extends TestCase {
 	}
 
 	/**
-	 * generate_document() should return a WP_Error when no OpenAI API key is configured.
+	 * generate_document() should return a WP_Error when no Claude API key is configured.
 	 */
 	public function test_generate_document_returns_error_when_no_api_key() {
 		$service = $this->make_service();
@@ -46,7 +46,7 @@ class AIServiceTest extends TestCase {
 	}
 
 	/**
-	 * score_guest() should return a WP_Error when no OpenAI API key is configured.
+	 * score_guest() should return a WP_Error when no Claude API key is configured.
 	 */
 	public function test_score_guest_returns_error_when_no_api_key() {
 		$service = $this->make_service();

@@ -136,7 +136,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			if ( '' === $output_path ) {
 				$output_path = $this->generate_output_path( $source_path );
 			}
-			$this->log_docx_event( 'process_owner_template_no_blanks', array( 'reason' => 'no_blanks_detected' ) );
+			error_log( 'Arriendo Facil process_owner_template: no blanks detected in document - will copy as-is' );
 			return $this->write_processed_docx( $source_path, $doc_xml, $output_path );
 		}
 
@@ -145,8 +145,11 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			$blank_count += isset( $para_info['blank_count'] ) ? (int) $para_info['blank_count'] : 0;
 		}
 
+		error_log( 'Arriendo Facil process_owner_template: detected ' . $blank_count . ' blanks in ' . count( $blank_paragraphs ) . ' paragraphs' );
+
 		// Step 4: Resolve blank occurrences → ordered placeholder names.
 		$ordered_placeholders = $this->resolve_blank_to_placeholder_order( (string) $doc_xml, $ai_service, $reservation_data );
+		error_log( 'Arriendo Facil process_owner_template: resolved ' . count( $ordered_placeholders ) . ' placeholder mappings: [' . implode( ',', array_slice( $ordered_placeholders, 0, 10 ) ) . ']' );
 
 		// Step 5: Inject placeholders into the XML.
 		$doc_xml = $this->inject_placeholders( $doc_xml, $ordered_placeholders );
@@ -213,6 +216,9 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			$processor = new \PhpOffice\PhpWord\TemplateProcessor( $template_path );
 			$values    = $this->build_placeholder_values( $payload );
 
+			$lease_id = isset( $payload['lease_id'] ) ? (int) $payload['lease_id'] : 0;
+			error_log( 'Arriendo Facil fill_template: starting fill for lease_id=' . $lease_id . ', payload_keys=[' . implode( ',', array_keys( $payload ) ) . ']' );
+
 			$template_vars = array();
 			if ( method_exists( $processor, 'getVariables' ) ) {
 				foreach ( $processor->getVariables() as $template_var ) {
@@ -226,17 +232,25 @@ class Arriendo_Facil_DOCX_Template_Processor {
 				}
 			}
 
+			error_log( 'Arriendo Facil fill_template: template found ' . count( $template_vars ) . ' variables: [' . implode( ',', $template_vars ) . ']' );
+			error_log( 'Arriendo Facil fill_template: prepared ' . count( $values ) . ' values to set' );
+
 			$vars_set = 0;
 			$vars_blank = 0;
+			$set_details = array();
 			foreach ( $values as $key => $value ) {
 				$value_str = (string) $value;
 				$processor->setValue( $key, htmlspecialchars( $value_str, ENT_COMPAT, 'UTF-8' ) );
 				if ( '...............' !== $value_str ) {
 					$vars_set++;
+					$set_details[] = $key . '=' . substr( $value_str, 0, 30 );
 				} else {
 					$vars_blank++;
+					$set_details[] = $key . '=BLANK';
 				}
 			}
+
+			error_log( 'Arriendo Facil fill_template: vars_set=' . $vars_set . ', vars_blank=' . $vars_blank . ', details=[' . implode( ';', array_slice( $set_details, 0, 10 ) ) . ']' );
 
 			$processor->saveAs( $output_path );
 

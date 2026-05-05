@@ -42,8 +42,18 @@ function af_settings_is_locked( $constant_name ) {
 
 if ( isset( $_POST['af_save_ai_settings'] ) ) {
 	check_admin_referer( 'af_ai_settings_nonce' );
-	update_option( 'af_ai_api_url', esc_url_raw( wp_unslash( $_POST['af_ai_api_url'] ?? '' ) ) );
-	update_option( 'af_ai_api_key', sanitize_text_field( wp_unslash( $_POST['af_ai_api_key'] ?? '' ) ) );
+
+	if ( ! af_settings_is_locked( 'AF_AI_API_URL' ) ) {
+		update_option( 'af_ai_api_url', esc_url_raw( wp_unslash( $_POST['af_ai_api_url'] ?? '' ) ) );
+	}
+
+	if ( ! af_settings_is_locked( 'AF_AI_API_KEY' ) ) {
+		$posted_ai_key = sanitize_text_field( wp_unslash( $_POST['af_ai_api_key'] ?? '' ) );
+		if ( '' !== trim( $posted_ai_key ) ) {
+			update_option( 'af_ai_api_key', $posted_ai_key );
+		}
+	}
+
 	echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Settings saved.', 'arriendo-facil' ) . '</p></div>';
 }
 
@@ -59,7 +69,10 @@ if ( isset( $_POST['af_save_storage_credentials'] ) ) {
 	}
 
 	if ( ! af_settings_is_locked( 'AF_R2_SECRET_ACCESS_KEY' ) ) {
-		update_option( 'af_r2_secret_access_key', sanitize_text_field( wp_unslash( $_POST['af_r2_secret_access_key'] ?? '' ) ) );
+		$posted_r2_secret = sanitize_text_field( wp_unslash( $_POST['af_r2_secret_access_key'] ?? '' ) );
+		if ( '' !== trim( $posted_r2_secret ) ) {
+			update_option( 'af_r2_secret_access_key', $posted_r2_secret );
+		}
 	}
 
 	if ( ! af_settings_is_locked( 'AF_R2_ENDPOINT_URL' ) ) {
@@ -141,10 +154,12 @@ if ( isset( $_POST['af_test_owner_data'] ) ) {
 
 $api_url = af_settings_get_value( 'AF_AI_API_URL', 'af_ai_api_url', '' );
 $api_key = af_settings_get_value( 'AF_AI_API_KEY', 'af_ai_api_key', '' );
+$has_api_key = '' !== trim( $api_key );
 
 $storage_provider = af_settings_get_value( 'AF_STORAGE_PROVIDER', 'af_storage_provider', 'cloudflare_r2' );
 $r2_access_key_id = af_settings_get_value( 'AF_R2_ACCESS_KEY_ID', 'af_r2_access_key_id', '' );
 $r2_secret_key    = af_settings_get_value( 'AF_R2_SECRET_ACCESS_KEY', 'af_r2_secret_access_key', '' );
+$has_r2_secret_key = '' !== trim( $r2_secret_key );
 $r2_endpoint_url  = af_settings_get_value( 'AF_R2_ENDPOINT_URL', 'af_r2_endpoint_url', '' );
 $r2_bucket_name   = af_settings_get_value( 'AF_R2_BUCKET_NAME', 'af_r2_bucket_name', '' );
 $r2_custom_domain = af_settings_get_value( 'AF_R2_CUSTOM_DOMAIN', 'af_r2_custom_domain', '' );
@@ -207,10 +222,13 @@ $any_storage_field_locked = $provider_locked || $access_key_locked || $secret_ke
 				</th>
 				<td>
 					<input type="password" id="af_ai_api_key" name="af_ai_api_key"
-						value="<?php echo esc_attr( $api_key ); ?>"
+						value=""
 						class="regular-text" autocomplete="off" <?php disabled( $ai_key_locked ); ?> />
 					<p class="description">
 						<?php esc_html_e( 'API key for Claude/Anthropic requests (required).', 'arriendo-facil' ); ?>
+						<?php if ( $has_api_key && ! $ai_key_locked ) : ?>
+							<br /><?php esc_html_e( 'A key is already configured. Leave this field blank to keep the current key.', 'arriendo-facil' ); ?>
+						<?php endif; ?>
 						<?php if ( $ai_key_locked ) : ?>
 							<br /><?php esc_html_e( 'This value is defined in wp-config.php and cannot be edited here.', 'arriendo-facil' ); ?>
 						<?php endif; ?>
@@ -251,7 +269,12 @@ $any_storage_field_locked = $provider_locked || $access_key_locked || $secret_ke
 			</tr>
 			<tr>
 				<th scope="row"><label for="af_r2_secret_access_key"><?php esc_html_e( 'Secret Access Key', 'arriendo-facil' ); ?></label></th>
-				<td><input type="password" id="af_r2_secret_access_key" name="af_r2_secret_access_key" value="<?php echo esc_attr( $r2_secret_key ); ?>" class="regular-text" autocomplete="off" <?php disabled( $secret_key_locked ); ?> /></td>
+				<td>
+					<input type="password" id="af_r2_secret_access_key" name="af_r2_secret_access_key" value="" class="regular-text" autocomplete="off" <?php disabled( $secret_key_locked ); ?> />
+					<?php if ( $has_r2_secret_key && ! $secret_key_locked ) : ?>
+						<p class="description"><?php esc_html_e( 'A secret key is already configured. Leave this field blank to keep the current key.', 'arriendo-facil' ); ?></p>
+					<?php endif; ?>
+				</td>
 			</tr>
 			<tr>
 				<th scope="row"><label for="af_r2_endpoint_url"><?php esc_html_e( 'Endpoint URL', 'arriendo-facil' ); ?></label></th>

@@ -576,7 +576,7 @@ class Arriendo_Facil_Guest {
 		$ai_payload['legal_template_base'] = $this->build_legal_contract_template( $ai_payload, '' );
 
 		$document_result = new WP_Error( 'af_ai_not_executed', __( 'AI document generation was not executed.', 'arriendo-facil' ) );
-		if ( class_exists( 'Arriendo_Facil_AI_Service' ) ) {
+		if ( ! $owner_template_exists && class_exists( 'Arriendo_Facil_AI_Service' ) ) {
 			try {
 				$ai = new Arriendo_Facil_AI_Service();
 				$document_result = $ai->generate_document( $ai_payload );
@@ -596,26 +596,7 @@ class Arriendo_Facil_Guest {
 
 		$generated_contract_text = '';
 
-		// Strict business rule: if owner template exists, always build the final contract from that template.
-		if ( $owner_template_exists ) {
-			// Try AI-filled result first (only when template text is available).
-			if ( ! is_wp_error( $document_result ) && isset( $document_result['contract_text'] ) && is_string( $document_result['contract_text'] ) && '' !== trim( $document_result['contract_text'] ) ) {
-				$generated_contract_text = trim( wp_strip_all_tags( $document_result['contract_text'] ) );
-			}
-
-			if ( '' === $generated_contract_text && isset( $ai_payload['template_text'] ) && is_string( $ai_payload['template_text'] ) && '' !== trim( $ai_payload['template_text'] ) ) {
-				$generated_contract_text = $this->fill_owner_template_with_lease_data( $ai_payload['template_text'], $ai_payload );
-			}
-
-			if ( '' === $generated_contract_text && isset( $ai_payload['template_text'] ) && is_string( $ai_payload['template_text'] ) && '' !== trim( $ai_payload['template_text'] ) ) {
-				$generated_contract_text = trim( (string) $ai_payload['template_text'] );
-			}
-
-			// When template file cannot be read (R2 unavailable, corrupt, etc.) generate a full legal contract as fallback.
-			if ( '' === $generated_contract_text ) {
-				$generated_contract_text = $this->build_legal_contract_template( $ai_payload, '' );
-			}
-		} else {
+		if ( ! $owner_template_exists ) {
 			if ( ! is_wp_error( $document_result ) && isset( $document_result['contract_text'] ) && is_string( $document_result['contract_text'] ) ) {
 				$generated_contract_text = trim( wp_strip_all_tags( $document_result['contract_text'] ) );
 			}
@@ -730,9 +711,8 @@ class Arriendo_Facil_Guest {
 		// Always refresh the processed owner template from the original DOCX before fill.
 		// This avoids reusing older placeholder mappings that may have been inferred incorrectly.
 		if ( class_exists( 'Arriendo_Facil_DOCX_Template_Processor' ) ) {
-			$ai_svc        = class_exists( 'Arriendo_Facil_AI_Service' ) ? new Arriendo_Facil_AI_Service() : null;
 			$tpl_proc      = new Arriendo_Facil_DOCX_Template_Processor();
-			$processed_new = $tpl_proc->process_owner_template( $template_path, $ai_svc, $processed_tpl_path, $payload );
+			$processed_new = $tpl_proc->process_owner_template( $template_path, null, $processed_tpl_path, $payload );
 			if ( '' !== $processed_new && file_exists( $processed_new ) ) {
 				$processed_tpl_path = $processed_new;
 				update_post_meta( $attachment_id, '_af_processed_template_path', $processed_tpl_path );

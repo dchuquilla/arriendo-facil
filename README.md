@@ -64,11 +64,11 @@ composer install
 
 ## AI Integration
 
-The plugin communicates with OpenAI ChatGPT via the Chat Completions API. Configure your OpenAI API key in **Arriendo Fácil → AI Settings**.
+The plugin communicates with Anthropic Claude via the Messages API. Configure your Claude API key in **Arriendo Fácil → AI Settings**.
 
-- Default endpoint used by the plugin: `https://api.openai.com/v1/chat/completions`
+- Default endpoint used by the plugin: `https://api.anthropic.com/v1/messages`
 - Optional override: `AI API URL` setting (advanced use)
-- Required credential: OpenAI API key
+- Required credential: Claude API key
 
 Expected responses:
 

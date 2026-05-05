@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *  - Lease document generation
  *  - Guest scoring / management
  *
- * Communicates with OpenAI Chat Completions (ChatGPT), with optional
+ * Communicates with Anthropic Claude Messages API, with optional
  * custom endpoint override from plugin settings.
  */
 class Arriendo_Facil_AI_Service {
@@ -37,18 +37,18 @@ class Arriendo_Facil_AI_Service {
 	private $api_key;
 
 	/**
-	 * Default OpenAI chat completions endpoint.
+	 * Default Anthropic Claude Messages endpoint.
 	 *
 	 * @var string
 	 */
-	private $default_openai_endpoint = 'https://api.openai.com/v1/chat/completions';
+	private $default_claude_endpoint = 'https://api.anthropic.com/v1/messages';
 
 	/**
-	 * OpenAI model used for requests.
+	 * Claude model used for requests.
 	 *
 	 * @var string
 	 */
-	private $model = 'gpt-4o-mini';
+	private $model = 'claude-3-5-sonnet-latest';
 
 	/**
 	 * Constructor - loads API configuration from plugin options.
@@ -208,35 +208,34 @@ class Arriendo_Facil_AI_Service {
 	}
 
 	/**
-	 * Sends a POST request to ChatGPT and expects JSON content in the response.
+	 * Sends a POST request to Claude and expects JSON content in the response.
 	 *
 	 * @param array $payload Request payload.
 	 * @return array|WP_Error Decoded response array, or WP_Error on failure.
 	 */
 	private function request( array $payload ) {
 		if ( empty( $this->api_key ) ) {
-			return new WP_Error( 'no_api_key', __( 'OpenAI API key is not configured.', 'arriendo-facil' ) );
+			return new WP_Error( 'no_api_key', __( 'Claude API key is not configured.', 'arriendo-facil' ) );
 		}
 
-		$endpoint = ! empty( $this->api_url ) ? $this->api_url : $this->default_openai_endpoint;
+		$endpoint = ! empty( $this->api_url ) ? $this->api_url : $this->default_claude_endpoint;
 		$prompt   = $this->build_action_prompt( $payload );
 
 		$args = array(
 			'method'  => 'POST',
 			'headers' => array(
-				'Accept'        => 'application/json',
-				'Content-Type'  => 'application/json',
-				'Authorization' => 'Bearer ' . $this->api_key,
+				'Accept'            => 'application/json',
+				'Content-Type'      => 'application/json',
+				'x-api-key'         => $this->api_key,
+				'anthropic-version' => '2023-06-01',
 			),
 			'body'    => wp_json_encode(
 				array(
 					'model'           => $this->model,
-					'response_format' => array( 'type' => 'json_object' ),
+					'max_tokens'      => 2048,
+					'temperature'     => 0,
+					'system'          => 'You are a rental management assistant. Return strictly valid JSON only.',
 					'messages'        => array(
-						array(
-							'role'    => 'system',
-							'content' => 'You are a rental management assistant. Return strictly valid JSON only.',
-						),
 						array(
 							'role'    => 'user',
 							'content' => $prompt,
@@ -249,12 +248,12 @@ class Arriendo_Facil_AI_Service {
 
 		$response = wp_remote_post( esc_url_raw( $endpoint ), $args );
 
-		// If a custom endpoint returns HTML (marketing/login page), retry once with official API endpoint.
-		if ( ! is_wp_error( $response ) && $endpoint !== $this->default_openai_endpoint ) {
+		// If a custom endpoint returns HTML (marketing/login page), retry once with official Claude endpoint.
+		if ( ! is_wp_error( $response ) && $endpoint !== $this->default_claude_endpoint ) {
 			$first_body = (string) wp_remote_retrieve_body( $response );
 			if ( $this->is_probably_html_response( $first_body ) ) {
-				$response = wp_remote_post( esc_url_raw( $this->default_openai_endpoint ), $args );
-				$endpoint = $this->default_openai_endpoint;
+				$response = wp_remote_post( esc_url_raw( $this->default_claude_endpoint ), $args );
+				$endpoint = $this->default_claude_endpoint;
 			}
 		}
 
@@ -267,8 +266,8 @@ class Arriendo_Facil_AI_Service {
 		$data = $this->decode_json_flexible( $body );
 
 		if ( $status_code < 200 || $status_code >= 300 ) {
-			$error_message = isset( $data['error']['message'] ) ? (string) $data['error']['message'] : __( 'OpenAI request failed.', 'arriendo-facil' );
-			return new WP_Error( 'openai_http_error', $error_message );
+			$error_message = isset( $data['error']['message'] ) ? (string) $data['error']['message'] : __( 'Claude request failed.', 'arriendo-facil' );
+			return new WP_Error( 'claude_http_error', $error_message );
 		}
 
 		if ( null === $data ) {
@@ -279,13 +278,13 @@ class Arriendo_Facil_AI_Service {
 		$content = $this->extract_message_content( $data );
 
 		if ( '' === $content ) {
-			return new WP_Error( 'invalid_response', __( 'Empty response from ChatGPT.', 'arriendo-facil' ) );
+			return new WP_Error( 'invalid_response', __( 'Empty response from Claude.', 'arriendo-facil' ) );
 		}
 
 		$parsed_content = $this->decode_json_flexible( $content );
 		if ( null === $parsed_content ) {
 			$preview = $this->preview_body( $content );
-			return new WP_Error( 'invalid_response', sprintf( __( 'ChatGPT did not return valid JSON. Preview: %s', 'arriendo-facil' ), $preview ) );
+			return new WP_Error( 'invalid_response', sprintf( __( 'Claude did not return valid JSON. Preview: %s', 'arriendo-facil' ), $preview ) );
 		}
 
 		return $parsed_content;
@@ -323,12 +322,23 @@ class Arriendo_Facil_AI_Service {
 	}
 
 	/**
-	 * Extracts content text from OpenAI-compatible response payload.
+	 * Extracts content text from Claude/OpenAI-compatible response payload.
 	 *
 	 * @param array $data Decoded response payload.
 	 * @return string
 	 */
 	private function extract_message_content( array $data ) {
+		if ( isset( $data['content'] ) && is_array( $data['content'] ) ) {
+			$parts = array();
+			foreach ( $data['content'] as $item ) {
+				if ( is_array( $item ) && isset( $item['type'] ) && 'text' === (string) $item['type'] && isset( $item['text'] ) && is_string( $item['text'] ) ) {
+					$parts[] = $item['text'];
+				}
+			}
+
+			return trim( implode( "\n", $parts ) );
+		}
+
 		if ( isset( $data['choices'][0]['message']['content'] ) && is_string( $data['choices'][0]['message']['content'] ) ) {
 			return trim( $data['choices'][0]['message']['content'] );
 		}
@@ -383,7 +393,8 @@ class Arriendo_Facil_AI_Service {
 		return false !== strpos( $sample, '<!doctype html' )
 			|| false !== strpos( $sample, '<html' )
 			|| false !== strpos( $sample, '<head' )
-			|| false !== strpos( $sample, 'openai | openai' );
+			|| false !== strpos( $sample, 'openai | openai' )
+			|| false !== strpos( $sample, 'anthropic' );
 	}
 
 	/**
@@ -529,7 +540,7 @@ class Arriendo_Facil_AI_Service {
 	}
 
 	/**
-	 * Sends owner data to ChatGPT endpoint to validate connectivity.
+	 * Sends owner data to Claude endpoint to validate connectivity.
 	 *
 	 * @return array Result of the operation.
 	 */
@@ -539,37 +550,36 @@ class Arriendo_Facil_AI_Service {
 		if ( empty( $owners ) ) {
 			return array(
 				'success' => false,
-				'message' => __( 'No owner records found to test ChatGPT.', 'arriendo-facil' ),
+				'message' => __( 'No owner records found to test Claude.', 'arriendo-facil' ),
 			);
 		}
 
 		if ( empty( $this->api_key ) ) {
 			return array(
 				'success' => false,
-				'message' => __( 'OpenAI API key is missing.', 'arriendo-facil' ),
+				'message' => __( 'Claude API key is missing.', 'arriendo-facil' ),
 			);
 		}
 
-		$endpoint = ! empty( $this->api_url ) ? $this->api_url : $this->default_openai_endpoint;
+		$endpoint = ! empty( $this->api_url ) ? $this->api_url : $this->default_claude_endpoint;
 
-		$prompt = 'Validate ChatGPT connectivity and provide a one-line summary for these owner records: ' . wp_json_encode( $owners );
+		$prompt = 'Validate Claude connectivity and provide a one-line summary for these owner records: ' . wp_json_encode( $owners );
 
 		$response = wp_remote_post(
 			esc_url_raw( $endpoint ),
 			array(
 				'timeout' => 20,
 				'headers' => array(
-					'Content-Type'  => 'application/json',
-					'Authorization' => 'Bearer ' . $this->api_key,
+					'Content-Type'      => 'application/json',
+					'x-api-key'         => $this->api_key,
+					'anthropic-version' => '2023-06-01',
 				),
 				'body'    => wp_json_encode(
 					array(
-						'model'    => $this->model,
+						'model'      => $this->model,
+						'max_tokens' => 256,
+						'system'     => 'You are a concise assistant.',
 						'messages' => array(
-							array(
-								'role'    => 'system',
-								'content' => 'You are a concise assistant.',
-							),
 							array(
 								'role'    => 'user',
 								'content' => $prompt,
@@ -591,7 +601,7 @@ class Arriendo_Facil_AI_Service {
 		if ( $status_code >= 200 && $status_code < 300 ) {
 			return array(
 				'success' => true,
-				'message' => __( 'ChatGPT connection successful with owner payload.', 'arriendo-facil' ),
+				'message' => __( 'Claude connection successful with owner payload.', 'arriendo-facil' ),
 			);
 		}
 
@@ -602,8 +612,8 @@ class Arriendo_Facil_AI_Service {
 		return array(
 			'success' => false,
 			'message' => sprintf(
-				/* translators: 1: HTTP status code from ChatGPT endpoint, 2: optional error message */
-				__( 'ChatGPT connection failed (HTTP %1$d). %2$s', 'arriendo-facil' ),
+				/* translators: 1: HTTP status code from Claude endpoint, 2: optional error message */
+				__( 'Claude connection failed (HTTP %1$d). %2$s', 'arriendo-facil' ),
 				(int) $status_code,
 				$error_text
 			),

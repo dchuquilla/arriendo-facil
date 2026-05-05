@@ -208,6 +208,26 @@ class Arriendo_Facil_AI_Service {
 	}
 
 	/**
+	 * Analyzes contract text directly to infer where fields should be filled.
+	 * Used when template has NO blanks but needs field mapping.
+	 *
+	 * @param array $context Contract text and reservation data.
+	 * @return array|WP_Error Response array with key 'field_locations'.
+	 */
+	public function analyze_contract_for_fields( array $context ) {
+		$payload = array(
+			'action' => 'analyze_contract_for_fields',
+			'data'   => $context,
+		);
+
+		$response = $this->request( $payload );
+
+		$this->log( 'analyze_contract_for_fields', $context, $response );
+
+		return $response;
+	}
+
+	/**
 	 * Sends a POST request to Claude and expects JSON content in the response.
 	 *
 	 * @param array $payload Request payload.
@@ -468,31 +488,72 @@ class Arriendo_Facil_AI_Service {
 				. wp_json_encode( $data );
 		}
 
-		if ( 'map_template_word_agent' === $action ) {
-			return "### AGENT WORD: MAPEO DE BLANCOS DOCX CON CONFIANZA ###\n"
-				. "Rol: Eres un agente experto en plantillas de contrato DOCX para arrendamiento en Ecuador.\n"
-				. "Objetivo: mapear cada blank a una sola clave canonica permitida sin reescribir el contrato.\n\n"
-				. "Reglas estrictas:\n"
-				. "1) Confianza obligatoria: Para CADA blank, asigna confianza: HIGH / MEDIUM / NONE\n"
-				. "   - HIGH: contexto muy claro, señales múltiples, imposible equivocarse\n"
-				. "   - MEDIUM: contexto parcial, algunas señales conflictivas\n"
-				. "   - NONE: contexto ambiguo o ausente\n"
-				. "2) Solo usar HIGH para campos críticos (guest_name, owner_name, monthly_rent, accommodation_address)\n"
-				. "3) Si no hay certeza alta, devolver confidence NONE: el blank quedará en blanco (seguro)\n"
-				. "4) No mezclar roles: arrendador != arrendatario.\n"
-				. "5) Priorizar senales fuertes de contexto:\n"
-				. "   - 'cedula'/'ciudadania' cerca del blank => owner_id_number o guest_id_number segun rol.\n"
-				. "   - 'sr.'/'srta.'/'sra.' junto a rol => owner_name o guest_name segun texto legal.\n"
-				. "   - 'canon', 'usd por mes', 'renta' => monthly_rent.\n"
-				. "   - 'ubicada en', 'calle', 'direccion' => accommodation_address.\n"
-				. "   - 'inmueble', 'departamento', 'casa' => accommodation_title.\n"
-				. "6) Plantillas DOCX pueden tener blanks por tabs (\\t): tratarlos como campos válidos.\n"
-				. "7) Salida: SOLO JSON válido con forma exacta:\n"
-				. "   {\"line_map\": {\"blank_0\": [\"canonical_key\", \"HIGH\"], \"blank_1\": [\"other_key\", \"MEDIUM\"], ...}}\n"
-				. "8) canonical_key solo puede ser una de las permitidas abajo. Si no hay mapeo, usar \"\" vacío.\n\n"
+		if ( 'analyze_contract_for_fields' === $action ) {
+			return "### ANALISIS DE CONTRATO PARA DETECCION DE CAMPOS ###\n"
+				. "Rol: Analiza un contrato legalmente para inferir DÓNDE y QUÉ datos deben ser completados.\n"
+				. "Objetivo: Detectar ubicaciones de campos incluso sin blancos explícitos (___, ..., …).\n\n"
+				. "Instrucciones:\n"
+				. "1) Lee el texto completo del contrato.\n"
+				. "2) Identifica patrones donde faltan valores, tales como:\n"
+				. "   - Después de 'Arrendatario: ' o 'Sr. / Sra. ' => guest_name\n"
+				. "   - Después de 'Cédula' y cerca de 'arrendatario' => guest_id_number\n"
+				. "   - Después de 'Propietario: ' o 'Arrendador: ' => owner_name\n"
+				. "   - Después de 'Cédula' y cerca de 'arrendador' => owner_id_number\n"
+				. "   - Después de 'USD', 'canon', 'renta', 'mensual' => monthly_rent\n"
+				. "   - Después de 'Ubicada en', 'Domicilio: ' => accommodation_address\n"
+				. "   - Después de 'Inmueble: ', 'Propiedad: ' => accommodation_title\n"
+				. "   - Después de 'Garantía: ', 'Depósito: ' => guarantee_text\n"
+				. "   - Después de 'Desde', 'Inicio', 'A partir de' => start_date\n"
+				. "   - Después de 'Hasta', 'Finaliza en', 'Vence' => end_date\n"
+				. "   - Después de 'Email', 'Correo' => guest_email\n"
+				. "   - Después de 'Teléfono', 'Celular' => guest_phone\n\n"
+				. "3) Para CADA campo identificado:\n"
+				. "   - Nombre del campo (canonical key)\n"
+				. "   - Ubicación aproximada en el contrato (párrafo/línea)\n"
+				. "   - Confianza: HIGH/MEDIUM/NONE\n\n"
+				. "4) Salida JSON:\n"
+				. "   {\"field_locations\": [\n"
+				. "     {\"field\": \"guest_name\", \"location\": \"Párrafo 2, línea 5\", \"confidence\": \"HIGH\"},\n"
+				. "     {\"field\": \"monthly_rent\", \"location\": \"Párrafo 4, línea 12\", \"confidence\": \"HIGH\"},\n"
+				. "     ...\n"
+				. "   ]}\n\n"
 				. "Claves permitidas:\n"
 				. implode( ', ', isset( $data['allowed_canonical'] ) && is_array( $data['allowed_canonical'] ) ? $data['allowed_canonical'] : array() )
-				. "\n\nEntrada:\n"
+				. "\n\nContrato a analizar:\n"
+				. wp_json_encode( $data );
+		}
+
+		if ( 'map_template_word_agent' === $action ) {
+			return "### AGENT WORD: MAPEO DE BLANCOS Y CAMPOS DOCX ###\n"
+				. "Rol: Eres un agente experto en plantillas de contrato DOCX para arrendamiento en Ecuador.\n"
+				. "Objetivo: mapear cada blank/espacio a su campo correspondiente para completarlo automáticamente.\n\n"
+				. "Reglas:\n"
+				. "1) Detecta todos los espacios a completar en el contrato, no solo blancos con guiones/puntos.\n"
+				. "2) Busca palabras clave que indiquen qué campo va en cada lugar:\n"
+				. "   - 'nombre', 'sr.', 'srta.' junto con 'arrendador'/'propietario' => owner_name\n"
+				. "   - 'nombre', 'sr.', 'srta.' junto con 'arrendatario'/'inquilino' => guest_name\n"
+				. "   - 'cedula', 'identificacion' junto con 'arrendador' => owner_id_number\n"
+				. "   - 'cedula', 'identificacion' junto con 'arrendatario' => guest_id_number\n"
+				. "   - 'canon', 'renta', 'monto', 'mensual', 'valor', 'usd' => monthly_rent\n"
+				. "   - 'fecha', 'inicio', 'desde', 'comienza' => start_date\n"
+				. "   - 'hasta', 'termina', 'vencimiento', 'fin', 'finaliza' => end_date\n"
+				. "   - 'ubicada', 'direccion', 'domicilio', 'calle', 'avenida' => accommodation_address\n"
+				. "   - 'inmueble', 'propiedad', 'departamento', 'casa', 'local' => accommodation_title\n"
+				. "   - 'email', 'correo', 'mail' => guest_email o owner_email (según contexto)\n"
+				. "   - 'telefono', 'celular', 'movil', 'contacto' => guest_phone\n"
+				. "   - 'garantia', 'deposito', 'fianza', 'caucion' => guarantee_text\n\n"
+				. "3) Para CADA blank/campo detectado:\n"
+				. "   - Asigna confianza: HIGH (muy claro), MEDIUM (parcial), NONE (ambiguo)\n"
+				. "   - Mapea a UNA sola clave canonica (ver lista abajo)\n"
+				. "   - Si no puedes mapear, devuelve \"\" (quedará en blanco)\n\n"
+				. "4) Prioridad: Campos críticos (nombres, montos, fechas, direcciones) = HIGH\n"
+				. "5) NO inventar datos ni reescribir. Solo mapear dónde van.\n"
+				. "6) Salida OBLIGATORIA: JSON válido con TODOS los blancos encontrados:\n"
+				. "   {\"line_map\": {\"blank_0\": [\"guest_name\", \"HIGH\"], \"blank_1\": [\"monthly_rent\", \"HIGH\"], ...}}\n"
+				. "7) Si encuentra 0 blancos, devolver {\"line_map\": {}}\n\n"
+				. "Claves canónicas permitidas (SOLO estas):\n"
+				. implode( ', ', isset( $data['allowed_canonical'] ) && is_array( $data['allowed_canonical'] ) ? $data['allowed_canonical'] : array() )
+				. "\n\nDatos del contrato:\n"
 				. wp_json_encode( $data );
 		}
 

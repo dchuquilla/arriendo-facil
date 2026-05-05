@@ -379,6 +379,10 @@ class Arriendo_Facil_Owner_Contact {
 				ARRAY_A
 			);
 
+			if ( is_array( $contact ) && isset( $contact['temp_password_hash'] ) ) {
+				unset( $contact['temp_password_hash'] );
+			}
+
 			if ( $is_xhr ) {
 				wp_send_json_success(
 					array(

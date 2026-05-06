@@ -165,12 +165,21 @@ class Arriendo_Facil_Accommodation {
 	public function render_meta_box( $post ) {
 		wp_nonce_field( 'af_save_accommodation_meta', 'af_accommodation_nonce' );
 
-		$address     = get_post_meta( $post->ID, '_af_address', true );
-		$bedrooms    = get_post_meta( $post->ID, '_af_bedrooms', true );
-		$bathrooms   = get_post_meta( $post->ID, '_af_bathrooms', true );
-		$monthly_rent = get_post_meta( $post->ID, '_af_monthly_rent', true );
-		$owner_id    = get_post_meta( $post->ID, '_af_owner_id', true );
-		$status      = get_post_meta( $post->ID, '_af_status', true );
+		$address       = get_post_meta( $post->ID, '_af_address', true );
+		$location_text = get_post_meta( $post->ID, '_af_location_text', true );
+		$latitude      = get_post_meta( $post->ID, '_af_latitude', true );
+		$longitude     = get_post_meta( $post->ID, '_af_longitude', true );
+		$bedrooms      = get_post_meta( $post->ID, '_af_bedrooms', true );
+		$bathrooms     = get_post_meta( $post->ID, '_af_bathrooms', true );
+		$monthly_rent  = get_post_meta( $post->ID, '_af_monthly_rent', true );
+		$property_type = get_post_meta( $post->ID, '_af_property_type', true );
+		$square_meters = get_post_meta( $post->ID, '_af_square_meters', true );
+		$amenities     = get_post_meta( $post->ID, '_af_amenities', true );
+		if ( ! is_array( $amenities ) ) {
+			$amenities = array();
+		}
+		$owner_id      = get_post_meta( $post->ID, '_af_owner_id', true );
+		$status        = get_post_meta( $post->ID, '_af_status', true );
 		$owner_options = $this->get_owner_user_options();
 		$is_owner_user = $this->is_owner_user( get_current_user_id() );
 
@@ -190,6 +199,9 @@ class Arriendo_Facil_Accommodation {
 			return;
 		}
 
+		// Invalidate search cache
+		$this->invalidate_search_cache();
+
 		$current_user_id = get_current_user_id();
 		$is_owner_user   = $this->is_owner_user( $current_user_id );
 
@@ -206,11 +218,16 @@ class Arriendo_Facil_Accommodation {
 		}
 
 		$fields = array(
-			'_af_address'      => 'sanitize_text_field',
-			'_af_bedrooms'     => 'absint',
-			'_af_bathrooms'    => 'absint',
-			'_af_monthly_rent' => 'floatval',
-			'_af_status'       => 'sanitize_text_field',
+			'_af_address'       => 'sanitize_text_field',
+			'_af_location_text' => 'sanitize_text_field',
+			'_af_latitude'      => 'floatval',
+			'_af_longitude'     => 'floatval',
+			'_af_bedrooms'      => 'absint',
+			'_af_bathrooms'     => 'absint',
+			'_af_monthly_rent'  => 'floatval',
+			'_af_status'        => 'sanitize_text_field',
+			'_af_property_type' => 'sanitize_text_field',
+			'_af_square_meters' => 'floatval',
 		);
 
 		foreach ( $fields as $key => $sanitize_cb ) {
@@ -218,6 +235,11 @@ class Arriendo_Facil_Accommodation {
 			if ( isset( $_POST[ $form_key ] ) ) {
 				update_post_meta( $post_id, $key, call_user_func( $sanitize_cb, wp_unslash( $_POST[ $form_key ] ) ) );
 			}
+		}
+
+		if ( isset( $_POST['af_amenities'] ) && is_array( $_POST['af_amenities'] ) ) {
+			$amenities = array_map( 'sanitize_text_field', wp_unslash( $_POST['af_amenities'] ) );
+			update_post_meta( $post_id, '_af_amenities', $amenities );
 		}
 
 		if ( ! $is_owner_user && isset( $_POST['af_owner_id'] ) ) {
@@ -567,6 +589,19 @@ class Arriendo_Facil_Accommodation {
 		$roles = isset( $user->roles ) && is_array( $user->roles ) ? $user->roles : array();
 
 		return in_array( 'af_owner', $roles, true );
+	}
+
+	/**
+	 * Invalidates search result cache.
+	 */
+	private function invalidate_search_cache() {
+		global $wpdb;
+		$wpdb->query(
+			$wpdb->prepare(
+				"DELETE FROM $wpdb->options WHERE option_name LIKE %s",
+				'_transient_af_search_results_%'
+			)
+		);
 	}
 
 	/**

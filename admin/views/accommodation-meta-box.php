@@ -4,14 +4,20 @@
  *
  * @package Arriendo_Facil
  * @var WP_Post $post         Current post object (in scope from render_meta_box).
- * @var string  $address      Current address meta value.
- * @var int     $bedrooms     Current bedrooms meta value.
- * @var int     $bathrooms    Current bathrooms meta value.
- * @var float   $monthly_rent Current monthly rent meta value.
- * @var int     $owner_id     Current owner user ID meta value.
- * @var string  $status       Current accommodation status meta value.
- * @var array   $owner_options Available owner options.
- * @var bool    $is_owner_user Whether current editor is an owner role.
+ * @var string  $address          Current address meta value.
+ * @var string  $location_text    Current location text meta value (city, neighborhood).
+ * @var float   $latitude         Current latitude meta value.
+ * @var float   $longitude        Current longitude meta value.
+ * @var int     $bedrooms         Current bedrooms meta value.
+ * @var int     $bathrooms        Current bathrooms meta value.
+ * @var float   $monthly_rent     Current monthly rent meta value.
+ * @var string  $property_type    Current property type meta value.
+ * @var float   $square_meters    Current square meters meta value.
+ * @var array   $amenities        Current amenities meta value (array).
+ * @var int     $owner_id         Current owner user ID meta value.
+ * @var string  $status           Current accommodation status meta value.
+ * @var array   $owner_options    Available owner options.
+ * @var bool    $is_owner_user    Whether current editor is an owner role.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -19,10 +25,29 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 $statuses = array(
-	'available'  => __( 'Available', 'arriendo-facil' ),
-	'rented'     => __( 'Rented', 'arriendo-facil' ),
-	'maintenance'=> __( 'Maintenance', 'arriendo-facil' ),
-	'inactive'   => __( 'Inactive', 'arriendo-facil' ),
+	'available'   => __( 'Available', 'arriendo-facil' ),
+	'rented'      => __( 'Rented', 'arriendo-facil' ),
+	'maintenance' => __( 'Maintenance', 'arriendo-facil' ),
+	'inactive'    => __( 'Inactive', 'arriendo-facil' ),
+);
+
+$property_types = array(
+	'apartment'  => __( 'Apartment', 'arriendo-facil' ),
+	'house'      => __( 'House', 'arriendo-facil' ),
+	'office'     => __( 'Office', 'arriendo-facil' ),
+	'room'       => __( 'Room', 'arriendo-facil' ),
+	'commercial' => __( 'Commercial', 'arriendo-facil' ),
+);
+
+$amenities_options = array(
+	'pet-friendly' => __( 'Pet Friendly', 'arriendo-facil' ),
+	'wifi'         => __( 'WiFi', 'arriendo-facil' ),
+	'parking'      => __( 'Parking', 'arriendo-facil' ),
+	'pool'         => __( 'Pool', 'arriendo-facil' ),
+	'gym'          => __( 'Gym', 'arriendo-facil' ),
+	'kitchen'      => __( 'Kitchen', 'arriendo-facil' ),
+	'balcony'      => __( 'Balcony', 'arriendo-facil' ),
+	'ac'           => __( 'Air Conditioning', 'arriendo-facil' ),
 );
 ?>
 <table class="form-table">
@@ -31,6 +56,44 @@ $statuses = array(
 		<td>
 			<input type="text" id="af_address" name="af_address"
 				value="<?php echo esc_attr( $address ); ?>" class="regular-text" />
+		</td>
+	</tr>
+	<tr>
+		<th><label for="af_location_text"><?php esc_html_e( 'Location (City/Neighborhood)', 'arriendo-facil' ); ?></label></th>
+		<td>
+			<input type="text" id="af_location_text" name="af_location_text"
+				value="<?php echo esc_attr( $location_text ); ?>" class="regular-text"
+				placeholder="<?php esc_attr_e( 'e.g., Quito, La Carolina', 'arriendo-facil' ); ?>" />
+			<p class="description"><?php esc_html_e( 'Used for search by location', 'arriendo-facil' ); ?></p>
+		</td>
+	</tr>
+	<tr>
+		<th><label for="af_latitude"><?php esc_html_e( 'Latitude', 'arriendo-facil' ); ?></label></th>
+		<td>
+			<input type="number" id="af_latitude" name="af_latitude" step="0.0001" min="-90" max="90"
+				value="<?php echo esc_attr( $latitude ); ?>" class="regular-text"
+				placeholder="<?php esc_attr_e( 'e.g., -0.2015', 'arriendo-facil' ); ?>" />
+		</td>
+	</tr>
+	<tr>
+		<th><label for="af_longitude"><?php esc_html_e( 'Longitude', 'arriendo-facil' ); ?></label></th>
+		<td>
+			<input type="number" id="af_longitude" name="af_longitude" step="0.0001" min="-180" max="180"
+				value="<?php echo esc_attr( $longitude ); ?>" class="regular-text"
+				placeholder="<?php esc_attr_e( 'e.g., -78.4889', 'arriendo-facil' ); ?>" />
+		</td>
+	</tr>
+	<tr>
+		<th><label for="af_property_type"><?php esc_html_e( 'Property Type', 'arriendo-facil' ); ?></label></th>
+		<td>
+			<select id="af_property_type" name="af_property_type">
+				<option value=""><?php esc_html_e( 'Select type', 'arriendo-facil' ); ?></option>
+				<?php foreach ( $property_types as $type_value => $type_label ) : ?>
+					<option value="<?php echo esc_attr( $type_value ); ?>" <?php selected( $property_type, $type_value ); ?>>
+						<?php echo esc_html( $type_label ); ?>
+					</option>
+				<?php endforeach; ?>
+			</select>
 		</td>
 	</tr>
 	<tr>
@@ -45,6 +108,28 @@ $statuses = array(
 		<td>
 			<input type="number" id="af_bathrooms" name="af_bathrooms" min="0"
 				value="<?php echo esc_attr( $bathrooms ); ?>" class="small-text" />
+		</td>
+	</tr>
+	<tr>
+		<th><label for="af_square_meters"><?php esc_html_e( 'Square Meters', 'arriendo-facil' ); ?></label></th>
+		<td>
+			<input type="number" id="af_square_meters" name="af_square_meters" step="0.01" min="0"
+				value="<?php echo esc_attr( $square_meters ); ?>" class="small-text" />
+		</td>
+	</tr>
+	<tr>
+		<th><label><?php esc_html_e( 'Amenities', 'arriendo-facil' ); ?></label></th>
+		<td>
+			<fieldset>
+				<?php foreach ( $amenities_options as $amenity_value => $amenity_label ) : ?>
+					<label>
+						<input type="checkbox" name="af_amenities[]"
+							value="<?php echo esc_attr( $amenity_value ); ?>"
+							<?php checked( in_array( $amenity_value, $amenities, true ) ); ?> />
+						<?php echo esc_html( $amenity_label ); ?>
+					</label><br />
+				<?php endforeach; ?>
+			</fieldset>
 		</td>
 	</tr>
 	<tr>

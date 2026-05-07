@@ -575,7 +575,8 @@ class Arriendo_Facil_Owner_Contact {
 					$raw_tpl_path = get_attached_file( (int) $attachment_id );
 					if ( $raw_tpl_path && file_exists( $raw_tpl_path ) ) {
 						$tpl_processor = new Arriendo_Facil_DOCX_Template_Processor();
-						$processed_path = $tpl_processor->process_owner_template( $raw_tpl_path, null );
+						$upload_ai_service = class_exists( 'Arriendo_Facil_AI_Service' ) ? new Arriendo_Facil_AI_Service() : null;
+						$processed_path = $tpl_processor->process_owner_template( $raw_tpl_path, $upload_ai_service );
 						if ( '' !== $processed_path ) {
 							update_post_meta( (int) $attachment_id, '_af_processed_template_path', $processed_path );
 						} else {

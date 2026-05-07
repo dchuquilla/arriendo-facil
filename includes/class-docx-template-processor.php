@@ -82,6 +82,434 @@ class Arriendo_Facil_DOCX_Template_Processor {
 	// ─────────────────────────────────────────────────────────────────────────
 
 	/**
+	 * Fills a DOCX contract directly using AI to detect and replace blanks.
+	 *
+	 * This is the PRIMARY path for owner templates. It:
+	 * 1. Extracts the full text from the DOCX.
+	 * 2. Detects ALL blank markers (underscores, dots, dashes, tabs, spaces).
+	 * 3. Sends the text + chatbot data to AI for field mapping.
+	 * 4. Replaces each blank with the actual value in the XML (preserving format).
+	 * 5. Writes the filled DOCX.
+	 *
+	 * Works with ANY template format — no pre-processing step needed.
+	 *
+	 * @param string                         $source_path  Original DOCX path.
+	 * @param string                         $output_path  Destination path for filled contract.
+	 * @param array                          $payload      Lease and guest data from chatbot.
+	 * @param Arriendo_Facil_AI_Service|null $ai_service   AI service for field detection.
+	 * @return bool True on success.
+	 */
+	public function fill_template_with_ai( $source_path, $output_path, array $payload, $ai_service = null ) {
+		$source_path = (string) $source_path;
+		$output_path = (string) $output_path;
+		$lease_id    = isset( $payload['lease_id'] ) ? (int) $payload['lease_id'] : 0;
+
+		if ( '' === $source_path || ! file_exists( $source_path ) || ! class_exists( 'ZipArchive' ) ) {
+			$this->log_docx_event( 'fill_with_ai_failed', array( 'reason' => 'source_invalid', 'lease_id' => $lease_id ) );
+			return false;
+		}
+
+		$zip = new ZipArchive();
+		if ( true !== $zip->open( $source_path ) ) {
+			$this->log_docx_event( 'fill_with_ai_failed', array( 'reason' => 'zip_open_failed', 'lease_id' => $lease_id ) );
+			return false;
+		}
+
+		$doc_xml = $zip->getFromName( 'word/document.xml' );
+		$zip->close();
+
+		if ( false === $doc_xml || '' === trim( (string) $doc_xml ) ) {
+			$this->log_docx_event( 'fill_with_ai_failed', array( 'reason' => 'xml_empty', 'lease_id' => $lease_id ) );
+			return false;
+		}
+
+		$doc_xml = (string) $doc_xml;
+
+		// Step 1: Convert legacy tokens first.
+		$doc_xml = $this->convert_legacy_tokens( $doc_xml );
+
+		// Step 2: Extract flat text and detect ALL blank sequences.
+		$flat_text = $this->extract_flat_text_from_doc_xml( $doc_xml );
+		if ( '' === $flat_text ) {
+			$this->log_docx_event( 'fill_with_ai_failed', array( 'reason' => 'flat_text_empty', 'lease_id' => $lease_id ) );
+			return false;
+		}
+
+		// Detect blanks: underscores, dots, dashes, ellipsis, tabs.
+		$blank_pattern = '/_{3,}|\.{4,}|…{2,}|-{4,}|\t+/u';
+		if ( ! preg_match_all( $blank_pattern, $flat_text, $matches, PREG_OFFSET_CAPTURE ) ) {
+			$this->log_docx_event( 'fill_with_ai_no_blanks', array( 'lease_id' => $lease_id, 'text_length' => strlen( $flat_text ) ) );
+			return false;
+		}
+
+		$blank_count = count( $matches[0] );
+		$this->log_docx_event( 'fill_with_ai_blanks_found', array( 'lease_id' => $lease_id, 'blank_count' => $blank_count ) );
+
+		// Step 3: Build context for each blank.
+		$ai_lines = array();
+		foreach ( $matches[0] as $idx => $match ) {
+			$blank_text = (string) $match[0];
+			$offset     = (int) $match[1];
+			$before     = substr( $flat_text, max( 0, $offset - 200 ), min( 200, $offset ) );
+			$after      = substr( $flat_text, $offset + strlen( $blank_text ), 200 );
+
+			$ai_lines[] = array(
+				'id'      => 'blank_' . $idx,
+				'before'  => $before,
+				'after'   => $after,
+				'blank'   => $blank_text,
+			);
+		}
+
+		// Step 4: Build the values map from chatbot payload.
+		$values = $this->build_placeholder_values( $payload );
+
+		// Step 5: Use AI to map each blank to its value.
+		$ai_replacements = array();
+		if ( $ai_service && method_exists( $ai_service, 'fill_contract_blanks' ) ) {
+			try {
+				$ai_result = $ai_service->fill_contract_blanks( array(
+					'contract_text'    => $flat_text,
+					'blanks'           => $ai_lines,
+					'available_values' => $values,
+					'payload'          => array(
+						'guest_name'            => $this->val( $payload, 'guest_name' ),
+						'guest_id_number'       => $this->val( $payload, 'guest_id_number' ),
+						'guest_phone'           => $this->val( $payload, 'guest_phone' ),
+						'guest_email'           => $this->val( $payload, 'guest_email' ),
+						'owner_name'            => $this->val( $payload, 'owner_name' ),
+						'owner_id_number'       => $this->val( $payload, 'owner_id_number' ),
+						'monthly_rent'          => isset( $payload['monthly_rent'] ) ? 'USD ' . number_format( (float) $payload['monthly_rent'], 2, '.', '' ) : '',
+						'start_date'            => $this->val( $payload, 'start_date' ),
+						'end_date'              => $this->val( $payload, 'end_date' ),
+						'accommodation_address' => $this->val( $payload, 'accommodation_address' ),
+						'accommodation_title'   => $this->val( $payload, 'accommodation_title' ),
+						'guarantee_text'        => $this->val( $payload, 'guarantee_text' ),
+					),
+				) );
+
+				if ( ! is_wp_error( $ai_result ) && isset( $ai_result['replacements'] ) && is_array( $ai_result['replacements'] ) ) {
+					$ai_replacements = $ai_result['replacements'];
+					$this->log_docx_event( 'fill_with_ai_mapped', array(
+						'lease_id'     => $lease_id,
+						'mapped_count' => count( $ai_replacements ),
+					) );
+				} else {
+					$error_msg = is_wp_error( $ai_result ) ? $ai_result->get_error_message() : 'no replacements in response';
+					$this->log_docx_event( 'fill_with_ai_mapping_failed', array( 'lease_id' => $lease_id, 'error' => $error_msg ) );
+				}
+			} catch ( \Throwable $e ) {
+				$this->log_docx_event( 'fill_with_ai_exception', array( 'lease_id' => $lease_id, 'error' => $e->getMessage() ) );
+			}
+		}
+
+		// If AI returned no useful mappings, fall back to context rules.
+		if ( empty( $ai_replacements ) ) {
+			$this->log_docx_event( 'fill_with_ai_using_context_fallback', array( 'lease_id' => $lease_id ) );
+			$ai_replacements = $this->map_blanks_by_context_rules( $ai_lines, $values );
+		}
+
+		if ( empty( $ai_replacements ) ) {
+			$this->log_docx_event( 'fill_with_ai_no_replacements', array( 'lease_id' => $lease_id ) );
+			return false;
+		}
+
+		// Step 6: Build ordered replacement values matching blank positions.
+		$ordered_values = array();
+		foreach ( $matches[0] as $idx => $match ) {
+			$blank_id = 'blank_' . $idx;
+			if ( isset( $ai_replacements[ $blank_id ] ) && '' !== trim( (string) $ai_replacements[ $blank_id ] ) ) {
+				$ordered_values[] = (string) $ai_replacements[ $blank_id ];
+			} else {
+				$ordered_values[] = null; // Keep original blank.
+			}
+		}
+
+		// Step 7: Replace blanks in the XML with actual values.
+		$filled_xml = $this->replace_blanks_in_xml_with_values( $doc_xml, $ordered_values );
+		if ( '' === $filled_xml ) {
+			$this->log_docx_event( 'fill_with_ai_xml_replace_failed', array( 'lease_id' => $lease_id ) );
+			return false;
+		}
+
+		// Step 8: Write the filled DOCX.
+		$result = $this->write_processed_docx( $source_path, $filled_xml, $output_path );
+		if ( '' === $result ) {
+			$this->log_docx_event( 'fill_with_ai_write_failed', array( 'lease_id' => $lease_id ) );
+			return false;
+		}
+
+		$filled_count = 0;
+		foreach ( $ordered_values as $v ) {
+			if ( null !== $v ) {
+				$filled_count++;
+			}
+		}
+
+		$this->log_docx_event( 'fill_with_ai_success', array(
+			'lease_id'     => $lease_id,
+			'blanks_total' => $blank_count,
+			'blanks_filled'=> $filled_count,
+			'output_path'  => $result,
+		) );
+
+		return true;
+	}
+
+	/**
+	 * Maps blanks to values using context rules when AI is unavailable.
+	 *
+	 * @param array $ai_lines  Blank context items.
+	 * @param array $values    Available placeholder values.
+	 * @return array<string,string> blank_id => replacement value.
+	 */
+	private function map_blanks_by_context_rules( array $ai_lines, array $values ) {
+		$result = array();
+
+		foreach ( $ai_lines as $line ) {
+			$blank_id = isset( $line['id'] ) ? (string) $line['id'] : '';
+			$before   = isset( $line['before'] ) ? (string) $line['before'] : '';
+			$after    = isset( $line['after'] ) ? (string) $line['after'] : '';
+
+			$idx = 0;
+			if ( preg_match( '/(\d+)$/', $blank_id, $m ) ) {
+				$idx = (int) $m[1];
+			}
+
+			$placeholder = $this->infer_placeholder_from_context( $before, $after, $idx );
+
+			if ( 0 === strpos( $placeholder, 'CAMPO_' ) ) {
+				continue;
+			}
+
+			if ( isset( $values[ $placeholder ] ) && '...............' !== $values[ $placeholder ] ) {
+				$result[ $blank_id ] = $values[ $placeholder ];
+			}
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Replaces blank sequences in the DOCX XML with actual values, preserving formatting.
+	 *
+	 * Uses DOM traversal to handle blanks split across multiple <w:t> nodes.
+	 *
+	 * @param string     $doc_xml        Raw word/document.xml content.
+	 * @param list<string|null> $ordered_values Values in document order. null = keep original.
+	 * @return string Modified XML, or '' on failure.
+	 */
+	private function replace_blanks_in_xml_with_values( $doc_xml, array $ordered_values ) {
+		if ( ! class_exists( 'DOMDocument' ) || ! class_exists( 'DOMXPath' ) ) {
+			return $this->replace_blanks_in_xml_with_values_regex( $doc_xml, $ordered_values );
+		}
+
+		$dom = new DOMDocument();
+		if ( ! @$dom->loadXML( (string) $doc_xml, LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING ) ) {
+			return $this->replace_blanks_in_xml_with_values_regex( $doc_xml, $ordered_values );
+		}
+
+		$xpath = new DOMXPath( $dom );
+		$xpath->registerNamespace( 'w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main' );
+		$text_nodes = $xpath->query( '//w:t|//w:tab' );
+
+		if ( ! $text_nodes || 0 === $text_nodes->length ) {
+			return $this->replace_blanks_in_xml_with_values_regex( $doc_xml, $ordered_values );
+		}
+
+		// Collect all nodes and build char-level entries.
+		$nodes = array();
+		foreach ( $text_nodes as $node ) {
+			$nodes[] = $node;
+		}
+
+		$entries     = array();
+		$nodes_chars = array();
+		$node_kind   = array();
+
+		foreach ( $nodes as $node_index => $node ) {
+			$local_name = (string) $node->localName;
+			if ( 'tab' === $local_name ) {
+				$node_kind[ $node_index ] = 'tab';
+				$entries[] = array( 'node' => $node_index, 'char' => 0, 'text' => "\t", 'kind' => 'tab' );
+				continue;
+			}
+
+			$node_kind[ $node_index ] = 'text';
+			$text  = (string) $node->textContent;
+			$chars = preg_split( '//u', $text, -1, PREG_SPLIT_NO_EMPTY );
+			if ( ! is_array( $chars ) ) {
+				$chars = array();
+			}
+
+			$nodes_chars[ $node_index ] = $chars;
+			foreach ( $chars as $char_index => $char ) {
+				$entries[] = array( 'node' => $node_index, 'char' => $char_index, 'text' => $char, 'kind' => 'text' );
+			}
+		}
+
+		if ( empty( $entries ) ) {
+			return '';
+		}
+
+		// Find blank sequences and map to ordered_values.
+		$replace_at = array();
+		$remove_at  = array();
+		$counter    = 0;
+		$total      = count( $entries );
+		$i          = 0;
+
+		while ( $i < $total ) {
+			$char = $entries[ $i ]['text'];
+			if ( ! $this->is_blank_marker_char_extended( $char ) ) {
+				$i++;
+				continue;
+			}
+
+			$start       = $i;
+			$blank_count = 1;
+			$j           = $i + 1;
+
+			while ( $j < $total ) {
+				$next_char = $entries[ $j ]['text'];
+				if ( $this->is_blank_marker_char_extended( $next_char ) ) {
+					$blank_count++;
+					$j++;
+					continue;
+				}
+				if ( preg_match( '/\s/u', $next_char ) && $blank_count < 3 ) {
+					$j++;
+					continue;
+				}
+				break;
+			}
+
+			$start_char = isset( $entries[ $start ]['text'] ) ? (string) $entries[ $start ]['text'] : '';
+			$min_count  = "\t" === $start_char ? 1 : 3;
+
+			if ( $blank_count >= $min_count ) {
+				$replacement = isset( $ordered_values[ $counter ] ) ? $ordered_values[ $counter ] : null;
+				$counter++;
+
+				if ( null === $replacement ) {
+					$i = $j;
+					continue;
+				}
+
+				$replace_at[ $start ] = $replacement;
+				for ( $k = $start; $k < $j; $k++ ) {
+					$remove_at[ $k ] = true;
+				}
+				$remove_at[ $start ] = false;
+			}
+
+			$i = $j;
+		}
+
+		if ( empty( $replace_at ) ) {
+			return (string) $dom->saveXML( $dom->documentElement );
+		}
+
+		// Apply replacements.
+		$tab_replace_nodes = array();
+		$tab_remove_nodes  = array();
+
+		foreach ( $entries as $entry_index => $entry ) {
+			$node_index = (int) $entry['node'];
+			$char_index = (int) $entry['char'];
+			$kind       = isset( $entry['kind'] ) ? (string) $entry['kind'] : 'text';
+
+			if ( 'tab' === $kind ) {
+				if ( isset( $replace_at[ $entry_index ] ) ) {
+					$tab_replace_nodes[ $node_index ] = (string) $replace_at[ $entry_index ];
+				} elseif ( ! empty( $remove_at[ $entry_index ] ) ) {
+					$tab_remove_nodes[ $node_index ] = true;
+				}
+				continue;
+			}
+
+			if ( isset( $replace_at[ $entry_index ] ) ) {
+				$nodes_chars[ $node_index ][ $char_index ] = $replace_at[ $entry_index ];
+			} elseif ( ! empty( $remove_at[ $entry_index ] ) ) {
+				$nodes_chars[ $node_index ][ $char_index ] = '';
+			}
+		}
+
+		foreach ( $nodes as $node_index => $node ) {
+			if ( isset( $node_kind[ $node_index ] ) && 'text' === $node_kind[ $node_index ] && isset( $nodes_chars[ $node_index ] ) ) {
+				$node->nodeValue = implode( '', $nodes_chars[ $node_index ] );
+			}
+		}
+
+		foreach ( $nodes as $node_index => $node ) {
+			if ( ! isset( $node_kind[ $node_index ] ) || 'tab' !== $node_kind[ $node_index ] ) {
+				continue;
+			}
+
+			$parent = $node->parentNode;
+			if ( ! $parent ) {
+				continue;
+			}
+
+			if ( isset( $tab_replace_nodes[ $node_index ] ) ) {
+				$text_node = $dom->createElementNS( 'http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'w:t' );
+				$text_node->appendChild( $dom->createTextNode( $tab_replace_nodes[ $node_index ] ) );
+				$parent->replaceChild( $text_node, $node );
+			} elseif ( isset( $tab_remove_nodes[ $node_index ] ) ) {
+				$parent->removeChild( $node );
+			}
+		}
+
+		return (string) $dom->saveXML( $dom->documentElement );
+	}
+
+	/**
+	 * Regex fallback for replacing blanks when DOM is unavailable.
+	 *
+	 * @param string          $doc_xml        Raw XML.
+	 * @param list<string|null> $ordered_values Values in document order.
+	 * @return string
+	 */
+	private function replace_blanks_in_xml_with_values_regex( $doc_xml, array $ordered_values ) {
+		$counter = 0;
+
+		return (string) preg_replace_callback(
+			'/(<w:t(?:[^>]*)>)([\s\S]*?)(<\/w:t>)/',
+			function ( $m ) use ( &$counter, $ordered_values ) {
+				$open    = $m[1];
+				$content = $m[2];
+				$close   = $m[3];
+
+				$new_content = (string) preg_replace_callback(
+					'/_{3,}|\.{4,}|…{2,}|-{4,}/u',
+					function ( $blank_match ) use ( &$counter, $ordered_values ) {
+						$replacement = isset( $ordered_values[ $counter ] ) ? $ordered_values[ $counter ] : null;
+						$counter++;
+						if ( null === $replacement ) {
+							return $blank_match[0];
+						}
+						return htmlspecialchars( $replacement, ENT_COMPAT, 'UTF-8' );
+					},
+					$content
+				);
+
+				return $open . $new_content . $close;
+			},
+			(string) $doc_xml
+		);
+	}
+
+	/**
+	 * Extended blank marker detection including dashes.
+	 *
+	 * @param string $char One UTF-8 character.
+	 * @return bool
+	 */
+	private function is_blank_marker_char_extended( $char ) {
+		return '_' === $char || '.' === $char || '…' === $char || '-' === $char || "\t" === $char;
+	}
+
+	/**
 	 * Processes an owner DOCX template: detects blank fields, maps them to
 	 * canonical ${PLACEHOLDER} markers, and writes a processed copy.
 	 *

@@ -208,6 +208,32 @@ class Arriendo_Facil_AI_Service {
 	}
 
 	/**
+	 * Fills contract blanks by sending the full text + detected blanks + chatbot data to AI.
+	 *
+	 * The AI returns a JSON object mapping each blank_N to the value that should replace it.
+	 *
+	 * @param array $context {
+	 *     @type string $contract_text    Full flat text of the contract.
+	 *     @type array  $blanks           Array of blank context items (id, before, after, blank).
+	 *     @type array  $available_values Placeholder values from build_placeholder_values().
+	 *     @type array  $payload          Key chatbot fields (guest_name, owner_name, etc.).
+	 * }
+	 * @return array|WP_Error Response array with key 'replacements'.
+	 */
+	public function fill_contract_blanks( array $context ) {
+		$payload = array(
+			'action' => 'fill_contract_blanks',
+			'data'   => $context,
+		);
+
+		$response = $this->request( $payload );
+
+		$this->log( 'fill_contract_blanks', $context, $response );
+
+		return $response;
+	}
+
+	/**
 	 * Analyzes contract text directly to infer where fields should be filled.
 	 * Used when template has NO blanks but needs field mapping.
 	 *
@@ -240,6 +266,11 @@ class Arriendo_Facil_AI_Service {
 
 		$endpoint = ! empty( $this->api_url ) ? $this->api_url : $this->default_claude_endpoint;
 		$prompt   = $this->build_action_prompt( $payload );
+		$action   = isset( $payload['action'] ) ? (string) $payload['action'] : '';
+
+		$heavy_actions = array( 'fill_contract_blanks', 'generate_document', 'map_template_word_agent' );
+		$timeout    = in_array( $action, $heavy_actions, true ) ? 60 : 30;
+		$max_tokens = in_array( $action, $heavy_actions, true ) ? 4096 : 2048;
 
 		$args = array(
 			'method'  => 'POST',
@@ -252,7 +283,7 @@ class Arriendo_Facil_AI_Service {
 			'body'    => wp_json_encode(
 				array(
 					'model'           => $this->model,
-					'max_tokens'      => 2048,
+					'max_tokens'      => $max_tokens,
 					'temperature'     => 0,
 					'system'          => 'You are a rental management assistant. Return strictly valid JSON only.',
 					'messages'        => array(
@@ -263,7 +294,7 @@ class Arriendo_Facil_AI_Service {
 					),
 				),
 			),
-			'timeout' => 30,
+			'timeout' => $timeout,
 		);
 
 		$response = wp_remote_post( esc_url_raw( $endpoint ), $args );
@@ -486,6 +517,41 @@ class Arriendo_Facil_AI_Service {
 				. implode( ', ', isset( $data['allowed_canonical'] ) && is_array( $data['allowed_canonical'] ) ? $data['allowed_canonical'] : array() )
 				. "\n\nDATOS:\n"
 				. wp_json_encode( $data );
+		}
+
+		if ( 'fill_contract_blanks' === $action ) {
+			$blanks_json  = isset( $data['blanks'] ) ? wp_json_encode( $data['blanks'] ) : '[]';
+			$payload_json = isset( $data['payload'] ) ? wp_json_encode( $data['payload'] ) : '{}';
+			$contract     = isset( $data['contract_text'] ) ? (string) $data['contract_text'] : '';
+
+			return "### AGENTE DE COMPLETACIÓN DE CONTRATO ###\n"
+				. "Rol: Eres un agente experto en contratos de arrendamiento en Ecuador. Tu tarea es COMPLETAR un contrato reemplazando cada espacio en blanco con el dato correcto de la reserva.\n\n"
+				. "INSTRUCCIONES:\n"
+				. "1) Se te proporcionan: el texto completo del contrato, una lista de blancos detectados (con su contexto antes/después), y los datos de la reserva.\n"
+				. "2) Para CADA blanco (blank_0, blank_1, ...), determina QUÉ dato de la reserva corresponde basándote en el contexto.\n"
+				. "3) Reglas de mapeo:\n"
+				. "   - 'señor/señora' + contexto de arrendatario/inquilino => guest_name\n"
+				. "   - 'señor/señora' + contexto de arrendador/propietario => owner_name\n"
+				. "   - 'cédula/identificación' + cerca de arrendatario => guest_id_number\n"
+				. "   - 'cédula/identificación' + cerca de arrendador => owner_id_number\n"
+				. "   - 'canon/renta/monto/mensual/USD' => monthly_rent\n"
+				. "   - 'fecha de inicio/desde/a partir de' => start_date\n"
+				. "   - 'hasta/vencimiento/fin' => end_date\n"
+				. "   - 'ubicada en/dirección/calle' => accommodation_address\n"
+				. "   - 'inmueble/propiedad/departamento' => accommodation_title\n"
+				. "   - 'garantía/depósito/fianza' => guarantee_text\n"
+				. "   - 'teléfono/celular' => guest_phone\n"
+				. "   - 'correo/email' => guest_email\n"
+				. "4) Si un blanco NO tiene dato correspondiente o el contexto es ambiguo, devuelve cadena vacía \"\" para ese blanco.\n"
+				. "5) NO inventes datos. USA EXCLUSIVAMENTE los valores proporcionados en DATOS_RESERVA.\n"
+				. "6) Devuelve ÚNICAMENTE JSON válido con esta estructura exacta:\n"
+				. "   {\"replacements\": {\"blank_0\": \"valor\", \"blank_1\": \"valor\", ...}}\n\n"
+				. "DATOS_RESERVA (usa SOLO estos valores):\n"
+				. $payload_json . "\n\n"
+				. "BLANCOS DETECTADOS (con contexto):\n"
+				. $blanks_json . "\n\n"
+				. "TEXTO COMPLETO DEL CONTRATO:\n"
+				. $contract;
 		}
 
 		if ( 'analyze_contract_for_fields' === $action ) {

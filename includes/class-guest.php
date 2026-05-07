@@ -710,57 +710,52 @@ class Arriendo_Facil_Guest {
 		$file_name = sprintf( 'lease-%d-owner-template-%s.docx', $lease_id, gmdate( 'Ymd-His' ) );
 		$file_path = trailingslashit( $contracts_dir ) . $file_name;
 
-		// Phase 1: PHPWord TemplateProcessor using the pre-processed template (preferred).
-		$phpword_success    = false;
-		$processed_tpl_path = (string) get_post_meta( $attachment_id, '_af_processed_template_path', true );
+		// PRIMARY PATH: AI-driven direct fill (works with any template format).
+		$phpword_success = false;
 
-		// Check if cached processed template exists and is valid.
-		// Only reprocess if cache is missing or file doesn't exist locally.
-		$use_cached = false;
-		if ( '' !== $processed_tpl_path && file_exists( $processed_tpl_path ) ) {
-			$use_cached = true;
-			error_log( 'Arriendo Facil owner-template generation: using cached processed template for lease_id=' . $lease_id . ', attachment_id=' . $attachment_id );
-		} else {
-			// Reprocess only if cache is missing or invalid.
-			if ( class_exists( 'Arriendo_Facil_DOCX_Template_Processor' ) ) {
-				$tpl_proc      = new Arriendo_Facil_DOCX_Template_Processor();
-				$processed_new = $tpl_proc->process_owner_template( $template_path, null, $processed_tpl_path, $payload );
+		if ( class_exists( 'Arriendo_Facil_DOCX_Template_Processor' ) ) {
+			$tpl_proc   = new Arriendo_Facil_DOCX_Template_Processor();
+			$ai_service = class_exists( 'Arriendo_Facil_AI_Service' ) ? new Arriendo_Facil_AI_Service() : null;
+
+			if ( $ai_service && $tpl_proc->fill_template_with_ai( $template_path, $file_path, $payload, $ai_service ) ) {
+				$phpword_success = true;
+				error_log( 'Arriendo Facil owner-template generation: fill_template_with_ai succeeded for lease_id=' . $lease_id );
+			} else {
+				error_log( 'Arriendo Facil owner-template generation: fill_template_with_ai failed or unavailable for lease_id=' . $lease_id . '; trying legacy path' );
+
+				// FALLBACK: Pre-processed template with PhpWord TemplateProcessor.
+				// Always regenerate to avoid stale cache from before bug fixes.
+				$processed_tpl_path = '';
+
+				$processed_new = $tpl_proc->process_owner_template( $template_path, $ai_service, '', $payload );
 				if ( '' !== $processed_new && file_exists( $processed_new ) ) {
 					$processed_tpl_path = $processed_new;
 					update_post_meta( $attachment_id, '_af_processed_template_path', $processed_tpl_path );
-					error_log( 'Arriendo Facil owner-template generation: generated and cached processed template for lease_id=' . $lease_id . ', attachment_id=' . $attachment_id );
+					error_log( 'Arriendo Facil owner-template generation: regenerated processed template for lease_id=' . $lease_id );
+				}
+
+				if ( '' !== $processed_tpl_path && file_exists( $processed_tpl_path ) ) {
+					if ( $tpl_proc->fill_template( $processed_tpl_path, $file_path, $payload ) ) {
+						$phpword_success = true;
+						error_log( 'Arriendo Facil owner-template generation: legacy fill_template succeeded for lease_id=' . $lease_id );
+					}
 				}
 			}
 		}
 
-		if ( '' !== $processed_tpl_path
-			&& file_exists( $processed_tpl_path )
-			&& class_exists( 'Arriendo_Facil_DOCX_Template_Processor' )
-		) {
-			$tpl_proc = new Arriendo_Facil_DOCX_Template_Processor();
-			if ( $tpl_proc->fill_template( $processed_tpl_path, $file_path, $payload ) ) {
-				$phpword_success = true;
-				error_log( 'Arriendo Facil owner-template generation: fill_template succeeded for lease_id=' . $lease_id );
-
-				// Validate that critical fields were actually filled.
-				$validation = $this->validate_filled_contract( $file_path, $lease_id );
-				if ( ! $validation['valid'] ) {
-					error_log( 'Arriendo Facil owner-template generation: contract validation failed for lease_id=' . $lease_id . ', missing_count=' . $validation['missing_count'] . '; may trigger fallback' );
-				}
-
-				if ( $tmp_downloaded ) {
-					@unlink( $template_path );
-				}
-			} else {
-				error_log( 'Arriendo Facil owner-template generation: fill_template failed for lease_id=' . $lease_id . ', attachment_id=' . $attachment_id );
+		if ( $phpword_success ) {
+			$validation = $this->validate_filled_contract( $file_path, $lease_id );
+			if ( ! $validation['valid'] ) {
+				error_log( 'Arriendo Facil owner-template generation: contract validation failed for lease_id=' . $lease_id . ', missing_count=' . $validation['missing_count'] );
 			}
+		}
+
+		if ( $tmp_downloaded ) {
+			@unlink( $template_path );
 		}
 
 		if ( ! $phpword_success ) {
-			if ( $tmp_downloaded ) {
-				@unlink( $template_path );
-			}
-			error_log( 'Arriendo Facil owner-template generation failed: PHPWord fill could not produce a contract from the owner template.' );
+			error_log( 'Arriendo Facil owner-template generation failed: could not produce a contract from the owner template.' );
 			return '';
 		}
 

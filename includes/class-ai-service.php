@@ -234,6 +234,28 @@ class Arriendo_Facil_AI_Service {
 	}
 
 	/**
+	 * Analyzes a DOCX template at upload time to produce a field map for owner preview/approval.
+	 *
+	 * @param array $context {
+	 *     @type string $contract_text Full flat text of the contract.
+	 *     @type array  $blanks        Array of { blank_index, before, after, blank }.
+	 * }
+	 * @return array|WP_Error Response array with key 'field_map'.
+	 */
+	public function analyze_template_fields( array $context ) {
+		$payload = array(
+			'action' => 'analyze_template_fields',
+			'data'   => $context,
+		);
+
+		$response = $this->request( $payload );
+
+		$this->log( 'analyze_template_fields', $context, $response );
+
+		return $response;
+	}
+
+	/**
 	 * Analyzes contract text directly to infer where fields should be filled.
 	 * Used when template has NO blanks but needs field mapping.
 	 *
@@ -268,7 +290,7 @@ class Arriendo_Facil_AI_Service {
 		$prompt   = $this->build_action_prompt( $payload );
 		$action   = isset( $payload['action'] ) ? (string) $payload['action'] : '';
 
-		$heavy_actions = array( 'fill_contract_blanks', 'generate_document', 'map_template_word_agent' );
+		$heavy_actions = array( 'fill_contract_blanks', 'generate_document', 'map_template_word_agent', 'analyze_template_fields' );
 		$timeout    = in_array( $action, $heavy_actions, true ) ? 60 : 30;
 		$max_tokens = in_array( $action, $heavy_actions, true ) ? 4096 : 2048;
 
@@ -517,6 +539,103 @@ class Arriendo_Facil_AI_Service {
 				. implode( ', ', isset( $data['allowed_canonical'] ) && is_array( $data['allowed_canonical'] ) ? $data['allowed_canonical'] : array() )
 				. "\n\nDATOS:\n"
 				. wp_json_encode( $data );
+		}
+
+		if ( 'analyze_template_fields' === $action ) {
+			$blanks_json  = isset( $data['blanks'] ) ? wp_json_encode( $data['blanks'] ) : '[]';
+			$contract     = isset( $data['contract_text'] ) ? (string) $data['contract_text'] : '';
+
+			return "### AGENTE DE ANÁLISIS DE PLANTILLA DE CONTRATO ###\n\n"
+				. "Rol: Eres un abogado ecuatoriano especialista en contratos de arrendamiento. "
+				. "Tu tarea es analizar una plantilla de contrato y clasificar CADA espacio en blanco detectado.\n\n"
+				. "## OBJETIVO\n"
+				. "Para cada blanco (espacio subrayado, puntos suspensivos, tabulaciones) en el contrato, determina:\n"
+				. "1. field_key: qué dato debe ir ahí\n"
+				. "2. label: etiqueta descriptiva en español\n"
+				. "3. source: quién provee ese dato\n\n"
+				. "## FIELD_KEYS PERMITIDOS (usa SOLO estos):\n"
+				. "- guest_name: Nombre completo del arrendatario/inquilino\n"
+				. "- guest_id_number: Cédula/identificación del arrendatario\n"
+				. "- guest_phone: Teléfono del arrendatario\n"
+				. "- guest_email: Email del arrendatario\n"
+				. "- owner_name: Nombre completo del arrendador/propietario\n"
+				. "- owner_id_number: Cédula/identificación del arrendador\n"
+				. "- accommodation_title: Nombre/tipo del inmueble\n"
+				. "- accommodation_address: Dirección del inmueble\n"
+				. "- monthly_rent: Canon/valor mensual de arriendo\n"
+				. "- start_date: Fecha de inicio del contrato\n"
+				. "- end_date: Fecha de finalización del contrato\n"
+				. "- current_date: Fecha de firma del documento\n"
+				. "- guarantee_text: Texto de garantía/depósito\n"
+				. "- none: Dejar vacío (no se llena automáticamente)\n\n"
+				. "## SOURCE (quién provee el dato):\n"
+				. "- chatbot: El arrendatario lo llena vía chatbot (guest_name, guest_id_number, guest_phone, guest_email)\n"
+				. "- owner: El sistema lo tiene del propietario (owner_name, owner_id_number)\n"
+				. "- system: El sistema lo calcula automáticamente (accommodation_title, accommodation_address, monthly_rent, start_date, end_date, current_date, guarantee_text)\n"
+				. "- none: Se deja vacío para que se llene manualmente después\n\n"
+				. "## REGLAS DE CLASIFICACIÓN (CRÍTICAS - lee con extremo cuidado):\n\n"
+				. "### 1. NOMBRES DE PERSONAS:\n"
+				. "- Primer blanco después de 'señor/señora' + contexto 'arrendador'/'propietario' → owner_name\n"
+				. "- Primer blanco después de 'señor/señora' + contexto 'arrendatario'/'inquilino' → guest_name\n"
+				. "- En un contrato típico ecuatoriano, el PRIMER nombre mencionado es el arrendador (propietario)\n"
+				. "- El SEGUNDO nombre mencionado es el arrendatario (inquilino)\n"
+				. "- Línea de firma 'ARRENDADOR' / 'EL ARRENDADOR' → owner_name\n"
+				. "- Línea de firma 'ARRENDATARIO' / 'EL ARRENDATARIO' → guest_name\n"
+				. "- Si una misma persona aparece varias veces, usa el mismo field_key cada vez\n\n"
+				. "### 2. NÚMEROS DE CÉDULA (NUNCA confundir con nombres):\n"
+				. "- Después de 'cédula', 'C.C.', 'C.I.', 'identificación', 'consignado con el número' → es un NÚMERO\n"
+				. "- Si está en contexto de arrendador/propietario → owner_id_number\n"
+				. "- Si está en contexto de arrendatario/inquilino → guest_id_number\n"
+				. "- Patrón: '[NOMBRE] consignado con el número [BLANK]' → el blank es cédula de esa persona\n"
+				. "- Patrón: '[NOMBRE], portador de la cédula [BLANK]' → el blank es cédula de esa persona\n\n"
+				. "### 3. BLANCOS QUE SIEMPRE SON 'none' (dejar vacío):\n"
+				. "- 'dedicarlo a ___' (uso del local)\n"
+				. "- 'accesorios ___' (lista de accesorios)\n"
+				. "- 'Chapas con ___ llaves' (cantidad de llaves)\n"
+				. "- 'uso y goce de ___'\n"
+				. "- 'recibido ___ llave(s)' (cantidad)\n"
+				. "- 'corresponde(n) a ___' (descripción de llaves)\n"
+				. "- 'Plazo es de ___ años/meses' (duración)\n"
+				. "- 'servicios básicos ___' (lista de servicios)\n"
+				. "- 'ciudad de ___' (jurisdicción/ciudad)\n"
+				. "- 'estado civil ___' (estado civil de cualquier persona)\n"
+				. "- 'de profesión ___' (profesión de cualquier persona)\n"
+				. "- 'domiciliado en ___' (domicilio personal, NO dirección del inmueble)\n"
+				. "- 'Conjunto ___' / 'Etapa ___' / 'Manzana ___' / 'Casa ___' / 'Villa ___'\n"
+				. "- 'habitaciones ___' / 'baños ___' / 'garaje ___' (características)\n"
+				. "- Número de cláusula, artículo, literal\n"
+				. "- Cualquier detalle descriptivo del inmueble que no sea título ni dirección\n"
+				. "- Testigos, notario, juez, abogado → none\n\n"
+				. "### 4. PROPIEDAD:\n"
+				. "- 'propietario de [BLANK]' → accommodation_title\n"
+				. "- 'situada en' / 'ubicada en' / 'ubicado en' / 'dirección' → accommodation_address\n"
+				. "- 'inmueble denominado' / 'el bien inmueble' → accommodation_title\n\n"
+				. "### 5. DINERO:\n"
+				. "- 'USD ___' / '___ dólares' / 'canon de ___' / 'mensualidad de ___' → monthly_rent\n"
+				. "- 'garantía de ___' / 'depósito de ___' / 'caución de ___' → guarantee_text\n\n"
+				. "### 6. FECHAS:\n"
+				. "- 'a partir del ___' / 'desde el ___' / 'inicio ___' → start_date\n"
+				. "- 'hasta el ___' / 'vence el ___' / 'finaliza ___' → end_date\n"
+				. "- Fecha de firma al final: '___ de ___ del ___' → current_date (los 3 blancos son current_date)\n\n"
+				. "## ERRORES QUE NO DEBES COMETER:\n"
+				. "1. Poner guest_name donde va owner_name o viceversa\n"
+				. "2. Poner un nombre donde va un número de cédula\n"
+				. "3. Clasificar blancos de accesorios, llaves, profesión como campos del sistema\n"
+				. "4. Asignar accommodation_address a 'domiciliado en' (eso es domicilio personal = none)\n"
+				. "5. Repetir el mismo field_key para blancos que claramente son de personas distintas\n\n"
+				. "## FORMATO DE SALIDA (OBLIGATORIO):\n"
+				. "Devuelve ÚNICAMENTE JSON válido con esta estructura:\n"
+				. "{\"field_map\": [\n"
+				. "  {\"blank_index\": 0, \"field_key\": \"owner_name\", \"label\": \"Nombre del arrendador\", \"source\": \"owner\"},\n"
+				. "  {\"blank_index\": 1, \"field_key\": \"guest_name\", \"label\": \"Nombre del arrendatario\", \"source\": \"chatbot\"},\n"
+				. "  {\"blank_index\": 2, \"field_key\": \"none\", \"label\": \"Dejar vacío\", \"source\": \"none\"},\n"
+				. "  ...\n"
+				. "]}\n\n"
+				. "IMPORTANTE: Debes incluir TODOS los blancos detectados, uno por cada blank_index. No omitas ninguno.\n\n"
+				. "BLANCOS DETECTADOS (con contexto antes/después de cada blanco):\n"
+				. $blanks_json . "\n\n"
+				. "TEXTO COMPLETO DEL CONTRATO:\n"
+				. $contract;
 		}
 
 		if ( 'fill_contract_blanks' === $action ) {

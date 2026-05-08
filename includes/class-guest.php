@@ -717,14 +717,32 @@ class Arriendo_Facil_Guest {
 			$tpl_proc   = new Arriendo_Facil_DOCX_Template_Processor();
 			$ai_service = class_exists( 'Arriendo_Facil_AI_Service' ) ? new Arriendo_Facil_AI_Service() : null;
 
-			if ( $ai_service && $tpl_proc->fill_template_with_ai( $template_path, $file_path, $payload, $ai_service ) ) {
+			// PRIORITY 1: Use saved field map from owner preview/approval (no AI needed).
+			$saved_field_map_json = get_post_meta( $attachment_id, '_af_template_field_map', true );
+			$saved_field_map      = '';
+			if ( is_string( $saved_field_map_json ) && '' !== $saved_field_map_json ) {
+				$saved_field_map = json_decode( $saved_field_map_json, true );
+			}
+
+			if ( is_array( $saved_field_map ) && ! empty( $saved_field_map ) ) {
+				if ( $tpl_proc->fill_template_with_field_map( $template_path, $file_path, $payload, $saved_field_map ) ) {
+					$phpword_success = true;
+					error_log( 'Arriendo Facil owner-template generation: fill_template_with_field_map succeeded for lease_id=' . $lease_id );
+				} else {
+					error_log( 'Arriendo Facil owner-template generation: fill_template_with_field_map failed for lease_id=' . $lease_id . '; falling through to AI fill' );
+				}
+			}
+
+			// PRIORITY 2: AI-driven direct fill.
+			if ( ! $phpword_success && $ai_service && $tpl_proc->fill_template_with_ai( $template_path, $file_path, $payload, $ai_service ) ) {
 				$phpword_success = true;
 				error_log( 'Arriendo Facil owner-template generation: fill_template_with_ai succeeded for lease_id=' . $lease_id );
-			} else {
+			}
+
+			// PRIORITY 3: Legacy pre-processed template with PhpWord TemplateProcessor.
+			if ( ! $phpword_success ) {
 				error_log( 'Arriendo Facil owner-template generation: fill_template_with_ai failed or unavailable for lease_id=' . $lease_id . '; trying legacy path' );
 
-				// FALLBACK: Pre-processed template with PhpWord TemplateProcessor.
-				// Always regenerate to avoid stale cache from before bug fixes.
 				$processed_tpl_path = '';
 
 				$processed_new = $tpl_proc->process_owner_template( $template_path, $ai_service, '', $payload );

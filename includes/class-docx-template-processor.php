@@ -189,7 +189,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 				) );
 
 				if ( ! is_wp_error( $ai_result ) && isset( $ai_result['replacements'] ) && is_array( $ai_result['replacements'] ) ) {
-					$ai_replacements = $ai_result['replacements'];
+					$ai_replacements = $this->validate_ai_replacements( $ai_result['replacements'], $ai_lines, $payload );
 					$this->log_docx_event( 'fill_with_ai_mapped', array(
 						'lease_id'     => $lease_id,
 						'mapped_count' => count( $ai_replacements ),
@@ -254,6 +254,138 @@ class Arriendo_Facil_DOCX_Template_Processor {
 		) );
 
 		return true;
+	}
+
+	/**
+	 * Validates AI replacements by cross-checking each value against its context.
+	 *
+	 * Catches errors like: name in an ID field, ID number in a name field,
+	 * same value repeated for unrelated blanks, values in leave-blank fields.
+	 *
+	 * @param array $replacements AI-returned blank_id => value map.
+	 * @param array $ai_lines     Blank context items (id, before, after).
+	 * @param array $payload      Original chatbot payload.
+	 * @return array Validated replacements (bad ones removed).
+	 */
+	private function validate_ai_replacements( array $replacements, array $ai_lines, array $payload ) {
+		$guest_name  = $this->val( $payload, 'guest_name' );
+		$owner_name  = $this->val( $payload, 'owner_name' );
+		$guest_id    = $this->val( $payload, 'guest_id_number' );
+		$owner_id    = $this->val( $payload, 'owner_id_number' );
+
+		$lines_by_id = array();
+		foreach ( $ai_lines as $line ) {
+			$id = isset( $line['id'] ) ? (string) $line['id'] : '';
+			if ( '' !== $id ) {
+				$lines_by_id[ $id ] = $line;
+			}
+		}
+
+		$leave_blank_keywords = array(
+			'dedicarlo a', 'accesorios', 'chapas con', 'uso y goce',
+			'recibido', 'corresponde', 'plazo', 'servicios basico',
+			'jueces competentes', 'estado civil', 'profesion',
+			'conjunto habitacional', 'etapa', 'manzana',
+		);
+
+		$validated = array();
+
+		foreach ( $replacements as $blank_id => $value ) {
+			$value = trim( (string) $value );
+			if ( '' === $value ) {
+				continue;
+			}
+
+			if ( ! isset( $lines_by_id[ $blank_id ] ) ) {
+				$validated[ $blank_id ] = $value;
+				continue;
+			}
+
+			$before = $this->normalize_context_text( isset( $lines_by_id[ $blank_id ]['before'] ) ? (string) $lines_by_id[ $blank_id ]['before'] : '' );
+			$after  = $this->normalize_context_text( isset( $lines_by_id[ $blank_id ]['after'] ) ? (string) $lines_by_id[ $blank_id ]['after'] : '' );
+
+			// Rule 1: Leave-blank fields should never be filled.
+			$skip = false;
+			foreach ( $leave_blank_keywords as $kw ) {
+				if ( false !== strpos( $before, $kw ) ) {
+					$skip = true;
+					break;
+				}
+			}
+			if ( $skip ) {
+				$this->log_docx_event( 'validate_ai_rejected', array( 'blank' => $blank_id, 'reason' => 'leave_blank_field', 'value' => substr( $value, 0, 30 ) ) );
+				continue;
+			}
+
+			// Rule 2: If context says "cédula"/"número"/"C.C." → value must look like a number, not a name.
+			$is_id_context = false !== strpos( $before, 'cedula' )
+				|| false !== strpos( $before, 'identificacion' )
+				|| false !== strpos( $before, 'consignado con el numero' )
+				|| 1 === preg_match( '/c\.?\s*[ci]\.?\s*$/', $before );
+
+			if ( $is_id_context ) {
+				$is_numeric_value = (bool) preg_match( '/^\d[\d\-\.]+$/', $value );
+				if ( ! $is_numeric_value ) {
+					// Value looks like a name but context wants an ID number.
+					if ( '' !== $guest_id && $value === $guest_name ) {
+						$value = $guest_id;
+						$this->log_docx_event( 'validate_ai_corrected', array( 'blank' => $blank_id, 'from' => 'guest_name', 'to' => 'guest_id_number' ) );
+					} elseif ( '' !== $owner_id && $value === $owner_name ) {
+						$value = $owner_id;
+						$this->log_docx_event( 'validate_ai_corrected', array( 'blank' => $blank_id, 'from' => 'owner_name', 'to' => 'owner_id_number' ) );
+					} else {
+						$this->log_docx_event( 'validate_ai_rejected', array( 'blank' => $blank_id, 'reason' => 'name_in_id_field', 'value' => substr( $value, 0, 30 ) ) );
+						continue;
+					}
+				}
+			}
+
+			// Rule 3: If context says "señor"/"nombre" → value should not be a pure number.
+			$is_name_context = ( false !== strpos( $before, 'senor' ) || false !== strpos( $before, 'senora' )
+				|| false !== strpos( $before, 'sr.' ) || false !== strpos( $before, 'sra.' )
+				|| false !== strpos( $before, 'srta' ) || false !== strpos( $before, 'arrendatario senor' ) )
+				&& false === strpos( $before, 'cedula' ) && false === strpos( $before, 'numero' );
+
+			if ( $is_name_context && preg_match( '/^\d[\d\-\.]+$/', $value ) ) {
+				// Value looks like an ID number but context wants a name.
+				if ( '' !== $guest_name && $value === $guest_id ) {
+					$value = $guest_name;
+					$this->log_docx_event( 'validate_ai_corrected', array( 'blank' => $blank_id, 'from' => 'guest_id', 'to' => 'guest_name' ) );
+				} elseif ( '' !== $owner_name && $value === $owner_id ) {
+					$value = $owner_name;
+					$this->log_docx_event( 'validate_ai_corrected', array( 'blank' => $blank_id, 'from' => 'owner_id', 'to' => 'owner_name' ) );
+				} else {
+					$this->log_docx_event( 'validate_ai_rejected', array( 'blank' => $blank_id, 'reason' => 'id_in_name_field', 'value' => substr( $value, 0, 30 ) ) );
+					continue;
+				}
+			}
+
+			// Rule 4: If context says "arrendador"/"propietario" and value = guest_name, swap.
+			$is_owner_context = ( false !== strpos( $after, 'arrendador' ) && false === strpos( $after, 'arrendatario' ) )
+				|| false !== strpos( $after, 'propietario' )
+				|| false !== strpos( $before, 'como arrendador' )
+				|| false !== strpos( $after, 'en calidad de arrendador' );
+
+			if ( $is_owner_context && '' !== $guest_name && $value === $guest_name && '' !== $owner_name ) {
+				$value = $owner_name;
+				$this->log_docx_event( 'validate_ai_corrected', array( 'blank' => $blank_id, 'from' => 'guest_name', 'to' => 'owner_name' ) );
+			}
+
+			// Rule 5: If context says "arrendatario"/"inquilino" and value = owner_name, swap.
+			$is_guest_context = ( false !== strpos( $after, 'arrendatario' ) && false === strpos( $after, 'arrendador' ) )
+				|| false !== strpos( $before, 'arrendamiento al senor' )
+				|| false !== strpos( $before, 'como arrendatario' )
+				|| false !== strpos( $after, 'en calidad de arrendatario' );
+
+			if ( $is_guest_context && '' !== $owner_name && $value === $owner_name && '' !== $guest_name ) {
+				$value = $guest_name;
+				$this->log_docx_event( 'validate_ai_corrected', array( 'blank' => $blank_id, 'from' => 'owner_name', 'to' => 'guest_name' ) );
+			}
+
+			$validated[ $blank_id ] = $value;
+		}
+
+		return $validated;
 	}
 
 	/**
@@ -954,9 +1086,103 @@ class Arriendo_Facil_DOCX_Template_Processor {
 	private function infer_placeholder_from_context( $before, $after, $blank_idx ) {
 		$before = $this->normalize_context_text( $before );
 		$after  = $this->normalize_context_text( $after );
-		$context = trim( $before . ' ' . $after );
+
+		// Use only the last ~80 chars of before for leave-blank checks to avoid
+		// matching patterns from distant earlier blanks in the 200-char window.
+		$before_tail = strlen( $before ) > 80 ? substr( $before, -80 ) : $before;
+
+		// ── Blanks that should ALWAYS stay empty (no chatbot data applies) ──
+
+		$leave_blank_patterns = array(
+			'dedicarlo a',
+			'siguientes accesorios',
+			'chapas con',
+			'uso y goce de',
+			'haber recibido',
+			'corresponde(n) a',
+			'plazo de este contrato es de',
+			'plazo de duracion',
+			'servicios basico',
+			'jueces competentes de la ciudad',
+			'estado civil',
+			'de profesion',
+			'conjunto habitacional',
+			'etapa',
+			'manzana',
+		);
+
+		foreach ( $leave_blank_patterns as $pat ) {
+			if ( false !== strpos( $before_tail, $pat ) ) {
+				return 'CAMPO_' . $blank_idx;
+			}
+		}
+
+		if ( false !== strpos( $after, 'llaves' ) && false !== strpos( $before_tail, 'con' ) ) {
+			return 'CAMPO_' . $blank_idx;
+		}
+
+		if ( false !== strpos( $after, 'llave(s)' ) || false !== strpos( $after, 'llaves' ) ) {
+			if ( false !== strpos( $before_tail, 'recibido' ) ) {
+				return 'CAMPO_' . $blank_idx;
+			}
+		}
+
+		if ( false !== strpos( $after, 'anos' ) && ( false !== strpos( $before_tail, 'plazo' ) || false !== strpos( $before_tail, 'duracion' ) ) ) {
+			return 'CAMPO_' . $blank_idx;
+		}
+
+		// ── OWNER (arrendador) name ──
+
+		if ( false !== strpos( $after, 'que en adelante se denominara el arrendador' ) ) {
+			return 'ARRENDADOR';
+		}
+
+		if ( 1 === preg_match( '/como\s+arrendador.*?senor\s*$/', $before ) ) {
+			return 'ARRENDADOR';
+		}
+
+		if ( false !== strpos( $before, 'como arrendador, el senor' ) || false !== strpos( $before, 'como arrendador el senor' ) ) {
+			return 'ARRENDADOR';
+		}
+
+		if ( false !== strpos( $after, 'en calidad de arrendador' ) ) {
+			return 'ARRENDADOR';
+		}
+
+		if ( false !== strpos( $before, 'el senor' ) && false !== strpos( $after, 'propietario de' ) ) {
+			return 'ARRENDADOR';
+		}
+
+		if ( false !== strpos( $after, 'propietario de' ) ) {
+			return 'ARRENDADOR';
+		}
+
+		// "el señor [BLANK], propietario de" pattern.
+		if ( 1 === preg_match( '/el\s+senor\s*$/', $before ) && false !== strpos( $after, 'propietario' ) ) {
+			return 'ARRENDADOR';
+		}
+
+		// "El señor [BLANK] , en calidad de arrendador" pattern.
+		if ( 1 === preg_match( '/el\s+senor\s*$/', $before ) && false !== strpos( $after, 'arrendador' ) && false === strpos( $after, 'arrendatario' ) ) {
+			return 'ARRENDADOR';
+		}
+
+		// "SR. [BLANK] da en arrendamiento" pattern.
+		if ( 1 === preg_match( '/sr\.?\s*$/', $before ) && false !== strpos( $after, 'da en arrendamiento' ) ) {
+			return 'ARRENDADOR';
+		}
+
+		// ── GUEST (arrendatario) name ──
+
+		if ( false !== strpos( $after, 'que en adelante se denominara el arrendatario' ) ) {
+			return 'ARRENDATARIO';
+		}
 
 		if ( 1 === preg_match( '/como\s+arrendatario\s+el\s+senor\s*$/', $before ) ) {
+			return 'ARRENDATARIO';
+		}
+
+		if ( false !== strpos( $before, 'como arrendatario el senor' ) || false !== strpos( $before, 'como arrendatario, el senor' ) ) {
 			return 'ARRENDATARIO';
 		}
 
@@ -964,99 +1190,103 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			return 'ARRENDATARIO';
 		}
 
-		if ( 1 === preg_match( '/arrendamiento\s+al\s+senor\s*$/', $before ) ) {
+		if ( 1 === preg_match( '/arrendamiento\s+al?\s+(?:senor|senora|sr|sra|srta)\s*$/', $before ) ) {
 			return 'ARRENDATARIO';
 		}
 
-		if ( false !== strpos( $before, 'arrendamiento al senor' ) && false !== strpos( $after, 'consignado con el numero' ) ) {
+		if ( false !== strpos( $before, 'arrendamiento al senor' ) || false !== strpos( $before, 'arrendamiento a la srta' ) ) {
 			return 'ARRENDATARIO';
-		}
-
-		if ( false !== strpos( $after, 'propietario de' ) ) {
-			return 'ARRENDADOR';
-		}
-
-		if ( false !== strpos( $after, 'que en adelante se denominara el arrendador' ) ) {
-			return 'ARRENDADOR';
-		}
-
-		if ( false !== strpos( $after, 'que en adelante se denominara el arrendatario' ) ) {
-			return 'ARRENDATARIO';
-		}
-
-		if ( false !== strpos( $before, 'como arrendador, el senor' ) ) {
-			return 'ARRENDADOR';
-		}
-
-		if ( false !== strpos( $before, 'como arrendatario el senor' ) ) {
-			return 'ARRENDATARIO';
-		}
-
-		if ( false !== strpos( $before, 'el senor' ) && false !== strpos( $after, 'propietario de' ) ) {
-			return 'ARRENDADOR';
-		}
-
-		if ( false !== strpos( $before, 'propietario de' ) && false !== strpos( $after, 'situada en' ) ) {
-			return 'INMUEBLE';
-		}
-
-		if ( false !== strpos( $before, 'situada en' ) && false !== strpos( $after, 'de esta ciudad' ) ) {
-			return 'DIRECCION';
-		}
-
-		if ( false !== strpos( $after, 'en calidad de arrendador' ) ) {
-			return 'ARRENDADOR';
 		}
 
 		if ( false !== strpos( $before, 'da y entrega en arrendamiento al senor' ) ) {
 			return 'ARRENDATARIO';
 		}
 
-		if ( false !== strpos( $after, 'consignado con el numero' ) ) {
-			return 'CAMPO_' . $blank_idx;
+		if ( false !== strpos( $before, 'arrendatario senor' ) || false !== strpos( $before, 'arrendatario sr' ) ) {
+			return 'ARRENDATARIO';
 		}
 
-		if ( false !== strpos( $after, 'con cedula de ciudadania n' ) ) {
-			if ( false !== strpos( $before, 'srta' ) || false !== strpos( $before, 'sra' ) || false !== strpos( $before, 'arrendamiento a la' ) ) {
-				return 'ARRENDATARIO';
+		// "Srta. [BLANK] , con Cedula" in arrendatario context.
+		if ( 1 === preg_match( '/(srta|sra)\.?\s*$/', $before ) && false !== strpos( $after, 'cedula' ) ) {
+			return 'ARRENDATARIO';
+		}
+
+		// ── CÉDULA (ID numbers — NEVER a name) ──
+
+		if ( false !== strpos( $before, 'cedula de ciudadania n' ) || false !== strpos( $before, 'cedula de identidad n' ) ) {
+			if ( false !== strpos( $after, 'arrendador' ) || false !== strpos( $before, 'arrendador' ) ) {
+				return 'CEDULA_ARRENDADOR';
 			}
-
-			return 'ARRENDADOR';
-		}
-
-		if ( false !== strpos( $before, 'cedula de ciudadania n' ) && false !== strpos( $after, 'arrendador' ) ) {
-			return 'CEDULA_ARRENDADOR';
-		}
-
-		if ( false !== strpos( $before, 'cedula de ciudadania n' ) && false !== strpos( $after, 'arrendatario' ) ) {
-			return 'CEDULA_ARRENDATARIO';
+			if ( false !== strpos( $after, 'arrendatario' ) || false !== strpos( $before, 'arrendatario' ) ) {
+				return 'CEDULA_ARRENDATARIO';
+			}
+			// If context mentions propietario/dador → owner.
+			if ( false !== strpos( $after, 'propietario' ) || false !== strpos( $before, 'propietario' ) ) {
+				return 'CEDULA_ARRENDADOR';
+			}
+			// Default: first cédula without context = owner, but safer as CAMPO.
+			return 'CAMPO_' . $blank_idx;
 		}
 
 		if ( false !== strpos( $before, 'consignado con el numero' ) ) {
 			return 'CEDULA_ARRENDATARIO';
 		}
 
+		// "C.C. [BLANK]" or "C.I. [BLANK]" patterns.
+		if ( 1 === preg_match( '/c\.?\s*c\.?\s*$/', $before ) || 1 === preg_match( '/c\.?\s*i\.?\s*$/', $before ) ) {
+			if ( false !== strpos( $before, 'arrendador' ) || false !== strpos( $before, 'propietario' ) ) {
+				return 'CEDULA_ARRENDADOR';
+			}
+			if ( false !== strpos( $before, 'arrendatario' ) || false !== strpos( $before, 'inquilino' ) ) {
+				return 'CEDULA_ARRENDATARIO';
+			}
+			return 'CAMPO_' . $blank_idx;
+		}
+
+		// Blank BEFORE "consignado con el número" — this is often a descriptor, NOT a person name.
+		if ( false !== strpos( $after, 'consignado con el numero' ) ) {
+			return 'CAMPO_' . $blank_idx;
+		}
+
+		// "con cedula de ciudadania" after a name blank.
+		if ( false !== strpos( $after, 'con cedula de ciudadania n' ) || false !== strpos( $after, 'con cedula' ) ) {
+			if ( false !== strpos( $before, 'srta' ) || false !== strpos( $before, 'sra' ) || false !== strpos( $before, 'arrendamiento' ) || false !== strpos( $before, 'arrendatario' ) ) {
+				return 'ARRENDATARIO';
+			}
+			if ( false !== strpos( $before, 'arrendador' ) || false !== strpos( $before, 'propietario' ) ) {
+				return 'ARRENDADOR';
+			}
+			// Positional: first occurrence near beginning is usually arrendador.
+			return 'ARRENDADOR';
+		}
+
+		// ── PROPERTY ──
+
+		if ( false !== strpos( $before, 'propietario de' ) && ( false !== strpos( $after, 'situada' ) || false !== strpos( $after, 'ubicad' ) ) ) {
+			return 'INMUEBLE';
+		}
+
+		if ( false !== strpos( $before, 'propietario de' ) ) {
+			return 'INMUEBLE';
+		}
+
 		if ( false !== strpos( $before, 'ubicado en' ) && false !== strpos( $after, 'antes descrita' ) ) {
 			return 'INMUEBLE';
 		}
 
-		if ( false !== strpos( $before, 'calle' ) ) {
+		// ── ADDRESS ──
+
+		if ( false !== strpos( $before, 'situada en' ) || false !== strpos( $before, 'ubicada en' ) ) {
 			return 'DIRECCION';
 		}
 
-		if ( false !== strpos( $before, 'arrendatario senor' ) ) {
-			return 'ARRENDATARIO';
+		if ( 1 === preg_match( '/\bcalle\s*$/', $before ) || 1 === preg_match( '/\bavenida\s*$/', $before ) || 1 === preg_match( '/\bav\.?\s*$/', $before ) ) {
+			return 'DIRECCION';
 		}
 
-		if ( false !== strpos( $before, 'plazo de este contrato es de' ) && false !== strpos( $after, 'anos' ) ) {
-			return 'CAMPO_' . $blank_idx;
-		}
+		// ── MONEY ──
 
-		if ( false !== strpos( $before, 'dedicarlo a' ) ) {
-			return 'CAMPO_' . $blank_idx;
-		}
-
-		if ( false !== strpos( $before, 'y da en garantia, la cantidad de' ) ) {
+		if ( false !== strpos( $before, 'y da en garantia, la cantidad de' ) || false !== strpos( $before, 'garantia' ) && false !== strpos( $after, 'usd' ) ) {
 			return 'GARANTIA';
 		}
 
@@ -1064,23 +1294,29 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			return 'CANON';
 		}
 
-		if ( false !== strpos( $before, 'siguientes accesorios' ) ) {
+		if ( false !== strpos( $after, 'usd por mes' ) || false !== strpos( $after, 'mensuales' ) ) {
+			return 'CANON';
+		}
+
+		// ── SIGNATURES at end of contract ──
+
+		if ( 1 === preg_match( '/arrendatario\s*$/', $after ) || false !== strpos( $after, '"el arrendatario"' ) ) {
+			return 'ARRENDATARIO';
+		}
+
+		if ( 1 === preg_match( '/arrendador\s*$/', $after ) || false !== strpos( $after, '"el arrendador"' ) ) {
+			return 'ARRENDADOR';
+		}
+
+		// ── DATE at end of contract: "[BLANK] de [BLANK] del [BLANK]" ──
+
+		if ( 1 === preg_match( '/\bde\s*$/', $after ) && 1 === preg_match( '/\bdel?\s*$/', $before ) ) {
 			return 'CAMPO_' . $blank_idx;
 		}
 
-		if ( false !== strpos( $before, 'chapas con' ) && false !== strpos( $after, 'llaves' ) ) {
-			return 'CAMPO_' . $blank_idx;
-		}
+		// ── Fallback keyword inference (conservative) ──
 
-		if ( false !== strpos( $before, 'servicios basico' ) ) {
-			return 'CAMPO_' . $blank_idx;
-		}
-
-		if ( false !== strpos( $before, 'jueces competentes de la ciudad de' ) ) {
-			return 'CAMPO_' . $blank_idx;
-		}
-
-		$keyword_guess = $this->infer_placeholder_by_keywords( $context );
+		$keyword_guess = $this->infer_placeholder_by_keywords_strict( $before, $after );
 		if ( '' !== $keyword_guess ) {
 			return $keyword_guess;
 		}
@@ -1089,71 +1325,42 @@ class Arriendo_Facil_DOCX_Template_Processor {
 	}
 
 	/**
-	 * Performs a conservative keyword-based inference for unknown blank contexts.
+	 * Stricter keyword inference that checks before/after separately to avoid confusion.
 	 *
-	 * @param string $context Normalized local context around the blank.
-	 * @return string Placeholder name or empty string if uncertain.
+	 * @param string $before Normalized text before blank.
+	 * @param string $after  Normalized text after blank.
+	 * @return string Placeholder name or empty string.
 	 */
-	private function infer_placeholder_by_keywords( $context ) {
-		$context = (string) $context;
-		if ( '' === $context ) {
+	private function infer_placeholder_by_keywords_strict( $before, $after ) {
+		$before = (string) $before;
+		$after  = (string) $after;
+
+		if ( '' === $before && '' === $after ) {
 			return '';
 		}
 
-		if ( false !== strpos( $context, 'arrendador' ) && false !== strpos( $context, 'arrendatario' ) ) {
+		// If both arrendador and arrendatario mentioned, skip (ambiguous).
+		$combined = $before . ' ' . $after;
+		if ( false !== strpos( $combined, 'arrendador' ) && false !== strpos( $combined, 'arrendatario' ) ) {
 			return '';
 		}
 
-		$rules = array(
-			'CEDULA_ARRENDATARIO' => array( 'cedula', 'identificacion', 'documento', 'arrendatario', 'inquilino' ),
-			'CEDULA_ARRENDADOR'   => array( 'cedula', 'identificacion', 'documento', 'arrendador', 'propietario' ),
-			'ARRENDATARIO'        => array( 'arrendatario', 'inquilino', 'locatario', 'tomador' ),
-			'ARRENDADOR'          => array( 'arrendador', 'propietario', 'dador', 'locador' ),
-			'CANON'               => array( 'canon', 'renta', 'mensualidad', 'valor', 'monto', 'precio', 'usd', 'dolar' ),
-			'FECHA_INICIO'        => array( 'fecha de inicio', 'iniciara', 'inicio', 'desde', 'comienza', 'vigencia desde' ),
-			'FECHA_FIN'           => array( 'fecha de fin', 'hasta', 'termina', 'vencimiento', 'fin de contrato' ),
-			'DIRECCION'           => array( 'direccion', 'calle', 'avenida', 'sector', 'parroquia', 'canton', 'provincia', 'ubicada en' ),
-			'INMUEBLE'            => array( 'inmueble', 'departamento', 'casa', 'local', 'oficina', 'propiedad', 'predio', 'bien' ),
-			'GARANTIA'            => array( 'garantia', 'deposito', 'fianza', 'caucion' ),
-			'TELEFONO'            => array( 'telefono', 'celular', 'movil', 'contacto' ),
-			'EMAIL'               => array( 'correo', 'email', 'e-mail' ),
-			'FECHA_ACTUAL'        => array( 'fecha actual', 'suscribe', 'firma en', 'celebrado en' ),
-		);
-
-		$scores = array();
-		foreach ( $rules as $placeholder => $keywords ) {
-			$score = 0;
-			foreach ( $keywords as $keyword ) {
-				if ( false !== strpos( $context, $keyword ) ) {
-					$score++;
-				}
-			}
-
-			if ( $score > 0 ) {
-				$scores[ $placeholder ] = $score;
-			}
+		// Phone.
+		if ( false !== strpos( $before, 'telefono' ) || false !== strpos( $before, 'celular' ) || false !== strpos( $before, 'movil' ) ) {
+			return 'TELEFONO';
 		}
 
-		if ( empty( $scores ) ) {
-			return '';
+		// Email.
+		if ( false !== strpos( $before, 'correo' ) || false !== strpos( $before, 'email' ) || false !== strpos( $before, 'e-mail' ) ) {
+			return 'EMAIL';
 		}
 
-		arsort( $scores );
-		$top_keys   = array_keys( $scores );
-		$top_key    = isset( $top_keys[0] ) ? (string) $top_keys[0] : '';
-		$top_score  = isset( $scores[ $top_key ] ) ? (int) $scores[ $top_key ] : 0;
-		$next_key   = isset( $top_keys[1] ) ? (string) $top_keys[1] : '';
-		$next_score = '' !== $next_key && isset( $scores[ $next_key ] ) ? (int) $scores[ $next_key ] : 0;
-
-		if ( $top_score < 2 ) {
-			return '';
+		// Address patterns.
+		if ( false !== strpos( $before, 'direccion' ) || false !== strpos( $before, 'domicilio' ) ) {
+			return 'DIRECCION';
 		}
 
-		if ( $top_score === $next_score ) {
-			return '';
-		}
-
-		return $top_key;
+		return '';
 	}
 
 	/**

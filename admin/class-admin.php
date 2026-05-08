@@ -116,9 +116,17 @@ class Arriendo_Facil_Admin {
 		);
 
 		wp_enqueue_script(
+			'mammoth',
+			ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/vendor/mammoth.browser.min.js',
+			array(),
+			'1.8.0',
+			true
+		);
+
+		wp_enqueue_script(
 			'af-admin',
 			ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/admin.js',
-			array( 'jquery' ),
+			array( 'jquery', 'mammoth' ),
 			$admin_js_version,
 			true
 		);

@@ -39,6 +39,7 @@ class Arriendo_Facil_Owner_Contact {
 		add_action( 'wp_ajax_nopriv_af_send_owner_contact', array( $this, 'ajax_send_contact' ) );
 		add_action( 'wp_ajax_af_get_owner_contacts', array( $this, 'ajax_get_contacts' ) );
 		add_action( 'wp_ajax_af_disable_owner_account', array( $this, 'ajax_disable_owner_account' ) );
+		add_action( 'wp_ajax_af_analyze_owner_template', array( $this, 'ajax_analyze_owner_template' ) );
 		add_action( 'af_owner_contact_saved', array( $this, 'upload_sensitive_documents' ), 10, 2 );
 		add_action( 'admin_post_af_disable_owner_account', array( $this, 'handle_disable_owner_account_post' ) );
 		add_action( 'after_password_reset', array( $this, 'handle_owner_password_reset' ), 10, 2 );
@@ -413,6 +414,51 @@ class Arriendo_Facil_Owner_Contact {
 	}
 
 	/**
+	 * AJAX handler: Analyzes an uploaded DOCX template and returns segments + field map for preview.
+	 */
+	public function ajax_analyze_owner_template() {
+		if ( false === check_ajax_referer( 'af_owner_contact_nonce', 'nonce', false ) ) {
+			wp_send_json_error( array( 'message' => __( 'Invalid nonce.', 'arriendo-facil' ) ), 403 );
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+		}
+
+		if ( ! isset( $_FILES['template_file'] ) || ! is_array( $_FILES['template_file'] ) ) {
+			wp_send_json_error( array( 'message' => __( 'No file uploaded.', 'arriendo-facil' ) ) );
+		}
+
+		$file_data  = $_FILES['template_file'];
+		$file_error = isset( $file_data['error'] ) ? (int) $file_data['error'] : UPLOAD_ERR_NO_FILE;
+
+		if ( UPLOAD_ERR_OK !== $file_error ) {
+			wp_send_json_error( array( 'message' => __( 'File upload error.', 'arriendo-facil' ) ) );
+		}
+
+		$allowed_mimes = array( 'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' );
+		$checked = wp_check_filetype_and_ext( $file_data['tmp_name'], $file_data['name'], $allowed_mimes );
+		if ( 'docx' !== (string) $checked['ext'] ) {
+			wp_send_json_error( array( 'message' => __( 'Only DOCX files are allowed.', 'arriendo-facil' ) ) );
+		}
+
+		if ( ! class_exists( 'Arriendo_Facil_DOCX_Template_Processor' ) || ! class_exists( 'Arriendo_Facil_AI_Service' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Required classes not available.', 'arriendo-facil' ) ) );
+		}
+
+		$tpl_proc   = new Arriendo_Facil_DOCX_Template_Processor();
+		$ai_service = new Arriendo_Facil_AI_Service();
+
+		$result = $tpl_proc->analyze_template_for_preview( $file_data['tmp_name'], $ai_service );
+
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
+		}
+
+		wp_send_json_success( $result );
+	}
+
+	/**
 	 * Hook callback for uploading sensitive owner documents.
 	 *
 	 * @param int $contact_id Contact ID.
@@ -566,6 +612,14 @@ class Arriendo_Facil_Owner_Contact {
 					update_post_meta( (int) $attachment_id, '_af_owner_contract_placeholders', wp_json_encode( array_values( $detected_placeholders ) ) );
 				} else {
 					delete_post_meta( (int) $attachment_id, '_af_owner_contract_placeholders' );
+				}
+
+				if ( isset( $_POST['owner_contract_field_map'] ) ) {
+					$field_map_raw = sanitize_text_field( wp_unslash( $_POST['owner_contract_field_map'] ) );
+					$field_map_decoded = json_decode( $field_map_raw, true );
+					if ( is_array( $field_map_decoded ) && ! empty( $field_map_decoded ) ) {
+						update_post_meta( (int) $attachment_id, '_af_template_field_map', wp_json_encode( $field_map_decoded ) );
+					}
 				}
 
 				// Process owner template: detect blank fields, inject ${PLACEHOLDER} markers,

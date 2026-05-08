@@ -202,6 +202,14 @@ $message = isset( $_GET['af_message'] ) ? sanitize_text_field( wp_unslash( $_GET
                             <input type="file" id="af_owner_contract_example_file" name="owner_contract_example_file" class="regular-text" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
                         </p>
                         <p class="description"><?php esc_html_e( 'Campo opcional. Puedes subir la plantilla del owner con su estructura y campos propios. No se rechaza por un formato fijo de campos.', 'arriendo-facil' ); ?></p>
+                        <div id="af-template-analyze-status" style="display:none; margin-top: 8px;">
+                            <span class="spinner is-active" style="float:none;"></span>
+                            <span><?php esc_html_e( 'Analizando plantilla...', 'arriendo-facil' ); ?></span>
+                        </div>
+                        <div id="af-template-approved-status" style="display:none; margin-top: 8px; color: #1d6c00; font-weight: 600;">
+                            &#10003; <?php esc_html_e( 'Campos aprobados', 'arriendo-facil' ); ?>
+                        </div>
+                        <input type="hidden" name="owner_contract_field_map" id="af_template_field_map" value="" />
                     </td>
                 </tr>
             </table>
@@ -318,6 +326,35 @@ $message = isset( $_GET['af_message'] ) ? sanitize_text_field( wp_unslash( $_GET
                     <p><strong><?php esc_html_e( 'Phone', 'arriendo-facil' ); ?>:</strong> <span data-af-field="legal-phone">-</span></p>
                     <p><strong><?php esc_html_e( 'Email', 'arriendo-facil' ); ?>:</strong> <span data-af-field="legal-email">-</span></p>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="af-template-preview-modal" class="af-modal" hidden>
+        <div class="af-modal__backdrop" data-af-close-template-preview="1"></div>
+        <div class="af-modal__dialog af-modal__dialog--large" role="dialog" aria-modal="true" aria-labelledby="af-template-preview-title">
+            <div class="af-modal__header">
+                <h2 id="af-template-preview-title"><?php esc_html_e( 'Vista previa de campos del contrato', 'arriendo-facil' ); ?></h2>
+                <button type="button" class="button-link af-modal__close" data-af-close-template-preview="1" aria-label="<?php esc_attr_e( 'Close', 'arriendo-facil' ); ?>">&times;</button>
+            </div>
+            <div class="af-modal__body">
+                <p class="af-template-preview-instructions">
+                    <?php esc_html_e( 'Revise los campos detectados. Puede cambiar la asignación usando los selectores.', 'arriendo-facil' ); ?>
+                    <?php esc_html_e( 'Los campos en', 'arriendo-facil' ); ?>
+                    <span class="af-field-tag af-tag-chatbot"><?php esc_html_e( 'azul', 'arriendo-facil' ); ?></span>
+                    <?php esc_html_e( 'serán llenados por el arrendatario, en', 'arriendo-facil' ); ?>
+                    <span class="af-field-tag af-tag-owner"><?php esc_html_e( 'naranja', 'arriendo-facil' ); ?></span>
+                    <?php esc_html_e( 'por datos del propietario, en', 'arriendo-facil' ); ?>
+                    <span class="af-field-tag af-tag-system"><?php esc_html_e( 'verde', 'arriendo-facil' ); ?></span>
+                    <?php esc_html_e( 'automáticamente, y en', 'arriendo-facil' ); ?>
+                    <span class="af-field-tag af-tag-none"><?php esc_html_e( 'gris', 'arriendo-facil' ); ?></span>
+                    <?php esc_html_e( 'se dejarán vacíos.', 'arriendo-facil' ); ?>
+                </p>
+                <div id="af-template-preview-content" class="af-template-preview-text"></div>
+            </div>
+            <div class="af-modal__footer">
+                <button id="af-template-approve" type="button" class="button button-primary"><?php esc_html_e( 'Aprobar campos', 'arriendo-facil' ); ?></button>
+                <button type="button" class="button" data-af-close-template-preview="1"><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
             </div>
         </div>
     </div>

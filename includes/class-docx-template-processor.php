@@ -257,6 +257,330 @@ class Arriendo_Facil_DOCX_Template_Processor {
 	}
 
 	/**
+	 * Analyzes a DOCX template at upload time and returns segments for preview.
+	 *
+	 * Each segment is either plain text or a detected blank with its AI-inferred field.
+	 * The owner can review and edit the assignments before saving.
+	 *
+	 * @param string                    $source_path Path to the DOCX file.
+	 * @param Arriendo_Facil_AI_Service $ai_service  AI service for field analysis.
+	 * @return array|WP_Error { segments: array, field_map: array } or WP_Error.
+	 */
+	public function analyze_template_for_preview( $source_path, $ai_service ) {
+		$source_path = (string) $source_path;
+
+		if ( '' === $source_path || ! file_exists( $source_path ) || ! class_exists( 'ZipArchive' ) ) {
+			return new WP_Error( 'invalid_source', __( 'Invalid DOCX file.', 'arriendo-facil' ) );
+		}
+
+		$zip = new ZipArchive();
+		if ( true !== $zip->open( $source_path ) ) {
+			return new WP_Error( 'zip_failed', __( 'Cannot open DOCX file.', 'arriendo-facil' ) );
+		}
+
+		$doc_xml = $zip->getFromName( 'word/document.xml' );
+		$zip->close();
+
+		if ( false === $doc_xml || '' === trim( (string) $doc_xml ) ) {
+			return new WP_Error( 'xml_empty', __( 'DOCX contains no document content.', 'arriendo-facil' ) );
+		}
+
+		$doc_xml   = (string) $doc_xml;
+		$flat_text = $this->extract_flat_text_from_doc_xml( $doc_xml );
+
+		if ( '' === $flat_text ) {
+			return new WP_Error( 'text_empty', __( 'Could not extract text from document.', 'arriendo-facil' ) );
+		}
+
+		$blank_pattern = '/_{3,}|\.{4,}|…{2,}|-{4,}|\t+/u';
+		if ( ! preg_match_all( $blank_pattern, $flat_text, $matches, PREG_OFFSET_CAPTURE ) ) {
+			return new WP_Error( 'no_blanks', __( 'No blank fields detected in the document.', 'arriendo-facil' ) );
+		}
+
+		$blanks_for_ai = array();
+		foreach ( $matches[0] as $idx => $match ) {
+			$blank_text = (string) $match[0];
+			$offset     = (int) $match[1];
+			$before     = substr( $flat_text, max( 0, $offset - 200 ), min( 200, $offset ) );
+			$after      = substr( $flat_text, $offset + strlen( $blank_text ), 200 );
+
+			$blanks_for_ai[] = array(
+				'blank_index' => $idx,
+				'before'      => $before,
+				'after'       => $after,
+				'blank'       => $blank_text,
+			);
+		}
+
+		$field_map = array();
+
+		if ( $ai_service && method_exists( $ai_service, 'analyze_template_fields' ) ) {
+			try {
+				$ai_result = $ai_service->analyze_template_fields( array(
+					'contract_text' => $flat_text,
+					'blanks'        => $blanks_for_ai,
+				) );
+
+				if ( ! is_wp_error( $ai_result ) && isset( $ai_result['field_map'] ) && is_array( $ai_result['field_map'] ) ) {
+					$field_map = $ai_result['field_map'];
+				}
+			} catch ( \Throwable $e ) {
+				$this->log_docx_event( 'analyze_preview_ai_exception', array( 'error' => $e->getMessage() ) );
+			}
+		}
+
+		if ( empty( $field_map ) ) {
+			foreach ( $blanks_for_ai as $blank_info ) {
+				$idx         = (int) $blank_info['blank_index'];
+				$before      = isset( $blank_info['before'] ) ? (string) $blank_info['before'] : '';
+				$after       = isset( $blank_info['after'] ) ? (string) $blank_info['after'] : '';
+				$placeholder = $this->infer_placeholder_from_context( $before, $after, $idx );
+
+				$field_key = 'none';
+				$label     = 'Dejar vacío';
+				$source    = 'none';
+
+				if ( 0 !== strpos( $placeholder, 'CAMPO_' ) ) {
+					$canonical = array_flip( self::CANONICAL_TO_PLACEHOLDER );
+					if ( isset( $canonical[ $placeholder ] ) ) {
+						$field_key = $canonical[ $placeholder ];
+						$label     = $this->get_field_label( $field_key );
+						$source    = $this->get_field_source( $field_key );
+					}
+				}
+
+				$field_map[] = array(
+					'blank_index' => $idx,
+					'field_key'   => $field_key,
+					'label'       => $label,
+					'source'      => $source,
+				);
+			}
+		}
+
+		$segments    = array();
+		$last_offset = 0;
+
+		foreach ( $matches[0] as $idx => $match ) {
+			$blank_text = (string) $match[0];
+			$offset     = (int) $match[1];
+
+			if ( $offset > $last_offset ) {
+				$segments[] = array(
+					'type'    => 'text',
+					'content' => substr( $flat_text, $last_offset, $offset - $last_offset ),
+				);
+			}
+
+			$field_info = null;
+			foreach ( $field_map as $fm ) {
+				if ( isset( $fm['blank_index'] ) && (int) $fm['blank_index'] === $idx ) {
+					$field_info = $fm;
+					break;
+				}
+			}
+
+			if ( ! $field_info ) {
+				$field_info = array(
+					'blank_index' => $idx,
+					'field_key'   => 'none',
+					'label'       => 'Dejar vacío',
+					'source'      => 'none',
+				);
+			}
+
+			$segments[] = array(
+				'type'        => 'field',
+				'blank_index' => $idx,
+				'field_key'   => $field_info['field_key'],
+				'label'       => $field_info['label'],
+				'source'      => $field_info['source'],
+			);
+
+			$last_offset = $offset + strlen( $blank_text );
+		}
+
+		if ( $last_offset < strlen( $flat_text ) ) {
+			$segments[] = array(
+				'type'    => 'text',
+				'content' => substr( $flat_text, $last_offset ),
+			);
+		}
+
+		$this->log_docx_event( 'analyze_preview_success', array(
+			'blanks_found' => count( $matches[0] ),
+			'segments'     => count( $segments ),
+		) );
+
+		return array(
+			'segments'  => $segments,
+			'field_map' => $field_map,
+		);
+	}
+
+	/**
+	 * Fills a DOCX template using a pre-approved field map (no AI at generation time).
+	 *
+	 * @param string $source_path Path to original DOCX template.
+	 * @param string $output_path Destination for filled contract.
+	 * @param array  $payload     Lease and guest data from chatbot.
+	 * @param array  $field_map   Approved field map from owner preview.
+	 * @return bool True on success.
+	 */
+	public function fill_template_with_field_map( $source_path, $output_path, array $payload, array $field_map ) {
+		$source_path = (string) $source_path;
+		$output_path = (string) $output_path;
+		$lease_id    = isset( $payload['lease_id'] ) ? (int) $payload['lease_id'] : 0;
+
+		if ( '' === $source_path || ! file_exists( $source_path ) || ! class_exists( 'ZipArchive' ) ) {
+			$this->log_docx_event( 'fill_with_field_map_failed', array( 'reason' => 'source_invalid', 'lease_id' => $lease_id ) );
+			return false;
+		}
+
+		$zip = new ZipArchive();
+		if ( true !== $zip->open( $source_path ) ) {
+			$this->log_docx_event( 'fill_with_field_map_failed', array( 'reason' => 'zip_open_failed', 'lease_id' => $lease_id ) );
+			return false;
+		}
+
+		$doc_xml = $zip->getFromName( 'word/document.xml' );
+		$zip->close();
+
+		if ( false === $doc_xml || '' === trim( (string) $doc_xml ) ) {
+			$this->log_docx_event( 'fill_with_field_map_failed', array( 'reason' => 'xml_empty', 'lease_id' => $lease_id ) );
+			return false;
+		}
+
+		$doc_xml   = (string) $doc_xml;
+		$flat_text = $this->extract_flat_text_from_doc_xml( $doc_xml );
+
+		if ( '' === $flat_text ) {
+			$this->log_docx_event( 'fill_with_field_map_failed', array( 'reason' => 'flat_text_empty', 'lease_id' => $lease_id ) );
+			return false;
+		}
+
+		$blank_pattern = '/_{3,}|\.{4,}|…{2,}|-{4,}|\t+/u';
+		if ( ! preg_match_all( $blank_pattern, $flat_text, $matches, PREG_OFFSET_CAPTURE ) ) {
+			$this->log_docx_event( 'fill_with_field_map_failed', array( 'reason' => 'no_blanks', 'lease_id' => $lease_id ) );
+			return false;
+		}
+
+		$values = $this->build_placeholder_values( $payload );
+
+		$field_map_by_index = array();
+		foreach ( $field_map as $fm ) {
+			if ( isset( $fm['blank_index'] ) ) {
+				$field_map_by_index[ (int) $fm['blank_index'] ] = $fm;
+			}
+		}
+
+		$ordered_values = array();
+		$filled_count   = 0;
+
+		foreach ( $matches[0] as $idx => $match ) {
+			if ( ! isset( $field_map_by_index[ $idx ] ) ) {
+				$ordered_values[] = null;
+				continue;
+			}
+
+			$fm        = $field_map_by_index[ $idx ];
+			$field_key = isset( $fm['field_key'] ) ? (string) $fm['field_key'] : 'none';
+
+			if ( 'none' === $field_key || '' === $field_key ) {
+				$ordered_values[] = null;
+				continue;
+			}
+
+			if ( isset( self::CANONICAL_TO_PLACEHOLDER[ $field_key ] ) ) {
+				$placeholder = self::CANONICAL_TO_PLACEHOLDER[ $field_key ];
+				if ( isset( $values[ $placeholder ] ) && '...............' !== $values[ $placeholder ] ) {
+					$ordered_values[] = $values[ $placeholder ];
+					$filled_count++;
+				} else {
+					$ordered_values[] = null;
+				}
+			} else {
+				$ordered_values[] = null;
+			}
+		}
+
+		$filled_xml = $this->replace_blanks_in_xml_with_values( $doc_xml, $ordered_values );
+		if ( '' === $filled_xml ) {
+			$this->log_docx_event( 'fill_with_field_map_failed', array( 'reason' => 'xml_replace_failed', 'lease_id' => $lease_id ) );
+			return false;
+		}
+
+		$result = $this->write_processed_docx( $source_path, $filled_xml, $output_path );
+		if ( '' === $result ) {
+			$this->log_docx_event( 'fill_with_field_map_failed', array( 'reason' => 'write_failed', 'lease_id' => $lease_id ) );
+			return false;
+		}
+
+		$this->log_docx_event( 'fill_with_field_map_success', array(
+			'lease_id'      => $lease_id,
+			'blanks_total'  => count( $matches[0] ),
+			'blanks_filled' => $filled_count,
+			'output_path'   => $result,
+		) );
+
+		return true;
+	}
+
+	/**
+	 * Returns a human-readable label for a canonical field key.
+	 *
+	 * @param string $field_key Canonical field key.
+	 * @return string
+	 */
+	private function get_field_label( $field_key ) {
+		$labels = array(
+			'guest_name'            => 'Nombre del arrendatario',
+			'guest_id_number'       => 'Cédula del arrendatario',
+			'guest_phone'           => 'Teléfono del arrendatario',
+			'guest_email'           => 'Email del arrendatario',
+			'owner_name'            => 'Nombre del arrendador',
+			'owner_id_number'       => 'Cédula del arrendador',
+			'accommodation_title'   => 'Nombre del inmueble',
+			'accommodation_address' => 'Dirección del inmueble',
+			'monthly_rent'          => 'Canon mensual',
+			'start_date'            => 'Fecha de inicio',
+			'end_date'              => 'Fecha de finalización',
+			'current_date'          => 'Fecha actual',
+			'guarantee_text'        => 'Garantía',
+			'none'                  => 'Dejar vacío',
+		);
+
+		return isset( $labels[ $field_key ] ) ? $labels[ $field_key ] : $field_key;
+	}
+
+	/**
+	 * Returns the source type for a canonical field key.
+	 *
+	 * @param string $field_key Canonical field key.
+	 * @return string chatbot|owner|system|none
+	 */
+	private function get_field_source( $field_key ) {
+		$sources = array(
+			'guest_name'            => 'chatbot',
+			'guest_id_number'       => 'chatbot',
+			'guest_phone'           => 'chatbot',
+			'guest_email'           => 'chatbot',
+			'owner_name'            => 'owner',
+			'owner_id_number'       => 'owner',
+			'accommodation_title'   => 'system',
+			'accommodation_address' => 'system',
+			'monthly_rent'          => 'system',
+			'start_date'            => 'system',
+			'end_date'              => 'system',
+			'current_date'          => 'system',
+			'guarantee_text'        => 'system',
+			'none'                  => 'none',
+		);
+
+		return isset( $sources[ $field_key ] ) ? $sources[ $field_key ] : 'none';
+	}
+
+	/**
 	 * Validates AI replacements by cross-checking each value against its context.
 	 *
 	 * Catches errors like: name in an ID field, ID number in a name field,

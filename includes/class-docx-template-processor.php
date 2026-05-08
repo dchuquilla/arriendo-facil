@@ -1994,6 +1994,15 @@ class Arriendo_Facil_DOCX_Template_Processor {
 
 		$zip->addFromString( 'word/document.xml', $new_doc_xml );
 
+		$settings_xml = $zip->getFromName( 'word/settings.xml' );
+		if ( false !== $settings_xml && '' !== $settings_xml ) {
+			$cleaned = preg_replace( '/<w:documentProtection[^\/]*\/>/i', '', (string) $settings_xml );
+			$cleaned = preg_replace( '/<w:documentProtection[^>]*>.*?<\/w:documentProtection>/is', '', (string) $cleaned );
+			if ( $cleaned !== $settings_xml ) {
+				$zip->addFromString( 'word/settings.xml', $cleaned );
+			}
+		}
+
 		if ( ! $zip->close() ) {
 			@unlink( $output_path );
 			return '';

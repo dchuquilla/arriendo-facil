@@ -863,7 +863,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 		}
 
 		if ( empty( $replace_at ) ) {
-			return (string) $dom->saveXML( $dom->documentElement );
+			return (string) $dom->saveXML();
 		}
 
 		// Apply replacements.
@@ -916,7 +916,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			}
 		}
 
-		return (string) $dom->saveXML( $dom->documentElement );
+		return (string) $dom->saveXML();
 	}
 
 	/**
@@ -1955,7 +1955,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			}
 		}
 
-		return (string) $dom->saveXML( $dom->documentElement );
+		return (string) $dom->saveXML();
 	}
 
 	/**

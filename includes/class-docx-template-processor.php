@@ -146,8 +146,8 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			return false;
 		}
 
-		// Detect blanks: underscores, dots, dashes, ellipsis, tabs.
-		$blank_pattern = '/_{3,}|\.{4,}|…{2,}|-{4,}|\t+/u';
+		// Detect blanks: underscores, dots, dashes, ellipsis, tabs (2+ consecutive).
+		$blank_pattern = '/_{3,}|\.{4,}|…{2,}|-{4,}|\t{2,}/u';
 		if ( ! preg_match_all( $blank_pattern, $flat_text, $matches, PREG_OFFSET_CAPTURE ) ) {
 			$this->log_docx_event( 'fill_with_ai_no_blanks', array( 'lease_id' => $lease_id, 'text_length' => strlen( $flat_text ) ) );
 			return false;
@@ -155,6 +155,14 @@ class Arriendo_Facil_DOCX_Template_Processor {
 
 		$blank_count = count( $matches[0] );
 		$this->log_docx_event( 'fill_with_ai_blanks_found', array( 'lease_id' => $lease_id, 'blank_count' => $blank_count ) );
+
+		// Step 2b: Filter out likely decorative blanks (PDF-to-Word artifacts).
+		$matches[0] = $this->filter_decorative_blanks( $matches[0], $flat_text );
+
+		if ( empty( $matches[0] ) ) {
+			$this->log_docx_event( 'fill_with_ai_no_blanks_after_filter', array( 'lease_id' => $lease_id, 'original_count' => $blank_count ) );
+			return false;
+		}
 
 		// Step 3: Build context for each blank.
 		$ai_lines = array();
@@ -303,8 +311,15 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			return new WP_Error( 'text_empty', __( 'Could not extract text from document.', 'arriendo-facil' ) );
 		}
 
-		$blank_pattern = '/_{3,}|\.{4,}|…{2,}|-{4,}|\t+/u';
+		$blank_pattern = '/_{3,}|\.{4,}|…{2,}|-{4,}|\t{2,}/u';
 		if ( ! preg_match_all( $blank_pattern, $flat_text, $matches, PREG_OFFSET_CAPTURE ) ) {
+			return new WP_Error( 'no_blanks', __( 'No blank fields detected in the document.', 'arriendo-facil' ) );
+		}
+
+		// Filter decorative blanks (PDF-to-Word artifacts).
+		$matches[0] = $this->filter_decorative_blanks( $matches[0], $flat_text );
+
+		if ( empty( $matches[0] ) ) {
 			return new WP_Error( 'no_blanks', __( 'No blank fields detected in the document.', 'arriendo-facil' ) );
 		}
 
@@ -470,9 +485,17 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			return false;
 		}
 
-		$blank_pattern = '/_{3,}|\.{4,}|…{2,}|-{4,}|\t+/u';
+		$blank_pattern = '/_{3,}|\.{4,}|…{2,}|-{4,}|\t{2,}/u';
 		if ( ! preg_match_all( $blank_pattern, $flat_text, $matches, PREG_OFFSET_CAPTURE ) ) {
 			$this->log_docx_event( 'fill_with_field_map_failed', array( 'reason' => 'no_blanks', 'lease_id' => $lease_id ) );
+			return false;
+		}
+
+		// Filter decorative blanks (PDF-to-Word artifacts).
+		$matches[0] = $this->filter_decorative_blanks( $matches[0], $flat_text );
+
+		if ( empty( $matches[0] ) ) {
+			$this->log_docx_event( 'fill_with_field_map_failed', array( 'reason' => 'no_blanks_after_filter', 'lease_id' => $lease_id ) );
 			return false;
 		}
 
@@ -725,6 +748,38 @@ class Arriendo_Facil_DOCX_Template_Processor {
 				$this->log_docx_event( 'validate_ai_corrected', array( 'blank' => $blank_id, 'from' => 'owner_name', 'to' => 'guest_name' ) );
 			}
 
+			// Rule 6: Date format correction — full date in a day-only context.
+			$is_day_context = ( 1 === preg_match( '/a\s+los\s*$/', $before ) && false !== strpos( $after, 'dias' ) )
+				|| ( 1 === preg_match( '/(,|el)\s*$/', $before ) && 1 === preg_match( '/^\s*de\s+[a-z]/', $after ) );
+			if ( $is_day_context && preg_match( '#^\d{1,2}/\d{1,2}/\d{4}$#', $value ) ) {
+				$value = gmdate( 'j' );
+				$this->log_docx_event( 'validate_ai_corrected', array( 'blank' => $blank_id, 'reason' => 'full_date_in_day_field' ) );
+			}
+
+			// Rule 7: Month context — replace full date or numeric with month name.
+			$is_month_context = ( false !== strpos( $before, 'del mes de' ) || false !== strpos( $before, 'dias del mes de' ) )
+				&& ( 1 === preg_match( '/^\s*de[l\s]/', $after ) );
+			if ( $is_month_context && preg_match( '#^\d{1,2}/\d{1,2}/\d{4}$#', $value ) ) {
+				$value = $this->get_spanish_month_name( (int) gmdate( 'n' ) );
+				$this->log_docx_event( 'validate_ai_corrected', array( 'blank' => $blank_id, 'reason' => 'full_date_in_month_field' ) );
+			}
+
+			// Rule 8: Year context — replace full date with year only.
+			$is_year_context = 1 === preg_match( '/del?\s*$/', $before )
+				&& ( false !== strpos( $before, 'mes de' ) || false !== strpos( $before, 'dias' ) );
+			if ( $is_year_context && preg_match( '#^\d{1,2}/\d{1,2}/\d{4}$#', $value ) ) {
+				$value = gmdate( 'Y' );
+				$this->log_docx_event( 'validate_ai_corrected', array( 'blank' => $blank_id, 'reason' => 'full_date_in_year_field' ) );
+			}
+
+			// Rule 9: Reject values that look like names in date/city contexts.
+			$is_date_or_city_context = $is_day_context || $is_month_context || $is_year_context
+				|| false !== strpos( $before, 'ciudad de' );
+			if ( $is_date_or_city_context && '' !== $guest_name && $value === $guest_name ) {
+				$this->log_docx_event( 'validate_ai_rejected', array( 'blank' => $blank_id, 'reason' => 'name_in_date_city_field' ) );
+				continue;
+			}
+
 			$validated[ $blank_id ] = $value;
 		}
 
@@ -860,7 +915,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			}
 
 			$start_char = isset( $entries[ $start ]['text'] ) ? (string) $entries[ $start ]['text'] : '';
-			$min_count  = "\t" === $start_char ? 1 : 3;
+			$min_count  = "\t" === $start_char ? 2 : 3;
 
 			if ( $blank_count >= $min_count ) {
 				$replacement = isset( $ordered_values[ $counter ] ) ? $ordered_values[ $counter ] : null;
@@ -1325,7 +1380,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			return $ordered;
 		}
 
-		if ( ! preg_match_all( '/_{3,}|\.{5,}|…{3,}|\t+/u', $flat_text, $matches, PREG_OFFSET_CAPTURE ) ) {
+		if ( ! preg_match_all( '/_{3,}|\.{5,}|…{3,}|\t{2,}/u', $flat_text, $matches, PREG_OFFSET_CAPTURE ) ) {
 			return $ordered;
 		}
 
@@ -1655,12 +1710,6 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			return 'ARRENDADOR';
 		}
 
-		// ── DATE at end of contract: "[BLANK] de [BLANK] del [BLANK]" ──
-
-		if ( 1 === preg_match( '/\bde\s*$/', $after ) && 1 === preg_match( '/\bdel?\s*$/', $before ) ) {
-			return 'CAMPO_' . $blank_idx;
-		}
-
 		// ── CITY ──
 
 		if ( false !== strpos( $before, 'ciudad de' ) ) {
@@ -1951,7 +2000,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			}
 
 			$start_char = isset( $entries[ $start ]['text'] ) ? (string) $entries[ $start ]['text'] : '';
-			$min_count  = "\t" === $start_char ? 1 : 3;
+			$min_count  = "\t" === $start_char ? 2 : 3;
 
 			if ( $blank_count >= $min_count ) {
 				$placeholder = isset( $ordered_placeholders[ $counter ] )
@@ -2181,5 +2230,30 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			10 => 'octubre', 11 => 'noviembre', 12 => 'diciembre',
 		);
 		return isset( $months[ $month_number ] ) ? $months[ $month_number ] : '';
+	}
+
+	private function filter_decorative_blanks( array $raw_matches, $flat_text ) {
+		$filtered = array();
+		foreach ( $raw_matches as $match ) {
+			$blank_text = (string) $match[0];
+			$offset     = (int) $match[1];
+			$len        = strlen( $blank_text );
+
+			if ( $len <= 4 && '_' === $blank_text[0] ) {
+				$char_before    = $offset > 0 ? $flat_text[ $offset - 1 ] : '';
+				$after_snippet  = substr( $flat_text, $offset + $len, 60 );
+				$before_snippet = substr( $flat_text, max( 0, $offset - 60 ), min( 60, $offset ) );
+				$has_field_context = (bool) preg_match(
+					'/(?:senor|cedula|ciudad|telefono|direccion|ubicad|situad|canon|garantia|arrendador|arrendatario|nombre|correo|fecha)/i',
+					$before_snippet . $after_snippet
+				);
+				if ( ! $has_field_context && ( '.' === $char_before || ';' === $char_before || ':' === $char_before || '' === trim( $char_before ) ) ) {
+					continue;
+				}
+			}
+
+			$filtered[] = $match;
+		}
+		return $filtered;
 	}
 }

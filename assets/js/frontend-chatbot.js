@@ -616,13 +616,6 @@
 			message.textContent = '';
 			message.className = '';
 			state.values[step.key] = value;
-			clearDependentValues(step.key);
-			if (step.key === 'reference_1_name' || step.key === 'reference_2_name') {
-				state.values[step.key] = value.replace(/\s+/g, ' ').trim();
-			}
-			if (step.key === 'reference_1_phone' || step.key === 'reference_2_phone') {
-				state.values[step.key] = normalizePhoneDigits(value);
-			}
 			state.lastSubmitFailed = false;
 			appendBubble(getStepLabel(step, value), 'user');
 			state.currentStep += 1;

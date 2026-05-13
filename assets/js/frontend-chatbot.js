@@ -119,11 +119,16 @@
 			},
 			{
 				key: 'rental_start_date',
-				type: 'text',
-				question: 'Cuando te gustaria iniciar el arriendo? (formato YYYY-MM-DD, ejemplo: 2026-06-01)',
-				placeholder: '2026-06-01',
-				validate: function (value) { return /^\d{4}-\d{2}-\d{2}$/.test(value); },
-				error: 'Ingresa una fecha valida en formato YYYY-MM-DD (ejemplo: 2026-06-01).'
+				type: 'date',
+				question: 'Selecciona la fecha en la que te gustaria iniciar el arriendo.',
+				validate: function (value) {
+					if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) { return false; }
+					var selected = new Date(value + 'T00:00:00');
+					var today = new Date();
+					today.setHours(0, 0, 0, 0);
+					return selected >= today;
+				},
+				error: 'Selecciona una fecha valida (debe ser hoy o en el futuro).'
 			},
 			{
 				key: 'rental_years',
@@ -230,11 +235,21 @@
 			if ('select' === type) {
 				input.setAttribute('hidden', 'hidden');
 				select.removeAttribute('hidden');
+				input.type = 'text';
 				select.focus();
 				return;
 			}
 			select.setAttribute('hidden', 'hidden');
 			input.removeAttribute('hidden');
+			if ('date' === type) {
+				input.type = 'date';
+				var today = new Date();
+				input.min = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+				input.value = '';
+			} else {
+				input.type = 'text';
+				input.removeAttribute('min');
+			}
 			input.focus();
 		}
 

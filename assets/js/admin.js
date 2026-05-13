@@ -1259,14 +1259,21 @@
 			{ key: 'guest_email', label: 'Email del arrendatario', source: 'chatbot' }
 		] },
 		{ group: 'Datos del propietario', options: [
-			{ key: 'owner_name', label: 'Nombre del arrendador', source: 'owner' },
+			{ key: 'owner_name', label: 'Nombre del arrendador/propietario', source: 'owner' },
 			{ key: 'owner_id_number', label: 'Cédula del arrendador', source: 'owner' }
 		] },
 		{ group: 'Datos del inmueble', options: [
 			{ key: 'accommodation_title', label: 'Nombre del inmueble', source: 'system' },
 			{ key: 'accommodation_address', label: 'Dirección del inmueble', source: 'system' },
-			{ key: 'accommodation_city', label: 'Ciudad del inmueble', source: 'system' },
-			{ key: 'monthly_rent', label: 'Canon mensual (valor numérico)', source: 'system' }
+			{ key: 'accommodation_city', label: 'Ciudad', source: 'system' },
+			{ key: 'accommodation_square_meters', label: 'Metros cuadrados (m²)', source: 'system' },
+			{ key: 'accommodation_bedrooms', label: 'Número de habitaciones', source: 'system' },
+			{ key: 'accommodation_bathrooms', label: 'Número de baños', source: 'system' },
+			{ key: 'accommodation_property_type', label: 'Tipo de inmueble', source: 'system' }
+		] },
+		{ group: 'Valores económicos', options: [
+			{ key: 'monthly_rent', label: 'Canon mensual (valor numérico)', source: 'system' },
+			{ key: 'guarantee_text', label: 'Texto de garantía', source: 'system' }
 		] },
 		{ group: 'Fecha del documento (auto)', options: [
 			{ key: 'current_day', label: 'Día (ej: 13)', source: 'system' },
@@ -1275,11 +1282,8 @@
 			{ key: 'current_date', label: 'Fecha completa (13/05/2026)', source: 'system' }
 		] },
 		{ group: 'Fechas del arriendo', options: [
-			{ key: 'start_date', label: 'Inicio del arriendo', source: 'system' },
-			{ key: 'end_date', label: 'Fin del arriendo', source: 'system' }
-		] },
-		{ group: 'Otros', options: [
-			{ key: 'guarantee_text', label: 'Texto de garantía', source: 'system' }
+			{ key: 'start_date', label: 'Inicio del arriendo (YYYY-MM-DD)', source: 'system' },
+			{ key: 'end_date', label: 'Fin del arriendo (YYYY-MM-DD)', source: 'system' }
 		] },
 		{ group: 'Sin asignar', options: [
 			{ key: 'none', label: 'Dejar vacío (no llenar)', source: 'none' }

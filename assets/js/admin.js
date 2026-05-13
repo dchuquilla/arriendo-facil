@@ -1266,21 +1266,23 @@
 			{ key: 'accommodation_title', label: 'Nombre del inmueble', source: 'system' },
 			{ key: 'accommodation_address', label: 'Dirección del inmueble', source: 'system' },
 			{ key: 'accommodation_city', label: 'Ciudad del inmueble', source: 'system' },
-			{ key: 'monthly_rent', label: 'Canon mensual', source: 'system' }
+			{ key: 'monthly_rent', label: 'Canon mensual (valor numérico)', source: 'system' }
 		] },
-		{ group: 'Fechas', options: [
-			{ key: 'start_date', label: 'Fecha de inicio', source: 'system' },
-			{ key: 'end_date', label: 'Fecha de finalización', source: 'system' },
-			{ key: 'current_date', label: 'Fecha actual (dd/mm/yyyy)', source: 'system' },
-			{ key: 'current_day', label: 'Día actual (número)', source: 'system' },
-			{ key: 'current_month_name', label: 'Mes actual (nombre)', source: 'system' },
-			{ key: 'current_year', label: 'Año actual', source: 'system' }
+		{ group: 'Fecha del documento (auto)', options: [
+			{ key: 'current_day', label: 'Día (ej: 13)', source: 'system' },
+			{ key: 'current_month_name', label: 'Mes (ej: mayo)', source: 'system' },
+			{ key: 'current_year', label: 'Año (ej: 2026)', source: 'system' },
+			{ key: 'current_date', label: 'Fecha completa (13/05/2026)', source: 'system' }
+		] },
+		{ group: 'Fechas del arriendo', options: [
+			{ key: 'start_date', label: 'Inicio del arriendo', source: 'system' },
+			{ key: 'end_date', label: 'Fin del arriendo', source: 'system' }
 		] },
 		{ group: 'Otros', options: [
-			{ key: 'guarantee_text', label: 'Garantía', source: 'system' }
+			{ key: 'guarantee_text', label: 'Texto de garantía', source: 'system' }
 		] },
 		{ group: 'Sin asignar', options: [
-			{ key: 'none', label: 'Dejar vacío', source: 'none' }
+			{ key: 'none', label: 'Dejar vacío (no llenar)', source: 'none' }
 		] }
 	];
 

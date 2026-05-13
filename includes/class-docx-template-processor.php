@@ -198,7 +198,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 						'guest_email'           => $this->val( $payload, 'guest_email' ),
 						'owner_name'            => $this->val( $payload, 'owner_name' ),
 						'owner_id_number'       => $this->val( $payload, 'owner_id_number' ),
-						'monthly_rent'          => isset( $payload['monthly_rent'] ) ? 'USD ' . number_format( (float) $payload['monthly_rent'], 2, '.', '' ) : '',
+						'monthly_rent'          => isset( $payload['monthly_rent'] ) ? number_format( (float) $payload['monthly_rent'], 2, '.', '' ) : '',
 						'start_date'            => $this->val( $payload, 'start_date' ),
 						'end_date'              => $this->val( $payload, 'end_date' ),
 						'accommodation_address' => $this->val( $payload, 'accommodation_address' ),
@@ -652,6 +652,8 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			'recibido', 'corresponde', 'plazo', 'servicios basico',
 			'jueces competentes', 'estado civil', 'profesion',
 			'conjunto habitacional', 'etapa', 'manzana',
+			'firma del presente contrato el dia', 'primer mes de garantia',
+			'segundo mes de garantia', 'entregadas las llaves',
 		);
 
 		$validated = array();
@@ -778,6 +780,11 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			if ( $is_date_or_city_context && '' !== $guest_name && $value === $guest_name ) {
 				$this->log_docx_event( 'validate_ai_rejected', array( 'blank' => $blank_id, 'reason' => 'name_in_date_city_field' ) );
 				continue;
+			}
+
+			// Rule 10: Strip duplicate currency prefix when context already has "USD".
+			if ( 1 === preg_match( '/usd\s*\$?\s*$/', $before ) && 1 === preg_match( '/^USD\s*/i', $value ) ) {
+				$value = preg_replace( '/^USD\s*/i', '', $value );
 			}
 
 			$validated[ $blank_id ] = $value;
@@ -926,6 +933,20 @@ class Arriendo_Facil_DOCX_Template_Processor {
 					continue;
 				}
 
+				// Smart spacing: ensure replacement doesn't collide with adjacent text.
+				$char_before_blank = ( $start > 0 && isset( $entries[ $start - 1 ]['text'] ) ) ? $entries[ $start - 1 ]['text'] : ' ';
+				$char_after_blank  = ( $j < $total && isset( $entries[ $j ]['text'] ) ) ? $entries[ $j ]['text'] : ' ';
+
+				$needs_space_before = ! preg_match( '/[\s\(\[\"\']/u', $char_before_blank );
+				$needs_space_after  = ! preg_match( '/[\s\)\]\.\,\;\:\"\']/u', $char_after_blank );
+
+				if ( $needs_space_before ) {
+					$replacement = ' ' . $replacement;
+				}
+				if ( $needs_space_after ) {
+					$replacement = $replacement . ' ';
+				}
+
 				$replace_at[ $start ] = $replacement;
 				for ( $k = $start; $k < $j; $k++ ) {
 					$remove_at[ $k ] = true;
@@ -1011,14 +1032,19 @@ class Arriendo_Facil_DOCX_Template_Processor {
 				$close   = $m[3];
 
 				$new_content = (string) preg_replace_callback(
-					'/_{3,}|\.{4,}|…{2,}|-{4,}/u',
+					'/(.)?(_{3,}|\.{4,}|…{2,}|-{4,})(.)?/u',
 					function ( $blank_match ) use ( &$counter, $ordered_values ) {
 						$replacement = isset( $ordered_values[ $counter ] ) ? $ordered_values[ $counter ] : null;
 						$counter++;
 						if ( null === $replacement ) {
 							return $blank_match[0];
 						}
-						return htmlspecialchars( $replacement, ENT_COMPAT, 'UTF-8' );
+						$value = htmlspecialchars( $replacement, ENT_COMPAT, 'UTF-8' );
+						$before_char = isset( $blank_match[1] ) ? $blank_match[1] : '';
+						$after_char  = isset( $blank_match[3] ) ? $blank_match[3] : '';
+						$prefix = ( '' !== $before_char && ! preg_match( '/[\s\(\["\']/', $before_char ) ) ? ' ' : '';
+						$suffix = ( '' !== $after_char && ! preg_match( '/[\s\)\]\.,;:"\']/', $after_char ) ) ? ' ' : '';
+						return $before_char . $prefix . $value . $suffix . $after_char;
 					},
 					$content
 				);
@@ -1253,7 +1279,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			'EMAIL'               => $this->val( $payload, 'guest_email', $blank ),
 			'ARRENDADOR'          => $this->val( $payload, 'owner_name', $blank ),
 			'CEDULA_ARRENDADOR'   => $this->val( $payload, 'owner_id_number', $blank ),
-			'CANON'               => '' !== $rent ? 'USD ' . $rent : $blank,
+			'CANON'               => '' !== $rent ? $rent : $blank,
 			'FECHA_INICIO'        => $this->val( $payload, 'start_date', $blank ),
 			'FECHA_FIN'           => $this->val( $payload, 'end_date', $blank ),
 			'DIRECCION'           => $this->val( $payload, 'accommodation_address', $blank ),
@@ -1511,6 +1537,10 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			'conjunto habitacional',
 			'etapa',
 			'manzana',
+			'firma del presente contrato el dia',
+			'primer mes de garantia',
+			'segundo mes de garantia',
+			'seran entregadas las llaves',
 		);
 
 		foreach ( $leave_blank_patterns as $pat ) {
@@ -1642,6 +1672,13 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			if ( false !== strpos( $before, 'arrendatario' ) || false !== strpos( $before, 'inquilino' ) ) {
 				return 'CEDULA_ARRENDATARIO';
 			}
+			// Check after context for signature section: "C.C. [BLANK] LA ARRENDADORA/EL ARRENDATARIO"
+			if ( false !== strpos( $after, 'arrendadora' ) || ( false !== strpos( $after, 'arrendador' ) && false === strpos( $after, 'arrendatario' ) ) ) {
+				return 'CEDULA_ARRENDADOR';
+			}
+			if ( false !== strpos( $after, 'arrendatario' ) ) {
+				return 'CEDULA_ARRENDATARIO';
+			}
 			return 'CAMPO_' . $blank_idx;
 		}
 
@@ -1748,15 +1785,15 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			return 'MES_ACTUAL';
 		}
 
-		// YEAR: after "de/del" when preceded by month-like context
-		if ( 1 === preg_match( '/del?\s*$/', $before ) && ( false !== strpos( $before, 'mes de' ) || false !== strpos( $before, 'dias' ) ) ) {
+		// YEAR: after "de/del/del." when preceded by month-like context
+		if ( 1 === preg_match( '/del?\.?\s*$/', $before ) && ( false !== strpos( $before, 'mes de' ) || false !== strpos( $before, 'dias' ) ) ) {
 			return 'ANO_ACTUAL';
 		}
 		// Generic: "de [month_name] de/del [BLANK]" — year at end of date
-		if ( 1 === preg_match( '/de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+del?\s*$/', $before ) ) {
+		if ( 1 === preg_match( '/de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+del?\.?\s*$/', $before ) ) {
 			return 'ANO_ACTUAL';
 		}
-		if ( 1 === preg_match( '/del?\s*$/', $before ) && 1 === preg_match( '/\bde\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\b/', $before ) ) {
+		if ( 1 === preg_match( '/del?\.?\s*$/', $before ) && 1 === preg_match( '/\bde\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\b/', $before ) ) {
 			return 'ANO_ACTUAL';
 		}
 
@@ -2238,6 +2275,11 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			$blank_text = (string) $match[0];
 			$offset     = (int) $match[1];
 			$len        = strlen( $blank_text );
+
+			// Long dash sequences (>20 chars) are decorative separators, not fields.
+			if ( $len > 20 && '-' === $blank_text[0] ) {
+				continue;
+			}
 
 			if ( $len <= 4 && '_' === $blank_text[0] ) {
 				$char_before    = $offset > 0 ? $flat_text[ $offset - 1 ] : '';

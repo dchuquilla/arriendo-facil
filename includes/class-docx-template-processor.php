@@ -41,6 +41,10 @@ class Arriendo_Facil_DOCX_Template_Processor {
 		'accommodation_title'   => 'INMUEBLE',
 		'guarantee_text'        => 'GARANTIA',
 		'current_date'          => 'FECHA_ACTUAL',
+		'accommodation_city'    => 'CIUDAD',
+		'current_day'           => 'DIA_ACTUAL',
+		'current_month_name'    => 'MES_ACTUAL',
+		'current_year'          => 'ANO_ACTUAL',
 	);
 
 	/**
@@ -75,6 +79,13 @@ class Arriendo_Facil_DOCX_Template_Processor {
 		'TELEFONO'            => 'TELEFONO',
 		'EMAIL'               => 'EMAIL',
 		'CORREO'              => 'EMAIL',
+		'CIUDAD'              => 'CIUDAD',
+		'DIA'                 => 'DIA_ACTUAL',
+		'DIA_ACTUAL'          => 'DIA_ACTUAL',
+		'MES'                 => 'MES_ACTUAL',
+		'MES_ACTUAL'          => 'MES_ACTUAL',
+		'ANO'                 => 'ANO_ACTUAL',
+		'ANO_ACTUAL'          => 'ANO_ACTUAL',
 	);
 
 	// ─────────────────────────────────────────────────────────────────────────
@@ -546,6 +557,10 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			'start_date'            => 'Fecha de inicio',
 			'end_date'              => 'Fecha de finalización',
 			'current_date'          => 'Fecha actual',
+			'accommodation_city'    => 'Ciudad del inmueble',
+			'current_day'           => 'Día actual (número)',
+			'current_month_name'    => 'Mes actual (nombre)',
+			'current_year'          => 'Año actual',
 			'guarantee_text'        => 'Garantía',
 			'none'                  => 'Dejar vacío',
 		);
@@ -569,10 +584,14 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			'owner_id_number'       => 'owner',
 			'accommodation_title'   => 'system',
 			'accommodation_address' => 'system',
+			'accommodation_city'    => 'system',
 			'monthly_rent'          => 'system',
 			'start_date'            => 'system',
 			'end_date'              => 'system',
 			'current_date'          => 'system',
+			'current_day'           => 'system',
+			'current_month_name'    => 'system',
+			'current_year'          => 'system',
 			'guarantee_text'        => 'system',
 			'none'                  => 'none',
 		);
@@ -863,7 +882,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 		}
 
 		if ( empty( $replace_at ) ) {
-			return (string) $dom->saveXML();
+			return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' . "\n" . $dom->saveXML( $dom->documentElement );
 		}
 
 		// Apply replacements.
@@ -916,7 +935,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			}
 		}
 
-		return (string) $dom->saveXML();
+		return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' . "\n" . $dom->saveXML( $dom->documentElement );
 	}
 
 	/**
@@ -1192,6 +1211,10 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			'REFERENCIA_1'        => $this->val( $payload, 'referencia_personal_1', $blank ),
 			'REFERENCIA_2'        => $this->val( $payload, 'referencia_personal_2', $blank ),
 			'FECHA_ACTUAL'        => gmdate( 'd/m/Y' ),
+			'CIUDAD'              => $this->val( $payload, 'accommodation_city', $blank ),
+			'DIA_ACTUAL'          => gmdate( 'j' ),
+			'MES_ACTUAL'          => $this->get_spanish_month_name( (int) gmdate( 'n' ) ),
+			'ANO_ACTUAL'          => gmdate( 'Y' ),
 		);
 
 		$missing_fields = array();
@@ -1638,6 +1661,56 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			return 'CAMPO_' . $blank_idx;
 		}
 
+		// ── CITY ──
+
+		if ( false !== strpos( $before, 'ciudad de' ) ) {
+			return 'CIUDAD';
+		}
+
+		// ── CONTRACT DATE PARTS ──
+		// Covers multiple Spanish date formats:
+		// "a los ___ días del mes de ___ de/del ___"
+		// "Quito, ___ de ___ de ___"
+		// "firmado el ___ de ___ de ___"
+		// "___ de ___ del ___"
+
+		// DAY: "a los [BLANK] dias" or after comma/article + before "de [month]"
+		if ( 1 === preg_match( '/a\s+los\s*$/', $before ) && false !== strpos( $after, 'dias' ) ) {
+			return 'DIA_ACTUAL';
+		}
+		if ( 1 === preg_match( '/(,|el)\s*$/', $before ) && 1 === preg_match( '/^\s*de\s+[a-z]/', $after ) ) {
+			return 'DIA_ACTUAL';
+		}
+		if ( 1 === preg_match( '/(,|el)\s*$/', $before ) && 1 === preg_match( '/^\s*dias?\s+del?\s+mes/', $after ) ) {
+			return 'DIA_ACTUAL';
+		}
+
+		// MONTH: after "del mes de" / "dias del mes de" / "de [day] de" + before "de/del [year]"
+		if ( ( false !== strpos( $before, 'del mes de' ) || false !== strpos( $before, 'dias del mes de' ) )
+			&& ( 1 === preg_match( '/^\s*de[l\s]/', $after ) || 1 === preg_match( '/^\s*del?\s/', $after ) )
+		) {
+			return 'MES_ACTUAL';
+		}
+		// Generic: number + "de [BLANK] de/del" (month between two "de")
+		if ( 1 === preg_match( '/\d+\s+de\s*$/', $before ) && 1 === preg_match( '/^\s*de[l\s]/', $after ) ) {
+			return 'MES_ACTUAL';
+		}
+		if ( 1 === preg_match( '/dias\s+de\s*$/', $before ) && 1 === preg_match( '/^\s*de[l\s]/', $after ) ) {
+			return 'MES_ACTUAL';
+		}
+
+		// YEAR: after "de/del" when preceded by month-like context
+		if ( 1 === preg_match( '/del?\s*$/', $before ) && ( false !== strpos( $before, 'mes de' ) || false !== strpos( $before, 'dias' ) ) ) {
+			return 'ANO_ACTUAL';
+		}
+		// Generic: "de [month_name] de/del [BLANK]" — year at end of date
+		if ( 1 === preg_match( '/de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+del?\s*$/', $before ) ) {
+			return 'ANO_ACTUAL';
+		}
+		if ( 1 === preg_match( '/del?\s*$/', $before ) && 1 === preg_match( '/\bde\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\b/', $before ) ) {
+			return 'ANO_ACTUAL';
+		}
+
 		// ── Fallback keyword inference (conservative) ──
 
 		$keyword_guess = $this->infer_placeholder_by_keywords_strict( $before, $after );
@@ -1955,7 +2028,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			}
 		}
 
-		return (string) $dom->saveXML();
+		return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' . "\n" . $dom->saveXML( $dom->documentElement );
 	}
 
 	/**
@@ -1994,14 +2067,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 
 		$zip->addFromString( 'word/document.xml', $new_doc_xml );
 
-		$settings_xml = $zip->getFromName( 'word/settings.xml' );
-		if ( false !== $settings_xml && '' !== $settings_xml ) {
-			$cleaned = preg_replace( '/<w:documentProtection[^\/]*\/>/i', '', (string) $settings_xml );
-			$cleaned = preg_replace( '/<w:documentProtection[^>]*>.*?<\/w:documentProtection>/is', '', (string) $cleaned );
-			if ( $cleaned !== $settings_xml ) {
-				$zip->addFromString( 'word/settings.xml', $cleaned );
-			}
-		}
+		$this->strip_docx_protection( $zip );
 
 		if ( ! $zip->close() ) {
 			@unlink( $output_path );
@@ -2009,6 +2075,64 @@ class Arriendo_Facil_DOCX_Template_Processor {
 		}
 
 		return file_exists( $output_path ) ? $output_path : '';
+	}
+
+	/**
+	 * Removes all document protection and write-protection from a DOCX zip.
+	 *
+	 * Handles: w:documentProtection, w:writeProtection in word/settings.xml
+	 * and any encryption entries in EncryptedPackage.
+	 *
+	 * @param ZipArchive $zip Open DOCX zip archive.
+	 */
+	private function strip_docx_protection( ZipArchive $zip ) {
+		$settings_xml = $zip->getFromName( 'word/settings.xml' );
+		if ( false === $settings_xml || '' === trim( (string) $settings_xml ) ) {
+			return;
+		}
+
+		$settings_xml = (string) $settings_xml;
+
+		if ( class_exists( 'DOMDocument' ) ) {
+			$dom = new DOMDocument();
+			if ( @$dom->loadXML( $settings_xml, LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING ) ) {
+				$changed  = false;
+				$xpath    = new DOMXPath( $dom );
+				$ns_uri   = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+				$xpath->registerNamespace( 'w', $ns_uri );
+
+				$protection_nodes = $xpath->query( '//w:documentProtection' );
+				if ( $protection_nodes && $protection_nodes->length > 0 ) {
+					foreach ( $protection_nodes as $node ) {
+						$node->parentNode->removeChild( $node );
+					}
+					$changed = true;
+				}
+
+				$write_nodes = $xpath->query( '//w:writeProtection' );
+				if ( $write_nodes && $write_nodes->length > 0 ) {
+					foreach ( $write_nodes as $node ) {
+						$node->parentNode->removeChild( $node );
+					}
+					$changed = true;
+				}
+
+				if ( $changed ) {
+					$zip->addFromString( 'word/settings.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' . "\n" . $dom->saveXML( $dom->documentElement ) );
+				}
+				return;
+			}
+		}
+
+		$original = $settings_xml;
+		$settings_xml = preg_replace( '/<w:documentProtection\b[^>]*\/>/si', '', $settings_xml );
+		$settings_xml = preg_replace( '/<w:documentProtection\b[^>]*>.*?<\/w:documentProtection>/si', '', $settings_xml );
+		$settings_xml = preg_replace( '/<w:writeProtection\b[^>]*\/>/si', '', $settings_xml );
+		$settings_xml = preg_replace( '/<w:writeProtection\b[^>]*>.*?<\/w:writeProtection>/si', '', $settings_xml );
+
+		if ( $settings_xml !== $original ) {
+			$zip->addFromString( 'word/settings.xml', $settings_xml );
+		}
 	}
 
 	/**
@@ -2041,5 +2165,21 @@ class Arriendo_Facil_DOCX_Template_Processor {
 	private function val( array $payload, $key, $default = '' ) {
 		$v = isset( $payload[ $key ] ) ? trim( (string) $payload[ $key ] ) : '';
 		return '' !== $v ? $v : $default;
+	}
+
+	/**
+	 * Returns the Spanish month name for a given month number.
+	 *
+	 * @param int $month_number 1-12.
+	 * @return string
+	 */
+	private function get_spanish_month_name( $month_number ) {
+		$months = array(
+			1 => 'enero', 2 => 'febrero', 3 => 'marzo',
+			4 => 'abril', 5 => 'mayo', 6 => 'junio',
+			7 => 'julio', 8 => 'agosto', 9 => 'septiembre',
+			10 => 'octubre', 11 => 'noviembre', 12 => 'diciembre',
+		);
+		return isset( $months[ $month_number ] ) ? $months[ $month_number ] : '';
 	}
 }

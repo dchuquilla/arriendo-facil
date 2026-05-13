@@ -39,25 +39,21 @@
 				activeRequestController: null
 		};
 
-		var menuOptions = [
-				{ key: 'rent', label: 'Quiero arrendar (soy inquilino)' },
-			{ key: 'availability', label: 'Consultar disponibilidad' },
-				{ key: 'advisor', label: 'Hablar con un asesor' }
-		];
+		var menuOptions = [];
 
 		var steps = [
 			{
 				key: 'name',
 				type: 'text',
-				question: 'Empecemos con tus datos como inquilino. Cual es tu nombre completo?',
+				question: 'Para comenzar, cual es tu nombre completo?',
 				placeholder: 'Ejemplo: Juan Perez',
 				validate: function (value) { return value.length >= 3; },
-				error: 'Escribe tu nombre completo.'
+				error: 'Escribe tu nombre completo (minimo 3 caracteres).'
 			},
 			{
 				key: 'email',
 				type: 'text',
-				question: 'Cual es tu correo electronico para enviarte informacion del arriendo?',
+				question: 'Cual es tu correo electronico? Lo usaremos para enviarte informacion del arriendo.',
 				placeholder: 'correo@dominio.com',
 				validate: function (value) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value); },
 				error: 'Ingresa un correo valido.'
@@ -65,7 +61,7 @@
 			{
 				key: 'phone',
 				type: 'text',
-				question: 'Cual es tu numero de celular en Ecuador? (10 digitos, sin espacios ni guiones)',
+				question: 'Cual es tu numero de celular? (10 digitos, ejemplo: 0991234567)',
 				placeholder: '0991234567',
 				validate: function (value) { return /^[0-9]{10}$/.test(value); },
 				error: 'El telefono debe tener exactamente 10 digitos numericos.'
@@ -73,7 +69,7 @@
 			{
 				key: 'id_number',
 				type: 'text',
-				question: 'Ingresa tu numero de cedula (10 digitos, solo numeros).',
+				question: 'Cual es tu numero de cedula? (10 digitos)',
 				placeholder: '1723456789',
 				validate: function (value) { return /^[0-9]{10}$/.test(value); },
 				error: 'La cedula debe tener exactamente 10 digitos numericos.'
@@ -81,65 +77,13 @@
 			{
 				key: 'mascotas',
 				type: 'text',
-				question: 'Cuantas mascotas vivirian contigo en la propiedad? (0 a 10)',
+				question: 'Cuantas mascotas tendrias en la propiedad? (escribe 0 si ninguna)',
 				placeholder: '0',
 				validate: function (value) {
 					var num = parseInt(value, 10);
 					return !isNaN(num) && num >= 0 && num <= 10;
 				},
 				error: 'Mascotas debe estar entre 0 y 10.'
-			},
-			{
-				key: 'reference_1_name',
-				type: 'text',
-				question: 'Primera referencia personal: escribe solo el nombre completo.',
-				placeholder: 'Ejemplo: Ana Perez',
-				helperText: 'Esta referencia debe ser una persona que pueda confirmar tu perfil como inquilino.',
-				validate: function (value) {
-					return /^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'.,\-\s]{2,79}$/.test(value);
-				},
-				error: 'Ingresa un nombre valido (solo letras y minimo 3 caracteres).'
-			},
-			{
-				key: 'reference_1_phone',
-				type: 'text',
-				question: 'Ahora escribe el celular de esa primera referencia.',
-				placeholder: 'Ejemplo: 0991234567',
-				helperText: 'Acepta formatos como: 0991234567, 099 123 4567 o 099-123-4567. Siempre deben ser 10 digitos.',
-				validate: function (value) {
-					var digits = normalizePhoneDigits(value);
-					return /^0[0-9]{9}$/.test(digits);
-				},
-				error: 'El celular de la referencia debe tener 10 digitos y empezar con 0.'
-			},
-			{
-				key: 'reference_2_name',
-				type: 'text',
-				question: 'Segunda referencia personal: escribe solo el nombre completo.',
-				placeholder: 'Ejemplo: Carlos Ruiz',
-				helperText: 'Debe ser una persona distinta a la referencia anterior.',
-				validate: function (value, values) {
-					if (!/^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'.,\-\s]{2,79}$/.test(value)) {
-						return false;
-					}
-					return normalizeText(value) !== normalizeText(values.reference_1_name || '');
-				},
-				error: 'Ingresa un nombre valido y diferente al de la primera referencia.'
-			},
-			{
-				key: 'reference_2_phone',
-				type: 'text',
-				question: 'Ahora escribe el celular de la segunda referencia.',
-				placeholder: 'Ejemplo: 0987654321',
-				helperText: 'Acepta formatos como: 0991234567, 099 123 4567 o 099-123-4567. Siempre deben ser 10 digitos.',
-				validate: function (value, values) {
-					var digits = normalizePhoneDigits(value);
-					if (!/^0[0-9]{9}$/.test(digits)) {
-						return false;
-					}
-					return digits !== normalizePhoneDigits(values.reference_1_phone || '');
-				},
-				error: 'El celular debe tener 10 digitos y ser distinto al de la primera referencia.'
 			},
 			{
 				key: 'personas_viviran',
@@ -155,7 +99,7 @@
 			{
 				key: 'accommodation_id',
 				type: 'select',
-				question: 'Selecciona la propiedad o habitacion que te interesa arrendar.',
+				question: 'Selecciona la propiedad que te interesa arrendar.',
 				shouldAsk: function () { return true; },
 				options: function () {
 					var opts = [{ value: '', label: 'Selecciona una opcion' }];
@@ -171,90 +115,26 @@
 					var parsed = parseInt(value, 10);
 					return !isNaN(parsed) && parsed > 0;
 				},
-				error: 'Selecciona una accommodation valida.'
-			},
-			{
-				key: 'rental_mode',
-				type: 'select',
-				question: 'Como prefieres indicar el tiempo de arriendo?',
-				options: function () {
-					return [
-						{ value: '', label: 'Selecciona una modalidad' },
-						{ value: 'dates', label: 'Por fechas exactas (inicio y fin)' },
-						{ value: 'months', label: 'Por cantidad de meses' },
-						{ value: 'years', label: 'Por cantidad de anos' }
-					];
-				},
-				validate: function (value) {
-					return value === 'dates' || value === 'months' || value === 'years';
-				},
-				error: 'Selecciona una modalidad valida.'
+				error: 'Selecciona una propiedad valida.'
 			},
 			{
 				key: 'rental_start_date',
 				type: 'text',
-				question: 'Fecha de inicio del arriendo (formato YYYY-MM-DD).',
-				placeholder: '2026-04-01',
-				shouldAsk: function (values) { return values.rental_mode === 'dates'; },
+				question: 'Cuando te gustaria iniciar el arriendo? (formato YYYY-MM-DD, ejemplo: 2026-06-01)',
+				placeholder: '2026-06-01',
 				validate: function (value) { return /^\d{4}-\d{2}-\d{2}$/.test(value); },
-				error: 'Ingresa la fecha inicial en formato YYYY-MM-DD.'
-			},
-			{
-				key: 'rental_end_date',
-				type: 'text',
-				question: 'Fecha de fin del arriendo (formato YYYY-MM-DD).',
-				placeholder: '2026-10-01',
-				shouldAsk: function (values) { return values.rental_mode === 'dates'; },
-				validate: function (value, values) {
-					if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-						return false;
-					}
-					if (!/^\d{4}-\d{2}-\d{2}$/.test(values.rental_start_date || '')) {
-						return false;
-					}
-					return new Date(value).getTime() >= new Date(values.rental_start_date).getTime();
-				},
-				error: 'La fecha final debe ser valida y mayor o igual a la fecha inicial.'
-			},
-			{
-				key: 'rental_months',
-				type: 'text',
-				question: 'Cuantos meses quieres arrendar la propiedad?',
-				placeholder: '12',
-				shouldAsk: function (values) { return values.rental_mode === 'months'; },
-				validate: function (value) {
-					var num = parseInt(value, 10);
-					return !isNaN(num) && num >= 1 && num <= 120;
-				},
-				error: 'Los meses deben estar entre 1 y 120.'
+				error: 'Ingresa una fecha valida en formato YYYY-MM-DD (ejemplo: 2026-06-01).'
 			},
 			{
 				key: 'rental_years',
 				type: 'text',
-				question: 'Cuantos anos quieres arrendar la propiedad?',
-				placeholder: '2',
-				shouldAsk: function (values) { return values.rental_mode === 'years'; },
+				question: 'Por cuantos anos deseas arrendar? (minimo 1 ano)',
+				placeholder: '1',
 				validate: function (value) {
 					var num = parseInt(value, 10);
 					return !isNaN(num) && num >= 1 && num <= 20;
 				},
-				error: 'Los anos deben estar entre 1 y 20.'
-			},
-			{
-				key: 'desired_price',
-				type: 'text',
-				question: 'Cual es tu presupuesto mensual aproximado para el arriendo?',
-				placeholder: 'Ejemplo: 350 USD al mes',
-				validate: function (value) { return value.length >= 2; },
-				error: 'Ingresa un presupuesto aproximado.'
-			},
-			{
-				key: 'guarantee_text',
-				type: 'text',
-				question: 'Como puedes garantizar el pago? (ejemplo: deposito, garante, rol de pagos, certificado laboral)',
-				placeholder: 'Ejemplo: Deposito de 2 meses + certificado laboral',
-				validate: function (value) { return value.length >= 5; },
-				error: 'Describe la garantia con un poco mas de detalle.'
+				error: 'La duracion minima es 1 ano y la maxima es 20 anos.'
 			}
 		];
 
@@ -448,7 +328,7 @@
 				return;
 			}
 			state.started = true;
-			state.collecting = false;
+			state.collecting = true;
 			state.currentStep = 0;
 			state.values = {};
 			state.lastSubmitFailed = false;
@@ -458,10 +338,11 @@
 			messages.innerHTML = '';
 			message.textContent = '';
 			message.className = '';
-			showForm(false);
-				botReply(afChatbot.welcomeText || 'Hola, soy el asistente de Arriendo Facil. Te ayudo a registrar tu solicitud de arriendo.', function () {
-					botReply('Este chatbot es solo para personas que quieren arrendar (inquilinos).', function () {
-						appendOptions();
+			showForm(true);
+				botReply(afChatbot.welcomeText || 'Hola! Soy el asistente de Arriendo Facil.', function () {
+					botReply('Estoy aqui para facilitar el proceso de arriendo entre tu y el propietario. Con tus datos podre generar el contrato de forma rapida y sencilla.', function () {
+						botReply('Solo necesito algunos datos basicos. Si te equivocas en algo, puedes escribir "volver" para corregir o "cancelar" para empezar de nuevo.');
+						askCurrentStep();
 					});
 				});
 			}
@@ -484,23 +365,17 @@
 				}
 
 				resetCollectionState();
+				state.collecting = true;
 				setFormDisabled(false);
-				showForm(false);
+				showForm(true);
 				message.className = '';
 				message.textContent = '';
-				botReply('Operacion cancelada. Cuando quieras, puedes iniciar nuevamente.', function () {
-					appendOptions();
+				botReply('Operacion cancelada. Empecemos de nuevo.', function () {
+					askCurrentStep();
 				});
 			}
 
-			function clearDependentValues(stepKey) {
-				if ('rental_mode' !== stepKey) {
-					return;
-				}
-				delete state.values.rental_start_date;
-				delete state.values.rental_end_date;
-				delete state.values.rental_months;
-				delete state.values.rental_years;
+			function clearDependentValues() {
 			}
 
 			function goToPreviousStep() {
@@ -570,27 +445,15 @@
 
 			function handleMenuOption(key, label) {
 				appendBubble(label, 'user');
-				if ('rent' === key) {
-					state.collecting = true;
-					state.currentStep = 0;
-					state.values = {};
-					if (currentAccommodationId > 0) {
-						state.values.accommodation_id = String(currentAccommodationId);
-					}
-					showForm(true);
-					botReply('Perfecto. Vamos paso a paso. Si te equivocas, puedes usar "Volver" o escribir "cancelar" para reiniciar.');
-					askCurrentStep();
-					return;
+				state.collecting = true;
+				state.currentStep = 0;
+				state.values = {};
+				if (currentAccommodationId > 0) {
+					state.values.accommodation_id = String(currentAccommodationId);
 				}
-				if ('availability' === key) {
-					botReply('Te ayudo con disponibilidad. Si quieres registrar una solicitud completa de arriendo, elige "Quiero arrendar (soy inquilino)".', function () {
-						appendOptions();
-					});
-					return;
-				}
-				botReply('Un asesor te contactara pronto. Si deseas, tambien puedes elegir "Quiero arrendar (soy inquilino)" para adelantar tu registro.', function () {
-				appendOptions();
-			});
+				showForm(true);
+				botReply('Vamos paso a paso. Si te equivocas, puedes usar "Volver" o escribir "cancelar" para reiniciar.');
+				askCurrentStep();
 		}
 
 		function submitConversation() {
@@ -605,10 +468,6 @@
 				}
 
 			var data = new FormData();
-			var reference1Phone = normalizePhoneDigits(state.values.reference_1_phone || '');
-			var reference2Phone = normalizePhoneDigits(state.values.reference_2_phone || '');
-			var reference1Text = ((state.values.reference_1_name || '').trim() + ' - ' + reference1Phone).trim();
-			var reference2Text = ((state.values.reference_2_name || '').trim() + ' - ' + reference2Phone).trim();
 			data.append('action', 'af_create_guest_frontend');
 			data.append('nonce', afChatbot.nonce);
 			data.append('name', state.values.name || '');
@@ -616,21 +475,10 @@
 			data.append('phone', state.values.phone || '');
 			data.append('id_number', state.values.id_number || '');
 			data.append('mascotas', state.values.mascotas || '0');
-			data.append('reference_1_name', state.values.reference_1_name || '');
-			data.append('reference_1_phone', reference1Phone);
-			data.append('reference_2_name', state.values.reference_2_name || '');
-			data.append('reference_2_phone', reference2Phone);
-			data.append('referencia_personal_1', reference1Text);
-			data.append('referencia_personal_2', reference2Text);
 			data.append('personas_viviran', state.values.personas_viviran || '1');
 			data.append('accommodation_id', state.values.accommodation_id || '');
-			data.append('rental_mode', state.values.rental_mode || '');
 			data.append('rental_start_date', state.values.rental_start_date || '');
-			data.append('rental_end_date', state.values.rental_end_date || '');
-			data.append('rental_months', state.values.rental_months || '');
-			data.append('rental_years', state.values.rental_years || '');
-			data.append('desired_price', state.values.desired_price || '');
-			data.append('guarantee_text', state.values.guarantee_text || '');
+			data.append('rental_years', state.values.rental_years || '1');
 
 			state.isSubmitting = true;
 			state.activeRequestController = new AbortController();
@@ -741,9 +589,10 @@
 				return;
 			}
 			if (!state.collecting) {
-				botReply('Elige una opcion para continuar.', function () {
-					appendOptions();
-				});
+				state.collecting = true;
+				state.currentStep = 0;
+				showForm(true);
+				askCurrentStep();
 				return;
 			}
 			var step = getCurrentStep();

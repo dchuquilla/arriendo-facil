@@ -178,6 +178,7 @@ class Arriendo_Facil_Accommodation {
 		if ( ! is_array( $amenities ) ) {
 			$amenities = array();
 		}
+		$city          = get_post_meta( $post->ID, '_af_city', true );
 		$owner_id      = get_post_meta( $post->ID, '_af_owner_id', true );
 		$status        = get_post_meta( $post->ID, '_af_status', true );
 		$owner_options = $this->get_owner_user_options();
@@ -220,6 +221,7 @@ class Arriendo_Facil_Accommodation {
 		$fields = array(
 			'_af_address'       => 'sanitize_text_field',
 			'_af_location_text' => 'sanitize_text_field',
+			'_af_city'          => 'sanitize_text_field',
 			'_af_latitude'      => 'floatval',
 			'_af_longitude'     => 'floatval',
 			'_af_bedrooms'      => 'absint',

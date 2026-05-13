@@ -1265,12 +1265,16 @@
 		{ group: 'Datos del inmueble', options: [
 			{ key: 'accommodation_title', label: 'Nombre del inmueble', source: 'system' },
 			{ key: 'accommodation_address', label: 'Dirección del inmueble', source: 'system' },
+			{ key: 'accommodation_city', label: 'Ciudad del inmueble', source: 'system' },
 			{ key: 'monthly_rent', label: 'Canon mensual', source: 'system' }
 		] },
 		{ group: 'Fechas', options: [
 			{ key: 'start_date', label: 'Fecha de inicio', source: 'system' },
 			{ key: 'end_date', label: 'Fecha de finalización', source: 'system' },
-			{ key: 'current_date', label: 'Fecha actual', source: 'system' }
+			{ key: 'current_date', label: 'Fecha actual (dd/mm/yyyy)', source: 'system' },
+			{ key: 'current_day', label: 'Día actual (número)', source: 'system' },
+			{ key: 'current_month_name', label: 'Mes actual (nombre)', source: 'system' },
+			{ key: 'current_year', label: 'Año actual', source: 'system' }
 		] },
 		{ group: 'Otros', options: [
 			{ key: 'guarantee_text', label: 'Garantía', source: 'system' }

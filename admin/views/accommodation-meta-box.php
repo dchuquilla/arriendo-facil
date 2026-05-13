@@ -68,6 +68,15 @@ $amenities_options = array(
 		</td>
 	</tr>
 	<tr>
+		<th><label for="af_city"><?php esc_html_e( 'City', 'arriendo-facil' ); ?></label></th>
+		<td>
+			<input type="text" id="af_city" name="af_city"
+				value="<?php echo esc_attr( $city ); ?>" class="regular-text"
+				placeholder="<?php esc_attr_e( 'e.g., Quito', 'arriendo-facil' ); ?>" />
+			<p class="description"><?php esc_html_e( 'City name used in the rental contract', 'arriendo-facil' ); ?></p>
+		</td>
+	</tr>
+	<tr>
 		<th><label for="af_latitude"><?php esc_html_e( 'Latitude', 'arriendo-facil' ); ?></label></th>
 		<td>
 			<input type="number" id="af_latitude" name="af_latitude" step="0.0001" min="-90" max="90"

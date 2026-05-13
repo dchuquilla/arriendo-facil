@@ -46,29 +46,18 @@ class Arriendo_Facil_Guest {
 		$phone      = isset( $_POST['phone'] ) ? sanitize_text_field( wp_unslash( $_POST['phone'] ) ) : '';
 		$id_number  = isset( $_POST['id_number'] ) ? sanitize_text_field( wp_unslash( $_POST['id_number'] ) ) : '';
 		$accommodation_id = isset( $_POST['accommodation_id'] ) ? absint( wp_unslash( $_POST['accommodation_id'] ) ) : 0;
-		$rental_mode = isset( $_POST['rental_mode'] ) ? sanitize_key( wp_unslash( $_POST['rental_mode'] ) ) : '';
 		$rental_start_date = isset( $_POST['rental_start_date'] ) ? sanitize_text_field( wp_unslash( $_POST['rental_start_date'] ) ) : '';
-		$rental_end_date   = isset( $_POST['rental_end_date'] ) ? sanitize_text_field( wp_unslash( $_POST['rental_end_date'] ) ) : '';
-		$rental_months     = isset( $_POST['rental_months'] ) ? absint( wp_unslash( $_POST['rental_months'] ) ) : 0;
-		$rental_years      = isset( $_POST['rental_years'] ) ? absint( wp_unslash( $_POST['rental_years'] ) ) : 0;
-		$desired_price     = isset( $_POST['desired_price'] ) ? sanitize_text_field( wp_unslash( $_POST['desired_price'] ) ) : '';
-		$guarantee_text    = isset( $_POST['guarantee_text'] ) ? sanitize_text_field( wp_unslash( $_POST['guarantee_text'] ) ) : '';
+		$rental_years      = isset( $_POST['rental_years'] ) ? max( 1, absint( wp_unslash( $_POST['rental_years'] ) ) ) : 1;
 		$mascotas   = isset( $_POST['mascotas'] ) ? absint( wp_unslash( $_POST['mascotas'] ) ) : 0;
-		$reference_1_name  = isset( $_POST['reference_1_name'] ) ? $this->normalize_reference_name( wp_unslash( $_POST['reference_1_name'] ) ) : '';
-		$reference_1_phone = isset( $_POST['reference_1_phone'] ) ? $this->normalize_reference_phone( wp_unslash( $_POST['reference_1_phone'] ) ) : '';
-		$reference_2_name  = isset( $_POST['reference_2_name'] ) ? $this->normalize_reference_name( wp_unslash( $_POST['reference_2_name'] ) ) : '';
-		$reference_2_phone = isset( $_POST['reference_2_phone'] ) ? $this->normalize_reference_phone( wp_unslash( $_POST['reference_2_phone'] ) ) : '';
-		$referencia_personal_1 = $this->build_reference_entry( $reference_1_name, $reference_1_phone );
-		$referencia_personal_2 = $this->build_reference_entry( $reference_2_name, $reference_2_phone );
+		$personas_viviran = isset( $_POST['personas_viviran'] ) ? absint( wp_unslash( $_POST['personas_viviran'] ) ) : 0;
 
-		if ( '' === $referencia_personal_1 ) {
-			$referencia_personal_1 = isset( $_POST['referencia_personal_1'] ) ? sanitize_text_field( wp_unslash( $_POST['referencia_personal_1'] ) ) : '';
-		}
-
-		if ( '' === $referencia_personal_2 ) {
-			$referencia_personal_2 = isset( $_POST['referencia_personal_2'] ) ? sanitize_text_field( wp_unslash( $_POST['referencia_personal_2'] ) ) : '';
-		}
-		$personas_viviran      = isset( $_POST['personas_viviran'] ) ? absint( wp_unslash( $_POST['personas_viviran'] ) ) : 0;
+		$rental_mode = 'years';
+		$rental_end_date = '';
+		$rental_months = 0;
+		$desired_price = '';
+		$guarantee_text = 'Garantía equivalente a dos (2) meses del canon de arrendamiento';
+		$referencia_personal_1 = '';
+		$referencia_personal_2 = '';
 
 		$name_parts = preg_split( '/\s+/', trim( $name ) );
 		$first_name = ! empty( $name_parts[0] ) ? $name_parts[0] : '';
@@ -84,41 +73,15 @@ class Arriendo_Facil_Guest {
 
 		// Allow registration for any accommodation status; operational review is handled later.
 
-		if ( ! in_array( $rental_mode, array( 'dates', 'months', 'years' ), true ) ) {
-			wp_send_json_error( array( 'message' => __( 'Debes indicar una modalidad de arriendo valida.', 'arriendo-facil' ) ) );
+		if ( 1 !== preg_match( '/^\d{4}-\d{2}-\d{2}$/', $rental_start_date ) ) {
+			wp_send_json_error( array( 'message' => __( 'La fecha de inicio no es valida (formato YYYY-MM-DD).', 'arriendo-facil' ) ) );
 		}
 
-		if ( 'dates' === $rental_mode ) {
-			if ( 1 !== preg_match( '/^\d{4}-\d{2}-\d{2}$/', $rental_start_date ) || 1 !== preg_match( '/^\d{4}-\d{2}-\d{2}$/', $rental_end_date ) ) {
-				wp_send_json_error( array( 'message' => __( 'Las fechas de arriendo no son validas.', 'arriendo-facil' ) ) );
-			}
-
-			$start_ts = strtotime( $rental_start_date );
-			$end_ts   = strtotime( $rental_end_date );
-			if ( ! $start_ts || ! $end_ts || $end_ts < $start_ts ) {
-				wp_send_json_error( array( 'message' => __( 'La fecha final debe ser mayor o igual a la inicial.', 'arriendo-facil' ) ) );
-			}
-		} elseif ( 'months' === $rental_mode ) {
-			if ( $rental_months < 1 || $rental_months > 120 ) {
-				wp_send_json_error( array( 'message' => __( 'Los meses deben estar entre 1 y 120.', 'arriendo-facil' ) ) );
-			}
-		} else {
-			if ( $rental_years < 1 || $rental_years > 20 ) {
-				wp_send_json_error( array( 'message' => __( 'Los anos deben estar entre 1 y 20.', 'arriendo-facil' ) ) );
-			}
+		if ( $rental_years < 1 || $rental_years > 20 ) {
+			wp_send_json_error( array( 'message' => __( 'La duracion debe ser entre 1 y 20 anos.', 'arriendo-facil' ) ) );
 		}
 
-		if ( '' === $desired_price || '' === $guarantee_text ) {
-			wp_send_json_error( array( 'message' => __( 'Debes ingresar tu presupuesto y como garantizas el pago.', 'arriendo-facil' ) ) );
-		}
-
-		if ( ! $referencia_personal_1 || ! $referencia_personal_2 ) {
-			wp_send_json_error( array( 'message' => __( 'Debes ingresar dos referencias personales con nombre y contacto.', 'arriendo-facil' ) ) );
-		}
-
-		if ( ! $this->is_valid_reference_entry( $referencia_personal_1 ) || ! $this->is_valid_reference_entry( $referencia_personal_2 ) ) {
-			wp_send_json_error( array( 'message' => __( 'Cada referencia debe incluir nombre y celular de 10 digitos (ejemplo: Ana Perez - 0991234567).', 'arriendo-facil' ) ) );
-		}
+		$rental_end_date = gmdate( 'Y-m-d', strtotime( '+' . $rental_years . ' years', strtotime( $rental_start_date ) ) );
 
 		if ( ! is_email( $email ) ) {
 			wp_send_json_error( array( 'message' => __( 'Correo invalido.', 'arriendo-facil' ) ) );
@@ -197,13 +160,9 @@ class Arriendo_Facil_Guest {
 						'rental_end_date'   => $rental_end_date,
 						'rental_months'     => $rental_months,
 						'rental_years'      => $rental_years,
-						'desired_price'     => $desired_price,
-						'guarantee_text'    => $guarantee_text,
 						'phone'             => $phone,
 						'id_number'         => $id_number,
 						'mascotas'          => $mascotas,
-						'referencia_personal_1' => $referencia_personal_1,
-						'referencia_personal_2' => $referencia_personal_2,
 						'personas_viviran'  => $personas_viviran,
 						'name'              => trim( $first_name . ' ' . $last_name ),
 						'email'             => $email,
@@ -479,7 +438,7 @@ class Arriendo_Facil_Guest {
 	 */
 	private function create_lease_contract_for_guest( $guest_id, array $data ) {
 		$accommodation_id = isset( $data['accommodation_id'] ) ? absint( $data['accommodation_id'] ) : 0;
-		$rental_mode      = isset( $data['rental_mode'] ) ? sanitize_key( $data['rental_mode'] ) : '';
+		$rental_mode      = isset( $data['rental_mode'] ) ? sanitize_key( $data['rental_mode'] ) : 'years';
 
 		if ( ! $accommodation_id || ! $guest_id ) {
 			return array( 'generated' => false );
@@ -494,19 +453,19 @@ class Arriendo_Facil_Guest {
 			$end_date   = isset( $data['rental_end_date'] ) ? sanitize_text_field( $data['rental_end_date'] ) : '';
 		} elseif ( 'months' === $rental_mode ) {
 			$months = isset( $data['rental_months'] ) ? absint( $data['rental_months'] ) : 1;
-			$start_date = $today;
-			$end_date   = gmdate( 'Y-m-d', strtotime( '+' . max( 1, $months ) . ' months', strtotime( $today ) ) );
-		} elseif ( 'years' === $rental_mode ) {
-			$years = isset( $data['rental_years'] ) ? absint( $data['rental_years'] ) : 1;
-			$start_date = $today;
-			$end_date   = gmdate( 'Y-m-d', strtotime( '+' . max( 1, $years ) . ' years', strtotime( $today ) ) );
+			$start_date = isset( $data['rental_start_date'] ) ? sanitize_text_field( $data['rental_start_date'] ) : $today;
+			$end_date   = gmdate( 'Y-m-d', strtotime( '+' . max( 1, $months ) . ' months', strtotime( $start_date ) ) );
+		} else {
+			$years = isset( $data['rental_years'] ) ? max( 1, absint( $data['rental_years'] ) ) : 1;
+			$start_date = isset( $data['rental_start_date'] ) ? sanitize_text_field( $data['rental_start_date'] ) : $today;
+			$end_date   = gmdate( 'Y-m-d', strtotime( '+' . $years . ' years', strtotime( $start_date ) ) );
 		}
 
 		if ( ! $start_date || ! $end_date ) {
 			return array( 'generated' => false );
 		}
 
-		$monthly_rent = $this->parse_price_amount( isset( $data['desired_price'] ) ? (string) $data['desired_price'] : '' );
+		$monthly_rent = (float) get_post_meta( $accommodation_id, '_af_monthly_rent', true );
 
 		global $wpdb;
 		$lease_inserted = $wpdb->insert(
@@ -552,21 +511,21 @@ class Arriendo_Facil_Guest {
 			'accommodation_id'  => $accommodation_id,
 			'accommodation_title' => $accommodation_title,
 			'accommodation_address' => sanitize_text_field( $accommodation_address ),
+			'accommodation_city' => (string) get_post_meta( $accommodation_id, '_af_city', true ),
 			'guest_id'          => $guest_id,
 			'guest_name'        => isset( $data['name'] ) ? sanitize_text_field( $data['name'] ) : '',
 			'guest_email'       => isset( $data['email'] ) ? sanitize_email( $data['email'] ) : '',
 			'guest_phone'       => isset( $data['phone'] ) ? sanitize_text_field( $data['phone'] ) : '',
 			'guest_id_number'   => isset( $data['id_number'] ) ? sanitize_text_field( $data['id_number'] ) : '',
 			'mascotas'          => isset( $data['mascotas'] ) ? absint( $data['mascotas'] ) : 0,
-			'referencia_personal_1' => isset( $data['referencia_personal_1'] ) ? sanitize_text_field( $data['referencia_personal_1'] ) : '',
-			'referencia_personal_2' => isset( $data['referencia_personal_2'] ) ? sanitize_text_field( $data['referencia_personal_2'] ) : '',
+			'referencia_personal_1' => '',
+			'referencia_personal_2' => '',
 			'personas_viviran'  => isset( $data['personas_viviran'] ) ? absint( $data['personas_viviran'] ) : 0,
 			'start_date'        => $start_date,
 			'end_date'          => $end_date,
 			'monthly_rent'      => $monthly_rent,
 			'rental_mode'       => $rental_mode,
-			'desired_price'     => isset( $data['desired_price'] ) ? sanitize_text_field( $data['desired_price'] ) : '',
-			'guarantee_text'    => isset( $data['guarantee_text'] ) ? sanitize_text_field( $data['guarantee_text'] ) : '',
+			'guarantee_text'    => 'Garantía equivalente a dos (2) meses del canon de arrendamiento',
 			'template_available'=> ! empty( $owner_contract_example['attachment_id'] ),
 			'template_name'     => isset( $owner_contract_example['file_name'] ) ? sanitize_text_field( (string) $owner_contract_example['file_name'] ) : '',
 			'template_mime'     => isset( $owner_contract_example['mime_type'] ) ? sanitize_text_field( (string) $owner_contract_example['mime_type'] ) : '',

@@ -39,9 +39,13 @@ class Arriendo_Facil_DOCX_Template_Processor {
 		'end_date'              => 'FECHA_FIN',
 		'accommodation_address' => 'DIRECCION',
 		'accommodation_title'   => 'INMUEBLE',
+		'accommodation_city'    => 'CIUDAD',
+		'accommodation_square_meters' => 'METROS_CUADRADOS',
+		'accommodation_bedrooms'      => 'HABITACIONES',
+		'accommodation_bathrooms'     => 'BANOS',
+		'accommodation_property_type' => 'TIPO_INMUEBLE',
 		'guarantee_text'        => 'GARANTIA',
 		'current_date'          => 'FECHA_ACTUAL',
-		'accommodation_city'    => 'CIUDAD',
 		'current_day'           => 'DIA_ACTUAL',
 		'current_month_name'    => 'MES_ACTUAL',
 		'current_year'          => 'ANO_ACTUAL',
@@ -80,6 +84,13 @@ class Arriendo_Facil_DOCX_Template_Processor {
 		'EMAIL'               => 'EMAIL',
 		'CORREO'              => 'EMAIL',
 		'CIUDAD'              => 'CIUDAD',
+		'METROS_CUADRADOS'    => 'METROS_CUADRADOS',
+		'M2'                  => 'METROS_CUADRADOS',
+		'AREA'                => 'METROS_CUADRADOS',
+		'HABITACIONES'        => 'HABITACIONES',
+		'DORMITORIOS'         => 'HABITACIONES',
+		'BANOS'               => 'BANOS',
+		'TIPO_INMUEBLE'       => 'TIPO_INMUEBLE',
 		'DIA'                 => 'DIA_ACTUAL',
 		'DIA_ACTUAL'          => 'DIA_ACTUAL',
 		'MES'                 => 'MES_ACTUAL',
@@ -576,15 +587,19 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			'owner_id_number'       => 'Cédula del arrendador',
 			'accommodation_title'   => 'Nombre del inmueble',
 			'accommodation_address' => 'Dirección del inmueble',
+			'accommodation_city'    => 'Ciudad',
+			'accommodation_square_meters' => 'Metros cuadrados (m²)',
+			'accommodation_bedrooms'      => 'Número de habitaciones',
+			'accommodation_bathrooms'     => 'Número de baños',
+			'accommodation_property_type' => 'Tipo de inmueble',
 			'monthly_rent'          => 'Canon mensual',
-			'start_date'            => 'Fecha de inicio',
-			'end_date'              => 'Fecha de finalización',
-			'current_date'          => 'Fecha actual',
-			'accommodation_city'    => 'Ciudad del inmueble',
-			'current_day'           => 'Día actual (número)',
-			'current_month_name'    => 'Mes actual (nombre)',
-			'current_year'          => 'Año actual',
 			'guarantee_text'        => 'Garantía',
+			'start_date'            => 'Inicio del arriendo',
+			'end_date'              => 'Fin del arriendo',
+			'current_date'          => 'Fecha actual completa',
+			'current_day'           => 'Día actual',
+			'current_month_name'    => 'Mes actual',
+			'current_year'          => 'Año actual',
 			'none'                  => 'Dejar vacío',
 		);
 
@@ -608,14 +623,18 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			'accommodation_title'   => 'system',
 			'accommodation_address' => 'system',
 			'accommodation_city'    => 'system',
+			'accommodation_square_meters' => 'system',
+			'accommodation_bedrooms'      => 'system',
+			'accommodation_bathrooms'     => 'system',
+			'accommodation_property_type' => 'system',
 			'monthly_rent'          => 'system',
+			'guarantee_text'        => 'system',
 			'start_date'            => 'system',
 			'end_date'              => 'system',
 			'current_date'          => 'system',
 			'current_day'           => 'system',
 			'current_month_name'    => 'system',
 			'current_year'          => 'system',
-			'guarantee_text'        => 'system',
 			'none'                  => 'none',
 		);
 
@@ -1284,6 +1303,11 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			'FECHA_FIN'           => $this->val( $payload, 'end_date', $blank ),
 			'DIRECCION'           => $this->val( $payload, 'accommodation_address', $blank ),
 			'INMUEBLE'            => $this->val( $payload, 'accommodation_title', $blank ),
+			'CIUDAD'              => $this->val( $payload, 'accommodation_city', $blank ),
+			'METROS_CUADRADOS'    => $this->val( $payload, 'accommodation_square_meters', $blank ),
+			'HABITACIONES'        => $this->val( $payload, 'accommodation_bedrooms', $blank ),
+			'BANOS'               => $this->val( $payload, 'accommodation_bathrooms', $blank ),
+			'TIPO_INMUEBLE'       => $this->val( $payload, 'accommodation_property_type', $blank ),
 			'GARANTIA'            => $this->val( $payload, 'guarantee_text', $blank ),
 			'MASCOTAS'            => isset( $payload['mascotas'] ) && (int) $payload['mascotas'] > 0 ? 'Sí' : 'No',
 			'PERSONAS'            => isset( $payload['personas_viviran'] ) && (int) $payload['personas_viviran'] > 0
@@ -1292,7 +1316,6 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			'REFERENCIA_1'        => $this->val( $payload, 'referencia_personal_1', $blank ),
 			'REFERENCIA_2'        => $this->val( $payload, 'referencia_personal_2', $blank ),
 			'FECHA_ACTUAL'        => gmdate( 'd/m/Y' ),
-			'CIUDAD'              => $this->val( $payload, 'accommodation_city', $blank ),
 			'DIA_ACTUAL'          => gmdate( 'j' ),
 			'MES_ACTUAL'          => $this->get_spanish_month_name( (int) gmdate( 'n' ) ),
 			'ANO_ACTUAL'          => gmdate( 'Y' ),
@@ -1713,6 +1736,28 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			return 'INMUEBLE';
 		}
 
+		// ── PROPERTY DETAILS (m2, ubicación, edificio) ──
+
+		// "de [BLANK] m2" or "de [BLANK]m2" — square meters
+		if ( 1 === preg_match( '/de\s*$/', $before ) && 1 === preg_match( '/^\s*m2/', $after ) ) {
+			return 'METROS_CUADRADOS';
+		}
+
+		// "ubicado en la [BLANK]" or "ubicado en [BLANK]" — address/location
+		if ( 1 === preg_match( '/ubicad[oa]\s+en\s+(la\s+)?$/', $before ) ) {
+			return 'DIRECCION';
+		}
+
+		// "Edificio [BLANK]" — building name (part of address)
+		if ( 1 === preg_match( '/edificio\s*$/', $before ) ) {
+			return 'DIRECCION';
+		}
+
+		// "Ubicada en el [BLANK]" — location context
+		if ( 1 === preg_match( '/ubicada?\s+en\s+el\s*$/', $before ) ) {
+			return 'DIRECCION';
+		}
+
 		// ── ADDRESS ──
 
 		if ( false !== strpos( $before, 'situada en' ) || false !== strpos( $before, 'ubicada en' ) ) {
@@ -1737,6 +1782,16 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			return 'CANON';
 		}
 
+		// "USD [BLANK] DÓLARES/dolares" — Alfil format (already has USD before)
+		if ( 1 === preg_match( '/usd\s*\$?\s*$/', $before ) && false !== strpos( $after, 'dolares' ) ) {
+			return 'CANON';
+		}
+
+		// "canon de arrendamiento mensual en [BLANK]" — generic
+		if ( false !== strpos( $before, 'canon' ) && false !== strpos( $before, 'mensual' ) ) {
+			return 'CANON';
+		}
+
 		// ── SIGNATURES at end of contract ──
 
 		if ( 1 === preg_match( '/arrendatario\s*$/', $after ) || false !== strpos( $after, '"el arrendatario"' ) ) {
@@ -1751,6 +1806,13 @@ class Arriendo_Facil_DOCX_Template_Processor {
 
 		if ( false !== strpos( $before, 'ciudad de' ) ) {
 			return 'CIUDAD';
+		}
+
+		// ── START DATE ──
+
+		// "a partir del [BLANK] fecha en la cual" or "a partir del [BLANK]"
+		if ( false !== strpos( $before, 'a partir del' ) || false !== strpos( $before, 'a partir de' ) ) {
+			return 'FECHA_INICIO';
 		}
 
 		// ── CONTRACT DATE PARTS ──
@@ -1768,6 +1830,10 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			return 'DIA_ACTUAL';
 		}
 		if ( 1 === preg_match( '/(,|el)\s*$/', $before ) && 1 === preg_match( '/^\s*dias?\s+del?\s+mes/', $after ) ) {
+			return 'DIA_ACTUAL';
+		}
+		// EcuadorLegal: "[BLANK]de [month/BLANK] del" — day before "de" at end of document
+		if ( 1 === preg_match( '/^\s*de\s/', $after ) && 1 === preg_match( '/(arrendador|arrendatario|constancia|firmado|suscri)/i', $before ) ) {
 			return 'DIA_ACTUAL';
 		}
 

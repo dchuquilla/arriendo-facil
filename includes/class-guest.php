@@ -3507,13 +3507,30 @@ class Arriendo_Facil_Guest {
 		$offset   = ( $page - 1 ) * $per_page;
 
 		global $wpdb;
-		$guests = $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT * FROM {$wpdb->prefix}af_guests ORDER BY created_at DESC LIMIT %d OFFSET %d",
-				$per_page,
-				$offset
-			)
-		);
+
+		if ( Arriendo_Facil_Accommodation::user_is_owner() ) {
+			$owner_ids = Arriendo_Facil_Accommodation::get_owner_accommodation_ids( get_current_user_id() );
+			if ( ! empty( $owner_ids ) ) {
+				$ids_sql = implode( ',', array_map( 'intval', $owner_ids ) );
+				$guests = $wpdb->get_results(
+					$wpdb->prepare(
+						"SELECT * FROM {$wpdb->prefix}af_guests WHERE accommodation_id IN ($ids_sql) ORDER BY created_at DESC LIMIT %d OFFSET %d",
+						$per_page,
+						$offset
+					)
+				);
+			} else {
+				$guests = array();
+			}
+		} else {
+			$guests = $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT * FROM {$wpdb->prefix}af_guests ORDER BY created_at DESC LIMIT %d OFFSET %d",
+					$per_page,
+					$offset
+				)
+			);
+		}
 
 		wp_send_json_success( $guests );
 	}

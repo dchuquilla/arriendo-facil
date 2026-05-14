@@ -63,7 +63,7 @@ class Arriendo_Facil_Admin {
 			'arriendo-facil',
 			__( 'Cleaning Requests', 'arriendo-facil' ),
 			__( 'Cleaning Requests', 'arriendo-facil' ),
-			'edit_posts',
+			'manage_options',
 			'af-cleaning-requests',
 			array( $this, 'render_cleaning_requests' )
 		);

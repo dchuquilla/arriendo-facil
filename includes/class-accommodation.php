@@ -182,7 +182,7 @@ class Arriendo_Facil_Accommodation {
 		$owner_id      = get_post_meta( $post->ID, '_af_owner_id', true );
 		$status        = get_post_meta( $post->ID, '_af_status', true );
 		$owner_options = $this->get_owner_user_options();
-		$is_owner_user = $this->is_owner_user( get_current_user_id() );
+		$is_owner_user = self::user_is_owner( get_current_user_id() );
 
 		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/accommodation-meta-box.php';
 	}
@@ -204,7 +204,7 @@ class Arriendo_Facil_Accommodation {
 		$this->invalidate_search_cache();
 
 		$current_user_id = get_current_user_id();
-		$is_owner_user   = $this->is_owner_user( $current_user_id );
+		$is_owner_user   = self::user_is_owner( $current_user_id );
 
 		// Keep owner/accommodation link consistent even when nonce payload is missing.
 		if ( $is_owner_user ) {
@@ -512,7 +512,7 @@ class Arriendo_Facil_Accommodation {
 		}
 
 		$current_user_id = get_current_user_id();
-		if ( ! $this->is_owner_user( $current_user_id ) ) {
+		if ( ! self::user_is_owner( $current_user_id ) ) {
 			return;
 		}
 
@@ -577,20 +577,39 @@ class Arriendo_Facil_Accommodation {
 	}
 
 	/**
-	 * Returns whether a user is an owner user.
+	 * Returns whether a user has the af_owner role.
 	 *
-	 * @param int $user_id User ID.
+	 * @param int $user_id User ID. Defaults to current user.
 	 * @return bool
 	 */
-	private function is_owner_user( $user_id ) {
+	public static function user_is_owner( $user_id = 0 ) {
+		if ( ! $user_id ) {
+			$user_id = get_current_user_id();
+		}
 		$user = get_user_by( 'id', absint( $user_id ) );
 		if ( ! $user ) {
 			return false;
 		}
-
 		$roles = isset( $user->roles ) && is_array( $user->roles ) ? $user->roles : array();
-
 		return in_array( 'af_owner', $roles, true );
+	}
+
+	/**
+	 * Returns accommodation post IDs owned by a given user.
+	 *
+	 * @param int $user_id User ID.
+	 * @return int[]
+	 */
+	public static function get_owner_accommodation_ids( $user_id ) {
+		return get_posts( array(
+			'post_type'      => 'accommodation',
+			'post_status'    => 'any',
+			'posts_per_page' => -1,
+			'fields'         => 'ids',
+			'meta_query'     => array(
+				array( 'key' => '_af_owner_id', 'value' => absint( $user_id ) ),
+			),
+		) );
 	}
 
 	/**

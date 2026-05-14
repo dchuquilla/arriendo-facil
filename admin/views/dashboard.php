@@ -11,12 +11,29 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 global $wpdb;
 
-$accommodation_count   = wp_count_posts( 'accommodation' )->publish;
-$cleaning_service_count = wp_count_posts( 'cleaning_service' )->publish;
-$lease_count           = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_leases" );
-$guest_count           = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_guests" );
-$pending_cleaning      = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_cleaning_requests WHERE status = 'pending'" );
-$active_contacts = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_owner_contacts WHERE status IN ('active', 'read')" );
+$is_owner = Arriendo_Facil_Accommodation::user_is_owner();
+
+if ( $is_owner ) {
+	$owner_ids = Arriendo_Facil_Accommodation::get_owner_accommodation_ids( get_current_user_id() );
+	$accommodation_count = count( $owner_ids );
+
+	if ( ! empty( $owner_ids ) ) {
+		$ids_sql = implode( ',', array_map( 'intval', $owner_ids ) );
+		$lease_count      = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_leases WHERE accommodation_id IN ($ids_sql)" );
+		$guest_count      = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_guests WHERE accommodation_id IN ($ids_sql)" );
+		$pending_cleaning = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_cleaning_requests WHERE accommodation_id IN ($ids_sql) AND status = 'pending'" );
+	} else {
+		$lease_count = $guest_count = $pending_cleaning = 0;
+	}
+	$active_contacts = null;
+} else {
+	$accommodation_count    = wp_count_posts( 'accommodation' )->publish;
+	$cleaning_service_count = wp_count_posts( 'cleaning_service' )->publish;
+	$lease_count            = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_leases" );
+	$guest_count            = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_guests" );
+	$pending_cleaning       = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_cleaning_requests WHERE status = 'pending'" );
+	$active_contacts        = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_owner_contacts WHERE status IN ('active', 'read')" );
+}
 ?>
 <div class="wrap af-dashboard">
 	<h1><?php esc_html_e( 'Arriendo Fácil – Dashboard', 'arriendo-facil' ); ?></h1>
@@ -40,11 +57,13 @@ $active_contacts = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_owner
 			<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-cleaning-requests' ) ); ?>"><?php esc_html_e( 'View all', 'arriendo-facil' ); ?></a>
 		</div>
 
+		<?php if ( null !== $active_contacts ) : ?>
 		<div class="af-stat-card">
 			<span class="af-stat-number"><?php echo esc_html( $active_contacts ); ?></span>
 			<span class="af-stat-label"><?php esc_html_e( 'Active Contacts', 'arriendo-facil' ); ?></span>
 			<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-owner-contacts' ) ); ?>"><?php esc_html_e( 'View all', 'arriendo-facil' ); ?></a>
 		</div>
+		<?php endif; ?>
 
 		<div class="af-stat-card">
 			<span class="af-stat-number"><?php echo esc_html( $guest_count ); ?></span>

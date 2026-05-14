@@ -13,13 +13,32 @@ global $wpdb;
 
 $lease_service = class_exists( 'Arriendo_Facil_Lease' ) ? new Arriendo_Facil_Lease() : null;
 
-$leases = $wpdb->get_results(
-	"SELECT l.*, p.post_title AS accommodation_title
-	 FROM {$wpdb->prefix}af_leases l
-	 LEFT JOIN {$wpdb->posts} p ON p.ID = l.accommodation_id
-	 ORDER BY l.created_at DESC
-	 LIMIT 100"
-);
+$is_owner = Arriendo_Facil_Accommodation::user_is_owner();
+
+if ( $is_owner ) {
+	$owner_ids = Arriendo_Facil_Accommodation::get_owner_accommodation_ids( get_current_user_id() );
+	if ( ! empty( $owner_ids ) ) {
+		$ids_sql = implode( ',', array_map( 'intval', $owner_ids ) );
+		$leases = $wpdb->get_results(
+			"SELECT l.*, p.post_title AS accommodation_title
+			 FROM {$wpdb->prefix}af_leases l
+			 LEFT JOIN {$wpdb->posts} p ON p.ID = l.accommodation_id
+			 WHERE l.accommodation_id IN ($ids_sql)
+			 ORDER BY l.created_at DESC
+			 LIMIT 100"
+		);
+	} else {
+		$leases = array();
+	}
+} else {
+	$leases = $wpdb->get_results(
+		"SELECT l.*, p.post_title AS accommodation_title
+		 FROM {$wpdb->prefix}af_leases l
+		 LEFT JOIN {$wpdb->posts} p ON p.ID = l.accommodation_id
+		 ORDER BY l.created_at DESC
+		 LIMIT 100"
+	);
+}
 ?>
 <div class="wrap">
 	<h1><?php esc_html_e( 'Leases', 'arriendo-facil' ); ?></h1>

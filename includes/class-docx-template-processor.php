@@ -359,7 +359,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 				) );
 
 				if ( ! is_wp_error( $ai_result ) && isset( $ai_result['field_map'] ) && is_array( $ai_result['field_map'] ) ) {
-					$field_map = $ai_result['field_map'];
+					$field_map = $this->validate_ai_field_map( $ai_result['field_map'], $blanks_for_ai );
 				}
 			} catch ( \Throwable $e ) {
 				$this->log_docx_event( 'analyze_preview_ai_exception', array( 'error' => $e->getMessage() ) );
@@ -1554,7 +1554,6 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			'plazo de este contrato es de',
 			'plazo de duracion',
 			'servicios basico',
-			'jueces competentes de la ciudad',
 			'estado civil',
 			'de profesion',
 			'conjunto habitacional',
@@ -2317,6 +2316,37 @@ class Arriendo_Facil_DOCX_Template_Processor {
 	private function val( array $payload, $key, $default = '' ) {
 		$v = isset( $payload[ $key ] ) ? trim( (string) $payload[ $key ] ) : '';
 		return '' !== $v ? $v : $default;
+	}
+
+	/**
+	 * Post-validates AI field_map assignments using rule-based inference.
+	 * When rules have high confidence (non-CAMPO_ result), they override the AI.
+	 */
+	private function validate_ai_field_map( array $ai_map, array $blanks_info ) {
+		$canonical_flip = array_flip( self::CANONICAL_TO_PLACEHOLDER );
+
+		foreach ( $ai_map as &$entry ) {
+			$idx   = isset( $entry['blank_index'] ) ? (int) $entry['blank_index'] : -1;
+			$blank = isset( $blanks_info[ $idx ] ) ? $blanks_info[ $idx ] : null;
+			if ( ! $blank ) {
+				continue;
+			}
+
+			$before = isset( $blank['before'] ) ? (string) $blank['before'] : '';
+			$after  = isset( $blank['after'] ) ? (string) $blank['after'] : '';
+
+			$rule_result = $this->infer_placeholder_from_context( $before, $after, $idx );
+
+			if ( 0 !== strpos( $rule_result, 'CAMPO_' ) && isset( $canonical_flip[ $rule_result ] ) ) {
+				$field_key = $canonical_flip[ $rule_result ];
+				$entry['field_key'] = $field_key;
+				$entry['label']     = $this->get_field_label( $field_key );
+				$entry['source']    = $this->get_field_source( $field_key );
+			}
+		}
+		unset( $entry );
+
+		return $ai_map;
 	}
 
 	/**

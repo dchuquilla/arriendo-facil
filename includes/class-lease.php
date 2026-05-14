@@ -324,6 +324,13 @@ class Arriendo_Facil_Lease {
 
 		$accommodation_id = isset( $_GET['accommodation_id'] ) ? absint( $_GET['accommodation_id'] ) : 0;
 
+		if ( Arriendo_Facil_Accommodation::user_is_owner() ) {
+			$owner_ids = Arriendo_Facil_Accommodation::get_owner_accommodation_ids( get_current_user_id() );
+			if ( ! in_array( $accommodation_id, $owner_ids, true ) ) {
+				wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+			}
+		}
+
 		global $wpdb;
 		$leases = $wpdb->get_results(
 			$wpdb->prepare(
@@ -980,6 +987,13 @@ class Arriendo_Facil_Lease {
 		$lease = $this->get_lease( $lease_id );
 		if ( ! $lease ) {
 			wp_die( esc_html__( 'Lease not found.', 'arriendo-facil' ), 404 );
+		}
+
+		if ( Arriendo_Facil_Accommodation::user_is_owner() ) {
+			$owner_ids = Arriendo_Facil_Accommodation::get_owner_accommodation_ids( get_current_user_id() );
+			if ( ! in_array( (int) $lease->accommodation_id, $owner_ids, true ) ) {
+				wp_die( esc_html__( 'Permission denied.', 'arriendo-facil' ), 403 );
+			}
 		}
 
 		$requested_version = isset( $_GET['version'] ) ? absint( wp_unslash( $_GET['version'] ) ) : 0;

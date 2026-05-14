@@ -176,6 +176,7 @@ function arriendo_facil_enqueue_chatbot_assets() {
 			'doneText'      => __( 'Perfecto, ya tengo tus datos. Estoy enviando tu solicitud de arriendo...', 'arriendo-facil' ),
 			'accommodations' => $accommodations,
 			'currentAccommodationId' => $current_accommodation_id,
+			'whatsapp'      => get_option( 'af_whatsapp_number', '' ),
 		)
 	);
 }

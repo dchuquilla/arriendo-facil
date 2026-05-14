@@ -132,6 +132,14 @@ if ( isset( $_POST['af_test_storage_connection'] ) ) {
 	}
 }
 
+if ( isset( $_POST['af_save_whatsapp'] ) ) {
+	check_admin_referer( 'af_ai_settings_nonce' );
+	$phone = isset( $_POST['af_whatsapp_number'] ) ? sanitize_text_field( wp_unslash( $_POST['af_whatsapp_number'] ) ) : '';
+	$phone = preg_replace( '/[^0-9+]/', '', $phone );
+	update_option( 'af_whatsapp_number', $phone );
+	echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'WhatsApp number saved.', 'arriendo-facil' ) . '</p></div>';
+}
+
 if ( isset( $_POST['af_test_owner_data'] ) ) {
 	check_admin_referer( 'af_ai_settings_nonce' );
 
@@ -155,6 +163,8 @@ if ( isset( $_POST['af_test_owner_data'] ) ) {
 $api_url = af_settings_get_value( 'AF_AI_API_URL', 'af_ai_api_url', '' );
 $api_key = af_settings_get_value( 'AF_AI_API_KEY', 'af_ai_api_key', '' );
 $has_api_key = '' !== trim( $api_key );
+
+$whatsapp_number = get_option( 'af_whatsapp_number', '' );
 
 $storage_provider = af_settings_get_value( 'AF_STORAGE_PROVIDER', 'af_storage_provider', 'cloudflare_r2' );
 $r2_access_key_id = af_settings_get_value( 'AF_R2_ACCESS_KEY_ID', 'af_r2_access_key_id', '' );
@@ -328,5 +338,27 @@ $any_storage_field_locked = $provider_locked || $access_key_locked || $secret_ke
 		<?php if ( $any_storage_field_locked ) : ?>
 			<p class="description"><?php esc_html_e( 'One or more storage fields are locked by constants in wp-config.php.', 'arriendo-facil' ); ?></p>
 		<?php endif; ?>
+	</form>
+
+	<hr />
+	<form method="post" action="">
+		<?php wp_nonce_field( 'af_ai_settings_nonce' ); ?>
+		<h2><?php esc_html_e( 'WhatsApp de contacto', 'arriendo-facil' ); ?></h2>
+		<p><?php esc_html_e( 'Número de WhatsApp de la empresa visible en el frontend para que los visitantes puedan contactarse.', 'arriendo-facil' ); ?></p>
+		<table class="form-table">
+			<tr>
+				<th scope="row"><label for="af_whatsapp_number"><?php esc_html_e( 'Número WhatsApp', 'arriendo-facil' ); ?></label></th>
+				<td>
+					<input type="tel" id="af_whatsapp_number" name="af_whatsapp_number"
+						value="<?php echo esc_attr( $whatsapp_number ); ?>"
+						class="regular-text" placeholder="+593991234567" />
+					<p class="description"><?php esc_html_e( 'Formato internacional con código de país (ej: +593991234567). Solo se almacena el número, sin espacios ni guiones.', 'arriendo-facil' ); ?></p>
+				</td>
+			</tr>
+		</table>
+		<p class="submit">
+			<input type="submit" name="af_save_whatsapp" class="button button-primary"
+				value="<?php esc_attr_e( 'Guardar número', 'arriendo-facil' ); ?>" />
+		</p>
 	</form>
 </div>

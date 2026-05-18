@@ -111,9 +111,8 @@ class Arriendo_Facil_Admin {
 		remove_menu_page( 'tools.php' );
 		remove_menu_page( 'edit.php?post_type=residencia' );
 
-		// Hide CPT submenus not relevant for owners.
+		// Hide Cleaning Services CPT (admin-managed, not for owners).
 		remove_submenu_page( 'arriendo-facil', 'edit.php?post_type=cleaning_service' );
-		remove_submenu_page( 'arriendo-facil', 'edit.php?post_type=accommodation' );
 	}
 
 	/**

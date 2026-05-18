@@ -21,6 +21,7 @@ class Arriendo_Facil_Admin {
 	 */
 	public function __construct() {
 		add_action( 'admin_menu', array( $this, 'add_menu' ) );
+		add_action( 'admin_menu', array( $this, 'remove_menus_for_owner' ), 999 );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
 		add_action( 'wp_ajax_af_predict_cost', array( $this, 'ajax_predict_cost' ) );
 		add_action( 'wp_ajax_af_generate_document', array( $this, 'ajax_generate_document' ) );
@@ -63,7 +64,7 @@ class Arriendo_Facil_Admin {
 			'arriendo-facil',
 			__( 'Cleaning Requests', 'arriendo-facil' ),
 			__( 'Cleaning Requests', 'arriendo-facil' ),
-			'manage_options',
+			'edit_posts',
 			'af-cleaning-requests',
 			array( $this, 'render_cleaning_requests' )
 		);
@@ -94,6 +95,23 @@ class Arriendo_Facil_Admin {
 			'af-ai-settings',
 			array( $this, 'render_ai_settings' )
 		);
+	}
+
+	/**
+	 * Removes WordPress default menus and plugin CPT menus for owner users.
+	 */
+	public function remove_menus_for_owner() {
+		if ( ! Arriendo_Facil_Accommodation::user_is_owner() ) {
+			return;
+		}
+
+		remove_menu_page( 'edit.php' );
+		remove_menu_page( 'upload.php' );
+		remove_menu_page( 'edit-comments.php' );
+		remove_menu_page( 'tools.php' );
+
+		// Hide Cleaning Services CPT (admin-managed, not for owners).
+		remove_submenu_page( 'arriendo-facil', 'edit.php?post_type=cleaning_service' );
 	}
 
 	/**

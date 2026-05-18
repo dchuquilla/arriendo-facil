@@ -11,13 +11,32 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 global $wpdb;
 
-$requests = $wpdb->get_results(
-	"SELECT r.*, p.post_title AS accommodation_title
-	 FROM {$wpdb->prefix}af_cleaning_requests r
-	 LEFT JOIN {$wpdb->posts} p ON p.ID = r.accommodation_id
-	 ORDER BY r.requested_date DESC
-	 LIMIT 100"
-);
+$is_owner = Arriendo_Facil_Accommodation::user_is_owner();
+
+if ( $is_owner ) {
+	$owner_ids = Arriendo_Facil_Accommodation::get_owner_accommodation_ids( get_current_user_id() );
+	if ( ! empty( $owner_ids ) ) {
+		$ids_sql = implode( ',', array_map( 'intval', $owner_ids ) );
+		$requests = $wpdb->get_results(
+			"SELECT r.*, p.post_title AS accommodation_title
+			 FROM {$wpdb->prefix}af_cleaning_requests r
+			 LEFT JOIN {$wpdb->posts} p ON p.ID = r.accommodation_id
+			 WHERE r.accommodation_id IN ($ids_sql)
+			 ORDER BY r.requested_date DESC
+			 LIMIT 100"
+		);
+	} else {
+		$requests = array();
+	}
+} else {
+	$requests = $wpdb->get_results(
+		"SELECT r.*, p.post_title AS accommodation_title
+		 FROM {$wpdb->prefix}af_cleaning_requests r
+		 LEFT JOIN {$wpdb->posts} p ON p.ID = r.accommodation_id
+		 ORDER BY r.requested_date DESC
+		 LIMIT 100"
+	);
+}
 
 $owners_raw = $wpdb->get_results(
 	"SELECT id, wp_user_id, owner_id_type, owner_id, subject

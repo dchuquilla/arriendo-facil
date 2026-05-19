@@ -2446,6 +2446,30 @@ class Arriendo_Facil_DOCX_Template_Processor {
 		return self::$pandoc_path_cache;
 	}
 
+	public function convert_and_store_markdown( $docx_path, $attachment_id ) {
+		$md_content = $this->convert_docx_to_markdown( $docx_path );
+		if ( is_wp_error( $md_content ) ) {
+			return '';
+		}
+
+		$uploads = wp_upload_dir();
+		if ( ! empty( $uploads['error'] ) || empty( $uploads['basedir'] ) ) {
+			return '';
+		}
+
+		$md_dir = trailingslashit( $uploads['basedir'] ) . 'arriendo-facil/owner-templates';
+		wp_mkdir_p( $md_dir );
+
+		$md_filename = 'template-' . $attachment_id . '-' . md5( $docx_path ) . '.md';
+		$md_path     = trailingslashit( $md_dir ) . $md_filename;
+
+		if ( false === file_put_contents( $md_path, $md_content ) ) {
+			return '';
+		}
+
+		return $md_path;
+	}
+
 	public function fill_template_with_markdown( $source_path, $output_path, array $payload, $ai_service = null ) {
 		$source_path = (string) $source_path;
 		$output_path = (string) $output_path;
@@ -2461,10 +2485,24 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			return false;
 		}
 
-		$md_content = $this->convert_docx_to_markdown( $source_path );
-		if ( is_wp_error( $md_content ) ) {
-			$this->log_docx_event( 'fill_with_markdown_failed', array( 'reason' => 'docx_to_md_failed', 'error' => $md_content->get_error_message(), 'lease_id' => $lease_id ) );
-			return false;
+		// Use pre-converted MD if available (stored at upload time).
+		$attachment_id = isset( $payload['attachment_id'] ) ? (int) $payload['attachment_id'] : 0;
+		$stored_md_path = $attachment_id ? (string) get_post_meta( $attachment_id, '_af_template_markdown_path', true ) : '';
+
+		if ( '' !== $stored_md_path && file_exists( $stored_md_path ) ) {
+			$md_content = file_get_contents( $stored_md_path );
+			if ( false === $md_content || '' === trim( $md_content ) ) {
+				$md_content = null;
+			}
+		}
+
+		// Fallback: convert on-the-fly if stored MD is not available.
+		if ( empty( $md_content ) ) {
+			$md_content = $this->convert_docx_to_markdown( $source_path );
+			if ( is_wp_error( $md_content ) ) {
+				$this->log_docx_event( 'fill_with_markdown_failed', array( 'reason' => 'docx_to_md_failed', 'error' => $md_content->get_error_message(), 'lease_id' => $lease_id ) );
+				return false;
+			}
 		}
 
 		if ( null === $ai_service || ! method_exists( $ai_service, 'fill_contract_blanks_markdown' ) ) {

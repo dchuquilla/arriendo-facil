@@ -696,7 +696,10 @@ class Arriendo_Facil_Guest {
 				$tpl_proc   = new Arriendo_Facil_DOCX_Template_Processor();
 				$ai_service = class_exists( 'Arriendo_Facil_AI_Service' ) ? new Arriendo_Facil_AI_Service() : null;
 
-				if ( $ai_service && $tpl_proc->fill_template_with_markdown( $template_path, $file_path, $payload, $ai_service ) ) {
+				$md_payload = $payload;
+				$md_payload['attachment_id'] = $attachment_id;
+
+				if ( $ai_service && $tpl_proc->fill_template_with_markdown( $template_path, $file_path, $md_payload, $ai_service ) ) {
 					$phpword_success = true;
 					error_log( 'Arriendo Facil owner-template generation: fill_template_with_markdown succeeded for lease_id=' . $lease_id );
 				} else {

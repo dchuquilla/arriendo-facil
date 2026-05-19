@@ -370,3 +370,52 @@ body.post-type-cleaning_service .page-title-action:focus {
 	background: #e5e7eb;
 	border: 1px solid #d1d5db;
 }
+
+/* Location Picker */
+.af-location-picker {
+	position: relative;
+}
+
+#af_location_search {
+	width: 100%;
+	max-width: 400px;
+	padding: 8px 12px;
+	border: 1px solid #8c8f94;
+	border-radius: 4px;
+	font-size: 14px;
+}
+
+.af-location-suggestions {
+	position: absolute;
+	z-index: 1000;
+	width: 100%;
+	max-width: 400px;
+	max-height: 240px;
+	overflow-y: auto;
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	border-top: none;
+	border-radius: 0 0 4px 4px;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.af-suggestion-item {
+	padding: 10px 12px;
+	cursor: pointer;
+	font-size: 13px;
+	border-bottom: 1px solid #f0f0f1;
+}
+
+.af-suggestion-item:last-child {
+	border-bottom: none;
+}
+
+.af-suggestion-item:hover,
+.af-suggestion-item--active {
+	background: #e8f0fe;
+}
+
+#af-location-map {
+	border-radius: 8px;
+	border: 1px solid #c3c4c7;
+}

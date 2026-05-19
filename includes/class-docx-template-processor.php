@@ -2394,4 +2394,445 @@ class Arriendo_Facil_DOCX_Template_Processor {
 		}
 		return $filtered;
 	}
+
+	// ─── Markdown/Pandoc-based flow ─────────────────────────────────────────────
+
+	private static $pandoc_path_cache = null;
+
+	public static function is_pandoc_available() {
+		if ( null !== self::$pandoc_path_cache ) {
+			return '' !== self::$pandoc_path_cache;
+		}
+
+		if ( ! function_exists( 'exec' ) ) {
+			self::$pandoc_path_cache = '';
+			return false;
+		}
+
+		$output     = array();
+		$return_var = 1;
+		@exec( 'which pandoc 2>/dev/null', $output, $return_var );
+
+		if ( 0 === $return_var && ! empty( $output[0] ) ) {
+			self::$pandoc_path_cache = trim( $output[0] );
+			return true;
+		}
+
+		$common_paths = array( '/usr/bin/pandoc', '/usr/local/bin/pandoc', '/opt/homebrew/bin/pandoc' );
+		foreach ( $common_paths as $path ) {
+			if ( file_exists( $path ) && is_executable( $path ) ) {
+				self::$pandoc_path_cache = $path;
+				return true;
+			}
+		}
+
+		self::$pandoc_path_cache = '';
+		return false;
+	}
+
+	public static function get_pandoc_path() {
+		self::is_pandoc_available();
+		return self::$pandoc_path_cache;
+	}
+
+	public function fill_template_with_markdown( $source_path, $output_path, array $payload, $ai_service = null ) {
+		$source_path = (string) $source_path;
+		$output_path = (string) $output_path;
+		$lease_id    = isset( $payload['lease_id'] ) ? (int) $payload['lease_id'] : 0;
+
+		if ( ! self::is_pandoc_available() ) {
+			$this->log_docx_event( 'fill_with_markdown_failed', array( 'reason' => 'pandoc_unavailable', 'lease_id' => $lease_id ) );
+			return false;
+		}
+
+		if ( '' === $source_path || ! file_exists( $source_path ) ) {
+			$this->log_docx_event( 'fill_with_markdown_failed', array( 'reason' => 'source_invalid', 'lease_id' => $lease_id ) );
+			return false;
+		}
+
+		$md_content = $this->convert_docx_to_markdown( $source_path );
+		if ( is_wp_error( $md_content ) ) {
+			$this->log_docx_event( 'fill_with_markdown_failed', array( 'reason' => 'docx_to_md_failed', 'error' => $md_content->get_error_message(), 'lease_id' => $lease_id ) );
+			return false;
+		}
+
+		if ( null === $ai_service || ! method_exists( $ai_service, 'fill_contract_blanks_markdown' ) ) {
+			$this->log_docx_event( 'fill_with_markdown_failed', array( 'reason' => 'ai_service_unavailable', 'lease_id' => $lease_id ) );
+			return false;
+		}
+
+		$ai_payload = array(
+			'guest_name'            => $this->val( $payload, 'guest_name' ),
+			'guest_id_number'       => $this->val( $payload, 'guest_id_number' ),
+			'guest_phone'           => $this->val( $payload, 'guest_phone' ),
+			'guest_email'           => $this->val( $payload, 'guest_email' ),
+			'owner_name'            => $this->val( $payload, 'owner_name' ),
+			'owner_id_number'       => $this->val( $payload, 'owner_id_number' ),
+			'monthly_rent'          => isset( $payload['monthly_rent'] ) ? number_format( (float) $payload['monthly_rent'], 2, '.', '' ) : '',
+			'start_date'            => $this->val( $payload, 'start_date' ),
+			'end_date'              => $this->val( $payload, 'end_date' ),
+			'accommodation_address' => $this->val( $payload, 'accommodation_address' ),
+			'accommodation_title'   => $this->val( $payload, 'accommodation_title' ),
+			'accommodation_city'    => $this->val( $payload, 'accommodation_city' ),
+			'guarantee_text'        => $this->val( $payload, 'guarantee_text' ),
+		);
+
+		try {
+			$ai_result = $ai_service->fill_contract_blanks_markdown( array(
+				'markdown_text' => $md_content,
+				'payload'       => $ai_payload,
+			) );
+		} catch ( \Throwable $e ) {
+			$this->log_docx_event( 'fill_with_markdown_exception', array( 'lease_id' => $lease_id, 'error' => $e->getMessage() ) );
+			return false;
+		}
+
+		if ( is_wp_error( $ai_result ) ) {
+			$this->log_docx_event( 'fill_with_markdown_ai_failed', array( 'lease_id' => $lease_id, 'error' => $ai_result->get_error_message() ) );
+			return false;
+		}
+
+		$filled_md = isset( $ai_result['filled_markdown'] ) ? trim( (string) $ai_result['filled_markdown'] ) : '';
+		if ( '' === $filled_md ) {
+			$this->log_docx_event( 'fill_with_markdown_ai_failed', array( 'lease_id' => $lease_id, 'error' => 'empty filled_markdown' ) );
+			return false;
+		}
+
+		$conversion_result = $this->convert_markdown_to_docx( $filled_md, $source_path, $output_path );
+		if ( is_wp_error( $conversion_result ) ) {
+			$this->log_docx_event( 'fill_with_markdown_failed', array( 'reason' => 'md_to_docx_failed', 'error' => $conversion_result->get_error_message(), 'lease_id' => $lease_id ) );
+			return false;
+		}
+
+		$this->copy_headers_footers_media( $source_path, $output_path );
+
+		if ( class_exists( 'ZipArchive' ) ) {
+			$zip = new ZipArchive();
+			if ( true === $zip->open( $output_path ) ) {
+				$this->strip_docx_protection( $zip );
+				$zip->close();
+			}
+		}
+
+		$this->log_docx_event( 'fill_with_markdown_success', array( 'lease_id' => $lease_id, 'output_path' => $output_path ) );
+		return true;
+	}
+
+	private function convert_docx_to_markdown( $docx_path ) {
+		$pandoc = self::get_pandoc_path();
+		if ( '' === $pandoc ) {
+			return new \WP_Error( 'pandoc_unavailable', 'Pandoc is not installed.' );
+		}
+
+		$tmp_md = wp_tempnam( 'af_md_' ) . '.md';
+
+		$cmd = sprintf(
+			'%s --from=docx --to=markdown --wrap=none %s -o %s 2>&1',
+			escapeshellarg( $pandoc ),
+			escapeshellarg( $docx_path ),
+			escapeshellarg( $tmp_md )
+		);
+
+		$output     = array();
+		$return_var = 1;
+		@exec( $cmd, $output, $return_var );
+
+		if ( 0 !== $return_var || ! file_exists( $tmp_md ) ) {
+			@unlink( $tmp_md );
+			return new \WP_Error( 'pandoc_conversion_failed', 'DOCX to MD failed: ' . implode( "\n", $output ) );
+		}
+
+		$md_content = file_get_contents( $tmp_md );
+		@unlink( $tmp_md );
+
+		if ( false === $md_content || '' === trim( $md_content ) ) {
+			return new \WP_Error( 'md_empty', 'Pandoc produced empty markdown.' );
+		}
+
+		return $md_content;
+	}
+
+	private function convert_markdown_to_docx( $md_content, $reference_docx_path, $output_path ) {
+		$pandoc = self::get_pandoc_path();
+		if ( '' === $pandoc ) {
+			return new \WP_Error( 'pandoc_unavailable', 'Pandoc is not installed.' );
+		}
+
+		$tmp_md = wp_tempnam( 'af_filled_md_' ) . '.md';
+		file_put_contents( $tmp_md, $md_content );
+
+		$cmd = sprintf(
+			'%s --from=markdown --to=docx --reference-doc=%s %s -o %s 2>&1',
+			escapeshellarg( $pandoc ),
+			escapeshellarg( $reference_docx_path ),
+			escapeshellarg( $tmp_md ),
+			escapeshellarg( $output_path )
+		);
+
+		$output     = array();
+		$return_var = 1;
+		@exec( $cmd, $output, $return_var );
+
+		@unlink( $tmp_md );
+
+		if ( 0 !== $return_var || ! file_exists( $output_path ) ) {
+			return new \WP_Error( 'pandoc_md_to_docx_failed', 'MD to DOCX failed: ' . implode( "\n", $output ) );
+		}
+
+		return true;
+	}
+
+	private function copy_headers_footers_media( $source_docx, $output_docx ) {
+		if ( ! class_exists( 'ZipArchive' ) ) {
+			return false;
+		}
+
+		$src_zip = new ZipArchive();
+		if ( true !== $src_zip->open( $source_docx ) ) {
+			$src_zip->close();
+			return false;
+		}
+
+		$out_zip = new ZipArchive();
+		if ( true !== $out_zip->open( $output_docx ) ) {
+			$src_zip->close();
+			return false;
+		}
+
+		$header_footer_parts = array();
+		$media_files         = array();
+
+		for ( $i = 0; $i < $src_zip->numFiles; $i++ ) {
+			$name = $src_zip->getNameIndex( $i );
+			if ( preg_match( '#^word/(header\d*\.xml|footer\d*\.xml)$#', $name ) ) {
+				$header_footer_parts[] = $name;
+			} elseif ( 0 === strpos( $name, 'word/media/' ) ) {
+				$media_files[] = $name;
+			}
+		}
+
+		if ( empty( $header_footer_parts ) ) {
+			$src_zip->close();
+			$out_zip->close();
+			return true;
+		}
+
+		foreach ( $header_footer_parts as $part ) {
+			$content = $src_zip->getFromName( $part );
+			if ( false !== $content ) {
+				$out_zip->addFromString( $part, $content );
+			}
+		}
+
+		foreach ( $media_files as $media ) {
+			$content = $src_zip->getFromName( $media );
+			if ( false !== $content ) {
+				$out_zip->addFromString( $media, $content );
+			}
+		}
+
+		// Also copy header/footer relationship files if they exist.
+		for ( $i = 0; $i < $src_zip->numFiles; $i++ ) {
+			$name = $src_zip->getNameIndex( $i );
+			if ( preg_match( '#^word/_rels/(header\d*\.xml\.rels|footer\d*\.xml\.rels)$#', $name ) ) {
+				$content = $src_zip->getFromName( $name );
+				if ( false !== $content ) {
+					$out_zip->addFromString( $name, $content );
+				}
+			}
+		}
+
+		$src_rels_xml = $src_zip->getFromName( 'word/_rels/document.xml.rels' );
+		$out_rels_xml = $out_zip->getFromName( 'word/_rels/document.xml.rels' );
+
+		if ( false !== $src_rels_xml && false !== $out_rels_xml ) {
+			$merged_rels = $this->merge_header_footer_rels( (string) $src_rels_xml, (string) $out_rels_xml );
+			if ( '' !== $merged_rels ) {
+				$out_zip->addFromString( 'word/_rels/document.xml.rels', $merged_rels );
+			}
+		}
+
+		$out_doc_xml = $out_zip->getFromName( 'word/document.xml' );
+		$src_doc_xml = $src_zip->getFromName( 'word/document.xml' );
+		if ( false !== $out_doc_xml && false !== $src_doc_xml ) {
+			$patched_doc = $this->inject_header_footer_refs_into_sectpr( (string) $src_doc_xml, (string) $out_doc_xml );
+			if ( '' !== $patched_doc ) {
+				$out_zip->addFromString( 'word/document.xml', $patched_doc );
+			}
+		}
+
+		$src_ct = $src_zip->getFromName( '[Content_Types].xml' );
+		$out_ct = $out_zip->getFromName( '[Content_Types].xml' );
+		if ( false !== $src_ct && false !== $out_ct ) {
+			$merged_ct = $this->merge_content_types_for_headers( (string) $src_ct, (string) $out_ct );
+			if ( '' !== $merged_ct ) {
+				$out_zip->addFromString( '[Content_Types].xml', $merged_ct );
+			}
+		}
+
+		$src_zip->close();
+		$out_zip->close();
+
+		return true;
+	}
+
+	private function merge_header_footer_rels( $src_rels_xml, $out_rels_xml ) {
+		if ( ! class_exists( 'DOMDocument' ) ) {
+			return '';
+		}
+
+		$src_dom = new DOMDocument();
+		$out_dom = new DOMDocument();
+
+		if ( ! @$src_dom->loadXML( $src_rels_xml, LIBXML_NONET | LIBXML_NOERROR ) ) {
+			return '';
+		}
+		if ( ! @$out_dom->loadXML( $out_rels_xml, LIBXML_NONET | LIBXML_NOERROR ) ) {
+			return '';
+		}
+
+		$hf_rels     = array();
+		$src_root    = $src_dom->documentElement;
+		$existing_ids = array();
+
+		foreach ( $out_dom->documentElement->childNodes as $node ) {
+			if ( $node instanceof DOMElement && $node->hasAttribute( 'Id' ) ) {
+				$existing_ids[ $node->getAttribute( 'Id' ) ] = true;
+			}
+		}
+
+		foreach ( $src_root->childNodes as $node ) {
+			if ( ! ( $node instanceof DOMElement ) ) {
+				continue;
+			}
+			$type = $node->getAttribute( 'Type' );
+			if ( false !== strpos( $type, '/header' ) || false !== strpos( $type, '/footer' ) ) {
+				$hf_rels[] = $node;
+			}
+		}
+
+		if ( empty( $hf_rels ) ) {
+			return '';
+		}
+
+		foreach ( $hf_rels as $rel_node ) {
+			$id = $rel_node->getAttribute( 'Id' );
+			if ( isset( $existing_ids[ $id ] ) ) {
+				continue;
+			}
+			$imported = $out_dom->importNode( $rel_node, true );
+			$out_dom->documentElement->appendChild( $imported );
+		}
+
+		return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' . "\n" . $out_dom->saveXML( $out_dom->documentElement );
+	}
+
+	private function inject_header_footer_refs_into_sectpr( $src_doc_xml, $out_doc_xml ) {
+		if ( ! class_exists( 'DOMDocument' ) ) {
+			return '';
+		}
+
+		$ns_w = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+		$ns_r = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+
+		$src_dom = new DOMDocument();
+		$out_dom = new DOMDocument();
+
+		if ( ! @$src_dom->loadXML( $src_doc_xml, LIBXML_NONET | LIBXML_NOERROR ) ) {
+			return '';
+		}
+		if ( ! @$out_dom->loadXML( $out_doc_xml, LIBXML_NONET | LIBXML_NOERROR ) ) {
+			return '';
+		}
+
+		$src_xpath = new DOMXPath( $src_dom );
+		$src_xpath->registerNamespace( 'w', $ns_w );
+		$src_xpath->registerNamespace( 'r', $ns_r );
+
+		$out_xpath = new DOMXPath( $out_dom );
+		$out_xpath->registerNamespace( 'w', $ns_w );
+		$out_xpath->registerNamespace( 'r', $ns_r );
+
+		$src_refs = $src_xpath->query( '//w:sectPr/w:headerReference | //w:sectPr/w:footerReference' );
+		if ( ! $src_refs || 0 === $src_refs->length ) {
+			return '';
+		}
+
+		$out_sectpr_nodes = $out_xpath->query( '//w:sectPr' );
+		if ( ! $out_sectpr_nodes || 0 === $out_sectpr_nodes->length ) {
+			return '';
+		}
+
+		$out_sectpr = $out_sectpr_nodes->item( $out_sectpr_nodes->length - 1 );
+
+		$existing_ref_ids = array();
+		$existing_refs = $out_xpath->query( 'w:headerReference | w:footerReference', $out_sectpr );
+		if ( $existing_refs ) {
+			foreach ( $existing_refs as $ref ) {
+				$existing_ref_ids[] = $ref->getAttributeNS( $ns_r, 'id' );
+			}
+		}
+
+		foreach ( $src_refs as $ref ) {
+			$rid = $ref->getAttributeNS( $ns_r, 'id' );
+			if ( in_array( $rid, $existing_ref_ids, true ) ) {
+				continue;
+			}
+			$imported = $out_dom->importNode( $ref, true );
+			$first_child = $out_sectpr->firstChild;
+			if ( $first_child ) {
+				$out_sectpr->insertBefore( $imported, $first_child );
+			} else {
+				$out_sectpr->appendChild( $imported );
+			}
+		}
+
+		return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' . "\n" . $out_dom->saveXML( $out_dom->documentElement );
+	}
+
+	private function merge_content_types_for_headers( $src_ct, $out_ct ) {
+		if ( ! class_exists( 'DOMDocument' ) ) {
+			return '';
+		}
+
+		$src_dom = new DOMDocument();
+		$out_dom = new DOMDocument();
+
+		if ( ! @$src_dom->loadXML( $src_ct, LIBXML_NONET | LIBXML_NOERROR ) ) {
+			return '';
+		}
+		if ( ! @$out_dom->loadXML( $out_ct, LIBXML_NONET | LIBXML_NOERROR ) ) {
+			return '';
+		}
+
+		$existing_parts = array();
+		foreach ( $out_dom->documentElement->childNodes as $node ) {
+			if ( $node instanceof DOMElement && $node->hasAttribute( 'PartName' ) ) {
+				$existing_parts[ $node->getAttribute( 'PartName' ) ] = true;
+			}
+		}
+
+		$changed = false;
+		foreach ( $src_dom->documentElement->childNodes as $node ) {
+			if ( ! ( $node instanceof DOMElement ) || ! $node->hasAttribute( 'PartName' ) ) {
+				continue;
+			}
+			$part_name = $node->getAttribute( 'PartName' );
+			if ( ! preg_match( '#/word/(header|footer)\d*\.xml$#', $part_name ) ) {
+				continue;
+			}
+			if ( isset( $existing_parts[ $part_name ] ) ) {
+				continue;
+			}
+			$imported = $out_dom->importNode( $node, true );
+			$out_dom->documentElement->appendChild( $imported );
+			$changed = true;
+		}
+
+		if ( ! $changed ) {
+			return '';
+		}
+
+		return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' . "\n" . $out_dom->saveXML( $out_dom->documentElement );
+	}
 }

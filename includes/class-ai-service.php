@@ -233,6 +233,19 @@ class Arriendo_Facil_AI_Service {
 		return $response;
 	}
 
+	public function fill_contract_blanks_markdown( array $context ) {
+		$payload = array(
+			'action' => 'fill_contract_blanks_markdown',
+			'data'   => $context,
+		);
+
+		$response = $this->request( $payload );
+
+		$this->log( 'fill_contract_blanks_markdown', $context, $response );
+
+		return $response;
+	}
+
 	/**
 	 * Analyzes a DOCX template at upload time to produce a field map for owner preview/approval.
 	 *
@@ -290,9 +303,9 @@ class Arriendo_Facil_AI_Service {
 		$prompt   = $this->build_action_prompt( $payload );
 		$action   = isset( $payload['action'] ) ? (string) $payload['action'] : '';
 
-		$heavy_actions = array( 'fill_contract_blanks', 'generate_document', 'map_template_word_agent', 'analyze_template_fields' );
+		$heavy_actions = array( 'fill_contract_blanks', 'generate_document', 'map_template_word_agent', 'analyze_template_fields', 'fill_contract_blanks_markdown' );
 		$timeout    = in_array( $action, $heavy_actions, true ) ? 60 : 30;
-		$max_tokens = in_array( $action, $heavy_actions, true ) ? 4096 : 2048;
+		$max_tokens = 'fill_contract_blanks_markdown' === $action ? 8192 : ( in_array( $action, $heavy_actions, true ) ? 4096 : 2048 );
 
 		$args = array(
 			'method'  => 'POST',
@@ -682,6 +695,45 @@ class Arriendo_Facil_AI_Service {
 				. $blanks_json . "\n\n"
 				. "TEXTO COMPLETO DEL CONTRATO:\n"
 				. $contract;
+		}
+
+		if ( 'fill_contract_blanks_markdown' === $action ) {
+			$md_text      = isset( $data['markdown_text'] ) ? (string) $data['markdown_text'] : '';
+			$payload_json = isset( $data['payload'] ) ? wp_json_encode( $data['payload'] ) : '{}';
+
+			return "### AGENTE DE COMPLETACIÓN DE CONTRATO EN MARKDOWN ###\n\n"
+				. "Rol: Eres un abogado experto en contratos de arrendamiento ecuatorianos.\n"
+				. "Tarea: Completa los blancos (_____, ....., ……) en el siguiente contrato en formato Markdown.\n\n"
+				. "## REGLAS:\n"
+				. "1. Devuelve el TEXTO COMPLETO del contrato en Markdown con los blancos reemplazados por los valores correctos.\n"
+				. "2. Si NO estás 100% seguro de qué dato va en un blanco, DÉJALO COMO ESTÁ (no lo modifiques).\n"
+				. "3. NUNCA inventes datos. Usa SOLO los valores de DATOS_RESERVA.\n"
+				. "4. Mantén TODA la estructura del Markdown intacta (encabezados, listas, negritas, etc.).\n"
+				. "5. NO añadas ni elimines párrafos, cláusulas o secciones.\n"
+				. "6. Reemplaza el blanco completo (todos los guiones/puntos) con el valor, sin dejar caracteres de blanco.\n\n"
+				. "## MAPEO DE DATOS (lee el contexto antes y después del blanco):\n"
+				. "- Contexto 'arrendador'/'propietario' + blanco de nombre → owner_name\n"
+				. "- Contexto 'arrendatario'/'inquilino' + blanco de nombre → guest_name\n"
+				. "- Contexto 'cédula'/'C.C.'/'C.I.' + arrendador → owner_id_number\n"
+				. "- Contexto 'cédula'/'C.C.'/'C.I.' + arrendatario → guest_id_number\n"
+				. "- Contexto 'USD'/'canon'/'mensual'/'valor' → monthly_rent\n"
+				. "- Contexto 'ubicad'/'situad'/'dirección' → accommodation_address\n"
+				. "- Contexto 'a partir de'/'desde'/'inicio' → start_date\n"
+				. "- Contexto 'hasta'/'vencimiento'/'fin' → end_date\n"
+				. "- Contexto 'garantía'/'depósito' → guarantee_text\n"
+				. "- Contexto 'ciudad de' (encabezado del contrato) → accommodation_city\n"
+				. "- Contexto 'teléfono'/'celular' → guest_phone\n"
+				. "- Contexto 'correo'/'email' → guest_email\n\n"
+				. "## BLANCOS QUE SIEMPRE SE DEJAN INTACTOS:\n"
+				. "- 'dedicarlo a ___' (uso del local)\n"
+				. "- 'accesorios ___', 'llaves ___', 'servicios básicos ___'\n"
+				. "- 'estado civil ___', 'profesión ___', 'domiciliado en ___'\n"
+				. "- Cualquier blanco cuyo dato NO exista en DATOS_RESERVA\n\n"
+				. "## FORMATO DE SALIDA:\n"
+				. "Devuelve ÚNICAMENTE JSON válido:\n"
+				. "{\"filled_markdown\": \"...texto completo del contrato con blancos completados...\"}\n\n"
+				. "DATOS_RESERVA (usa SOLO estos valores):\n" . $payload_json . "\n\n"
+				. "CONTRATO EN MARKDOWN:\n" . $md_text;
 		}
 
 		if ( 'analyze_contract_for_fields' === $action ) {

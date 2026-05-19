@@ -1427,6 +1427,18 @@
 		}
 	}
 
+	function afAutoApproveFieldMap( fieldMap ) {
+		var hiddenInput = document.getElementById( 'af_template_field_map' );
+		if ( hiddenInput ) {
+			hiddenInput.value = JSON.stringify( fieldMap );
+		}
+
+		var approvedStatus = document.getElementById( 'af-template-approved-status' );
+		if ( approvedStatus ) {
+			approvedStatus.style.display = 'block';
+		}
+	}
+
 	function afCloseTemplatePreview() {
 		var modal = document.getElementById( 'af-template-preview-modal' );
 		if ( modal ) {
@@ -1546,7 +1558,12 @@
 					analyzeStatus.style.display = 'none';
 				}
 
-				afRenderTemplatePreview( html, fieldMap );
+				// Auto-approve the AI field map (no manual review required).
+				afAutoApproveFieldMap( fieldMap );
+
+				// Store html and fieldMap for optional manual review.
+				window._afTemplatePreviewHtml = html;
+				window._afTemplatePreviewFieldMap = fieldMap;
 			} )
 			.catch( function ( err ) {
 				if ( analyzeStatus ) {
@@ -1558,6 +1575,13 @@
 
 	$( document ).on( 'click', '[data-af-close-template-preview]', function () {
 		afCloseTemplatePreview();
+	} );
+
+	$( document ).on( 'click', '#af-template-review-link', function ( e ) {
+		e.preventDefault();
+		if ( window._afTemplatePreviewHtml && window._afTemplatePreviewFieldMap ) {
+			afRenderTemplatePreview( window._afTemplatePreviewHtml, window._afTemplatePreviewFieldMap );
+		}
 	} );
 
 	$( document ).on( 'click', '#af-template-approve', function () {

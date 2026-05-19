@@ -54,6 +54,13 @@ if ( isset( $_POST['af_save_ai_settings'] ) ) {
 		}
 	}
 
+	if ( ! af_settings_is_locked( 'AF_CONTRACT_PROCESSING_METHOD' ) ) {
+		$method = sanitize_key( wp_unslash( $_POST['af_contract_processing_method'] ?? 'markdown' ) );
+		if ( in_array( $method, array( 'markdown', 'direct_xml' ), true ) ) {
+			update_option( 'af_contract_processing_method', $method );
+		}
+	}
+
 	echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Settings saved.', 'arriendo-facil' ) . '</p></div>';
 }
 
@@ -164,6 +171,10 @@ $api_url = af_settings_get_value( 'AF_AI_API_URL', 'af_ai_api_url', '' );
 $api_key = af_settings_get_value( 'AF_AI_API_KEY', 'af_ai_api_key', '' );
 $has_api_key = '' !== trim( $api_key );
 
+$contract_method        = af_settings_get_value( 'AF_CONTRACT_PROCESSING_METHOD', 'af_contract_processing_method', 'markdown' );
+$contract_method_locked = af_settings_is_locked( 'AF_CONTRACT_PROCESSING_METHOD' );
+$pandoc_available       = class_exists( 'Arriendo_Facil_DOCX_Template_Processor' ) && Arriendo_Facil_DOCX_Template_Processor::is_pandoc_available();
+
 $whatsapp_number = get_option( 'af_whatsapp_number', '' );
 
 $storage_provider = af_settings_get_value( 'AF_STORAGE_PROVIDER', 'af_storage_provider', 'cloudflare_r2' );
@@ -243,6 +254,32 @@ $any_storage_field_locked = $provider_locked || $access_key_locked || $secret_ke
 							<br /><?php esc_html_e( 'This value is defined in wp-config.php and cannot be edited here.', 'arriendo-facil' ); ?>
 						<?php endif; ?>
 					</p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row">
+					<label for="af_contract_processing_method"><?php esc_html_e( 'Contract Processing Method', 'arriendo-facil' ); ?></label>
+				</th>
+				<td>
+					<select id="af_contract_processing_method" name="af_contract_processing_method" <?php disabled( $contract_method_locked ); ?>>
+						<option value="markdown" <?php selected( $contract_method, 'markdown' ); ?>><?php esc_html_e( 'Markdown (via Pandoc) — recommended', 'arriendo-facil' ); ?></option>
+						<option value="direct_xml" <?php selected( $contract_method, 'direct_xml' ); ?>><?php esc_html_e( 'Direct XML (legacy)', 'arriendo-facil' ); ?></option>
+					</select>
+					<?php if ( ! $pandoc_available && 'markdown' === $contract_method ) : ?>
+						<p class="description" style="color: #d63638;">
+							<span class="dashicons dashicons-warning"></span>
+							<?php esc_html_e( 'Pandoc is not installed on this server. The markdown method will fall back to Direct XML automatically. Install pandoc to enable this feature.', 'arriendo-facil' ); ?>
+						</p>
+					<?php else : ?>
+						<p class="description">
+							<?php esc_html_e( 'Markdown converts DOCX to plain text for better AI accuracy, then reconstructs the document preserving styles. Requires pandoc on the server.', 'arriendo-facil' ); ?>
+						</p>
+					<?php endif; ?>
+					<?php if ( $contract_method_locked ) : ?>
+						<p class="description">
+							<br /><?php esc_html_e( 'This value is defined in wp-config.php and cannot be edited here.', 'arriendo-facil' ); ?>
+						</p>
+					<?php endif; ?>
 				</td>
 			</tr>
 		</table>

@@ -676,7 +676,29 @@ class Arriendo_Facil_Guest {
 		// PRIMARY PATH: AI-driven direct fill (works with any template format).
 		$phpword_success = false;
 
-		if ( class_exists( 'Arriendo_Facil_DOCX_Template_Processor' ) ) {
+		// Check configured processing method (markdown is primary, direct_xml is fallback).
+		$processing_method = defined( 'AF_CONTRACT_PROCESSING_METHOD' )
+			? AF_CONTRACT_PROCESSING_METHOD
+			: (string) get_option( 'af_contract_processing_method', 'markdown' );
+
+		// MARKDOWN PATH: try pandoc-based flow first.
+		if ( 'markdown' === $processing_method
+			&& class_exists( 'Arriendo_Facil_DOCX_Template_Processor' )
+			&& Arriendo_Facil_DOCX_Template_Processor::is_pandoc_available()
+		) {
+			$tpl_proc   = new Arriendo_Facil_DOCX_Template_Processor();
+			$ai_service = class_exists( 'Arriendo_Facil_AI_Service' ) ? new Arriendo_Facil_AI_Service() : null;
+
+			if ( $ai_service && $tpl_proc->fill_template_with_markdown( $template_path, $file_path, $payload, $ai_service ) ) {
+				$phpword_success = true;
+				error_log( 'Arriendo Facil owner-template generation: fill_template_with_markdown succeeded for lease_id=' . $lease_id );
+			} else {
+				error_log( 'Arriendo Facil owner-template generation: fill_template_with_markdown failed for lease_id=' . $lease_id . '; falling through to direct XML methods' );
+			}
+		}
+
+		// DIRECT XML FALLBACK: existing P1/P2/P3 priority cascade.
+		if ( ! $phpword_success && class_exists( 'Arriendo_Facil_DOCX_Template_Processor' ) ) {
 			$tpl_proc   = new Arriendo_Facil_DOCX_Template_Processor();
 			$ai_service = class_exists( 'Arriendo_Facil_AI_Service' ) ? new Arriendo_Facil_AI_Service() : null;
 

@@ -77,19 +77,18 @@ $amenities_options = array(
 		</td>
 	</tr>
 	<tr>
-		<th><label for="af_latitude"><?php esc_html_e( 'Latitude', 'arriendo-facil' ); ?></label></th>
+		<th><label for="af_location_search"><?php esc_html_e( 'Location', 'arriendo-facil' ); ?></label></th>
 		<td>
-			<input type="number" id="af_latitude" name="af_latitude" step="0.0001" min="-90" max="90"
-				value="<?php echo esc_attr( $latitude ); ?>" class="regular-text"
-				placeholder="<?php esc_attr_e( 'e.g., -0.2015', 'arriendo-facil' ); ?>" />
-		</td>
-	</tr>
-	<tr>
-		<th><label for="af_longitude"><?php esc_html_e( 'Longitude', 'arriendo-facil' ); ?></label></th>
-		<td>
-			<input type="number" id="af_longitude" name="af_longitude" step="0.0001" min="-180" max="180"
-				value="<?php echo esc_attr( $longitude ); ?>" class="regular-text"
-				placeholder="<?php esc_attr_e( 'e.g., -78.4889', 'arriendo-facil' ); ?>" />
+			<div class="af-location-picker">
+				<input type="text" id="af_location_search" autocomplete="off"
+					placeholder="<?php esc_attr_e( 'Search address in Ecuador…', 'arriendo-facil' ); ?>" />
+				<div id="af-location-suggestions" class="af-location-suggestions"></div>
+				<div id="af-location-map" style="height: 300px; width: 100%; margin-top: 10px;"></div>
+				<input type="hidden" id="af_latitude" name="af_latitude"
+					value="<?php echo esc_attr( $latitude ); ?>" />
+				<input type="hidden" id="af_longitude" name="af_longitude"
+					value="<?php echo esc_attr( $longitude ); ?>" />
+			</div>
 		</td>
 	</tr>
 	<tr>

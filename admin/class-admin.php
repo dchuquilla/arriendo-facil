@@ -26,6 +26,7 @@ class Arriendo_Facil_Admin {
 		add_action( 'wp_ajax_af_predict_cost', array( $this, 'ajax_predict_cost' ) );
 		add_action( 'wp_ajax_af_generate_document', array( $this, 'ajax_generate_document' ) );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
+		add_action( 'admin_notices', array( $this, 'pandoc_notice' ) );
 	}
 
 	/**
@@ -167,6 +168,27 @@ class Arriendo_Facil_Admin {
 				'guestNonce'         => wp_create_nonce( 'af_guest_nonce' ),
 			)
 		);
+
+		$screen = get_current_screen();
+		if ( $screen && 'accommodation' === $screen->post_type && in_array( $hook, array( 'post.php', 'post-new.php' ), true ) ) {
+			wp_enqueue_style( 'leaflet-css', 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css', array(), '1.9.4' );
+			wp_enqueue_script( 'leaflet-js', 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js', array(), '1.9.4', true );
+
+			$picker_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/admin-location-picker.js';
+			wp_enqueue_script(
+				'af-location-picker',
+				ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/admin-location-picker.js',
+				array( 'jquery', 'leaflet-js' ),
+				file_exists( $picker_path ) ? (string) filemtime( $picker_path ) : ARRIENDO_FACIL_VERSION,
+				true
+			);
+
+			wp_localize_script( 'af-location-picker', 'afLocationPicker', array(
+				'defaultLat'    => -0.1807,
+				'defaultLng'    => -78.4678,
+				'ecuadorBounds' => array( 'latMin' => -5, 'latMax' => 2, 'lngMin' => -81, 'lngMax' => -75 ),
+			) );
+		}
 	}
 
 	/**
@@ -175,6 +197,30 @@ class Arriendo_Facil_Admin {
 	public function register_settings() {
 		register_setting( 'af_ai_settings', 'af_ai_api_url', array( 'sanitize_callback' => 'esc_url_raw' ) );
 		register_setting( 'af_ai_settings', 'af_ai_api_key', array( 'sanitize_callback' => 'sanitize_text_field' ) );
+	}
+
+	public function pandoc_notice() {
+		$screen = get_current_screen();
+		if ( ! $screen || 'arriendo-facil_page_af-ai-settings' !== $screen->id ) {
+			return;
+		}
+
+		$method = defined( 'AF_CONTRACT_PROCESSING_METHOD' )
+			? AF_CONTRACT_PROCESSING_METHOD
+			: (string) get_option( 'af_contract_processing_method', 'markdown' );
+
+		if ( 'markdown' !== $method ) {
+			return;
+		}
+
+		if ( class_exists( 'Arriendo_Facil_DOCX_Template_Processor' ) && Arriendo_Facil_DOCX_Template_Processor::is_pandoc_available() ) {
+			return;
+		}
+
+		echo '<div class="notice notice-warning"><p>';
+		echo '<strong>' . esc_html__( 'Arriendo Facil:', 'arriendo-facil' ) . '</strong> ';
+		echo esc_html__( 'Pandoc is not installed. The Markdown contract processing method requires pandoc. Install it with: sudo apt-get install pandoc (Debian/Ubuntu) or brew install pandoc (macOS). The plugin will fall back to Direct XML until pandoc is available.', 'arriendo-facil' );
+		echo '</p></div>';
 	}
 
 	/**
@@ -481,31 +527,53 @@ class Arriendo_Facil_Admin {
 		$file_name = sprintf( 'lease-%d-owner-template-%s.docx', $lease_id, gmdate( 'Ymd-His' ) );
 		$file_path = trailingslashit( $contracts_dir ) . $file_name;
 
-		// Phase 1: PHPWord TemplateProcessor using the pre-processed template (preferred).
-		$phpword_success    = false;
-		$processed_tpl_path = (string) get_post_meta( $attachment_id, '_af_processed_template_path', true );
+		$phpword_success = false;
 
-		// Always refresh the processed owner template from the original DOCX before fill.
-		// This avoids reusing older placeholder mappings that may have been inferred incorrectly.
-		if ( class_exists( 'Arriendo_Facil_DOCX_Template_Processor' ) ) {
-			$ai_svc        = class_exists( 'Arriendo_Facil_AI_Service' ) ? new Arriendo_Facil_AI_Service() : null;
-			$tpl_proc      = new Arriendo_Facil_DOCX_Template_Processor();
-			$processed_new = $tpl_proc->process_owner_template( $template_path, $ai_svc, $processed_tpl_path, $payload );
-			if ( '' !== $processed_new && file_exists( $processed_new ) ) {
-				$processed_tpl_path = $processed_new;
-				update_post_meta( $attachment_id, '_af_processed_template_path', $processed_tpl_path );
+		// Check configured processing method (markdown is primary, direct_xml is fallback).
+		$processing_method = defined( 'AF_CONTRACT_PROCESSING_METHOD' )
+			? AF_CONTRACT_PROCESSING_METHOD
+			: (string) get_option( 'af_contract_processing_method', 'markdown' );
+
+		// MARKDOWN PATH: try pandoc-based flow first.
+		if ( 'markdown' === $processing_method
+			&& class_exists( 'Arriendo_Facil_DOCX_Template_Processor' )
+			&& Arriendo_Facil_DOCX_Template_Processor::is_pandoc_available()
+		) {
+			$tpl_proc   = new Arriendo_Facil_DOCX_Template_Processor();
+			$ai_service = class_exists( 'Arriendo_Facil_AI_Service' ) ? new Arriendo_Facil_AI_Service() : null;
+
+			if ( $ai_service && $tpl_proc->fill_template_with_markdown( $template_path, $file_path, $payload, $ai_service ) ) {
+				$phpword_success = true;
+				error_log( 'Arriendo Facil admin owner-template generation: fill_template_with_markdown succeeded for lease_id=' . $lease_id );
+			} else {
+				error_log( 'Arriendo Facil admin owner-template generation: fill_template_with_markdown failed for lease_id=' . $lease_id . '; falling through to legacy path' );
 			}
 		}
 
-		if ( '' !== $processed_tpl_path
-			&& file_exists( $processed_tpl_path )
-			&& class_exists( 'Arriendo_Facil_DOCX_Template_Processor' )
-		) {
-			$tpl_proc = new Arriendo_Facil_DOCX_Template_Processor();
-			if ( $tpl_proc->fill_template( $processed_tpl_path, $file_path, $payload ) ) {
-				$phpword_success = true;
-				if ( $tmp_downloaded ) {
-					@unlink( $template_path );
+		// DIRECT XML FALLBACK: legacy pre-processed template with PhpWord TemplateProcessor.
+		if ( ! $phpword_success ) {
+			$processed_tpl_path = (string) get_post_meta( $attachment_id, '_af_processed_template_path', true );
+
+			if ( class_exists( 'Arriendo_Facil_DOCX_Template_Processor' ) ) {
+				$ai_svc        = class_exists( 'Arriendo_Facil_AI_Service' ) ? new Arriendo_Facil_AI_Service() : null;
+				$tpl_proc      = new Arriendo_Facil_DOCX_Template_Processor();
+				$processed_new = $tpl_proc->process_owner_template( $template_path, $ai_svc, $processed_tpl_path, $payload );
+				if ( '' !== $processed_new && file_exists( $processed_new ) ) {
+					$processed_tpl_path = $processed_new;
+					update_post_meta( $attachment_id, '_af_processed_template_path', $processed_tpl_path );
+				}
+			}
+
+			if ( '' !== $processed_tpl_path
+				&& file_exists( $processed_tpl_path )
+				&& class_exists( 'Arriendo_Facil_DOCX_Template_Processor' )
+			) {
+				$tpl_proc = new Arriendo_Facil_DOCX_Template_Processor();
+				if ( $tpl_proc->fill_template( $processed_tpl_path, $file_path, $payload ) ) {
+					$phpword_success = true;
+					if ( $tmp_downloaded ) {
+						@unlink( $template_path );
+					}
 				}
 			}
 		}

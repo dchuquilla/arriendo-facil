@@ -80,8 +80,11 @@ $amenities_options = array(
 		<th><label for="af_location_search"><?php esc_html_e( 'Location', 'arriendo-facil' ); ?></label></th>
 		<td>
 			<div class="af-location-picker">
-				<input type="text" id="af_location_search" autocomplete="off"
-					placeholder="<?php esc_attr_e( 'Search address in Ecuador…', 'arriendo-facil' ); ?>" />
+				<div class="af-location-search-row">
+					<input type="text" id="af_location_search" autocomplete="off"
+						placeholder="<?php esc_attr_e( 'Search address or paste Google Maps URL…', 'arriendo-facil' ); ?>" />
+					<button type="button" id="af_location_search_btn" class="button"><?php esc_html_e( 'Search', 'arriendo-facil' ); ?></button>
+				</div>
 				<div id="af-location-suggestions" class="af-location-suggestions"></div>
 				<div id="af-location-map" style="height: 300px; width: 100%; margin-top: 10px;"></div>
 				<input type="hidden" id="af_latitude" name="af_latitude"

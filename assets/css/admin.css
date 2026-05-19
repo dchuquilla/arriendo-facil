@@ -376,8 +376,14 @@ body.post-type-cleaning_service .page-title-action:focus {
 	position: relative;
 }
 
+.af-location-search-row {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+
 #af_location_search {
-	width: 100%;
+	flex: 1;
 	max-width: 400px;
 	padding: 8px 12px;
 	border: 1px solid #8c8f94;

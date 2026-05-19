@@ -52,9 +52,33 @@
 		setTimeout(function () { map.invalidateSize(); }, 100);
 		setTimeout(function () { map.invalidateSize(); }, 500);
 		setTimeout(function () { map.invalidateSize(); }, 1500);
+		setTimeout(function () { map.invalidateSize(); }, 3000);
+
+		// Observe container size changes — covers all rendering edge cases.
+		var mapContainer = document.getElementById('af-location-map');
+		if (window.ResizeObserver) {
+			var ro = new ResizeObserver(function () {
+				map.invalidateSize();
+			});
+			ro.observe(mapContainer);
+		}
+
+		// Observe parent visibility changes (meta box toggle, tabs, etc.).
+		var metaBox = mapContainer.closest('.postbox');
+		if (metaBox && window.MutationObserver) {
+			var mo = new MutationObserver(function () {
+				setTimeout(function () { map.invalidateSize(); }, 50);
+			});
+			mo.observe(metaBox, { attributes: true, attributeFilter: ['class', 'style'] });
+		}
 
 		jQuery(document).on('postbox-toggled', function () {
 			setTimeout(function () { map.invalidateSize(); }, 200);
+		});
+
+		// Also invalidate when the window finishes loading all assets.
+		window.addEventListener('load', function () {
+			setTimeout(function () { map.invalidateSize(); }, 100);
 		});
 
 		// If no saved coordinates, center map on user's device location (visual only, does not save).
@@ -72,11 +96,31 @@
 		searchInput.addEventListener('input', onSearchInput);
 		searchInput.addEventListener('paste', onSearchPaste);
 		searchInput.addEventListener('keydown', onSearchKeydown);
+
+		var searchBtn = document.getElementById('af_location_search_btn');
+		if (searchBtn) {
+			searchBtn.addEventListener('click', triggerSearch);
+		}
+
 		document.addEventListener('click', function (e) {
 			if (!suggestionsEl.contains(e.target) && e.target !== searchInput) {
 				closeSuggestions();
 			}
 		});
+	}
+
+	function triggerSearch() {
+		var query = searchInput.value.trim();
+		if (!query || query.length < 3) return;
+
+		var coords = parseGoogleMapsUrl(query);
+		if (coords) {
+			moveToCoords(coords.lat, coords.lng);
+			return;
+		}
+
+		clearTimeout(debounceTimer);
+		searchNominatim(query, true);
 	}
 
 	function isInEcuador(lat, lng) {
@@ -149,6 +193,23 @@
 	}
 
 	function onSearchKeydown(e) {
+		if (e.key === 'Enter') {
+			e.preventDefault();
+			if (suggestions.length && activeIndex >= 0) {
+				selectSuggestion(suggestions[activeIndex]);
+			} else if (suggestions.length) {
+				selectSuggestion(suggestions[0]);
+			} else {
+				// Force search immediately on Enter.
+				var query = searchInput.value.trim();
+				if (query.length >= 3) {
+					clearTimeout(debounceTimer);
+					searchNominatim(query, true);
+				}
+			}
+			return;
+		}
+
 		if (!suggestions.length) return;
 
 		if (e.key === 'ArrowDown') {
@@ -159,11 +220,6 @@
 			e.preventDefault();
 			activeIndex = Math.max(activeIndex - 1, 0);
 			highlightSuggestion();
-		} else if (e.key === 'Enter') {
-			e.preventDefault();
-			if (activeIndex >= 0 && activeIndex < suggestions.length) {
-				selectSuggestion(suggestions[activeIndex]);
-			}
 		} else if (e.key === 'Escape') {
 			closeSuggestions();
 		}
@@ -182,8 +238,36 @@
 		activeIndex = -1;
 	}
 
-	function searchNominatim(query) {
-		var url = 'https://nominatim.openstreetmap.org/search?format=json&countrycodes=ec&limit=5&addressdetails=1&q=' + encodeURIComponent(query);
+	function searchNominatim(query, autoSelect) {
+		var queries = buildSearchVariants(query);
+		searchWithFallback(queries, 0, autoSelect || false);
+	}
+
+	function buildSearchVariants(query) {
+		var variants = [query];
+
+		// For Ecuadorian intersections: "Calle X y Calle Y" → try "Calle X, Ecuador"
+		var intersection = query.split(/\s+y\s+/i);
+		if (intersection.length === 2) {
+			variants.push(intersection[0].trim() + ', ' + intersection[1].trim() + ', Ecuador');
+			variants.push(intersection[0].trim() + ', Ecuador');
+		}
+
+		// Append Ecuador if not already present.
+		if (!/ecuador/i.test(query)) {
+			variants.push(query + ', Ecuador');
+		}
+
+		return variants;
+	}
+
+	function searchWithFallback(queries, index, autoSelect) {
+		if (index >= queries.length) {
+			closeSuggestions();
+			return;
+		}
+
+		var url = 'https://nominatim.openstreetmap.org/search?format=json&countrycodes=ec&limit=5&addressdetails=1&q=' + encodeURIComponent(queries[index]);
 
 		fetch(url, { headers: { 'Accept-Language': 'es' } })
 			.then(function (r) { return r.json(); })
@@ -191,10 +275,19 @@
 				suggestions = results.filter(function (r) {
 					return isInEcuador(parseFloat(r.lat), parseFloat(r.lon));
 				});
-				renderSuggestions();
+
+				if (suggestions.length) {
+					if (autoSelect) {
+						selectSuggestion(suggestions[0]);
+					} else {
+						renderSuggestions();
+					}
+				} else {
+					searchWithFallback(queries, index + 1, autoSelect);
+				}
 			})
 			.catch(function () {
-				closeSuggestions();
+				searchWithFallback(queries, index + 1, autoSelect);
 			});
 	}
 

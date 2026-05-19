@@ -25,6 +25,7 @@ class Arriendo_Facil_Admin {
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
 		add_action( 'wp_ajax_af_predict_cost', array( $this, 'ajax_predict_cost' ) );
 		add_action( 'wp_ajax_af_generate_document', array( $this, 'ajax_generate_document' ) );
+		add_action( 'wp_ajax_af_resolve_short_url', array( $this, 'ajax_resolve_short_url' ) );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
 		add_action( 'admin_notices', array( $this, 'pandoc_notice' ) );
 	}
@@ -187,6 +188,8 @@ class Arriendo_Facil_Admin {
 				'defaultLat'    => -0.1807,
 				'defaultLng'    => -78.4678,
 				'ecuadorBounds' => array( 'latMin' => -5, 'latMax' => 2, 'lngMin' => -81, 'lngMax' => -75 ),
+				'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
+				'nonce'         => wp_create_nonce( 'af_location_nonce' ),
 			) );
 		}
 	}
@@ -263,6 +266,41 @@ class Arriendo_Facil_Admin {
 	 */
 	public function render_ai_settings() {
 		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/ai-settings.php';
+	}
+
+	/**
+	 * AJAX handler: resolve a short Google Maps URL to extract the final redirect URL.
+	 */
+	public function ajax_resolve_short_url() {
+		check_ajax_referer( 'af_location_nonce', 'nonce' );
+
+		$url = isset( $_POST['url'] ) ? esc_url_raw( wp_unslash( $_POST['url'] ) ) : '';
+		if ( ! $url ) {
+			wp_send_json_error( 'No URL provided' );
+		}
+
+		$response = wp_remote_get( $url, array(
+			'redirection' => 10,
+			'timeout'     => 15,
+		) );
+
+		if ( is_wp_error( $response ) ) {
+			wp_send_json_error( $response->get_error_message() );
+		}
+
+		$body = wp_remote_retrieve_body( $response );
+		$final_url = $url;
+
+		// Try to extract the canonical/redirect URL from the response body or headers.
+		if ( preg_match( '/@(-?\d+\.\d+),(-?\d+\.\d+)/', $body, $m ) ) {
+			$final_url = '@' . $m[1] . ',' . $m[2];
+		} elseif ( preg_match( '/window\.location\s*=\s*["\']([^"\']+)/', $body, $m ) ) {
+			$final_url = $m[1];
+		} elseif ( preg_match( '/content="0;url=([^"]+)"/', $body, $m ) ) {
+			$final_url = $m[1];
+		}
+
+		wp_send_json_success( array( 'resolved_url' => $final_url ) );
 	}
 
 	/**

@@ -113,11 +113,7 @@
 		var query = searchInput.value.trim();
 		if (!query || query.length < 3) return;
 
-		var coords = parseGoogleMapsUrl(query);
-		if (coords) {
-			moveToCoords(coords.lat, coords.lng);
-			return;
-		}
+		if (handleUrlInput(query)) return;
 
 		clearTimeout(debounceTimer);
 		searchNominatim(query, true);
@@ -153,13 +149,52 @@
 		return null;
 	}
 
+	function isShortMapUrl(text) {
+		return /^https?:\/\/(goo\.gl\/maps|maps\.app\.goo\.gl)\//i.test(text);
+	}
+
+	function resolveShortUrl(url, callback) {
+		jQuery.post(config.ajaxUrl, {
+			action: 'af_resolve_short_url',
+			nonce: config.nonce,
+			url: url
+		}, function (response) {
+			if (response.success && response.data.resolved_url) {
+				callback(response.data.resolved_url);
+			} else {
+				callback(null);
+			}
+		}).fail(function () {
+			callback(null);
+		});
+	}
+
+	function handleUrlInput(text) {
+		var coords = parseGoogleMapsUrl(text);
+		if (coords) {
+			moveToCoords(coords.lat, coords.lng);
+			return true;
+		}
+
+		if (isShortMapUrl(text)) {
+			resolveShortUrl(text, function (resolvedUrl) {
+				if (resolvedUrl) {
+					var resolvedCoords = parseGoogleMapsUrl(resolvedUrl);
+					if (resolvedCoords) {
+						moveToCoords(resolvedCoords.lat, resolvedCoords.lng);
+					}
+				}
+			});
+			return true;
+		}
+
+		return false;
+	}
+
 	function onSearchPaste(e) {
 		setTimeout(function () {
 			var text = searchInput.value.trim();
-			var coords = parseGoogleMapsUrl(text);
-			if (coords) {
-				moveToCoords(coords.lat, coords.lng);
-			}
+			handleUrlInput(text);
 		}, 0);
 	}
 
@@ -175,12 +210,7 @@
 		var query = searchInput.value.trim();
 		clearTimeout(debounceTimer);
 
-		// Check if it's a Google Maps URL.
-		var coords = parseGoogleMapsUrl(query);
-		if (coords) {
-			moveToCoords(coords.lat, coords.lng);
-			return;
-		}
+		if (handleUrlInput(query)) return;
 
 		if (query.length < 3) {
 			closeSuggestions();
@@ -327,12 +357,21 @@
 
 	function fillAddressFields(item) {
 		var addr = item.address || {};
+
+		// Full address for frontend display.
+		var parts = [];
 		var road = addr.road || addr.pedestrian || addr.footway || '';
 		var number = addr.house_number || '';
-		var fullAddress = (road + (number ? ' ' + number : '')).trim() || item.display_name;
-
-		var city = addr.city || addr.town || addr.village || addr.municipality || '';
+		if (road) parts.push(road + (number ? ' ' + number : ''));
 		var suburb = addr.suburb || addr.neighbourhood || addr.quarter || '';
+		if (suburb) parts.push(suburb);
+		var city = addr.city || addr.town || addr.village || addr.municipality || '';
+		if (city) parts.push(city);
+		var state = addr.state || addr.province || '';
+		if (state) parts.push(state);
+
+		var fullAddress = parts.length ? parts.join(', ') : item.display_name;
+
 		var locationText = city + (suburb ? ', ' + suburb : '');
 
 		if (addressInput) addressInput.value = fullAddress;

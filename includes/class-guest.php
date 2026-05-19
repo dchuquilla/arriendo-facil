@@ -686,14 +686,18 @@ class Arriendo_Facil_Guest {
 			&& class_exists( 'Arriendo_Facil_DOCX_Template_Processor' )
 			&& Arriendo_Facil_DOCX_Template_Processor::is_pandoc_available()
 		) {
-			$tpl_proc   = new Arriendo_Facil_DOCX_Template_Processor();
-			$ai_service = class_exists( 'Arriendo_Facil_AI_Service' ) ? new Arriendo_Facil_AI_Service() : null;
+			try {
+				$tpl_proc   = new Arriendo_Facil_DOCX_Template_Processor();
+				$ai_service = class_exists( 'Arriendo_Facil_AI_Service' ) ? new Arriendo_Facil_AI_Service() : null;
 
-			if ( $ai_service && $tpl_proc->fill_template_with_markdown( $template_path, $file_path, $payload, $ai_service ) ) {
-				$phpword_success = true;
-				error_log( 'Arriendo Facil owner-template generation: fill_template_with_markdown succeeded for lease_id=' . $lease_id );
-			} else {
-				error_log( 'Arriendo Facil owner-template generation: fill_template_with_markdown failed for lease_id=' . $lease_id . '; falling through to direct XML methods' );
+				if ( $ai_service && $tpl_proc->fill_template_with_markdown( $template_path, $file_path, $payload, $ai_service ) ) {
+					$phpword_success = true;
+					error_log( 'Arriendo Facil owner-template generation: fill_template_with_markdown succeeded for lease_id=' . $lease_id );
+				} else {
+					error_log( 'Arriendo Facil owner-template generation: fill_template_with_markdown failed for lease_id=' . $lease_id . '; falling through to direct XML methods' );
+				}
+			} catch ( \Throwable $e ) {
+				error_log( 'Arriendo Facil owner-template generation: fill_template_with_markdown exception for lease_id=' . $lease_id . ': ' . $e->getMessage() );
 			}
 		}
 

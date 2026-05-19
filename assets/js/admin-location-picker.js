@@ -25,8 +25,10 @@
 			return;
 		}
 
-		var startLat = parseFloat(latInput.value) || defaultLat;
-		var startLng = parseFloat(lngInput.value) || defaultLng;
+		var hasSavedCoords = latInput.value && lngInput.value &&
+			parseFloat(latInput.value) !== 0 && parseFloat(lngInput.value) !== 0;
+		var startLat = hasSavedCoords ? parseFloat(latInput.value) : defaultLat;
+		var startLng = hasSavedCoords ? parseFloat(lngInput.value) : defaultLng;
 
 		map = L.map('af-location-map').setView([startLat, startLng], 14);
 
@@ -47,22 +49,28 @@
 			reverseGeocode(pos.lat, pos.lng);
 		});
 
-		setTimeout(function () {
-			map.invalidateSize();
-		}, 100);
-		setTimeout(function () {
-			map.invalidateSize();
-		}, 500);
-		setTimeout(function () {
-			map.invalidateSize();
-		}, 1500);
+		setTimeout(function () { map.invalidateSize(); }, 100);
+		setTimeout(function () { map.invalidateSize(); }, 500);
+		setTimeout(function () { map.invalidateSize(); }, 1500);
 
-		// Fix for WordPress meta box toggle (open/close).
 		jQuery(document).on('postbox-toggled', function () {
 			setTimeout(function () { map.invalidateSize(); }, 200);
 		});
 
+		// If no saved coordinates, center map on user's device location (visual only, does not save).
+		if (!hasSavedCoords && navigator.geolocation) {
+			navigator.geolocation.getCurrentPosition(function (position) {
+				var lat = position.coords.latitude;
+				var lng = position.coords.longitude;
+				if (isInEcuador(lat, lng)) {
+					map.setView([lat, lng], 13);
+					marker.setLatLng([lat, lng]);
+				}
+			});
+		}
+
 		searchInput.addEventListener('input', onSearchInput);
+		searchInput.addEventListener('paste', onSearchPaste);
 		searchInput.addEventListener('keydown', onSearchKeydown);
 		document.addEventListener('click', function (e) {
 			if (!suggestionsEl.contains(e.target) && e.target !== searchInput) {
@@ -81,9 +89,54 @@
 		lngInput.value = lng.toFixed(6);
 	}
 
+	function parseGoogleMapsUrl(text) {
+		// Pattern: @lat,lng or ?q=lat,lng or !3d<lat>!4d<lng>
+		var patterns = [
+			/@(-?\d+\.?\d*),(-?\d+\.?\d*)/,
+			/[?&]q=(-?\d+\.?\d*),(-?\d+\.?\d*)/,
+			/!3d(-?\d+\.?\d*)!4d(-?\d+\.?\d*)/
+		];
+		for (var i = 0; i < patterns.length; i++) {
+			var match = text.match(patterns[i]);
+			if (match) {
+				var lat = parseFloat(match[1]);
+				var lng = parseFloat(match[2]);
+				if (isInEcuador(lat, lng)) {
+					return { lat: lat, lng: lng };
+				}
+			}
+		}
+		return null;
+	}
+
+	function onSearchPaste(e) {
+		setTimeout(function () {
+			var text = searchInput.value.trim();
+			var coords = parseGoogleMapsUrl(text);
+			if (coords) {
+				moveToCoords(coords.lat, coords.lng);
+			}
+		}, 0);
+	}
+
+	function moveToCoords(lat, lng) {
+		updateCoords(lat, lng);
+		marker.setLatLng([lat, lng]);
+		map.setView([lat, lng], 16);
+		reverseGeocode(lat, lng);
+		closeSuggestions();
+	}
+
 	function onSearchInput() {
 		var query = searchInput.value.trim();
 		clearTimeout(debounceTimer);
+
+		// Check if it's a Google Maps URL.
+		var coords = parseGoogleMapsUrl(query);
+		if (coords) {
+			moveToCoords(coords.lat, coords.lng);
+			return;
+		}
 
 		if (query.length < 3) {
 			closeSuggestions();

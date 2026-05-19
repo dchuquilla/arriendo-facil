@@ -2409,13 +2409,24 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			return false;
 		}
 
-		$output     = array();
-		$return_var = 1;
-		@exec( 'which pandoc 2>/dev/null', $output, $return_var );
+		$disabled = array_map( 'trim', explode( ',', (string) ini_get( 'disable_functions' ) ) );
+		if ( in_array( 'exec', $disabled, true ) ) {
+			self::$pandoc_path_cache = '';
+			return false;
+		}
 
-		if ( 0 === $return_var && ! empty( $output[0] ) ) {
-			self::$pandoc_path_cache = trim( $output[0] );
-			return true;
+		try {
+			$output     = array();
+			$return_var = 1;
+			@exec( 'which pandoc 2>/dev/null', $output, $return_var );
+
+			if ( 0 === $return_var && ! empty( $output[0] ) ) {
+				self::$pandoc_path_cache = trim( $output[0] );
+				return true;
+			}
+		} catch ( \Throwable $e ) {
+			self::$pandoc_path_cache = '';
+			return false;
 		}
 
 		$common_paths = array( '/usr/bin/pandoc', '/usr/local/bin/pandoc', '/opt/homebrew/bin/pandoc' );
@@ -2589,7 +2600,6 @@ class Arriendo_Facil_DOCX_Template_Processor {
 
 		$src_zip = new ZipArchive();
 		if ( true !== $src_zip->open( $source_docx ) ) {
-			$src_zip->close();
 			return false;
 		}
 

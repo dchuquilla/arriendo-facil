@@ -636,6 +636,14 @@ class Arriendo_Facil_Owner_Contact {
 						} else {
 							delete_post_meta( (int) $attachment_id, '_af_processed_template_path' );
 						}
+
+						// Pre-convert DOCX to Markdown for the MD-based fill flow.
+						if ( Arriendo_Facil_DOCX_Template_Processor::is_pandoc_available() ) {
+							$md_path = $tpl_processor->convert_and_store_markdown( $raw_tpl_path, (int) $attachment_id );
+							if ( '' !== $md_path ) {
+								update_post_meta( (int) $attachment_id, '_af_template_markdown_path', $md_path );
+							}
+						}
 					}
 				}
 

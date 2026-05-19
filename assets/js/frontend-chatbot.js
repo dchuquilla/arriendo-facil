@@ -484,7 +484,6 @@
 
 			var data = new FormData();
 			data.append('action', 'af_create_guest_frontend');
-			data.append('nonce', afChatbot.nonce);
 			data.append('name', state.values.name || '');
 			data.append('email', state.values.email || '');
 			data.append('phone', state.values.phone || '');
@@ -499,14 +498,34 @@
 			state.activeRequestController = new AbortController();
 			setFormDisabled(true);
 			state.lastSubmitFailed = false;
-			botReply(afChatbot.doneText || 'Perfecto, ya tengo tus datos. Estoy registrando tu solicitud...');
+			botReply(afChatbot.doneText || 'Perfecto, ya tengo tus datos. Estoy enviando tu solicitud de arriendo...');
 
-			fetch(afChatbot.ajaxUrl, {
-				method: 'POST',
-				body: data,
-					credentials: 'same-origin',
-					signal: state.activeRequestController.signal
-			})
+			// Fetch a fresh nonce before submitting (avoids stale nonce from cached pages).
+			fetch(afChatbot.ajaxUrl + '?action=af_refresh_nonce', { credentials: 'same-origin' })
+				.then(function (r) { return r.json(); })
+				.then(function (nonceResp) {
+					if (nonceResp && nonceResp.success && nonceResp.data && nonceResp.data.nonce) {
+						data.append('nonce', nonceResp.data.nonce);
+					} else {
+						data.append('nonce', afChatbot.nonce);
+					}
+					return fetch(afChatbot.ajaxUrl, {
+						method: 'POST',
+						body: data,
+						credentials: 'same-origin',
+						signal: state.activeRequestController.signal
+					});
+				})
+				.catch(function () {
+					// If nonce refresh fails, try with original nonce.
+					data.append('nonce', afChatbot.nonce);
+					return fetch(afChatbot.ajaxUrl, {
+						method: 'POST',
+						body: data,
+						credentials: 'same-origin',
+						signal: state.activeRequestController.signal
+					});
+				})
 				.then(function (response) {
 					return response.text().then(function (rawText) {
 						var payload = null;

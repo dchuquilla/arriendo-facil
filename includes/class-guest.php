@@ -24,8 +24,14 @@ class Arriendo_Facil_Guest {
 		add_action( 'wp_ajax_af_create_guest', array( $this, 'ajax_create_guest' ) );
 		add_action( 'wp_ajax_af_create_guest_frontend', array( $this, 'ajax_create_guest_frontend' ) );
 		add_action( 'wp_ajax_nopriv_af_create_guest_frontend', array( $this, 'ajax_create_guest_frontend' ) );
+		add_action( 'wp_ajax_af_refresh_nonce', array( $this, 'ajax_refresh_nonce' ) );
+		add_action( 'wp_ajax_nopriv_af_refresh_nonce', array( $this, 'ajax_refresh_nonce' ) );
 		add_action( 'wp_ajax_af_get_guests', array( $this, 'ajax_get_guests' ) );
 		add_action( 'wp_ajax_af_score_guest', array( $this, 'ajax_score_guest' ) );
+	}
+
+	public function ajax_refresh_nonce() {
+		wp_send_json_success( array( 'nonce' => wp_create_nonce( 'af_guest_frontend_nonce' ) ) );
 	}
 
 	/**

@@ -1140,7 +1140,7 @@ class Arriendo_Facil_Owner_Contact {
 	 * @param string $reset_url   One-time password reset URL.
 	 * @return true|WP_Error
 	 */
-	private function send_owner_activation_email( $owner_email, $owner_name, $reset_url ) {
+	public function send_owner_activation_email( $owner_email, $owner_name, $reset_url ) {
 		$mail_subject = __( 'Activa tu cuenta en Arriendo Facil', 'arriendo-facil' );
 
 		$safe_name     = esc_html( $owner_name );

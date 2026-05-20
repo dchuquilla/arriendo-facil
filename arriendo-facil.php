@@ -29,6 +29,7 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-cleaning-service.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-docx-template-processor.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-lease.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-owner-contact.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-owner-register-api.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-guest.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ai-service.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'admin/class-admin.php';
@@ -74,6 +75,7 @@ function arriendo_facil_init() {
 	new Arriendo_Facil_Cleaning_Service();
 	new Arriendo_Facil_Lease();
 	new Arriendo_Facil_Owner_Contact();
+	new Arriendo_Facil_Owner_Register_API();
 	new Arriendo_Facil_Guest();
 	new Arriendo_Facil_Admin();
 }

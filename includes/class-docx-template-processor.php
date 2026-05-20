@@ -511,11 +511,16 @@ class Arriendo_Facil_DOCX_Template_Processor {
 		);
 
 		foreach ( $matches[0] as $idx => $match ) {
-			$offset = $match[1];
-			$before = mb_strtolower( mb_substr( $flat_text, max( 0, $offset - 120 ), min( $offset, 120 ) ) );
-			$after  = mb_strtolower( mb_substr( $flat_text, $offset + mb_strlen( $match[0] ), 80 ) );
+			$byte_offset = $match[1];
+			// Convert byte offset (from PREG_OFFSET_CAPTURE) to character offset for mb_substr.
+			$offset = mb_strlen( substr( $flat_text, 0, $byte_offset ) );
+			$blank_char_len = mb_strlen( $match[0] );
 
-			$value = $this->determine_value_from_context( $before, $after, $decomposed, $state );
+			$before = mb_strtolower( mb_substr( $flat_text, max( 0, $offset - 120 ), min( $offset, 120 ) ) );
+			$after  = mb_strtolower( mb_substr( $flat_text, $offset + $blank_char_len, 80 ) );
+			$before_short = mb_strtolower( mb_substr( $flat_text, max( 0, $offset - 55 ), min( $offset, 55 ) ) );
+
+			$value = $this->determine_value_from_context( $before, $before_short, $after, $decomposed, $state );
 			$ordered_values[] = $value;
 		}
 
@@ -603,27 +608,15 @@ class Arriendo_Facil_DOCX_Template_Processor {
 		);
 	}
 
-	private function determine_value_from_context( $before, $after, array $vals, array &$state ) {
-		// ESTADO CIVIL - always leave blank (check first to avoid false matches)
-		if ( $this->ctx_matches( $before, array( 'estado civil' ) ) ) {
+	private function determine_value_from_context( $before, $before_short, $after, array $vals, array &$state ) {
+		// ESTADO CIVIL - always leave blank (highest priority)
+		if ( $this->ctx_matches( $before_short, array( 'estado civil' ) ) ) {
 			return null;
 		}
 
-		// NAMES: detect arrendador vs arrendatario name context
-		if ( $this->ctx_matches( $before, array( 'señor', 'sr.', 'sra.' ) ) || $this->ctx_matches( $after, array( ', portador' ) ) ) {
-			if ( ! $state['arrendador_name_placed'] && ( $this->ctx_is_arrendador( $before, $after ) || ! $state['arrendador_name_placed'] ) ) {
-				$state['arrendador_name_placed'] = true;
-				return $vals['owner_name'] ?: null;
-			}
-			if ( ! $state['arrendatario_name_placed'] ) {
-				$state['arrendatario_name_placed'] = true;
-				return $vals['guest_name'] ?: null;
-			}
-		}
-
-		// CEDULA / ID numbers
-		if ( $this->ctx_matches( $before, array( 'cédula', 'cedula', 'c.c.', 'c.i.', 'identidad no' ) ) ) {
-			if ( ! $state['arrendador_id_placed'] && ( $this->ctx_is_arrendador( $before, $after ) || ! $state['arrendador_id_placed'] ) ) {
+		// CEDULA / ID — check BEFORE names to avoid false matches from 120-char lookback.
+		if ( $this->ctx_matches( $before_short, array( 'cédula', 'cedula', 'c.c.', 'c.i.', 'identidad no', 'c.c. no' ) ) ) {
+			if ( ! $state['arrendador_id_placed'] ) {
 				$state['arrendador_id_placed'] = true;
 				return $vals['owner_id_number'] ?: null;
 			}
@@ -631,35 +624,58 @@ class Arriendo_Facil_DOCX_Template_Processor {
 				$state['arrendatario_id_placed'] = true;
 				return $vals['guest_id_number'] ?: null;
 			}
+			return null;
 		}
 
-		// CITY - "ciudad de ___"
-		if ( $this->ctx_matches( $before, array( 'ciudad de' ) ) ) {
-			return $vals['city'] ?: null;
+		// NAMES: use before_short to ensure "señor/a" is immediately preceding this blank.
+		if ( $this->ctx_matches( $before_short, array( 'señor', 'sr.', 'sra.' ) ) || $this->ctx_matches( $after, array( ', portador' ) ) ) {
+			if ( ! $state['arrendador_name_placed'] ) {
+				$state['arrendador_name_placed'] = true;
+				return $vals['owner_name'] ?: null;
+			}
+			if ( ! $state['arrendatario_name_placed'] ) {
+				$state['arrendatario_name_placed'] = true;
+				return $vals['guest_name'] ?: null;
+			}
+			return null;
 		}
 
-		// PROVINCE / CANTON / PARISH
-		if ( $this->ctx_matches( $before, array( 'provincia de' ) ) ) {
-			return $vals['city'] ?: null;
-		}
-		if ( $this->ctx_matches( $before, array( 'cantón ', 'canton ' ) ) && ! $this->ctx_matches( $before, array( 'jueces', 'jurisdicción', 'competencia' ) ) ) {
-			return $vals['city'] ?: null;
-		}
-		if ( $this->ctx_matches( $before, array( 'parroquia' ) ) ) {
-			return $vals['city'] ?: null;
-		}
-
-		// ADDRESS
-		if ( $this->ctx_matches( $before, array( 'dirección exacta', 'direccion exacta', 'dirección en', 'ubicado en:', 'ubicada en:' ) ) ) {
+		// ADDRESS — very specific pattern, check before generic geography.
+		if ( $this->ctx_matches( $before_short, array( 'dirección exacta', 'direccion exacta' ) ) || $this->ctx_matches( $before, array( 'dirección exacta en:', 'con dirección exacta en:' ) ) ) {
 			return $vals['address'] ?: null;
 		}
 
-		// SQUARE METERS
+		// SQUARE METERS — after-based, high specificity.
 		if ( $this->ctx_matches( $after, array( 'metros cuadrados', 'm²', 'm2' ) ) ) {
 			return $vals['square_meters'] ?: null;
 		}
 
-		// START DATE - "el día ___ de ___ del año 20___"
+		// SIGNING DAY — "a los ___ días del mes" (very specific after-pattern).
+		// Must check before city because "ciudad de" from a nearby blank can bleed into before_short.
+		// Only match if "días del mes" is within 20 chars (immediately after the blank).
+		$after_close = mb_substr( $after, 0, 20 );
+		if ( $this->ctx_matches( $after_close, array( 'días del mes' ) ) ) {
+			return $vals['start_day'] ?: null;
+		}
+
+		// CITY — only match when "ciudad de" immediately precedes the blank (last 18 chars).
+		$before_tail = mb_substr( $before_short, -18 );
+		if ( $this->ctx_matches( $before_tail, array( 'ciudad de' ) ) ) {
+			return $vals['city'] ?: null;
+		}
+
+		// PROVINCE / CANTON / PARISH
+		if ( $this->ctx_matches( $before_short, array( 'provincia de' ) ) ) {
+			return $vals['city'] ?: null;
+		}
+		if ( $this->ctx_matches( $before_short, array( 'cantón ', 'canton ' ) ) && ! $this->ctx_matches( $before, array( 'jueces', 'jurisdicción', 'competencia' ) ) ) {
+			return $vals['city'] ?: null;
+		}
+		if ( $this->ctx_matches( $before_short, array( 'parroquia' ) ) ) {
+			return $vals['city'] ?: null;
+		}
+
+		// START DATE - "a partir del día ___ de ___ del año 20___"
 		if ( 0 === $state['start_date_state'] && $this->ctx_matches( $before, array( 'a partir del día', 'regir a partir', 'empezará a regir' ) ) ) {
 			$state['start_date_state'] = 1;
 			return $vals['start_day'] ?: null;
@@ -668,7 +684,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			$state['start_date_state'] = 2;
 			return $vals['start_month'] ?: null;
 		}
-		if ( 2 === $state['start_date_state'] && $this->ctx_matches( $before, array( 'del año', 'año 20' ) ) ) {
+		if ( 2 === $state['start_date_state'] && $this->ctx_matches( $before_short, array( 'del año', 'año 20' ) ) ) {
 			$state['start_date_state'] = 3;
 			return '' !== $vals['start_year'] ? substr( $vals['start_year'], -2 ) : null;
 		}
@@ -682,9 +698,19 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			$state['end_date_state'] = 2;
 			return $vals['end_month'] ?: null;
 		}
-		if ( 2 === $state['end_date_state'] && $this->ctx_matches( $before, array( 'del año', 'año 20' ) ) ) {
+		if ( 2 === $state['end_date_state'] && $this->ctx_matches( $before_short, array( 'del año', 'año 20' ) )
+			&& ! $this->ctx_matches( $before, array( 'firmado', 'días del mes' ) ) ) {
 			$state['end_date_state'] = 3;
 			return '' !== $vals['end_year'] ? substr( $vals['end_year'], -2 ) : null;
+		}
+
+		// SIGNING MONTH/YEAR — "del mes de ___ del año 20___"
+		// Only after start date state machine is complete.
+		if ( 3 === $state['start_date_state'] && $this->ctx_matches( $before_short, array( 'del mes de' ) ) && $this->ctx_matches( $after, array( 'del año', 'año' ) ) ) {
+			return $vals['start_month'] ?: null;
+		}
+		if ( 3 === $state['start_date_state'] && $this->ctx_matches( $before_short, array( 'del año 20' ) ) && $this->ctx_matches( $before, array( 'firmado', 'días del mes' ) ) ) {
+			return '' !== $vals['start_year'] ? substr( $vals['start_year'], -2 ) : null;
 		}
 
 		// GUARANTEE (check BEFORE rent - guarantee context is more specific)
@@ -692,39 +718,42 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			$state['guarantee_state'] = 1;
 			return $vals['guarantee_words'] ?: null;
 		}
-		if ( 1 === $state['guarantee_state'] && ( $this->ctx_matches( $before, array( '($', '(\\$', '$ ' ) ) || $this->ctx_matches( $after, array( ',00)' ) ) ) ) {
+		if ( 1 === $state['guarantee_state'] && ( $this->ctx_matches( $before_short, array( '($', '(\\$', '$ ' ) ) || $this->ctx_matches( $after, array( ',00)' ) ) ) ) {
 			$state['guarantee_state'] = 2;
 			return $vals['guarantee_number'] ?: null;
 		}
 
-		// MONTHLY RENT - "_____ DÓLARES" (words) then "($_____,00)" (number)
+		// MONTHLY RENT - "___ DÓLARES" (words) then "($_,00)" (number)
 		if ( 0 === $state['rent_state'] && $this->ctx_matches( $after, array( 'dólares', 'dolares' ) ) ) {
 			$state['rent_state'] = 1;
 			return $vals['rent_words'] ?: null;
 		}
-		if ( 1 === $state['rent_state'] && ( $this->ctx_matches( $before, array( '($', '(\\$', '$ ' ) ) || $this->ctx_matches( $after, array( ',00)' ) ) ) ) {
+		if ( 1 === $state['rent_state'] && ( $this->ctx_matches( $before_short, array( '($', '(\\$', '$ ' ) ) || $this->ctx_matches( $after, array( ',00)' ) ) ) ) {
 			$state['rent_state'] = 2;
 			return $vals['rent_number'] ?: null;
 		}
 
 		// CANTON in jurisdiction clause
-		if ( $this->ctx_matches( $before, array( 'cantón de', 'canton de' ) ) ) {
+		if ( $this->ctx_matches( $before, array( 'cantón de', 'canton de' ) ) && $this->ctx_matches( $before, array( 'jueces', 'jurisdicción', 'competencia' ) ) ) {
 			return $vals['city'] ?: null;
 		}
 
 		// PHONE
-		if ( $this->ctx_matches( $before, array( 'teléfono', 'telefono', 'celular', 'móvil' ) ) ) {
+		if ( $this->ctx_matches( $before_short, array( 'teléfono', 'telefono', 'celular', 'móvil' ) ) ) {
 			return $vals['guest_phone'] ?: null;
 		}
 
 		// EMAIL
-		if ( $this->ctx_matches( $before, array( 'correo', 'email', 'e-mail' ) ) ) {
+		if ( $this->ctx_matches( $before_short, array( 'correo', 'email', 'e-mail' ) ) ) {
 			return $vals['guest_email'] ?: null;
 		}
 
-		// "días del mes de ___" (signing date at the end)
-		if ( $this->ctx_matches( $before, array( 'días del mes de', 'del mes de' ) ) && $this->ctx_matches( $after, array( 'del año', 'año' ) ) ) {
-			return $vals['start_month'] ?: null;
+		// SIGNATURE SECTION: names and IDs in signature block
+		if ( $this->ctx_matches( $after, array( 'el arrendador' ) ) ) {
+			return $vals['owner_name'] ?: null;
+		}
+		if ( $this->ctx_matches( $after, array( 'el arrendatario' ) ) ) {
+			return $vals['guest_name'] ?: null;
 		}
 
 		return null;

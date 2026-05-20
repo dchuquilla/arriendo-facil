@@ -2470,6 +2470,157 @@ class Arriendo_Facil_DOCX_Template_Processor {
 		return $md_path;
 	}
 
+	private function build_markdown_ai_payload( array $payload ) {
+		$months_es = array(
+			1 => 'enero', 2 => 'febrero', 3 => 'marzo', 4 => 'abril',
+			5 => 'mayo', 6 => 'junio', 7 => 'julio', 8 => 'agosto',
+			9 => 'septiembre', 10 => 'octubre', 11 => 'noviembre', 12 => 'diciembre',
+		);
+
+		$start_date = $this->val( $payload, 'start_date' );
+		$end_date   = $this->val( $payload, 'end_date' );
+
+		$start_day = '';
+		$start_month_name = '';
+		$start_year = '';
+		if ( preg_match( '/^(\d{4})-(\d{2})-(\d{2})$/', $start_date, $m ) ) {
+			$start_day        = ltrim( $m[3], '0' );
+			$start_month_name = isset( $months_es[ (int) $m[2] ] ) ? $months_es[ (int) $m[2] ] : $m[2];
+			$start_year       = $m[1];
+		}
+
+		$end_day = '';
+		$end_month_name = '';
+		$end_year = '';
+		if ( preg_match( '/^(\d{4})-(\d{2})-(\d{2})$/', $end_date, $m ) ) {
+			$end_day        = ltrim( $m[3], '0' );
+			$end_month_name = isset( $months_es[ (int) $m[2] ] ) ? $months_es[ (int) $m[2] ] : $m[2];
+			$end_year       = $m[1];
+		}
+
+		$monthly_rent = isset( $payload['monthly_rent'] ) ? (float) $payload['monthly_rent'] : 0.0;
+		$rent_formatted = $monthly_rent > 0 ? number_format( $monthly_rent, 2, '.', '' ) : '';
+		$rent_in_words  = $monthly_rent > 0 ? $this->number_to_spanish_words( $monthly_rent ) : '';
+
+		$guarantee_months = 2;
+		$guarantee_amount = $monthly_rent * $guarantee_months;
+		$guarantee_formatted = $guarantee_amount > 0 ? number_format( $guarantee_amount, 2, '.', '' ) : '';
+		$guarantee_in_words  = $guarantee_amount > 0 ? $this->number_to_spanish_words( $guarantee_amount ) : '';
+
+		$city = $this->val( $payload, 'accommodation_city' );
+		$address = $this->val( $payload, 'accommodation_address' );
+
+		// If city is empty, try to extract it from the last part of the address.
+		if ( '' === $city && '' !== $address ) {
+			$parts = array_map( 'trim', explode( ',', $address ) );
+			if ( count( $parts ) >= 2 ) {
+				$city = end( $parts );
+			}
+		}
+
+		return array(
+			'owner_name'               => $this->val( $payload, 'owner_name' ),
+			'owner_id_number'          => $this->val( $payload, 'owner_id_number' ),
+			'guest_name'               => $this->val( $payload, 'guest_name' ),
+			'guest_id_number'          => $this->val( $payload, 'guest_id_number' ),
+			'guest_phone'              => $this->val( $payload, 'guest_phone' ),
+			'guest_email'              => $this->val( $payload, 'guest_email' ),
+			'accommodation_address'    => $this->val( $payload, 'accommodation_address' ),
+			'accommodation_city'       => $city,
+			'accommodation_province'   => $this->val( $payload, 'accommodation_province', $city ),
+			'accommodation_canton'     => $this->val( $payload, 'accommodation_canton', $city ),
+			'accommodation_parish'     => $this->val( $payload, 'accommodation_parish', $city ),
+			'accommodation_square_meters' => $this->val( $payload, 'accommodation_square_meters' ),
+			'monthly_rent'             => $rent_formatted,
+			'monthly_rent_in_words'    => $rent_in_words,
+			'guarantee_amount'         => $guarantee_formatted,
+			'guarantee_in_words'       => $guarantee_in_words,
+			'start_day'                => $start_day,
+			'start_month_name'         => $start_month_name,
+			'start_year'               => $start_year,
+			'end_day'                  => $end_day,
+			'end_month_name'           => $end_month_name,
+			'end_year'                 => $end_year,
+		);
+	}
+
+	private function number_to_spanish_words( $number ) {
+		$number = (float) $number;
+		$integer_part = (int) floor( $number );
+		$decimal_part = (int) round( ( $number - $integer_part ) * 100 );
+
+		$units = array( '', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve' );
+		$teens = array( 'diez', 'once', 'doce', 'trece', 'catorce', 'quince', 'dieciséis', 'diecisiete', 'dieciocho', 'diecinueve' );
+		$tens  = array( '', 'diez', 'veinte', 'treinta', 'cuarenta', 'cincuenta', 'sesenta', 'setenta', 'ochenta', 'noventa' );
+		$hundreds = array( '', 'ciento', 'doscientos', 'trescientos', 'cuatrocientos', 'quinientos', 'seiscientos', 'setecientos', 'ochocientos', 'novecientos' );
+
+		if ( 0 === $integer_part ) {
+			return 'cero';
+		}
+
+		$words = '';
+
+		if ( $integer_part >= 1000 ) {
+			$thousands = (int) floor( $integer_part / 1000 );
+			if ( 1 === $thousands ) {
+				$words .= 'mil';
+			} else {
+				$words .= $this->number_under_thousand_to_words( $thousands, $units, $teens, $tens, $hundreds ) . ' mil';
+			}
+			$integer_part %= 1000;
+			if ( $integer_part > 0 ) {
+				$words .= ' ';
+			}
+		}
+
+		if ( $integer_part > 0 ) {
+			$words .= $this->number_under_thousand_to_words( $integer_part, $units, $teens, $tens, $hundreds );
+		}
+
+		$words = strtoupper( trim( $words ) );
+
+		if ( $decimal_part > 0 ) {
+			$words .= ' CON ' . str_pad( (string) $decimal_part, 2, '0', STR_PAD_LEFT ) . '/100';
+		}
+
+		return $words;
+	}
+
+	private function number_under_thousand_to_words( $n, $units, $teens, $tens, $hundreds ) {
+		$n = (int) $n;
+		if ( $n <= 0 ) {
+			return '';
+		}
+		if ( 100 === $n ) {
+			return 'cien';
+		}
+
+		$result = '';
+		if ( $n >= 100 ) {
+			$result .= $hundreds[ (int) floor( $n / 100 ) ];
+			$n %= 100;
+			if ( $n > 0 ) {
+				$result .= ' ';
+			}
+		}
+
+		if ( $n >= 10 && $n <= 19 ) {
+			$result .= $teens[ $n - 10 ];
+		} elseif ( $n >= 20 && $n <= 29 ) {
+			$result .= ( 20 === $n ) ? 'veinte' : 'veinti' . $units[ $n - 20 ];
+		} elseif ( $n >= 30 ) {
+			$result .= $tens[ (int) floor( $n / 10 ) ];
+			$remainder = $n % 10;
+			if ( $remainder > 0 ) {
+				$result .= ' y ' . $units[ $remainder ];
+			}
+		} elseif ( $n >= 1 ) {
+			$result .= $units[ $n ];
+		}
+
+		return $result;
+	}
+
 	public function fill_template_with_markdown( $source_path, $output_path, array $payload, $ai_service = null ) {
 		$source_path = (string) $source_path;
 		$output_path = (string) $output_path;
@@ -2510,21 +2661,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			return false;
 		}
 
-		$ai_payload = array(
-			'guest_name'            => $this->val( $payload, 'guest_name' ),
-			'guest_id_number'       => $this->val( $payload, 'guest_id_number' ),
-			'guest_phone'           => $this->val( $payload, 'guest_phone' ),
-			'guest_email'           => $this->val( $payload, 'guest_email' ),
-			'owner_name'            => $this->val( $payload, 'owner_name' ),
-			'owner_id_number'       => $this->val( $payload, 'owner_id_number' ),
-			'monthly_rent'          => isset( $payload['monthly_rent'] ) ? number_format( (float) $payload['monthly_rent'], 2, '.', '' ) : '',
-			'start_date'            => $this->val( $payload, 'start_date' ),
-			'end_date'              => $this->val( $payload, 'end_date' ),
-			'accommodation_address' => $this->val( $payload, 'accommodation_address' ),
-			'accommodation_title'   => $this->val( $payload, 'accommodation_title' ),
-			'accommodation_city'    => $this->val( $payload, 'accommodation_city' ),
-			'guarantee_text'        => $this->val( $payload, 'guarantee_text' ),
-		);
+		$ai_payload = $this->build_markdown_ai_payload( $payload );
 
 		try {
 			$ai_result = $ai_service->fill_contract_blanks_markdown( array(
@@ -2547,6 +2684,8 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			return false;
 		}
 
+		$filled_md = $this->sanitize_filled_markdown( $filled_md, $ai_payload );
+
 		$conversion_result = $this->convert_markdown_to_docx( $filled_md, $source_path, $output_path );
 		if ( is_wp_error( $conversion_result ) ) {
 			$this->log_docx_event( 'fill_with_markdown_failed', array( 'reason' => 'md_to_docx_failed', 'error' => $conversion_result->get_error_message(), 'lease_id' => $lease_id ) );
@@ -2565,6 +2704,63 @@ class Arriendo_Facil_DOCX_Template_Processor {
 
 		$this->log_docx_event( 'fill_with_markdown_success', array( 'lease_id' => $lease_id, 'output_path' => $output_path ) );
 		return true;
+	}
+
+	private function sanitize_filled_markdown( $md, array $ai_payload ) {
+		$owner_name   = isset( $ai_payload['owner_name'] ) ? $ai_payload['owner_name'] : '';
+		$guest_name   = isset( $ai_payload['guest_name'] ) ? $ai_payload['guest_name'] : '';
+		$rent         = isset( $ai_payload['monthly_rent'] ) ? $ai_payload['monthly_rent'] : '';
+		$guarantee    = isset( $ai_payload['guarantee_amount'] ) ? $ai_payload['guarantee_amount'] : '';
+		$address      = isset( $ai_payload['accommodation_address'] ) ? $ai_payload['accommodation_address'] : '';
+		$city         = isset( $ai_payload['accommodation_city'] ) ? $ai_payload['accommodation_city'] : '';
+		$start_day    = isset( $ai_payload['start_day'] ) ? $ai_payload['start_day'] : '';
+		$start_month  = isset( $ai_payload['start_month_name'] ) ? $ai_payload['start_month_name'] : '';
+		$start_year   = isset( $ai_payload['start_year'] ) ? $ai_payload['start_year'] : '';
+		$end_day      = isset( $ai_payload['end_day'] ) ? $ai_payload['end_day'] : '';
+		$end_month    = isset( $ai_payload['end_month_name'] ) ? $ai_payload['end_month_name'] : '';
+		$end_year     = isset( $ai_payload['end_year'] ) ? $ai_payload['end_year'] : '';
+		$rent_words   = isset( $ai_payload['monthly_rent_in_words'] ) ? $ai_payload['monthly_rent_in_words'] : '';
+		$guar_words   = isset( $ai_payload['guarantee_in_words'] ) ? $ai_payload['guarantee_in_words'] : '';
+
+		// Fix: If AI put a full ISO date where day/month/year components go.
+		$full_start = isset( $ai_payload['start_year'] ) ? $ai_payload['start_year'] . '-' . sprintf( '%02d', array_search( strtolower( $start_month ), array( 1 => 'enero', 2 => 'febrero', 3 => 'marzo', 4 => 'abril', 5 => 'mayo', 6 => 'junio', 7 => 'julio', 8 => 'agosto', 9 => 'septiembre', 10 => 'octubre', 11 => 'noviembre', 12 => 'diciembre' ) ) ) . '-' . sprintf( '%02d', (int) $start_day ) : '';
+
+		if ( '' !== $full_start ) {
+			// "el día 2026-06-03 de 2026-06-03 del año 20 2026-06-03" → fix
+			$md = preg_replace(
+				'/el día\s+' . preg_quote( $full_start, '/' ) . '\s+de\s+' . preg_quote( $full_start, '/' ) . '\s+del año\s+20\s*' . preg_quote( $full_start, '/' ) . '/u',
+				'el día ' . $start_day . ' de ' . $start_month . ' del año ' . $start_year,
+				$md
+			);
+			// Simpler patterns where full date appears in day slot
+			$md = str_replace( 'el día ' . $full_start, 'el día ' . $start_day, $md );
+		}
+
+		// Fix: If AI put monthly_rent where date fields go.
+		if ( '' !== $rent && '' !== $end_day ) {
+			$md = preg_replace(
+				'/fenecerá el día\s+' . preg_quote( $rent, '/' ) . '\s+de\s+' . preg_quote( $rent, '/' ) . '/u',
+				'fenecerá el día ' . $end_day . ' de ' . $end_month,
+				$md
+			);
+		}
+
+		// Fix: If AI put address in dollar amount field ($address,00).
+		if ( '' !== $address && '' !== $guarantee ) {
+			$md = str_replace( '($' . $address . ',00)', '($' . $guarantee . ',00)', $md );
+			$md = str_replace( '(\\$' . $address . ',00)', '(\\$' . $guarantee . ',00)', $md );
+		}
+
+		// Fix: If AI put owner_name as city.
+		if ( '' !== $owner_name && '' !== $city ) {
+			$md = preg_replace(
+				'/ciudad de\s+' . preg_quote( $owner_name, '/' ) . '/u',
+				'ciudad de ' . $city,
+				$md
+			);
+		}
+
+		return $md;
 	}
 
 	private function convert_docx_to_markdown( $docx_path ) {

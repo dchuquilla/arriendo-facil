@@ -457,7 +457,299 @@ class Arriendo_Facil_DOCX_Template_Processor {
 
 	/**
 	 * Fills a DOCX template using a pre-approved field map (no AI at generation time).
-	 *
+	/**
+	 * Deterministic context-based filling (no AI needed).
+	 * Reads surrounding text of each blank and assigns the correct value via keyword rules.
+	 */
+	public function fill_template_with_context( $source_path, $output_path, array $payload ) {
+		$source_path = (string) $source_path;
+		$output_path = (string) $output_path;
+		$lease_id    = isset( $payload['lease_id'] ) ? (int) $payload['lease_id'] : 0;
+
+		if ( '' === $source_path || ! file_exists( $source_path ) || ! class_exists( 'ZipArchive' ) ) {
+			return false;
+		}
+
+		$zip = new ZipArchive();
+		if ( true !== $zip->open( $source_path ) ) {
+			return false;
+		}
+		$doc_xml = $zip->getFromName( 'word/document.xml' );
+		$zip->close();
+
+		if ( false === $doc_xml || '' === trim( (string) $doc_xml ) ) {
+			return false;
+		}
+
+		$doc_xml   = (string) $doc_xml;
+		$flat_text = $this->extract_flat_text_from_doc_xml( $doc_xml );
+		if ( '' === $flat_text ) {
+			return false;
+		}
+
+		$blank_pattern = '/_{3,}|\.{4,}|…{2,}|-{4,}|\t{2,}/u';
+		if ( ! preg_match_all( $blank_pattern, $flat_text, $matches, PREG_OFFSET_CAPTURE ) ) {
+			return false;
+		}
+
+		$matches[0] = $this->filter_decorative_blanks( $matches[0], $flat_text );
+		if ( empty( $matches[0] ) ) {
+			return false;
+		}
+
+		$decomposed = $this->build_decomposed_values( $payload );
+		$ordered_values = array();
+		$state = array(
+			'arrendador_name_placed'   => false,
+			'arrendatario_name_placed' => false,
+			'arrendador_id_placed'     => false,
+			'arrendatario_id_placed'   => false,
+			'start_date_state'         => 0,
+			'end_date_state'           => 0,
+			'rent_state'               => 0,
+			'guarantee_state'          => 0,
+		);
+
+		foreach ( $matches[0] as $idx => $match ) {
+			$offset = $match[1];
+			$before = mb_strtolower( mb_substr( $flat_text, max( 0, $offset - 120 ), min( $offset, 120 ) ) );
+			$after  = mb_strtolower( mb_substr( $flat_text, $offset + mb_strlen( $match[0] ), 80 ) );
+
+			$value = $this->determine_value_from_context( $before, $after, $decomposed, $state );
+			$ordered_values[] = $value;
+		}
+
+		$filled_xml = $this->replace_blanks_in_xml_with_values( $doc_xml, $ordered_values );
+		if ( '' === $filled_xml ) {
+			return false;
+		}
+
+		$result = $this->write_processed_docx( $source_path, $filled_xml, $output_path );
+		if ( '' === $result ) {
+			return false;
+		}
+
+		$filled_count = count( array_filter( $ordered_values, function( $v ) { return null !== $v; } ) );
+		$this->log_docx_event( 'fill_with_context_success', array(
+			'lease_id'      => $lease_id,
+			'blanks_total'  => count( $matches[0] ),
+			'blanks_filled' => $filled_count,
+			'output_path'   => $result,
+		) );
+
+		return true;
+	}
+
+	private function build_decomposed_values( array $payload ) {
+		$months_es = array(
+			1 => 'enero', 2 => 'febrero', 3 => 'marzo', 4 => 'abril',
+			5 => 'mayo', 6 => 'junio', 7 => 'julio', 8 => 'agosto',
+			9 => 'septiembre', 10 => 'octubre', 11 => 'noviembre', 12 => 'diciembre',
+		);
+
+		$start_date = $this->val( $payload, 'start_date' );
+		$end_date   = $this->val( $payload, 'end_date' );
+
+		$start_day = '';
+		$start_month = '';
+		$start_year = '';
+		if ( preg_match( '/^(\d{4})-(\d{2})-(\d{2})$/', $start_date, $m ) ) {
+			$start_day   = ltrim( $m[3], '0' );
+			$start_month = isset( $months_es[ (int) $m[2] ] ) ? $months_es[ (int) $m[2] ] : $m[2];
+			$start_year  = $m[1];
+		}
+
+		$end_day = '';
+		$end_month = '';
+		$end_year = '';
+		if ( preg_match( '/^(\d{4})-(\d{2})-(\d{2})$/', $end_date, $m ) ) {
+			$end_day   = ltrim( $m[3], '0' );
+			$end_month = isset( $months_es[ (int) $m[2] ] ) ? $months_es[ (int) $m[2] ] : $m[2];
+			$end_year  = $m[1];
+		}
+
+		$monthly_rent = isset( $payload['monthly_rent'] ) ? (float) $payload['monthly_rent'] : 0.0;
+		$guarantee_amount = $monthly_rent * 2;
+
+		$city    = $this->val( $payload, 'accommodation_city' );
+		$address = $this->val( $payload, 'accommodation_address' );
+		if ( '' === $city && '' !== $address ) {
+			$parts = array_map( 'trim', explode( ',', $address ) );
+			if ( count( $parts ) >= 2 ) {
+				$city = end( $parts );
+			}
+		}
+
+		return array(
+			'owner_name'       => $this->val( $payload, 'owner_name' ),
+			'owner_id_number'  => $this->val( $payload, 'owner_id_number' ),
+			'guest_name'       => $this->val( $payload, 'guest_name' ),
+			'guest_id_number'  => $this->val( $payload, 'guest_id_number' ),
+			'guest_phone'      => $this->val( $payload, 'guest_phone' ),
+			'guest_email'      => $this->val( $payload, 'guest_email' ),
+			'address'          => $address,
+			'city'             => $city,
+			'square_meters'    => $this->val( $payload, 'accommodation_square_meters' ),
+			'start_day'        => $start_day,
+			'start_month'      => $start_month,
+			'start_year'       => $start_year,
+			'end_day'          => $end_day,
+			'end_month'        => $end_month,
+			'end_year'         => $end_year,
+			'rent_number'      => $monthly_rent > 0 ? number_format( $monthly_rent, 2, '.', '' ) : '',
+			'rent_words'       => $monthly_rent > 0 ? $this->number_to_spanish_words( $monthly_rent ) : '',
+			'guarantee_number' => $guarantee_amount > 0 ? number_format( $guarantee_amount, 2, '.', '' ) : '',
+			'guarantee_words'  => $guarantee_amount > 0 ? $this->number_to_spanish_words( $guarantee_amount ) : '',
+		);
+	}
+
+	private function determine_value_from_context( $before, $after, array $vals, array &$state ) {
+		// ESTADO CIVIL - always leave blank (check first to avoid false matches)
+		if ( $this->ctx_matches( $before, array( 'estado civil' ) ) ) {
+			return null;
+		}
+
+		// NAMES: detect arrendador vs arrendatario name context
+		if ( $this->ctx_matches( $before, array( 'señor', 'sr.', 'sra.' ) ) || $this->ctx_matches( $after, array( ', portador' ) ) ) {
+			if ( ! $state['arrendador_name_placed'] && ( $this->ctx_is_arrendador( $before, $after ) || ! $state['arrendador_name_placed'] ) ) {
+				$state['arrendador_name_placed'] = true;
+				return $vals['owner_name'] ?: null;
+			}
+			if ( ! $state['arrendatario_name_placed'] ) {
+				$state['arrendatario_name_placed'] = true;
+				return $vals['guest_name'] ?: null;
+			}
+		}
+
+		// CEDULA / ID numbers
+		if ( $this->ctx_matches( $before, array( 'cédula', 'cedula', 'c.c.', 'c.i.', 'identidad no' ) ) ) {
+			if ( ! $state['arrendador_id_placed'] && ( $this->ctx_is_arrendador( $before, $after ) || ! $state['arrendador_id_placed'] ) ) {
+				$state['arrendador_id_placed'] = true;
+				return $vals['owner_id_number'] ?: null;
+			}
+			if ( ! $state['arrendatario_id_placed'] ) {
+				$state['arrendatario_id_placed'] = true;
+				return $vals['guest_id_number'] ?: null;
+			}
+		}
+
+		// CITY - "ciudad de ___"
+		if ( $this->ctx_matches( $before, array( 'ciudad de' ) ) ) {
+			return $vals['city'] ?: null;
+		}
+
+		// PROVINCE / CANTON / PARISH
+		if ( $this->ctx_matches( $before, array( 'provincia de' ) ) ) {
+			return $vals['city'] ?: null;
+		}
+		if ( $this->ctx_matches( $before, array( 'cantón ', 'canton ' ) ) && ! $this->ctx_matches( $before, array( 'jueces', 'jurisdicción', 'competencia' ) ) ) {
+			return $vals['city'] ?: null;
+		}
+		if ( $this->ctx_matches( $before, array( 'parroquia' ) ) ) {
+			return $vals['city'] ?: null;
+		}
+
+		// ADDRESS
+		if ( $this->ctx_matches( $before, array( 'dirección exacta', 'direccion exacta', 'dirección en', 'ubicado en:', 'ubicada en:' ) ) ) {
+			return $vals['address'] ?: null;
+		}
+
+		// SQUARE METERS
+		if ( $this->ctx_matches( $after, array( 'metros cuadrados', 'm²', 'm2' ) ) ) {
+			return $vals['square_meters'] ?: null;
+		}
+
+		// START DATE - "el día ___ de ___ del año 20___"
+		if ( 0 === $state['start_date_state'] && $this->ctx_matches( $before, array( 'a partir del día', 'regir a partir', 'empezará a regir' ) ) ) {
+			$state['start_date_state'] = 1;
+			return $vals['start_day'] ?: null;
+		}
+		if ( 1 === $state['start_date_state'] && $this->ctx_matches( $after, array( 'del año' ) ) ) {
+			$state['start_date_state'] = 2;
+			return $vals['start_month'] ?: null;
+		}
+		if ( 2 === $state['start_date_state'] && $this->ctx_matches( $before, array( 'del año', 'año 20' ) ) ) {
+			$state['start_date_state'] = 3;
+			return '' !== $vals['start_year'] ? substr( $vals['start_year'], -2 ) : null;
+		}
+
+		// END DATE - "fenecerá el día ___"
+		if ( 0 === $state['end_date_state'] && $this->ctx_matches( $before, array( 'fenecerá el día', 'fenecera el dia', 'vencerá el día', 'terminará el' ) ) ) {
+			$state['end_date_state'] = 1;
+			return $vals['end_day'] ?: null;
+		}
+		if ( 1 === $state['end_date_state'] && $this->ctx_matches( $after, array( 'del año' ) ) ) {
+			$state['end_date_state'] = 2;
+			return $vals['end_month'] ?: null;
+		}
+		if ( 2 === $state['end_date_state'] && $this->ctx_matches( $before, array( 'del año', 'año 20' ) ) ) {
+			$state['end_date_state'] = 3;
+			return '' !== $vals['end_year'] ? substr( $vals['end_year'], -2 ) : null;
+		}
+
+		// GUARANTEE (check BEFORE rent - guarantee context is more specific)
+		if ( 0 === $state['guarantee_state'] && $this->ctx_matches( $after, array( 'dólares', 'dolares' ) ) && $this->ctx_matches( $before, array( 'garantía', 'garantia', 'depósito', 'deposito', 'fianza', 'equivalente a' ) ) ) {
+			$state['guarantee_state'] = 1;
+			return $vals['guarantee_words'] ?: null;
+		}
+		if ( 1 === $state['guarantee_state'] && ( $this->ctx_matches( $before, array( '($', '(\\$', '$ ' ) ) || $this->ctx_matches( $after, array( ',00)' ) ) ) ) {
+			$state['guarantee_state'] = 2;
+			return $vals['guarantee_number'] ?: null;
+		}
+
+		// MONTHLY RENT - "_____ DÓLARES" (words) then "($_____,00)" (number)
+		if ( 0 === $state['rent_state'] && $this->ctx_matches( $after, array( 'dólares', 'dolares' ) ) ) {
+			$state['rent_state'] = 1;
+			return $vals['rent_words'] ?: null;
+		}
+		if ( 1 === $state['rent_state'] && ( $this->ctx_matches( $before, array( '($', '(\\$', '$ ' ) ) || $this->ctx_matches( $after, array( ',00)' ) ) ) ) {
+			$state['rent_state'] = 2;
+			return $vals['rent_number'] ?: null;
+		}
+
+		// CANTON in jurisdiction clause
+		if ( $this->ctx_matches( $before, array( 'cantón de', 'canton de' ) ) ) {
+			return $vals['city'] ?: null;
+		}
+
+		// PHONE
+		if ( $this->ctx_matches( $before, array( 'teléfono', 'telefono', 'celular', 'móvil' ) ) ) {
+			return $vals['guest_phone'] ?: null;
+		}
+
+		// EMAIL
+		if ( $this->ctx_matches( $before, array( 'correo', 'email', 'e-mail' ) ) ) {
+			return $vals['guest_email'] ?: null;
+		}
+
+		// "días del mes de ___" (signing date at the end)
+		if ( $this->ctx_matches( $before, array( 'días del mes de', 'del mes de' ) ) && $this->ctx_matches( $after, array( 'del año', 'año' ) ) ) {
+			return $vals['start_month'] ?: null;
+		}
+
+		return null;
+	}
+
+	private function ctx_matches( $text, array $keywords ) {
+		foreach ( $keywords as $kw ) {
+			if ( false !== mb_strpos( $text, $kw ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private function ctx_is_arrendador( $before, $after ) {
+		return $this->ctx_matches( $before, array( 'arrendador', 'propietario' ) )
+			|| $this->ctx_matches( $after, array( 'arrendador', 'propietario' ) );
+	}
+
+	private function ctx_is_arrendatario( $before, $after ) {
+		return $this->ctx_matches( $before, array( 'arrendatario', 'inquilino' ) )
+			|| $this->ctx_matches( $after, array( 'arrendatario', 'inquilino' ) );
+	}
+
+	/**
 	 * @param string $source_path Path to original DOCX template.
 	 * @param string $output_path Destination for filled contract.
 	 * @param array  $payload     Lease and guest data from chatbot.

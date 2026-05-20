@@ -591,6 +591,15 @@ class Arriendo_Facil_Admin {
 			}
 		}
 
+		// CONTEXT-BASED FALLBACK: deterministic filling without AI.
+		if ( ! $phpword_success && class_exists( 'Arriendo_Facil_DOCX_Template_Processor' ) ) {
+			$tpl_proc = new Arriendo_Facil_DOCX_Template_Processor();
+			if ( $tpl_proc->fill_template_with_context( $template_path, $file_path, $payload ) ) {
+				$phpword_success = true;
+				error_log( 'Arriendo Facil admin owner-template generation: fill_template_with_context succeeded for lease_id=' . $lease_id );
+			}
+		}
+
 		// DIRECT XML FALLBACK: legacy pre-processed template with PhpWord TemplateProcessor.
 		if ( ! $phpword_success ) {
 			$processed_tpl_path = (string) get_post_meta( $attachment_id, '_af_processed_template_path', true );

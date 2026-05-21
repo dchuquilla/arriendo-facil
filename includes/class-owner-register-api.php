@@ -360,8 +360,28 @@ class Arriendo_Facil_Owner_Register_API {
 
 		update_post_meta( (int) $attachment_id, '_af_sensitive_doc', '1' );
 		update_post_meta( (int) $attachment_id, '_af_sensitive_doc_type', 'contract_example' );
+		update_post_meta( (int) $attachment_id, '_af_owner_contract_example', '1' );
 		update_post_meta( (int) $attachment_id, '_af_owner_contact_id', $contact_id );
 		update_post_meta( (int) $attachment_id, '_af_owner_user_id', $user_id );
+
+		if ( class_exists( 'Arriendo_Facil_DOCX_Template_Processor' ) ) {
+			$raw_tpl_path = get_attached_file( (int) $attachment_id );
+			if ( $raw_tpl_path && file_exists( $raw_tpl_path ) ) {
+				$tpl_processor = new Arriendo_Facil_DOCX_Template_Processor();
+				$upload_ai_service = class_exists( 'Arriendo_Facil_AI_Service' ) ? new Arriendo_Facil_AI_Service() : null;
+				$processed_path = $tpl_processor->process_owner_template( $raw_tpl_path, $upload_ai_service );
+				if ( '' !== $processed_path ) {
+					update_post_meta( (int) $attachment_id, '_af_processed_template_path', $processed_path );
+				}
+
+				if ( Arriendo_Facil_DOCX_Template_Processor::is_pandoc_available() ) {
+					$md_path = $tpl_processor->convert_and_store_markdown( $raw_tpl_path, (int) $attachment_id );
+					if ( '' !== $md_path ) {
+						update_post_meta( (int) $attachment_id, '_af_template_markdown_path', $md_path );
+					}
+				}
+			}
+		}
 
 		$this->uploaded_document_ids['contract_example'] = (int) $attachment_id;
 		return true;

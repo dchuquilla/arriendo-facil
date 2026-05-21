@@ -2075,6 +2075,36 @@ class Arriendo_Facil_Admin {
 		);
 
 		$attachment_id = ! empty( $attachment_ids ) ? absint( $attachment_ids[0] ) : 0;
+
+		if ( ! $attachment_id ) {
+			$attachment_ids = get_posts(
+				array(
+					'post_type'      => 'attachment',
+					'post_status'    => 'inherit',
+					'posts_per_page' => 1,
+					'orderby'        => 'date',
+					'order'          => 'DESC',
+					'fields'         => 'ids',
+					'meta_query'     => array(
+						'relation' => 'AND',
+						array(
+							'key'   => '_af_sensitive_doc_type',
+							'value' => 'contract_example',
+						),
+						array(
+							'key'   => '_af_owner_user_id',
+							'value' => (string) $owner_user_id,
+						),
+					),
+				)
+			);
+			$attachment_id = ! empty( $attachment_ids ) ? absint( $attachment_ids[0] ) : 0;
+
+			if ( $attachment_id ) {
+				update_post_meta( $attachment_id, '_af_owner_contract_example', '1' );
+			}
+		}
+
 		if ( ! $attachment_id ) {
 			error_log( 'Arriendo Facil admin owner-template lookup: no owner contract attachment found. accommodation_id=' . $accommodation_id . ', owner_user_id=' . $owner_user_id );
 			return array();

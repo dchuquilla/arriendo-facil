@@ -45,50 +45,39 @@
 			{
 				key: 'name',
 				type: 'text',
-				question: 'Para comenzar, cual es tu nombre completo?',
-				placeholder: 'Ejemplo: Juan Perez',
+				question: '\u00bfPara comenzar, cu\u00e1l es tu nombre completo?',
+				placeholder: 'Ejemplo: Juan P\u00e9rez',
 				validate: function (value) { return value.length >= 3; },
-				error: 'Escribe tu nombre completo (minimo 3 caracteres).'
+				error: 'Escribe tu nombre completo (m\u00ednimo 3 caracteres).'
 			},
 			{
 				key: 'email',
 				type: 'text',
-				question: 'Cual es tu correo electronico? Lo usaremos para enviarte informacion del arriendo.',
+				question: '\u00bfCu\u00e1l es tu correo electr\u00f3nico? Lo usaremos para enviarte informaci\u00f3n del arriendo.',
 				placeholder: 'correo@dominio.com',
 				validate: function (value) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value); },
-				error: 'Ingresa un correo valido.'
+				error: 'Ingresa un correo v\u00e1lido.'
 			},
 			{
 				key: 'phone',
 				type: 'text',
-				question: 'Cual es tu numero de celular? (10 digitos, ejemplo: 0991234567)',
+				question: '\u00bfCu\u00e1l es tu n\u00famero de celular? (10 d\u00edgitos, ejemplo: 0991234567)',
 				placeholder: '0991234567',
 				validate: function (value) { return /^[0-9]{10}$/.test(value); },
-				error: 'El telefono debe tener exactamente 10 digitos numericos.'
+				error: 'El tel\u00e9fono debe tener exactamente 10 d\u00edgitos num\u00e9ricos.'
 			},
 			{
 				key: 'id_number',
 				type: 'text',
-				question: 'Cual es tu numero de cedula? (10 digitos)',
+				question: '\u00bfCu\u00e1l es tu n\u00famero de c\u00e9dula? (10 d\u00edgitos)',
 				placeholder: '1723456789',
 				validate: function (value) { return /^[0-9]{10}$/.test(value); },
-				error: 'La cedula debe tener exactamente 10 digitos numericos.'
-			},
-			{
-				key: 'mascotas',
-				type: 'text',
-				question: 'Cuantas mascotas tendrias en la propiedad? (escribe 0 si ninguna)',
-				placeholder: '0',
-				validate: function (value) {
-					var num = parseInt(value, 10);
-					return !isNaN(num) && num >= 0 && num <= 10;
-				},
-				error: 'Mascotas debe estar entre 0 y 10.'
+				error: 'La c\u00e9dula debe tener exactamente 10 d\u00edgitos num\u00e9ricos.'
 			},
 			{
 				key: 'personas_viviran',
 				type: 'text',
-				question: 'Contandote a ti, cuantas personas vivirian en la propiedad? (1 a 10)',
+				question: 'Cont\u00e1ndote a ti, \u00bfcu\u00e1ntas personas vivir\u00edan en la propiedad? (1 a 10)',
 				placeholder: '2',
 				validate: function (value) {
 					var num = parseInt(value, 10);
@@ -102,7 +91,7 @@
 				question: 'Selecciona la propiedad que te interesa arrendar.',
 				shouldAsk: function () { return true; },
 				options: function () {
-					var opts = [{ value: '', label: 'Selecciona una opcion' }];
+					var opts = [{ value: '', label: 'Selecciona una opci\u00f3n' }];
 					accommodations.forEach(function (item) {
 						opts.push({ value: String(item.id), label: item.title });
 					});
@@ -115,12 +104,33 @@
 					var parsed = parseInt(value, 10);
 					return !isNaN(parsed) && parsed > 0;
 				},
-				error: 'Selecciona una propiedad valida.'
+				error: 'Selecciona una propiedad v\u00e1lida.'
+			},
+			{
+				key: 'mascotas',
+				type: 'text',
+				question: '\u00bfCu\u00e1ntas mascotas tendr\u00edas en la propiedad? (escribe 0 si ninguna)',
+				placeholder: '0',
+				shouldAsk: function () {
+					var selectedId = parseInt(state.values.accommodation_id, 10);
+					var selected = accommodations.find(function (a) { return a.id === selectedId; });
+					if (selected && !selected.petFriendly) {
+						state.values.mascotas = '0';
+						return false;
+					}
+					return true;
+				},
+				skipMessage: 'La propiedad seleccionada no permite mascotas. Se registrar\u00e1 0 mascotas.',
+				validate: function (value) {
+					var num = parseInt(value, 10);
+					return !isNaN(num) && num >= 0 && num <= 10;
+				},
+				error: 'Mascotas debe estar entre 0 y 10.'
 			},
 			{
 				key: 'rental_start_date',
 				type: 'date',
-				question: 'Selecciona la fecha en la que te gustaria iniciar el arriendo.',
+				question: 'Selecciona la fecha en la que te gustar\u00eda iniciar el arriendo.',
 				validate: function (value) {
 					if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) { return false; }
 					var selected = new Date(value + 'T00:00:00');
@@ -128,18 +138,18 @@
 					today.setHours(0, 0, 0, 0);
 					return selected >= today;
 				},
-				error: 'Selecciona una fecha valida (debe ser hoy o en el futuro).'
+				error: 'Selecciona una fecha v\u00e1lida (debe ser hoy o en el futuro).'
 			},
 			{
 				key: 'rental_years',
 				type: 'text',
-				question: 'Por cuantos anos deseas arrendar? (minimo 1 ano)',
+				question: '\u00bfPor cu\u00e1ntos a\u00f1os deseas arrendar? (m\u00ednimo 1 a\u00f1o)',
 				placeholder: '1',
 				validate: function (value) {
 					var num = parseInt(value, 10);
 					return !isNaN(num) && num >= 1 && num <= 20;
 				},
-				error: 'La duracion minima es 1 ano y la maxima es 20 anos.'
+				error: 'La duraci\u00f3n m\u00ednima es 1 a\u00f1o y la m\u00e1xima es 20 a\u00f1os.'
 			}
 		];
 
@@ -297,6 +307,9 @@
 				var step = steps[state.currentStep];
 				if (!step.shouldAsk || step.shouldAsk(state.values)) {
 					return step;
+				}
+				if (step.skipMessage) {
+					appendBubble(step.skipMessage, 'bot');
 				}
 				state.currentStep += 1;
 			}

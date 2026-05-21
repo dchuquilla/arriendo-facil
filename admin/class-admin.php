@@ -282,22 +282,36 @@ class Arriendo_Facil_Admin {
 		$response = wp_remote_get( $url, array(
 			'redirection' => 10,
 			'timeout'     => 15,
+			'user-agent'  => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+			'headers'     => array( 'Accept' => 'text/html' ),
 		) );
 
 		if ( is_wp_error( $response ) ) {
 			wp_send_json_error( $response->get_error_message() );
 		}
 
-		$body = wp_remote_retrieve_body( $response );
-		$final_url = $url;
+		$body      = wp_remote_retrieve_body( $response );
+		$final_url = '';
 
-		// Try to extract the canonical/redirect URL from the response body or headers.
+		// Try to find coordinates in the resolved page content.
 		if ( preg_match( '/@(-?\d+\.\d+),(-?\d+\.\d+)/', $body, $m ) ) {
 			$final_url = '@' . $m[1] . ',' . $m[2];
+		} elseif ( preg_match( '/center=(-?\d+\.\d+)%2C(-?\d+\.\d+)/', $body, $m ) ) {
+			$final_url = '@' . $m[1] . ',' . $m[2];
+		} elseif ( preg_match( '/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/', $body, $m ) ) {
+			$final_url = '!3d' . $m[1] . '!4d' . $m[2];
+		} elseif ( preg_match( '/ll=(-?\d+\.\d+),(-?\d+\.\d+)/', $body, $m ) ) {
+			$final_url = '@' . $m[1] . ',' . $m[2];
+		} elseif ( preg_match( '/href="([^"]*google\.com\/maps[^"]*)"/', $body, $m ) ) {
+			$final_url = html_entity_decode( $m[1] );
+		} elseif ( preg_match( '/content="0;\s*url=([^"]+)"/i', $body, $m ) ) {
+			$final_url = $m[1];
 		} elseif ( preg_match( '/window\.location\s*=\s*["\']([^"\']+)/', $body, $m ) ) {
 			$final_url = $m[1];
-		} elseif ( preg_match( '/content="0;url=([^"]+)"/', $body, $m ) ) {
-			$final_url = $m[1];
+		}
+
+		if ( ! $final_url ) {
+			$final_url = $url;
 		}
 
 		wp_send_json_success( array( 'resolved_url' => $final_url ) );

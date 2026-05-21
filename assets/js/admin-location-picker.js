@@ -27,10 +27,19 @@
 
 		var hasSavedCoords = latInput.value && lngInput.value &&
 			parseFloat(latInput.value) !== 0 && parseFloat(lngInput.value) !== 0;
+
+		// Disable address fields until location is set.
+		if (!hasSavedCoords) {
+			setAddressFieldsDisabled(true);
+		}
 		var startLat = hasSavedCoords ? parseFloat(latInput.value) : defaultLat;
 		var startLng = hasSavedCoords ? parseFloat(lngInput.value) : defaultLng;
 
-		map = L.map('af-location-map').setView([startLat, startLng], 14);
+		map = L.map('af-location-map', { keyboard: false, scrollWheelZoom: true }).setView([startLat, startLng], 14);
+
+		// Prevent Leaflet from stealing focus and scrolling the page.
+		var mapEl = document.getElementById('af-location-map');
+		mapEl.removeAttribute('tabindex');
 
 		L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 			attribution: '&copy; OpenStreetMap contributors',
@@ -109,6 +118,15 @@
 		});
 	}
 
+	function setAddressFieldsDisabled(disabled) {
+		[addressInput, locationTextInput, cityInput].forEach(function (el) {
+			if (el) {
+				el.readOnly = disabled;
+				el.style.opacity = disabled ? '0.6' : '1';
+			}
+		});
+	}
+
 	function triggerSearch() {
 		var query = searchInput.value.trim();
 		if (!query || query.length < 3) return;
@@ -160,7 +178,8 @@
 			url: url
 		}, function (response) {
 			if (response.success && response.data.resolved_url) {
-				callback(response.data.resolved_url);
+				var coords = parseGoogleMapsUrl(response.data.resolved_url);
+				callback(coords);
 			} else {
 				callback(null);
 			}
@@ -177,12 +196,9 @@
 		}
 
 		if (isShortMapUrl(text)) {
-			resolveShortUrl(text, function (resolvedUrl) {
-				if (resolvedUrl) {
-					var resolvedCoords = parseGoogleMapsUrl(resolvedUrl);
-					if (resolvedCoords) {
-						moveToCoords(resolvedCoords.lat, resolvedCoords.lng);
-					}
+			resolveShortUrl(text, function (resolvedCoords) {
+				if (resolvedCoords) {
+					moveToCoords(resolvedCoords.lat, resolvedCoords.lng);
 				}
 			});
 			return true;
@@ -377,6 +393,8 @@
 		if (addressInput) addressInput.value = fullAddress;
 		if (cityInput) cityInput.value = city;
 		if (locationTextInput) locationTextInput.value = locationText;
+
+		setAddressFieldsDisabled(false);
 	}
 
 	function reverseGeocode(lat, lng) {

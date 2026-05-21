@@ -158,9 +158,12 @@ function arriendo_facil_enqueue_chatbot_assets() {
 	}
 
 	foreach ( $accommodation_posts as $accommodation_post_id ) {
+		$amenities_meta = get_post_meta( $accommodation_post_id, '_af_amenities', true );
+		$amenities_list = is_array( $amenities_meta ) ? $amenities_meta : array();
 		$accommodations[] = array(
-			'id'    => (int) $accommodation_post_id,
-			'title' => get_the_title( $accommodation_post_id ),
+			'id'         => (int) $accommodation_post_id,
+			'title'      => get_the_title( $accommodation_post_id ),
+			'petFriendly' => in_array( 'pet-friendly', $amenities_list, true ),
 		);
 	}
 

@@ -84,7 +84,7 @@ class Arriendo_Facil_Guest {
 		}
 
 		if ( $rental_years < 1 || $rental_years > 20 ) {
-			wp_send_json_error( array( 'message' => __( 'La duracion debe ser entre 1 y 20 anos.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'La duración debe ser entre 1 y 20 años.', 'arriendo-facil' ) ) );
 		}
 
 		$rental_end_date = gmdate( 'Y-m-d', strtotime( '+' . $rental_years . ' years', strtotime( $rental_start_date ) ) );

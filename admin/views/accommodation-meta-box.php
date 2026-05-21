@@ -86,7 +86,7 @@ $amenities_options = array(
 					<button type="button" id="af_location_search_btn" class="button"><?php esc_html_e( 'Search', 'arriendo-facil' ); ?></button>
 				</div>
 				<div id="af-location-suggestions" class="af-location-suggestions"></div>
-				<div id="af-location-map" style="height: 300px; width: 100%; margin-top: 10px;"></div>
+				<div id="af-location-map" style="height: 300px; width: 100%; margin-top: 10px;" tabindex="-1"></div>
 				<input type="hidden" id="af_latitude" name="af_latitude"
 					value="<?php echo esc_attr( $latitude ); ?>" />
 				<input type="hidden" id="af_longitude" name="af_longitude"

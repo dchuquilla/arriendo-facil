@@ -32,6 +32,7 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-owner-contact.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-owner-register-api.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-guest.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ai-service.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-owner-admin-redirect.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'admin/class-admin.php';
 
 register_activation_hook( __FILE__, array( 'Arriendo_Facil_Activator', 'activate' ) );
@@ -70,6 +71,7 @@ function arriendo_facil_init() {
 	load_plugin_textdomain( 'arriendo-facil', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
 	Arriendo_Facil_Activator::ensure_owner_role();
 
+	new Arriendo_Facil_Owner_Admin_Redirect();
 	new Arriendo_Facil_Accommodation();
 	new Arriendo_Facil_Accommodation_Search_API();
 	new Arriendo_Facil_Cleaning_Service();

@@ -83,8 +83,10 @@ if ( $is_owner ) {
 		<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-cleaning-requests' ) ); ?>" class="button">
 			<?php esc_html_e( 'Cleaning Requests', 'arriendo-facil' ); ?>
 		</a>
+		<?php if ( ! $is_owner ) : ?>
 		<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-ai-settings' ) ); ?>" class="button">
 			<?php esc_html_e( 'AI Settings', 'arriendo-facil' ); ?>
 		</a>
+		<?php endif; ?>
 	</div>
 </div>

@@ -34,6 +34,7 @@
 			collecting: false,
 			currentStep: 0,
 			values: {},
+			pendingExistingChoice: null,
 				lastSubmitFailed: false,
 				isSubmitting: false,
 				activeRequestController: null
@@ -289,6 +290,61 @@
 			scrollMessagesBottom();
 		}
 
+		function renderExistingGuestChoice(existing) {
+			state.pendingExistingChoice = existing || null;
+			showForm(false);
+
+			var summary = [
+				'Se encontro una solicitud previa con este correo.',
+				'Datos enmascarados encontrados:',
+				'- Nombre: ' + ((existing && existing.name) ? existing.name : '****'),
+				'- Correo: ' + ((existing && existing.email) ? existing.email : '****'),
+				'- Celular: ' + ((existing && existing.phone) ? existing.phone : '****')
+			].join('\n');
+
+			botReply(summary);
+
+			var wrap = document.createElement('div');
+			wrap.className = 'af-chatbot-options';
+
+			var reuseButton = document.createElement('button');
+			reuseButton.type = 'button';
+			reuseButton.className = 'af-chatbot-option-btn af-chatbot-existing-choice';
+			reuseButton.setAttribute('data-existing-choice', 'reuse');
+			reuseButton.textContent = 'Si, continuar con la informacion existente';
+
+			var refreshButton = document.createElement('button');
+			refreshButton.type = 'button';
+			refreshButton.className = 'af-chatbot-option-btn af-chatbot-existing-choice';
+			refreshButton.setAttribute('data-existing-choice', 'refresh');
+			refreshButton.textContent = 'No, continuar con un proceso nuevo';
+
+			wrap.appendChild(reuseButton);
+			wrap.appendChild(refreshButton);
+			messages.appendChild(wrap);
+			scrollMessagesBottom();
+		}
+
+		function resolveExistingGuestChoice(choice) {
+			if (!state.pendingExistingChoice) {
+				return;
+			}
+
+			if ('reuse' === choice) {
+				state.values.existing_mode = 'reuse';
+				appendBubble('Si, continuar con la informacion existente', 'user');
+				botReply('Perfecto. Usaremos tus datos ya registrados para continuar el proceso.');
+			} else {
+				state.values.existing_mode = 'refresh';
+				appendBubble('No, continuar con un proceso nuevo', 'user');
+				botReply('Perfecto. Guardaremos los datos nuevos para este proceso.');
+			}
+
+			state.pendingExistingChoice = null;
+			showForm(true);
+			submitConversation();
+		}
+
 		function fillSelectOptions(options, defaultValue) {
 			select.innerHTML = '';
 			options.forEach(function (opt) {
@@ -359,6 +415,7 @@
 			state.collecting = true;
 			state.currentStep = 0;
 			state.values = {};
+			state.pendingExistingChoice = null;
 			state.lastSubmitFailed = false;
 			if (currentAccommodationId > 0) {
 				state.values.accommodation_id = String(currentAccommodationId);
@@ -379,6 +436,7 @@
 				state.collecting = false;
 				state.currentStep = 0;
 				state.values = {};
+				state.pendingExistingChoice = null;
 				state.lastSubmitFailed = false;
 				state.isSubmitting = false;
 				state.activeRequestController = null;
@@ -506,6 +564,7 @@
 			data.append('accommodation_id', state.values.accommodation_id || '');
 			data.append('rental_start_date', state.values.rental_start_date || '');
 			data.append('rental_years', state.values.rental_years || '1');
+			data.append('existing_mode', state.values.existing_mode || '');
 
 			state.isSubmitting = true;
 			state.activeRequestController = new AbortController();
@@ -571,6 +630,16 @@
 							state.started = false;
 							resetCollectionState();
 						showForm(false);
+						return;
+					}
+
+					if (payload && payload.data && payload.data.code === 'af_guest_email_exists') {
+						state.isSubmitting = false;
+						state.activeRequestController = null;
+						setFormDisabled(false);
+						message.className = '';
+						message.textContent = '';
+						renderExistingGuestChoice(payload.data.existing || null);
 						return;
 					}
 
@@ -671,6 +740,11 @@
 
 		messages.addEventListener('click', function (event) {
 			var target = event.target;
+			if (target && target.classList && target.classList.contains('af-chatbot-existing-choice')) {
+				resolveExistingGuestChoice(target.getAttribute('data-existing-choice') || 'refresh');
+				return;
+			}
+
 			if (!target || !target.classList || !target.classList.contains('af-chatbot-option-btn')) {
 				return;
 			}

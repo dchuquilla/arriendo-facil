@@ -242,12 +242,25 @@ $message = isset( $_GET['af_message'] ) ? sanitize_text_field( wp_unslash( $_GET
 				<?php foreach ( $contacts as $contact ) : ?>
                     <?php
                     $account_status = '';
+					$status_label  = __( 'No user linked', 'arriendo-facil' );
+					$status_class  = 'is-inactive';
                     $accommodations = array();
 
                     if ( ! empty( $contact->wp_user_id ) ) {
                         $account_status = (string) get_user_meta( (int) $contact->wp_user_id, 'af_owner_account_status', true );
                         if ( '' === $account_status ) {
                             $account_status = 'inactive';
+                        }
+
+                        if ( 'disabled' === $account_status ) {
+                            $status_label = __( 'Disabled', 'arriendo-facil' );
+                            $status_class = 'is-disabled';
+                        } elseif ( 'active' === $account_status ) {
+                            $status_label = __( 'Active', 'arriendo-facil' );
+                            $status_class = 'is-active';
+                        } else {
+                            $status_label = __( 'Inactive', 'arriendo-facil' );
+                            $status_class = 'is-inactive';
                         }
 
 						if ( isset( $owner_accommodations[ (int) $contact->wp_user_id ] ) ) {
@@ -268,6 +281,9 @@ $message = isset( $_GET['af_message'] ) ? sanitize_text_field( wp_unslash( $_GET
 						<td><?php echo esc_html( wp_trim_words( $contact->message, 15 ) ); ?></td>
                         <td><?php echo ! empty( $contact->has_legal_agent ) ? esc_html__( 'Yes', 'arriendo-facil' ) : esc_html__( 'No', 'arriendo-facil' ); ?></td>
                         <td class="af-account-actions">
+							<span class="af-owner-status-badge <?php echo esc_attr( $status_class ); ?>" style="display:inline-block;margin-right:8px;padding:2px 8px;border-radius:999px;background:#f1f5f9;font-size:12px;font-weight:600;">
+								<?php echo esc_html( $status_label ); ?>
+							</span>
                             <button
                                 type="button"
                                 class="button button-secondary af-open-owner-details-modal"
@@ -285,7 +301,7 @@ $message = isset( $_GET['af_message'] ) ? sanitize_text_field( wp_unslash( $_GET
                             >
                                 <?php esc_html_e( 'Details', 'arriendo-facil' ); ?>
                             </button>
-                            <?php if ( ! empty( $contact->wp_user_id ) && 'active' === $account_status ) : ?>
+                            <?php if ( ! empty( $contact->wp_user_id ) && 'disabled' !== $account_status ) : ?>
                                 <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Disable this account? The user will no longer be able to log in.');" style="display:inline;">
                                     <input type="hidden" name="action" value="af_disable_owner_account" />
                                     <input type="hidden" name="user_id" value="<?php echo esc_attr( (int) $contact->wp_user_id ); ?>" />
@@ -294,6 +310,8 @@ $message = isset( $_GET['af_message'] ) ? sanitize_text_field( wp_unslash( $_GET
                                         <?php esc_html_e( 'Disable Account', 'arriendo-facil' ); ?>
                                     </button>
                                 </form>
+                            <?php elseif ( 'disabled' === $account_status ) : ?>
+								<span class="description" style="margin-left:6px;"><?php esc_html_e( 'Cuenta deshabilitada', 'arriendo-facil' ); ?></span>
                             <?php endif; ?>
                         </td>
 					</tr>

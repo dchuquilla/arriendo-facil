@@ -28,6 +28,7 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-search-ap
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-cleaning-service.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-docx-template-processor.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-lease.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-rental-workflow.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-owner-contact.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-owner-register-api.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-guest.php';
@@ -74,12 +75,36 @@ function arriendo_facil_init() {
 	new Arriendo_Facil_Accommodation_Search_API();
 	new Arriendo_Facil_Cleaning_Service();
 	new Arriendo_Facil_Lease();
+	new Arriendo_Facil_Rental_Workflow();
 	new Arriendo_Facil_Owner_Contact();
 	new Arriendo_Facil_Owner_Register_API();
 	new Arriendo_Facil_Guest();
 	new Arriendo_Facil_Admin();
 }
 add_action( 'plugins_loaded', 'arriendo_facil_init' );
+
+/**
+ * Runs one-time schema upgrades for ZIP-based plugin updates.
+ *
+ * This ensures new tables/columns are created even when the plugin is updated
+ * from ZIP without triggering activation hooks.
+ */
+function arriendo_facil_maybe_upgrade_schema() {
+	if ( ! is_admin() || ! current_user_can( 'manage_options' ) ) {
+		return;
+	}
+
+	$target_schema_version = '2026-05-rental-workflow-1';
+	$current_schema_version = (string) get_option( 'af_db_schema_version', '' );
+
+	if ( $current_schema_version === $target_schema_version ) {
+		return;
+	}
+
+	Arriendo_Facil_Activator::activate();
+	update_option( 'af_db_schema_version', $target_schema_version, false );
+}
+add_action( 'admin_init', 'arriendo_facil_maybe_upgrade_schema' );
 
 /**
  * Determines if chatbot should be shown in current frontend request.

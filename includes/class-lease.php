@@ -104,6 +104,23 @@ class Arriendo_Facil_Lease {
 			)
 		);
 
+		global $wpdb;
+		$wpdb->update(
+			$wpdb->prefix . 'af_leases',
+			array( 'status' => 'active' ),
+			array( 'id' => $lease_id ),
+			array( '%s' ),
+			array( '%d' )
+		);
+
+		if ( class_exists( 'Arriendo_Facil_Rental_Workflow' ) ) {
+			$lease = $this->get_lease( $lease_id );
+			if ( $lease && isset( $lease->accommodation_id ) ) {
+				Arriendo_Facil_Rental_Workflow::set_commercial_state( (int) $lease->accommodation_id, 'rented', 'private' );
+				Arriendo_Facil_Rental_Workflow::log_lease_event( $lease_id, (int) $lease->accommodation_id, 'lease_approved_active' );
+			}
+		}
+
 		wp_send_json_success(
 			array(
 				'message' => __( 'Document approved. Protected PDF is now active for view/download.', 'arriendo-facil' ),
@@ -291,7 +308,7 @@ class Arriendo_Facil_Lease {
 		$lease_id = isset( $_POST['lease_id'] ) ? absint( $_POST['lease_id'] ) : 0;
 		$status   = isset( $_POST['status'] ) ? sanitize_text_field( wp_unslash( $_POST['status'] ) ) : '';
 
-		$allowed_statuses = array( 'draft', 'active', 'expired', 'terminated' );
+		$allowed_statuses = array( 'draft', 'active', 'expired', 'terminated', 'pending_release' );
 		if ( ! $lease_id || ! in_array( $status, $allowed_statuses, true ) ) {
 			wp_send_json_error( array( 'message' => __( 'Invalid data.', 'arriendo-facil' ) ) );
 		}

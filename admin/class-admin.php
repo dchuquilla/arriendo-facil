@@ -22,6 +22,9 @@ class Arriendo_Facil_Admin {
 	public function __construct() {
 		add_action( 'admin_menu', array( $this, 'add_menu' ) );
 		add_action( 'admin_menu', array( $this, 'remove_menus_for_owner' ), 999 );
+		add_filter( 'login_redirect', array( $this, 'redirect_owner_after_login' ), 10, 3 );
+		add_action( 'admin_init', array( $this, 'redirect_owner_from_wp_dashboard' ) );
+		add_action( 'wp_dashboard_setup', array( $this, 'remove_owner_dashboard_widgets' ), 999 );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
 		add_action( 'wp_ajax_af_predict_cost', array( $this, 'ajax_predict_cost' ) );
 		add_action( 'wp_ajax_af_generate_document', array( $this, 'ajax_generate_document' ) );
@@ -107,6 +110,7 @@ class Arriendo_Facil_Admin {
 			return;
 		}
 
+		remove_menu_page( 'index.php' );
 		remove_menu_page( 'edit.php' );
 		remove_menu_page( 'upload.php' );
 		remove_menu_page( 'edit-comments.php' );
@@ -115,6 +119,69 @@ class Arriendo_Facil_Admin {
 
 		// Hide Cleaning Services CPT (admin-managed, not for owners).
 		remove_submenu_page( 'arriendo-facil', 'edit.php?post_type=cleaning_service' );
+	}
+
+	/**
+	 * Redirects owner users to Arriendo Facil dashboard right after login.
+	 *
+	 * @param string           $redirect_to           Requested redirect destination.
+	 * @param string           $requested_redirect_to Redirect destination passed to login form.
+	 * @param WP_User|WP_Error $user                  Authenticated user object.
+	 * @return string
+	 */
+	public function redirect_owner_after_login( $redirect_to, $requested_redirect_to, $user ) {
+		if ( ! ( $user instanceof WP_User ) ) {
+			return $redirect_to;
+		}
+
+		$roles = isset( $user->roles ) && is_array( $user->roles ) ? $user->roles : array();
+		if ( in_array( 'af_owner', $roles, true ) && ! in_array( 'administrator', $roles, true ) ) {
+			return admin_url( 'admin.php?page=arriendo-facil' );
+		}
+
+		return $redirect_to;
+	}
+
+	/**
+	 * Prevents owner users from landing on WordPress native dashboard.
+	 *
+	 * @return void
+	 */
+	public function redirect_owner_from_wp_dashboard() {
+		if ( ! is_admin() || wp_doing_ajax() || ! Arriendo_Facil_Accommodation::user_is_owner() || current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		global $pagenow;
+		$is_dashboard = ( 'index.php' === $pagenow );
+
+		if ( ! $is_dashboard ) {
+			return;
+		}
+
+		wp_safe_redirect( admin_url( 'admin.php?page=arriendo-facil' ) );
+		exit;
+	}
+
+	/**
+	 * Removes native WordPress dashboard widgets for owner users.
+	 *
+	 * @return void
+	 */
+	public function remove_owner_dashboard_widgets() {
+		if ( ! Arriendo_Facil_Accommodation::user_is_owner() ) {
+			return;
+		}
+
+		remove_meta_box( 'dashboard_right_now', 'dashboard', 'normal' );
+		remove_meta_box( 'dashboard_activity', 'dashboard', 'normal' );
+		remove_meta_box( 'dashboard_quick_press', 'dashboard', 'side' );
+		remove_meta_box( 'dashboard_primary', 'dashboard', 'side' );
+		remove_meta_box( 'dashboard_site_health', 'dashboard', 'normal' );
+		remove_meta_box( 'dashboard_recent_comments', 'dashboard', 'normal' );
+		remove_meta_box( 'dashboard_incoming_links', 'dashboard', 'normal' );
+		remove_meta_box( 'dashboard_plugins', 'dashboard', 'normal' );
+		remove_meta_box( 'dashboard_secondary', 'dashboard', 'side' );
 	}
 
 	/**

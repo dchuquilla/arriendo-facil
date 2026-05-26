@@ -230,8 +230,19 @@ class Arriendo_Facil_Accommodation_Search_API {
 		$monthly_price = floatval( get_post_meta( $accommodation_id, '_af_monthly_rent', true ) );
 		$property_type = get_post_meta( $accommodation_id, '_af_property_type', true );
 		$amenities     = get_post_meta( $accommodation_id, '_af_amenities', true );
+		$status        = sanitize_key( (string) get_post_meta( $accommodation_id, '_af_status', true ) );
+		$commercial_state = sanitize_key( (string) get_post_meta( $accommodation_id, '_af_commercial_state', true ) );
+		$commercial_visibility = sanitize_key( (string) get_post_meta( $accommodation_id, '_af_commercial_visibility', true ) );
 		if ( ! is_array( $amenities ) ) {
 			$amenities = array();
+		}
+
+		if ( '' === $commercial_state ) {
+			$commercial_state = ( 'rented' === $status ) ? 'rented' : 'available';
+		}
+
+		if ( '' === $commercial_visibility ) {
+			$commercial_visibility = 'public';
 		}
 
 		$image_url = '';
@@ -245,6 +256,9 @@ class Arriendo_Facil_Accommodation_Search_API {
 			'location'       => $location_text,
 			'latitude'       => $latitude,
 			'longitude'      => $longitude,
+			'status'         => $status,
+			'commercial_state' => $commercial_state,
+			'commercial_visibility' => $commercial_visibility,
 			'price'          => $monthly_price,
 			'bedrooms'       => $bedrooms,
 			'bathrooms'      => $bathrooms,
@@ -273,6 +287,14 @@ class Arriendo_Facil_Accommodation_Search_API {
 		$bathrooms  = $filters['bathrooms'] ?? 0;
 		$prop_type  = $filters['property_type'] ?? '';
 		$amenities  = $filters['amenities'] ?? array();
+
+		if ( in_array( $accommodation['status'], array( 'inactive', 'maintenance' ), true ) ) {
+			return false;
+		}
+
+		if ( 'private' === $accommodation['commercial_visibility'] ) {
+			return false;
+		}
 
 		// Location filter
 		if ( $location && stripos( $accommodation['location'], $location ) === false ) {
@@ -347,7 +369,7 @@ class Arriendo_Facil_Accommodation_Search_API {
 			// Relevance: sort by distance if coordinates available
 			if ( is_numeric( $latitude ) && is_numeric( $longitude ) ) {
 				usort( $accommodations, function( $a, $b ) use ( $latitude, $longitude ) {
-					$dist_a = $this->haversine_distance( $latitude, $longitude, $a['latitude'], $b['longitude'] );
+					$dist_a = $this->haversine_distance( $latitude, $longitude, $a['latitude'], $a['longitude'] );
 					$dist_b = $this->haversine_distance( $latitude, $longitude, $b['latitude'], $b['longitude'] );
 					return $dist_a <=> $dist_b;
 				} );

@@ -56,6 +56,7 @@ class Arriendo_Facil_Guest {
 		$rental_years      = isset( $_POST['rental_years'] ) ? max( 1, absint( wp_unslash( $_POST['rental_years'] ) ) ) : 1;
 		$mascotas   = isset( $_POST['mascotas'] ) ? absint( wp_unslash( $_POST['mascotas'] ) ) : 0;
 		$personas_viviran = isset( $_POST['personas_viviran'] ) ? absint( wp_unslash( $_POST['personas_viviran'] ) ) : 0;
+		$existing_mode = isset( $_POST['existing_mode'] ) ? sanitize_key( wp_unslash( $_POST['existing_mode'] ) ) : '';
 
 		$rental_mode = 'years';
 		$rental_end_date = '';
@@ -77,7 +78,19 @@ class Arriendo_Facil_Guest {
 			wp_send_json_error( array( 'message' => __( 'Debes seleccionar una propiedad o habitacion valida.', 'arriendo-facil' ) ) );
 		}
 
-		// Allow registration for any accommodation status; operational review is handled later.
+		if ( class_exists( 'Arriendo_Facil_Rental_Workflow' ) ) {
+			$availability = Arriendo_Facil_Rental_Workflow::get_availability_summary( $accommodation_id );
+			if ( empty( $availability['can_start_flow'] ) ) {
+				wp_send_json_error(
+					array(
+						'code'         => isset( $availability['reason_code'] ) ? (string) $availability['reason_code'] : 'accommodation_unavailable',
+						'message'      => isset( $availability['message'] ) ? (string) $availability['message'] : __( 'La acomodacion no esta disponible para iniciar un nuevo arriendo.', 'arriendo-facil' ),
+						'availability' => $availability,
+					),
+					409
+				);
+			}
+		}
 
 		if ( 1 !== preg_match( '/^\d{4}-\d{2}-\d{2}$/', $rental_start_date ) ) {
 			wp_send_json_error( array( 'message' => __( 'La fecha de inicio no es valida (formato YYYY-MM-DD).', 'arriendo-facil' ) ) );
@@ -115,17 +128,102 @@ class Arriendo_Facil_Guest {
 		}
 
 		global $wpdb;
-		$existing_guest_id = (int) $wpdb->get_var(
+		$existing_guest = $wpdb->get_row(
 			$wpdb->prepare(
-				"SELECT id FROM {$wpdb->prefix}af_guests WHERE email = %s LIMIT 1",
+				"SELECT id, first_name, last_name, email, phone, id_number
+				 FROM {$wpdb->prefix}af_guests
+				 WHERE email = %s
+				 ORDER BY id DESC
+				 LIMIT 1",
 				$email
 			)
 		);
+		$existing_guest_id = ( $existing_guest && isset( $existing_guest->id ) ) ? (int) $existing_guest->id : 0;
 
 		if ( $existing_guest_id > 0 ) {
-			wp_send_json_error(
+			if ( ! in_array( $existing_mode, array( 'reuse', 'refresh' ), true ) ) {
+				wp_send_json_error(
+					array(
+						'code'     => 'af_guest_email_exists',
+						'message'  => __( 'Encontramos una solicitud previa con ese correo.', 'arriendo-facil' ),
+						'existing' => $this->build_masked_guest_snapshot( $existing_guest ),
+					)
+				);
+			}
+
+			$guest_id = $existing_guest_id;
+
+			if ( 'reuse' === $existing_mode ) {
+				$first_name = ! empty( $existing_guest->first_name ) ? sanitize_text_field( (string) $existing_guest->first_name ) : $first_name;
+				$last_name  = ! empty( $existing_guest->last_name ) ? sanitize_text_field( (string) $existing_guest->last_name ) : $last_name;
+				$phone      = ! empty( $existing_guest->phone ) ? sanitize_text_field( (string) $existing_guest->phone ) : $phone;
+				$id_number  = ! empty( $existing_guest->id_number ) ? sanitize_text_field( (string) $existing_guest->id_number ) : $id_number;
+			}
+
+			$updated = $wpdb->update(
+				$wpdb->prefix . 'af_guests',
 				array(
-					'message' => __( 'Ya existe una solicitud con ese correo. Si necesitas actualizar tus datos, contactanos para ayudarte.', 'arriendo-facil' ),
+					'first_name'        => $first_name,
+					'last_name'         => $last_name,
+					'phone'             => $phone,
+					'id_number'         => $id_number,
+					'accommodation_id'  => $accommodation_id,
+					'rental_mode'       => $rental_mode,
+					'rental_start_date' => $rental_start_date ? $rental_start_date : null,
+					'rental_end_date'   => $rental_end_date ? $rental_end_date : null,
+					'rental_months'     => $rental_months ? $rental_months : null,
+					'rental_years'      => $rental_years ? $rental_years : null,
+					'desired_price'     => $desired_price,
+					'guarantee_text'    => $guarantee_text,
+					'mascotas'          => $mascotas,
+					'personas_viviran'  => $personas_viviran,
+				),
+				array( 'id' => $guest_id ),
+				array( '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%d', '%d' ),
+				array( '%d' )
+			);
+
+			if ( false === $updated ) {
+				wp_send_json_error(
+					array(
+						'message' => __( 'No se pudo actualizar la solicitud existente.', 'arriendo-facil' ),
+					)
+				);
+			}
+
+			try {
+				$contract_info = $this->create_lease_contract_for_guest(
+					$guest_id,
+					array(
+						'accommodation_id'  => $accommodation_id,
+						'rental_mode'       => $rental_mode,
+						'rental_start_date' => $rental_start_date,
+						'rental_end_date'   => $rental_end_date,
+						'rental_months'     => $rental_months,
+						'rental_years'      => $rental_years,
+						'phone'             => $phone,
+						'id_number'         => $id_number,
+						'mascotas'          => $mascotas,
+						'personas_viviran'  => $personas_viviran,
+						'name'              => trim( $first_name . ' ' . $last_name ),
+						'email'             => $email,
+					)
+				);
+			} catch ( Throwable $throwable ) {
+				error_log( 'Arriendo Facil lease auto-generation error: ' . $throwable->getMessage() );
+				$contract_info = array(
+					'generated' => false,
+					'error'     => 'lease_generation_failed',
+				);
+			}
+
+			wp_send_json_success(
+				array(
+					'id'      => $guest_id,
+					'message' => 'reuse' === $existing_mode
+						? __( 'Encontramos tus datos y los reutilizamos para continuar tu proceso de arriendo.', 'arriendo-facil' )
+						: __( 'Actualizamos tu informacion y continuamos con tu nuevo proceso de arriendo.', 'arriendo-facil' ),
+					'contract' => $contract_info,
 				)
 			);
 		}
@@ -209,6 +307,46 @@ class Arriendo_Facil_Guest {
 				'message' => __( 'No se pudo registrar tu solicitud de arriendo. Intenta nuevamente en unos minutos.', 'arriendo-facil' ),
 			)
 		);
+	}
+
+	/**
+	 * Returns masked guest data for safe chatbot confirmations.
+	 *
+	 * @param object $guest Guest DB row.
+	 * @return array<string,string>
+	 */
+	private function build_masked_guest_snapshot( $guest ) {
+		$full_name = trim( sanitize_text_field( (string) ( ( isset( $guest->first_name ) ? $guest->first_name : '' ) . ' ' . ( isset( $guest->last_name ) ? $guest->last_name : '' ) ) ) );
+		$email     = isset( $guest->email ) ? sanitize_email( (string) $guest->email ) : '';
+		$phone     = isset( $guest->phone ) ? preg_replace( '/\D+/', '', (string) $guest->phone ) : '';
+
+		return array(
+			'name'  => $this->mask_tail_value( $full_name ),
+			'email' => $this->mask_tail_value( $email ),
+			'phone' => $this->mask_tail_value( $phone ),
+		);
+	}
+
+	/**
+	 * Masks a value preserving only its last 4 characters.
+	 *
+	 * @param string $value Raw value.
+	 * @return string
+	 */
+	private function mask_tail_value( $value ) {
+		$value = trim( (string) $value );
+		if ( '' === $value ) {
+			return '****';
+		}
+
+		$length = function_exists( 'mb_strlen' ) ? mb_strlen( $value, 'UTF-8' ) : strlen( $value );
+		if ( $length <= 4 ) {
+			return str_repeat( '*', $length );
+		}
+
+		$tail = function_exists( 'mb_substr' ) ? mb_substr( $value, $length - 4, null, 'UTF-8' ) : substr( $value, -4 );
+
+		return str_repeat( '*', $length - 4 ) . $tail;
 	}
 
 	/**

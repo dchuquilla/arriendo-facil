@@ -184,6 +184,106 @@ class Arriendo_Facil_Activator {
 				PRIMARY KEY (id),
 				UNIQUE KEY email (email)
 			) $charset_collate;",
+
+			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_visit_slots (
+				id               BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+				accommodation_id BIGINT(20) UNSIGNED NOT NULL,
+				visit_date       DATE NOT NULL,
+				start_time       TIME NOT NULL,
+				end_time         TIME NOT NULL,
+				status           VARCHAR(20) NOT NULL DEFAULT 'open',
+				created_by       BIGINT(20) UNSIGNED DEFAULT NULL,
+				created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				UNIQUE KEY uniq_slot (accommodation_id, visit_date, start_time),
+				KEY accommodation_id (accommodation_id),
+				KEY status (status)
+			) $charset_collate;",
+
+			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_visit_bookings (
+				id               BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+				slot_id          BIGINT(20) UNSIGNED NOT NULL,
+				accommodation_id BIGINT(20) UNSIGNED NOT NULL,
+				guest_name       VARCHAR(190) NOT NULL,
+				guest_email      VARCHAR(190) NOT NULL,
+				guest_phone      VARCHAR(50) DEFAULT NULL,
+				guest_id_number  VARCHAR(100) DEFAULT NULL,
+				status           VARCHAR(20) NOT NULL DEFAULT 'confirmed',
+				notes            TEXT DEFAULT NULL,
+				created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				UNIQUE KEY uniq_slot_booking (slot_id),
+				KEY accommodation_id (accommodation_id),
+				KEY guest_email (guest_email),
+				KEY status (status)
+			) $charset_collate;",
+
+			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_interest_queue (
+				id               BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+				accommodation_id BIGINT(20) UNSIGNED NOT NULL,
+				name             VARCHAR(190) NOT NULL,
+				email            VARCHAR(190) NOT NULL,
+				phone            VARCHAR(50) DEFAULT NULL,
+				message          TEXT DEFAULT NULL,
+				status           VARCHAR(20) NOT NULL DEFAULT 'queued',
+				created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				KEY accommodation_id (accommodation_id),
+				KEY email (email),
+				KEY status (status)
+			) $charset_collate;",
+
+			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_reservations (
+				id                 BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+				accommodation_id   BIGINT(20) UNSIGNED NOT NULL,
+				guest_id           BIGINT(20) UNSIGNED DEFAULT NULL,
+				deposit_amount     DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+				hold_until         DATETIME NOT NULL,
+				payment_reference  VARCHAR(190) DEFAULT NULL,
+				payment_status     VARCHAR(30) NOT NULL DEFAULT 'pending',
+				reservation_status VARCHAR(30) NOT NULL DEFAULT 'reserved',
+				notes              TEXT DEFAULT NULL,
+				release_reason     TEXT DEFAULT NULL,
+				released_at        DATETIME DEFAULT NULL,
+				created_by         BIGINT(20) UNSIGNED DEFAULT NULL,
+				created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				KEY accommodation_id (accommodation_id),
+				KEY guest_id (guest_id),
+				KEY reservation_status (reservation_status),
+				KEY hold_until (hold_until)
+			) $charset_collate;",
+
+			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_lease_events (
+				id               BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+				lease_id         BIGINT(20) UNSIGNED DEFAULT NULL,
+				accommodation_id BIGINT(20) UNSIGNED DEFAULT NULL,
+				event_type       VARCHAR(80) NOT NULL,
+				event_payload    LONGTEXT DEFAULT NULL,
+				created_by       BIGINT(20) UNSIGNED DEFAULT NULL,
+				created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				KEY lease_id (lease_id),
+				KEY accommodation_id (accommodation_id),
+				KEY event_type (event_type)
+			) $charset_collate;",
+
+			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_notifications_log (
+				id                BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+				accommodation_id  BIGINT(20) UNSIGNED DEFAULT NULL,
+				notification_type VARCHAR(80) NOT NULL,
+				recipient         VARCHAR(190) NOT NULL,
+				delivery_status   VARCHAR(20) NOT NULL DEFAULT 'pending',
+				created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				KEY accommodation_id (accommodation_id),
+				KEY notification_type (notification_type),
+				KEY delivery_status (delivery_status)
+			) $charset_collate;",
 		);
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';

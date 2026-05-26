@@ -54,6 +54,9 @@ class Arriendo_Facil_Guest {
 		$accommodation_id = isset( $_POST['accommodation_id'] ) ? absint( wp_unslash( $_POST['accommodation_id'] ) ) : 0;
 		$rental_start_date = isset( $_POST['rental_start_date'] ) ? sanitize_text_field( wp_unslash( $_POST['rental_start_date'] ) ) : '';
 		$rental_years      = isset( $_POST['rental_years'] ) ? max( 1, absint( wp_unslash( $_POST['rental_years'] ) ) ) : 1;
+		$visit_preferred_date = isset( $_POST['visit_preferred_date'] ) ? sanitize_text_field( wp_unslash( $_POST['visit_preferred_date'] ) ) : '';
+		$visit_preferred_time = isset( $_POST['visit_preferred_time'] ) ? sanitize_text_field( wp_unslash( $_POST['visit_preferred_time'] ) ) : '';
+		$visit_notes = isset( $_POST['visit_notes'] ) ? sanitize_textarea_field( wp_unslash( $_POST['visit_notes'] ) ) : '';
 		$mascotas   = isset( $_POST['mascotas'] ) ? absint( wp_unslash( $_POST['mascotas'] ) ) : 0;
 		$personas_viviran = isset( $_POST['personas_viviran'] ) ? absint( wp_unslash( $_POST['personas_viviran'] ) ) : 0;
 		$existing_mode = isset( $_POST['existing_mode'] ) ? sanitize_key( wp_unslash( $_POST['existing_mode'] ) ) : '';
@@ -79,16 +82,19 @@ class Arriendo_Facil_Guest {
 		}
 
 		if ( class_exists( 'Arriendo_Facil_Rental_Workflow' ) ) {
-			$availability = Arriendo_Facil_Rental_Workflow::get_availability_summary( $accommodation_id );
+			$availability = Arriendo_Facil_Rental_Workflow::get_availability_summary( $accommodation_id, $email );
 			if ( empty( $availability['can_start_flow'] ) ) {
-				wp_send_json_error(
-					array(
-						'code'         => isset( $availability['reason_code'] ) ? (string) $availability['reason_code'] : 'accommodation_unavailable',
-						'message'      => isset( $availability['message'] ) ? (string) $availability['message'] : __( 'La acomodacion no esta disponible para iniciar un nuevo arriendo.', 'arriendo-facil' ),
-						'availability' => $availability,
-					),
-					409
-				);
+				$reason_code = isset( $availability['reason_code'] ) ? (string) $availability['reason_code'] : 'accommodation_unavailable';
+				if ( 'requires_visit_booking' !== $reason_code ) {
+					wp_send_json_error(
+						array(
+							'code'         => $reason_code,
+							'message'      => isset( $availability['message'] ) ? (string) $availability['message'] : __( 'La acomodacion no esta disponible para iniciar un nuevo arriendo.', 'arriendo-facil' ),
+							'availability' => $availability,
+						),
+						409
+					);
+				}
 			}
 		}
 
@@ -120,6 +126,14 @@ class Arriendo_Facil_Guest {
 
 		if ( $personas_viviran < 1 || $personas_viviran > 10 ) {
 			wp_send_json_error( array( 'message' => __( 'Personas debe estar entre 1 y 10.', 'arriendo-facil' ) ) );
+		}
+
+		if ( ! $this->is_valid_date( $visit_preferred_date ) ) {
+			wp_send_json_error( array( 'message' => __( 'Debes indicar una fecha valida para la visita (YYYY-MM-DD).', 'arriendo-facil' ) ) );
+		}
+
+		if ( ! $this->is_valid_time( $visit_preferred_time ) || ! $this->is_prudent_visit_time( $visit_preferred_time ) ) {
+			wp_send_json_error( array( 'message' => __( 'La hora sugerida de visita debe estar entre 09:00 y 18:00.', 'arriendo-facil' ) ) );
 		}
 
 		$schema_result = $this->ensure_guest_extra_columns();
@@ -224,6 +238,7 @@ class Arriendo_Facil_Guest {
 						? __( 'Encontramos tus datos y los reutilizamos para continuar tu proceso de arriendo.', 'arriendo-facil' )
 						: __( 'Actualizamos tu informacion y continuamos con tu nuevo proceso de arriendo.', 'arriendo-facil' ),
 					'contract' => $contract_info,
+					'visit_request' => $this->create_or_update_visit_request( $accommodation_id, trim( $first_name . ' ' . $last_name ), $email, $phone, $visit_preferred_date, $visit_preferred_time, $visit_notes ),
 				)
 			);
 		}
@@ -285,6 +300,7 @@ class Arriendo_Facil_Guest {
 					'id'      => $guest_id,
 					'message' => __( 'Registro enviado. Pronto nos contactaremos contigo.', 'arriendo-facil' ),
 					'contract' => $contract_info,
+					'visit_request' => $this->create_or_update_visit_request( $accommodation_id, trim( $first_name . ' ' . $last_name ), $email, $phone, $visit_preferred_date, $visit_preferred_time, $visit_notes ),
 				)
 			);
 		}
@@ -307,6 +323,181 @@ class Arriendo_Facil_Guest {
 				'message' => __( 'No se pudo registrar tu solicitud de arriendo. Intenta nuevamente en unos minutos.', 'arriendo-facil' ),
 			)
 		);
+	}
+
+	/**
+	 * Creates or refreshes a visit request in queue and notifies owner.
+	 *
+	 * @param int    $accommodation_id Accommodation ID.
+	 * @param string $name Lead name.
+	 * @param string $email Lead email.
+	 * @param string $phone Lead phone.
+	 * @param string $preferred_date Preferred date.
+	 * @param string $preferred_time Preferred time.
+	 * @param string $visit_notes Optional notes.
+	 * @return array<string,mixed>
+	 */
+	private function create_or_update_visit_request( $accommodation_id, $name, $email, $phone, $preferred_date, $preferred_time, $visit_notes ) {
+		global $wpdb;
+
+		$accommodation_id = absint( $accommodation_id );
+		$name             = sanitize_text_field( (string) $name );
+		$email            = sanitize_email( (string) $email );
+		$phone            = sanitize_text_field( (string) $phone );
+		$preferred_date   = sanitize_text_field( (string) $preferred_date );
+		$preferred_time   = sanitize_text_field( (string) $preferred_time );
+		$visit_notes      = sanitize_textarea_field( (string) $visit_notes );
+
+		if ( ! $accommodation_id || ! is_email( $email ) || ! $this->is_valid_date( $preferred_date ) || ! $this->is_valid_time( $preferred_time ) ) {
+			return array( 'saved' => false, 'message' => 'invalid_visit_request_data' );
+		}
+
+		$queue_table = $wpdb->prefix . 'af_interest_queue';
+		$request_message = sprintf(
+			/* translators: 1: preferred date, 2: preferred time */
+			__( 'Solicitud de visita desde chatbot. Fecha sugerida: %1$s. Hora sugerida: %2$s.', 'arriendo-facil' ),
+			$preferred_date,
+			$preferred_time
+		);
+
+		if ( '' !== $visit_notes ) {
+			$request_message .= ' ' . sprintf(
+				/* translators: %s: notes */
+				__( 'Notas del interesado: %s', 'arriendo-facil' ),
+				$visit_notes
+			);
+		}
+
+		$existing_id = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT id
+				 FROM {$queue_table}
+				 WHERE accommodation_id = %d AND email = %s
+				 ORDER BY id DESC
+				 LIMIT 1",
+				$accommodation_id,
+				$email
+			)
+		);
+
+		if ( $existing_id > 0 ) {
+			$wpdb->update(
+				$queue_table,
+				array(
+					'name'    => $name,
+					'phone'   => $phone,
+					'message' => $request_message,
+					'status'  => 'visit_requested',
+				),
+				array( 'id' => $existing_id ),
+				array( '%s', '%s', '%s', '%s' ),
+				array( '%d' )
+			);
+		} else {
+			$wpdb->insert(
+				$queue_table,
+				array(
+					'accommodation_id' => $accommodation_id,
+					'name'             => $name,
+					'email'            => $email,
+					'phone'            => $phone,
+					'message'          => $request_message,
+					'status'           => 'visit_requested',
+				),
+				array( '%d', '%s', '%s', '%s', '%s', '%s' )
+			);
+		}
+
+		$this->send_owner_visit_request_email( $accommodation_id, $name, $email, $phone, $preferred_date, $preferred_time, $visit_notes );
+
+		return array(
+			'saved'          => true,
+			'preferred_date' => $preferred_date,
+			'preferred_time' => $preferred_time,
+		);
+	}
+
+	/**
+	 * Sends owner notification for a new visit request suggestion.
+	 *
+	 * @param int    $accommodation_id Accommodation ID.
+	 * @param string $name Lead name.
+	 * @param string $email Lead email.
+	 * @param string $phone Lead phone.
+	 * @param string $preferred_date Preferred date.
+	 * @param string $preferred_time Preferred time.
+	 * @param string $visit_notes Optional notes.
+	 * @return void
+	 */
+	private function send_owner_visit_request_email( $accommodation_id, $name, $email, $phone, $preferred_date, $preferred_time, $visit_notes ) {
+		$accommodation_id = absint( $accommodation_id );
+		$owner_id         = (int) get_post_meta( $accommodation_id, '_af_owner_id', true );
+		$owner            = $owner_id ? get_user_by( 'ID', $owner_id ) : null;
+		$owner_email      = ( $owner && ! empty( $owner->user_email ) ) ? sanitize_email( (string) $owner->user_email ) : '';
+
+		if ( ! is_email( $owner_email ) ) {
+			return;
+		}
+
+		$title   = get_the_title( $accommodation_id );
+		$subject = sprintf( __( '[Arriendo Facil] Nueva solicitud de visita: %s', 'arriendo-facil' ), $title );
+		$message = sprintf(
+			/* translators: 1: name, 2: email, 3: phone, 4: date, 5: time, 6: title */
+			__( "Hola,\n\nTienes una nueva persona interesada en la propiedad '%6$s'.\n\nDatos de contacto:\n- Nombre: %1$s\n- Correo: %2$s\n- Telefono: %3$s\n\nPreferencia de visita:\n- Fecha sugerida: %4$s\n- Hora sugerida: %5$s\n\nEl contrato ya se genero en borrador para agilizar el proceso.\nSolo falta que coordines directamente con la persona el dia y la hora definitiva de la visita.", 'arriendo-facil' ),
+			sanitize_text_field( (string) $name ),
+			sanitize_email( (string) $email ),
+			sanitize_text_field( (string) $phone ),
+			sanitize_text_field( (string) $preferred_date ),
+			sanitize_text_field( (string) $preferred_time ),
+			sanitize_text_field( (string) $title )
+		);
+
+		if ( '' !== trim( (string) $visit_notes ) ) {
+			$message .= "\n\n" . sprintf(
+				/* translators: %s: notes */
+				__( 'Mensaje adicional del interesado: %s', 'arriendo-facil' ),
+				sanitize_textarea_field( (string) $visit_notes )
+			);
+		}
+
+		$message .= "\n\n" . __( 'Gracias por usar Arriendo Facil.', 'arriendo-facil' );
+
+		wp_mail( $owner_email, $subject, $message );
+	}
+
+	/**
+	 * Checks valid date format (YYYY-MM-DD).
+	 *
+	 * @param string $value Date text.
+	 * @return bool
+	 */
+	private function is_valid_date( $value ) {
+		return 1 === preg_match( '/^\d{4}-\d{2}-\d{2}$/', (string) $value );
+	}
+
+	/**
+	 * Checks valid time format (HH:MM).
+	 *
+	 * @param string $value Time text.
+	 * @return bool
+	 */
+	private function is_valid_time( $value ) {
+		return 1 === preg_match( '/^\d{2}:\d{2}$/', (string) $value );
+	}
+
+	/**
+	 * Validates prudent visit time window (09:00 to 18:00).
+	 *
+	 * @param string $value Time text.
+	 * @return bool
+	 */
+	private function is_prudent_visit_time( $value ) {
+		if ( ! $this->is_valid_time( $value ) ) {
+			return false;
+		}
+
+		$minutes = (int) substr( (string) $value, 0, 2 ) * 60 + (int) substr( (string) $value, 3, 2 );
+		return $minutes >= 540 && $minutes <= 1080;
 	}
 
 	/**

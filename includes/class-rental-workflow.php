@@ -29,6 +29,7 @@ class Arriendo_Facil_Rental_Workflow {
 		add_action( 'wp_ajax_af_join_interest_queue', array( $this, 'ajax_join_interest_queue' ) );
 		add_action( 'wp_ajax_nopriv_af_join_interest_queue', array( $this, 'ajax_join_interest_queue' ) );
 		add_action( 'wp_ajax_af_get_interest_stats', array( $this, 'ajax_get_interest_stats' ) );
+		add_action( 'wp_ajax_af_get_interest_queue', array( $this, 'ajax_get_interest_queue' ) );
 		add_action( 'wp_ajax_af_create_reservation_hold', array( $this, 'ajax_create_reservation_hold' ) );
 		add_action( 'wp_ajax_af_release_reservation_hold', array( $this, 'ajax_release_reservation_hold' ) );
 		add_action( 'wp_ajax_af_finalize_lease_manual_release', array( $this, 'ajax_finalize_lease_manual_release' ) );
@@ -41,11 +42,13 @@ class Arriendo_Facil_Rental_Workflow {
 	/**
 	 * Returns whether an accommodation can start a new rental flow.
 	 *
-	 * @param int $accommodation_id Accommodation ID.
+	 * @param int    $accommodation_id Accommodation ID.
+	 * @param string $guest_email      Optional guest email to validate appointment requirement.
 	 * @return array<string,mixed>
 	 */
-	public static function get_availability_summary( $accommodation_id ) {
+	public static function get_availability_summary( $accommodation_id, $guest_email = '' ) {
 		$accommodation_id = absint( $accommodation_id );
+		$guest_email      = sanitize_email( (string) $guest_email );
 		if ( ! $accommodation_id || 'accommodation' !== get_post_type( $accommodation_id ) ) {
 			return array(
 				'can_start_flow' => false,
@@ -56,6 +59,28 @@ class Arriendo_Facil_Rental_Workflow {
 		}
 
 		$status = sanitize_key( (string) get_post_meta( $accommodation_id, '_af_status', true ) );
+		$commercial_status = sanitize_key( (string) get_post_meta( $accommodation_id, '_af_commercial_status', true ) );
+
+		if ( '' === $commercial_status ) {
+			$legacy_state      = sanitize_key( (string) get_post_meta( $accommodation_id, '_af_commercial_state', true ) );
+			$legacy_visibility = sanitize_key( (string) get_post_meta( $accommodation_id, '_af_commercial_visibility', true ) );
+			if ( 'private' === $legacy_visibility ) {
+				$commercial_status = 'private';
+			} elseif ( in_array( $legacy_state, array( 'available', 'reserved', 'rented' ), true ) ) {
+				$commercial_status = $legacy_state;
+			}
+		}
+
+		if ( in_array( $commercial_status, array( 'reserved', 'rented', 'private' ), true ) ) {
+			return array(
+				'can_start_flow' => false,
+				'reason_code'    => $commercial_status,
+				'message'        => __( 'This accommodation is currently not available for a new rental flow.', 'arriendo-facil' ),
+				'state'          => $commercial_status,
+				'status'         => $status,
+			);
+		}
+
 		if ( in_array( $status, array( 'maintenance', 'inactive' ), true ) ) {
 			return array(
 				'can_start_flow' => false,
@@ -89,6 +114,18 @@ class Arriendo_Facil_Rental_Workflow {
 			);
 		}
 
+		$visit_is_required = (bool) apply_filters( 'af_require_visit_before_rental_flow', true, $accommodation_id );
+		if ( $visit_is_required && '' !== $guest_email && ! self::has_required_visit_booking( $accommodation_id, $guest_email ) ) {
+			return array(
+				'can_start_flow'      => false,
+				'reason_code'         => 'requires_visit_booking',
+				'message'             => __( 'A confirmed visit is required before continuing the rental process.', 'arriendo-facil' ),
+				'state'               => 'requires_visit',
+				'status'              => $status,
+				'requires_visit_step' => true,
+			);
+		}
+
 		return array(
 			'can_start_flow' => true,
 			'reason_code'    => 'available',
@@ -105,7 +142,8 @@ class Arriendo_Facil_Rental_Workflow {
 		$this->verify_frontend_nonce_optional();
 
 		$accommodation_id = isset( $_REQUEST['accommodation_id'] ) ? absint( wp_unslash( $_REQUEST['accommodation_id'] ) ) : 0;
-		wp_send_json_success( self::get_availability_summary( $accommodation_id ) );
+		$guest_email      = isset( $_REQUEST['guest_email'] ) ? sanitize_email( wp_unslash( $_REQUEST['guest_email'] ) ) : '';
+		wp_send_json_success( self::get_availability_summary( $accommodation_id, $guest_email ) );
 	}
 
 	/**
@@ -176,22 +214,51 @@ class Arriendo_Facil_Rental_Workflow {
 
 		global $wpdb;
 		$table = $wpdb->prefix . 'af_visit_slots';
+		$nonce = isset( $_REQUEST['nonce'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['nonce'] ) ) : '';
+		$is_admin_owner_request = is_user_logged_in() && current_user_can( 'edit_posts' ) && '' !== $nonce && wp_verify_nonce( $nonce, 'af_owner_contact_nonce' );
 
-		$slots = $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT id, accommodation_id, visit_date, start_time, end_time, status
-				 FROM {$table}
-				 WHERE accommodation_id = %d
-				   AND status = %s
-				   AND visit_date >= %s
-				 ORDER BY visit_date ASC, start_time ASC",
-				$accommodation_id,
-				'open',
-				gmdate( 'Y-m-d' )
-			)
-		);
+		if ( $is_admin_owner_request && ! $this->can_manage_accommodation( $accommodation_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+		}
 
-		wp_send_json_success( array( 'slots' => is_array( $slots ) ? $slots : array() ) );
+		if ( $is_admin_owner_request ) {
+			$slots = $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT id, accommodation_id, visit_date, start_time, end_time, status
+					 FROM {$table}
+					 WHERE accommodation_id = %d
+					 ORDER BY visit_date ASC, start_time ASC",
+					$accommodation_id
+				)
+			);
+		} else {
+			$slots = $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT id, accommodation_id, visit_date, start_time, end_time, status
+					 FROM {$table}
+					 WHERE accommodation_id = %d
+					   AND status = %s
+					   AND visit_date >= %s
+					 ORDER BY visit_date ASC, start_time ASC",
+					$accommodation_id,
+					'open',
+					gmdate( 'Y-m-d' )
+				)
+			);
+		}
+
+		$slots = is_array( $slots ) ? array_map(
+			static function ( $slot ) {
+				if ( ! is_object( $slot ) ) {
+					return $slot;
+				}
+				$slot->available = ( isset( $slot->status ) && 'open' === (string) $slot->status );
+				return $slot;
+			},
+			$slots
+		) : array();
+
+		wp_send_json_success( array( 'slots' => $slots ) );
 	}
 
 	/**
@@ -223,7 +290,7 @@ class Arriendo_Facil_Rental_Workflow {
 		);
 
 		if ( ! $slot || 'open' !== (string) $slot->status ) {
-			wp_send_json_error( array( 'message' => __( 'This slot is no longer available.', 'arriendo-facil' ) ), 409 );
+			wp_send_json_error( array( 'message' => __( 'This slot is no longer available.', 'arriendo-facil' ), 'code' => 409 ), 409 );
 		}
 
 		$inserted_booking = $wpdb->insert(
@@ -242,7 +309,7 @@ class Arriendo_Facil_Rental_Workflow {
 		);
 
 		if ( ! $inserted_booking ) {
-			wp_send_json_error( array( 'message' => __( 'That slot has already been booked.', 'arriendo-facil' ) ), 409 );
+			wp_send_json_error( array( 'message' => __( 'That slot has already been booked.', 'arriendo-facil' ), 'code' => 409 ), 409 );
 		}
 
 		$wpdb->update(
@@ -284,7 +351,7 @@ class Arriendo_Facil_Rental_Workflow {
 
 		$exists = $wpdb->get_var(
 			$wpdb->prepare(
-				"SELECT id FROM {$table} WHERE accommodation_id = %d AND email = %s AND status IN ('queued','notified') LIMIT 1",
+				"SELECT id FROM {$table} WHERE accommodation_id = %d AND email = %s AND status IN ('queued','notified','visit_requested') LIMIT 1",
 				$accommodation_id,
 				$email
 			)
@@ -337,7 +404,7 @@ class Arriendo_Facil_Rental_Workflow {
 
 		$queued_count = (int) $wpdb->get_var(
 			$wpdb->prepare(
-				"SELECT COUNT(*) FROM {$queue_table} WHERE accommodation_id = %d AND status IN ('queued','notified')",
+				"SELECT COUNT(*) FROM {$queue_table} WHERE accommodation_id = %d AND status IN ('queued','notified','visit_requested')",
 				$accommodation_id
 			)
 		);
@@ -349,11 +416,57 @@ class Arriendo_Facil_Rental_Workflow {
 			)
 		);
 
+		$completed_visits_count = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM {$bookings_table} WHERE accommodation_id = %d AND status = 'completed'",
+				$accommodation_id
+			)
+		);
+
 		wp_send_json_success(
 			array(
-				'queued'       => $queued_count,
-				'bookedVisits' => $booked_visits_count,
-				'total'        => $queued_count + $booked_visits_count,
+				'queue_count'      => $queued_count,
+				'scheduled_visits' => $booked_visits_count,
+				'completed_visits' => $completed_visits_count,
+				'queued'           => $queued_count,
+				'bookedVisits'     => $booked_visits_count,
+				'total'            => $queued_count + $booked_visits_count,
+			)
+		);
+	}
+
+	/**
+	 * AJAX: owner/admin detailed interest queue list.
+	 */
+	public function ajax_get_interest_queue() {
+		check_ajax_referer( 'af_owner_contact_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'read' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$accommodation_id = isset( $_GET['accommodation_id'] ) ? absint( wp_unslash( $_GET['accommodation_id'] ) ) : 0;
+		if ( ! $accommodation_id || ! $this->can_manage_accommodation( $accommodation_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+		}
+
+		global $wpdb;
+		$table = $wpdb->prefix . 'af_interest_queue';
+
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT id, name, email, phone, message, status, created_at
+				 FROM {$table}
+				 WHERE accommodation_id = %d
+				 ORDER BY created_at DESC, id DESC
+				 LIMIT 100",
+				$accommodation_id
+			)
+		);
+
+		wp_send_json_success(
+			array(
+				'items' => is_array( $rows ) ? $rows : array(),
 			)
 		);
 	}
@@ -400,11 +513,12 @@ class Arriendo_Facil_Rental_Workflow {
 				'hold_until'        => gmdate( 'Y-m-d H:i:s', strtotime( $hold_until ) ),
 				'payment_reference' => $payment_reference,
 				'payment_status'    => $deposit_amount > 0 ? 'received' : 'pending',
+				'status'            => 'reserved',
 				'reservation_status'=> 'reserved',
 				'notes'             => $notes,
 				'created_by'        => get_current_user_id(),
 			),
-			array( '%d', '%d', '%f', '%s', '%s', '%s', '%s', '%s', '%d' )
+			array( '%d', '%d', '%f', '%s', '%s', '%s', '%s', '%s', '%s', '%d' )
 		);
 
 		if ( ! $inserted ) {
@@ -412,6 +526,7 @@ class Arriendo_Facil_Rental_Workflow {
 		}
 
 		self::set_commercial_state( $accommodation_id, 'reserved', 'public' );
+		$this->cancel_and_notify_interest_queue_unavailable( $accommodation_id );
 		self::log_lease_event( 0, $accommodation_id, 'reservation_created', array( 'reservation_id' => (int) $wpdb->insert_id, 'hold_until' => $hold_until ) );
 
 		wp_send_json_success(
@@ -449,12 +564,13 @@ class Arriendo_Facil_Rental_Workflow {
 		$updated = $wpdb->update(
 			$table,
 			array(
+				'status'             => 'released',
 				'reservation_status' => 'released',
 				'release_reason'     => $reason,
 				'released_at'        => current_time( 'mysql' ),
 			),
 			array( 'id' => $reservation_id ),
-			array( '%s', '%s', '%s' ),
+			array( '%s', '%s', '%s', '%s' ),
 			array( '%d' )
 		);
 
@@ -644,6 +760,7 @@ class Arriendo_Facil_Rental_Workflow {
 
 		update_post_meta( $accommodation_id, '_af_commercial_state', $state );
 		update_post_meta( $accommodation_id, '_af_commercial_visibility', $visibility );
+		update_post_meta( $accommodation_id, '_af_commercial_status', 'private' === $visibility ? 'private' : $state );
 
 		if ( 'rented' === $state ) {
 			update_post_meta( $accommodation_id, '_af_status', 'rented' );
@@ -688,7 +805,7 @@ class Arriendo_Facil_Rental_Workflow {
 			$wpdb->prepare(
 				"SELECT id, name, email FROM {$table}
 				 WHERE accommodation_id = %d
-				   AND status IN ('queued','notified')
+				   AND status IN ('queued','notified','visit_requested')
 				 ORDER BY id ASC
 				 LIMIT 100",
 				$accommodation_id
@@ -700,7 +817,7 @@ class Arriendo_Facil_Rental_Workflow {
 		}
 
 		$title   = get_the_title( $accommodation_id );
-		$subject = sprintf( __( '[Arriendo Facil] Accommodation available again: %s', 'arriendo-facil' ), $title );
+		$subject = sprintf( __( '[Arriendo Facil] Buenas noticias: %s vuelve a estar disponible', 'arriendo-facil' ), $title );
 
 		foreach ( $rows as $row ) {
 			$email = isset( $row->email ) ? sanitize_email( (string) $row->email ) : '';
@@ -708,10 +825,10 @@ class Arriendo_Facil_Rental_Workflow {
 				continue;
 			}
 
-			$name    = isset( $row->name ) ? sanitize_text_field( (string) $row->name ) : __( 'Interested tenant', 'arriendo-facil' );
+			$name    = isset( $row->name ) ? sanitize_text_field( (string) $row->name ) : __( 'Interesado', 'arriendo-facil' );
 			$message = sprintf(
 				/* translators: 1: interested name, 2: accommodation title */
-				__( "Hello %1\$s,\n\nThe accommodation '%2\$s' is now available again. If you still want to continue, please schedule your visit in the platform.\n\nArriendo Facil Team", 'arriendo-facil' ),
+				__( "Hola %1\$s,\n\nTe contamos que la acomodacion '%2\$s' vuelve a estar disponible.\n\nSi aun te interesa, puedes continuar tu proceso y coordinar tu visita desde la plataforma.\n\nGracias por confiar en Arriendo Facil.", 'arriendo-facil' ),
 				$name,
 				$title
 			);
@@ -746,10 +863,10 @@ class Arriendo_Facil_Rental_Workflow {
 		}
 
 		$title   = get_the_title( $accommodation_id );
-		$subject = sprintf( __( '[Arriendo Facil] Visit confirmed: %s', 'arriendo-facil' ), $title );
+		$subject = sprintf( __( '[Arriendo Facil] Tu visita esta confirmada: %s', 'arriendo-facil' ), $title );
 		$message = sprintf(
 			/* translators: 1: guest name, 2: title, 3: date, 4: start time, 5: end time */
-			__( "Hello %1\$s,\n\nYour visit has been confirmed for '%2\$s'.\nDate: %3\$s\nTime: %4\$s - %5\$s\n\nArriendo Facil Team", 'arriendo-facil' ),
+			__( "Hola %1\$s,\n\nTu visita para la acomodacion '%2\$s' ha sido confirmada.\n\nFecha: %3\$s\nHora: %4\$s - %5\$s\n\nSi necesitas reprogramar, responde a este correo o contacta al propietario.\n\nTe esperamos.", 'arriendo-facil' ),
 			sanitize_text_field( $name ),
 			sanitize_text_field( $title ),
 			sanitize_text_field( $visit_date ),
@@ -780,16 +897,16 @@ class Arriendo_Facil_Rental_Workflow {
 		$bookings_table = $wpdb->prefix . 'af_visit_bookings';
 
 		$queued_count = (int) $wpdb->get_var(
-			$wpdb->prepare( "SELECT COUNT(*) FROM {$queue_table} WHERE accommodation_id = %d AND status IN ('queued','notified')", $accommodation_id )
+			$wpdb->prepare( "SELECT COUNT(*) FROM {$queue_table} WHERE accommodation_id = %d AND status IN ('queued','notified','visit_requested')", $accommodation_id )
 		);
 		$visit_count = (int) $wpdb->get_var(
 			$wpdb->prepare( "SELECT COUNT(*) FROM {$bookings_table} WHERE accommodation_id = %d AND status IN ('confirmed','completed')", $accommodation_id )
 		);
 
-		$subject = sprintf( __( '[Arriendo Facil] Interest update: %s', 'arriendo-facil' ), get_the_title( $accommodation_id ) );
+		$subject = sprintf( __( '[Arriendo Facil] Resumen de actividad: %s', 'arriendo-facil' ), get_the_title( $accommodation_id ) );
 		$message = sprintf(
 			/* translators: 1: context, 2: queue count, 3: visit count */
-			__( "%1\$s\n\nInterested queue: %2\$d\nVisits booked: %3\$d\n\nArriendo Facil Team", 'arriendo-facil' ),
+			__( "Hola,\n\n%1\$s\n\nResumen actual de tu acomodacion:\n- Interesados en cola: %2\$d\n- Visitas agendadas: %3\$d\n\nRevisa los detalles en tu panel para continuar con tranquilidad y sin cruces.\n\nArriendo Facil", 'arriendo-facil' ),
 			sanitize_text_field( $context ),
 			$queued_count,
 			$visit_count
@@ -798,6 +915,63 @@ class Arriendo_Facil_Rental_Workflow {
 		$owner_email = sanitize_email( (string) $owner->user_email );
 		$sent = wp_mail( $owner_email, $subject, $message );
 		$this->log_notification( $accommodation_id, 'owner_interest_update', $owner_email, $sent ? 'sent' : 'failed' );
+	}
+
+	/**
+	 * Notifies and removes pending requests when accommodation is reserved.
+	 *
+	 * @param int $accommodation_id Accommodation ID.
+	 * @return void
+	 */
+	private function cancel_and_notify_interest_queue_unavailable( $accommodation_id ) {
+		global $wpdb;
+		$table = $wpdb->prefix . 'af_interest_queue';
+
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT id, name, email
+				 FROM {$table}
+				 WHERE accommodation_id = %d
+				   AND status IN ('queued','notified','visit_requested')
+				 ORDER BY id ASC
+				 LIMIT 200",
+				$accommodation_id
+			)
+		);
+
+		if ( empty( $rows ) || ! is_array( $rows ) ) {
+			return;
+		}
+
+		$title   = get_the_title( $accommodation_id );
+		$subject = sprintf( __( '[Arriendo Facil] Actualizacion: %s ya no esta disponible', 'arriendo-facil' ), $title );
+
+		foreach ( $rows as $row ) {
+			$email = isset( $row->email ) ? sanitize_email( (string) $row->email ) : '';
+			if ( ! is_email( $email ) ) {
+				continue;
+			}
+
+			$name = isset( $row->name ) ? sanitize_text_field( (string) $row->name ) : __( 'Interesado', 'arriendo-facil' );
+			$message = sprintf(
+				/* translators: 1: interested name, 2: accommodation title */
+				__( "Hola %1\$s,\n\nQueremos avisarte que la acomodacion '%2\$s' acaba de ser reservada y ya no se encuentra disponible.\n\nSi deseas, puedes seguir buscando otras opciones dentro de Arriendo Facil.\n\nGracias por tu interes.", 'arriendo-facil' ),
+				$name,
+				sanitize_text_field( (string) $title )
+			);
+
+			$sent = wp_mail( $email, $subject, $message );
+			$this->log_notification( $accommodation_id, 'accommodation_reserved_unavailable', $email, $sent ? 'sent' : 'failed' );
+		}
+
+		$wpdb->query(
+			$wpdb->prepare(
+				"DELETE FROM {$table}
+				 WHERE accommodation_id = %d
+				   AND status IN ('queued','notified','visit_requested')",
+				$accommodation_id
+			)
+		);
 	}
 
 	/**
@@ -883,12 +1057,43 @@ class Arriendo_Facil_Rental_Workflow {
 				"SELECT *
 				 FROM {$wpdb->prefix}af_reservations
 				 WHERE accommodation_id = %d
-				   AND reservation_status IN ('reserved','pending_payment')
+				   AND (reservation_status IN ('reserved','pending_payment') OR status IN ('reserved','pending_payment'))
 				 ORDER BY id DESC
 				 LIMIT 1",
 				absint( $accommodation_id )
 			)
 		);
+	}
+
+	/**
+	 * Returns whether a guest already has a visit booking for accommodation.
+	 *
+	 * @param int    $accommodation_id Accommodation ID.
+	 * @param string $guest_email      Guest email.
+	 * @return bool
+	 */
+	public static function has_required_visit_booking( $accommodation_id, $guest_email ) {
+		$accommodation_id = absint( $accommodation_id );
+		$guest_email      = sanitize_email( (string) $guest_email );
+
+		if ( ! $accommodation_id || ! is_email( $guest_email ) ) {
+			return false;
+		}
+
+		global $wpdb;
+		$count = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				 FROM {$wpdb->prefix}af_visit_bookings
+				 WHERE accommodation_id = %d
+				   AND guest_email = %s
+				   AND status IN ('confirmed','completed')",
+				$accommodation_id,
+				$guest_email
+			)
+		);
+
+		return $count > 0;
 	}
 
 	/**

@@ -230,19 +230,32 @@ class Arriendo_Facil_Accommodation_Search_API {
 		$monthly_price = floatval( get_post_meta( $accommodation_id, '_af_monthly_rent', true ) );
 		$property_type = get_post_meta( $accommodation_id, '_af_property_type', true );
 		$amenities     = get_post_meta( $accommodation_id, '_af_amenities', true );
-		$status        = sanitize_key( (string) get_post_meta( $accommodation_id, '_af_status', true ) );
-		$commercial_state = sanitize_key( (string) get_post_meta( $accommodation_id, '_af_commercial_state', true ) );
+		$status              = sanitize_key( (string) get_post_meta( $accommodation_id, '_af_status', true ) );
+		$commercial_status   = sanitize_key( (string) get_post_meta( $accommodation_id, '_af_commercial_status', true ) );
+		$commercial_state    = sanitize_key( (string) get_post_meta( $accommodation_id, '_af_commercial_state', true ) );
 		$commercial_visibility = sanitize_key( (string) get_post_meta( $accommodation_id, '_af_commercial_visibility', true ) );
 		if ( ! is_array( $amenities ) ) {
 			$amenities = array();
 		}
 
+		if ( '' === $commercial_status ) {
+			if ( 'private' === $commercial_visibility ) {
+				$commercial_status = 'private';
+			} elseif ( in_array( $commercial_state, array( 'available', 'reserved', 'rented' ), true ) ) {
+				$commercial_status = $commercial_state;
+			}
+		}
+
+		if ( '' === $commercial_status ) {
+			$commercial_status = ( 'rented' === $status ) ? 'rented' : 'available';
+		}
+
 		if ( '' === $commercial_state ) {
-			$commercial_state = ( 'rented' === $status ) ? 'rented' : 'available';
+			$commercial_state = in_array( $commercial_status, array( 'available', 'reserved', 'rented' ), true ) ? $commercial_status : 'available';
 		}
 
 		if ( '' === $commercial_visibility ) {
-			$commercial_visibility = 'public';
+			$commercial_visibility = ( 'private' === $commercial_status ) ? 'private' : 'public';
 		}
 
 		$image_url = '';
@@ -257,6 +270,7 @@ class Arriendo_Facil_Accommodation_Search_API {
 			'latitude'       => $latitude,
 			'longitude'      => $longitude,
 			'status'         => $status,
+			'commercial_status' => $commercial_status,
 			'commercial_state' => $commercial_state,
 			'commercial_visibility' => $commercial_visibility,
 			'price'          => $monthly_price,

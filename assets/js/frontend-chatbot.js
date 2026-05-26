@@ -129,6 +129,42 @@
 				error: 'Mascotas debe estar entre 0 y 10.'
 			},
 			{
+				key: 'visit_preferred_date',
+				type: 'date',
+				question: 'Que fecha prefieres para que te atiendan la visita de la propiedad?',
+				validate: function (value) {
+					if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) { return false; }
+					var selected = new Date(value + 'T00:00:00');
+					var today = new Date();
+					today.setHours(0, 0, 0, 0);
+					return selected >= today;
+				},
+				error: 'Selecciona una fecha valida para la visita (hoy o en el futuro).'
+			},
+			{
+				key: 'visit_preferred_time',
+				type: 'text',
+				question: 'Que hora prefieres para la visita? (09:00 a 18:00, formato HH:MM)',
+				placeholder: '10:30',
+				validate: function (value) {
+					var match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(value);
+					if (!match) { return false; }
+					var hour = parseInt(match[1], 10);
+					var minute = parseInt(match[2], 10);
+					var total = (hour * 60) + minute;
+					return total >= 540 && total <= 1080;
+				},
+				error: 'La hora sugerida debe estar entre 09:00 y 18:00.'
+			},
+			{
+				key: 'visit_notes',
+				type: 'text',
+				question: 'Agrega un comentario corto para el propietario (opcional). Si no tienes, escribe "ninguna".',
+				placeholder: 'Ejemplo: Me sirve mejor luego de las 5pm',
+				validate: function () { return true; },
+				error: ''
+			},
+			{
 				key: 'rental_start_date',
 				type: 'date',
 				question: 'Selecciona la fecha en la que te gustar\u00eda iniciar el arriendo.',
@@ -562,6 +598,9 @@
 			data.append('mascotas', state.values.mascotas || '0');
 			data.append('personas_viviran', state.values.personas_viviran || '1');
 			data.append('accommodation_id', state.values.accommodation_id || '');
+			data.append('visit_preferred_date', state.values.visit_preferred_date || '');
+			data.append('visit_preferred_time', state.values.visit_preferred_time || '');
+			data.append('visit_notes', state.values.visit_notes || '');
 			data.append('rental_start_date', state.values.rental_start_date || '');
 			data.append('rental_years', state.values.rental_years || '1');
 			data.append('existing_mode', state.values.existing_mode || '');

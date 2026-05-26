@@ -244,6 +244,7 @@ class Arriendo_Facil_Activator {
 				hold_until         DATETIME NOT NULL,
 				payment_reference  VARCHAR(190) DEFAULT NULL,
 				payment_status     VARCHAR(30) NOT NULL DEFAULT 'pending',
+				status             VARCHAR(30) NOT NULL DEFAULT 'reserved',
 				reservation_status VARCHAR(30) NOT NULL DEFAULT 'reserved',
 				notes              TEXT DEFAULT NULL,
 				release_reason     TEXT DEFAULT NULL,
@@ -254,6 +255,7 @@ class Arriendo_Facil_Activator {
 				PRIMARY KEY (id),
 				KEY accommodation_id (accommodation_id),
 				KEY guest_id (guest_id),
+				KEY status (status),
 				KEY reservation_status (reservation_status),
 				KEY hold_until (hold_until)
 			) $charset_collate;",
@@ -289,6 +291,65 @@ class Arriendo_Facil_Activator {
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		foreach ( $tables as $sql ) {
 			dbDelta( $sql );
+		}
+
+		$reservations_table = $wpdb->prefix . 'af_reservations';
+		$reservation_status_exists = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				 FROM INFORMATION_SCHEMA.COLUMNS
+				 WHERE TABLE_SCHEMA = %s
+				   AND TABLE_NAME = %s
+				   AND COLUMN_NAME = %s",
+				DB_NAME,
+				$reservations_table,
+				'reservation_status'
+			)
+		);
+
+		$reservation_simple_status_exists = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				 FROM INFORMATION_SCHEMA.COLUMNS
+				 WHERE TABLE_SCHEMA = %s
+				   AND TABLE_NAME = %s
+				   AND COLUMN_NAME = %s",
+				DB_NAME,
+				$reservations_table,
+				'status'
+			)
+		);
+
+		if ( ! $reservation_simple_status_exists ) {
+			$wpdb->query(
+				"ALTER TABLE {$reservations_table}
+				 ADD COLUMN status VARCHAR(30) NOT NULL DEFAULT 'reserved' AFTER payment_status"
+			);
+		}
+
+		if ( $reservation_status_exists ) {
+			$wpdb->query(
+				"UPDATE {$reservations_table}
+				 SET status = reservation_status
+				 WHERE (status IS NULL OR status = '')"
+			);
+		}
+
+		$status_index_exists = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				 FROM INFORMATION_SCHEMA.STATISTICS
+				 WHERE TABLE_SCHEMA = %s
+				   AND TABLE_NAME = %s
+				   AND INDEX_NAME = %s",
+				DB_NAME,
+				$reservations_table,
+				'status'
+			)
+		);
+
+		if ( ! $status_index_exists ) {
+			$wpdb->query( "ALTER TABLE {$reservations_table} ADD KEY status (status)" );
 		}
 
 		$owner_contacts_table = $wpdb->prefix . 'af_owner_contacts';

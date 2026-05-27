@@ -423,6 +423,32 @@
 			return selected ? selected.text : value;
 		}
 
+		function parseAjaxPayload(rawText) {
+			var text = String(rawText || '').trim();
+			if (!text) {
+				return null;
+			}
+
+			try {
+				return JSON.parse(text);
+			} catch (parseError) {
+				// Continue with recovery attempts.
+			}
+
+			var firstBrace = text.indexOf('{');
+			var lastBrace = text.lastIndexOf('}');
+			if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+				var candidate = text.slice(firstBrace, lastBrace + 1);
+				try {
+					return JSON.parse(candidate);
+				} catch (recoveredError) {
+					// Keep trying below.
+				}
+			}
+
+			return null;
+		}
+
 		function askCurrentStep() {
 			var step = getCurrentStep();
 			if (!step) {
@@ -639,16 +665,7 @@
 				})
 				.then(function (response) {
 					return response.text().then(function (rawText) {
-						var payload = null;
-						var text = String(rawText || '').trim();
-
-						if (text) {
-							try {
-								payload = JSON.parse(text);
-							} catch (parseError) {
-								payload = null;
-							}
-						}
+						var payload = parseAjaxPayload(rawText);
 
 						return {
 							ok: response.ok,

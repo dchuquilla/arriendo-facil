@@ -360,22 +360,6 @@ class Arriendo_Facil_Lease {
 	}
 
 	/**
-	 * Returns a single lease by ID.
-	 *
-	 * @param int $lease_id Lease ID.
-	 * @return object|null Lease object or null.
-	 */
-	public function get_lease( $lease_id ) {
-		global $wpdb;
-		return $wpdb->get_row(
-			$wpdb->prepare(
-				"SELECT * FROM {$wpdb->prefix}af_leases WHERE id = %d AND deleted_at IS NULL",
-				$lease_id
-			)
-		);
-	}
-
-	/**
 	 * Attaches a generated document URL to a lease.
 	 *
 	 * @param int    $lease_id     Lease ID.
@@ -1859,22 +1843,6 @@ class Arriendo_Facil_Lease {
 			array('id' => absint($lease_id)),
 			array('%s'),
 			array('%d')
-		);
-	}
-
-	/**
-	 * Overrides the default get_lease method to exclude deleted leases.
-	 *
-	 * @param int $lease_id Lease ID.
-	 * @return object|null Lease object or null.
-	 */
-	public function get_lease($lease_id) {
-		global $wpdb;
-		return $wpdb->get_row(
-			$wpdb->prepare(
-				"SELECT * FROM {$wpdb->prefix}af_leases WHERE id = %d AND deleted_at IS NULL",
-				$lease_id
-			)
 		);
 	}
 

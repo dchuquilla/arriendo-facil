@@ -1040,6 +1040,11 @@ class Arriendo_Facil_Owner_Contact {
 	 * @return array|WP_Error
 	 */
 	private function disable_owner_account_internal( $user_id ) {
+		$current_user_id = function_exists( 'get_current_user_id' ) ? (int) get_current_user_id() : 0;
+		if ( $current_user_id > 0 && $current_user_id === (int) $user_id ) {
+			return new WP_Error( 'af_owner_disable_self_forbidden', __( 'You cannot disable your own account.', 'arriendo-facil' ) );
+		}
+
 		$user = get_user_by( 'id', $user_id );
 		if ( ! $user ) {
 			return new WP_Error( 'af_owner_not_found', __( 'User not found.', 'arriendo-facil' ) );

@@ -434,7 +434,10 @@ class Arriendo_Facil_Guest {
 			);
 		}
 
-		$this->send_owner_visit_request_email( $accommodation_id, $name, $email, $phone, $preferred_date, $preferred_time, $visit_notes );
+		$active_interested_count = $this->get_active_interest_count_for_accommodation( $accommodation_id );
+
+		$this->send_owner_visit_request_email( $accommodation_id, $name, $email, $phone, $preferred_date, $preferred_time, $visit_notes, $active_interested_count );
+		$this->send_tenant_visit_request_email( $accommodation_id, $name, $email, $preferred_date, $preferred_time );
 
 		return array(
 			'saved'          => true,
@@ -455,7 +458,7 @@ class Arriendo_Facil_Guest {
 	 * @param string $visit_notes Optional notes.
 	 * @return void
 	 */
-	private function send_owner_visit_request_email( $accommodation_id, $name, $email, $phone, $preferred_date, $preferred_time, $visit_notes ) {
+	private function send_owner_visit_request_email( $accommodation_id, $name, $email, $phone, $preferred_date, $preferred_time, $visit_notes, $active_interested_count = 0 ) {
 		$accommodation_id = absint( $accommodation_id );
 		$owner_id         = (int) get_post_meta( $accommodation_id, '_af_owner_id', true );
 		$owner            = $owner_id ? get_user_by( 'ID', $owner_id ) : null;
@@ -465,30 +468,121 @@ class Arriendo_Facil_Guest {
 			return;
 		}
 
-		$title   = get_the_title( $accommodation_id );
-		$subject = sprintf( __( '[Arriendo Facil] Nueva solicitud de visita: %s', 'arriendo-facil' ), $title );
-		$message = sprintf(
-			/* translators: 1: name, 2: email, 3: phone, 4: date, 5: time, 6: title */
-			__( "Hola,\n\nTienes una nueva persona interesada en la propiedad '%6$s'.\n\nDatos de contacto:\n- Nombre: %1$s\n- Correo: %2$s\n- Telefono: %3$s\n\nPreferencia de visita:\n- Fecha sugerida: %4$s\n- Hora sugerida: %5$s\n\nEl contrato ya se genero en borrador para agilizar el proceso.\nSolo falta que coordines directamente con la persona el dia y la hora definitiva de la visita.", 'arriendo-facil' ),
-			sanitize_text_field( (string) $name ),
-			sanitize_email( (string) $email ),
-			sanitize_text_field( (string) $phone ),
-			sanitize_text_field( (string) $preferred_date ),
-			sanitize_text_field( (string) $preferred_time ),
-			sanitize_text_field( (string) $title )
-		);
+		$title            = get_the_title( $accommodation_id );
+		$subject          = sprintf( __( '[Arriendo Facil] Nueva cita solicitada para %s', 'arriendo-facil' ), $title );
+		$active_count_int = max( 1, absint( $active_interested_count ) );
 
+		$visit_notes_html = '';
 		if ( '' !== trim( (string) $visit_notes ) ) {
-			$message .= "\n\n" . sprintf(
-				/* translators: %s: notes */
-				__( 'Mensaje adicional del interesado: %s', 'arriendo-facil' ),
-				sanitize_textarea_field( (string) $visit_notes )
-			);
+			$visit_notes_html = '<p style="margin:0 0 8px;"><strong>' . esc_html__( 'Mensaje adicional del interesado:', 'arriendo-facil' ) . '</strong></p>';
+			$visit_notes_html .= '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;line-height:1.6;color:#334155;">' . nl2br( esc_html( sanitize_textarea_field( (string) $visit_notes ) ) ) . '</div>';
 		}
 
-		$message .= "\n\n" . __( 'Gracias por usar Arriendo Facil.', 'arriendo-facil' );
+		$message = '<div style="margin:0;padding:24px;background:#f1f5f9;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#0f172a;">';
+		$message .= '<div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">';
+		$message .= '<div style="padding:18px 22px;background:linear-gradient(135deg,#0f766e,#0ea5a4);color:#ffffff;">';
+		$message .= '<h2 style="margin:0;font-size:20px;line-height:1.3;">' . esc_html__( 'Nueva solicitud de cita desde Arriendo Facil', 'arriendo-facil' ) . '</h2>';
+		$message .= '</div>';
+		$message .= '<div style="padding:22px;">';
+		$message .= '<p style="margin:0 0 12px;line-height:1.6;">' . sprintf( esc_html__( 'Tienes un nuevo interesado en %s.', 'arriendo-facil' ), '<strong>' . esc_html( (string) $title ) . '</strong>' ) . '</p>';
+		$message .= '<p style="margin:0 0 16px;line-height:1.6;">' . sprintf( esc_html__( 'Actualmente esta acomodacion tiene %d interesado(s) activo(s) en cola. Revisa y contacta a esta persona cuanto antes.', 'arriendo-facil' ), $active_count_int ) . '</p>';
 
-		wp_mail( $owner_email, $subject, $message );
+		$message .= '<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;margin:0 0 16px;">';
+		$message .= '<tr><td style="padding:8px 0;border-top:1px solid #e2e8f0;"><strong>' . esc_html__( 'Acomodacion', 'arriendo-facil' ) . ':</strong> ' . esc_html( (string) $title ) . '</td></tr>';
+		$message .= '<tr><td style="padding:8px 0;border-top:1px solid #e2e8f0;"><strong>' . esc_html__( 'Interesado', 'arriendo-facil' ) . ':</strong> ' . esc_html( sanitize_text_field( (string) $name ) ) . '</td></tr>';
+		$message .= '<tr><td style="padding:8px 0;border-top:1px solid #e2e8f0;"><strong>' . esc_html__( 'Correo', 'arriendo-facil' ) . ':</strong> ' . esc_html( sanitize_email( (string) $email ) ) . '</td></tr>';
+		$message .= '<tr><td style="padding:8px 0;border-top:1px solid #e2e8f0;"><strong>' . esc_html__( 'Telefono', 'arriendo-facil' ) . ':</strong> ' . esc_html( sanitize_text_field( (string) $phone ) ) . '</td></tr>';
+		$message .= '<tr><td style="padding:8px 0;border-top:1px solid #e2e8f0;"><strong>' . esc_html__( 'Fecha sugerida', 'arriendo-facil' ) . ':</strong> ' . esc_html( sanitize_text_field( (string) $preferred_date ) ) . '</td></tr>';
+		$message .= '<tr><td style="padding:8px 0;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;"><strong>' . esc_html__( 'Hora sugerida', 'arriendo-facil' ) . ':</strong> ' . esc_html( sanitize_text_field( (string) $preferred_time ) ) . '</td></tr>';
+		$message .= '</table>';
+
+		$message .= $visit_notes_html;
+		$message .= '<p style="margin:16px 0 0;line-height:1.6;color:#334155;">' . esc_html__( 'El arrendatario espera tu contacto para confirmar o ajustar la cita.', 'arriendo-facil' ) . '</p>';
+		$message .= '</div>';
+		$message .= '</div>';
+		$message .= '<p style="max-width:640px;margin:12px auto 0;font-size:12px;color:#64748b;text-align:center;">Arriendo Facil</p>';
+		$message .= '</div>';
+
+		$headers = array( 'Content-Type: text/html; charset=UTF-8' );
+		wp_mail( $owner_email, $subject, $message, $headers );
+	}
+
+	/**
+	 * Sends tenant confirmation email after visit request is registered.
+	 *
+	 * @param int    $accommodation_id Accommodation ID.
+	 * @param string $tenant_name Tenant name.
+	 * @param string $tenant_email Tenant email.
+	 * @param string $preferred_date Suggested visit date.
+	 * @param string $preferred_time Suggested visit time.
+	 * @return void
+	 */
+	private function send_tenant_visit_request_email( $accommodation_id, $tenant_name, $tenant_email, $preferred_date, $preferred_time ) {
+		$tenant_email = sanitize_email( (string) $tenant_email );
+		if ( ! is_email( $tenant_email ) ) {
+			return;
+		}
+
+		$tenant_name = sanitize_text_field( (string) $tenant_name );
+		if ( '' === trim( $tenant_name ) ) {
+			$tenant_name = __( 'arrendatario', 'arriendo-facil' );
+		}
+
+		$accommodation_title = (string) get_the_title( absint( $accommodation_id ) );
+		if ( '' === trim( $accommodation_title ) ) {
+			$accommodation_title = __( 'la acomodacion seleccionada', 'arriendo-facil' );
+		}
+
+		$subject = sprintf( __( '[Arriendo Facil] Recibimos tu solicitud de cita para %s', 'arriendo-facil' ), $accommodation_title );
+
+		$message = '<div style="margin:0;padding:24px;background:#eef2ff;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1e293b;">';
+		$message .= '<div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #dbeafe;border-radius:12px;overflow:hidden;">';
+		$message .= '<div style="padding:18px 22px;background:linear-gradient(135deg,#1d4ed8,#2563eb);color:#ffffff;">';
+		$message .= '<h2 style="margin:0;font-size:20px;line-height:1.3;">' . esc_html__( 'Tu solicitud de cita fue registrada', 'arriendo-facil' ) . '</h2>';
+		$message .= '</div>';
+		$message .= '<div style="padding:22px;">';
+		$message .= '<p style="margin:0 0 12px;line-height:1.6;">' . sprintf( esc_html__( 'Hola %s, gracias por tu interes.', 'arriendo-facil' ), esc_html( $tenant_name ) ) . '</p>';
+		$message .= '<p style="margin:0 0 16px;line-height:1.6;">' . esc_html__( 'Recibimos tu solicitud para visitar la acomodacion. El propietario se pondra en contacto contigo para confirmar la cita o proponer ajustes de fecha/hora.', 'arriendo-facil' ) . '</p>';
+
+		$message .= '<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;margin:0;">';
+		$message .= '<tr><td style="padding:8px 0;border-top:1px solid #dbeafe;"><strong>' . esc_html__( 'Acomodacion', 'arriendo-facil' ) . ':</strong> ' . esc_html( $accommodation_title ) . '</td></tr>';
+		$message .= '<tr><td style="padding:8px 0;border-top:1px solid #dbeafe;"><strong>' . esc_html__( 'Fecha sugerida', 'arriendo-facil' ) . ':</strong> ' . esc_html( sanitize_text_field( (string) $preferred_date ) ) . '</td></tr>';
+		$message .= '<tr><td style="padding:8px 0;border-top:1px solid #dbeafe;border-bottom:1px solid #dbeafe;"><strong>' . esc_html__( 'Hora sugerida', 'arriendo-facil' ) . ':</strong> ' . esc_html( sanitize_text_field( (string) $preferred_time ) ) . '</td></tr>';
+		$message .= '</table>';
+
+		$message .= '<p style="margin:16px 0 0;line-height:1.6;color:#334155;">' . esc_html__( 'Si necesitas cambiar algun dato, responde este correo o contactanos por los canales oficiales.', 'arriendo-facil' ) . '</p>';
+		$message .= '</div>';
+		$message .= '</div>';
+		$message .= '<p style="max-width:640px;margin:12px auto 0;font-size:12px;color:#64748b;text-align:center;">Arriendo Facil</p>';
+		$message .= '</div>';
+
+		$headers = array( 'Content-Type: text/html; charset=UTF-8' );
+		wp_mail( $tenant_email, $subject, $message, $headers );
+	}
+
+	/**
+	 * Counts active interested leads for an accommodation.
+	 *
+	 * @param int $accommodation_id Accommodation ID.
+	 * @return int
+	 */
+	private function get_active_interest_count_for_accommodation( $accommodation_id ) {
+		global $wpdb;
+
+		$accommodation_id = absint( $accommodation_id );
+		if ( ! $accommodation_id ) {
+			return 0;
+		}
+
+		$table = $wpdb->prefix . 'af_interest_queue';
+		$count = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM {$table} WHERE accommodation_id = %d AND status IN ('queued','notified','visit_requested')",
+				$accommodation_id
+			)
+		);
+
+		return max( 0, $count );
 	}
 
 	/**

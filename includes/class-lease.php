@@ -369,7 +369,7 @@ class Arriendo_Facil_Lease {
 		global $wpdb;
 		return $wpdb->get_row(
 			$wpdb->prepare(
-				"SELECT * FROM {$wpdb->prefix}af_leases WHERE id = %d",
+				"SELECT * FROM {$wpdb->prefix}af_leases WHERE id = %d AND deleted_at IS NULL",
 				$lease_id
 			)
 		);
@@ -1843,5 +1843,54 @@ class Arriendo_Facil_Lease {
 	 */
 	private function get_approved_pdf_password() {
 		return 'arriendofacil.net';
+	}
+
+	/**
+	 * Marks a lease as deleted by setting the deleted_at field.
+	 *
+	 * @param int $lease_id Lease ID.
+	 * @return bool True on success, false on failure.
+	 */
+	public function delete_lease($lease_id) {
+		global $wpdb;
+		return (bool) $wpdb->update(
+			$wpdb->prefix . 'af_leases',
+			array('deleted_at' => current_time('mysql')),
+			array('id' => absint($lease_id)),
+			array('%s'),
+			array('%d')
+		);
+	}
+
+	/**
+	 * Overrides the default get_lease method to exclude deleted leases.
+	 *
+	 * @param int $lease_id Lease ID.
+	 * @return object|null Lease object or null.
+	 */
+	public function get_lease($lease_id) {
+		global $wpdb;
+		return $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT * FROM {$wpdb->prefix}af_leases WHERE id = %d AND deleted_at IS NULL",
+				$lease_id
+			)
+		);
+	}
+
+	/**
+	 * Fetches leases for a given accommodation, excluding deleted ones.
+	 *
+	 * @param int $accommodation_id Accommodation ID.
+	 * @return array List of leases.
+	 */
+	public function get_leases_by_accommodation($accommodation_id) {
+		global $wpdb;
+		return $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT * FROM {$wpdb->prefix}af_leases WHERE accommodation_id = %d AND deleted_at IS NULL ORDER BY start_date DESC",
+				$accommodation_id
+			)
+		);
 	}
 }

@@ -47,6 +47,8 @@ class Arriendo_Facil_Guest {
 			);
 		}
 
+		try {
+
 		$name       = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
 		$email      = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
 		$phone      = isset( $_POST['phone'] ) ? sanitize_text_field( wp_unslash( $_POST['phone'] ) ) : '';
@@ -83,6 +85,7 @@ class Arriendo_Facil_Guest {
 
 		if ( class_exists( 'Arriendo_Facil_Rental_Workflow' ) ) {
 			$availability = Arriendo_Facil_Rental_Workflow::get_availability_summary( $accommodation_id, $email );
+			error_log( 'Availability Data: ' . print_r( $availability, true ) );
 			if ( empty( $availability['can_start_flow'] ) ) {
 				$reason_code = isset( $availability['reason_code'] ) ? (string) $availability['reason_code'] : 'accommodation_unavailable';
 				if ( 'requires_visit_booking' !== $reason_code ) {
@@ -231,6 +234,13 @@ class Arriendo_Facil_Guest {
 				);
 			}
 
+			$visit_request = array( 'saved' => false, 'message' => 'visit_request_not_processed' );
+			try {
+				$visit_request = $this->create_or_update_visit_request( $accommodation_id, trim( $first_name . ' ' . $last_name ), $email, $phone, $visit_preferred_date, $visit_preferred_time, $visit_notes );
+			} catch ( Throwable $throwable ) {
+				error_log( 'Arriendo Facil visit request error (existing guest): ' . $throwable->getMessage() );
+			}
+
 			wp_send_json_success(
 				array(
 					'id'      => $guest_id,
@@ -238,7 +248,7 @@ class Arriendo_Facil_Guest {
 						? __( 'Encontramos tus datos y los reutilizamos para continuar tu proceso de arriendo.', 'arriendo-facil' )
 						: __( 'Actualizamos tu informacion y continuamos con tu nuevo proceso de arriendo.', 'arriendo-facil' ),
 					'contract' => $contract_info,
-					'visit_request' => $this->create_or_update_visit_request( $accommodation_id, trim( $first_name . ' ' . $last_name ), $email, $phone, $visit_preferred_date, $visit_preferred_time, $visit_notes ),
+					'visit_request' => $visit_request,
 				)
 			);
 		}
@@ -295,12 +305,19 @@ class Arriendo_Facil_Guest {
 				);
 			}
 
+			$visit_request = array( 'saved' => false, 'message' => 'visit_request_not_processed' );
+			try {
+				$visit_request = $this->create_or_update_visit_request( $accommodation_id, trim( $first_name . ' ' . $last_name ), $email, $phone, $visit_preferred_date, $visit_preferred_time, $visit_notes );
+			} catch ( Throwable $throwable ) {
+				error_log( 'Arriendo Facil visit request error (new guest): ' . $throwable->getMessage() );
+			}
+
 			wp_send_json_success(
 				array(
 					'id'      => $guest_id,
 					'message' => __( 'Registro enviado. Pronto nos contactaremos contigo.', 'arriendo-facil' ),
 					'contract' => $contract_info,
-					'visit_request' => $this->create_or_update_visit_request( $accommodation_id, trim( $first_name . ' ' . $last_name ), $email, $phone, $visit_preferred_date, $visit_preferred_time, $visit_notes ),
+					'visit_request' => $visit_request,
 				)
 			);
 		}
@@ -323,6 +340,15 @@ class Arriendo_Facil_Guest {
 				'message' => __( 'No se pudo registrar tu solicitud de arriendo. Intenta nuevamente en unos minutos.', 'arriendo-facil' ),
 			)
 		);
+		} catch ( Throwable $throwable ) {
+			error_log( 'Arriendo Facil ajax_create_guest_frontend exception: ' . $throwable->getMessage() );
+			wp_send_json_error(
+				array(
+					'message' => __( 'Error interno procesando tu solicitud. Intenta nuevamente en unos minutos.', 'arriendo-facil' ),
+				),
+				500
+			);
+		}
 	}
 
 	/**
@@ -2475,7 +2501,7 @@ class Arriendo_Facil_Guest {
 		$contract .= "Como garantia del cumplimiento de las obligaciones contractuales, EL ARRENDATARIO entrega: " . $guarantee_text . ". Dicha garantia sera devuelta al termino del contrato, previa verificacion del estado del inmueble y la ausencia de valores pendientes de pago, en un plazo no mayor a quince (15) dias habiles.\n";
 		$contract .= "\n";
 		$contract .= "CLAUSULA QUINTA - DESTINO Y USO DEL INMUEBLE\n";
-		$contract .= "El inmueble objeto de este contrato sera destinado unica y exclusivamente para uso habitacional de EL ARRENDATARIO y su nucleo familiar autorizado, compuesto por " . $personas . " persona(s) y " . $mascotas . " mascota(s) declarada(s). Queda expresamente prohibido subarrendar total o parcialmente el inmueble, ceder este contrato o cambiar el destino del bien sin autorizacion previa y escrita de EL ARRENDADOR.\n";
+		$contract .= "El inmueble objeto de este contrato sera destinado unica y exclusivamente para uso habitacional de EL ARRENDATARIO y su nucleo familiar autorizado, compuesto por " . $personas . " persona(s) y " . $mascotas . " mascota(s) declarada(s). Queda expresamente prohibido subarriendar total o parcialmente el inmueble, ceder este contrato o cambiar el destino del bien sin autorizacion previa y escrita de EL ARRENDADOR.\n";
 		$contract .= "\n";
 		$contract .= "CLAUSULA SEXTA - SERVICIOS BASICOS Y GASTOS\n";
 		$contract .= "Los servicios de energia electrica, agua potable, telefonia, internet y gas domiciliario seran de cargo exclusivo de EL ARRENDATARIO durante la vigencia del contrato. El impuesto predial y los gastos de administracion del inmueble (si aplican) corresponden a EL ARRENDADOR, salvo pacto expreso en contrario.\n";

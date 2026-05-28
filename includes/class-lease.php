@@ -369,7 +369,7 @@ class Arriendo_Facil_Lease {
 	public function attach_document( $lease_id, $document_url ) {
 		global $wpdb;
 		return (bool) $wpdb->update(
-			$wpdb->prefix . 'af_leases',
+				$wpdb->prefix . 'af_leases',
 			array( 'document_url' => esc_url_raw( $document_url ) ),
 			array( 'id' => absint( $lease_id ) ),
 			array( '%s' ),

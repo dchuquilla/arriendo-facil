@@ -245,10 +245,16 @@ $current_user_id = (int) get_current_user_id();
                     $account_status = '';
 					$status_label  = __( 'No user linked', 'arriendo-facil' );
 					$status_class  = 'is-inactive';
+                    $is_protected_admin_row = false;
                     $accommodations = array();
                     $is_current_user_row = ! empty( $contact->wp_user_id ) && (int) $contact->wp_user_id === $current_user_id;
 
                     if ( ! empty( $contact->wp_user_id ) ) {
+                        $row_user = get_user_by( 'id', (int) $contact->wp_user_id );
+                        if ( $row_user instanceof WP_User ) {
+                            $is_protected_admin_row = ( function_exists( 'is_super_admin' ) && is_super_admin( (int) $row_user->ID ) ) || user_can( $row_user, 'manage_options' );
+                        }
+
                         $account_status = (string) get_user_meta( (int) $contact->wp_user_id, 'af_owner_account_status', true );
                         if ( '' === $account_status ) {
                             $account_status = 'inactive';
@@ -303,7 +309,7 @@ $current_user_id = (int) get_current_user_id();
                             >
                                 <?php esc_html_e( 'Details', 'arriendo-facil' ); ?>
                             </button>
-							<?php if ( ! empty( $contact->wp_user_id ) && 'disabled' !== $account_status && ! $is_current_user_row ) : ?>
+							<?php if ( ! empty( $contact->wp_user_id ) && 'disabled' !== $account_status && ! $is_current_user_row && ! $is_protected_admin_row ) : ?>
                                 <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Disable this account? The user will no longer be able to log in.');" style="display:inline;">
                                     <input type="hidden" name="action" value="af_disable_owner_account" />
                                     <input type="hidden" name="user_id" value="<?php echo esc_attr( (int) $contact->wp_user_id ); ?>" />
@@ -312,6 +318,8 @@ $current_user_id = (int) get_current_user_id();
                                         <?php esc_html_e( 'Disable Account', 'arriendo-facil' ); ?>
                                     </button>
                                 </form>
+							<?php elseif ( $is_protected_admin_row ) : ?>
+								<span class="description" style="margin-left:6px;"><?php esc_html_e( 'No puedes desactivar una cuenta de administrador', 'arriendo-facil' ); ?></span>
 							<?php elseif ( $is_current_user_row ) : ?>
 								<span class="description" style="margin-left:6px;"><?php esc_html_e( 'No puedes desactivar tu propia cuenta', 'arriendo-facil' ); ?></span>
                             <?php elseif ( 'disabled' === $account_status ) : ?>

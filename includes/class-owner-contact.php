@@ -42,10 +42,45 @@ class Arriendo_Facil_Owner_Contact {
 		add_action( 'wp_ajax_af_analyze_owner_template', array( $this, 'ajax_analyze_owner_template' ) );
 		add_action( 'af_owner_contact_saved', array( $this, 'upload_sensitive_documents' ), 10, 2 );
 		add_action( 'admin_post_af_disable_owner_account', array( $this, 'handle_disable_owner_account_post' ) );
+		add_action( 'init', array( $this, 'restore_protected_admin_accounts' ), 5 );
 		add_action( 'after_password_reset', array( $this, 'handle_owner_password_reset' ), 10, 2 );
 		add_filter( 'authenticate', array( $this, 'block_disabled_owner_login' ), 30, 3 );
 		add_action( 'delete_user', array( $this, 'handle_owner_user_deleted' ), 10, 3 );
 		add_action( 'wpmu_delete_user', array( $this, 'handle_owner_user_deleted_network' ), 10, 1 );
+	}
+
+	/**
+	 * Restores protected admin accounts if they were accidentally marked as disabled.
+	 *
+	 * @return void
+	 */
+	public function restore_protected_admin_accounts() {
+		$disabled_users = get_users(
+			array(
+				'fields'     => array( 'ID' ),
+				'meta_key'   => 'af_owner_account_status',
+				'meta_value' => 'disabled',
+				'number'     => 200,
+			)
+		);
+
+		if ( empty( $disabled_users ) ) {
+			return;
+		}
+
+		foreach ( $disabled_users as $disabled_user ) {
+			$user_id = isset( $disabled_user->ID ) ? absint( $disabled_user->ID ) : 0;
+			if ( ! $user_id ) {
+				continue;
+			}
+
+			$user = get_user_by( 'id', $user_id );
+			if ( ! ( $user instanceof WP_User ) || ! $this->is_protected_admin_user( $user ) ) {
+				continue;
+			}
+
+			update_user_meta( $user_id, 'af_owner_account_status', 'active' );
+		}
 	}
 
 	/**
@@ -1050,6 +1085,10 @@ class Arriendo_Facil_Owner_Contact {
 			return new WP_Error( 'af_owner_not_found', __( 'User not found.', 'arriendo-facil' ) );
 		}
 
+		if ( $this->is_protected_admin_user( $user ) ) {
+			return new WP_Error( 'af_owner_disable_admin_forbidden', __( 'Admin accounts cannot be disabled.', 'arriendo-facil' ) );
+		}
+
 		update_user_meta( $user_id, 'af_owner_account_status', 'disabled' );
 
 		global $wpdb;
@@ -1128,6 +1167,11 @@ class Arriendo_Facil_Owner_Contact {
 
 		$account_status = get_user_meta( (int) $user->ID, 'af_owner_account_status', true );
 		if ( 'disabled' === $account_status ) {
+			if ( $this->is_protected_admin_user( $user ) ) {
+				update_user_meta( (int) $user->ID, 'af_owner_account_status', 'active' );
+				return $user;
+			}
+
 			return new WP_Error(
 				'af_owner_account_disabled',
 				__( '<strong>Error:</strong> Your account is disabled. Please contact support.', 'arriendo-facil' )
@@ -1135,6 +1179,26 @@ class Arriendo_Facil_Owner_Contact {
 		}
 
 		return $user;
+	}
+
+	/**
+	 * Determines if a user is an admin account that must never be disabled.
+	 *
+	 * @param WP_User $user User object.
+	 * @return bool
+	 */
+	private function is_protected_admin_user( $user ) {
+		if ( ! ( $user instanceof WP_User ) || empty( $user->ID ) ) {
+			return false;
+		}
+
+		$user_id = (int) $user->ID;
+
+		if ( function_exists( 'is_super_admin' ) && is_super_admin( $user_id ) ) {
+			return true;
+		}
+
+		return user_can( $user, 'manage_options' );
 	}
 
 	/**

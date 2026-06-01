@@ -286,6 +286,63 @@ class Arriendo_Facil_Activator {
 				KEY notification_type (notification_type),
 				KEY delivery_status (delivery_status)
 			) $charset_collate;",
+
+			// ── Facturación Electrónica SRI ──────────────────────────────────
+
+			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_emission_points (
+				id                       BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+				codigo_establecimiento   CHAR(3) NOT NULL DEFAULT '001',
+				codigo_punto_emision     CHAR(3) NOT NULL DEFAULT '001',
+				descripcion              VARCHAR(255) DEFAULT NULL,
+				activo                   TINYINT(1) NOT NULL DEFAULT 1,
+				secuencial_actual        BIGINT(20) UNSIGNED NOT NULL DEFAULT 1,
+				created_at               DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at               DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				UNIQUE KEY uniq_punto (codigo_establecimiento, codigo_punto_emision)
+			) $charset_collate;",
+
+			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_electronic_invoices (
+				id                   BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+				lease_id             BIGINT(20) UNSIGNED DEFAULT NULL,
+				cleaning_request_id  BIGINT(20) UNSIGNED DEFAULT NULL,
+				tipo_comprobante     VARCHAR(2) NOT NULL DEFAULT '01',
+				clave_acceso         CHAR(49) DEFAULT NULL,
+				numero_autorizacion  VARCHAR(49) DEFAULT NULL,
+				fecha_autorizacion   DATETIME DEFAULT NULL,
+				ambiente             TINYINT(1) NOT NULL DEFAULT 1,
+				estado               VARCHAR(20) NOT NULL DEFAULT 'generada',
+				numero_comprobante   VARCHAR(17) DEFAULT NULL,
+				subtotal_0           DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+				subtotal_iva         DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+				iva_valor            DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+				total                DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+				xml_firmado          LONGTEXT DEFAULT NULL,
+				xml_autorizacion     LONGTEXT DEFAULT NULL,
+				ride_path            VARCHAR(500) DEFAULT NULL,
+				errores              TEXT DEFAULT NULL,
+				created_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				UNIQUE KEY clave_acceso (clave_acceso),
+				KEY lease_id (lease_id),
+				KEY cleaning_request_id (cleaning_request_id),
+				KEY estado (estado),
+				KEY tipo_comprobante (tipo_comprobante)
+			) $charset_collate;",
+
+			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_sri_log (
+				id                BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+				invoice_id        BIGINT(20) UNSIGNED NOT NULL,
+				tipo_operacion    VARCHAR(20) NOT NULL,
+				request_payload   LONGTEXT DEFAULT NULL,
+				response_payload  LONGTEXT DEFAULT NULL,
+				http_status       INT DEFAULT NULL,
+				created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				KEY invoice_id (invoice_id),
+				KEY tipo_operacion (tipo_operacion)
+			) $charset_collate;",
 		);
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
@@ -619,6 +676,23 @@ class Arriendo_Facil_Activator {
 
 		if ( ! $wp_user_id_index_exists ) {
 			$wpdb->query( "ALTER TABLE {$owner_contacts_table} ADD KEY wp_user_id (wp_user_id)" );
+		}
+
+		// Seed a default emission point if none exists yet.
+		$emission_table = $wpdb->prefix . 'af_emission_points';
+		$ep_count       = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$emission_table}" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( 0 === $ep_count ) {
+			$wpdb->insert(
+				$emission_table,
+				array(
+					'codigo_establecimiento' => '001',
+					'codigo_punto_emision'   => '001',
+					'descripcion'            => 'Punto de emisión principal',
+					'activo'                 => 1,
+					'secuencial_actual'      => 1,
+				),
+				array( '%s', '%s', '%s', '%d', '%d' )
+			);
 		}
 
 		add_option( 'arriendo_facil_version', ARRIENDO_FACIL_VERSION );

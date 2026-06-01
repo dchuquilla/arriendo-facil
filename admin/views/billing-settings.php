@@ -1,0 +1,471 @@
+<?php
+/**
+ * Configuración SRI – Facturación Electrónica Ecuador.
+ *
+ * @package Arriendo_Facil
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+if ( ! current_user_can( 'manage_options' ) ) {
+	wp_die( esc_html__( 'No tienes permisos suficientes para acceder a esta página.', 'arriendo-facil' ) );
+}
+
+// ─── POST handlers ───────────────────────────────────────────────────────────
+
+$af_sri_notice = null;
+
+// Save general + environment settings.
+if ( isset( $_POST['af_save_sri_config'] ) ) {
+	check_admin_referer( 'af_sri_settings_nonce' );
+
+	$ruc = preg_replace( '/\D/', '', sanitize_text_field( wp_unslash( $_POST['af_ruc'] ?? '' ) ) );
+
+	$ruc_validation = Arriendo_Facil_SRI_Config::validate_ruc( $ruc );
+	if ( is_wp_error( $ruc_validation ) ) {
+		$af_sri_notice = array( 'type' => 'error', 'msg' => $ruc_validation->get_error_message() );
+	} else {
+		Arriendo_Facil_SRI_Config::save(
+			array(
+				'ruc'                   => $ruc,
+				'razon_social'          => sanitize_text_field( wp_unslash( $_POST['af_razon_social'] ?? '' ) ),
+				'nombre_comercial'      => sanitize_text_field( wp_unslash( $_POST['af_nombre_comercial'] ?? '' ) ),
+				'dir_establecimiento'   => sanitize_text_field( wp_unslash( $_POST['af_dir_establecimiento'] ?? '' ) ),
+				'dir_matriz'            => sanitize_text_field( wp_unslash( $_POST['af_dir_matriz'] ?? '' ) ),
+				'obligado_contabilidad' => sanitize_text_field( wp_unslash( $_POST['af_obligado_contabilidad'] ?? 'NO' ) ),
+				'ambiente'              => sanitize_key( wp_unslash( $_POST['af_ambiente'] ?? '1' ) ),
+				'email_notificacion'    => sanitize_email( wp_unslash( $_POST['af_email_notificacion'] ?? '' ) ),
+			)
+		);
+		$af_sri_notice = array( 'type' => 'success', 'msg' => __( 'Configuración guardada.', 'arriendo-facil' ) );
+	}
+}
+
+// Upload certificate.
+if ( isset( $_POST['af_upload_certificate'] ) ) {
+	check_admin_referer( 'af_sri_settings_nonce' );
+
+	if ( ! empty( $_FILES['af_cert_file']['name'] ) ) {
+		$upload_result = Arriendo_Facil_SRI_Config::upload_certificate( $_FILES['af_cert_file'] );
+		if ( is_wp_error( $upload_result ) ) {
+			$af_sri_notice = array( 'type' => 'error', 'msg' => $upload_result->get_error_message() );
+		} else {
+			$af_sri_notice = array( 'type' => 'success', 'msg' => __( 'Certificado subido correctamente.', 'arriendo-facil' ) );
+		}
+	}
+
+	// Save password if provided alongside upload.
+	$new_password = sanitize_text_field( wp_unslash( $_POST['af_cert_password'] ?? '' ) );
+	if ( '' !== $new_password ) {
+		Arriendo_Facil_SRI_Config::save_cert_password( $new_password );
+	}
+}
+
+// Test certificate.
+if ( isset( $_POST['af_test_certificate'] ) ) {
+	check_admin_referer( 'af_sri_settings_nonce' );
+
+	$cert_path = Arriendo_Facil_SRI_Config::cert_path();
+	$cert_pass = Arriendo_Facil_SRI_Config::cert_password();
+
+	if ( ! $cert_path ) {
+		$af_sri_notice = array( 'type' => 'error', 'msg' => __( 'No hay ningún certificado cargado.', 'arriendo-facil' ) );
+	} else {
+		$test_result = Arriendo_Facil_SRI_Config::test_certificate( $cert_path, $cert_pass );
+		if ( is_wp_error( $test_result ) ) {
+			$af_sri_notice = array( 'type' => 'error', 'msg' => $test_result->get_error_message() );
+		} else {
+			$af_sri_notice = array( 'type' => 'success', 'msg' => __( 'Certificado válido y legible. ✓', 'arriendo-facil' ) );
+		}
+	}
+}
+
+// Save/Add emission point.
+if ( isset( $_POST['af_save_emission_point'] ) ) {
+	check_admin_referer( 'af_sri_settings_nonce' );
+
+	global $wpdb;
+	$estab  = str_pad( preg_replace( '/\D/', '', sanitize_text_field( wp_unslash( $_POST['af_cod_estab'] ?? '001' ) ) ), 3, '0', STR_PAD_LEFT );
+	$punto  = str_pad( preg_replace( '/\D/', '', sanitize_text_field( wp_unslash( $_POST['af_cod_punto'] ?? '001' ) ) ), 3, '0', STR_PAD_LEFT );
+	$desc   = sanitize_text_field( wp_unslash( $_POST['af_punto_desc'] ?? '' ) );
+	$activo = isset( $_POST['af_punto_activo'] ) ? 1 : 0;
+
+	if ( strlen( $estab ) !== 3 || strlen( $punto ) !== 3 ) {
+		$af_sri_notice = array( 'type' => 'error', 'msg' => __( 'Los códigos de establecimiento y punto de emisión deben tener exactamente 3 dígitos.', 'arriendo-facil' ) );
+	} else {
+		$existing = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT id FROM {$wpdb->prefix}af_emission_points WHERE codigo_establecimiento = %s AND codigo_punto_emision = %s",
+				$estab,
+				$punto
+			)
+		);
+
+		if ( $existing ) {
+			$wpdb->update(
+				$wpdb->prefix . 'af_emission_points',
+				array(
+					'descripcion' => $desc,
+					'activo'      => $activo,
+				),
+				array( 'id' => (int) $existing ),
+				array( '%s', '%d' ),
+				array( '%d' )
+			);
+			$af_sri_notice = array( 'type' => 'success', 'msg' => __( 'Punto de emisión actualizado.', 'arriendo-facil' ) );
+		} else {
+			$wpdb->insert(
+				$wpdb->prefix . 'af_emission_points',
+				array(
+					'codigo_establecimiento' => $estab,
+					'codigo_punto_emision'   => $punto,
+					'descripcion'            => $desc,
+					'activo'                 => $activo,
+					'secuencial_actual'      => 1,
+				),
+				array( '%s', '%s', '%s', '%d', '%d' )
+			);
+			$af_sri_notice = array( 'type' => 'success', 'msg' => __( 'Punto de emisión creado.', 'arriendo-facil' ) );
+		}
+	}
+}
+
+// ─── Load current values ─────────────────────────────────────────────────────
+
+$cfg          = Arriendo_Facil_SRI_Config::get();
+$cert_path    = Arriendo_Facil_SRI_Config::cert_path();
+$cert_has_pwd = ( '' !== $cfg['cert_password_enc'] );
+
+global $wpdb;
+$emission_points = $wpdb->get_results(
+	"SELECT * FROM {$wpdb->prefix}af_emission_points ORDER BY codigo_establecimiento, codigo_punto_emision"
+);
+
+?>
+<div class="wrap">
+	<h1><?php esc_html_e( 'Configuración SRI – Facturación Electrónica', 'arriendo-facil' ); ?></h1>
+
+	<?php if ( $af_sri_notice ) : ?>
+		<div class="notice notice-<?php echo esc_attr( $af_sri_notice['type'] ); ?> is-dismissible">
+			<p><?php echo esc_html( $af_sri_notice['msg'] ); ?></p>
+		</div>
+	<?php endif; ?>
+
+	<?php if ( '2' === $cfg['ambiente'] ) : ?>
+		<div class="notice notice-warning">
+			<p>
+				<strong><?php esc_html_e( '⚠ Ambiente de PRODUCCIÓN activo.', 'arriendo-facil' ); ?></strong>
+				<?php esc_html_e( 'Los comprobantes emitidos son documentos tributarios con validez legal ante el SRI. Asegúrese de que el RUC y el certificado sean los definitivos.', 'arriendo-facil' ); ?>
+			</p>
+		</div>
+	<?php else : ?>
+		<div class="notice notice-info">
+			<p>
+				<?php esc_html_e( 'Ambiente de PRUEBAS activo. Los comprobantes se envían al servidor de certificación del SRI y no tienen validez tributaria.', 'arriendo-facil' ); ?>
+			</p>
+		</div>
+	<?php endif; ?>
+
+	<!-- ─── Datos del Emisor ──────────────────────────────────────────────── -->
+	<form method="post" action="">
+		<?php wp_nonce_field( 'af_sri_settings_nonce' ); ?>
+
+		<h2><?php esc_html_e( 'Datos del Emisor', 'arriendo-facil' ); ?></h2>
+		<table class="form-table" role="presentation">
+			<tr>
+				<th scope="row">
+					<label for="af_ruc"><?php esc_html_e( 'RUC', 'arriendo-facil' ); ?> <span class="description">(13 dígitos)</span></label>
+				</th>
+				<td>
+					<input type="text" id="af_ruc" name="af_ruc"
+						value="<?php echo esc_attr( $cfg['ruc'] ); ?>"
+						class="regular-text" maxlength="13" pattern="\d{13}"
+						placeholder="0912345678001"
+						required />
+				</td>
+			</tr>
+			<tr>
+				<th scope="row">
+					<label for="af_razon_social"><?php esc_html_e( 'Razón Social', 'arriendo-facil' ); ?></label>
+				</th>
+				<td>
+					<input type="text" id="af_razon_social" name="af_razon_social"
+						value="<?php echo esc_attr( $cfg['razon_social'] ); ?>"
+						class="large-text" maxlength="300" required />
+					<p class="description"><?php esc_html_e( 'Tal como aparece en el RUC del SRI.', 'arriendo-facil' ); ?></p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row">
+					<label for="af_nombre_comercial"><?php esc_html_e( 'Nombre Comercial', 'arriendo-facil' ); ?></label>
+				</th>
+				<td>
+					<input type="text" id="af_nombre_comercial" name="af_nombre_comercial"
+						value="<?php echo esc_attr( $cfg['nombre_comercial'] ); ?>"
+						class="large-text" maxlength="300" />
+					<p class="description"><?php esc_html_e( 'Opcional. Aparece en los comprobantes si es diferente a la razón social.', 'arriendo-facil' ); ?></p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row">
+					<label for="af_dir_establecimiento"><?php esc_html_e( 'Dirección del Establecimiento', 'arriendo-facil' ); ?></label>
+				</th>
+				<td>
+					<input type="text" id="af_dir_establecimiento" name="af_dir_establecimiento"
+						value="<?php echo esc_attr( $cfg['dir_establecimiento'] ); ?>"
+						class="large-text" maxlength="300" />
+				</td>
+			</tr>
+			<tr>
+				<th scope="row">
+					<label for="af_dir_matriz"><?php esc_html_e( 'Dirección Matriz', 'arriendo-facil' ); ?></label>
+				</th>
+				<td>
+					<input type="text" id="af_dir_matriz" name="af_dir_matriz"
+						value="<?php echo esc_attr( $cfg['dir_matriz'] ); ?>"
+						class="large-text" maxlength="300" />
+				</td>
+			</tr>
+			<tr>
+				<th scope="row">
+					<?php esc_html_e( 'Obligado a llevar Contabilidad', 'arriendo-facil' ); ?>
+				</th>
+				<td>
+					<fieldset>
+						<label>
+							<input type="radio" name="af_obligado_contabilidad" value="NO"
+								<?php checked( $cfg['obligado_contabilidad'], 'NO' ); ?> />
+							<?php esc_html_e( 'NO', 'arriendo-facil' ); ?>
+						</label>
+						&nbsp;&nbsp;
+						<label>
+							<input type="radio" name="af_obligado_contabilidad" value="SI"
+								<?php checked( $cfg['obligado_contabilidad'], 'SI' ); ?> />
+							<?php esc_html_e( 'SI', 'arriendo-facil' ); ?>
+						</label>
+					</fieldset>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row">
+					<label for="af_email_notificacion"><?php esc_html_e( 'Email para notificaciones de comprobantes', 'arriendo-facil' ); ?></label>
+				</th>
+				<td>
+					<input type="email" id="af_email_notificacion" name="af_email_notificacion"
+						value="<?php echo esc_attr( $cfg['email_notificacion'] ); ?>"
+						class="regular-text" />
+					<p class="description"><?php esc_html_e( 'Email del emisor al que el SRI envía la autorización.', 'arriendo-facil' ); ?></p>
+				</td>
+			</tr>
+		</table>
+
+		<h2><?php esc_html_e( 'Ambiente SRI', 'arriendo-facil' ); ?></h2>
+		<table class="form-table" role="presentation">
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Ambiente de emisión', 'arriendo-facil' ); ?></th>
+				<td>
+					<fieldset>
+						<label>
+							<input type="radio" name="af_ambiente" value="1"
+								<?php checked( $cfg['ambiente'], '1' ); ?> />
+							<strong><?php esc_html_e( 'Pruebas (Certificación)', 'arriendo-facil' ); ?></strong>
+							<span class="description"> — <?php esc_html_e( 'Servidor de certificación SRI. Sin validez tributaria.', 'arriendo-facil' ); ?></span>
+						</label>
+						<br />
+						<label>
+							<input type="radio" name="af_ambiente" value="2"
+								<?php checked( $cfg['ambiente'], '2' ); ?> />
+							<strong><?php esc_html_e( 'Producción', 'arriendo-facil' ); ?></strong>
+							<span class="description"> — <?php esc_html_e( 'Servidor productivo SRI. Comprobantes con validez legal.', 'arriendo-facil' ); ?></span>
+						</label>
+					</fieldset>
+				</td>
+			</tr>
+		</table>
+
+		<p class="submit">
+			<button type="submit" name="af_save_sri_config" class="button button-primary">
+				<?php esc_html_e( 'Guardar Configuración', 'arriendo-facil' ); ?>
+			</button>
+		</p>
+	</form>
+
+	<hr />
+
+	<!-- ─── Certificado Digital ──────────────────────────────────────────── -->
+	<h2><?php esc_html_e( 'Certificado Digital (P12)', 'arriendo-facil' ); ?></h2>
+
+	<table class="form-table" role="presentation">
+		<tr>
+			<th><?php esc_html_e( 'Estado actual', 'arriendo-facil' ); ?></th>
+			<td>
+				<?php if ( $cert_path ) : ?>
+					<span style="color:#2e7d32; font-weight:600;">
+						&#10003; <?php esc_html_e( 'Certificado cargado', 'arriendo-facil' ); ?>
+					</span>
+					&nbsp;
+					<span class="description"><?php echo esc_html( basename( $cert_path ) ); ?></span>
+					&nbsp;|&nbsp;
+					<?php if ( $cert_has_pwd ) : ?>
+						<span style="color:#2e7d32;">&#10003; <?php esc_html_e( 'Contraseña guardada', 'arriendo-facil' ); ?></span>
+					<?php else : ?>
+						<span style="color:#c62828;">&#10007; <?php esc_html_e( 'Sin contraseña', 'arriendo-facil' ); ?></span>
+					<?php endif; ?>
+				<?php else : ?>
+					<span style="color:#c62828;">&#10007; <?php esc_html_e( 'Ningún certificado cargado', 'arriendo-facil' ); ?></span>
+				<?php endif; ?>
+			</td>
+		</tr>
+	</table>
+
+	<form method="post" action="" enctype="multipart/form-data">
+		<?php wp_nonce_field( 'af_sri_settings_nonce' ); ?>
+		<table class="form-table" role="presentation">
+			<tr>
+				<th scope="row">
+					<label for="af_cert_file"><?php esc_html_e( 'Archivo .p12 / .pfx', 'arriendo-facil' ); ?></label>
+				</th>
+				<td>
+					<input type="file" id="af_cert_file" name="af_cert_file"
+						accept=".p12,.pfx" />
+					<p class="description">
+						<?php esc_html_e( 'Certificado emitido por el Banco Central del Ecuador o una entidad de certificación autorizada. Máx. 1 MB.', 'arriendo-facil' ); ?>
+					</p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row">
+					<label for="af_cert_password"><?php esc_html_e( 'Contraseña del certificado', 'arriendo-facil' ); ?></label>
+				</th>
+				<td>
+					<input type="password" id="af_cert_password" name="af_cert_password"
+						class="regular-text" autocomplete="new-password" />
+					<p class="description">
+						<?php
+						if ( $cert_has_pwd ) {
+							esc_html_e( 'Ya hay una contraseña guardada. Déjela en blanco para mantenerla.', 'arriendo-facil' );
+						} else {
+							esc_html_e( 'Introduzca la contraseña del archivo P12.', 'arriendo-facil' );
+						}
+						?>
+					</p>
+				</td>
+			</tr>
+		</table>
+		<p class="submit">
+			<button type="submit" name="af_upload_certificate" class="button button-primary">
+				<?php esc_html_e( 'Subir Certificado', 'arriendo-facil' ); ?>
+			</button>
+		</p>
+	</form>
+
+	<?php if ( $cert_path && $cert_has_pwd ) : ?>
+		<form method="post" action="">
+			<?php wp_nonce_field( 'af_sri_settings_nonce' ); ?>
+			<p>
+				<button type="submit" name="af_test_certificate" class="button">
+					<?php esc_html_e( 'Verificar certificado', 'arriendo-facil' ); ?>
+				</button>
+				<span class="description"><?php esc_html_e( 'Comprueba que el certificado se abre correctamente y no ha vencido.', 'arriendo-facil' ); ?></span>
+			</p>
+		</form>
+	<?php endif; ?>
+
+	<hr />
+
+	<!-- ─── Puntos de Emisión ────────────────────────────────────────────── -->
+	<h2><?php esc_html_e( 'Puntos de Emisión', 'arriendo-facil' ); ?></h2>
+	<p class="description">
+		<?php esc_html_e( 'Cada comprobante se asocia a un establecimiento y punto de emisión (serie). El punto activo con el secuencial más bajo se utiliza por defecto.', 'arriendo-facil' ); ?>
+	</p>
+
+	<?php if ( $emission_points ) : ?>
+		<table class="wp-list-table widefat fixed striped" style="max-width:800px;">
+			<thead>
+				<tr>
+					<th><?php esc_html_e( 'Establecimiento', 'arriendo-facil' ); ?></th>
+					<th><?php esc_html_e( 'Punto Emisión', 'arriendo-facil' ); ?></th>
+					<th><?php esc_html_e( 'Serie', 'arriendo-facil' ); ?></th>
+					<th><?php esc_html_e( 'Descripción', 'arriendo-facil' ); ?></th>
+					<th><?php esc_html_e( 'Secuencial actual', 'arriendo-facil' ); ?></th>
+					<th><?php esc_html_e( 'Activo', 'arriendo-facil' ); ?></th>
+				</tr>
+			</thead>
+			<tbody>
+				<?php foreach ( $emission_points as $pt ) : ?>
+					<tr>
+						<td><?php echo esc_html( $pt->codigo_establecimiento ); ?></td>
+						<td><?php echo esc_html( $pt->codigo_punto_emision ); ?></td>
+						<td><strong><?php echo esc_html( $pt->codigo_establecimiento . $pt->codigo_punto_emision ); ?></strong></td>
+						<td><?php echo esc_html( $pt->descripcion ?: '—' ); ?></td>
+						<td><?php echo esc_html( number_format( (int) $pt->secuencial_actual, 0, '', '' ) ); ?></td>
+						<td>
+							<?php if ( $pt->activo ) : ?>
+								<span style="color:#2e7d32;">&#10003;</span>
+							<?php else : ?>
+								<span style="color:#c62828;">&#10007;</span>
+							<?php endif; ?>
+						</td>
+					</tr>
+				<?php endforeach; ?>
+			</tbody>
+		</table>
+		<br />
+	<?php else : ?>
+		<p style="color:#c62828;"><?php esc_html_e( 'No hay puntos de emisión configurados. Agregue al menos uno.', 'arriendo-facil' ); ?></p>
+	<?php endif; ?>
+
+	<h3><?php esc_html_e( 'Agregar / Actualizar Punto de Emisión', 'arriendo-facil' ); ?></h3>
+	<form method="post" action="">
+		<?php wp_nonce_field( 'af_sri_settings_nonce' ); ?>
+		<table class="form-table" role="presentation" style="max-width:600px;">
+			<tr>
+				<th scope="row">
+					<label for="af_cod_estab"><?php esc_html_e( 'Código Establecimiento', 'arriendo-facil' ); ?></label>
+				</th>
+				<td>
+					<input type="text" id="af_cod_estab" name="af_cod_estab"
+						value="001" class="small-text" maxlength="3" pattern="\d{3}" required />
+					<span class="description"><?php esc_html_e( '3 dígitos (ej: 001)', 'arriendo-facil' ); ?></span>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row">
+					<label for="af_cod_punto"><?php esc_html_e( 'Código Punto de Emisión', 'arriendo-facil' ); ?></label>
+				</th>
+				<td>
+					<input type="text" id="af_cod_punto" name="af_cod_punto"
+						value="001" class="small-text" maxlength="3" pattern="\d{3}" required />
+					<span class="description"><?php esc_html_e( '3 dígitos (ej: 001)', 'arriendo-facil' ); ?></span>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row">
+					<label for="af_punto_desc"><?php esc_html_e( 'Descripción', 'arriendo-facil' ); ?></label>
+				</th>
+				<td>
+					<input type="text" id="af_punto_desc" name="af_punto_desc"
+						class="regular-text" maxlength="255"
+						placeholder="<?php esc_attr_e( 'Punto de emisión principal', 'arriendo-facil' ); ?>" />
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Activo', 'arriendo-facil' ); ?></th>
+				<td>
+					<label>
+						<input type="checkbox" name="af_punto_activo" value="1" checked />
+						<?php esc_html_e( 'Habilitado para emitir comprobantes', 'arriendo-facil' ); ?>
+					</label>
+				</td>
+			</tr>
+		</table>
+		<p class="submit">
+			<button type="submit" name="af_save_emission_point" class="button button-primary">
+				<?php esc_html_e( 'Guardar Punto de Emisión', 'arriendo-facil' ); ?>
+			</button>
+		</p>
+	</form>
+
+</div><!-- .wrap -->

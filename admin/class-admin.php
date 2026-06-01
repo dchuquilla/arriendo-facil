@@ -100,6 +100,24 @@ class Arriendo_Facil_Admin {
 			'af-ai-settings',
 			array( $this, 'render_ai_settings' )
 		);
+
+		add_submenu_page(
+			'arriendo-facil',
+			__( 'Facturación Electrónica', 'arriendo-facil' ),
+			__( 'Facturación', 'arriendo-facil' ),
+			'edit_posts',
+			'af-billing',
+			array( $this, 'render_billing' )
+		);
+
+		add_submenu_page(
+			'arriendo-facil',
+			__( 'Configuración SRI', 'arriendo-facil' ),
+			__( 'Config. SRI', 'arriendo-facil' ),
+			'manage_options',
+			'af-billing-settings',
+			array( $this, 'render_billing_settings' )
+		);
 	}
 
 	/**
@@ -333,6 +351,20 @@ class Arriendo_Facil_Admin {
 	 */
 	public function render_ai_settings() {
 		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/ai-settings.php';
+	}
+
+	/**
+	 * Renders the electronic billing list page.
+	 */
+	public function render_billing() {
+		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/billing.php';
+	}
+
+	/**
+	 * Renders the SRI configuration page.
+	 */
+	public function render_billing_settings() {
+		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/billing-settings.php';
 	}
 
 	/**

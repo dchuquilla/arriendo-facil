@@ -137,5 +137,46 @@ if ( ! isset( $GLOBALS['wpdb'] ) ) {
 	$GLOBALS['wpdb'] = new WPDB_Stub();
 }
 
+// ── Constants required by billing classes ──────────────────────────────────
+
+if ( ! defined( 'AUTH_KEY' ) ) {
+	define( 'AUTH_KEY', 'test-auth-key-arriendo-facil-billing' );
+}
+if ( ! defined( 'SECURE_AUTH_KEY' ) ) {
+	define( 'SECURE_AUTH_KEY', 'test-secure-auth-key-arriendo-facil-billing' );
+}
+if ( ! defined( 'WP_CONTENT_DIR' ) ) {
+	define( 'WP_CONTENT_DIR', sys_get_temp_dir() . '/af-test-wp-content' );
+}
+
+// ── Additional WP function stubs ─────────────────────────────────────────────
+
+if ( ! function_exists( 'update_option' ) ) {
+	function update_option( $option, $value, $autoload = null ) {
+		return true;
+	}
+}
+
+if ( ! function_exists( 'wp_mkdir_p' ) ) {
+	function wp_mkdir_p( $dir ) {
+		return is_dir( $dir ) || mkdir( $dir, 0755, true );
+	}
+}
+
+if ( ! function_exists( 'wp_date' ) ) {
+	function wp_date( $format, $timestamp = null ) {
+		return gmdate( $format, $timestamp ?? time() );
+	}
+}
+
+if ( ! function_exists( 'wp_generate_password' ) ) {
+	function wp_generate_password( $length = 12, $special_chars = true, $extra_special_chars = false ) {
+		return bin2hex( random_bytes( (int) ceil( $length / 2 ) ) );
+	}
+}
+
 // Load classes under test.
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ai-service.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-sri-config.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-sri-clave-acceso.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-sri-xml-factura.php';

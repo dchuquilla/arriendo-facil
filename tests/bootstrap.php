@@ -59,7 +59,12 @@ if ( ! function_exists( '__' ) ) {
 
 if ( ! function_exists( 'get_option' ) ) {
 	function get_option( $option, $default = false ) {
-		return $default;
+		if ( ! isset( $GLOBALS['af_test_options'] ) || ! is_array( $GLOBALS['af_test_options'] ) ) {
+			$GLOBALS['af_test_options'] = array();
+		}
+		return array_key_exists( $option, $GLOBALS['af_test_options'] )
+			? $GLOBALS['af_test_options'][ $option ]
+			: $default;
 	}
 }
 
@@ -153,6 +158,10 @@ if ( ! defined( 'WP_CONTENT_DIR' ) ) {
 
 if ( ! function_exists( 'update_option' ) ) {
 	function update_option( $option, $value, $autoload = null ) {
+		if ( ! isset( $GLOBALS['af_test_options'] ) || ! is_array( $GLOBALS['af_test_options'] ) ) {
+			$GLOBALS['af_test_options'] = array();
+		}
+		$GLOBALS['af_test_options'][ $option ] = $value;
 		return true;
 	}
 }
@@ -175,8 +184,38 @@ if ( ! function_exists( 'wp_generate_password' ) ) {
 	}
 }
 
+if ( ! function_exists( 'trailingslashit' ) ) {
+	function trailingslashit( $string ) {
+		return rtrim( (string) $string, '/\\' ) . '/';
+	}
+}
+
+if ( ! function_exists( 'wp_upload_dir' ) ) {
+	function wp_upload_dir() {
+		$base = WP_CONTENT_DIR . '/uploads';
+		if ( ! is_dir( $base ) ) {
+			mkdir( $base, 0755, true );
+		}
+		return array(
+			'basedir' => $base,
+			'baseurl' => 'http://example.com/wp-content/uploads',
+			'error'   => false,
+		);
+	}
+}
+
+if ( ! function_exists( 'wp_remote_retrieve_response_code' ) ) {
+	function wp_remote_retrieve_response_code( $response ) {
+		return is_array( $response ) ? ( $response['response']['code'] ?? 200 ) : 0;
+	}
+}
+
 // Load classes under test.
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ai-service.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-sri-config.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-sri-clave-acceso.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-sri-xml-factura.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-sri-signer.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-sri-soap-client.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-sri-ride.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-billing-manager.php';

@@ -704,6 +704,9 @@ class Arriendo_Facil_Activator {
 	 * Runs on plugin deactivation.
 	 */
 	public static function deactivate() {
+		if ( function_exists( 'wp_clear_scheduled_hook' ) ) {
+			wp_clear_scheduled_hook( 'af_sri_retry_cron' );
+		}
 		flush_rewrite_rules();
 	}
 }

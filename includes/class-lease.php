@@ -121,6 +121,8 @@ class Arriendo_Facil_Lease {
 			}
 		}
 
+		do_action( 'af_lease_activated', $lease_id );
+
 		wp_send_json_success(
 			array(
 				'message' => __( 'Document approved. Protected PDF is now active for view/download.', 'arriendo-facil' ),

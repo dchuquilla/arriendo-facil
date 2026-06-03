@@ -270,6 +270,193 @@ class Arriendo_Facil_Billing_Manager {
 	}
 
 	/**
+	 * Returns one invoice by ID.
+	 *
+	 * @param int $invoice_id Invoice ID.
+	 * @return object|null
+	 */
+	public function get_invoice( int $invoice_id ) {
+		if ( ! $this->wpdb || $invoice_id <= 0 ) {
+			return null;
+		}
+
+		return $this->wpdb->get_row(
+			$this->wpdb->prepare(
+				"SELECT * FROM {$this->wpdb->prefix}af_electronic_invoices WHERE id = %d LIMIT 1",
+				$invoice_id
+			)
+		);
+	}
+
+	/**
+	 * Returns latest invoice for a lease.
+	 *
+	 * @param int $lease_id Lease ID.
+	 * @return object|null
+	 */
+	public function get_latest_invoice_by_lease( int $lease_id ) {
+		if ( ! $this->wpdb || $lease_id <= 0 ) {
+			return null;
+		}
+
+		return $this->wpdb->get_row(
+			$this->wpdb->prepare(
+				"SELECT * FROM {$this->wpdb->prefix}af_electronic_invoices
+				 WHERE lease_id = %d
+				 ORDER BY id DESC
+				 LIMIT 1",
+				$lease_id
+			)
+		);
+	}
+
+	/**
+	 * Returns invoices eligible for retry.
+	 *
+	 * @param int $limit Maximum row count.
+	 * @return array<int, object>
+	 */
+	public function get_retry_candidates( int $limit = 20 ): array {
+		if ( ! $this->wpdb ) {
+			return array();
+		}
+
+		$limit = max( 1, min( 200, $limit ) );
+		return (array) $this->wpdb->get_results(
+			"SELECT * FROM {$this->wpdb->prefix}af_electronic_invoices
+			 WHERE estado IN ('error_envio', 'error_autorizacion', 'no_autorizada', 'devuelta', 'autorizada_sin_ride')
+			 ORDER BY updated_at ASC
+			 LIMIT " . (int) $limit
+		);
+	}
+
+	/**
+	 * Retries a previously generated invoice against SRI.
+	 *
+	 * @param int $invoice_id Invoice ID.
+	 * @return array|WP_Error
+	 */
+	public function retry_invoice( int $invoice_id ) {
+		$invoice = $this->get_invoice( $invoice_id );
+		if ( ! $invoice ) {
+			return new WP_Error( 'invoice_not_found', __( 'Comprobante no encontrado.', 'arriendo-facil' ) );
+		}
+
+		if ( empty( $invoice->clave_acceso ) ) {
+			return new WP_Error( 'missing_access_key', __( 'El comprobante no tiene clave de acceso.', 'arriendo-facil' ) );
+		}
+
+		if ( 'autorizada' === (string) $invoice->estado && ! empty( $invoice->ride_path ) && file_exists( (string) $invoice->ride_path ) ) {
+			return array(
+				'invoice_id' => (int) $invoice->id,
+				'estado'     => 'autorizada',
+				'message'    => __( 'El comprobante ya esta autorizado.', 'arriendo-facil' ),
+			);
+		}
+
+		$soap = call_user_func( $this->soap_factory, (string) $invoice->ambiente );
+
+		if ( in_array( (string) $invoice->estado, array( 'error_envio', 'devuelta' ), true ) && ! empty( $invoice->xml_firmado ) ) {
+			$recepcion = $soap->enviar( (string) $invoice->xml_firmado );
+			$this->log_sri( (int) $invoice->id, 'recepcion_retry', (string) $invoice->xml_firmado, $recepcion );
+
+			if ( is_wp_error( $recepcion ) ) {
+				$this->update_invoice_row(
+					(int) $invoice->id,
+					array(
+						'estado'  => 'error_envio',
+						'errores' => $recepcion->get_error_message(),
+					)
+				);
+				return $recepcion;
+			}
+
+			if ( 'DEVUELTA' === strtoupper( (string) ( $recepcion['estado'] ?? '' ) ) ) {
+				$errores = wp_json_encode( (array) ( $recepcion['mensajes'] ?? array() ) );
+				$this->update_invoice_row(
+					(int) $invoice->id,
+					array(
+						'estado'  => 'devuelta',
+						'errores' => $errores,
+					)
+				);
+				return new WP_Error( 'sri_devuelta', __( 'SRI devolvio el comprobante en reintento.', 'arriendo-facil' ), $recepcion );
+			}
+		}
+
+		$autorizacion = $soap->autorizar( (string) $invoice->clave_acceso );
+		$this->log_sri( (int) $invoice->id, 'autorizacion_retry', (string) $invoice->clave_acceso, $autorizacion );
+
+		if ( is_wp_error( $autorizacion ) ) {
+			$this->update_invoice_row(
+				(int) $invoice->id,
+				array(
+					'estado'  => 'error_autorizacion',
+					'errores' => $autorizacion->get_error_message(),
+				)
+			);
+			return $autorizacion;
+		}
+
+		if ( 'AUTORIZADO' !== strtoupper( (string) ( $autorizacion['estado'] ?? '' ) ) ) {
+			$errores = wp_json_encode( (array) ( $autorizacion['mensajes'] ?? array() ) );
+			$this->update_invoice_row(
+				(int) $invoice->id,
+				array(
+					'estado'  => 'no_autorizada',
+					'errores' => $errores,
+				)
+			);
+			return new WP_Error( 'sri_no_autorizada', __( 'SRI no autorizo el comprobante en reintento.', 'arriendo-facil' ), $autorizacion );
+		}
+
+		$ride_path = (string) ( $invoice->ride_path ?? '' );
+		if ( '' === $ride_path || ! file_exists( $ride_path ) ) {
+			$ride_result = $this->ride_generator->generate(
+				array(
+					'razon_social'            => '',
+					'ruc'                     => '',
+					'numero_comprobante'      => (string) ( $invoice->numero_comprobante ?? '' ),
+					'clave_acceso'            => (string) $invoice->clave_acceso,
+					'numero_autorizacion'     => (string) ( $autorizacion['numero_autorizacion'] ?? '' ),
+					'fecha_autorizacion'      => (string) ( $autorizacion['fecha_autorizacion'] ?? '' ),
+					'ambiente_label'          => (string) ( $autorizacion['ambiente'] ?? '' ),
+					'razon_social_comprador'  => 'CONSUMIDOR FINAL',
+					'identificacion_comprador'=> '9999999999999',
+					'subtotal_0'              => (float) ( $invoice->subtotal_0 ?? 0 ),
+					'subtotal_iva'            => (float) ( $invoice->subtotal_iva ?? 0 ),
+					'iva_valor'               => (float) ( $invoice->iva_valor ?? 0 ),
+					'total'                   => (float) ( $invoice->total ?? 0 ),
+					'items'                   => array(),
+				)
+			);
+
+			if ( ! is_wp_error( $ride_result ) ) {
+				$ride_path = (string) $ride_result['path'];
+			}
+		}
+
+		$this->update_invoice_row(
+			(int) $invoice->id,
+			array(
+				'estado'              => 'autorizada',
+				'numero_autorizacion' => (string) ( $autorizacion['numero_autorizacion'] ?? '' ),
+				'fecha_autorizacion'  => $this->normalize_datetime( (string) ( $autorizacion['fecha_autorizacion'] ?? '' ) ),
+				'xml_autorizacion'    => (string) ( $autorizacion['xml_autorizacion'] ?? '' ),
+				'ride_path'           => $ride_path,
+				'errores'             => '',
+			)
+		);
+
+		return array(
+			'invoice_id'          => (int) $invoice->id,
+			'estado'              => 'autorizada',
+			'numero_autorizacion' => (string) ( $autorizacion['numero_autorizacion'] ?? '' ),
+			'ride_path'           => $ride_path,
+		);
+	}
+
+	/**
 	 * Builds XML payload from issuer config + business payload.
 	 */
 	protected function build_xml_data( array $config, array $payload, array $totals, string $clave, array $emission ): array {

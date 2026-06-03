@@ -40,6 +40,7 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-sri-signer.php'
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-sri-soap-client.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-sri-ride.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-billing-manager.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-billing-api.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'admin/class-admin.php';
 
 register_activation_hook( __FILE__, array( 'Arriendo_Facil_Activator', 'activate' ) );
@@ -86,6 +87,7 @@ function arriendo_facil_init() {
 	new Arriendo_Facil_Owner_Contact();
 	new Arriendo_Facil_Owner_Register_API();
 	new Arriendo_Facil_Guest();
+	new Arriendo_Facil_Billing_API();
 	new Arriendo_Facil_Admin();
 }
 add_action( 'plugins_loaded', 'arriendo_facil_init' );

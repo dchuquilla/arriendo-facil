@@ -306,6 +306,7 @@ class Arriendo_Facil_Activator {
 				id                   BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
 				lease_id             BIGINT(20) UNSIGNED DEFAULT NULL,
 				cleaning_request_id  BIGINT(20) UNSIGNED DEFAULT NULL,
+				billing_period       CHAR(7) DEFAULT NULL COMMENT 'YYYY-MM del periodo facturado',
 				tipo_comprobante     VARCHAR(2) NOT NULL DEFAULT '01',
 				clave_acceso         CHAR(49) DEFAULT NULL,
 				numero_autorizacion  VARCHAR(49) DEFAULT NULL,
@@ -325,7 +326,9 @@ class Arriendo_Facil_Activator {
 				updated_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 				PRIMARY KEY (id),
 				UNIQUE KEY clave_acceso (clave_acceso),
+				UNIQUE KEY uniq_lease_period (lease_id, billing_period),
 				KEY lease_id (lease_id),
+				KEY billing_period (billing_period),
 				KEY cleaning_request_id (cleaning_request_id),
 				KEY estado (estado),
 				KEY tipo_comprobante (tipo_comprobante)

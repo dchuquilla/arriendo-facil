@@ -14,6 +14,12 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class Arriendo_Facil_Billing_API {
 
+	/** Retry meta option key. */
+	const RETRY_META_OPTION = 'af_sri_retry_meta';
+
+	/** Cron lock transient key. */
+	const RETRY_LOCK_TRANSIENT = 'af_sri_retry_lock';
+
 	/** @var Arriendo_Facil_Billing_Manager */
 	private $manager;
 
@@ -93,7 +99,7 @@ class Arriendo_Facil_Billing_API {
 	public function ajax_issue_invoice(): void {
 		check_ajax_referer( 'af_billing_nonce', 'nonce' );
 
-		if ( ! current_user_can( 'edit_posts' ) ) {
+		if ( ! $this->can_manage_billing() ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
@@ -122,7 +128,7 @@ class Arriendo_Facil_Billing_API {
 	public function ajax_retry_invoice(): void {
 		check_ajax_referer( 'af_billing_nonce', 'nonce' );
 
-		if ( ! current_user_can( 'edit_posts' ) ) {
+		if ( ! $this->can_manage_billing() ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
@@ -154,7 +160,7 @@ class Arriendo_Facil_Billing_API {
 			wp_die( esc_html__( 'Nonce invalido.', 'arriendo-facil' ), 403 );
 		}
 
-		if ( ! current_user_can( 'edit_posts' ) ) {
+		if ( ! $this->can_manage_billing() ) {
 			wp_die( esc_html__( 'Permiso denegado.', 'arriendo-facil' ), 403 );
 		}
 
@@ -169,7 +175,16 @@ class Arriendo_Facil_Billing_API {
 			wp_die( esc_html__( 'Archivo RIDE no encontrado.', 'arriendo-facil' ), 404 );
 		}
 
+		$ride_dir = ( new Arriendo_Facil_SRI_Ride() )->ride_dir();
+		$path_real = realpath( $path );
+		$dir_real  = is_string( $ride_dir ) ? realpath( $ride_dir ) : false;
+		if ( false === $path_real || false === $dir_real || 0 !== strpos( $path_real, $dir_real . DIRECTORY_SEPARATOR ) ) {
+			wp_die( esc_html__( 'Ruta de archivo no autorizada.', 'arriendo-facil' ), 403 );
+		}
+
 		nocache_headers();
+		header( 'X-Content-Type-Options: nosniff' );
+		header( 'X-Frame-Options: DENY' );
 		header( 'Content-Type: application/pdf' );
 		header( 'Content-Disposition: attachment; filename="RIDE-' . (int) $invoice->id . '.pdf"' );
 		header( 'Content-Length: ' . filesize( $path ) );
@@ -186,7 +201,7 @@ class Arriendo_Facil_Billing_API {
 			wp_die( esc_html__( 'Nonce invalido.', 'arriendo-facil' ), 403 );
 		}
 
-		if ( ! current_user_can( 'edit_posts' ) ) {
+		if ( ! $this->can_manage_billing() ) {
 			wp_die( esc_html__( 'Permiso denegado.', 'arriendo-facil' ), 403 );
 		}
 
@@ -208,6 +223,8 @@ class Arriendo_Facil_Billing_API {
 		}
 
 		nocache_headers();
+		header( 'X-Content-Type-Options: nosniff' );
+		header( 'X-Frame-Options: DENY' );
 		header( 'Content-Type: application/xml; charset=UTF-8' );
 		header( 'Content-Disposition: attachment; filename="comprobante-' . (int) $invoice->id . '.xml"' );
 		echo $xml; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
@@ -218,19 +235,74 @@ class Arriendo_Facil_Billing_API {
 	 * Cron worker: retries pending invoices.
 	 */
 	public function process_retry_queue(): void {
+		if ( get_transient( self::RETRY_LOCK_TRANSIENT ) ) {
+			return;
+		}
+		set_transient( self::RETRY_LOCK_TRANSIENT, 1, 5 * MINUTE_IN_SECONDS );
+
 		$candidates = $this->manager->get_retry_candidates( 20 );
 		if ( empty( $candidates ) ) {
+			delete_transient( self::RETRY_LOCK_TRANSIENT );
 			return;
 		}
 
+		$retry_meta = $this->get_retry_meta();
 		foreach ( $candidates as $invoice ) {
 			if ( ! isset( $invoice->id ) ) {
 				continue;
 			}
+
+			$invoice_id = (int) $invoice->id;
+			$meta       = isset( $retry_meta[ $invoice_id ] ) && is_array( $retry_meta[ $invoice_id ] ) ? $retry_meta[ $invoice_id ] : array();
+			$next_ts    = isset( $meta['next_ts'] ) ? (int) $meta['next_ts'] : 0;
+			if ( $next_ts > time() ) {
+				continue;
+			}
+
 			$result = $this->manager->retry_invoice( (int) $invoice->id );
 			if ( is_wp_error( $result ) ) {
-				error_log( 'Arriendo Facil billing retry failed invoice ' . (int) $invoice->id . ' => ' . $result->get_error_message() );
+				$attempts = isset( $meta['attempts'] ) ? (int) $meta['attempts'] + 1 : 1;
+				$delay    = min( 12 * HOUR_IN_SECONDS, (int) pow( 2, min( 10, $attempts ) ) * 60 );
+				$retry_meta[ $invoice_id ] = array(
+					'attempts' => $attempts,
+					'next_ts'  => time() + $delay,
+				);
+				error_log( 'Arriendo Facil billing retry failed invoice ' . $invoice_id . ' => ' . $result->get_error_message() );
+			} else {
+				unset( $retry_meta[ $invoice_id ] );
 			}
 		}
+
+		$this->save_retry_meta( $retry_meta );
+		delete_transient( self::RETRY_LOCK_TRANSIENT );
+	}
+
+	/**
+	 * Returns whether current user can manage electronic billing operations.
+	 *
+	 * @return bool
+	 */
+	private function can_manage_billing(): bool {
+		$default_capability = apply_filters( 'af_billing_capability', 'manage_options' );
+		return current_user_can( (string) $default_capability );
+	}
+
+	/**
+	 * Reads retry control metadata.
+	 *
+	 * @return array
+	 */
+	private function get_retry_meta(): array {
+		$meta = get_option( self::RETRY_META_OPTION, array() );
+		return is_array( $meta ) ? $meta : array();
+	}
+
+	/**
+	 * Persists retry control metadata.
+	 *
+	 * @param array $meta Retry metadata.
+	 */
+	private function save_retry_meta( array $meta ): void {
+		update_option( self::RETRY_META_OPTION, $meta, false );
 	}
 }

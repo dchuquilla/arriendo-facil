@@ -24,6 +24,15 @@ class Arriendo_Facil_SRI_Config {
 	/** OpenSSL cipher used to protect the certificate password at rest. */
 	const CIPHER = 'aes-256-cbc';
 
+	/** Authenticated cipher used for sensitive data at rest. */
+	const AEAD_CIPHER = 'aes-256-gcm';
+
+	/** Prefix for authenticated encrypted payloads. */
+	const AEAD_PREFIX = 'ENC2:';
+
+	/** Prefix for legacy CBC encrypted payloads. */
+	const LEGACY_PREFIX = 'ENC1:';
+
 	// ─── Config read / write ─────────────────────────────────────────────────
 
 	/**
@@ -357,11 +366,7 @@ class Arriendo_Facil_SRI_Config {
 	 * @return string Base64-encoded blob (IV prepended to ciphertext).
 	 */
 	public static function encrypt_password( string $plain ): string {
-		$key    = substr( hash( 'sha256', AUTH_KEY . SECURE_AUTH_KEY, true ), 0, 32 );
-		$iv_len = (int) openssl_cipher_iv_length( self::CIPHER );
-		$iv     = random_bytes( $iv_len );
-		$enc    = (string) openssl_encrypt( $plain, self::CIPHER, $key, OPENSSL_RAW_DATA, $iv );
-		return base64_encode( $iv . $enc );
+		return self::protect_sensitive( $plain );
 	}
 
 	/**
@@ -371,6 +376,15 @@ class Arriendo_Facil_SRI_Config {
 	 * @return string Plain-text password, or empty string on failure.
 	 */
 	public static function decrypt_password( string $encrypted ): string {
+		if ( self::starts_with( $encrypted, self::AEAD_PREFIX ) ) {
+			return self::unprotect_sensitive( $encrypted );
+		}
+
+		if ( self::starts_with( $encrypted, self::LEGACY_PREFIX ) ) {
+			return self::legacy_decrypt( substr( $encrypted, strlen( self::LEGACY_PREFIX ) ) );
+		}
+
+		// Backward compatibility for legacy AES-256-CBC payloads (without prefix).
 		$raw = base64_decode( $encrypted, true );
 		if ( false === $raw ) {
 			return '';
@@ -387,5 +401,123 @@ class Arriendo_Facil_SRI_Config {
 		$plain      = openssl_decrypt( $ciphertext, self::CIPHER, $key, OPENSSL_RAW_DATA, $iv );
 
 		return ( false === $plain ) ? '' : $plain;
+	}
+
+	/**
+	 * Encrypts sensitive data with authenticated encryption (AES-256-GCM).
+	 *
+	 * @param string $plain Plain text.
+	 * @return string Protected payload prefixed with AEAD_PREFIX.
+	 */
+	public static function protect_sensitive( string $plain ): string {
+		if ( '' === $plain ) {
+			return '';
+		}
+
+		$key = substr( hash( 'sha256', AUTH_KEY . SECURE_AUTH_KEY, true ), 0, 32 );
+
+		$iv_len = (int) openssl_cipher_iv_length( self::AEAD_CIPHER );
+		if ( $iv_len <= 0 ) {
+			return '';
+		}
+
+		$iv  = random_bytes( $iv_len );
+		$tag = '';
+		$enc = openssl_encrypt( $plain, self::AEAD_CIPHER, $key, OPENSSL_RAW_DATA, $iv, $tag );
+		if ( false === $enc || '' === $tag ) {
+			return self::legacy_encrypt( $plain );
+		}
+
+		return self::AEAD_PREFIX . base64_encode( $iv . $tag . $enc );
+	}
+
+	/**
+	 * Decrypts sensitive data protected by protect_sensitive().
+	 *
+	 * @param string $protected Protected payload.
+	 * @return string Decrypted text or empty string on failure.
+	 */
+	public static function unprotect_sensitive( string $protected ): string {
+		if ( '' === $protected ) {
+			return '';
+		}
+
+		if ( self::starts_with( $protected, self::AEAD_PREFIX ) ) {
+			$protected = substr( $protected, strlen( self::AEAD_PREFIX ) );
+		} elseif ( self::starts_with( $protected, self::LEGACY_PREFIX ) ) {
+			return self::legacy_decrypt( substr( $protected, strlen( self::LEGACY_PREFIX ) ) );
+		}
+
+		$raw = base64_decode( $protected, true );
+		if ( false === $raw ) {
+			return '';
+		}
+
+		$iv_len = (int) openssl_cipher_iv_length( self::AEAD_CIPHER );
+		$tag_len = 16;
+		if ( strlen( $raw ) <= ( $iv_len + $tag_len ) ) {
+			return '';
+		}
+
+		$iv         = substr( $raw, 0, $iv_len );
+		$tag        = substr( $raw, $iv_len, $tag_len );
+		$ciphertext = substr( $raw, $iv_len + $tag_len );
+		$key        = substr( hash( 'sha256', AUTH_KEY . SECURE_AUTH_KEY, true ), 0, 32 );
+
+		$plain = openssl_decrypt( $ciphertext, self::AEAD_CIPHER, $key, OPENSSL_RAW_DATA, $iv, $tag );
+		return false === $plain ? '' : (string) $plain;
+	}
+
+	/**
+	 * Legacy AES-256-CBC encryption helper.
+	 *
+	 * @param string $plain Plain text.
+	 * @return string
+	 */
+	private static function legacy_encrypt( string $plain ): string {
+		$key    = substr( hash( 'sha256', AUTH_KEY . SECURE_AUTH_KEY, true ), 0, 32 );
+		$iv_len = (int) openssl_cipher_iv_length( self::CIPHER );
+		$iv     = random_bytes( $iv_len );
+		$enc    = (string) openssl_encrypt( $plain, self::CIPHER, $key, OPENSSL_RAW_DATA, $iv );
+		return self::LEGACY_PREFIX . base64_encode( $iv . $enc );
+	}
+
+	/**
+	 * Legacy AES-256-CBC decryption helper.
+	 *
+	 * @param string $encrypted Base64 blob.
+	 * @return string
+	 */
+	private static function legacy_decrypt( string $encrypted ): string {
+		$raw = base64_decode( $encrypted, true );
+		if ( false === $raw ) {
+			return '';
+		}
+
+		$iv_len = (int) openssl_cipher_iv_length( self::CIPHER );
+		if ( strlen( $raw ) <= $iv_len ) {
+			return '';
+		}
+
+		$iv         = substr( $raw, 0, $iv_len );
+		$ciphertext = substr( $raw, $iv_len );
+		$key        = substr( hash( 'sha256', AUTH_KEY . SECURE_AUTH_KEY, true ), 0, 32 );
+		$plain      = openssl_decrypt( $ciphertext, self::CIPHER, $key, OPENSSL_RAW_DATA, $iv );
+
+		return ( false === $plain ) ? '' : (string) $plain;
+	}
+
+	/**
+	 * PHP 7.4-safe starts-with helper.
+	 *
+	 * @param string $haystack Full string.
+	 * @param string $needle Prefix to match.
+	 * @return bool
+	 */
+	private static function starts_with( string $haystack, string $needle ): bool {
+		if ( '' === $needle ) {
+			return true;
+		}
+		return 0 === strpos( $haystack, $needle );
 	}
 }

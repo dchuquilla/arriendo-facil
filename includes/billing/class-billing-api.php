@@ -36,6 +36,8 @@ class Arriendo_Facil_Billing_API {
 		add_action( 'wp_ajax_af_retry_invoice', array( $this, 'ajax_retry_invoice' ) );
 		add_action( 'wp_ajax_af_download_ride', array( $this, 'ajax_download_ride' ) );
 		add_action( 'wp_ajax_af_download_xml', array( $this, 'ajax_download_xml' ) );
+		add_action( 'wp_ajax_af_sri_ruc_lookup', array( $this, 'ajax_sri_ruc_lookup' ) );
+		add_action( 'wp_ajax_af_billing_lease_search', array( $this, 'ajax_billing_lease_search' ) );
 
 		add_filter( 'cron_schedules', array( $this, 'register_retry_schedule' ) );
 		add_action( 'init', array( $this, 'maybe_schedule_retry_cron' ) );
@@ -59,7 +61,8 @@ class Arriendo_Facil_Billing_API {
 	}
 
 	/**
-	 * Ensures cron event for SRI retries exists.
+	 * Ensures cron event for SRI error retries exists (every 15 min).
+	 * Billing issuance is always manual — no automatic monthly generation.
 	 */
 	public function maybe_schedule_retry_cron(): void {
 		if ( ! function_exists( 'wp_next_scheduled' ) || ! function_exists( 'wp_schedule_event' ) ) {
@@ -73,24 +76,12 @@ class Arriendo_Facil_Billing_API {
 
 	/**
 	 * Triggered when lease transitions to active state.
+	 * Billing is fully manual — this hook does NOT auto-issue an invoice.
 	 *
 	 * @param int $lease_id Lease ID.
 	 */
 	public function handle_lease_activated( $lease_id ): void {
-		$lease_id = absint( $lease_id );
-		if ( $lease_id <= 0 ) {
-			return;
-		}
-
-		$existing = $this->manager->get_latest_invoice_by_lease( $lease_id );
-		if ( $existing && in_array( (string) $existing->estado, array( 'autorizada', 'firmada', 'enviada' ), true ) ) {
-			return;
-		}
-
-		$result = $this->manager->issue_lease_invoice( $lease_id );
-		if ( is_wp_error( $result ) ) {
-			error_log( 'Arriendo Facil billing: lease invoice issue failed for lease ' . $lease_id . ' => ' . $result->get_error_message() );
-		}
+		// Intentionally left empty: invoices must be issued manually via the Leases admin page.
 	}
 
 	/**
@@ -108,8 +99,25 @@ class Arriendo_Facil_Billing_API {
 			wp_send_json_error( array( 'message' => __( 'Lease ID invalido.', 'arriendo-facil' ) ), 400 );
 		}
 
-		$result = $this->manager->issue_lease_invoice( $lease_id );
+		// Server-side lock: prevents duplicate submissions within 30 s (double-click, race condition).
+		$period   = Arriendo_Facil_Billing_Manager::billing_period();
+		$lock_key = 'af_inv_lock_' . $lease_id . '_' . substr( md5( $period ), 0, 8 );
+		if ( get_transient( $lock_key ) ) {
+			wp_send_json_error(
+				array(
+					'message' => __( 'Operación en progreso. Espere un momento antes de reintentar.', 'arriendo-facil' ),
+					'code'    => 'request_locked',
+				),
+				429
+			);
+		}
+		set_transient( $lock_key, 1, 30 );
+
+		$result = $this->manager->issue_lease_invoice( $lease_id, array( 'billing_period' => $period ) );
+
+		// Release lock immediately if the request failed (allows fast retry on real errors).
 		if ( is_wp_error( $result ) ) {
+			delete_transient( $lock_key );
 			wp_send_json_error(
 				array(
 					'message' => $result->get_error_message(),
@@ -304,5 +312,174 @@ class Arriendo_Facil_Billing_API {
 	 */
 	private function save_retry_meta( array $meta ): void {
 		update_option( self::RETRY_META_OPTION, $meta, false );
+	}
+
+	/**
+	 * AJAX: consults SRI public API to auto-fill issuer data by RUC.
+	 * Only accessible by admins (manage_options).
+	 */
+	public function ajax_sri_ruc_lookup(): void {
+		check_ajax_referer( 'af_sri_ruc_lookup', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$ruc = isset( $_POST['ruc'] ) ? preg_replace( '/\D/', '', sanitize_text_field( wp_unslash( $_POST['ruc'] ) ) ) : '';
+
+		if ( strlen( $ruc ) !== 13 ) {
+			wp_send_json_error( array( 'message' => __( 'El RUC debe tener exactamente 13 dígitos.', 'arriendo-facil' ) ), 400 );
+		}
+
+		$url = add_query_arg(
+			array( 'ruc' => rawurlencode( $ruc ) ),
+			'https://srienlinea.sri.gob.ec/sri-catastro-sujeto-servicio-internet/rest/ConsolidadoContribuyente/obtenerPorNumerosRuc'
+		);
+
+		$response = wp_remote_get(
+			$url,
+			array(
+				'timeout'     => 12,
+				'redirection' => 2,
+				'sslverify'   => true,
+				'headers'     => array(
+					'Accept'     => 'application/json',
+					'User-Agent' => 'Mozilla/5.0 (compatible; ArriendoFacil/1.0; +https://arriendofacil.ec)',
+				),
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			wp_send_json_error( array( 'message' => __( 'No se pudo conectar con el SRI. Verifique su conexión a internet.', 'arriendo-facil' ) ), 503 );
+		}
+
+		$code = (int) wp_remote_retrieve_response_code( $response );
+		if ( 200 !== $code ) {
+			wp_send_json_error(
+				array( 'message' => sprintf( __( 'El SRI respondió con error HTTP %d. Intente manualmente.', 'arriendo-facil' ), $code ) ),
+				502
+			);
+		}
+
+		$body = wp_remote_retrieve_body( $response );
+		$data = json_decode( $body, true );
+
+		if ( ! is_array( $data ) ) {
+			wp_send_json_error( array( 'message' => __( 'Respuesta inválida del SRI. Intente manualmente.', 'arriendo-facil' ) ), 502 );
+		}
+
+		// SRI API wraps data in 'contribuyente' key.
+		$c = isset( $data['contribuyente'] ) && is_array( $data['contribuyente'] ) ? $data['contribuyente'] : $data;
+
+		$razon_social     = $this->sri_field( $c, array( 'razonSocial', 'nombreContribuyente' ) );
+		$nombre_comercial = $this->sri_field( $c, array( 'nombreFantasia', 'nombreComercial' ) );
+		$obligado         = strtoupper( $this->sri_field( $c, array( 'obligadoLlevarContabilidad' ) ) );
+
+		$dir_establecimiento = '';
+		$dir_matriz          = '';
+
+		$establecimientos = isset( $c['establecimientos'] ) && is_array( $c['establecimientos'] ) ? $c['establecimientos'] : array();
+		foreach ( $establecimientos as $estab ) {
+			if ( ! is_array( $estab ) ) {
+				continue;
+			}
+			$tipo = strtoupper( (string) ( $estab['tipoEstablecimiento'] ?? '' ) );
+			$dir  = sanitize_text_field( (string) ( $estab['direccionCompleta'] ?? $estab['direccion'] ?? '' ) );
+			if ( '' === $dir ) {
+				continue;
+			}
+			if ( 'MATRIZ' === $tipo ) {
+				$dir_matriz = $dir;
+			}
+			if ( '' === $dir_establecimiento ) {
+				$dir_establecimiento = $dir;
+			}
+		}
+
+		if ( '' === $razon_social ) {
+			wp_send_json_error( array( 'message' => __( 'No se encontró información para este RUC en el SRI. Verifique el número o ingrese los datos manualmente.', 'arriendo-facil' ) ), 404 );
+		}
+
+		wp_send_json_success(
+			array(
+				'razon_social'          => $razon_social,
+				'nombre_comercial'      => $nombre_comercial,
+				'dir_establecimiento'   => $dir_establecimiento,
+				'dir_matriz'            => $dir_matriz,
+				'obligado_contabilidad' => ( 'SI' === $obligado ) ? 'SI' : 'NO',
+			)
+		);
+	}
+
+	/**
+	 * Extracts the first non-empty field from an array using a list of candidate keys.
+	 *
+	 * @param array  $data      Source data array.
+	 * @param array  $keys      Ordered list of candidate keys.
+	 * @return string
+	 */
+	private function sri_field( array $data, array $keys ): string {
+		foreach ( $keys as $key ) {
+			if ( isset( $data[ $key ] ) && '' !== (string) $data[ $key ] ) {
+				return sanitize_text_field( (string) $data[ $key ] );
+			}
+		}
+		return '';
+	}
+
+	/**
+	 * AJAX: searches leases by guest id_number / name for billing issue form.
+	 */
+	public function ajax_billing_lease_search(): void {
+		check_ajax_referer( 'af_billing_nonce', 'nonce' );
+
+		if ( ! $this->can_manage_billing() ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		global $wpdb;
+
+		$q = isset( $_POST['q'] ) ? sanitize_text_field( wp_unslash( $_POST['q'] ) ) : '';
+		if ( strlen( $q ) < 2 ) {
+			wp_send_json_success( array( 'leases' => array() ) );
+			return;
+		}
+
+		$like = '%' . $wpdb->esc_like( $q ) . '%';
+
+		$where_owner = '';
+		if ( class_exists( 'Arriendo_Facil_Accommodation' ) && Arriendo_Facil_Accommodation::user_is_owner() ) {
+			$owner_ids = Arriendo_Facil_Accommodation::get_owner_accommodation_ids( get_current_user_id() );
+			if ( empty( $owner_ids ) ) {
+				wp_send_json_success( array( 'leases' => array() ) );
+				return;
+			}
+			$ids_sql     = implode( ',', array_map( 'intval', $owner_ids ) );
+			$where_owner = " AND l.accommodation_id IN ($ids_sql)";
+		}
+
+		$results = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT l.id, l.monthly_rent, l.status,
+				        CONCAT(g.first_name, ' ', g.last_name) AS guest_name,
+				        g.id_number,
+				        p.post_title AS accommodation_title
+				 FROM {$wpdb->prefix}af_leases l
+				 LEFT JOIN {$wpdb->prefix}af_guests g ON g.id = l.guest_id
+				 LEFT JOIN {$wpdb->posts} p ON p.ID = l.accommodation_id
+				 WHERE (
+				     g.id_number LIKE %s
+				     OR g.first_name LIKE %s
+				     OR g.last_name LIKE %s
+				     OR CONCAT(g.first_name, ' ', g.last_name) LIKE %s
+				 )
+				 $where_owner
+				 ORDER BY l.id DESC
+				 LIMIT 20",
+				$like, $like, $like, $like
+			)
+		);
+
+		wp_send_json_success( array( 'leases' => array_values( (array) $results ) ) );
 	}
 }

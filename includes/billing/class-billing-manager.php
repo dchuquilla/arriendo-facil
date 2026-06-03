@@ -55,13 +55,70 @@ class Arriendo_Facil_Billing_Manager {
 	}
 
 	/**
+	 * Returns the YYYY-MM period string for a given date (defaults to today).
+	 *
+	 * @param DateTime|null $date Date to derive period from.
+	 * @return string e.g. "2026-06"
+	 */
+	public static function billing_period( ?DateTime $date = null ): string {
+		$d = $date ?? new DateTime();
+		return $d->format( 'Y-m' );
+	}
+
+	/**
+	 * Returns the invoice for a specific lease + billing period, or null.
+	 *
+	 * @param int    $lease_id Lease ID.
+	 * @param string $period   YYYY-MM period string.
+	 * @return object|null
+	 */
+	public function get_invoice_by_lease_period( int $lease_id, string $period ) {
+		if ( ! $this->wpdb || $lease_id <= 0 || '' === $period ) {
+			return null;
+		}
+		return $this->wpdb->get_row(
+			$this->wpdb->prepare(
+				"SELECT * FROM {$this->wpdb->prefix}af_electronic_invoices
+				 WHERE lease_id = %d AND billing_period = %s
+				 ORDER BY id DESC LIMIT 1",
+				$lease_id,
+				$period
+			)
+		);
+	}
+
+	/**
 	 * Full end-to-end issuance for a lease invoice.
 	 *
-	 * @param int   $lease_id Lease ID.
-	 * @param array $overrides Optional overrides: items, iva_codigo_porcentaje, fecha_emision, etc.
+	 * @param int   $lease_id  Lease ID.
+	 * @param array $overrides Optional overrides. Use key 'billing_period' (YYYY-MM) to target a specific month.
 	 * @return array|WP_Error
 	 */
 	public function issue_lease_invoice( int $lease_id, array $overrides = array() ) {
+		// Determine and extract billing period from overrides.
+		$period = isset( $overrides['billing_period'] )
+			? (string) $overrides['billing_period']
+			: self::billing_period();
+		unset( $overrides['billing_period'] );
+
+		// Duplicate guard: block re-issue for same period if a non-failed invoice exists.
+		$existing_period = $this->get_invoice_by_lease_period( $lease_id, $period );
+		if ( $existing_period ) {
+			$estado_existente = (string) $existing_period->estado;
+			$estados_validos  = array( 'generada', 'firmada', 'enviada', 'autorizada', 'autorizada_sin_ride' );
+			if ( in_array( $estado_existente, $estados_validos, true ) ) {
+				return new WP_Error(
+					'duplicate_invoice',
+					sprintf(
+						/* translators: 1: period YYYY-MM, 2: estado */
+						__( 'Ya existe un comprobante para el periodo %1$s (estado: %2$s). No se emite uno nuevo.', 'arriendo-facil' ),
+						$period,
+						$estado_existente
+					)
+				);
+			}
+		}
+
 		$context = $this->fetch_lease_context( $lease_id );
 		if ( is_wp_error( $context ) ) {
 			return $context;
@@ -75,7 +132,8 @@ class Arriendo_Facil_Billing_Manager {
 		return $this->issue_from_payload(
 			$payload,
 			array(
-				'lease_id' => $lease_id,
+				'lease_id'       => $lease_id,
+				'billing_period' => $period,
 			)
 		);
 	}
@@ -146,6 +204,7 @@ class Arriendo_Facil_Billing_Manager {
 			array_merge(
 				$context,
 				array(
+					'billing_period'     => isset( $context['billing_period'] ) ? (string) $context['billing_period'] : null,
 					'tipo_comprobante'   => $tipo_doc,
 					'clave_acceso'       => $clave,
 					'ambiente'           => (int) $ambiente,
@@ -648,6 +707,7 @@ class Arriendo_Facil_Billing_Manager {
 		$data = array(
 			'lease_id'            => isset( $row['lease_id'] ) ? (int) $row['lease_id'] : null,
 			'cleaning_request_id' => isset( $row['cleaning_request_id'] ) ? (int) $row['cleaning_request_id'] : null,
+			'billing_period'      => isset( $row['billing_period'] ) && '' !== $row['billing_period'] ? (string) $row['billing_period'] : null,
 			'tipo_comprobante'    => (string) $row['tipo_comprobante'],
 			'clave_acceso'        => (string) $row['clave_acceso'],
 			'ambiente'            => (int) $row['ambiente'],

@@ -184,6 +184,10 @@ $emission_points = $wpdb->get_results(
 						class="regular-text" maxlength="13" pattern="\d{13}"
 						placeholder="0912345678001"
 						required />
+					<button type="button" id="af-ruc-lookup-btn" class="button" style="margin-left:8px;">
+						<?php esc_html_e( '🔍 Consultar en SRI', 'arriendo-facil' ); ?>
+					</button>
+					<span id="af-ruc-lookup-status" style="margin-left:8px; font-style:italic;"></span>
 				</td>
 			</tr>
 			<tr>
@@ -469,3 +473,54 @@ $emission_points = $wpdb->get_results(
 	</form>
 
 </div><!-- .wrap -->
+
+<script>
+(function () {
+	var btn    = document.getElementById( 'af-ruc-lookup-btn' );
+	var status = document.getElementById( 'af-ruc-lookup-status' );
+	if ( ! btn ) return;
+
+	btn.addEventListener( 'click', function () {
+		var ruc = ( document.getElementById( 'af_ruc' ).value || '' ).replace( /\D/g, '' );
+		if ( ruc.length !== 13 ) {
+			status.innerHTML = '<span style="color:#c62828;">El RUC debe tener exactamente 13 dígitos.</span>';
+			return;
+		}
+		btn.disabled = true;
+		status.innerHTML = '<span style="color:#555;">Consultando SRI…</span>';
+
+		var data = new FormData();
+		data.append( 'action', 'af_sri_ruc_lookup' );
+		data.append( 'ruc', ruc );
+		data.append( 'nonce', '<?php echo esc_js( wp_create_nonce( 'af_sri_ruc_lookup' ) ); ?>' );
+
+		fetch( '<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>', {
+			method : 'POST',
+			body   : data,
+			credentials: 'same-origin',
+		} )
+		.then( function ( r ) { return r.json(); } )
+		.then( function ( resp ) {
+			if ( resp.success && resp.data ) {
+				var d = resp.data;
+				if ( d.razon_social )      { document.getElementById( 'af_razon_social' ).value        = d.razon_social; }
+				if ( d.nombre_comercial )  { document.getElementById( 'af_nombre_comercial' ).value    = d.nombre_comercial; }
+				if ( d.dir_establecimiento ) { document.getElementById( 'af_dir_establecimiento' ).value = d.dir_establecimiento; }
+				if ( d.dir_matriz )        { document.getElementById( 'af_dir_matriz' ).value          = d.dir_matriz; }
+				if ( d.obligado_contabilidad ) {
+					var radios = document.querySelectorAll( 'input[name="af_obligado_contabilidad"]' );
+					radios.forEach( function ( r ) { r.checked = ( r.value === d.obligado_contabilidad ); } );
+				}
+				status.innerHTML = '<span style="color:#2e7d32;">✓ Datos cargados desde el SRI. Revisa y guarda.</span>';
+			} else {
+				var msg = ( resp.data && resp.data.message ) ? resp.data.message : 'No se encontró información.';
+				status.innerHTML = '<span style="color:#c62828;">' + msg + '</span>';
+			}
+		} )
+		.catch( function () {
+			status.innerHTML = '<span style="color:#c62828;">Error de conexión con el SRI.</span>';
+		} )
+		.finally( function () { btn.disabled = false; } );
+	} );
+}());
+</script>

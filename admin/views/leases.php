@@ -39,6 +39,69 @@ if ( $is_owner ) {
 		 LIMIT 100"
 	);
 }
+
+// ── Batch-fetch billing state for the CURRENT period per visible lease ──────
+$billing_status_map    = array();
+$billing_current_month = class_exists( 'Arriendo_Facil_Billing_Manager' )
+	? Arriendo_Facil_Billing_Manager::billing_period()
+	: gmdate( 'Y-m' );
+
+if ( ! empty( $leases ) ) {
+	$lease_ids = array_filter( array_map( function( $l ) { return (int) $l->id; }, (array) $leases ) );
+	if ( ! empty( $lease_ids ) ) {
+		$ids_sql = implode( ',', $lease_ids );
+		// Current-period invoice (may be null → button shows).
+		$billing_rows_period = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT lease_id, id AS invoice_id, estado
+				 FROM {$wpdb->prefix}af_electronic_invoices
+				 WHERE lease_id IN ($ids_sql)
+				   AND billing_period = %s
+				 ORDER BY id DESC",
+				$billing_current_month
+			)
+		);
+		foreach ( (array) $billing_rows_period as $br ) {
+			$billing_status_map[ (int) $br->lease_id ] = array(
+				'invoice_id' => (int) $br->invoice_id,
+				'estado'     => (string) $br->estado,
+				'period'     => $billing_current_month,
+			);
+		}
+
+		// For leases with no current-period invoice, check if there's any invoice at all
+		// (to show last state as reference without blocking the Emitir button).
+		$no_current = array_diff(
+			$lease_ids,
+			array_keys( $billing_status_map )
+		);
+		if ( ! empty( $no_current ) ) {
+			$no_ids_sql  = implode( ',', array_map( 'intval', $no_current ) );
+			$prev_rows   = $wpdb->get_results(
+				"SELECT b.lease_id, b.id AS invoice_id, b.estado, b.billing_period
+				 FROM {$wpdb->prefix}af_electronic_invoices b
+				 INNER JOIN (
+				     SELECT lease_id, MAX(id) AS max_id
+				     FROM {$wpdb->prefix}af_electronic_invoices
+				     WHERE lease_id IN ($no_ids_sql)
+				     GROUP BY lease_id
+				 ) latest ON latest.max_id = b.id"
+			);
+			foreach ( (array) $prev_rows as $br ) {
+				// Mark as previous period so the view knows to show the Emitir button too.
+				$billing_status_map[ (int) $br->lease_id ] = array(
+					'invoice_id'  => (int) $br->invoice_id,
+					'estado'      => (string) $br->estado,
+					'period'      => (string) $br->billing_period,
+					'is_previous' => true,
+				);
+			}
+		}
+	}
+}
+
+$billing_nonce = wp_create_nonce( 'af_billing_nonce' );
+$can_bill      = current_user_can( (string) apply_filters( 'af_billing_capability', 'manage_options' ) );
 ?>
 <div class="wrap">
 	<h1><?php esc_html_e( 'Leases', 'arriendo-facil' ); ?></h1>
@@ -59,6 +122,7 @@ if ( $is_owner ) {
 				<th><?php esc_html_e( 'End Date', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Monthly Rent', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Status', 'arriendo-facil' ); ?></th>
+			<th><?php esc_html_e( 'Factura', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Document', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Actions', 'arriendo-facil' ); ?></th>
 			</tr>
@@ -115,8 +179,54 @@ if ( $is_owner ) {
 						<td><?php echo esc_html( $lease->start_date ); ?></td>
 						<td><?php echo esc_html( $lease->end_date ); ?></td>
 						<td><?php echo esc_html( number_format( (float) $lease->monthly_rent, 2 ) ); ?></td>
-						<td><?php echo esc_html( $lease->status ); ?></td>
-						<td class="af-lease-document-cell">
+						<td><?php echo esc_html( $lease->status ); ?></td>					<?php
+					$binfo  = isset( $billing_status_map[ (int) $lease->id ] ) ? $billing_status_map[ (int) $lease->id ] : null;
+					$estado_colores = array(
+						'autorizada'          => array( 'label' => 'Autorizada', 'color' => '#2e7d32' ),
+						'autorizada_sin_ride' => array( 'label' => 'Autorizada', 'color' => '#2e7d32' ),
+						'firmada'             => array( 'label' => 'Firmada',    'color' => '#1565c0' ),
+						'enviada'             => array( 'label' => 'Enviada',    'color' => '#1565c0' ),
+						'generada'            => array( 'label' => 'Generada',   'color' => '#555' ),
+						'devuelta'            => array( 'label' => 'Devuelta',   'color' => '#c62828' ),
+						'error_envio'         => array( 'label' => 'Error',      'color' => '#c62828' ),
+						'error_autorizacion'  => array( 'label' => 'Error',      'color' => '#c62828' ),
+						'no_autorizada'       => array( 'label' => 'No Aut.',    'color' => '#c62828' ),
+						'rechazada'           => array( 'label' => 'Rechazada',  'color' => '#c62828' ),
+						'anulada'             => array( 'label' => 'Anulada',    'color' => '#e65100' ),
+					);
+					?>
+					<td class="af-lease-billing-cell" id="af-billing-cell-<?php echo esc_attr( $lease->id ); ?>">
+						<?php
+						$is_current_period = $binfo && empty( $binfo['is_previous'] );
+						$is_prev_period    = $binfo && ! empty( $binfo['is_previous'] );
+						?>
+
+						<?php if ( $binfo ) : ?>
+							<?php
+							$ei      = isset( $estado_colores[ $binfo['estado'] ] ) ? $estado_colores[ $binfo['estado'] ] : array( 'label' => esc_html( $binfo['estado'] ), 'color' => '#555' );
+							$period_label = isset( $binfo['period'] ) && $binfo['period'] ? $binfo['period'] : '';
+							?>
+							<span style="font-weight:600; color:<?php echo esc_attr( $ei['color'] ); ?>; font-size:12px;">
+								<?php echo esc_html( $ei['label'] ); ?>
+							</span>
+							<?php if ( $period_label ) : ?>
+								<span style="color:#888; font-size:11px;"> (<?php echo esc_html( $period_label ); ?>)</span>
+							<?php endif; ?><br>
+							<small style="color:#888;">#<?php echo esc_html( $binfo['invoice_id'] ); ?></small>
+						<?php endif; ?>
+
+						<?php if ( ( ! $binfo || $is_prev_period ) && $can_bill && 'active' === (string) $lease->status ) : ?>
+							<br>
+							<button type="button"
+								class="button button-small af-lease-issue-invoice"
+								data-lease-id="<?php echo esc_attr( $lease->id ); ?>"
+								data-nonce="<?php echo esc_attr( $billing_nonce ); ?>">
+								<?php echo esc_html( sprintf( __( 'Emitir %s', 'arriendo-facil' ), $billing_current_month ) ); ?>
+							</button>
+						<?php elseif ( ! $binfo && ! $can_bill ) : ?>
+							<span style="color:#aaa; font-size:12px;">&mdash;</span>
+						<?php endif; ?>
+					</td>					<td class="af-lease-document-cell">
 							<?php if ( $versions_count > 0 || $lease->document_url ) : ?>
 								<a class="af-lease-view-link" href="<?php echo esc_url( $download_active ); ?>" target="_blank">
 									<?php esc_html_e( 'View', 'arriendo-facil' ); ?>
@@ -161,7 +271,7 @@ if ( $is_owner ) {
 				<?php endforeach; ?>
 			<?php else : ?>
 				<tr>
-					<td colspan="9"><?php esc_html_e( 'No leases found.', 'arriendo-facil' ); ?></td>
+					<td colspan="10"><?php esc_html_e( 'No leases found.', 'arriendo-facil' ); ?></td>
 				</tr>
 			<?php endif; ?>
 		</tbody>
@@ -194,3 +304,100 @@ if ( $is_owner ) {
 		</div>
 	</div>
 </div>
+
+<script>
+(function () {
+	// Two-step confirmation: first click arms the button, second click fires the request.
+	// This prevents accidental double-clicks from generating duplicate invoices.
+	var CONFIRM_TIMEOUT = 5000; // ms to auto-disarm if second click doesn't come.
+	var armed = {}; // keyed by leaseId
+
+	function disarm( leaseId, btn, origLabel ) {
+		clearTimeout( armed[ leaseId ] );
+		delete armed[ leaseId ];
+		if ( btn ) {
+			btn.textContent = origLabel;
+			btn.classList.remove( 'af-confirm-armed' );
+			btn.disabled = false;
+		}
+	}
+
+	document.addEventListener( 'click', function ( e ) {
+		var btn = e.target.closest( '.af-lease-issue-invoice' );
+		if ( ! btn || btn.disabled ) return;
+
+		var leaseId   = btn.dataset.leaseId;
+		var nonce     = btn.dataset.nonce;
+		var origLabel = btn.dataset.origLabel || btn.textContent.trim();
+		btn.dataset.origLabel = origLabel;
+
+		// ---- First click: arm / confirm prompt ----
+		if ( ! armed[ leaseId ] ) {
+			btn.textContent = '<?php echo esc_js( __( '¿Confirmar? (clic para emitir)', 'arriendo-facil' ) ); ?>';
+			btn.classList.add( 'af-confirm-armed' );
+			armed[ leaseId ] = setTimeout( function () {
+				disarm( leaseId, btn, origLabel );
+			}, CONFIRM_TIMEOUT );
+			return;
+		}
+
+		// ---- Second click: confirmed — fire request ----
+		clearTimeout( armed[ leaseId ] );
+		delete armed[ leaseId ];
+
+		var cell = document.getElementById( 'af-billing-cell-' + leaseId );
+
+		btn.disabled    = true;
+		btn.classList.remove( 'af-confirm-armed' );
+		btn.textContent = '<?php echo esc_js( __( 'Emitiendo…', 'arriendo-facil' ) ); ?>';
+
+		var formData = new FormData();
+		formData.append( 'action',   'af_issue_invoice' );
+		formData.append( 'lease_id', leaseId );
+		formData.append( 'nonce',    nonce );
+
+		fetch( '<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>', {
+			method      : 'POST',
+			body        : formData,
+			credentials : 'same-origin',
+		} )
+		.then( function ( r ) { return r.json(); } )
+		.then( function ( resp ) {
+			if ( resp.success ) {
+				var estado = ( resp.data && resp.data.estado ) ? resp.data.estado : 'generada';
+				var color  = ( 'autorizada' === estado || 'autorizada_sin_ride' === estado ) ? '#2e7d32'
+				           : ( 'error_envio' === estado || 'error_autorizacion' === estado ? '#c62828' : '#1565c0' );
+				var invId  = ( resp.data && resp.data.invoice_id ) ? '#' + resp.data.invoice_id : '';
+				var period = ( resp.data && resp.data.billing_period ) ? ' (' + resp.data.billing_period + ')' : '';
+				cell.innerHTML = '<span style="font-weight:600;color:' + color + ';font-size:12px;">' + estado + period + '</span><br><small style="color:#888;">' + invId + '</small>';
+			} else {
+				var msg = ( resp.data && resp.data.message ) ? resp.data.message : '<?php echo esc_js( __( 'Error al emitir', 'arriendo-facil' ) ); ?>';
+				// Re-show button so admin can retry (server lock released on error).
+				btn.disabled    = false;
+				btn.textContent = origLabel;
+				cell.querySelector( '.af-issue-error' ) && cell.querySelector( '.af-issue-error' ).remove();
+				var errSpan = document.createElement( 'span' );
+				errSpan.className = 'af-issue-error';
+				errSpan.style.cssText = 'display:block;color:#c62828;font-size:11px;margin-top:2px;';
+				errSpan.title = msg;
+				errSpan.textContent = '⚠ ' + msg.substring( 0, 60 ) + ( msg.length > 60 ? '…' : '' );
+				cell.appendChild( errSpan );
+			}
+		} )
+		.catch( function () {
+			btn.disabled    = false;
+			btn.textContent = origLabel;
+			var errSpan = document.createElement( 'span' );
+			errSpan.className = 'af-issue-error';
+			errSpan.style.cssText = 'display:block;color:#c62828;font-size:11px;margin-top:2px;';
+			errSpan.textContent = '⚠ <?php echo esc_js( __( 'Error de red', 'arriendo-facil' ) ); ?>';
+			cell.appendChild( errSpan );
+		} );
+	} );
+
+	// Style for armed state.
+	var style = document.createElement( 'style' );
+	style.textContent = '.af-confirm-armed{background:#c62828!important;border-color:#b71c1c!important;color:#fff!important;}';
+	document.head.appendChild( style );
+}());
+</script>

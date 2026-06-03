@@ -280,12 +280,23 @@ class Arriendo_Facil_Billing_Manager {
 			return null;
 		}
 
-		return $this->wpdb->get_row(
+		$invoice = $this->wpdb->get_row(
 			$this->wpdb->prepare(
 				"SELECT * FROM {$this->wpdb->prefix}af_electronic_invoices WHERE id = %d LIMIT 1",
 				$invoice_id
 			)
 		);
+
+		if ( $invoice ) {
+			if ( isset( $invoice->xml_firmado ) ) {
+				$invoice->xml_firmado = $this->unprotect_db_text( (string) $invoice->xml_firmado );
+			}
+			if ( isset( $invoice->xml_autorizacion ) ) {
+				$invoice->xml_autorizacion = $this->unprotect_db_text( (string) $invoice->xml_autorizacion );
+			}
+		}
+
+		return $invoice;
 	}
 
 	/**
@@ -646,7 +657,7 @@ class Arriendo_Facil_Billing_Manager {
 			'subtotal_iva'        => (float) $row['subtotal_iva'],
 			'iva_valor'           => (float) $row['iva_valor'],
 			'total'               => (float) $row['total'],
-			'xml_firmado'         => (string) $row['xml_firmado'],
+			'xml_firmado'         => $this->protect_db_text( (string) $row['xml_firmado'] ),
 		);
 
 		$this->wpdb->insert( $this->wpdb->prefix . 'af_electronic_invoices', $data );
@@ -660,6 +671,14 @@ class Arriendo_Facil_Billing_Manager {
 		if ( ! $this->wpdb || $invoice_id <= 0 || empty( $data ) ) {
 			return;
 		}
+
+		if ( isset( $data['xml_firmado'] ) ) {
+			$data['xml_firmado'] = $this->protect_db_text( (string) $data['xml_firmado'] );
+		}
+		if ( isset( $data['xml_autorizacion'] ) ) {
+			$data['xml_autorizacion'] = $this->protect_db_text( (string) $data['xml_autorizacion'] );
+		}
+
 		$this->wpdb->update(
 			$this->wpdb->prefix . 'af_electronic_invoices',
 			$data,
@@ -674,15 +693,83 @@ class Arriendo_Facil_Billing_Manager {
 		if ( ! $this->wpdb || $invoice_id <= 0 ) {
 			return;
 		}
+
+		$request_summary  = $this->summarize_payload( $request_payload );
+		$response_summary = $this->summarize_payload( $response_payload );
+
 		$this->wpdb->insert(
 			$this->wpdb->prefix . 'af_sri_log',
 			array(
 				'invoice_id'       => $invoice_id,
 				'tipo_operacion'   => $tipo_operacion,
-				'request_payload'  => is_scalar( $request_payload ) ? (string) $request_payload : wp_json_encode( $request_payload ),
-				'response_payload' => is_scalar( $response_payload ) ? (string) $response_payload : wp_json_encode( $response_payload ),
+				'request_payload'  => $this->protect_db_text( $request_summary ),
+				'response_payload' => $this->protect_db_text( $response_summary ),
 			)
 		);
+	}
+
+	/**
+	 * Encrypts sensitive DB text using authenticated encryption.
+	 *
+	 * @param string $plain Plain text.
+	 * @return string
+	 */
+	protected function protect_db_text( string $plain ): string {
+		if ( '' === $plain ) {
+			return '';
+		}
+
+		$enc = Arriendo_Facil_SRI_Config::protect_sensitive( $plain );
+		return '' !== $enc ? $enc : $plain;
+	}
+
+	/**
+	 * Decrypts DB text when stored with encryption prefix; keeps plaintext untouched.
+	 *
+	 * @param string $value Stored DB value.
+	 * @return string
+	 */
+	protected function unprotect_db_text( string $value ): string {
+		if ( '' === $value ) {
+			return '';
+		}
+
+		if ( 0 === strpos( $value, Arriendo_Facil_SRI_Config::AEAD_PREFIX ) || 0 === strpos( $value, Arriendo_Facil_SRI_Config::LEGACY_PREFIX ) ) {
+			$dec = Arriendo_Facil_SRI_Config::unprotect_sensitive( $value );
+			return '' !== $dec ? $dec : '';
+		}
+
+		return $value;
+	}
+
+	/**
+	 * Creates a redacted, bounded-size summary for audit logs.
+	 *
+	 * @param mixed $payload Request/response payload.
+	 * @return string
+	 */
+	protected function summarize_payload( $payload ): string {
+		if ( is_scalar( $payload ) ) {
+			$text = (string) $payload;
+		} else {
+			$text = wp_json_encode( $payload );
+		}
+
+		if ( false === $text ) {
+			$text = '';
+		}
+
+		$text = preg_replace( '/\s+/', ' ', $text );
+		$text = preg_replace( '/<X509Certificate>.*?<\/X509Certificate>/i', '<X509Certificate>[redacted]</X509Certificate>', $text );
+		$text = preg_replace( '/<SignatureValue>.*?<\/SignatureValue>/i', '<SignatureValue>[redacted]</SignatureValue>', $text );
+		$text = preg_replace( '/<claveAccesoComprobante>.*?<\/claveAccesoComprobante>/i', '<claveAccesoComprobante>[redacted]</claveAccesoComprobante>', $text );
+
+		if ( strlen( $text ) > 4000 ) {
+			$text = substr( $text, 0, 4000 ) . '...[truncated]';
+		}
+
+		$hash = hash( 'sha256', $text );
+		return '[sha256:' . $hash . '] ' . $text;
 	}
 
 	/**

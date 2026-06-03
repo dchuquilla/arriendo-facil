@@ -105,7 +105,7 @@ class Arriendo_Facil_Admin {
 			'arriendo-facil',
 			__( 'Facturación Electrónica', 'arriendo-facil' ),
 			__( 'Facturación', 'arriendo-facil' ),
-			'edit_posts',
+			(string) apply_filters( 'af_billing_capability', 'manage_options' ),
 			'af-billing',
 			array( $this, 'render_billing' )
 		);

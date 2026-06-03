@@ -9,7 +9,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-if ( ! current_user_can( 'edit_posts' ) ) {
+$billing_capability = apply_filters( 'af_billing_capability', 'manage_options' );
+if ( ! current_user_can( (string) $billing_capability ) ) {
 	wp_die( esc_html__( 'No tienes permisos suficientes para acceder a esta página.', 'arriendo-facil' ) );
 }
 

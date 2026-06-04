@@ -320,6 +320,7 @@ class Arriendo_Facil_Billing_API {
 
 	/**
 	 * AJAX: consults SRI public API to auto-fill issuer data by RUC.
+	 * Tries multiple endpoints with fallback strategy.
 	 * Only accessible by admins (manage_options).
 	 */
 	public function ajax_sri_ruc_lookup(): void {
@@ -335,59 +336,102 @@ class Arriendo_Facil_Billing_API {
 			wp_send_json_error( array( 'message' => __( 'El RUC debe tener exactamente 13 dígitos.', 'arriendo-facil' ) ), 400 );
 		}
 
-		$url = add_query_arg(
-			array( 'ruc' => $ruc ),
-			'https://srienlinea.sri.gob.ec/sri-catastro-sujeto-servicio-internet/rest/ConsolidadoContribuyente/obtenerPorNumerosRuc'
+		// Try multiple endpoints with fallback.
+		$endpoints = array(
+			'primary' => array(
+				'url'    => 'https://srienlinea.sri.gob.ec/sri-catastro-sujeto-servicio-internet/rest/ConsolidadoContribuyente/obtenerPorNumerosRuc',
+				'parser' => array( $this, 'parse_sri_catastro_response' ),
+			),
+			'secondary' => array(
+				'url'    => 'https://api.sri.gob.ec/api-dte/v1/contribuyente/ruc/{ruc}',
+				'parser' => array( $this, 'parse_sri_api_response' ),
+			),
 		);
 
-		$response = wp_remote_get(
-			$url,
-			array(
-				'timeout'     => 12,
-				'redirection' => 2,
-				'sslverify'   => true,
-				'headers'     => array(
-					'Accept'     => 'application/json',
-					'User-Agent' => 'Mozilla/5.0 (compatible; ArriendoFacil/1.0; +https://arriendofacil.ec)',
-				),
-			)
-		);
+		$last_error = null;
 
-		if ( is_wp_error( $response ) ) {
-			$msg        = $response->get_error_message();
-			$user_msg   = __( 'No se pudo conectar con el SRI.', 'arriendo-facil' );
-			$http_code  = 503;
+		foreach ( $endpoints as $name => $endpoint ) {
+			$url = str_replace( '{ruc}', $ruc, $endpoint['url'] );
 
-			if ( preg_match( '/cURL error 6/i', $msg ) ) {
-				$user_msg = __( 'Error DNS: no se pudo resolver el servidor del SRI. Verifique su conexión a internet.', 'arriendo-facil' );
-			} elseif ( preg_match( '/cURL error 28/i', $msg ) ) {
-				$user_msg = __( 'El SRI no respondió a tiempo. Intente de nuevo en unos minutos.', 'arriendo-facil' );
-				$http_code = 504;
-			} elseif ( preg_match( '/cURL error 7/i', $msg ) ) {
-				$user_msg = __( 'No se pudo conectar con el SRI. El servicio puede estar fuera de línea.', 'arriendo-facil' );
-			} elseif ( preg_match( '/ssl|certificate|handshake/i', $msg ) ) {
-				$user_msg = __( 'Error de certificado SSL con el SRI. Contacte al administrador.', 'arriendo-facil' );
+			if ( 'primary' === $name ) {
+				$url = add_query_arg( array( 'ruc' => $ruc ), $url );
 			}
 
-			wp_send_json_error( array( 'message' => $user_msg ), $http_code );
-		}
-
-		$code = (int) wp_remote_retrieve_response_code( $response );
-		if ( 200 !== $code ) {
-			wp_send_json_error(
-				array( 'message' => sprintf( __( 'El SRI respondió con error HTTP %d. Intente manualmente.', 'arriendo-facil' ), $code ) ),
-				502
+			$response = wp_remote_get(
+				$url,
+				array(
+					'timeout'     => 12,
+					'redirection' => 2,
+					'sslverify'   => true,
+					'headers'     => array(
+						'Accept'     => 'application/json',
+						'User-Agent' => 'Mozilla/5.0 (compatible; ArriendoFacil/1.0; +https://arriendofacil.ec)',
+					),
+				)
 			);
+
+			// Network error: try next endpoint.
+			if ( is_wp_error( $response ) ) {
+				$last_error = $response;
+				error_log( sprintf( '[RUC Lookup] %s endpoint failed: %s', $name, $response->get_error_message() ) );
+				continue;
+			}
+
+			$code = (int) wp_remote_retrieve_response_code( $response );
+
+			// Wrong status code: try next endpoint.
+			if ( 200 !== $code ) {
+				error_log( sprintf( '[RUC Lookup] %s endpoint HTTP %d', $name, $code ) );
+				continue;
+			}
+
+			$body = wp_remote_retrieve_body( $response );
+			$data = json_decode( $body, true );
+
+			// Invalid JSON: try next endpoint.
+			if ( ! is_array( $data ) ) {
+				error_log( '[RUC Lookup] ' . $name . ' endpoint returned invalid JSON' );
+				continue;
+			}
+
+			// Try to parse the response.
+			$parsed = call_user_func( $endpoint['parser'], $data );
+			if ( ! is_wp_error( $parsed ) && ! empty( $parsed['razon_social'] ) ) {
+				wp_send_json_success( $parsed );
+			}
+
+			$last_error = new WP_Error( 'sri_parse_error', 'Respuesta inválida del SRI.' );
 		}
 
-		$body = wp_remote_retrieve_body( $response );
-		$data = json_decode( $body, true );
+		// All endpoints failed: return user-friendly error.
+		if ( is_wp_error( $last_error ) ) {
+			$msg = $last_error->get_error_message();
 
-		if ( ! is_array( $data ) ) {
-			wp_send_json_error( array( 'message' => __( 'Respuesta inválida del SRI. Intente manualmente.', 'arriendo-facil' ) ), 502 );
+			if ( preg_match( '/cURL error 6/i', $msg ) ) {
+				$user_msg = __( 'Error DNS: no se pudo resolver el servidor del SRI. Verifique su conexión a internet o intente más tarde.', 'arriendo-facil' );
+			} elseif ( preg_match( '/cURL error 28/i', $msg ) ) {
+				$user_msg = __( 'El SRI no respondió a tiempo. Intente de nuevo en unos minutos.', 'arriendo-facil' );
+			} elseif ( preg_match( '/cURL error 7/i', $msg ) ) {
+				$user_msg = __( 'No se pudo conectar con el SRI. El servicio puede estar fuera de línea. Intente ingresando los datos manualmente.', 'arriendo-facil' );
+			} elseif ( preg_match( '/ssl|certificate|handshake/i', $msg ) ) {
+				$user_msg = __( 'Error de certificado SSL con el SRI. Intente más tarde o ingrese los datos manualmente.', 'arriendo-facil' );
+			} else {
+				$user_msg = __( 'No se encontró información para este RUC o el servicio del SRI no está disponible. Intente ingresando los datos manualmente.', 'arriendo-facil' );
+			}
+
+			wp_send_json_error( array( 'message' => $user_msg ), 503 );
 		}
 
-		// SRI API wraps data in 'contribuyente' key.
+		wp_send_json_error( array( 'message' => __( 'No se encontró información para este RUC. Intente ingresando los datos manualmente.', 'arriendo-facil' ) ), 404 );
+	}
+
+	/**
+	 * Parses SRI Catastro API response format.
+	 *
+	 * @param array $data JSON response data.
+	 * @return array|WP_Error
+	 */
+	private function parse_sri_catastro_response( array $data ) {
 		$c = isset( $data['contribuyente'] ) && is_array( $data['contribuyente'] ) ? $data['contribuyente'] : $data;
 
 		$razon_social     = $this->sri_field( $c, array( 'razonSocial', 'nombreContribuyente' ) );
@@ -416,17 +460,38 @@ class Arriendo_Facil_Billing_API {
 		}
 
 		if ( '' === $razon_social ) {
-			wp_send_json_error( array( 'message' => __( 'No se encontró información para este RUC en el SRI. Verifique el número o ingrese los datos manualmente.', 'arriendo-facil' ) ), 404 );
+			return new WP_Error( 'no_data', 'No data found' );
 		}
 
-		wp_send_json_success(
-			array(
-				'razon_social'          => $razon_social,
-				'nombre_comercial'      => $nombre_comercial,
-				'dir_establecimiento'   => $dir_establecimiento,
-				'dir_matriz'            => $dir_matriz,
-				'obligado_contabilidad' => ( 'SI' === $obligado ) ? 'SI' : 'NO',
-			)
+		return array(
+			'razon_social'          => $razon_social,
+			'nombre_comercial'      => $nombre_comercial,
+			'dir_establecimiento'   => $dir_establecimiento,
+			'dir_matriz'            => $dir_matriz,
+			'obligado_contabilidad' => ( 'SI' === $obligado ) ? 'SI' : 'NO',
+		);
+	}
+
+	/**
+	 * Parses alternative SRI API response format (fallback).
+	 *
+	 * @param array $data JSON response data.
+	 * @return array|WP_Error
+	 */
+	private function parse_sri_api_response( array $data ) {
+		// Alternative API format (if available in the future).
+		$razon_social = $this->sri_field( $data, array( 'razonSocial', 'razon_social', 'nombre' ) );
+
+		if ( '' === $razon_social ) {
+			return new WP_Error( 'no_data', 'No data found' );
+		}
+
+		return array(
+			'razon_social'          => $razon_social,
+			'nombre_comercial'      => $this->sri_field( $data, array( 'nombreComercial', 'nombre_comercial' ) ),
+			'dir_establecimiento'   => $this->sri_field( $data, array( 'direccionEstablecimiento', 'direccion' ) ),
+			'dir_matriz'            => $this->sri_field( $data, array( 'direccionMatriz', 'direccion_matriz' ) ),
+			'obligado_contabilidad' => ( 'SI' === strtoupper( $this->sri_field( $data, array( 'obligadoLlevarContabilidad', 'obligado_contabilidad' ) ) ) ) ? 'SI' : 'NO',
 		);
 	}
 

@@ -89,8 +89,10 @@ class Arriendo_Facil_Accommodation {
 		$query->set( 'post_type', 'accommodation' );
 		$query->set( 'post_status', 'publish' );
 		$query->set( 'ignore_sticky_posts', true );
-		$query->set( 'posts_per_page', -1 );
-		$query->set( 'nopaging', true );
+		$query->set( 'posts_per_page', 100 );
+		$query->set( 'nopaging', false );
+		$paged = get_query_var( 'paged' ) ? absint( get_query_var( 'paged' ) ) : 1;
+		$query->set( 'paged', $paged );
 
 		$featured_tax_query = $this->get_featured_tax_query();
 		if ( ! empty( $featured_tax_query ) ) {
@@ -257,16 +259,22 @@ class Arriendo_Facil_Accommodation {
 	public function render_managed_accommodations_shortcode() {
 		$featured_tax_query = $this->get_featured_tax_query();
 
-		$accommodations = get_posts(
-			array(
-				'post_type'      => 'accommodation',
-				'post_status'    => 'publish',
-				'posts_per_page' => -1,
-				'orderby'        => 'date',
-				'order'          => 'DESC',
-				'tax_query'      => $featured_tax_query,
-			)
-		);
+		$cache_key      = 'af_managed_accommodations_' . md5( wp_json_encode( $featured_tax_query ) );
+		$accommodations = get_transient( $cache_key );
+
+		if ( false === $accommodations ) {
+			$accommodations = get_posts(
+				array(
+					'post_type'      => 'accommodation',
+					'post_status'    => 'publish',
+					'posts_per_page' => 100,
+					'orderby'        => 'date',
+					'order'          => 'DESC',
+					'tax_query'      => $featured_tax_query,
+				)
+			);
+			set_transient( $cache_key, $accommodations, 12 * HOUR_IN_SECONDS );
+		}
 
 		ob_start();
 		?>
@@ -327,16 +335,22 @@ class Arriendo_Facil_Accommodation {
 	public function render_featured_accommodation_shortcode() {
 		$featured_tax_query = $this->get_featured_tax_query();
 
-		$accommodations = get_posts(
-			array(
-				'post_type'      => 'accommodation',
-				'post_status'    => 'publish',
-				'posts_per_page' => -1,
-				'orderby'        => 'date',
-				'order'          => 'DESC',
-				'tax_query'      => $featured_tax_query,
-			)
-		);
+		$cache_key      = 'af_featured_accommodations_' . md5( wp_json_encode( $featured_tax_query ) );
+		$accommodations = get_transient( $cache_key );
+
+		if ( false === $accommodations ) {
+			$accommodations = get_posts(
+				array(
+					'post_type'      => 'accommodation',
+					'post_status'    => 'publish',
+					'posts_per_page' => 12,
+					'orderby'        => 'date',
+					'order'          => 'DESC',
+					'tax_query'      => $featured_tax_query,
+				)
+			);
+			set_transient( $cache_key, $accommodations, 12 * HOUR_IN_SECONDS );
+		}
 
 		if ( empty( $accommodations ) ) {
 			return '<p>' . esc_html__( 'No hay accommodation disponible para destacar.', 'arriendo-facil' ) . '</p>';
@@ -604,7 +618,7 @@ class Arriendo_Facil_Accommodation {
 		return get_posts( array(
 			'post_type'      => 'accommodation',
 			'post_status'    => 'any',
-			'posts_per_page' => -1,
+			'posts_per_page' => 500,
 			'fields'         => 'ids',
 			'meta_query'     => array(
 				array( 'key' => '_af_owner_id', 'value' => absint( $user_id ) ),
@@ -613,14 +627,16 @@ class Arriendo_Facil_Accommodation {
 	}
 
 	/**
-	 * Invalidates search result cache.
+	 * Invalidates search result and shortcode cache.
 	 */
 	private function invalidate_search_cache() {
 		global $wpdb;
 		$wpdb->query(
 			$wpdb->prepare(
-				"DELETE FROM $wpdb->options WHERE option_name LIKE %s",
-				'_transient_af_search_results_%'
+				"DELETE FROM $wpdb->options WHERE option_name LIKE %s OR option_name LIKE %s OR option_name LIKE %s",
+				'_transient_af_search_results_%',
+				'_transient_af_managed_accommodations_%',
+				'_transient_af_featured_accommodations_%'
 			)
 		);
 	}

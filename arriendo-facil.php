@@ -103,7 +103,7 @@ function arriendo_facil_maybe_upgrade_schema() {
 		return;
 	}
 
-	$target_schema_version = '2026-05-rental-workflow-1';
+	$target_schema_version = '2026-06-performance-1';
 	$current_schema_version = (string) get_option( 'af_db_schema_version', '' );
 
 	if ( $current_schema_version === $target_schema_version ) {
@@ -180,12 +180,17 @@ function arriendo_facil_enqueue_chatbot_assets() {
 		array(
 			'post_type'      => 'accommodation',
 			'post_status'    => 'publish',
-			'posts_per_page' => -1,
+			'posts_per_page' => 100,
 			'orderby'        => 'title',
 			'order'          => 'ASC',
 			'fields'         => 'ids',
 		)
 	);
+
+	if ( ! empty( $accommodation_posts ) ) {
+		// Batch-prime meta cache to avoid N+1 queries in the foreach below.
+		update_meta_cache( 'post', $accommodation_posts );
+	}
 
 	if ( $current_accommodation_id && in_array( $current_accommodation_id, $accommodation_posts, true ) ) {
 		$current_index = array_search( $current_accommodation_id, $accommodation_posts, true );
@@ -300,3 +305,47 @@ function arriendo_facil_render_chatbot_widget() {
 }
 add_action( 'wp_footer', 'arriendo_facil_render_chatbot_widget' );
 add_action( 'wp_body_open', 'arriendo_facil_render_chatbot_widget' );
+
+/**
+ * WP-Cron callback: processes pending AI queue tasks in the background.
+ */
+add_action( 'af_process_ai_queue', array( 'Arriendo_Facil_AI_Service', 'process_queued_ai_tasks' ) );
+
+/**
+ * REST endpoint: returns the status of a queued AI task.
+ *
+ * GET /wp-json/af/v1/ai-queue/{id}
+ */
+add_action(
+	'rest_api_init',
+	function () {
+		register_rest_route(
+			'af/v1',
+			'/ai-queue/(?P<id>\d+)',
+			array(
+				'methods'             => 'GET',
+				'callback'            => function ( WP_REST_Request $request ) {
+					$queue_id = absint( $request->get_param( 'id' ) );
+					$service  = new Arriendo_Facil_AI_Service();
+					$status   = $service->get_queue_status( $queue_id );
+
+					if ( is_wp_error( $status ) ) {
+						return new WP_REST_Response( array( 'error' => $status->get_error_message() ), 404 );
+					}
+
+					return new WP_REST_Response( $status, 200 );
+				},
+				'permission_callback' => function () {
+					return is_user_logged_in();
+				},
+				'args'                => array(
+					'id' => array(
+						'type'              => 'integer',
+						'required'          => true,
+						'sanitize_callback' => 'absint',
+					),
+				),
+			)
+		);
+	}
+);

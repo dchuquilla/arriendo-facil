@@ -142,15 +142,20 @@ class Arriendo_Facil_Accommodation_Search_API {
 			return new WP_REST_Response( $cached_results, 200 );
 		}
 
-		// Get all accommodations
+		// Get all accommodations (capped to prevent memory exhaustion)
 		$all_accommodations = get_posts(
 			array(
 				'post_type'      => 'accommodation',
 				'post_status'    => 'publish',
-				'posts_per_page' => -1,
+				'posts_per_page' => 500,
 				'fields'         => 'ids',
 			)
 		);
+
+		if ( ! empty( $all_accommodations ) ) {
+			// Batch-prime meta cache to eliminate N+1 queries in the loop below.
+			update_meta_cache( 'post', $all_accommodations );
+		}
 
 		if ( empty( $all_accommodations ) ) {
 			return new WP_REST_Response(

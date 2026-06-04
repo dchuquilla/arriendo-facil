@@ -170,6 +170,22 @@ class Arriendo_Facil_Activator {
 				PRIMARY KEY (id)
 			) $charset_collate;",
 
+			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_ai_processing_queue (
+				id          BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+				action      VARCHAR(100) NOT NULL,
+				context     LONGTEXT NOT NULL,
+				result      LONGTEXT DEFAULT NULL,
+				status      VARCHAR(20) NOT NULL DEFAULT 'pending',
+				user_id     BIGINT(20) UNSIGNED DEFAULT NULL,
+				attempts    TINYINT(3) UNSIGNED NOT NULL DEFAULT 0,
+				error_msg   TEXT DEFAULT NULL,
+				created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				KEY status_created (status, created_at),
+				KEY user_id (user_id)
+			) $charset_collate;",
+
 			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_guests (
 				id          BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
 				user_id     BIGINT(20) UNSIGNED DEFAULT NULL,
@@ -700,7 +716,56 @@ class Arriendo_Facil_Activator {
 
 		add_option( 'arriendo_facil_version', ARRIENDO_FACIL_VERSION );
 		update_option( 'arriendo_facil_version', ARRIENDO_FACIL_VERSION );
+
+		// Performance indexes on wp_postmeta (conditional – safe to re-run).
+		self::maybe_add_performance_indexes();
+
 		flush_rewrite_rules();
+	}
+
+	/**
+	 * Creates performance-critical indexes on wp_postmeta for accommodation
+	 * meta key lookups. Each index is guarded to avoid duplicate-key errors.
+	 */
+	private static function maybe_add_performance_indexes() {
+		global $wpdb;
+
+		$postmeta_table = $wpdb->postmeta;
+		$leases_table   = $wpdb->prefix . 'af_leases';
+
+		$indexes = array(
+			array(
+				'table' => $postmeta_table,
+				'name'  => 'idx_af_meta_key_value',
+				'sql'   => "ALTER TABLE {$postmeta_table} ADD INDEX idx_af_meta_key_value (meta_key(64), meta_value(100))",
+			),
+			array(
+				'table' => $postmeta_table,
+				'name'  => 'idx_af_meta_key_post',
+				'sql'   => "ALTER TABLE {$postmeta_table} ADD INDEX idx_af_meta_key_post (meta_key(64), post_id)",
+			),
+			array(
+				'table' => $leases_table,
+				'name'  => 'idx_af_leases_status_created',
+				'sql'   => "ALTER TABLE {$leases_table} ADD INDEX idx_af_leases_status_created (status, created_at DESC)",
+			),
+		);
+
+		foreach ( $indexes as $index ) {
+			$exists = $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS
+					 WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND INDEX_NAME = %s",
+					DB_NAME,
+					$index['table'],
+					$index['name']
+				)
+			);
+
+			if ( ! $exists ) {
+				$wpdb->query( $index['sql'] ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			}
+		}
 	}
 
 	/**
@@ -709,6 +774,7 @@ class Arriendo_Facil_Activator {
 	public static function deactivate() {
 		if ( function_exists( 'wp_clear_scheduled_hook' ) ) {
 			wp_clear_scheduled_hook( 'af_sri_retry_cron' );
+			wp_clear_scheduled_hook( 'af_process_ai_queue' );
 		}
 		flush_rewrite_rules();
 	}

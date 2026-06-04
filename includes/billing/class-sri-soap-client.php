@@ -45,18 +45,24 @@ class Arriendo_Facil_SRI_Soap_Client {
 	/** @var int HTTP timeout in seconds. */
 	private $timeout;
 
+	/** @var int Maximum immediate retries for transient errors. */
+	private $max_retries;
+
 	/**
 	 * Constructor.
 	 *
 	 * @param string $ambiente '1' (pruebas) or '2' (producción).
 	 * @param int    $timeout  HTTP timeout in seconds (default 30).
 	 */
-	public function __construct( string $ambiente = '1', int $timeout = 30 ) {
+	public function __construct( string $ambiente = '1', int $timeout = 0 ) {
 		$this->ambiente = $ambiente;
-		$this->timeout  = $timeout;
 		$this->base_url = ( '2' === $ambiente )
 			? 'https://cel.sri.gob.ec/comprobantes-electronicos-ws/'
 			: 'https://celcer.sri.gob.ec/comprobantes-electronicos-ws/';
+
+		$config             = class_exists( 'Arriendo_Facil_SRI_Config' ) ? Arriendo_Facil_SRI_Config::get() : array();
+		$this->timeout      = $timeout > 0 ? $timeout : (int) ( $config['sri_soap_timeout'] ?? 30 );
+		$this->max_retries  = (int) ( $config['sri_soap_max_retries'] ?? 3 );
 	}
 
 	// ─── Public API ──────────────────────────────────────────────────────────
@@ -247,54 +253,174 @@ class Arriendo_Facil_SRI_Soap_Client {
 	// ─── HTTP + parse helpers ────────────────────────────────────────────────
 
 	/**
-	 * Sends a raw SOAP request using WordPress HTTP API.
+	 * Sends a raw SOAP request using WordPress HTTP API with structured logging
+	 * and immediate retries for transient errors.
 	 *
 	 * @param string $url  Endpoint URL.
 	 * @param string $body SOAP XML body.
 	 * @return string|WP_Error Response body string, or WP_Error on failure.
 	 */
 	private function http_post( string $url, string $body ) {
-		/**
-		 * Filtro: controla la verificación SSL en las llamadas SOAP al SRI.
-		 * Si el servidor no confía en el CA del SRI, puede definirse false aquí
-		 * (solo en entornos de prueba/desarrollo):
-		 *   add_filter( 'af_sri_sslverify', '__return_false' );
-		 */
-		$sslverify = function_exists( 'apply_filters' )
-			? (bool) apply_filters( 'af_sri_sslverify', true )
-			: true;
+		$sslverify = $this->resolve_ssl_verify();
 
-		$response = wp_remote_post(
-			$url,
-			array(
-				'headers' => array(
-					'Content-Type' => 'text/xml; charset=UTF-8',
-					'SOAPAction'   => '""',
-				),
-				'body'      => $body,
-				'timeout'   => $this->timeout,
-				'sslverify' => $sslverify,
-			)
-		);
+		$last_error = null;
+		$attempts   = max( 1, $this->max_retries );
 
-		if ( is_wp_error( $response ) ) {
-			return new WP_Error(
-				'sri_http_error',
-				'Error de comunicación con SRI: ' . $response->get_error_message()
+		for ( $attempt = 1; $attempt <= $attempts; $attempt++ ) {
+			$start = microtime( true );
+			$this->log( 'info', sprintf( 'Intento %d/%d → %s', $attempt, $attempts, $url ) );
+
+			$response = wp_remote_post(
+				$url,
+				array(
+					'headers' => array(
+						'Content-Type' => 'text/xml; charset=UTF-8',
+						'SOAPAction'   => '""',
+					),
+					'body'      => $body,
+					'timeout'   => $this->timeout,
+					'sslverify' => $sslverify,
+				)
 			);
+
+			$elapsed_ms = round( ( microtime( true ) - $start ) * 1000 );
+
+			if ( is_wp_error( $response ) ) {
+				$last_error = $this->classify_connection_error( $response, $elapsed_ms );
+				$this->log( 'error', sprintf( '[%dms] %s', $elapsed_ms, $last_error->get_error_message() ) );
+
+				if ( $attempt < $attempts && $this->is_transient_error( $response ) ) {
+					$backoff = pow( 2, $attempt );
+					sleep( $backoff );
+					continue;
+				}
+				return $last_error;
+			}
+
+			$code = (int) wp_remote_retrieve_response_code( $response );
+			$raw  = (string) wp_remote_retrieve_body( $response );
+
+			$this->log( 'info', sprintf( 'HTTP %d (%dms) - %d bytes', $code, $elapsed_ms, strlen( $raw ) ) );
+
+			if ( $code >= 500 ) {
+				$last_error = new WP_Error(
+					'sri_http_' . $code,
+					sprintf( 'SRI devolvió HTTP %d. El servicio puede estar fuera de línea.', $code ),
+					array( 'http_code' => $code, 'elapsed_ms' => $elapsed_ms )
+				);
+				if ( $attempt < $attempts ) {
+					$backoff = pow( 2, $attempt );
+					sleep( $backoff );
+					continue;
+				}
+				return $last_error;
+			}
+
+			if ( $code >= 400 ) {
+				return new WP_Error(
+					'sri_http_' . $code,
+					sprintf( 'SRI devolvió HTTP %d.', $code ),
+					array( 'http_code' => $code, 'elapsed_ms' => $elapsed_ms )
+				);
+			}
+
+			if ( '' === trim( $raw ) ) {
+				$last_error = new WP_Error(
+					'sri_empty_body',
+					'SRI devolvió HTTP 200 pero con cuerpo vacío (posible timeout parcial).',
+					array( 'elapsed_ms' => $elapsed_ms )
+				);
+				if ( $attempt < $attempts ) {
+					$backoff = pow( 2, $attempt );
+					sleep( $backoff );
+					continue;
+				}
+				return $last_error;
+			}
+
+			return $raw;
 		}
 
-		$code = (int) wp_remote_retrieve_response_code( $response );
-		$raw  = (string) wp_remote_retrieve_body( $response );
+		return $last_error ?? new WP_Error( 'sri_http_error', 'Error desconocido de comunicación con SRI.' );
+	}
 
-		if ( $code >= 400 ) {
-			return new WP_Error(
-				'sri_http_' . $code,
-				'SRI devolvió HTTP ' . $code . '.'
-			);
+	/**
+	 * Resolves SSL verification setting with production safety guard.
+	 *
+	 * @return bool
+	 */
+	private function resolve_ssl_verify(): bool {
+		if ( '2' === $this->ambiente ) {
+			return true;
 		}
 
-		return $raw;
+		if ( ! function_exists( 'apply_filters' ) ) {
+			return true;
+		}
+
+		return (bool) apply_filters( 'af_sri_sslverify', true );
+	}
+
+	/**
+	 * Classifies a WP_Error from wp_remote_post into a user-actionable message.
+	 *
+	 * @param WP_Error $error      WordPress HTTP error.
+	 * @param float    $elapsed_ms Elapsed time in ms.
+	 * @return WP_Error Classified error with diagnostic data.
+	 */
+	private function classify_connection_error( WP_Error $error, float $elapsed_ms ): WP_Error {
+		$msg  = $error->get_error_message();
+		$code = 'sri_connection_error';
+
+		if ( preg_match( '/cURL error 6/i', $msg ) ) {
+			return new WP_Error( 'sri_dns_error', 'Error DNS: no se pudo resolver el servidor del SRI. Verifique la conexión a internet.', compact( 'elapsed_ms', 'msg' ) );
+		}
+
+		if ( preg_match( '/cURL error 28/i', $msg ) ) {
+			return new WP_Error( 'sri_timeout', sprintf( 'Timeout: el SRI no respondió en %ds. Posible congestión del servicio.', $this->timeout ), compact( 'elapsed_ms', 'msg' ) );
+		}
+
+		if ( preg_match( '/cURL error 7/i', $msg ) ) {
+			return new WP_Error( 'sri_connection_refused', 'Conexión rechazada por el SRI. El servicio puede estar fuera de línea.', compact( 'elapsed_ms', 'msg' ) );
+		}
+
+		if ( preg_match( '/ssl|certificate|handshake/i', $msg ) ) {
+			return new WP_Error( 'sri_ssl_error', 'Error SSL/TLS con el SRI. Posible problema de certificado del servidor.', compact( 'elapsed_ms', 'msg' ) );
+		}
+
+		return new WP_Error( $code, 'Error de comunicación con SRI: ' . $msg, compact( 'elapsed_ms', 'msg' ) );
+	}
+
+	/**
+	 * Determines if a connection error is transient and worth retrying.
+	 *
+	 * @param WP_Error $error WordPress HTTP error.
+	 * @return bool
+	 */
+	private function is_transient_error( WP_Error $error ): bool {
+		$msg = $error->get_error_message();
+		// Timeout (28), connection refused (7), and partial transfer (18) are transient.
+		return (bool) preg_match( '/cURL error (7|18|28|56)/i', $msg );
+	}
+
+	/**
+	 * Logs a structured message for SRI SOAP operations.
+	 *
+	 * @param string $level   'info' or 'error'.
+	 * @param string $message Log message.
+	 */
+	private function log( string $level, string $message ): void {
+		if ( ! function_exists( 'do_action' ) ) {
+			return;
+		}
+
+		$entry = sprintf( '[SRI SOAP][%s][%s] %s', strtoupper( $level ), gmdate( 'Y-m-d H:i:s' ), $message );
+
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG && defined( 'WP_DEBUG_LOG' ) && WP_DEBUG_LOG ) {
+			error_log( $entry ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		}
+
+		do_action( 'af_sri_soap_log', $level, $message, $this->ambiente );
 	}
 
 	/**

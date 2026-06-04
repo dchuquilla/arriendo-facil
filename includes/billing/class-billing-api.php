@@ -354,7 +354,22 @@ class Arriendo_Facil_Billing_API {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			wp_send_json_error( array( 'message' => __( 'No se pudo conectar con el SRI. Verifique su conexión a internet.', 'arriendo-facil' ) ), 503 );
+			$msg        = $response->get_error_message();
+			$user_msg   = __( 'No se pudo conectar con el SRI.', 'arriendo-facil' );
+			$http_code  = 503;
+
+			if ( preg_match( '/cURL error 6/i', $msg ) ) {
+				$user_msg = __( 'Error DNS: no se pudo resolver el servidor del SRI. Verifique su conexión a internet.', 'arriendo-facil' );
+			} elseif ( preg_match( '/cURL error 28/i', $msg ) ) {
+				$user_msg = __( 'El SRI no respondió a tiempo. Intente de nuevo en unos minutos.', 'arriendo-facil' );
+				$http_code = 504;
+			} elseif ( preg_match( '/cURL error 7/i', $msg ) ) {
+				$user_msg = __( 'No se pudo conectar con el SRI. El servicio puede estar fuera de línea.', 'arriendo-facil' );
+			} elseif ( preg_match( '/ssl|certificate|handshake/i', $msg ) ) {
+				$user_msg = __( 'Error de certificado SSL con el SRI. Contacte al administrador.', 'arriendo-facil' );
+			}
+
+			wp_send_json_error( array( 'message' => $user_msg ), $http_code );
 		}
 
 		$code = (int) wp_remote_retrieve_response_code( $response );

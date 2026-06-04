@@ -59,6 +59,8 @@ class Arriendo_Facil_SRI_Config {
 				'cert_filename'         => '',    // filename within cert_dir()
 				'cert_password_enc'     => '',    // AES-256-CBC encrypted password
 				'email_notificacion'    => '',
+				'sri_soap_timeout'      => '30',  // seconds
+				'sri_soap_max_retries'  => '3',   // immediate retries for transient errors
 			),
 			$saved
 		);

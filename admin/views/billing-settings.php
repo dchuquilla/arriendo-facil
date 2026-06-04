@@ -37,6 +37,8 @@ if ( isset( $_POST['af_save_sri_config'] ) ) {
 				'obligado_contabilidad' => sanitize_text_field( wp_unslash( $_POST['af_obligado_contabilidad'] ?? 'NO' ) ),
 				'ambiente'              => sanitize_key( wp_unslash( $_POST['af_ambiente'] ?? '1' ) ),
 				'email_notificacion'    => sanitize_email( wp_unslash( $_POST['af_email_notificacion'] ?? '' ) ),
+				'sri_soap_timeout'      => (string) absint( wp_unslash( $_POST['af_sri_soap_timeout'] ?? 30 ) ),
+				'sri_soap_max_retries'  => (string) absint( wp_unslash( $_POST['af_sri_soap_max_retries'] ?? 3 ) ),
 			)
 		);
 		$af_sri_notice = array( 'type' => 'success', 'msg' => __( 'Configuración guardada.', 'arriendo-facil' ) );
@@ -285,6 +287,36 @@ $emission_points = $wpdb->get_results(
 							<span class="description"> — <?php esc_html_e( 'Servidor productivo SRI. Comprobantes con validez legal.', 'arriendo-facil' ); ?></span>
 						</label>
 					</fieldset>
+				</td>
+			</tr>
+		</table>
+
+		<h2><?php esc_html_e( 'Configuración de Conexión SOAP', 'arriendo-facil' ); ?></h2>
+		<table class="form-table" role="presentation">
+			<tr>
+				<th scope="row">
+					<label for="af_sri_soap_timeout"><?php esc_html_e( 'Timeout SOAP (segundos)', 'arriendo-facil' ); ?></label>
+				</th>
+				<td>
+					<input type="number" id="af_sri_soap_timeout" name="af_sri_soap_timeout"
+						value="<?php echo esc_attr( $cfg['sri_soap_timeout'] ?? 30 ); ?>"
+						class="small-text" min="10" max="120" step="1" />
+					<p class="description">
+						<?php esc_html_e( 'Tiempo máximo de espera para respuesta del SRI (10-120 segundos). Usar 60+ segundos si la conexión es lenta.', 'arriendo-facil' ); ?>
+					</p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row">
+					<label for="af_sri_soap_max_retries"><?php esc_html_e( 'Máximo de Reintentos Inmediatos', 'arriendo-facil' ); ?></label>
+				</th>
+				<td>
+					<input type="number" id="af_sri_soap_max_retries" name="af_sri_soap_max_retries"
+						value="<?php echo esc_attr( $cfg['sri_soap_max_retries'] ?? 3 ); ?>"
+						class="small-text" min="1" max="5" step="1" />
+					<p class="description">
+						<?php esc_html_e( 'Número de intentos inmediatos ante errores temporales (DNS, timeout, conexión rechazada). Luego se reintenta cada 15 minutos.', 'arriendo-facil' ); ?>
+					</p>
 				</td>
 			</tr>
 		</table>

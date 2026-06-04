@@ -499,7 +499,18 @@ $emission_points = $wpdb->get_results(
 			body   : data,
 			credentials: 'same-origin',
 		} )
-		.then( function ( r ) { return r.json(); } )
+		.then( function ( r ) {
+			// Read as text first so a non-JSON response (PHP debug output, fatal error HTML)
+			// reveals the actual content instead of a generic "Error de conexión".
+			return r.text().then( function ( text ) {
+				try {
+					return JSON.parse( text );
+				} catch ( e ) {
+					// Expose the first 200 chars of the raw response to help diagnose.
+					throw new Error( 'Respuesta inválida del servidor: ' + text.substring( 0, 200 ) );
+				}
+			} );
+		} )
 		.then( function ( resp ) {
 			if ( resp.success && resp.data ) {
 				var d = resp.data;
@@ -517,8 +528,8 @@ $emission_points = $wpdb->get_results(
 				status.innerHTML = '<span style="color:#c62828;">' + msg + '</span>';
 			}
 		} )
-		.catch( function () {
-			status.innerHTML = '<span style="color:#c62828;">Error de conexión con el SRI.</span>';
+		.catch( function ( err ) {
+			status.innerHTML = '<span style="color:#c62828;" title="' + ( err.message || '' ).replace( /"/g, '&quot;' ) + '">Error al consultar el SRI. Detalle: ' + ( err.message ? err.message.substring( 0, 120 ) : 'Error de red' ) + '</span>';
 		} )
 		.finally( function () { btn.disabled = false; } );
 	} );

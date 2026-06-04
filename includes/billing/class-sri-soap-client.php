@@ -212,7 +212,9 @@ class Arriendo_Facil_SRI_Soap_Client {
 		$autorizacion_nodes = $xpath->query( '//autorizaciones/autorizacion' );
 
 		if ( ! $autorizacion_nodes || 0 === $autorizacion_nodes->length ) {
-			return new WP_Error( 'sri_no_autorizacion', 'Respuesta SRI sin nodo <autorizacion>.' );
+			// SRI has not yet processed the document (asynchronous queue). Caller should
+			// keep the invoice as 'enviada' and retry later.
+			return new WP_Error( 'sri_en_proceso', 'SRI aún no ha procesado el comprobante. Se reintentará automáticamente.' );
 		}
 
 		$auth = $autorizacion_nodes->item( 0 );
@@ -221,6 +223,10 @@ class Arriendo_Facil_SRI_Soap_Client {
 		$num_auth   = $this->xpath_text( $xpath, 'numeroAutorizacion',  $auth );
 		$fecha_auth = $this->xpath_text( $xpath, 'fechaAutorizacion',   $auth );
 		$ambiente   = $this->xpath_text( $xpath, 'ambiente',            $auth );
+
+		if ( 'EN PROCESO' === strtoupper( $estado ) ) {
+			return new WP_Error( 'sri_en_proceso', 'SRI está procesando el comprobante. Se reintentará automáticamente.' );
+		}
 
 		// The <comprobante> node may contain the authorized XML in a CDATA section.
 		$xml_auth_node = $xpath->query( 'comprobante', $auth )->item( 0 );
@@ -248,6 +254,16 @@ class Arriendo_Facil_SRI_Soap_Client {
 	 * @return string|WP_Error Response body string, or WP_Error on failure.
 	 */
 	private function http_post( string $url, string $body ) {
+		/**
+		 * Filtro: controla la verificación SSL en las llamadas SOAP al SRI.
+		 * Si el servidor no confía en el CA del SRI, puede definirse false aquí
+		 * (solo en entornos de prueba/desarrollo):
+		 *   add_filter( 'af_sri_sslverify', '__return_false' );
+		 */
+		$sslverify = function_exists( 'apply_filters' )
+			? (bool) apply_filters( 'af_sri_sslverify', true )
+			: true;
+
 		$response = wp_remote_post(
 			$url,
 			array(
@@ -255,9 +271,9 @@ class Arriendo_Facil_SRI_Soap_Client {
 					'Content-Type' => 'text/xml; charset=UTF-8',
 					'SOAPAction'   => '""',
 				),
-				'body'    => $body,
-				'timeout' => $this->timeout,
-				'sslverify' => true,
+				'body'      => $body,
+				'timeout'   => $this->timeout,
+				'sslverify' => $sslverify,
 			)
 		);
 

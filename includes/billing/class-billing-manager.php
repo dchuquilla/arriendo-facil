@@ -251,6 +251,19 @@ class Arriendo_Facil_Billing_Manager {
 		$this->log_sri( $invoice_id, 'autorizacion', $clave, $autorizacion );
 
 		if ( is_wp_error( $autorizacion ) ) {
+			// SRI queued the document but hasn't authorized it yet (EN PROCESO or empty response).
+			// Mark as 'enviada' so the retry cron polls for authorization without backoff penalty.
+			if ( 'sri_en_proceso' === $autorizacion->get_error_code() ) {
+				$this->update_invoice_row( $invoice_id, array( 'estado' => 'enviada' ) );
+				return array(
+					'invoice_id'         => $invoice_id,
+					'estado'             => 'enviada',
+					'clave_acceso'       => $clave,
+					'numero_comprobante' => $numero_comprobante,
+					'billing_period'     => isset( $context['billing_period'] ) ? (string) $context['billing_period'] : null,
+					'message'            => __( 'Comprobante enviado al SRI. La autorización se procesará en breve.', 'arriendo-facil' ),
+				);
+			}
 			$this->update_invoice_row(
 				$invoice_id,
 				array(
@@ -321,6 +334,7 @@ class Arriendo_Facil_Billing_Manager {
 			'estado'              => 'autorizada',
 			'clave_acceso'        => $clave,
 			'numero_comprobante'  => $numero_comprobante,
+			'billing_period'      => isset( $context['billing_period'] ) ? (string) $context['billing_period'] : null,
 			'numero_autorizacion' => (string) ( $autorizacion['numero_autorizacion'] ?? '' ),
 			'ride_path'           => (string) $ride_result['path'],
 			'xml_firmado'         => $xml_signed,
@@ -394,7 +408,7 @@ class Arriendo_Facil_Billing_Manager {
 		$limit = max( 1, min( 200, $limit ) );
 		return (array) $this->wpdb->get_results(
 			"SELECT * FROM {$this->wpdb->prefix}af_electronic_invoices
-			 WHERE estado IN ('error_envio', 'error_autorizacion', 'no_autorizada', 'devuelta', 'autorizada_sin_ride')
+			 WHERE estado IN ('enviada', 'error_envio', 'error_autorizacion', 'no_autorizada', 'devuelta', 'autorizada_sin_ride')
 			 ORDER BY updated_at ASC
 			 LIMIT " . (int) $limit
 		);
@@ -458,6 +472,10 @@ class Arriendo_Facil_Billing_Manager {
 		$this->log_sri( (int) $invoice->id, 'autorizacion_retry', (string) $invoice->clave_acceso, $autorizacion );
 
 		if ( is_wp_error( $autorizacion ) ) {
+			if ( 'sri_en_proceso' === $autorizacion->get_error_code() ) {
+				// SRI still processing — keep invoice as 'enviada', retry cron will try again without backoff.
+				return $autorizacion;
+			}
 			$this->update_invoice_row(
 				(int) $invoice->id,
 				array(

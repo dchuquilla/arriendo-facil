@@ -269,6 +269,10 @@ class Arriendo_Facil_Billing_API {
 
 			$result = $this->manager->retry_invoice( (int) $invoice->id );
 			if ( is_wp_error( $result ) ) {
+				// sri_en_proceso: SRI still queuing the document — no backoff, just try next cron run.
+				if ( 'sri_en_proceso' === $result->get_error_code() ) {
+					continue;
+				}
 				$attempts = isset( $meta['attempts'] ) ? (int) $meta['attempts'] + 1 : 1;
 				$delay    = min( 12 * HOUR_IN_SECONDS, (int) pow( 2, min( 10, $attempts ) ) * 60 );
 				$retry_meta[ $invoice_id ] = array(
@@ -332,7 +336,7 @@ class Arriendo_Facil_Billing_API {
 		}
 
 		$url = add_query_arg(
-			array( 'ruc' => rawurlencode( $ruc ) ),
+			array( 'ruc' => $ruc ),
 			'https://srienlinea.sri.gob.ec/sri-catastro-sujeto-servicio-internet/rest/ConsolidadoContribuyente/obtenerPorNumerosRuc'
 		);
 

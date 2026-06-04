@@ -259,21 +259,27 @@ class Arriendo_Facil_Accommodation {
 	public function render_managed_accommodations_shortcode() {
 		$featured_tax_query = $this->get_featured_tax_query();
 
-		$cache_key      = 'af_managed_accommodations_' . md5( wp_json_encode( $featured_tax_query ) );
-		$accommodations = get_transient( $cache_key );
+		$cache_key   = 'af_managed_accommodations_' . md5( wp_json_encode( $featured_tax_query ) );
+		$cached_html = get_transient( $cache_key );
 
-		if ( false === $accommodations ) {
-			$accommodations = get_posts(
-				array(
-					'post_type'      => 'accommodation',
-					'post_status'    => 'publish',
-					'posts_per_page' => 100,
-					'orderby'        => 'date',
-					'order'          => 'DESC',
-					'tax_query'      => $featured_tax_query,
-				)
-			);
-			set_transient( $cache_key, $accommodations, 12 * HOUR_IN_SECONDS );
+		if ( false !== $cached_html ) {
+			return (string) $cached_html;
+		}
+
+		$accommodations = get_posts(
+			array(
+				'post_type'      => 'accommodation',
+				'post_status'    => 'publish',
+				'posts_per_page' => 100,
+				'orderby'        => 'date',
+				'order'          => 'DESC',
+				'tax_query'      => $featured_tax_query,
+			)
+		);
+
+		// Batch-prime meta cache to eliminate N+1 in the render loop.
+		if ( ! empty( $accommodations ) ) {
+			update_meta_cache( 'post', wp_list_pluck( $accommodations, 'ID' ) );
 		}
 
 		ob_start();
@@ -324,7 +330,10 @@ class Arriendo_Facil_Accommodation {
 		</div>
 		<?php
 
-		return (string) ob_get_clean();
+		$html = (string) ob_get_clean();
+		set_transient( $cache_key, $html, 12 * HOUR_IN_SECONDS );
+
+		return $html;
 	}
 
 	/**
@@ -335,26 +344,30 @@ class Arriendo_Facil_Accommodation {
 	public function render_featured_accommodation_shortcode() {
 		$featured_tax_query = $this->get_featured_tax_query();
 
-		$cache_key      = 'af_featured_accommodations_' . md5( wp_json_encode( $featured_tax_query ) );
-		$accommodations = get_transient( $cache_key );
+		$cache_key   = 'af_featured_accommodations_' . md5( wp_json_encode( $featured_tax_query ) );
+		$cached_html = get_transient( $cache_key );
 
-		if ( false === $accommodations ) {
-			$accommodations = get_posts(
-				array(
-					'post_type'      => 'accommodation',
-					'post_status'    => 'publish',
-					'posts_per_page' => 12,
-					'orderby'        => 'date',
-					'order'          => 'DESC',
-					'tax_query'      => $featured_tax_query,
-				)
-			);
-			set_transient( $cache_key, $accommodations, 12 * HOUR_IN_SECONDS );
+		if ( false !== $cached_html ) {
+			return (string) $cached_html;
 		}
+
+		$accommodations = get_posts(
+			array(
+				'post_type'      => 'accommodation',
+				'post_status'    => 'publish',
+				'posts_per_page' => 12,
+				'orderby'        => 'date',
+				'order'          => 'DESC',
+				'tax_query'      => $featured_tax_query,
+			)
+		);
 
 		if ( empty( $accommodations ) ) {
 			return '<p>' . esc_html__( 'No hay accommodation disponible para destacar.', 'arriendo-facil' ) . '</p>';
 		}
+
+		// Batch-prime meta cache to eliminate N+1 in the render loop.
+		update_meta_cache( 'post', wp_list_pluck( $accommodations, 'ID' ) );
 
 		ob_start();
 		?>
@@ -396,7 +409,10 @@ class Arriendo_Facil_Accommodation {
 		</div>
 		<?php
 
-		return (string) ob_get_clean();
+		$html = (string) ob_get_clean();
+		set_transient( $cache_key, $html, 12 * HOUR_IN_SECONDS );
+
+		return $html;
 	}
 
 	/**

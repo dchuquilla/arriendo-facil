@@ -968,4 +968,170 @@ class Arriendo_Facil_AI_Service {
 			),
 		);
 	}
+
+	// ─── ASYNC QUEUE ───────────────────────────────────────────────────────────
+
+	/**
+	 * Enqueues a heavy AI action for background processing via WP-Cron.
+	 *
+	 * Returns a queue_id immediately so the caller can poll for results later
+	 * without blocking the request thread.
+	 *
+	 * @param string $action  AI action name (e.g. 'fill_contract_blanks').
+	 * @param array  $context Context data to pass to the AI action.
+	 * @return int|WP_Error Queue row ID, or WP_Error on failure.
+	 */
+	public function enqueue_ai_processing( $action, array $context ) {
+		global $wpdb;
+
+		$inserted = $wpdb->insert(
+			$wpdb->prefix . 'af_ai_processing_queue',
+			array(
+				'action'  => sanitize_text_field( $action ),
+				'context' => wp_json_encode( $context ),
+				'status'  => 'pending',
+				'user_id' => get_current_user_id() ?: null,
+			),
+			array( '%s', '%s', '%s', '%d' )
+		);
+
+		if ( ! $inserted ) {
+			return new WP_Error( 'queue_insert_failed', __( 'No se pudo encolar la tarea de IA.', 'arriendo-facil' ) );
+		}
+
+		$queue_id = (int) $wpdb->insert_id;
+
+		// Ensure cron is scheduled to pick up the task shortly.
+		if ( ! wp_next_scheduled( 'af_process_ai_queue' ) ) {
+			wp_schedule_single_event( time() + 5, 'af_process_ai_queue' );
+		}
+
+		return $queue_id;
+	}
+
+	/**
+	 * Returns the current status and result of a queued AI task.
+	 *
+	 * @param int $queue_id Queue row ID.
+	 * @return array{status:string,result:array|null,error_msg:string|null}|WP_Error
+	 */
+	public function get_queue_status( $queue_id ) {
+		global $wpdb;
+
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT status, result, error_msg FROM {$wpdb->prefix}af_ai_processing_queue WHERE id = %d",
+				absint( $queue_id )
+			),
+			ARRAY_A
+		);
+
+		if ( ! $row ) {
+			return new WP_Error( 'queue_not_found', __( 'Tarea de IA no encontrada.', 'arriendo-facil' ) );
+		}
+
+		$result = null;
+		if ( ! empty( $row['result'] ) ) {
+			$decoded = json_decode( $row['result'], true );
+			$result  = is_array( $decoded ) ? $decoded : null;
+		}
+
+		return array(
+			'status'    => (string) $row['status'],
+			'result'    => $result,
+			'error_msg' => $row['error_msg'],
+		);
+	}
+
+	/**
+	 * WP-Cron callback: processes up to 5 pending AI queue tasks per run.
+	 *
+	 * Hooked to the 'af_process_ai_queue' cron action in the main plugin file.
+	 */
+	public static function process_queued_ai_tasks() {
+		global $wpdb;
+
+		$table = $wpdb->prefix . 'af_ai_processing_queue';
+
+		$pending = $wpdb->get_results(
+			"SELECT id, action, context, attempts FROM {$table}
+			 WHERE status = 'pending' AND attempts < 3
+			 ORDER BY created_at ASC
+			 LIMIT 5",
+			ARRAY_A
+		);
+
+		if ( empty( $pending ) ) {
+			return;
+		}
+
+		$service = new self();
+
+		foreach ( $pending as $task ) {
+			$task_id = (int) $task['id'];
+
+			// Mark as processing to prevent duplicate execution.
+			$wpdb->update(
+				$table,
+				array( 'status' => 'processing', 'attempts' => (int) $task['attempts'] + 1 ),
+				array( 'id' => $task_id ),
+				array( '%s', '%d' ),
+				array( '%d' )
+			);
+
+			$context = json_decode( (string) $task['context'], true );
+			if ( ! is_array( $context ) ) {
+				$wpdb->update(
+					$table,
+					array( 'status' => 'failed', 'error_msg' => 'Invalid context JSON' ),
+					array( 'id' => $task_id ),
+					array( '%s', '%s' ),
+					array( '%d' )
+				);
+				continue;
+			}
+
+			$action = sanitize_text_field( (string) $task['action'] );
+
+			// Dispatch to the correct method.
+			$method_map = array(
+				'fill_contract_blanks'          => 'fill_contract_blanks',
+				'fill_contract_blanks_markdown' => 'fill_contract_blanks_markdown',
+				'generate_document'             => 'generate_document',
+				'analyze_template_fields'       => 'analyze_template_fields',
+				'map_template_word_agent'       => 'map_template_word_agent',
+			);
+
+			if ( ! isset( $method_map[ $action ] ) || ! method_exists( $service, $method_map[ $action ] ) ) {
+				$wpdb->update(
+					$table,
+					array( 'status' => 'failed', 'error_msg' => 'Unknown action: ' . $action ),
+					array( 'id' => $task_id ),
+					array( '%s', '%s' ),
+					array( '%d' )
+				);
+				continue;
+			}
+
+			$response = call_user_func( array( $service, $method_map[ $action ] ), $context );
+
+			if ( is_wp_error( $response ) ) {
+				$wpdb->update(
+					$table,
+					array( 'status' => 'failed', 'error_msg' => $response->get_error_message() ),
+					array( 'id' => $task_id ),
+					array( '%s', '%s' ),
+					array( '%d' )
+				);
+			} else {
+				$wpdb->update(
+					$table,
+					array( 'status' => 'completed', 'result' => wp_json_encode( $response ) ),
+					array( 'id' => $task_id ),
+					array( '%s', '%s' ),
+					array( '%d' )
+				);
+			}
+		}
+	}
 }

@@ -134,7 +134,7 @@ class Arriendo_Facil_Owner_Contact {
 			array(
 				'post_type'      => 'accommodation',
 				'post_status'    => array( 'publish', 'draft', 'pending', 'private', 'future', 'trash' ),
-				'posts_per_page' => -1,
+				'posts_per_page' => 500,
 				'fields'         => 'ids',
 				'meta_query'     => array(
 					array(
@@ -146,8 +146,11 @@ class Arriendo_Facil_Owner_Contact {
 		);
 
 		if ( ! empty( $accommodation_ids ) ) {
-			foreach ( $accommodation_ids as $accommodation_id ) {
-				wp_delete_post( absint( $accommodation_id ), true );
+			// Process deletions in chunks to avoid memory exhaustion.
+			foreach ( array_chunk( $accommodation_ids, 50 ) as $chunk ) {
+				foreach ( $chunk as $accommodation_id ) {
+					wp_delete_post( absint( $accommodation_id ), true );
+				}
 			}
 		}
 

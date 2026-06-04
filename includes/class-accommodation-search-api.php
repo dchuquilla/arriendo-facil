@@ -142,22 +142,10 @@ class Arriendo_Facil_Accommodation_Search_API {
 			return new WP_REST_Response( $cached_results, 200 );
 		}
 
-		// Get all accommodations (capped to prevent memory exhaustion)
-		$all_accommodations = get_posts(
-			array(
-				'post_type'      => 'accommodation',
-				'post_status'    => 'publish',
-				'posts_per_page' => 500,
-				'fields'         => 'ids',
-			)
-		);
+		// Single JOIN query — replaces N×13 individual get_post/get_post_meta calls.
+		$raw_rows = $this->fetch_accommodations_with_meta();
 
-		if ( ! empty( $all_accommodations ) ) {
-			// Batch-prime meta cache to eliminate N+1 queries in the loop below.
-			update_meta_cache( 'post', $all_accommodations );
-		}
-
-		if ( empty( $all_accommodations ) ) {
+		if ( empty( $raw_rows ) ) {
 			return new WP_REST_Response(
 				array(
 					'success' => true,
@@ -172,11 +160,8 @@ class Arriendo_Facil_Accommodation_Search_API {
 
 		$filtered_accommodations = array();
 
-		foreach ( $all_accommodations as $accommodation_id ) {
-			$accommodation = $this->get_accommodation_data( $accommodation_id );
-			if ( ! $accommodation ) {
-				continue;
-			}
+		foreach ( $raw_rows as $row ) {
+			$accommodation = $this->build_accommodation_from_row( $row );
 
 			if ( ! $this->matches_filters(
 				$accommodation,
@@ -213,6 +198,174 @@ class Arriendo_Facil_Accommodation_Search_API {
 		set_transient( $cache_key, $response, 10 * MINUTE_IN_SECONDS );
 
 		return new WP_REST_Response( $response, 200 );
+	}
+
+	/**
+	 * Fetches all published accommodations with every needed meta key in a
+	 * single LEFT JOIN query, eliminating the N+1 pattern.
+	 *
+	 * Also primes the WP post object cache (for get_permalink) and the
+	 * attachment meta cache (for thumbnail URLs) so subsequent calls are
+	 * served entirely from RAM.
+	 *
+	 * @return stdClass[] Raw result rows from wpdb.
+	 */
+	private function fetch_accommodations_with_meta() {
+		global $wpdb;
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery
+		$rows = $wpdb->get_results(
+			"SELECT
+				p.ID,
+				p.post_title,
+				p.post_name,
+				p.post_date,
+				MAX(CASE WHEN pm.meta_key = '_af_location_text'         THEN pm.meta_value END) AS location_text,
+				MAX(CASE WHEN pm.meta_key = '_af_latitude'              THEN pm.meta_value END) AS latitude,
+				MAX(CASE WHEN pm.meta_key = '_af_longitude'             THEN pm.meta_value END) AS longitude,
+				MAX(CASE WHEN pm.meta_key = '_af_bedrooms'              THEN pm.meta_value END) AS bedrooms,
+				MAX(CASE WHEN pm.meta_key = '_af_bathrooms'             THEN pm.meta_value END) AS bathrooms,
+				MAX(CASE WHEN pm.meta_key = '_af_monthly_rent'          THEN pm.meta_value END) AS monthly_rent,
+				MAX(CASE WHEN pm.meta_key = '_af_property_type'         THEN pm.meta_value END) AS property_type,
+				MAX(CASE WHEN pm.meta_key = '_af_amenities'             THEN pm.meta_value END) AS amenities_raw,
+				MAX(CASE WHEN pm.meta_key = '_af_status'                THEN pm.meta_value END) AS status,
+				MAX(CASE WHEN pm.meta_key = '_af_commercial_status'     THEN pm.meta_value END) AS commercial_status,
+				MAX(CASE WHEN pm.meta_key = '_af_commercial_state'      THEN pm.meta_value END) AS commercial_state,
+				MAX(CASE WHEN pm.meta_key = '_af_commercial_visibility' THEN pm.meta_value END) AS commercial_visibility,
+				MAX(CASE WHEN pm.meta_key = '_thumbnail_id'             THEN pm.meta_value END) AS thumbnail_id
+			FROM {$wpdb->posts} p
+			LEFT JOIN {$wpdb->postmeta} pm
+				ON p.ID = pm.post_id
+				AND pm.meta_key IN (
+					'_af_location_text','_af_latitude','_af_longitude',
+					'_af_bedrooms','_af_bathrooms','_af_monthly_rent',
+					'_af_property_type','_af_amenities','_af_status',
+					'_af_commercial_status','_af_commercial_state','_af_commercial_visibility',
+					'_thumbnail_id'
+				)
+			WHERE p.post_type = 'accommodation'
+			  AND p.post_status = 'publish'
+			GROUP BY p.ID, p.post_title, p.post_name, p.post_date
+			ORDER BY p.post_date DESC
+			LIMIT 500"
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery
+
+		if ( empty( $rows ) ) {
+			return array();
+		}
+
+		// Prime the WP post object cache from the JOIN rows so that
+		// get_permalink() never triggers a DB round-trip.
+		foreach ( $rows as $row ) {
+			if ( ! wp_cache_get( (int) $row->ID, 'posts' ) ) {
+				$post_obj = new WP_Post(
+					(object) array(
+						'ID'                    => (int) $row->ID,
+						'post_author'           => 0,
+						'post_date'             => $row->post_date,
+						'post_date_gmt'         => '',
+						'post_content'          => '',
+						'post_title'            => $row->post_title,
+						'post_excerpt'          => '',
+						'post_status'           => 'publish',
+						'comment_status'        => 'closed',
+						'ping_status'           => 'closed',
+						'post_password'         => '',
+						'post_name'             => $row->post_name,
+						'to_ping'               => '',
+						'pinged'                => '',
+						'post_modified'         => $row->post_date,
+						'post_modified_gmt'     => '',
+						'post_content_filtered' => '',
+						'post_parent'           => 0,
+						'guid'                  => '',
+						'menu_order'            => 0,
+						'post_type'             => 'accommodation',
+						'post_mime_type'        => '',
+						'comment_count'         => 0,
+						'filter'                => 'raw',
+					)
+				);
+				wp_cache_add( (int) $row->ID, $post_obj, 'posts' );
+			}
+		}
+
+		// Batch-prime attachment meta cache for thumbnail URLs.
+		$thumbnail_ids = array_values( array_unique( array_filter(
+			array_map( function ( $r ) { return absint( $r->thumbnail_id ); }, $rows )
+		) ) );
+
+		if ( ! empty( $thumbnail_ids ) ) {
+			update_meta_cache( 'post', $thumbnail_ids );
+		}
+
+		return $rows;
+	}
+
+	/**
+	 * Builds the accommodation data array from a JOIN result row.
+	 *
+	 * Replicates the logic of get_accommodation_data() but reads pre-fetched
+	 * column values instead of issuing individual get_post_meta() queries.
+	 *
+	 * @param stdClass $row JOIN result row from fetch_accommodations_with_meta().
+	 * @return array
+	 */
+	private function build_accommodation_from_row( $row ) {
+		$amenities = ! empty( $row->amenities_raw ) ? maybe_unserialize( $row->amenities_raw ) : array();
+		if ( ! is_array( $amenities ) ) {
+			$amenities = array();
+		}
+
+		$status                = sanitize_key( (string) ( $row->status ?? '' ) );
+		$commercial_status     = sanitize_key( (string) ( $row->commercial_status ?? '' ) );
+		$commercial_state      = sanitize_key( (string) ( $row->commercial_state ?? '' ) );
+		$commercial_visibility = sanitize_key( (string) ( $row->commercial_visibility ?? '' ) );
+
+		if ( '' === $commercial_status ) {
+			if ( 'private' === $commercial_visibility ) {
+				$commercial_status = 'private';
+			} elseif ( in_array( $commercial_state, array( 'available', 'reserved', 'rented' ), true ) ) {
+				$commercial_status = $commercial_state;
+			}
+		}
+		if ( '' === $commercial_status ) {
+			$commercial_status = ( 'rented' === $status ) ? 'rented' : 'available';
+		}
+		if ( '' === $commercial_state ) {
+			$commercial_state = in_array( $commercial_status, array( 'available', 'reserved', 'rented' ), true ) ? $commercial_status : 'available';
+		}
+		if ( '' === $commercial_visibility ) {
+			$commercial_visibility = ( 'private' === $commercial_status ) ? 'private' : 'public';
+		}
+
+		// Attachment meta is already in WP cache — no extra DB query.
+		$thumbnail_id = absint( $row->thumbnail_id ?? 0 );
+		$image_url    = '';
+		if ( $thumbnail_id ) {
+			$src       = wp_get_attachment_image_src( $thumbnail_id, 'large' );
+			$image_url = $src ? (string) $src[0] : '';
+		}
+
+		return array(
+			'id'                    => (int) $row->ID,
+			'title'                 => (string) $row->post_title,
+			'location'              => (string) ( $row->location_text ?? '' ),
+			'latitude'              => floatval( $row->latitude ?? 0 ),
+			'longitude'             => floatval( $row->longitude ?? 0 ),
+			'status'                => $status,
+			'commercial_status'     => $commercial_status,
+			'commercial_state'      => $commercial_state,
+			'commercial_visibility' => $commercial_visibility,
+			'price'                 => floatval( $row->monthly_rent ?? 0 ),
+			'bedrooms'              => absint( $row->bedrooms ?? 0 ),
+			'bathrooms'             => absint( $row->bathrooms ?? 0 ),
+			'property_type'         => (string) ( $row->property_type ?? '' ),
+			'image_url'             => $image_url,
+			'url'                   => get_permalink( (int) $row->ID ),
+			'amenities'             => $amenities,
+		);
 	}
 
 	/**

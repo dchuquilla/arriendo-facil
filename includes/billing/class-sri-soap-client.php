@@ -144,6 +144,9 @@ class Arriendo_Facil_SRI_Soap_Client {
 	 *   dir_establecimiento   string
 	 *   dir_matriz            string
 	 *   obligado_contabilidad string (SI/NO)
+	 *   estado                string (ACTIVO/INACTIVO/SUSPENDIDO/CANCELADO)
+	 *   tipo_contribuyente    string
+	 *   agente_retencion      string (SI/NO)
 	 * }
 	 */
 	public function consultar_contribuyente( string $ruc ) {
@@ -196,13 +199,38 @@ class Arriendo_Facil_SRI_Soap_Client {
 
 	/**
 	 * Fallback: queries contributor via REST API.
-	 * Uses the actual endpoint that works from the SRI web interface.
+	 * Uses two endpoints in sequence:
+	 * 1. ConsolidadoContribuyente/obtenerPorNumerosRuc → basic info
+	 * 2. Establecimiento/consultarPorNumeroRuc → addresses
 	 *
 	 * @param string $ruc RUC number.
 	 * @return array|WP_Error
 	 */
 	private function consultar_contribuyente_rest( string $ruc ) {
-		// Build URL exactly as the SRI web interface does.
+		// Fetch basic contributor info.
+		$contribuyente_data = $this->fetch_consolidado_contribuyente( $ruc );
+		if ( is_wp_error( $contribuyente_data ) ) {
+			return $contribuyente_data;
+		}
+
+		// Fetch establishment details (addresses).
+		$establecimientos = $this->fetch_establecimientos( $ruc );
+		if ( is_wp_error( $establecimientos ) ) {
+			$this->log( 'warning', sprintf( 'Could not fetch establecimientos for RUC %s, proceeding with basic data', $ruc ) );
+			$establecimientos = array();
+		}
+
+		// Combine and parse data.
+		return $this->parse_combined_contributor_data( $contribuyente_data, $establecimientos );
+	}
+
+	/**
+	 * Fetches contributor info from ConsolidadoContribuyente endpoint.
+	 *
+	 * @param string $ruc RUC number.
+	 * @return array|WP_Error
+	 */
+	private function fetch_consolidado_contribuyente( string $ruc ) {
 		$url = 'https://srienlinea.sri.gob.ec/sri-catastro-sujeto-servicio-internet/rest/ConsolidadoContribuyente/obtenerPorNumerosRuc?ruc=' . $ruc;
 
 		$sslverify = $this->resolve_ssl_verify();
@@ -232,7 +260,7 @@ class Arriendo_Facil_SRI_Soap_Client {
 
 		$code = (int) wp_remote_retrieve_response_code( $response );
 		if ( 200 !== $code ) {
-			$this->log( 'error', sprintf( 'SRI REST API HTTP %d for RUC %s', $code, $ruc ) );
+			$this->log( 'error', sprintf( 'SRI ConsolidadoContribuyente HTTP %d for RUC %s', $code, $ruc ) );
 			return new WP_Error(
 				'sri_rest_http_error',
 				sprintf( __( 'El SRI respondió con error HTTP %d', 'arriendo-facil' ), $code )
@@ -241,18 +269,68 @@ class Arriendo_Facil_SRI_Soap_Client {
 
 		$body = wp_remote_retrieve_body( $response );
 		if ( '' === trim( $body ) ) {
-			$this->log( 'error', sprintf( 'SRI REST API returned empty body for RUC %s', $ruc ) );
+			$this->log( 'error', sprintf( 'SRI ConsolidadoContribuyente returned empty body for RUC %s', $ruc ) );
 			return new WP_Error( 'sri_rest_empty_response', __( 'El SRI devolvió una respuesta vacía.', 'arriendo-facil' ) );
 		}
 
 		$data = json_decode( $body, true );
-
 		if ( ! is_array( $data ) ) {
-			$this->log( 'error', sprintf( 'SRI REST API returned invalid JSON for RUC %s', $ruc ) );
+			$this->log( 'error', sprintf( 'SRI ConsolidadoContribuyente invalid JSON for RUC %s', $ruc ) );
 			return new WP_Error( 'sri_rest_invalid_response', __( 'Respuesta inválida del SRI.', 'arriendo-facil' ) );
 		}
 
-		return $this->parse_consulta_contribuyente_data( $data );
+		return $data;
+	}
+
+	/**
+	 * Fetches establishment details from Establecimiento endpoint.
+	 *
+	 * @param string $ruc RUC number.
+	 * @return array|WP_Error Array of establishments, or WP_Error on failure.
+	 */
+	private function fetch_establecimientos( string $ruc ) {
+		$url = 'https://srienlinea.sri.gob.ec/sri-catastro-sujeto-servicio-internet/rest/Establecimiento/consultarPorNumeroRuc?numeroRuc=' . $ruc;
+
+		$sslverify = $this->resolve_ssl_verify();
+
+		$response = wp_remote_get(
+			$url,
+			array(
+				'timeout'     => $this->timeout,
+				'redirection' => 2,
+				'sslverify'   => $sslverify,
+				'headers'     => array(
+					'Accept'          => 'application/json',
+					'Accept-Language' => 'es-ES,es;q=0.9',
+					'User-Agent'      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+					'Referer'         => 'https://srienlinea.sri.gob.ec/sri-en-linea/SriRucWeb/ConsultaRuc/Consultas/consultaRuc',
+				),
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return new WP_Error(
+				'sri_rest_connection_error',
+				$response->get_error_message()
+			);
+		}
+
+		$code = (int) wp_remote_retrieve_response_code( $response );
+		if ( 200 !== $code ) {
+			return new WP_Error(
+				'sri_rest_http_error',
+				sprintf( 'HTTP %d', $code )
+			);
+		}
+
+		$body = wp_remote_retrieve_body( $response );
+		$data = json_decode( $body, true );
+
+		if ( ! is_array( $data ) ) {
+			return new WP_Error( 'sri_rest_invalid_response', 'Invalid JSON response' );
+		}
+
+		return $data;
 	}
 
 	/**
@@ -623,31 +701,132 @@ class Arriendo_Facil_SRI_Soap_Client {
 	 * @param array $data Contributor data.
 	 * @return array|WP_Error
 	 */
-	private function parse_consulta_contribuyente_data( array $data ) {
-		// Handle REST API response: array of objects, extract first item.
-		if ( isset( $data[0] ) && is_array( $data[0] ) ) {
-			$data = $data[0];
+	/**
+	 * Parses combined data from ConsolidadoContribuyente and Establecimiento endpoints.
+	 *
+	 * @param array $contribuyente_data From ConsolidadoContribuyente endpoint.
+	 * @param array $establecimientos   From Establecimiento endpoint.
+	 * @return array|WP_Error
+	 */
+	private function parse_combined_contributor_data( array $contribuyente_data, array $establecimientos ) {
+		// Handle ConsolidadoContribuyente response: array of objects, extract first item.
+		if ( isset( $contribuyente_data[0] ) && is_array( $contribuyente_data[0] ) ) {
+			$contribuyente_data = $contribuyente_data[0];
 		}
 
+		// Extract main fields from ConsolidadoContribuyente.
+		$razon_social = $this->extract_field( $contribuyente_data, array( 'razonSocial', 'nombreContribuyente', 'nombre' ) );
+		$nombre_comercial = $this->extract_field( $contribuyente_data, array( 'nombreFantasia', 'nombreComercial' ) );
+		if ( '' === $nombre_comercial ) {
+			$nombre_comercial = $razon_social;
+		}
+
+		$obligado = strtoupper( $this->extract_field( $contribuyente_data, array( 'obligadoLlevarContabilidad' ) ) );
+		$estado = strtoupper( $this->extract_field( $contribuyente_data, array( 'estadoContribuyenteRuc', 'estado' ) ) );
+		$tipo_contribuyente = $this->extract_field( $contribuyente_data, array( 'tipoContribuyente' ) );
+		$agente_retencion = strtoupper( $this->extract_field( $contribuyente_data, array( 'agenteRetencion' ) ) );
+
+		// Validate RUC status.
+		if ( '' === $estado ) {
+			$estado = 'ACTIVO'; // Default to ACTIVO if not provided.
+		}
+
+		if ( 'ACTIVO' !== $estado ) {
+			return new WP_Error(
+				'sri_ruc_inactive',
+				sprintf(
+					__( 'Este RUC está %s en el SRI. No se puede usar para facturación.', 'arriendo-facil' ),
+					strtolower( $estado )
+				)
+			);
+		}
+
+		// Extract addresses from Establecimiento endpoint.
+		$dir_establecimiento = '';
+		$dir_matriz = '';
+
+		if ( is_array( $establecimientos ) && ! empty( $establecimientos ) ) {
+			foreach ( $establecimientos as $estab ) {
+				if ( ! is_array( $estab ) ) {
+					continue;
+				}
+
+				$tipo = strtoupper( (string) ( $estab['tipoEstablecimiento'] ?? '' ) );
+				$dir = sanitize_text_field( (string) ( $estab['direccionCompleta'] ?? $estab['direccion'] ?? '' ) );
+
+				if ( '' === $dir ) {
+					continue;
+				}
+
+				// Assign by establishment type.
+				if ( 'MATRIZ' === $tipo ) {
+					$dir_matriz = $dir;
+				}
+
+				// Use first non-empty direction as establecimiento.
+				if ( '' === $dir_establecimiento ) {
+					$dir_establecimiento = $dir;
+				}
+			}
+		}
+
+		if ( '' === $razon_social ) {
+			return new WP_Error( 'sri_no_data', __( 'No se encontró información para este RUC en el SRI.', 'arriendo-facil' ) );
+		}
+
+		return array(
+			'razon_social'          => sanitize_text_field( $razon_social ),
+			'nombre_comercial'      => sanitize_text_field( $nombre_comercial ),
+			'dir_establecimiento'   => sanitize_text_field( $dir_establecimiento ),
+			'dir_matriz'            => sanitize_text_field( $dir_matriz ),
+			'obligado_contabilidad' => ( 'SI' === $obligado || 'NO' === $obligado ) ? $obligado : 'NO',
+			'estado'                => $estado,
+			'tipo_contribuyente'    => sanitize_text_field( $tipo_contribuyente ),
+			'agente_retencion'      => ( 'SI' === $agente_retencion || 'NO' === $agente_retencion ) ? $agente_retencion : 'NO',
+		);
+	}
+
+	/**
+	 * Parses SOAP response for contributor query (legacy, kept for SOAP fallback).
+	 *
+	 * @param array $data SOAP response data.
+	 * @return array|WP_Error
+	 */
+	private function parse_consulta_contribuyente_data( array $data ) {
 		// Handle SOAP response: data wrapped in 'contribuyente' key.
 		$c = isset( $data['contribuyente'] ) && is_array( $data['contribuyente'] ) ? $data['contribuyente'] : $data;
 
 		// Extract main fields.
 		$razon_social = $this->extract_field( $c, array( 'razonSocial', 'nombreContribuyente', 'nombre' ) );
-
-		// For nombre_comercial, try multiple field names but default to razonSocial if not found.
 		$nombre_comercial = $this->extract_field( $c, array( 'nombreFantasia', 'nombreComercial' ) );
 		if ( '' === $nombre_comercial ) {
 			$nombre_comercial = $razon_social;
 		}
 
 		$obligado = strtoupper( $this->extract_field( $c, array( 'obligadoLlevarContabilidad' ) ) );
+		$estado = strtoupper( $this->extract_field( $c, array( 'estadoContribuyenteRuc', 'estado' ) ) );
+		$tipo_contribuyente = $this->extract_field( $c, array( 'tipoContribuyente' ) );
+		$agente_retencion = strtoupper( $this->extract_field( $c, array( 'agenteRetencion' ) ) );
 
-		// Initialize addresses (not always available in REST API).
+		// Validate RUC status.
+		if ( '' === $estado ) {
+			$estado = 'ACTIVO';
+		}
+
+		if ( 'ACTIVO' !== $estado ) {
+			return new WP_Error(
+				'sri_ruc_inactive',
+				sprintf(
+					__( 'Este RUC está %s en el SRI. No se puede usar para facturación.', 'arriendo-facil' ),
+					strtolower( $estado )
+				)
+			);
+		}
+
+		// For SOAP, addresses may be embedded. Try to extract.
 		$dir_establecimiento = '';
 		$dir_matriz = '';
 
-		// Try to extract addresses if available.
 		$establecimientos = isset( $c['establecimientos'] ) && is_array( $c['establecimientos'] ) ? $c['establecimientos'] : array();
 		foreach ( $establecimientos as $estab ) {
 			if ( ! is_array( $estab ) ) {
@@ -666,11 +845,6 @@ class Arriendo_Facil_SRI_Soap_Client {
 			}
 		}
 
-		// If no direcciones found but we have razonSocial, use it as establishment address for now.
-		if ( '' === $dir_establecimiento && '' !== $razon_social ) {
-			$dir_establecimiento = sanitize_text_field( $razon_social );
-		}
-
 		if ( '' === $razon_social ) {
 			return new WP_Error( 'sri_no_data', __( 'No se encontró información para este RUC en el SRI.', 'arriendo-facil' ) );
 		}
@@ -681,6 +855,9 @@ class Arriendo_Facil_SRI_Soap_Client {
 			'dir_establecimiento'   => sanitize_text_field( $dir_establecimiento ),
 			'dir_matriz'            => sanitize_text_field( $dir_matriz ),
 			'obligado_contabilidad' => ( 'SI' === $obligado || 'NO' === $obligado ) ? $obligado : 'NO',
+			'estado'                => $estado,
+			'tipo_contribuyente'    => sanitize_text_field( $tipo_contribuyente ),
+			'agente_retencion'      => ( 'SI' === $agente_retencion || 'NO' === $agente_retencion ) ? $agente_retencion : 'NO',
 		);
 	}
 

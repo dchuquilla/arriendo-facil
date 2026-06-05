@@ -239,11 +239,8 @@ $emission_points = $wpdb->get_results(
 					<input type="text" id="af_dir_establecimiento" name="af_dir_establecimiento"
 						value="<?php echo esc_attr( $cfg['dir_establecimiento'] ); ?>"
 						class="large-text" maxlength="300" placeholder="Ej: Quito, Pichincha, Calle X Nº123" required />
-					<p class="description" style="color:#d32f2f; font-weight:500;">
-						<?php esc_html_e( '⚠️ IMPORTANTE: Usa la dirección física REAL del local. No puede ser un nombre de persona.', 'arriendo-facil' ); ?>
-					</p>
-					<p id="af-dir-warning" class="description" style="color:#d32f2f; display:none; margin-top:5px;">
-						<?php esc_html_e( '⚠️ Parece que contiene un nombre en lugar de una dirección. Reemplaza con: calle, número, ciudad.', 'arriendo-facil' ); ?>
+					<p class="description">
+						<?php esc_html_e( 'Dirección física del establecimiento (se extrae del SRI al consultar el RUC). Si está vacía, completa manualmente.', 'arriendo-facil' ); ?>
 					</p>
 				</td>
 			</tr>

@@ -1590,33 +1590,6 @@
 
 	// ── SRI Configuration Validation ────────────────────────────────────────────
 
-	// Validate address field - warn if it contains a name instead of a real address
-	$( document ).on( 'change keyup', '#af_dir_establecimiento', function () {
-		var $field = $( this );
-		var value = $field.val().trim().toUpperCase();
-		var $warning = $( '#af-dir-warning' );
-
-		// Check if the field looks like a person's name (common patterns)
-		var namePatterns = [
-			/^[A-Z\s]+\s[A-Z\s]+$/, // All caps with spaces (likely a name)
-			/TORRES|CHAVEZ|GARCIA|RODRIGUEZ|MORALES|FLORES|GUTIERREZ|RAMOS/, // Common Ecuadorian surnames
-			/KEVIN|JAVIER|JUAN|MARIA|CARLOS|PEDRO|JOSÉ/, // Common first names
-		];
-
-		var hasNamePattern = namePatterns.some( function ( pattern ) {
-			return pattern.test( value );
-		} );
-
-		if ( hasNamePattern && value.length > 0 ) {
-			$warning.show();
-		} else {
-			$warning.hide();
-		}
-	} );
-
-	// Trigger check on page load
-	$( '#af_dir_establecimiento' ).trigger( 'change' );
-
 	// Email validation - show error message if invalid
 	$( document ).on( 'change keyup', '#af_email_notificacion', function () {
 		var $field = $( this );

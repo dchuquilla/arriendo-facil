@@ -353,6 +353,10 @@ class Arriendo_Facil_Billing_API {
 			if ( 'invalid_ruc' === $code ) {
 				$user_msg = __( 'El RUC debe tener exactamente 13 dígitos.', 'arriendo-facil' );
 				$http_code = 400;
+			} elseif ( 'sri_ruc_inactive' === $code ) {
+				// RUC status validation failed (not ACTIVO).
+				$user_msg = $message; // Use the detailed message from the error.
+				$http_code = 400;
 			} elseif ( 'sri_contribuyente_not_found' === $code || 'sri_no_data' === $code ) {
 				$user_msg = __( 'No se encontró información para este RUC en el SRI. Verifique el número o ingrese los datos manualmente.', 'arriendo-facil' );
 				$http_code = 404;

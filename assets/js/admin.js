@@ -1588,4 +1588,94 @@
 		afApproveTemplateFields();
 	} );
 
+	// ── SRI Configuration Validation ────────────────────────────────────────────
+
+	// Validate address field - warn if it contains a name instead of a real address
+	$( document ).on( 'change keyup', '#af_dir_establecimiento', function () {
+		var $field = $( this );
+		var value = $field.val().trim().toUpperCase();
+		var $warning = $( '#af-dir-warning' );
+
+		// Check if the field looks like a person's name (common patterns)
+		var namePatterns = [
+			/^[A-Z\s]+\s[A-Z\s]+$/, // All caps with spaces (likely a name)
+			/TORRES|CHAVEZ|GARCIA|RODRIGUEZ|MORALES|FLORES|GUTIERREZ|RAMOS/, // Common Ecuadorian surnames
+			/KEVIN|JAVIER|JUAN|MARIA|CARLOS|PEDRO|JOSÉ/, // Common first names
+		];
+
+		var hasNamePattern = namePatterns.some( function ( pattern ) {
+			return pattern.test( value );
+		} );
+
+		if ( hasNamePattern && value.length > 0 ) {
+			$warning.show();
+		} else {
+			$warning.hide();
+		}
+	} );
+
+	// Trigger check on page load
+	$( '#af_dir_establecimiento' ).trigger( 'change' );
+
+	// Email validation - show error message if invalid
+	$( document ).on( 'change keyup', '#af_email_notificacion', function () {
+		var $field = $( this );
+		var email = $field.val().trim();
+		var $error = $( '#af-email-error' );
+		var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+		if ( email.length > 0 && ! emailRegex.test( email ) ) {
+			$error.text( 'Formato de email inválido. Ej: admin@ejemplo.com' ).show();
+		} else {
+			$error.hide();
+		}
+	} );
+
+	// RUC Lookup functionality
+	$( document ).on( 'click', '#af-ruc-lookup-btn', function ( e ) {
+		e.preventDefault();
+
+		var $btn = $( this );
+		var $status = $( '#af-ruc-lookup-status' );
+		var ruc = $( '#af_ruc' ).val().trim().replace( /\D/g, '' );
+
+		if ( ruc.length !== 13 ) {
+			$status.text( '❌ El RUC debe tener 13 dígitos' ).css( 'color', '#d32f2f' );
+			return;
+		}
+
+		$btn.prop( 'disabled', true ).text( '⏳ Consultando...' );
+		$status.text( '' ).css( 'color', '#666' );
+
+		$.post( afAdmin.ajaxUrl, {
+			action: 'af_sri_ruc_lookup',
+			nonce: afAdmin.billingNonce,
+			ruc: ruc,
+		} )
+			.done( function ( response ) {
+				if ( response.success && response.data ) {
+					$( '#af_razon_social' ).val( response.data.razon_social || '' );
+					$( '#af_nombre_comercial' ).val( response.data.nombre_comercial || '' );
+					$( '#af_dir_establecimiento' ).val( response.data.dir_establecimiento || '' );
+					$( '#af_dir_matriz' ).val( response.data.dir_matriz || '' );
+
+					// Set obligado_contabilidad radio button
+					if ( response.data.obligado_contabilidad ) {
+						$( 'input[name="af_obligado_contabilidad"][value="' + response.data.obligado_contabilidad + '"]' ).prop( 'checked', true );
+					}
+
+					$status.text( '✅ Datos cargados desde el SRI' ).css( 'color', '#2e7d32' );
+					$( '#af_dir_establecimiento' ).trigger( 'change' ); // Validate address
+				} else {
+					$status.text( '❌ ' + ( response.data ? response.data.message : 'No se pudo consultar el RUC' ) ).css( 'color', '#d32f2f' );
+				}
+			} )
+			.fail( function () {
+				$status.text( '❌ Error de conexión' ).css( 'color', '#d32f2f' );
+			} )
+			.always( function () {
+				$btn.prop( 'disabled', false ).text( '🔍 Consultar en SRI' );
+			} );
+	} );
+
 } )( jQuery );

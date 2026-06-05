@@ -35,6 +35,7 @@ class Arriendo_Facil_SRI_Soap_Client {
 	const SOAP_NS_ENV    = 'http://schemas.xmlsoap.org/soap/envelope/';
 	const SOAP_NS_RECEP  = 'http://ec.gob.sri.ws.recepcion';
 	const SOAP_NS_AUTOR  = 'http://ec.gob.sri.ws.autorizacion';
+	const SOAP_NS_QUERY  = 'http://ec.gob.sri.ws.consulta';
 
 	/** @var string SRI base URL for this instance (resolved from ambiente). */
 	private $base_url;
@@ -129,6 +130,125 @@ class Arriendo_Facil_SRI_Soap_Client {
 		return $this->parse_autorizacion_response( $raw );
 	}
 
+	/**
+	 * Queries SRI for contributor/RUC information via SOAP.
+	 * Falls back to REST if SOAP endpoint is unavailable.
+	 *
+	 * @param string $ruc RUC to query.
+	 * @return array|WP_Error {
+	 *   razon_social          string
+	 *   nombre_comercial      string
+	 *   dir_establecimiento   string
+	 *   dir_matriz            string
+	 *   obligado_contabilidad string (SI/NO)
+	 * }
+	 */
+	public function consultar_contribuyente( string $ruc ) {
+		$ruc = preg_replace( '/\D/', '', $ruc );
+
+		if ( 13 !== strlen( $ruc ) ) {
+			return new WP_Error( 'invalid_ruc', __( 'El RUC debe tener exactamente 13 dígitos.', 'arriendo-facil' ) );
+		}
+
+		// Try SOAP first (official method).
+		$soap_result = $this->consultar_contribuyente_soap( $ruc );
+		if ( ! is_wp_error( $soap_result ) ) {
+			return $soap_result;
+		}
+
+		$this->log( 'info', sprintf( 'SOAP consulta failed for RUC %s, falling back to REST', $ruc ) );
+
+		// Fallback to REST with improved headers.
+		return $this->consultar_contribuyente_rest( $ruc );
+	}
+
+	// ─── Contributor query (SOAP + REST fallback) ────────────────────────────
+
+	/**
+	 * Attempts to query contributor via SOAP.
+	 *
+	 * @param string $ruc RUC number.
+	 * @return array|WP_Error
+	 */
+	private function consultar_contribuyente_soap( string $ruc ) {
+		$body = $this->build_consulta_contribuyente_envelope( $ruc );
+		$raw  = $this->http_post( $this->consulta_url(), $body );
+
+		if ( is_wp_error( $raw ) ) {
+			return $raw;
+		}
+
+		return $this->parse_consulta_contribuyente_response( $raw );
+	}
+
+	/**
+	 * Fallback: queries contributor via improved REST API with proper headers.
+	 *
+	 * @param string $ruc RUC number.
+	 * @return array|WP_Error
+	 */
+	private function consultar_contribuyente_rest( string $ruc ) {
+		$url = add_query_arg(
+			array( 'ruc' => $ruc ),
+			'https://srienlinea.sri.gob.ec/sri-catastro-sujeto-servicio-internet/rest/ConsolidadoContribuyente/obtenerPorNumerosRuc'
+		);
+
+		$sslverify = $this->resolve_ssl_verify();
+
+		$response = wp_remote_get(
+			$url,
+			array(
+				'timeout'     => $this->timeout,
+				'redirection' => 2,
+				'sslverify'   => $sslverify,
+				'headers'     => array(
+					'Accept'              => 'application/json',
+					'Accept-Language'     => 'es-ES,es;q=0.9',
+					'Accept-Encoding'     => 'gzip, deflate, br',
+					'Content-Type'        => 'application/json',
+					'User-Agent'          => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+					'X-Requested-With'    => 'XMLHttpRequest',
+					'Referer'             => 'https://srienlinea.sri.gob.ec/sri-en-linea/SriRucWeb/ConsultaRuc/Consultas/consultaRuc',
+					'Origin'              => 'https://srienlinea.sri.gob.ec',
+				),
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return new WP_Error(
+				'sri_rest_connection_error',
+				sprintf( __( 'No se pudo conectar con el SRI: %s', 'arriendo-facil' ), $response->get_error_message() )
+			);
+		}
+
+		$code = (int) wp_remote_retrieve_response_code( $response );
+		if ( 200 !== $code ) {
+			$this->log( 'error', sprintf( 'SRI REST API HTTP %d for RUC %s', $code, $ruc ) );
+			return new WP_Error(
+				'sri_rest_http_error',
+				sprintf( __( 'El SRI respondió con error HTTP %d', 'arriendo-facil' ), $code )
+			);
+		}
+
+		$body = wp_remote_retrieve_body( $response );
+		$data = json_decode( $body, true );
+
+		if ( ! is_array( $data ) ) {
+			return new WP_Error( 'sri_rest_invalid_response', __( 'Respuesta inválida del SRI.', 'arriendo-facil' ) );
+		}
+
+		return $this->parse_consulta_contribuyente_data( $data );
+	}
+
+	/**
+	 * Returns the SRI contributor query endpoint URL.
+	 *
+	 * @return string
+	 */
+	private function consulta_url(): string {
+		return $this->base_url . 'ConsultaContribuyente';
+	}
+
 	// ─── SOAP envelope builders ──────────────────────────────────────────────
 
 	/**
@@ -169,6 +289,27 @@ class Arriendo_Facil_SRI_Soap_Client {
 			. '<ec:autorizacionComprobante>'
 			. '<claveAccesoComprobante>' . $clave_safe . '</claveAccesoComprobante>'
 			. '</ec:autorizacionComprobante>'
+			. '</soapenv:Body>'
+			. '</soapenv:Envelope>';
+	}
+
+	/**
+	 * Builds the SOAP envelope for consulta de contribuyente.
+	 *
+	 * @param string $ruc RUC number.
+	 * @return string SOAP XML body.
+	 */
+	public function build_consulta_contribuyente_envelope( string $ruc ): string {
+		$ruc_safe = htmlspecialchars( $ruc, ENT_XML1, 'UTF-8' );
+		return '<?xml version="1.0" encoding="UTF-8"?>'
+			. '<soapenv:Envelope'
+			. ' xmlns:soapenv="' . self::SOAP_NS_ENV . '"'
+			. ' xmlns:ec="'      . self::SOAP_NS_QUERY . '">'
+			. '<soapenv:Header/>'
+			. '<soapenv:Body>'
+			. '<ec:consultaContribuyente>'
+			. '<ruc>' . $ruc_safe . '</ruc>'
+			. '</ec:consultaContribuyente>'
 			. '</soapenv:Body>'
 			. '</soapenv:Envelope>';
 	}
@@ -247,6 +388,95 @@ class Arriendo_Facil_SRI_Soap_Client {
 			'ambiente'            => $ambiente,
 			'xml_autorizacion'    => $xml_auth,
 			'mensajes'            => $mensajes,
+		);
+	}
+
+	/**
+	 * Parses the SOAP response from consultaContribuyente.
+	 *
+	 * @param string $soap_response Raw SOAP XML response body.
+	 * @return array|WP_Error
+	 */
+	public function parse_consulta_contribuyente_response( string $soap_response ) {
+		$dom = $this->load_soap_body( $soap_response );
+		if ( is_wp_error( $dom ) ) {
+			return $dom;
+		}
+
+		$xpath = new DOMXPath( $dom );
+
+		$contribuyente_nodes = $xpath->query( '//contribuyente' );
+		if ( ! $contribuyente_nodes || 0 === $contribuyente_nodes->length ) {
+			return new WP_Error( 'sri_contribuyente_not_found', __( 'No se encontró información para este RUC en el SRI.', 'arriendo-facil' ) );
+		}
+
+		$contribuyente_node = $contribuyente_nodes->item( 0 );
+
+		$data = array(
+			'razonSocial'                    => $this->xpath_text( $xpath, 'razonSocial', $contribuyente_node ),
+			'nombreFantasia'                 => $this->xpath_text( $xpath, 'nombreFantasia', $contribuyente_node ),
+			'obligadoLlevarContabilidad'     => $this->xpath_text( $xpath, 'obligadoLlevarContabilidad', $contribuyente_node ),
+		);
+
+		$establecimientos = $xpath->query( 'establecimientos/establecimiento', $contribuyente_node );
+		$data['establecimientos'] = array();
+		if ( $establecimientos ) {
+			foreach ( $establecimientos as $estab ) {
+				$data['establecimientos'][] = array(
+					'tipoEstablecimiento' => $this->xpath_text( $xpath, 'tipoEstablecimiento', $estab ),
+					'direccionCompleta'   => $this->xpath_text( $xpath, 'direccionCompleta', $estab ),
+					'direccion'           => $this->xpath_text( $xpath, 'direccion', $estab ),
+				);
+			}
+		}
+
+		return $this->parse_consulta_contribuyente_data( $data );
+	}
+
+	/**
+	 * Parses contributor data from array (works for both SOAP and REST responses).
+	 *
+	 * @param array $data Contributor data.
+	 * @return array|WP_Error
+	 */
+	private function parse_consulta_contribuyente_data( array $data ) {
+		$c = isset( $data['contribuyente'] ) && is_array( $data['contribuyente'] ) ? $data['contribuyente'] : $data;
+
+		$razon_social     = $this->extract_field( $c, array( 'razonSocial', 'nombreContribuyente', 'nombre' ) );
+		$nombre_comercial = $this->extract_field( $c, array( 'nombreFantasia', 'nombreComercial' ) );
+		$obligado         = strtoupper( $this->extract_field( $c, array( 'obligadoLlevarContabilidad' ) ) );
+
+		$dir_establecimiento = '';
+		$dir_matriz          = '';
+
+		$establecimientos = isset( $c['establecimientos'] ) && is_array( $c['establecimientos'] ) ? $c['establecimientos'] : array();
+		foreach ( $establecimientos as $estab ) {
+			if ( ! is_array( $estab ) ) {
+				continue;
+			}
+			$tipo = strtoupper( (string) ( $estab['tipoEstablecimiento'] ?? '' ) );
+			$dir  = sanitize_text_field( (string) ( $estab['direccionCompleta'] ?? $estab['direccion'] ?? '' ) );
+			if ( '' === $dir ) {
+				continue;
+			}
+			if ( 'MATRIZ' === $tipo ) {
+				$dir_matriz = $dir;
+			}
+			if ( '' === $dir_establecimiento ) {
+				$dir_establecimiento = $dir;
+			}
+		}
+
+		if ( '' === $razon_social ) {
+			return new WP_Error( 'sri_no_data', __( 'No se encontró información para este RUC en el SRI.', 'arriendo-facil' ) );
+		}
+
+		return array(
+			'razon_social'          => $razon_social,
+			'nombre_comercial'      => $nombre_comercial,
+			'dir_establecimiento'   => $dir_establecimiento,
+			'dir_matriz'            => $dir_matriz,
+			'obligado_contabilidad' => ( 'SI' === $obligado ) ? 'SI' : 'NO',
 		);
 	}
 
@@ -489,5 +719,21 @@ class Arriendo_Facil_SRI_Soap_Client {
 		}
 
 		return $mensajes;
+	}
+
+	/**
+	 * Extracts the first non-empty field from an array using candidate keys.
+	 *
+	 * @param array $data Source array.
+	 * @param array $keys Ordered list of candidate keys.
+	 * @return string
+	 */
+	private function extract_field( array $data, array $keys ): string {
+		foreach ( $keys as $key ) {
+			if ( isset( $data[ $key ] ) && '' !== (string) $data[ $key ] ) {
+				return sanitize_text_field( (string) $data[ $key ] );
+			}
+		}
+		return '';
 	}
 }

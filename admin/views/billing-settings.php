@@ -22,11 +22,23 @@ if ( isset( $_POST['af_save_sri_config'] ) ) {
 	check_admin_referer( 'af_sri_settings_nonce' );
 
 	$ruc = preg_replace( '/\D/', '', sanitize_text_field( wp_unslash( $_POST['af_ruc'] ?? '' ) ) );
+	$email = sanitize_email( wp_unslash( $_POST['af_email_notificacion'] ?? '' ) );
+	$dir_establecimiento = sanitize_text_field( wp_unslash( $_POST['af_dir_establecimiento'] ?? '' ) );
 
+	// Validate RUC
 	$ruc_validation = Arriendo_Facil_SRI_Config::validate_ruc( $ruc );
 	if ( is_wp_error( $ruc_validation ) ) {
 		$af_sri_notice = array( 'type' => 'error', 'msg' => $ruc_validation->get_error_message() );
-	} else {
+	}
+	// Validate Email is required and valid
+	elseif ( empty( $email ) || ! is_email( $email ) ) {
+		$af_sri_notice = array( 'type' => 'error', 'msg' => __( '❌ El email para notificaciones es OBLIGATORIO y debe ser válido. El SRI envía las autorizaciones a este correo.', 'arriendo-facil' ) );
+	}
+	// Validate establishment address
+	elseif ( empty( $dir_establecimiento ) ) {
+		$af_sri_notice = array( 'type' => 'error', 'msg' => __( '❌ La dirección del establecimiento es OBLIGATORIA. Debe contener una dirección física real (calle, número, ciudad).', 'arriendo-facil' ) );
+	}
+	else {
 		Arriendo_Facil_SRI_Config::save(
 			array(
 				'ruc'                   => $ruc,
@@ -175,10 +187,13 @@ $emission_points = $wpdb->get_results(
 		<?php wp_nonce_field( 'af_sri_settings_nonce' ); ?>
 
 		<h2><?php esc_html_e( 'Datos del Emisor', 'arriendo-facil' ); ?></h2>
+		<p class="description" style="margin-bottom:20px;">
+			<?php esc_html_e( 'Información requerida por el SRI para emitir comprobantes válidos. Los campos marcados con * son obligatorios.', 'arriendo-facil' ); ?>
+		</p>
 		<table class="form-table" role="presentation">
 			<tr>
 				<th scope="row">
-					<label for="af_ruc"><?php esc_html_e( 'RUC', 'arriendo-facil' ); ?> <span class="description">(13 dígitos)</span></label>
+					<label for="af_ruc"><?php esc_html_e( 'RUC', 'arriendo-facil' ); ?> <span style="color:red;">*</span> <span class="description">(13 dígitos)</span></label>
 				</th>
 				<td>
 					<input type="text" id="af_ruc" name="af_ruc"
@@ -194,13 +209,13 @@ $emission_points = $wpdb->get_results(
 			</tr>
 			<tr>
 				<th scope="row">
-					<label for="af_razon_social"><?php esc_html_e( 'Razón Social', 'arriendo-facil' ); ?></label>
+					<label for="af_razon_social"><?php esc_html_e( 'Razón Social', 'arriendo-facil' ); ?> <span style="color:red;">*</span></label>
 				</th>
 				<td>
 					<input type="text" id="af_razon_social" name="af_razon_social"
 						value="<?php echo esc_attr( $cfg['razon_social'] ); ?>"
 						class="large-text" maxlength="300" required />
-					<p class="description"><?php esc_html_e( 'Tal como aparece en el RUC del SRI.', 'arriendo-facil' ); ?></p>
+					<p class="description"><?php esc_html_e( 'Tal como aparece en el RUC del SRI. Auto-completado al consultar el RUC.', 'arriendo-facil' ); ?></p>
 				</td>
 			</tr>
 			<tr>
@@ -211,17 +226,25 @@ $emission_points = $wpdb->get_results(
 					<input type="text" id="af_nombre_comercial" name="af_nombre_comercial"
 						value="<?php echo esc_attr( $cfg['nombre_comercial'] ); ?>"
 						class="large-text" maxlength="300" />
-					<p class="description"><?php esc_html_e( 'Opcional. Aparece en los comprobantes si es diferente a la razón social.', 'arriendo-facil' ); ?></p>
+					<p class="description" style="color:#666;">
+						<?php esc_html_e( '❌ Opcional. Solo si es diferente a la razón social. Aparece en los comprobantes.', 'arriendo-facil' ); ?>
+					</p>
 				</td>
 			</tr>
 			<tr>
 				<th scope="row">
-					<label for="af_dir_establecimiento"><?php esc_html_e( 'Dirección del Establecimiento', 'arriendo-facil' ); ?></label>
+					<label for="af_dir_establecimiento"><?php esc_html_e( 'Dirección del Establecimiento', 'arriendo-facil' ); ?> <span style="color:red;">*</span></label>
 				</th>
 				<td>
 					<input type="text" id="af_dir_establecimiento" name="af_dir_establecimiento"
 						value="<?php echo esc_attr( $cfg['dir_establecimiento'] ); ?>"
-						class="large-text" maxlength="300" />
+						class="large-text" maxlength="300" placeholder="Ej: Quito, Pichincha, Calle X Nº123" required />
+					<p class="description" style="color:#d32f2f; font-weight:500;">
+						<?php esc_html_e( '⚠️ IMPORTANTE: Usa la dirección física REAL del local. No puede ser un nombre de persona.', 'arriendo-facil' ); ?>
+					</p>
+					<p id="af-dir-warning" class="description" style="color:#d32f2f; display:none; margin-top:5px;">
+						<?php esc_html_e( '⚠️ Parece que contiene un nombre en lugar de una dirección. Reemplaza con: calle, número, ciudad.', 'arriendo-facil' ); ?>
+					</p>
 				</td>
 			</tr>
 			<tr>
@@ -232,11 +255,14 @@ $emission_points = $wpdb->get_results(
 					<input type="text" id="af_dir_matriz" name="af_dir_matriz"
 						value="<?php echo esc_attr( $cfg['dir_matriz'] ); ?>"
 						class="large-text" maxlength="300" />
+					<p class="description" style="color:#666;">
+						<?php esc_html_e( '❌ Opcional. Solo si es diferente a la dirección del establecimiento.', 'arriendo-facil' ); ?>
+					</p>
 				</td>
 			</tr>
 			<tr>
 				<th scope="row">
-					<?php esc_html_e( 'Obligado a llevar Contabilidad', 'arriendo-facil' ); ?>
+					<?php esc_html_e( 'Obligado a llevar Contabilidad', 'arriendo-facil' ); ?> <span style="color:red;">*</span>
 				</th>
 				<td>
 					<fieldset>
@@ -252,17 +278,22 @@ $emission_points = $wpdb->get_results(
 							<?php esc_html_e( 'SI', 'arriendo-facil' ); ?>
 						</label>
 					</fieldset>
+					<p class="description"><?php esc_html_e( 'Auto-completado al consultar el RUC.', 'arriendo-facil' ); ?></p>
 				</td>
 			</tr>
 			<tr>
 				<th scope="row">
-					<label for="af_email_notificacion"><?php esc_html_e( 'Email para notificaciones de comprobantes', 'arriendo-facil' ); ?></label>
+					<label for="af_email_notificacion"><?php esc_html_e( 'Email para notificaciones', 'arriendo-facil' ); ?> <span style="color:red;">*</span></label>
 				</th>
 				<td>
 					<input type="email" id="af_email_notificacion" name="af_email_notificacion"
 						value="<?php echo esc_attr( $cfg['email_notificacion'] ); ?>"
-						class="regular-text" />
-					<p class="description"><?php esc_html_e( 'Email del emisor al que el SRI envía la autorización.', 'arriendo-facil' ); ?></p>
+						class="regular-text" required
+						pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$" />
+					<p class="description" style="color:#d32f2f; font-weight:500;">
+						<?php esc_html_e( '⚠️ CRÍTICO: El SRI envía las autorizaciones de comprobantes a este email. Sin él, no recibirás los documentos autorizados.', 'arriendo-facil' ); ?>
+					</p>
+					<p id="af-email-error" class="description" style="color:#d32f2f; display:none; margin-top:5px;"></p>
 				</td>
 			</tr>
 		</table>
@@ -291,7 +322,10 @@ $emission_points = $wpdb->get_results(
 			</tr>
 		</table>
 
-		<h2><?php esc_html_e( 'Configuración de Conexión SOAP', 'arriendo-facil' ); ?></h2>
+		<h2><?php esc_html_e( 'Configuración Avanzada', 'arriendo-facil' ); ?> <span class="description" style="font-size:0.9em;">(Opcional)</span></h2>
+		<p class="description" style="color:#666; margin-bottom:15px;">
+			<?php esc_html_e( 'Parámetros técnicos. Los valores por defecto funcionan para la mayoría de casos. Modifica solo si tienes problemas de conexión.', 'arriendo-facil' ); ?>
+		</p>
 		<table class="form-table" role="presentation">
 			<tr>
 				<th scope="row">
@@ -301,21 +335,21 @@ $emission_points = $wpdb->get_results(
 					<input type="number" id="af_sri_soap_timeout" name="af_sri_soap_timeout"
 						value="<?php echo esc_attr( $cfg['sri_soap_timeout'] ?? 30 ); ?>"
 						class="small-text" min="10" max="120" step="1" />
-					<p class="description">
-						<?php esc_html_e( 'Tiempo máximo de espera para respuesta del SRI (10-120 segundos). Usar 60+ segundos si la conexión es lenta.', 'arriendo-facil' ); ?>
+					<p class="description" style="color:#999;">
+						<?php esc_html_e( '⚙️ Default: 30 seg. Aumenta a 60 si tu conexión es lenta.', 'arriendo-facil' ); ?>
 					</p>
 				</td>
 			</tr>
 			<tr>
 				<th scope="row">
-					<label for="af_sri_soap_max_retries"><?php esc_html_e( 'Máximo de Reintentos Inmediatos', 'arriendo-facil' ); ?></label>
+					<label for="af_sri_soap_max_retries"><?php esc_html_e( 'Máximo de Reintentos', 'arriendo-facil' ); ?></label>
 				</th>
 				<td>
 					<input type="number" id="af_sri_soap_max_retries" name="af_sri_soap_max_retries"
 						value="<?php echo esc_attr( $cfg['sri_soap_max_retries'] ?? 3 ); ?>"
 						class="small-text" min="1" max="5" step="1" />
-					<p class="description">
-						<?php esc_html_e( 'Número de intentos inmediatos ante errores temporales (DNS, timeout, conexión rechazada). Luego se reintenta cada 15 minutos.', 'arriendo-facil' ); ?>
+					<p class="description" style="color:#999;">
+						<?php esc_html_e( '⚙️ Default: 3. Reintentos inmediatos ante errores temporales.', 'arriendo-facil' ); ?>
 					</p>
 				</td>
 			</tr>

@@ -1651,9 +1651,6 @@
 			.always( function () {
 				$btn.prop( 'disabled', false ).text( '🔍 Consultar en SRI' );
 			} );
-			// Update dir_matriz badge after RUC lookup
-			$( '#af_dir_matriz' ).data( 'af-prev-estab', $( '#af_dir_establecimiento' ).val().trim() );
-			afUpdateDirMatrizBadge();
 	} );
 
 	// ─── Auto-fill y badge: Dirección Matriz = Dirección del Establecimiento ─
@@ -1692,7 +1689,12 @@
 	$( document ).on( 'input', '#af_dir_matriz', afUpdateDirMatrizBadge );
 
 	// Inicializar al cargar la página.
-	$( '#af_dir_matriz' ).data( 'af-prev-estab', $( '#af_dir_establecimiento' ).val().trim() );
+	var $afDirMatrizInit = $( '#af_dir_matriz' );
+	var afEstabInit = $( '#af_dir_establecimiento' ).val().trim();
+	if ( $afDirMatrizInit.val().trim() === '' && afEstabInit !== '' ) {
+		$afDirMatrizInit.val( $( '#af_dir_establecimiento' ).val() );
+	}
+	$afDirMatrizInit.data( 'af-prev-estab', $( '#af_dir_establecimiento' ).val().trim() );
 	afUpdateDirMatrizBadge();
 
 } )( jQuery );

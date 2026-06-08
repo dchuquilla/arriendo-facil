@@ -195,10 +195,14 @@ class Arriendo_Facil_Billing_Manager {
 		);
 
 		$xml_data = $this->build_xml_data( $config, $payload, $totals, $clave, $emission );
-		$xml      = $this->xml_builder->build( $xml_data );
 
-		$signer     = call_user_func( $this->signer_factory, $cert, $pass );
-		$xml_signed = $signer->sign( $xml );
+		try {
+			$xml    = $this->xml_builder->build( $xml_data );
+			$signer = call_user_func( $this->signer_factory, $cert, $pass );
+			$xml_signed = $signer->sign( $xml );
+		} catch ( \RuntimeException $e ) {
+			return new WP_Error( 'sri_sign_error', $e->getMessage() );
+		}
 
 		$invoice_id = $this->insert_invoice_row(
 			array_merge(

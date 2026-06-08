@@ -211,7 +211,15 @@ class Arriendo_Facil_SRI_Config {
 
 		$certs = array();
 		if ( ! openssl_pkcs12_read( $contents, $certs, $password ) ) {
-			return new WP_Error( 'invalid_cert', __( 'No se pudo abrir el certificado. Verifique la contraseña.', 'arriendo-facil' ) );
+			$ssl_err = openssl_error_string() ?: 'unknown';
+			return new WP_Error(
+				'invalid_cert',
+				sprintf(
+					/* translators: %s: OpenSSL error detail */
+					__( 'No se pudo abrir el certificado. Verifique la contraseña. (OpenSSL: %s)', 'arriendo-facil' ),
+					$ssl_err
+				)
+			);
 		}
 
 		if ( empty( $certs['cert'] ) || empty( $certs['pkey'] ) ) {

@@ -209,15 +209,24 @@ class Arriendo_Facil_SRI_Config {
 			return new WP_Error( 'read_error', __( 'No se pudo leer el archivo de certificado.', 'arriendo-facil' ) );
 		}
 
+		// Clear any stale OpenSSL errors before the read attempt.
+		while ( openssl_error_string() ) {
+			// flush
+		}
+
 		$certs = array();
 		if ( ! openssl_pkcs12_read( $contents, $certs, $password ) ) {
-			$ssl_err = openssl_error_string() ?: 'unknown';
+			$ssl_err = '';
+			while ( $e = openssl_error_string() ) {
+				$ssl_err .= $e . '; ';
+			}
 			return new WP_Error(
 				'invalid_cert',
 				sprintf(
 					/* translators: %s: OpenSSL error detail */
-					__( 'No se pudo abrir el certificado. Verifique la contraseña. (OpenSSL: %s)', 'arriendo-facil' ),
-					$ssl_err
+					__( 'No se pudo abrir el certificado. Verifique la contraseña. (OpenSSL: %s | pwd_len: %d)', 'arriendo-facil' ),
+					$ssl_err ?: 'unknown',
+					strlen( $password )
 				)
 			);
 		}

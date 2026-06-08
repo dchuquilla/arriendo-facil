@@ -355,7 +355,13 @@ class Arriendo_Facil_SRI_Signer {
 		$raw   = file_get_contents( $this->p12_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 		$certs = array();
 		if ( ! openssl_pkcs12_read( $raw, $certs, $this->p12_password ) ) {
-			throw new RuntimeException( 'Cannot open P12 certificate. Check the password.' );
+			$ssl_err = '';
+			while ( $e = openssl_error_string() ) {
+				$ssl_err .= $e . '; ';
+			}
+			throw new RuntimeException(
+				'Cannot open P12 certificate. Check the password. (OpenSSL: ' . ( $ssl_err ?: 'unknown' ) . ')'
+			);
 		}
 		return $certs;
 	}

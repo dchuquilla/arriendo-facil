@@ -117,6 +117,7 @@ class Arriendo_Facil_Activator {
 				monthly_rent  DECIMAL(10,2) NOT NULL DEFAULT 0.00,
 				status        VARCHAR(20) NOT NULL DEFAULT 'draft',
 				document_url  VARCHAR(255) DEFAULT NULL,
+				deleted_at    DATETIME DEFAULT NULL,
 				created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 				updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 				PRIMARY KEY (id),
@@ -732,6 +733,19 @@ class Arriendo_Facil_Activator {
 
 		$postmeta_table = $wpdb->postmeta;
 		$leases_table   = $wpdb->prefix . 'af_leases';
+
+		// Ensure deleted_at column exists on af_leases (added after initial schema).
+		$col_exists = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+				 WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'deleted_at'",
+				DB_NAME,
+				$leases_table
+			)
+		);
+		if ( ! $col_exists ) {
+			$wpdb->query( "ALTER TABLE {$leases_table} ADD COLUMN deleted_at DATETIME DEFAULT NULL AFTER document_url" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		}
 
 		$indexes = array(
 			array(

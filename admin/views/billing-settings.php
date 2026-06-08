@@ -70,8 +70,8 @@ if ( isset( $_POST['af_upload_certificate'] ) ) {
 		}
 	}
 
-	// Save password if provided alongside upload.
-	$new_password = sanitize_text_field( wp_unslash( $_POST['af_cert_password'] ?? '' ) );
+	// Save password if provided alongside upload (no sanitize_text_field — it strips %XX and special chars).
+	$new_password = wp_unslash( $_POST['af_cert_password'] ?? '' );
 	if ( '' !== $new_password ) {
 		Arriendo_Facil_SRI_Config::save_cert_password( $new_password );
 	}

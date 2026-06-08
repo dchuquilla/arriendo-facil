@@ -23,7 +23,7 @@ if ( $is_owner ) {
 			"SELECT l.*, p.post_title AS accommodation_title
 			 FROM {$wpdb->prefix}af_leases l
 			 LEFT JOIN {$wpdb->posts} p ON p.ID = l.accommodation_id
-			 WHERE l.accommodation_id IN ($ids_sql)
+			 WHERE l.accommodation_id IN ($ids_sql) AND l.deleted_at IS NULL
 			 ORDER BY l.created_at DESC
 			 LIMIT 100"
 		);
@@ -35,6 +35,7 @@ if ( $is_owner ) {
 		"SELECT l.*, p.post_title AS accommodation_title
 		 FROM {$wpdb->prefix}af_leases l
 		 LEFT JOIN {$wpdb->posts} p ON p.ID = l.accommodation_id
+		 WHERE l.deleted_at IS NULL
 		 ORDER BY l.created_at DESC
 		 LIMIT 100"
 	);

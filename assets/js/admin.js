@@ -1655,8 +1655,13 @@
 
 	// ─── Auto-fill y badge: Dirección Matriz = Dirección del Establecimiento ─
 	function afUpdateDirMatrizBadge() {
-		var estab  = $( '#af_dir_establecimiento' ).val().trim();
-		var matriz = $( '#af_dir_matriz' ).val().trim();
+		var $estabEl = $( '#af_dir_establecimiento' );
+		var $matrizEl = $( '#af_dir_matriz' );
+		if ( ! $estabEl.length || ! $matrizEl.length ) {
+			return;
+		}
+		var estab  = $estabEl.val().trim();
+		var matriz = $matrizEl.val().trim();
 		var $desc  = $( '#af-dir-matriz-desc' );
 
 		if ( $desc.length === 0 ) {
@@ -1688,13 +1693,15 @@
 	// Cuando el usuario edita Dirección Matriz manualmente, solo actualizar badge.
 	$( document ).on( 'input', '#af_dir_matriz', afUpdateDirMatrizBadge );
 
-	// Inicializar al cargar la página.
-	var $afDirMatrizInit = $( '#af_dir_matriz' );
-	var afEstabInit = $( '#af_dir_establecimiento' ).val().trim();
-	if ( $afDirMatrizInit.val().trim() === '' && afEstabInit !== '' ) {
-		$afDirMatrizInit.val( $( '#af_dir_establecimiento' ).val() );
+	// Inicializar al cargar la página (solo en billing-settings).
+	if ( $( '#af_dir_establecimiento' ).length ) {
+		var $afDirMatrizInit = $( '#af_dir_matriz' );
+		var afEstabInit = $( '#af_dir_establecimiento' ).val().trim();
+		if ( $afDirMatrizInit.val().trim() === '' && afEstabInit !== '' ) {
+			$afDirMatrizInit.val( $( '#af_dir_establecimiento' ).val() );
+		}
+		$afDirMatrizInit.data( 'af-prev-estab', $( '#af_dir_establecimiento' ).val().trim() );
+		afUpdateDirMatrizBadge();
 	}
-	$afDirMatrizInit.data( 'af-prev-estab', $( '#af_dir_establecimiento' ).val().trim() );
-	afUpdateDirMatrizBadge();
 
 } )( jQuery );

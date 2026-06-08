@@ -129,6 +129,10 @@ function arriendo_facil_should_show_chatbot() {
 		return false;
 	}
 
+	if ( is_page( 'propiedades' ) ) {
+		return false;
+	}
+
 	if ( is_singular() || is_post_type_archive( 'accommodation' ) ) {
 		return true;
 	}

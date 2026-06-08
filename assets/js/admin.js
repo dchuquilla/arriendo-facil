@@ -1649,6 +1649,48 @@
 			.always( function () {
 				$btn.prop( 'disabled', false ).text( '🔍 Consultar en SRI' );
 			} );
+			// Update dir_matriz badge after RUC lookup
+			$( '#af_dir_matriz' ).data( 'af-prev-estab', $( '#af_dir_establecimiento' ).val().trim() );
+			afUpdateDirMatrizBadge();
 	} );
+
+	// ─── Auto-fill y badge: Dirección Matriz = Dirección del Establecimiento ─
+	function afUpdateDirMatrizBadge() {
+		var estab  = $( '#af_dir_establecimiento' ).val().trim();
+		var matriz = $( '#af_dir_matriz' ).val().trim();
+		var $desc  = $( '#af-dir-matriz-desc' );
+
+		if ( $desc.length === 0 ) {
+			return;
+		}
+
+		if ( estab && estab === matriz ) {
+			$desc.html( '<span style="color:#2e7d32; font-weight:500;">✓ Igual a la dirección del establecimiento.</span>' );
+		} else {
+			$desc.text( 'Opcional. Solo si es diferente a la dirección del establecimiento.' );
+		}
+	}
+
+	// Cuando el usuario escribe en Dirección del Establecimiento,
+	// auto-completar Dirección Matriz si estaba vacía o sincronizada.
+	$( document ).on( 'input', '#af_dir_establecimiento', function () {
+		var $matriz   = $( '#af_dir_matriz' );
+		var prevEstab = $matriz.data( 'af-prev-estab' ) || '';
+		var curMatriz = $matriz.val().trim();
+
+		if ( curMatriz === '' || curMatriz === prevEstab ) {
+			$matriz.val( $( this ).val() );
+		}
+
+		$matriz.data( 'af-prev-estab', $( this ).val().trim() );
+		afUpdateDirMatrizBadge();
+	} );
+
+	// Cuando el usuario edita Dirección Matriz manualmente, solo actualizar badge.
+	$( document ).on( 'input', '#af_dir_matriz', afUpdateDirMatrizBadge );
+
+	// Inicializar al cargar la página.
+	$( '#af_dir_matriz' ).data( 'af-prev-estab', $( '#af_dir_establecimiento' ).val().trim() );
+	afUpdateDirMatrizBadge();
 
 } )( jQuery );

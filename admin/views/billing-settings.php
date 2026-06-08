@@ -249,11 +249,16 @@ $emission_points = $wpdb->get_results(
 					<label for="af_dir_matriz"><?php esc_html_e( 'Dirección Matriz', 'arriendo-facil' ); ?></label>
 				</th>
 				<td>
+					<?php $af_dir_match = ( ! empty( $cfg['dir_establecimiento'] ) && $cfg['dir_establecimiento'] === $cfg['dir_matriz'] ); ?>
 					<input type="text" id="af_dir_matriz" name="af_dir_matriz"
 						value="<?php echo esc_attr( $cfg['dir_matriz'] ); ?>"
 						class="large-text" maxlength="300" />
-					<p class="description" style="color:#666;">
-						<?php esc_html_e( '❌ Opcional. Solo si es diferente a la dirección del establecimiento.', 'arriendo-facil' ); ?>
+					<p class="description" id="af-dir-matriz-desc">
+						<?php if ( $af_dir_match ) : ?>
+							<span style="color:#2e7d32; font-weight:500;">✓ Igual a la dirección del establecimiento.</span>
+						<?php else : ?>
+							<?php esc_html_e( 'Opcional. Solo si es diferente a la dirección del establecimiento.', 'arriendo-facil' ); ?>
+						<?php endif; ?>
 					</p>
 				</td>
 			</tr>

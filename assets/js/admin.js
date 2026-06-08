@@ -1629,8 +1629,9 @@
 				if ( response.success && response.data ) {
 					$( '#af_razon_social' ).val( response.data.razon_social || '' );
 					$( '#af_nombre_comercial' ).val( response.data.nombre_comercial || '' );
-					$( '#af_dir_establecimiento' ).val( response.data.dir_establecimiento || '' );
-					$( '#af_dir_matriz' ).val( response.data.dir_matriz || '' );
+					var dirEstab = response.data.dir_establecimiento || '';
+					$( '#af_dir_establecimiento' ).val( dirEstab );
+					$( '#af_dir_matriz' ).val( dirEstab ).data( 'af-prev-estab', dirEstab.trim() );
 
 					// Set obligado_contabilidad radio button
 					if ( response.data.obligado_contabilidad ) {
@@ -1639,6 +1640,7 @@
 
 					$status.text( '✅ Datos cargados desde el SRI' ).css( 'color', '#2e7d32' );
 					$( '#af_dir_establecimiento' ).trigger( 'change' ); // Validate address
+					afUpdateDirMatrizBadge();
 				} else {
 					$status.text( '❌ ' + ( response.data ? response.data.message : 'No se pudo consultar el RUC' ) ).css( 'color', '#d32f2f' );
 				}

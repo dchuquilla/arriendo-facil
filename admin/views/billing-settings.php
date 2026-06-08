@@ -71,9 +71,32 @@ if ( isset( $_POST['af_upload_certificate'] ) ) {
 	}
 
 	// Save password if provided alongside upload (no sanitize_text_field — it strips %XX and special chars).
-	$new_password = wp_unslash( $_POST['af_cert_password'] ?? '' );
+	$new_password = (string) wp_unslash( $_POST['af_cert_password'] ?? '' );
 	if ( '' !== $new_password ) {
 		Arriendo_Facil_SRI_Config::save_cert_password( $new_password );
+
+		// Immediately verify the cert opens with the plaintext password.
+		$cert_path = Arriendo_Facil_SRI_Config::cert_path();
+		if ( $cert_path ) {
+			$verify = Arriendo_Facil_SRI_Config::test_certificate( $cert_path, $new_password );
+			if ( is_wp_error( $verify ) ) {
+				$af_sri_notice = array(
+					'type' => 'error',
+					'msg'  => __( 'Certificado subido, pero NO se pudo abrir con la contraseña proporcionada: ', 'arriendo-facil' ) . $verify->get_error_message(),
+				);
+			} else {
+				// Also verify the encrypt/decrypt cycle returns the same password.
+				$decrypted = Arriendo_Facil_SRI_Config::cert_password();
+				if ( $decrypted !== $new_password ) {
+					$af_sri_notice = array(
+						'type' => 'error',
+						'msg'  => __( 'Certificado válido, pero la contraseña se corrompió durante la encriptación interna. Contacte soporte.', 'arriendo-facil' ),
+					);
+				} else {
+					$af_sri_notice = array( 'type' => 'success', 'msg' => __( 'Certificado subido y verificado correctamente. ✓', 'arriendo-facil' ) );
+				}
+			}
+		}
 	}
 }
 
@@ -86,6 +109,8 @@ if ( isset( $_POST['af_test_certificate'] ) ) {
 
 	if ( ! $cert_path ) {
 		$af_sri_notice = array( 'type' => 'error', 'msg' => __( 'No hay ningún certificado cargado.', 'arriendo-facil' ) );
+	} elseif ( '' === $cert_pass ) {
+		$af_sri_notice = array( 'type' => 'error', 'msg' => __( 'La contraseña almacenada no se pudo desencriptar. Vuelva a subir el certificado e ingrese la contraseña nuevamente.', 'arriendo-facil' ) );
 	} else {
 		$test_result = Arriendo_Facil_SRI_Config::test_certificate( $cert_path, $cert_pass );
 		if ( is_wp_error( $test_result ) ) {

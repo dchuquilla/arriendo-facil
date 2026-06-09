@@ -298,8 +298,120 @@ class Arriendo_Facil_SRI_Config {
 	}
 
 	/**
+	 * Attempts to build the CA chain by following AIA (Authority Information Access)
+	 * extensions in the certificate. Downloads intermediate CA certificates until
+	 * reaching a self-signed root or max depth.
+	 *
+	 * @param string $cert_pem PEM-encoded end-entity certificate.
+	 * @param int    $max_depth Maximum chain depth to follow (default 5).
+	 * @return string Concatenated PEM chain (intermediates only, no root), or empty string.
+	 */
+	public static function fetch_ca_chain( string $cert_pem, int $max_depth = 5 ): string {
+		$chain_pems = array();
+		$current    = $cert_pem;
+
+		for ( $i = 0; $i < $max_depth; $i++ ) {
+			$issuer_url = self::extract_aia_ca_issuer( $current );
+			if ( '' === $issuer_url ) {
+				break;
+			}
+
+			$response = wp_remote_get( $issuer_url, array( 'timeout' => 15, 'sslverify' => true ) );
+			if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
+				break;
+			}
+
+			$body = wp_remote_retrieve_body( $response );
+			if ( '' === $body ) {
+				break;
+			}
+
+			$ca_pem = self::normalize_cert_to_pem( $body );
+			if ( '' === $ca_pem ) {
+				break;
+			}
+
+			$ca_info = openssl_x509_parse( $ca_pem );
+			if ( false === $ca_info ) {
+				break;
+			}
+
+			$is_self_signed = ( ( $ca_info['subject'] ?? array() ) === ( $ca_info['issuer'] ?? array() ) );
+			if ( $is_self_signed ) {
+				break;
+			}
+
+			$chain_pems[] = $ca_pem;
+			$current      = $ca_pem;
+		}
+
+		return implode( "\n", $chain_pems );
+	}
+
+	/**
+	 * Extracts the CA Issuers URI from a certificate's AIA extension.
+	 *
+	 * @param string $cert_pem PEM certificate.
+	 * @return string URL or empty string.
+	 */
+	private static function extract_aia_ca_issuer( string $cert_pem ): string {
+		$parsed = openssl_x509_parse( $cert_pem );
+		if ( false === $parsed || empty( $parsed['extensions']['authorityInfoAccess'] ) ) {
+			return '';
+		}
+
+		$aia = $parsed['extensions']['authorityInfoAccess'];
+		if ( preg_match( '/CA Issuers\s*-\s*URI:(\S+)/i', $aia, $m ) ) {
+			return $m[1];
+		}
+		return '';
+	}
+
+	/**
+	 * Normalizes a certificate body (DER or PEM) to PEM format.
+	 *
+	 * @param string $data Raw certificate data (DER binary or PEM text).
+	 * @return string PEM string, or empty on failure.
+	 */
+	private static function normalize_cert_to_pem( string $data ): string {
+		if ( false !== strpos( $data, '-----BEGIN CERTIFICATE-----' ) ) {
+			return trim( $data );
+		}
+
+		$b64 = chunk_split( base64_encode( $data ), 64, "\n" );
+		$pem = "-----BEGIN CERTIFICATE-----\n" . $b64 . "-----END CERTIFICATE-----";
+
+		if ( false === openssl_x509_parse( $pem ) ) {
+			return '';
+		}
+		return $pem;
+	}
+
+	/**
+	 * Fetches the CA chain for the stored certificate and persists it.
+	 *
+	 * @return true|WP_Error
+	 */
+	public static function rebuild_chain() {
+		$pems = self::get_cert_pems();
+		if ( '' === $pems['cert'] ) {
+			return new WP_Error( 'no_cert', __( 'No hay certificado almacenado.', 'arriendo-facil' ) );
+		}
+
+		$chain = self::fetch_ca_chain( $pems['cert'] );
+		if ( '' === $chain ) {
+			return new WP_Error( 'chain_empty', __( 'No se pudo obtener la cadena de certificados CA. Verifique la conexión a internet del servidor.', 'arriendo-facil' ) );
+		}
+
+		$current               = self::get();
+		$current['chain_pem_enc'] = self::protect_sensitive( $chain );
+		update_option( self::OPTION_KEY, $current );
+
+		return true;
+	}
+
+	/**
 	 * Returns the secure directory for P12 certificates, creating it if needed.
-	 * Places a .htaccess and index.php to block direct HTTP access.
 	 *
 	 * @return string Absolute path, or empty string on failure.
 	 */

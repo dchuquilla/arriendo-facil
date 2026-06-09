@@ -120,17 +120,40 @@ if ( isset( $_POST['af_test_certificate'] ) ) {
 		if ( '' !== trim( $pems_diag['chain'] ) ) {
 			$chain_count = preg_match_all( '/-----BEGIN CERTIFICATE-----/', $pems_diag['chain'] );
 		}
-		$subject = $cert_info['subject'] ?? array();
-		$issuer  = $cert_info['issuer'] ?? array();
-		$valid_to = isset( $cert_info['validTo_time_t'] ) ? wp_date( 'd/m/Y', (int) $cert_info['validTo_time_t'] ) : '?';
-		$diag_msg = sprintf(
-			'Certificado válido y legible. ✓ | Sujeto: %s | Emisor: %s | Vence: %s | Certificados CA en cadena: %d',
-			$subject['CN'] ?? ( $subject['serialNumber'] ?? '?' ),
-			$issuer['CN'] ?? ( $issuer['O'] ?? '?' ),
-			$valid_to,
-			$chain_count
+		$subject    = $cert_info['subject'] ?? array();
+		$issuer     = $cert_info['issuer'] ?? array();
+		$extensions = $cert_info['extensions'] ?? array();
+		$valid_from = isset( $cert_info['validFrom_time_t'] ) ? wp_date( 'd/m/Y', (int) $cert_info['validFrom_time_t'] ) : '?';
+		$valid_to   = isset( $cert_info['validTo_time_t'] ) ? wp_date( 'd/m/Y', (int) $cert_info['validTo_time_t'] ) : '?';
+
+		$cert_ruc = '';
+		if ( ! empty( $subject['serialNumber'] ) ) {
+			$cert_ruc = $subject['serialNumber'];
+		} elseif ( ! empty( $subject['UID'] ) ) {
+			$cert_ruc = $subject['UID'];
+		}
+
+		$sri_config = Arriendo_Facil_SRI_Config::get();
+		$config_ruc = $sri_config['ruc'] ?? '';
+		$ruc_match  = '';
+		if ( '' !== $cert_ruc && '' !== $config_ruc ) {
+			$ruc_match = ( false !== strpos( $cert_ruc, $config_ruc ) ) ? ' ✓ coincide' : ' ⚠ NO coincide con RUC configurado: ' . $config_ruc;
+		}
+
+		$key_usage = $extensions['keyUsage'] ?? 'No definido';
+		$ext_key_usage = $extensions['extendedKeyUsage'] ?? 'No definido';
+
+		$diag_lines = array(
+			'✓ Certificado válido',
+			'Sujeto CN: ' . ( $subject['CN'] ?? '?' ),
+			'RUC/Serial en cert: ' . ( $cert_ruc ?: 'no encontrado' ) . $ruc_match,
+			'Emisor: ' . ( $issuer['CN'] ?? ( $issuer['O'] ?? '?' ) ),
+			'Vigencia: ' . $valid_from . ' → ' . $valid_to,
+			'Key Usage: ' . $key_usage,
+			'Extended Key Usage: ' . $ext_key_usage,
+			'CA chain: ' . $chain_count . ' certificado(s)',
 		);
-		$af_sri_notice = array( 'type' => 'success', 'msg' => $diag_msg );
+		$af_sri_notice = array( 'type' => 'success', 'msg' => implode( ' | ', $diag_lines ) );
 	}
 }
 

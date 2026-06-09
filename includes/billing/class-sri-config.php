@@ -298,10 +298,58 @@ class Arriendo_Facil_SRI_Config {
 	}
 
 	/**
-	 * Attempts to build the CA chain by following AIA (Authority Information Access)
-	 * extensions in the certificate. Downloads intermediate CA certificates until
-	 * reaching a self-signed root or max depth.
+	 * Returns detailed certificate diagnostics for troubleshooting SRI issues.
 	 *
+	 * @return array{valid: bool, details: array<string, string>}
+	 */
+	public static function certificate_diagnostics(): array {
+		$pems = self::get_cert_pems();
+		if ( '' === $pems['cert'] ) {
+			return array( 'valid' => false, 'details' => array( 'error' => 'No certificate stored' ) );
+		}
+
+		$cert_info = openssl_x509_parse( $pems['cert'] );
+		if ( false === $cert_info ) {
+			return array( 'valid' => false, 'details' => array( 'error' => 'Cannot parse certificate' ) );
+		}
+
+		$subject    = $cert_info['subject'] ?? array();
+		$issuer     = $cert_info['issuer'] ?? array();
+		$extensions = $cert_info['extensions'] ?? array();
+
+		$cert_ruc = $subject['serialNumber'] ?? ( $subject['UID'] ?? '' );
+
+		$pub_key     = openssl_pkey_get_public( $pems['cert'] );
+		$key_details = $pub_key ? openssl_pkey_get_details( $pub_key ) : array();
+		$key_bits    = $key_details['bits'] ?? 0;
+		$key_type    = isset( $key_details['rsa'] ) ? 'RSA' : 'Unknown';
+
+		$chain_count = 0;
+		if ( '' !== trim( $pems['chain'] ) ) {
+			$chain_count = (int) preg_match_all( '/-----BEGIN CERTIFICATE-----/', $pems['chain'] );
+		}
+
+		return array(
+			'valid'   => true,
+			'details' => array(
+				'subject_cn'       => $subject['CN'] ?? '',
+				'subject_serial'   => $cert_ruc,
+				'subject_o'        => $subject['O'] ?? '',
+				'issuer_cn'        => $issuer['CN'] ?? '',
+				'issuer_o'         => $issuer['O'] ?? '',
+				'valid_from'       => isset( $cert_info['validFrom_time_t'] ) ? gmdate( 'Y-m-d', (int) $cert_info['validFrom_time_t'] ) : '',
+				'valid_to'         => isset( $cert_info['validTo_time_t'] ) ? gmdate( 'Y-m-d', (int) $cert_info['validTo_time_t'] ) : '',
+				'key_type'         => $key_type,
+				'key_bits'         => (string) $key_bits,
+				'key_usage'        => $extensions['keyUsage'] ?? 'Not set',
+				'ext_key_usage'    => $extensions['extendedKeyUsage'] ?? 'Not set',
+				'chain_count'      => (string) $chain_count,
+				'aia'              => $extensions['authorityInfoAccess'] ?? 'Not set',
+			),
+		);
+	}
+
+	/**
 	 * @param string $cert_pem PEM-encoded end-entity certificate.
 	 * @param int    $max_depth Maximum chain depth to follow (default 5).
 	 * @return string Concatenated PEM chain (intermediates only, no root), or empty string.

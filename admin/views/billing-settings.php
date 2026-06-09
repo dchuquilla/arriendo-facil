@@ -70,54 +70,42 @@ if ( isset( $_POST['af_upload_certificate'] ) ) {
 		}
 	}
 
-	// Save password if provided alongside upload (no sanitize_text_field — it strips %XX and special chars).
+	// Save password if provided (no sanitize_text_field — it strips %XX and special chars).
 	$new_password = (string) wp_unslash( $_POST['af_cert_password'] ?? '' );
 	if ( '' !== $new_password ) {
 		Arriendo_Facil_SRI_Config::save_cert_password( $new_password );
 
-		// Immediately verify the cert opens with the plaintext password.
+		// Extract PEMs from the P12 and store them encrypted.
 		$cert_path = Arriendo_Facil_SRI_Config::cert_path();
 		if ( $cert_path ) {
-			$verify = Arriendo_Facil_SRI_Config::test_certificate( $cert_path, $new_password );
-			if ( is_wp_error( $verify ) ) {
+			$p12_result = Arriendo_Facil_SRI_Config::read_p12( $cert_path, $new_password );
+			if ( is_wp_error( $p12_result ) ) {
 				$af_sri_notice = array(
 					'type' => 'error',
-					'msg'  => __( 'Certificado subido, pero NO se pudo abrir con la contraseña proporcionada: ', 'arriendo-facil' ) . $verify->get_error_message(),
+					'msg'  => __( 'Certificado subido, pero no se pudo leer: ', 'arriendo-facil' ) . $p12_result->get_error_message(),
+				);
+			} elseif ( empty( $p12_result['cert'] ) || empty( $p12_result['pkey'] ) ) {
+				$af_sri_notice = array(
+					'type' => 'error',
+					'msg'  => __( 'El certificado no contiene los datos esperados (certificado + clave privada).', 'arriendo-facil' ),
 				);
 			} else {
-				// Also verify the encrypt/decrypt cycle returns the same password.
-				$decrypted = Arriendo_Facil_SRI_Config::cert_password();
-				if ( $decrypted !== $new_password ) {
-					$af_sri_notice = array(
-						'type' => 'error',
-						'msg'  => __( 'Certificado válido, pero la contraseña se corrompió durante la encriptación interna. Contacte soporte.', 'arriendo-facil' ),
-					);
-				} else {
-					$af_sri_notice = array( 'type' => 'success', 'msg' => __( 'Certificado subido y verificado correctamente. ✓', 'arriendo-facil' ) );
-				}
+				Arriendo_Facil_SRI_Config::save_cert_pems( $p12_result['cert'], $p12_result['pkey'] );
+				$af_sri_notice = array( 'type' => 'success', 'msg' => __( 'Certificado subido y verificado correctamente. ✓', 'arriendo-facil' ) );
 			}
 		}
 	}
 }
 
-// Test certificate.
+// Test certificate (uses stored PEMs — no need to re-read P12).
 if ( isset( $_POST['af_test_certificate'] ) ) {
 	check_admin_referer( 'af_sri_settings_nonce' );
 
-	$cert_path = Arriendo_Facil_SRI_Config::cert_path();
-	$cert_pass = Arriendo_Facil_SRI_Config::cert_password();
-
-	if ( ! $cert_path ) {
-		$af_sri_notice = array( 'type' => 'error', 'msg' => __( 'No hay ningún certificado cargado.', 'arriendo-facil' ) );
-	} elseif ( '' === $cert_pass ) {
-		$af_sri_notice = array( 'type' => 'error', 'msg' => __( 'La contraseña almacenada no se pudo desencriptar. Vuelva a subir el certificado e ingrese la contraseña nuevamente.', 'arriendo-facil' ) );
+	$test_result = Arriendo_Facil_SRI_Config::test_stored_certificate();
+	if ( is_wp_error( $test_result ) ) {
+		$af_sri_notice = array( 'type' => 'error', 'msg' => $test_result->get_error_message() );
 	} else {
-		$test_result = Arriendo_Facil_SRI_Config::test_certificate( $cert_path, $cert_pass );
-		if ( is_wp_error( $test_result ) ) {
-			$af_sri_notice = array( 'type' => 'error', 'msg' => $test_result->get_error_message() );
-		} else {
-			$af_sri_notice = array( 'type' => 'success', 'msg' => __( 'Certificado válido y legible. ✓', 'arriendo-facil' ) );
-		}
+		$af_sri_notice = array( 'type' => 'success', 'msg' => __( 'Certificado válido y legible. ✓', 'arriendo-facil' ) );
 	}
 }
 
@@ -176,6 +164,7 @@ if ( isset( $_POST['af_save_emission_point'] ) ) {
 $cfg          = Arriendo_Facil_SRI_Config::get();
 $cert_path    = Arriendo_Facil_SRI_Config::cert_path();
 $cert_has_pwd = ( '' !== $cfg['cert_password_enc'] );
+$cert_has_pems = ( '' !== $cfg['cert_pem_enc'] && '' !== $cfg['pkey_pem_enc'] );
 
 global $wpdb;
 $emission_points = $wpdb->get_results(
@@ -458,7 +447,7 @@ $emission_points = $wpdb->get_results(
 		</p>
 	</form>
 
-	<?php if ( $cert_path && $cert_has_pwd ) : ?>
+	<?php if ( $cert_has_pems ) : ?>
 		<form method="post" action="">
 			<?php wp_nonce_field( 'af_sri_settings_nonce' ); ?>
 			<p>

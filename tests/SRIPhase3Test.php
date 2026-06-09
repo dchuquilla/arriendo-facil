@@ -46,7 +46,13 @@ class SRIPhase3Test extends TestCase {
 		$path = sys_get_temp_dir() . '/af_test_cert_' . uniqid() . '.p12';
 		file_put_contents( $path, $p12_data );
 
-		return array( 'path' => $path, 'password' => 'testpass1234' );
+		// Export PEMs for the signer constructor.
+		$cert_pem = '';
+		openssl_x509_export( $cert, $cert_pem );
+		$pkey_pem = '';
+		openssl_pkey_export( $key, $pkey_pem );
+
+		return array( 'path' => $path, 'password' => 'testpass1234', 'cert_pem' => $cert_pem, 'pkey_pem' => $pkey_pem );
 	}
 
 	/** Returns a minimal but valid unsigned factura XML. */
@@ -99,16 +105,16 @@ class SRIPhase3Test extends TestCase {
 
 	// ─── Arriendo_Facil_SRI_Signer ───────────────────────────────────────────
 
-	public function test_signer_throws_when_p12_not_found() {
+	public function test_signer_throws_when_pems_empty() {
 		$this->expectException( RuntimeException::class );
-		( new Arriendo_Facil_SRI_Signer( '/nonexistent/cert.p12', 'pass' ) )->sign( '<x/>' );
+		( new Arriendo_Facil_SRI_Signer( '', '' ) )->sign( '<x/>' );
 	}
 
-	public function test_signer_throws_on_wrong_password() {
+	public function test_signer_throws_on_invalid_key() {
 		$cert = $this->generate_test_p12();
 		try {
 			$this->expectException( RuntimeException::class );
-			( new Arriendo_Facil_SRI_Signer( $cert['path'], 'WRONG_PASSWORD' ) )->sign( $this->sample_xml() );
+			( new Arriendo_Facil_SRI_Signer( $cert['cert_pem'], 'NOT_A_VALID_KEY' ) )->sign( $this->sample_xml() );
 		} finally {
 			@unlink( $cert['path'] );
 		}
@@ -116,7 +122,7 @@ class SRIPhase3Test extends TestCase {
 
 	public function test_signed_xml_is_well_formed() {
 		$cert   = $this->generate_test_p12();
-		$signer = new Arriendo_Facil_SRI_Signer( $cert['path'], $cert['password'] );
+		$signer = new Arriendo_Facil_SRI_Signer( $cert['cert_pem'], $cert['pkey_pem'] );
 		$signed = $signer->sign( $this->sample_xml() );
 		@unlink( $cert['path'] );
 
@@ -130,7 +136,7 @@ class SRIPhase3Test extends TestCase {
 
 	public function test_signed_xml_has_signature_element() {
 		$cert   = $this->generate_test_p12();
-		$signer = new Arriendo_Facil_SRI_Signer( $cert['path'], $cert['password'] );
+		$signer = new Arriendo_Facil_SRI_Signer( $cert['cert_pem'], $cert['pkey_pem'] );
 		$signed = $signer->sign( $this->sample_xml() );
 		@unlink( $cert['path'] );
 
@@ -145,7 +151,7 @@ class SRIPhase3Test extends TestCase {
 
 	public function test_signed_xml_signature_is_last_child_of_root() {
 		$cert   = $this->generate_test_p12();
-		$signer = new Arriendo_Facil_SRI_Signer( $cert['path'], $cert['password'] );
+		$signer = new Arriendo_Facil_SRI_Signer( $cert['cert_pem'], $cert['pkey_pem'] );
 		$signed = $signer->sign( $this->sample_xml() );
 		@unlink( $cert['path'] );
 
@@ -162,7 +168,7 @@ class SRIPhase3Test extends TestCase {
 
 	public function test_signed_xml_contains_key_info_with_certificate() {
 		$cert   = $this->generate_test_p12();
-		$signer = new Arriendo_Facil_SRI_Signer( $cert['path'], $cert['password'] );
+		$signer = new Arriendo_Facil_SRI_Signer( $cert['cert_pem'], $cert['pkey_pem'] );
 		$signed = $signer->sign( $this->sample_xml() );
 		@unlink( $cert['path'] );
 
@@ -178,7 +184,7 @@ class SRIPhase3Test extends TestCase {
 
 	public function test_signed_xml_contains_xades_signed_properties() {
 		$cert   = $this->generate_test_p12();
-		$signer = new Arriendo_Facil_SRI_Signer( $cert['path'], $cert['password'] );
+		$signer = new Arriendo_Facil_SRI_Signer( $cert['cert_pem'], $cert['pkey_pem'] );
 		$signed = $signer->sign( $this->sample_xml() );
 		@unlink( $cert['path'] );
 
@@ -197,7 +203,7 @@ class SRIPhase3Test extends TestCase {
 
 	public function test_digest_values_are_non_empty() {
 		$cert   = $this->generate_test_p12();
-		$signer = new Arriendo_Facil_SRI_Signer( $cert['path'], $cert['password'] );
+		$signer = new Arriendo_Facil_SRI_Signer( $cert['cert_pem'], $cert['pkey_pem'] );
 		$signed = $signer->sign( $this->sample_xml() );
 		@unlink( $cert['path'] );
 
@@ -221,7 +227,7 @@ class SRIPhase3Test extends TestCase {
 	 */
 	public function test_signature_verifies_with_openssl() {
 		$cert   = $this->generate_test_p12();
-		$signer = new Arriendo_Facil_SRI_Signer( $cert['path'], $cert['password'] );
+		$signer = new Arriendo_Facil_SRI_Signer( $cert['cert_pem'], $cert['pkey_pem'] );
 		$signed = $signer->sign( $this->sample_xml() );
 		@unlink( $cert['path'] );
 
@@ -259,7 +265,7 @@ class SRIPhase3Test extends TestCase {
 	public function test_signing_preserves_original_xml_content() {
 		$xml    = $this->sample_xml();
 		$cert   = $this->generate_test_p12();
-		$signed = ( new Arriendo_Facil_SRI_Signer( $cert['path'], $cert['password'] ) )->sign( $xml );
+		$signed = ( new Arriendo_Facil_SRI_Signer( $cert['cert_pem'], $cert['pkey_pem'] ) )->sign( $xml );
 		@unlink( $cert['path'] );
 
 		$dom  = new DOMDocument();

@@ -37,21 +37,21 @@ class Arriendo_Facil_SRI_Signer {
 	const RSA_SHA1   = 'http://www.w3.org/2000/09/xmldsig#rsa-sha1';
 	const SHA1_URL   = 'http://www.w3.org/2000/09/xmldsig#sha1';
 
-	/** @var string Absolute path to the P12/PFX certificate file. */
-	private $p12_path;
+	/** @var string PEM-encoded certificate. */
+	private $cert_pem;
 
-	/** @var string Password for the P12 file. */
-	private $p12_password;
+	/** @var string PEM-encoded private key. */
+	private $pkey_pem;
 
 	/**
 	 * Constructor.
 	 *
-	 * @param string $p12_path     Absolute path to the .p12 / .pfx certificate.
-	 * @param string $p12_password Certificate password.
+	 * @param string $cert_pem PEM-encoded certificate string.
+	 * @param string $pkey_pem PEM-encoded private key string.
 	 */
-	public function __construct( string $p12_path, string $p12_password ) {
-		$this->p12_path     = $p12_path;
-		$this->p12_password = $p12_password;
+	public function __construct( string $cert_pem, string $pkey_pem ) {
+		$this->cert_pem = $cert_pem;
+		$this->pkey_pem = $pkey_pem;
 	}
 
 	// ─── Public API ──────────────────────────────────────────────────────────
@@ -64,12 +64,13 @@ class Arriendo_Facil_SRI_Signer {
 	 * @throws RuntimeException On certificate, key, or signing errors.
 	 */
 	public function sign( string $xml_unsigned ): string {
-		// ── 1. Load P12 certificate ──────────────────────────────────────────
-		$certs = $this->load_p12();
+		// ── 1. Certificate and key from PEM ──────────────────────────────────
+		$cert_pem        = $this->cert_pem;
+		$private_key_pem = $this->pkey_pem;
 
-		// ── 2. Extract certificate components ───────────────────────────────
-		$cert_pem        = (string) $certs['cert'];
-		$private_key_pem = (string) $certs['pkey'];
+		if ( '' === $cert_pem || '' === $private_key_pem ) {
+			throw new RuntimeException( 'Certificate and private key PEM data are required for signing.' );
+		}
 
 		// DER-encoded certificate bytes (for X509Certificate element + digest).
 		$cert_der = $this->pem_to_der( $cert_pem );
@@ -80,6 +81,9 @@ class Arriendo_Facil_SRI_Signer {
 
 		// Certificate metadata for IssuerSerial.
 		$cert_info     = openssl_x509_parse( $cert_pem );
+		if ( false === $cert_info ) {
+			throw new RuntimeException( 'Failed to parse PEM certificate.' );
+		}
 		$issuer_name   = $this->build_issuer_dn( (array) $cert_info['issuer'] );
 		$serial_number = $this->cert_serial( (array) $cert_info );
 
@@ -341,30 +345,6 @@ class Arriendo_Facil_SRI_Signer {
 	}
 
 	// ─── Certificate helpers ─────────────────────────────────────────────────
-
-	/**
-	 * Loads and parses the P12 file.
-	 *
-	 * @return array{cert: string, pkey: string, extracerts: array}
-	 * @throws RuntimeException
-	 */
-	private function load_p12(): array {
-		if ( ! file_exists( $this->p12_path ) ) {
-			throw new RuntimeException( 'Certificate file not found: ' . $this->p12_path );
-		}
-		$raw   = file_get_contents( $this->p12_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
-		$certs = array();
-		if ( ! openssl_pkcs12_read( $raw, $certs, $this->p12_password ) ) {
-			$ssl_err = '';
-			while ( $e = openssl_error_string() ) {
-				$ssl_err .= $e . '; ';
-			}
-			throw new RuntimeException(
-				'Cannot open P12 certificate. Check the password. (OpenSSL: ' . ( $ssl_err ?: 'unknown' ) . ')'
-			);
-		}
-		return $certs;
-	}
 
 	/**
 	 * Converts a PEM-encoded certificate to raw DER bytes.

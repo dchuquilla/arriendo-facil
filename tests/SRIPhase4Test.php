@@ -106,6 +106,8 @@ class SRIPhase4Test extends TestCase {
 				'tipo_emision'          => '1',
 				'cert_filename'         => 'test_cert.p12',
 				'cert_password_enc'     => Arriendo_Facil_SRI_Config::encrypt_password( 'testpass' ),
+				'cert_pem_enc'          => Arriendo_Facil_SRI_Config::protect_sensitive( 'FAKE_CERT_PEM' ),
+				'pkey_pem_enc'          => Arriendo_Facil_SRI_Config::protect_sensitive( 'FAKE_PKEY_PEM' ),
 			)
 		);
 
@@ -159,6 +161,8 @@ class SRIPhase4Test extends TestCase {
 				'tipo_emision'          => '1',
 				'cert_filename'         => 'test_cert_2.p12',
 				'cert_password_enc'     => Arriendo_Facil_SRI_Config::encrypt_password( 'testpass' ),
+				'cert_pem_enc'          => Arriendo_Facil_SRI_Config::protect_sensitive( 'FAKE_CERT_PEM' ),
+				'pkey_pem_enc'          => Arriendo_Facil_SRI_Config::protect_sensitive( 'FAKE_PKEY_PEM' ),
 			)
 		);
 

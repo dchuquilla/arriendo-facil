@@ -609,8 +609,8 @@ class Arriendo_Facil_SRI_Config {
 	}
 
 	/**
-	 * Extracts cert + private key from a P12 file using the openssl CLI tool
-	 * with the -legacy flag to support old RC2/3DES algorithms.
+	 * Extracts cert + private key from a P12 file using the openssl CLI tool.
+	 * Tries without and with -legacy flag to cover both old and new OpenSSL versions.
 	 * Tries multiple PHP execution functions for maximum hosting compatibility.
 	 *
 	 * @param string $path     Absolute path to the .p12 file.
@@ -627,46 +627,58 @@ class Arriendo_Facil_SRI_Config {
 		$escaped_path      = escapeshellarg( $path );
 		$escaped_pass_file = escapeshellarg( $pass_file );
 
-		$cert_cmd = sprintf(
-			'openssl pkcs12 -in %s -passin file:%s -clcerts -nokeys -legacy 2>&1',
-			$escaped_path,
-			$escaped_pass_file
-		);
-		$key_cmd = sprintf(
-			'openssl pkcs12 -in %s -passin file:%s -nocerts -nodes -legacy 2>&1',
-			$escaped_path,
-			$escaped_pass_file
-		);
+		// Try different flag combinations: without -legacy (older OpenSSL/LibreSSL)
+		// and with -legacy (OpenSSL 3.x).
+		$flag_variants = array( '', '-legacy' );
+		$last_output   = '';
 
-		$cert_output = self::run_shell_command( $cert_cmd );
-		$key_output  = self::run_shell_command( $key_cmd );
+		foreach ( $flag_variants as $flags ) {
+			$cert_cmd = sprintf(
+				'openssl pkcs12 -in %s -passin file:%s -clcerts -nokeys %s 2>&1',
+				$escaped_path,
+				$escaped_pass_file,
+				$flags
+			);
+			$key_cmd = sprintf(
+				'openssl pkcs12 -in %s -passin file:%s -nocerts -nodes %s 2>&1',
+				$escaped_path,
+				$escaped_pass_file,
+				$flags
+			);
+
+			$cert_output = self::run_shell_command( $cert_cmd );
+			$key_output  = self::run_shell_command( $key_cmd );
+
+			if ( null === $cert_output || null === $key_output ) {
+				@unlink( $pass_file );
+				return new WP_Error(
+					'shell_disabled',
+					__( 'No se puede ejecutar comandos de shell en este servidor. Suba un certificado .p12 convertido a formato moderno o contacte a su proveedor de hosting para habilitar shell_exec/exec.', 'arriendo-facil' )
+				);
+			}
+
+			$cert_pem = self::extract_pem_block( $cert_output, 'CERTIFICATE' );
+			$key_pem  = self::extract_pem_block( $key_output, 'PRIVATE KEY' );
+
+			if ( '' !== $cert_pem && '' !== $key_pem ) {
+				@unlink( $pass_file );
+				return array(
+					'cert' => $cert_pem,
+					'pkey' => $key_pem,
+				);
+			}
+
+			$last_output = trim( $cert_output . "\n" . $key_output );
+		}
 
 		@unlink( $pass_file );
 
-		if ( null === $cert_output || null === $key_output ) {
-			return new WP_Error(
-				'shell_disabled',
-				__( 'No se puede ejecutar comandos de shell en este servidor. Suba un certificado .p12 convertido a formato moderno o contacte a su proveedor de hosting para habilitar shell_exec/exec.', 'arriendo-facil' )
-			);
-		}
-
-		$cert_pem = self::extract_pem_block( $cert_output, 'CERTIFICATE' );
-		$key_pem  = self::extract_pem_block( $key_output, 'PRIVATE KEY' );
-
-		if ( '' === $cert_pem || '' === $key_pem ) {
-			$combined_output = trim( $cert_output . "\n" . $key_output );
-			return new WP_Error(
-				'legacy_cli_failed',
-				sprintf(
-					__( 'No se pudo extraer el certificado con openssl -legacy. Salida: %s', 'arriendo-facil' ),
-					substr( $combined_output, 0, 300 )
-				)
-			);
-		}
-
-		return array(
-			'cert' => $cert_pem,
-			'pkey' => $key_pem,
+		return new WP_Error(
+			'legacy_cli_failed',
+			sprintf(
+				__( 'No se pudo extraer el certificado vía CLI. Salida: %s', 'arriendo-facil' ),
+				substr( $last_output, 0, 300 )
+			)
 		);
 	}
 

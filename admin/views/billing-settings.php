@@ -105,7 +105,23 @@ if ( isset( $_POST['af_test_certificate'] ) ) {
 	if ( is_wp_error( $test_result ) ) {
 		$af_sri_notice = array( 'type' => 'error', 'msg' => $test_result->get_error_message() );
 	} else {
-		$af_sri_notice = array( 'type' => 'success', 'msg' => __( 'Certificado válido y legible. ✓', 'arriendo-facil' ) );
+		$pems_diag  = Arriendo_Facil_SRI_Config::get_cert_pems();
+		$cert_info  = openssl_x509_parse( $pems_diag['cert'] );
+		$chain_count = 0;
+		if ( '' !== trim( $pems_diag['chain'] ) ) {
+			$chain_count = preg_match_all( '/-----BEGIN CERTIFICATE-----/', $pems_diag['chain'] );
+		}
+		$subject = $cert_info['subject'] ?? array();
+		$issuer  = $cert_info['issuer'] ?? array();
+		$valid_to = isset( $cert_info['validTo_time_t'] ) ? wp_date( 'd/m/Y', (int) $cert_info['validTo_time_t'] ) : '?';
+		$diag_msg = sprintf(
+			'Certificado válido y legible. ✓ | Sujeto: %s | Emisor: %s | Vence: %s | Certificados CA en cadena: %d',
+			$subject['CN'] ?? ( $subject['serialNumber'] ?? '?' ),
+			$issuer['CN'] ?? ( $issuer['O'] ?? '?' ),
+			$valid_to,
+			$chain_count
+		);
+		$af_sri_notice = array( 'type' => 'success', 'msg' => $diag_msg );
 	}
 }
 

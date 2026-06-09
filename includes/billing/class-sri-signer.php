@@ -88,6 +88,9 @@ class Arriendo_Facil_SRI_Signer {
 		}
 		$root = $doc->documentElement;
 
+		// Register 'id' attribute as XML ID so URI="#comprobante" resolves correctly.
+		$root->setIdAttribute( 'id', true );
+
 		// Compute digest of #comprobante BEFORE Signature is inserted.
 		$comprobante_c14n   = $root->C14N( false, false );
 		$comprobante_digest = base64_encode( hash( 'sha1', $comprobante_c14n, true ) );
@@ -201,7 +204,10 @@ class Arriendo_Facil_SRI_Signer {
 		$ref0->setAttribute( 'Id', 'comprobante-ref0' );
 		$ref0->setAttribute( 'URI', '#comprobante' );
 		$trs0 = $doc->createElementNS( $ds, 'ds:Transforms' );
-		$t0   = $doc->createElementNS( $ds, 'ds:Transform' );
+		$t0_env = $doc->createElementNS( $ds, 'ds:Transform' );
+		$t0_env->setAttribute( 'Algorithm', 'http://www.w3.org/2000/09/xmldsig#enveloped-signature' );
+		$trs0->appendChild( $t0_env );
+		$t0 = $doc->createElementNS( $ds, 'ds:Transform' );
 		$t0->setAttribute( 'Algorithm', self::C14N_URL );
 		$trs0->appendChild( $t0 );
 		$ref0->appendChild( $trs0 );
@@ -244,12 +250,12 @@ class Arriendo_Facil_SRI_Signer {
 
 		$x509d = $doc->createElementNS( $ds, 'ds:X509Data' );
 		$x509c = $doc->createElementNS( $ds, 'ds:X509Certificate' );
-		$x509c->appendChild( $doc->createTextNode( "\n" . $cert_b64 . "\n" ) );
+		$x509c->appendChild( $doc->createTextNode( $cert_b64 ) );
 		$x509d->appendChild( $x509c );
 
 		foreach ( $chain_b64 as $ca_b64 ) {
 			$ca_el = $doc->createElementNS( $ds, 'ds:X509Certificate' );
-			$ca_el->appendChild( $doc->createTextNode( "\n" . $ca_b64 . "\n" ) );
+			$ca_el->appendChild( $doc->createTextNode( $ca_b64 ) );
 			$x509d->appendChild( $ca_el );
 		}
 

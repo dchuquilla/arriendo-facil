@@ -152,7 +152,7 @@ class Arriendo_Facil_SRI_Signer {
 		// Write SignatureValue.
 		$this->set_text(
 			$xpath->query( '//ds:SignatureValue[@Id="Signature-SignatureValue"]' )->item( 0 ),
-			base64_encode( $sig_raw )
+			"\n" . chunk_split( base64_encode( $sig_raw ), 76, "\n" )
 		);
 
 		$result = $doc->saveXML();
@@ -250,12 +250,12 @@ class Arriendo_Facil_SRI_Signer {
 
 		$x509d = $doc->createElementNS( $ds, 'ds:X509Data' );
 		$x509c = $doc->createElementNS( $ds, 'ds:X509Certificate' );
-		$x509c->appendChild( $doc->createTextNode( $cert_b64 ) );
+		$x509c->appendChild( $doc->createTextNode( "\n" . chunk_split( $cert_b64, 76, "\n" ) ) );
 		$x509d->appendChild( $x509c );
 
 		foreach ( $chain_b64 as $ca_b64 ) {
 			$ca_el = $doc->createElementNS( $ds, 'ds:X509Certificate' );
-			$ca_el->appendChild( $doc->createTextNode( $ca_b64 ) );
+			$ca_el->appendChild( $doc->createTextNode( "\n" . chunk_split( $ca_b64, 76, "\n" ) ) );
 			$x509d->appendChild( $ca_el );
 		}
 
@@ -263,7 +263,9 @@ class Arriendo_Facil_SRI_Signer {
 
 		$kv  = $doc->createElementNS( $ds, 'ds:KeyValue' );
 		$rsa = $doc->createElementNS( $ds, 'ds:RSAKeyValue' );
-		$rsa->appendChild( $this->ds_el( $doc, 'ds:Modulus', $modulus_b64 ) );
+		$mod_el = $doc->createElementNS( $ds, 'ds:Modulus' );
+		$mod_el->appendChild( $doc->createTextNode( "\n" . chunk_split( $modulus_b64, 76, "\n" ) ) );
+		$rsa->appendChild( $mod_el );
 		$rsa->appendChild( $this->ds_el( $doc, 'ds:Exponent', $exponent_b64 ) );
 		$kv->appendChild( $rsa );
 		$ki->appendChild( $kv );

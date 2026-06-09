@@ -90,7 +90,7 @@ if ( isset( $_POST['af_upload_certificate'] ) ) {
 					'msg'  => __( 'El certificado no contiene los datos esperados (certificado + clave privada).', 'arriendo-facil' ),
 				);
 			} else {
-				Arriendo_Facil_SRI_Config::save_cert_pems( $p12_result['cert'], $p12_result['pkey'] );
+				Arriendo_Facil_SRI_Config::save_cert_pems( $p12_result['cert'], $p12_result['pkey'], $p12_result['chain'] ?? '' );
 				$af_sri_notice = array( 'type' => 'success', 'msg' => __( 'Certificado subido y verificado correctamente. ✓', 'arriendo-facil' ) );
 			}
 		}

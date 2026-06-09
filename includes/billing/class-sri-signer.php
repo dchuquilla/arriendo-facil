@@ -43,15 +43,20 @@ class Arriendo_Facil_SRI_Signer {
 	/** @var string PEM-encoded private key. */
 	private $pkey_pem;
 
+	/** @var string PEM-encoded CA certificate chain (concatenated). */
+	private $chain_pem;
+
 	/**
 	 * Constructor.
 	 *
-	 * @param string $cert_pem PEM-encoded certificate string.
-	 * @param string $pkey_pem PEM-encoded private key string.
+	 * @param string $cert_pem  PEM-encoded certificate string.
+	 * @param string $pkey_pem  PEM-encoded private key string.
+	 * @param string $chain_pem PEM-encoded CA chain (concatenated intermediates).
 	 */
-	public function __construct( string $cert_pem, string $pkey_pem ) {
-		$this->cert_pem = $cert_pem;
-		$this->pkey_pem = $pkey_pem;
+	public function __construct( string $cert_pem, string $pkey_pem, string $chain_pem = '' ) {
+		$this->cert_pem  = $cert_pem;
+		$this->pkey_pem  = $pkey_pem;
+		$this->chain_pem = $chain_pem;
 	}
 
 	// ─── Public API ──────────────────────────────────────────────────────────
@@ -93,6 +98,9 @@ class Arriendo_Facil_SRI_Signer {
 		// Signing timestamp.
 		$signing_time = ( new DateTime() )->format( DateTime::ATOM );
 
+		// Parse CA chain into array of base64-DER strings.
+		$chain_b64 = $this->parse_chain_pem( $this->chain_pem );
+
 		// ── 3. Load unsigned XML ─────────────────────────────────────────────
 		$doc                     = new DOMDocument( '1.0', 'UTF-8' );
 		$doc->preserveWhiteSpace = false;
@@ -115,7 +123,8 @@ class Arriendo_Facil_SRI_Signer {
 			$cert_digest_b64,
 			$issuer_name,
 			$serial_number,
-			$signing_time
+			$signing_time,
+			$chain_b64
 		);
 
 		// ── 6. XPath helpers on the now-complete document ────────────────────
@@ -188,6 +197,7 @@ class Arriendo_Facil_SRI_Signer {
 	 * @param string      $issuer_name  X509 issuer DN string.
 	 * @param string      $serial       Certificate serial (decimal string).
 	 * @param string      $signing_time ISO 8601 timestamp.
+	 * @param array       $chain_b64    Array of base64-DER CA certificates.
 	 */
 	private function insert_signature_skeleton(
 		DOMDocument $doc,
@@ -198,7 +208,8 @@ class Arriendo_Facil_SRI_Signer {
 		string      $cert_digest,
 		string      $issuer_name,
 		string      $serial,
-		string      $signing_time
+		string      $signing_time,
+		array       $chain_b64 = array()
 	): void {
 		$ds = self::XMLDSIG_NS;
 		$xa = self::XADES_NS;
@@ -243,6 +254,7 @@ class Arriendo_Facil_SRI_Signer {
 		// Reference[2] — #Signature-XAdES-SignedProperties (with C14N Transform)
 		$ref2 = $doc->createElementNS( $ds, 'Reference' );
 		$ref2->setAttribute( 'Id', 'Signature-SignedInfo-ref1' );
+		$ref2->setAttribute( 'Type', 'http://uri.etsi.org/01903#SignedProperties' );
 		$ref2->setAttribute( 'URI', '#Signature-XAdES-SignedProperties' );
 		$trs2 = $doc->createElementNS( $ds, 'Transforms' );
 		$t2   = $doc->createElementNS( $ds, 'Transform' );
@@ -269,6 +281,14 @@ class Arriendo_Facil_SRI_Signer {
 		$x509c = $doc->createElementNS( $ds, 'X509Certificate' );
 		$x509c->appendChild( $doc->createTextNode( $cert_b64 ) );
 		$x509d->appendChild( $x509c );
+
+		// Include CA chain certificates for trust validation.
+		foreach ( $chain_b64 as $ca_b64 ) {
+			$ca_el = $doc->createElementNS( $ds, 'X509Certificate' );
+			$ca_el->appendChild( $doc->createTextNode( $ca_b64 ) );
+			$x509d->appendChild( $ca_el );
+		}
+
 		$ki->appendChild( $x509d );
 
 		$kv   = $doc->createElementNS( $ds, 'KeyValue' );
@@ -461,5 +481,33 @@ class Arriendo_Facil_SRI_Signer {
 			$node->removeChild( $node->firstChild );
 		}
 		$node->appendChild( $node->ownerDocument->createTextNode( $text ) );
+	}
+
+	/**
+	 * Parses a concatenated PEM chain string into an array of base64-DER strings.
+	 *
+	 * @param string $chain_pem Concatenated PEM certificates.
+	 * @return array<string> Base64-encoded DER for each CA certificate.
+	 */
+	private function parse_chain_pem( string $chain_pem ): array {
+		if ( '' === trim( $chain_pem ) ) {
+			return array();
+		}
+
+		$certs = array();
+		if ( preg_match_all(
+			'/-----BEGIN CERTIFICATE-----(.+?)-----END CERTIFICATE-----/s',
+			$chain_pem,
+			$matches
+		) ) {
+			foreach ( $matches[1] as $body ) {
+				$der_b64 = preg_replace( '/\s+/', '', $body );
+				if ( '' !== $der_b64 ) {
+					$certs[] = $der_b64;
+				}
+			}
+		}
+
+		return $certs;
 	}
 }

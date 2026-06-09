@@ -46,8 +46,8 @@ class Arriendo_Facil_Billing_Manager {
 		$this->wpdb           = isset( $deps['wpdb'] ) ? $deps['wpdb'] : ( $GLOBALS['wpdb'] ?? null );
 		$this->xml_builder    = isset( $deps['xml_builder'] ) ? $deps['xml_builder'] : new Arriendo_Facil_SRI_XML_Factura();
 		$this->ride_generator = isset( $deps['ride_generator'] ) ? $deps['ride_generator'] : new Arriendo_Facil_SRI_Ride();
-		$this->signer_factory = isset( $deps['signer_factory'] ) ? $deps['signer_factory'] : function( string $cert_pem, string $pkey_pem ) {
-			return new Arriendo_Facil_SRI_Signer( $cert_pem, $pkey_pem );
+		$this->signer_factory = isset( $deps['signer_factory'] ) ? $deps['signer_factory'] : function( string $cert_pem, string $pkey_pem, string $chain_pem = '' ) {
+			return new Arriendo_Facil_SRI_Signer( $cert_pem, $pkey_pem, $chain_pem );
 		};
 		$this->soap_factory   = isset( $deps['soap_factory'] ) ? $deps['soap_factory'] : function( string $ambiente ) {
 			return new Arriendo_Facil_SRI_Soap_Client( $ambiente );
@@ -197,7 +197,7 @@ class Arriendo_Facil_Billing_Manager {
 
 		try {
 			$xml    = $this->xml_builder->build( $xml_data );
-			$signer = call_user_func( $this->signer_factory, $pems['cert'], $pems['pkey'] );
+			$signer = call_user_func( $this->signer_factory, $pems['cert'], $pems['pkey'], $pems['chain'] ?? '' );
 			$xml_signed = $signer->sign( $xml );
 		} catch ( \RuntimeException $e ) {
 			return new WP_Error( 'sri_sign_error', $e->getMessage() );

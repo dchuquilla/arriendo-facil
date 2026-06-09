@@ -57,7 +57,9 @@ class Arriendo_Facil_SRI_Config {
 				'ambiente'              => '1',   // 1 = pruebas, 2 = producción
 				'tipo_emision'          => '1',   // 1 = normal (offline)
 				'cert_filename'         => '',    // filename within cert_dir()
-				'cert_password_enc'     => '',    // AES-256-CBC encrypted password
+				'cert_password_enc'     => '',    // AES-256-GCM encrypted password
+				'cert_pem_enc'          => '',    // AES-256-GCM encrypted certificate PEM
+				'pkey_pem_enc'          => '',    // AES-256-GCM encrypted private key PEM
 				'email_notificacion'    => '',
 				'sri_soap_timeout'      => '30',  // seconds
 				'sri_soap_max_retries'  => '3',   // immediate retries for transient errors
@@ -192,6 +194,41 @@ class Arriendo_Facil_SRI_Config {
 	}
 
 	/**
+	 * Encrypts and persists the extracted PEM certificate and private key.
+	 *
+	 * @param string $cert_pem PEM-encoded certificate.
+	 * @param string $pkey_pem PEM-encoded private key.
+	 * @return bool
+	 */
+	public static function save_cert_pems( string $cert_pem, string $pkey_pem ): bool {
+		if ( '' === $cert_pem || '' === $pkey_pem ) {
+			return false;
+		}
+		$current                 = self::get();
+		$current['cert_pem_enc'] = self::protect_sensitive( $cert_pem );
+		$current['pkey_pem_enc'] = self::protect_sensitive( $pkey_pem );
+		return (bool) update_option( self::OPTION_KEY, $current );
+	}
+
+	/**
+	 * Returns the decrypted PEM certificate and private key.
+	 *
+	 * @return array{cert: string, pkey: string} Both empty strings if not available.
+	 */
+	public static function get_cert_pems(): array {
+		$config = self::get();
+		$cert   = '';
+		$pkey   = '';
+		if ( ! empty( $config['cert_pem_enc'] ) ) {
+			$cert = self::unprotect_sensitive( (string) $config['cert_pem_enc'] );
+		}
+		if ( ! empty( $config['pkey_pem_enc'] ) ) {
+			$pkey = self::unprotect_sensitive( (string) $config['pkey_pem_enc'] );
+		}
+		return array( 'cert' => $cert, 'pkey' => $pkey );
+	}
+
+	/**
 	 * Tests that a P12 certificate can be opened with the given password and
 	 * checks whether it is still within its validity period.
 	 *
@@ -200,42 +237,40 @@ class Arriendo_Facil_SRI_Config {
 	 * @return true|WP_Error
 	 */
 	public static function test_certificate( string $path, string $password ) {
-		if ( ! file_exists( $path ) ) {
-			return new WP_Error( 'not_found', __( 'Archivo de certificado no encontrado.', 'arriendo-facil' ) );
+		$result = self::read_p12( $path, $password );
+		if ( is_wp_error( $result ) ) {
+			return $result;
 		}
 
-		$contents = file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
-		if ( false === $contents ) {
-			return new WP_Error( 'read_error', __( 'No se pudo leer el archivo de certificado.', 'arriendo-facil' ) );
-		}
+		return self::validate_cert_pem( $result['cert'], $result['pkey'] );
+	}
 
-		// Clear any stale OpenSSL errors before the read attempt.
-		while ( openssl_error_string() ) {
-			// flush
+	/**
+	 * Validates stored PEM certificate: checks it is complete and not expired.
+	 *
+	 * @return true|WP_Error
+	 */
+	public static function test_stored_certificate() {
+		$pems = self::get_cert_pems();
+		if ( '' === $pems['cert'] || '' === $pems['pkey'] ) {
+			return new WP_Error( 'no_pems', __( 'No hay datos de certificado almacenados. Suba el certificado nuevamente.', 'arriendo-facil' ) );
 		}
+		return self::validate_cert_pem( $pems['cert'], $pems['pkey'] );
+	}
 
-		$certs = array();
-		if ( ! openssl_pkcs12_read( $contents, $certs, $password ) ) {
-			$ssl_err = '';
-			while ( $e = openssl_error_string() ) {
-				$ssl_err .= $e . '; ';
-			}
-			return new WP_Error(
-				'invalid_cert',
-				sprintf(
-					/* translators: %s: OpenSSL error detail */
-					__( 'No se pudo abrir el certificado. Verifique la contraseña. (OpenSSL: %s | pwd_len: %d)', 'arriendo-facil' ),
-					$ssl_err ?: 'unknown',
-					strlen( $password )
-				)
-			);
-		}
-
-		if ( empty( $certs['cert'] ) || empty( $certs['pkey'] ) ) {
+	/**
+	 * Validates a PEM certificate + key pair: checks completeness and expiry.
+	 *
+	 * @param string $cert_pem PEM certificate.
+	 * @param string $pkey_pem PEM private key.
+	 * @return true|WP_Error
+	 */
+	private static function validate_cert_pem( string $cert_pem, string $pkey_pem ) {
+		if ( '' === $cert_pem || '' === $pkey_pem ) {
 			return new WP_Error( 'incomplete_cert', __( 'El certificado no contiene los datos esperados (certificado + clave privada).', 'arriendo-facil' ) );
 		}
 
-		$cert_info = openssl_x509_parse( $certs['cert'] );
+		$cert_info = openssl_x509_parse( $cert_pem );
 		if ( false === $cert_info ) {
 			return new WP_Error( 'parse_error', __( 'No se pudo analizar el certificado X.509.', 'arriendo-facil' ) );
 		}
@@ -538,5 +573,181 @@ class Arriendo_Facil_SRI_Config {
 			return true;
 		}
 		return 0 === strpos( $haystack, $needle );
+	}
+
+	/**
+	 * Reads a P12/PFX certificate, falling back to OpenSSL CLI with -legacy
+	 * flag when PHP's openssl_pkcs12_read() fails (OpenSSL 3.x + legacy certs).
+	 *
+	 * @param string $path     Absolute path to the .p12 file.
+	 * @param string $password Certificate password.
+	 * @return array|WP_Error Array with keys 'cert' and 'pkey', or WP_Error on failure.
+	 */
+	public static function read_p12( string $path, string $password ) {
+		if ( ! file_exists( $path ) ) {
+			return new WP_Error( 'not_found', __( 'Archivo de certificado no encontrado.', 'arriendo-facil' ) );
+		}
+
+		$contents = file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		if ( false === $contents ) {
+			return new WP_Error( 'read_error', __( 'No se pudo leer el archivo de certificado.', 'arriendo-facil' ) );
+		}
+
+		// Flush stale OpenSSL errors.
+		while ( openssl_error_string() ) {
+			// flush
+		}
+
+		// Try native PHP first.
+		$certs = array();
+		if ( openssl_pkcs12_read( $contents, $certs, $password ) ) {
+			return $certs;
+		}
+
+		// Native failed — try CLI with -legacy flag (OpenSSL 3.x compat).
+		return self::read_p12_legacy_cli( $path, $password );
+	}
+
+	/**
+	 * Extracts cert + private key from a P12 file using the openssl CLI tool
+	 * with the -legacy flag to support old RC2/3DES algorithms.
+	 * Tries multiple PHP execution functions for maximum hosting compatibility.
+	 *
+	 * @param string $path     Absolute path to the .p12 file.
+	 * @param string $password Certificate password.
+	 * @return array|WP_Error Array with keys 'cert' and 'pkey', or WP_Error.
+	 */
+	private static function read_p12_legacy_cli( string $path, string $password ) {
+		$pass_file = tempnam( sys_get_temp_dir(), 'af_pass_' );
+		if ( false === $pass_file ) {
+			return new WP_Error( 'tmp_error', __( 'No se pudo crear archivo temporal.', 'arriendo-facil' ) );
+		}
+		file_put_contents( $pass_file, $password ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+
+		$escaped_path      = escapeshellarg( $path );
+		$escaped_pass_file = escapeshellarg( $pass_file );
+
+		$cert_cmd = sprintf(
+			'openssl pkcs12 -in %s -passin file:%s -clcerts -nokeys -legacy 2>&1',
+			$escaped_path,
+			$escaped_pass_file
+		);
+		$key_cmd = sprintf(
+			'openssl pkcs12 -in %s -passin file:%s -nocerts -nodes -legacy 2>&1',
+			$escaped_path,
+			$escaped_pass_file
+		);
+
+		$cert_output = self::run_shell_command( $cert_cmd );
+		$key_output  = self::run_shell_command( $key_cmd );
+
+		@unlink( $pass_file );
+
+		if ( null === $cert_output || null === $key_output ) {
+			return new WP_Error(
+				'shell_disabled',
+				__( 'No se puede ejecutar comandos de shell en este servidor. Suba un certificado .p12 convertido a formato moderno o contacte a su proveedor de hosting para habilitar shell_exec/exec.', 'arriendo-facil' )
+			);
+		}
+
+		$cert_pem = self::extract_pem_block( $cert_output, 'CERTIFICATE' );
+		$key_pem  = self::extract_pem_block( $key_output, 'PRIVATE KEY' );
+
+		if ( '' === $cert_pem || '' === $key_pem ) {
+			$combined_output = trim( $cert_output . "\n" . $key_output );
+			return new WP_Error(
+				'legacy_cli_failed',
+				sprintf(
+					__( 'No se pudo extraer el certificado con openssl -legacy. Salida: %s', 'arriendo-facil' ),
+					substr( $combined_output, 0, 300 )
+				)
+			);
+		}
+
+		return array(
+			'cert' => $cert_pem,
+			'pkey' => $key_pem,
+		);
+	}
+
+	/**
+	 * Attempts to run a shell command using multiple PHP functions for
+	 * compatibility across hosting environments.
+	 *
+	 * @param string $command The command to run.
+	 * @return string|null Output string or null if all methods are unavailable.
+	 */
+	private static function run_shell_command( string $command ): ?string {
+		// Try shell_exec.
+		if ( function_exists( 'shell_exec' ) && ! self::is_function_disabled( 'shell_exec' ) ) {
+			$result = @shell_exec( $command ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+			if ( null !== $result ) {
+				return (string) $result;
+			}
+		}
+
+		// Try exec.
+		if ( function_exists( 'exec' ) && ! self::is_function_disabled( 'exec' ) ) {
+			$output     = array();
+			$return_var = -1;
+			@exec( $command, $output, $return_var ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+			return implode( "\n", $output );
+		}
+
+		// Try proc_open.
+		if ( function_exists( 'proc_open' ) && ! self::is_function_disabled( 'proc_open' ) ) {
+			$descriptors = array(
+				0 => array( 'pipe', 'r' ),
+				1 => array( 'pipe', 'w' ),
+				2 => array( 'pipe', 'w' ),
+			);
+			$proc = @proc_open( $command, $descriptors, $pipes ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+			if ( is_resource( $proc ) ) {
+				fclose( $pipes[0] );
+				$stdout = stream_get_contents( $pipes[1] );
+				$stderr = stream_get_contents( $pipes[2] );
+				fclose( $pipes[1] );
+				fclose( $pipes[2] );
+				proc_close( $proc );
+				return $stdout . $stderr;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Checks if a function is in the disabled_functions list.
+	 *
+	 * @param string $function Function name.
+	 * @return bool
+	 */
+	private static function is_function_disabled( string $function ): bool {
+		$disabled = ini_get( 'disable_functions' );
+		if ( false === $disabled || '' === $disabled ) {
+			return false;
+		}
+		return in_array( $function, array_map( 'trim', explode( ',', $disabled ) ), true );
+	}
+
+	/**
+	 * Extracts a PEM block from CLI output.
+	 *
+	 * @param string $output  Raw CLI output.
+	 * @param string $type    PEM type (e.g. 'CERTIFICATE', 'PRIVATE KEY').
+	 * @return string PEM block or empty string.
+	 */
+	private static function extract_pem_block( string $output, string $type ): string {
+		$begin = "-----BEGIN {$type}-----";
+		$end   = "-----END {$type}-----";
+		$start = strpos( $output, $begin );
+		if ( false === $start ) {
+			return '';
+		}
+		$finish = strpos( $output, $end, $start );
+		if ( false === $finish ) {
+			return '';
+		}
+		return substr( $output, $start, $finish - $start + strlen( $end ) );
 	}
 }

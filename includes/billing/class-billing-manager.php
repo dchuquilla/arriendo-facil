@@ -46,8 +46,8 @@ class Arriendo_Facil_Billing_Manager {
 		$this->wpdb           = isset( $deps['wpdb'] ) ? $deps['wpdb'] : ( $GLOBALS['wpdb'] ?? null );
 		$this->xml_builder    = isset( $deps['xml_builder'] ) ? $deps['xml_builder'] : new Arriendo_Facil_SRI_XML_Factura();
 		$this->ride_generator = isset( $deps['ride_generator'] ) ? $deps['ride_generator'] : new Arriendo_Facil_SRI_Ride();
-		$this->signer_factory = isset( $deps['signer_factory'] ) ? $deps['signer_factory'] : function( string $p12, string $password ) {
-			return new Arriendo_Facil_SRI_Signer( $p12, $password );
+		$this->signer_factory = isset( $deps['signer_factory'] ) ? $deps['signer_factory'] : function( string $cert_pem, string $pkey_pem ) {
+			return new Arriendo_Facil_SRI_Signer( $cert_pem, $pkey_pem );
 		};
 		$this->soap_factory   = isset( $deps['soap_factory'] ) ? $deps['soap_factory'] : function( string $ambiente ) {
 			return new Arriendo_Facil_SRI_Soap_Client( $ambiente );
@@ -148,13 +148,12 @@ class Arriendo_Facil_Billing_Manager {
 	 */
 	public function issue_from_payload( array $payload, array $context = array() ) {
 		$config = Arriendo_Facil_SRI_Config::get();
-		$cert   = Arriendo_Facil_SRI_Config::cert_path();
-		$pass   = Arriendo_Facil_SRI_Config::cert_password();
+		$pems   = Arriendo_Facil_SRI_Config::get_cert_pems();
 
 		if ( empty( $config['ruc'] ) ) {
 			return new WP_Error( 'sri_config_missing_ruc', __( 'Debe configurar el RUC del emisor en Facturacion SRI.', 'arriendo-facil' ) );
 		}
-		if ( '' === $cert || '' === $pass ) {
+		if ( '' === $pems['cert'] || '' === $pems['pkey'] ) {
 			return new WP_Error( 'sri_cert_missing', __( 'Debe cargar y configurar el certificado digital (.p12).', 'arriendo-facil' ) );
 		}
 
@@ -198,7 +197,7 @@ class Arriendo_Facil_Billing_Manager {
 
 		try {
 			$xml    = $this->xml_builder->build( $xml_data );
-			$signer = call_user_func( $this->signer_factory, $cert, $pass );
+			$signer = call_user_func( $this->signer_factory, $pems['cert'], $pems['pkey'] );
 			$xml_signed = $signer->sign( $xml );
 		} catch ( \RuntimeException $e ) {
 			return new WP_Error( 'sri_sign_error', $e->getMessage() );

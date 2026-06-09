@@ -60,6 +60,7 @@ class Arriendo_Facil_SRI_Config {
 				'cert_password_enc'     => '',    // AES-256-GCM encrypted password
 				'cert_pem_enc'          => '',    // AES-256-GCM encrypted certificate PEM
 				'pkey_pem_enc'          => '',    // AES-256-GCM encrypted private key PEM
+				'chain_pem_enc'         => '',    // AES-256-GCM encrypted CA chain PEM
 				'email_notificacion'    => '',
 				'sri_soap_timeout'      => '30',  // seconds
 				'sri_soap_max_retries'  => '3',   // immediate retries for transient errors
@@ -194,38 +195,44 @@ class Arriendo_Facil_SRI_Config {
 	}
 
 	/**
-	 * Encrypts and persists the extracted PEM certificate and private key.
+	 * Encrypts and persists the extracted PEM certificate, private key, and CA chain.
 	 *
-	 * @param string $cert_pem PEM-encoded certificate.
-	 * @param string $pkey_pem PEM-encoded private key.
+	 * @param string $cert_pem  PEM-encoded certificate.
+	 * @param string $pkey_pem  PEM-encoded private key.
+	 * @param string $chain_pem PEM-encoded CA chain (concatenated intermediates).
 	 * @return bool
 	 */
-	public static function save_cert_pems( string $cert_pem, string $pkey_pem ): bool {
+	public static function save_cert_pems( string $cert_pem, string $pkey_pem, string $chain_pem = '' ): bool {
 		if ( '' === $cert_pem || '' === $pkey_pem ) {
 			return false;
 		}
-		$current                 = self::get();
-		$current['cert_pem_enc'] = self::protect_sensitive( $cert_pem );
-		$current['pkey_pem_enc'] = self::protect_sensitive( $pkey_pem );
+		$current                  = self::get();
+		$current['cert_pem_enc']  = self::protect_sensitive( $cert_pem );
+		$current['pkey_pem_enc']  = self::protect_sensitive( $pkey_pem );
+		$current['chain_pem_enc'] = '' !== $chain_pem ? self::protect_sensitive( $chain_pem ) : '';
 		return (bool) update_option( self::OPTION_KEY, $current );
 	}
 
 	/**
-	 * Returns the decrypted PEM certificate and private key.
+	 * Returns the decrypted PEM certificate, private key, and CA chain.
 	 *
-	 * @return array{cert: string, pkey: string} Both empty strings if not available.
+	 * @return array{cert: string, pkey: string, chain: string} Empty strings if not available.
 	 */
 	public static function get_cert_pems(): array {
 		$config = self::get();
 		$cert   = '';
 		$pkey   = '';
+		$chain  = '';
 		if ( ! empty( $config['cert_pem_enc'] ) ) {
 			$cert = self::unprotect_sensitive( (string) $config['cert_pem_enc'] );
 		}
 		if ( ! empty( $config['pkey_pem_enc'] ) ) {
 			$pkey = self::unprotect_sensitive( (string) $config['pkey_pem_enc'] );
 		}
-		return array( 'cert' => $cert, 'pkey' => $pkey );
+		if ( ! empty( $config['chain_pem_enc'] ) ) {
+			$chain = self::unprotect_sensitive( (string) $config['chain_pem_enc'] );
+		}
+		return array( 'cert' => $cert, 'pkey' => $pkey, 'chain' => $chain );
 	}
 
 	/**
@@ -601,7 +608,15 @@ class Arriendo_Facil_SRI_Config {
 		// Try native PHP first.
 		$certs = array();
 		if ( openssl_pkcs12_read( $contents, $certs, $password ) ) {
-			return $certs;
+			$chain = '';
+			if ( ! empty( $certs['extracerts'] ) && is_array( $certs['extracerts'] ) ) {
+				$chain = implode( "\n", $certs['extracerts'] );
+			}
+			return array(
+				'cert'  => $certs['cert'] ?? '',
+				'pkey'  => $certs['pkey'] ?? '',
+				'chain' => $chain,
+			);
 		}
 
 		// Native failed — try CLI with -legacy flag (OpenSSL 3.x compat).
@@ -645,9 +660,16 @@ class Arriendo_Facil_SRI_Config {
 				$escaped_pass_file,
 				$flags
 			);
+			$chain_cmd = sprintf(
+				'openssl pkcs12 -in %s -passin file:%s -cacerts -nokeys %s 2>&1',
+				$escaped_path,
+				$escaped_pass_file,
+				$flags
+			);
 
-			$cert_output = self::run_shell_command( $cert_cmd );
-			$key_output  = self::run_shell_command( $key_cmd );
+			$cert_output  = self::run_shell_command( $cert_cmd );
+			$key_output   = self::run_shell_command( $key_cmd );
+			$chain_output = self::run_shell_command( $chain_cmd );
 
 			if ( null === $cert_output || null === $key_output ) {
 				@unlink( $pass_file );
@@ -661,10 +683,15 @@ class Arriendo_Facil_SRI_Config {
 			$key_pem  = self::extract_pem_block( $key_output, 'PRIVATE KEY' );
 
 			if ( '' !== $cert_pem && '' !== $key_pem ) {
+				$chain_pem = '';
+				if ( null !== $chain_output ) {
+					$chain_pem = self::extract_all_pem_blocks( $chain_output, 'CERTIFICATE' );
+				}
 				@unlink( $pass_file );
 				return array(
-					'cert' => $cert_pem,
-					'pkey' => $key_pem,
+					'cert'  => $cert_pem,
+					'pkey'  => $key_pem,
+					'chain' => $chain_pem,
 				);
 			}
 
@@ -761,5 +788,30 @@ class Arriendo_Facil_SRI_Config {
 			return '';
 		}
 		return substr( $output, $start, $finish - $start + strlen( $end ) );
+	}
+
+	/**
+	 * Extracts ALL PEM blocks of a given type from CLI output (for CA chain).
+	 *
+	 * @param string $output Raw CLI output.
+	 * @param string $type   PEM type (e.g. 'CERTIFICATE').
+	 * @return string Concatenated PEM blocks or empty string.
+	 */
+	private static function extract_all_pem_blocks( string $output, string $type ): string {
+		$begin  = "-----BEGIN {$type}-----";
+		$end    = "-----END {$type}-----";
+		$blocks = array();
+		$offset = 0;
+
+		while ( false !== ( $start = strpos( $output, $begin, $offset ) ) ) {
+			$finish = strpos( $output, $end, $start );
+			if ( false === $finish ) {
+				break;
+			}
+			$blocks[] = substr( $output, $start, $finish - $start + strlen( $end ) );
+			$offset   = $finish + strlen( $end );
+		}
+
+		return implode( "\n", $blocks );
 	}
 }

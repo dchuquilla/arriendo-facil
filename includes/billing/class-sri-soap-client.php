@@ -770,6 +770,11 @@ class Arriendo_Facil_SRI_Soap_Client {
 			}
 		}
 
+		// SRI requirement: dirMatriz cannot be empty. Default to dir_establecimiento.
+		if ( '' === $dir_matriz && '' !== $dir_establecimiento ) {
+			$dir_matriz = $dir_establecimiento;
+		}
+
 		if ( '' === $razon_social ) {
 			return new WP_Error( 'sri_no_data', __( 'No se encontró información para este RUC en el SRI.', 'arriendo-facil' ) );
 		}
@@ -843,6 +848,11 @@ class Arriendo_Facil_SRI_Soap_Client {
 			if ( '' === $dir_establecimiento ) {
 				$dir_establecimiento = $dir;
 			}
+		}
+
+		// SRI requirement: dirMatriz cannot be empty. Default to dir_establecimiento.
+		if ( '' === $dir_matriz && '' !== $dir_establecimiento ) {
+			$dir_matriz = $dir_establecimiento;
 		}
 
 		if ( '' === $razon_social ) {

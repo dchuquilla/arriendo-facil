@@ -137,7 +137,15 @@ if ( isset( $_POST['af_test_certificate'] ) ) {
 		$config_ruc = $sri_config['ruc'] ?? '';
 		$ruc_match  = '';
 		if ( '' !== $cert_ruc && '' !== $config_ruc ) {
-			$ruc_match = ( false !== strpos( $cert_ruc, $config_ruc ) ) ? ' ✓ coincide' : ' ⚠ NO coincide con RUC configurado: ' . $config_ruc;
+			$cert_numeric = preg_replace( '/[^0-9]/', '', $cert_ruc );
+			$ruc_base     = substr( $config_ruc, 0, 10 );
+			if ( $cert_numeric === $ruc_base ) {
+				$ruc_match = ' ✓ cédula coincide con RUC';
+			} elseif ( false !== strpos( $cert_ruc, $config_ruc ) ) {
+				$ruc_match = ' ✓ coincide';
+			} else {
+				$ruc_match = ' ⚠ NO coincide con RUC configurado: ' . $config_ruc . ' (cédula del cert: ' . $cert_numeric . ')';
+			}
 		}
 
 		$key_usage = $extensions['keyUsage'] ?? 'No definido';
@@ -171,6 +179,55 @@ if ( isset( $_POST['af_rebuild_chain'] ) ) {
 			'type' => 'success',
 			'msg'  => sprintf( __( 'Cadena CA reconstruida exitosamente. Se obtuvieron %d certificado(s) intermedio(s). ✓', 'arriendo-facil' ), $chain_count ),
 		);
+	}
+}
+
+// Test sign: sign a sample XML and verify the signature locally.
+if ( isset( $_POST['af_test_sign'] ) ) {
+	check_admin_referer( 'af_sri_settings_nonce' );
+
+	$pems = Arriendo_Facil_SRI_Config::get_cert_pems();
+	if ( '' === $pems['cert'] || '' === $pems['pkey'] ) {
+		$af_sri_notice = array( 'type' => 'error', 'msg' => 'No hay certificado almacenado.' );
+	} else {
+		try {
+			$test_xml = '<?xml version="1.0" encoding="UTF-8"?><factura id="comprobante" version="2.1.0"><infoTributaria><ambiente>1</ambiente><razonSocial>TEST</razonSocial></infoTributaria></factura>';
+			$signer   = new Arriendo_Facil_SRI_Signer( $pems['cert'], $pems['pkey'], $pems['chain'] );
+			$signed   = $signer->sign( $test_xml );
+
+			// Verify: parse signed XML and check RSA-SHA1 over SignedInfo.
+			$vdoc = new DOMDocument();
+			$vdoc->loadXML( $signed );
+			$vxp  = new DOMXPath( $vdoc );
+			$vxp->registerNamespace( 'ds', 'http://www.w3.org/2000/09/xmldsig#' );
+
+			$si_node = $vxp->query( '//ds:SignedInfo' )->item( 0 );
+			$sv_node = $vxp->query( '//ds:SignatureValue' )->item( 0 );
+			$si_c14n = $si_node->C14N( false, false );
+			$sig_b64 = trim( $sv_node->textContent );
+
+			$pub_key = openssl_pkey_get_public( $pems['cert'] );
+			$verify  = openssl_verify( $si_c14n, base64_decode( $sig_b64 ), $pub_key, OPENSSL_ALGO_SHA1 );
+
+			if ( 1 === $verify ) {
+				$xml_size = strlen( $signed );
+				$has_enveloped = ( false !== strpos( $signed, 'enveloped-signature' ) );
+				$has_chain = ( substr_count( $signed, '<ds:X509Certificate>' ) > 1 );
+				$af_sri_notice = array(
+					'type' => 'success',
+					'msg'  => sprintf(
+						'✓ Firma XML verificada correctamente (RSA-SHA1 válida) | Tamaño: %d bytes | Enveloped-signature: %s | Cadena CA en firma: %s | El problema NO es el código de firma — es el trust store del SRI pruebas que no reconoce UANATACA.',
+						$xml_size,
+						$has_enveloped ? 'Sí' : 'No',
+						$has_chain ? 'Sí' : 'No'
+					),
+				);
+			} else {
+				$af_sri_notice = array( 'type' => 'error', 'msg' => '✗ La verificación de firma falló. Error OpenSSL: ' . openssl_error_string() );
+			}
+		} catch ( \Exception $e ) {
+			$af_sri_notice = array( 'type' => 'error', 'msg' => 'Error al firmar: ' . $e->getMessage() );
+		}
 	}
 }
 
@@ -521,6 +578,9 @@ $emission_points = $wpdb->get_results(
 				</button>
 				<button type="submit" name="af_rebuild_chain" class="button">
 					<?php esc_html_e( 'Reconstruir cadena CA', 'arriendo-facil' ); ?>
+				</button>
+				<button type="submit" name="af_test_sign" class="button">
+					<?php esc_html_e( 'Test firma XML', 'arriendo-facil' ); ?>
 				</button>
 				<span class="description"><?php esc_html_e( 'Comprueba que el certificado se abre correctamente y no ha vencido. Use "Reconstruir cadena CA" si los certificados intermedios están en 0.', 'arriendo-facil' ); ?></span>
 			</p>

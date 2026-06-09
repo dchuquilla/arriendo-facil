@@ -566,7 +566,7 @@ class Arriendo_Facil_Billing_Manager {
 			'estab'                    => (string) $emission['estab'],
 			'pto_emi'                  => (string) $emission['pto_emi'],
 			'secuencial'               => str_pad( (string) $emission['secuencial'], 9, '0', STR_PAD_LEFT ),
-			'dir_matriz'               => (string) ( $config['dir_matriz'] ?? '' ),
+			'dir_matriz'               => (string) ( $config['dir_matriz'] ?: $config['dir_establecimiento'] ?? '' ),
 			'fecha_emision'            => (string) ( $payload['fecha_emision'] ?? wp_date( 'd/m/Y' ) ),
 			'dir_establecimiento'      => (string) ( $config['dir_establecimiento'] ?? '' ),
 			'obligado_contabilidad'    => (string) ( $config['obligado_contabilidad'] ?? 'NO' ),

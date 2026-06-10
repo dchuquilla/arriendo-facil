@@ -118,13 +118,32 @@ class Arriendo_Facil_Billing_API {
 		// Release lock immediately if the request failed (allows fast retry on real errors).
 		if ( is_wp_error( $result ) ) {
 			delete_transient( $lock_key );
-			wp_send_json_error(
-				array(
-					'message' => $result->get_error_message(),
-					'code'    => $result->get_error_code(),
-				),
-				400
+
+			$response = array(
+				'message' => $result->get_error_message(),
+				'code'    => $result->get_error_code(),
 			);
+
+			$error_data = $result->get_error_data();
+			if ( ! empty( $error_data['mensajes'] ) ) {
+				$response['detalle_error'] = $error_data['mensajes'];
+			}
+
+			if ( 'sri_no_autorizada' === $result->get_error_code() || 'sri_devuelta' === $result->get_error_code() ) {
+				$pems = Arriendo_Facil_SRI_Config::get_cert_pems();
+				$cert_info = openssl_x509_parse( $pems['cert'] );
+				if ( false !== $cert_info ) {
+					$response['diagnostico_cert'] = array(
+						'cn'       => $cert_info['subject']['CN'] ?? '?',
+						'emisor'   => $cert_info['issuer']['CN'] ?? ( $cert_info['issuer']['O'] ?? '?' ),
+						'vigencia' => wp_date( 'd/m/Y', $cert_info['validFrom_time_t'] ?? 0 ) . ' → ' . wp_date( 'd/m/Y', $cert_info['validTo_time_t'] ?? 0 ),
+						'serial'   => $cert_info['serialNumberHex'] ?? '?',
+						'chain_bytes' => strlen( $pems['chain'] ?? '' ),
+					);
+				}
+			}
+
+			wp_send_json_error( $response, 400 );
 		}
 
 		wp_send_json_success( $result );

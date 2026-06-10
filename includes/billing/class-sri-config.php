@@ -384,13 +384,14 @@ class Arriendo_Facil_SRI_Config {
 				break;
 			}
 
+			$chain_pems[] = $ca_pem;
+
 			$is_self_signed = ( ( $ca_info['subject'] ?? array() ) === ( $ca_info['issuer'] ?? array() ) );
 			if ( $is_self_signed ) {
 				break;
 			}
 
-			$chain_pems[] = $ca_pem;
-			$current      = $ca_pem;
+			$current = $ca_pem;
 		}
 
 		return implode( "\n", $chain_pems );

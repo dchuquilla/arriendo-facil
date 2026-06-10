@@ -216,10 +216,10 @@ if ( $cert_len > 0 && $pkey_len > 0 ) {
 			$sig_b64 = trim( $sv_node->textContent );
 
 			$pub_key = openssl_pkey_get_public( $pems['cert'] );
-			$verify = openssl_verify( $si_c14n, base64_decode( $sig_b64 ), $pub_key, OPENSSL_ALGO_SHA1 );
+			$verify = openssl_verify( $si_c14n, base64_decode( $sig_b64 ), $pub_key, OPENSSL_ALGO_SHA256 );
 
 			if ( 1 === $verify ) {
-				echo '<span class="success">✓ Firma RSA-SHA1 verificada correctamente localmente</span><br>';
+				echo '<span class="success">✓ Firma RSA-SHA256 verificada correctamente localmente</span><br>';
 
 				// Contar certificados en la firma
 				$x509_count = substr_count( $signed, '<ds:X509Certificate>' );

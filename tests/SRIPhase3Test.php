@@ -223,7 +223,7 @@ class SRIPhase3Test extends TestCase {
 	}
 
 	/**
-	 * The most important test: verifies the RSA-SHA1 signature cryptographically.
+	 * The most important test: verifies the RSA-SHA256 signature cryptographically.
 	 */
 	public function test_signature_verifies_with_openssl() {
 		$cert   = $this->generate_test_p12();
@@ -258,8 +258,8 @@ class SRIPhase3Test extends TestCase {
 		$pub_key = openssl_pkey_get_public( $cert_pem );
 		$this->assertNotFalse( $pub_key, 'Must be able to extract public key from embedded cert.' );
 
-		$result = openssl_verify( $si_c14n, $sig_bytes, $pub_key, OPENSSL_ALGO_SHA1 );
-		$this->assertSame( 1, $result, 'RSA-SHA1 signature over C14N(SignedInfo) must verify successfully.' );
+		$result = openssl_verify( $si_c14n, $sig_bytes, $pub_key, OPENSSL_ALGO_SHA256 );
+		$this->assertSame( 1, $result, 'RSA-SHA256 signature over C14N(SignedInfo) must verify successfully.' );
 	}
 
 	public function test_signing_preserves_original_xml_content() {

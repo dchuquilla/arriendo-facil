@@ -129,6 +129,9 @@ class Arriendo_Facil_Billing_Manager {
 			return $payload;
 		}
 
+		// Logging mejorado para diagnóstico
+		error_log( '=== Arriendo Facil: Emitiendo factura para lease ' . $lease_id . ' periodo ' . $period . ' ===' );
+
 		return $this->issue_from_payload(
 			$payload,
 			array(
@@ -197,9 +200,38 @@ class Arriendo_Facil_Billing_Manager {
 
 		try {
 			$xml    = $this->xml_builder->build( $xml_data );
+
+			// Logging de diagnóstico
+			error_log( '=== Diagnóstico de Firma ===' );
+			error_log( 'XML length: ' . strlen( $xml ) );
+			error_log( 'Cert bytes: ' . strlen( $pems['cert'] ) );
+			error_log( 'Pkey bytes: ' . strlen( $pems['pkey'] ) );
+			error_log( 'Chain bytes: ' . strlen( $pems['chain'] ?? '' ) );
+
+			// Valida que cert y pkey puedan ser parseados
+			$cert_test = openssl_x509_parse( $pems['cert'] );
+			$key_test = openssl_pkey_get_private( $pems['pkey'] );
+			if ( false === $cert_test || false === $key_test ) {
+				error_log( 'ERROR: Certificado o clave privada inválidos!' );
+				if ( false === $cert_test ) {
+					error_log( 'Cert error: ' . openssl_error_string() );
+				}
+				if ( false === $key_test ) {
+					error_log( 'Key error: ' . openssl_error_string() );
+				}
+				return new WP_Error( 'sri_cert_invalid', 'Certificado o clave privada inválidos: ' . openssl_error_string() );
+			}
+
+			error_log( 'Certificado y clave privada válidos' );
+
 			$signer = call_user_func( $this->signer_factory, $pems['cert'], $pems['pkey'], $pems['chain'] ?? '' );
 			$xml_signed = $signer->sign( $xml );
+
+			error_log( 'XML firmado length: ' . strlen( $xml_signed ) );
+			error_log( 'Signature element present: ' . ( strpos( $xml_signed, '<Signature' ) !== false ? 'Sí' : 'No' ) );
+			error_log( '=== Fin Diagnóstico ===' );
 		} catch ( \RuntimeException $e ) {
+			error_log( 'EXCEPTION al firmar: ' . $e->getMessage() );
 			return new WP_Error( 'sri_sign_error', $e->getMessage() );
 		}
 

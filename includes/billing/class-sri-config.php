@@ -797,7 +797,13 @@ class Arriendo_Facil_SRI_Config {
 		if ( false === $pass_file ) {
 			return new WP_Error( 'tmp_error', __( 'No se pudo crear archivo temporal.', 'arriendo-facil' ) );
 		}
-		file_put_contents( $pass_file, $password ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+
+		// Escribe la contraseña en el archivo y valida
+		$bytes_written = file_put_contents( $pass_file, $password, LOCK_EX ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+		if ( false === $bytes_written || $bytes_written !== strlen( $password ) ) {
+			@unlink( $pass_file );
+			return new WP_Error( 'tmp_write_error', __( 'No se pudo escribir la contraseña en el archivo temporal.', 'arriendo-facil' ) );
+		}
 
 		$escaped_path      = escapeshellarg( $path );
 		$escaped_pass_file = escapeshellarg( $pass_file );
@@ -930,48 +936,139 @@ class Arriendo_Facil_SRI_Config {
 	}
 
 	/**
-	 * Extracts a PEM block from CLI output.
+	 * Limpia y valida un PEM extraído del CLI.
+	 * Elimina whitespace, advertencias, y errores.
+	 * Normaliza line endings.
+	 *
+	 * @param string $pem_raw Raw output from openssl CLI.
+	 * @param string $type PEM type ('CERTIFICATE' or 'PRIVATE KEY').
+	 * @return string Clean PEM or empty string.
+	 */
+	private static function clean_pem_output( string $pem_raw, string $type ): string {
+		$begin = "-----BEGIN {$type}-----";
+		$end   = "-----END {$type}-----";
+
+		// Buscar el BEGIN del PEM
+		$start = strpos( $pem_raw, $begin );
+		if ( false === $start ) {
+			return '';
+		}
+
+		// Buscar el END del PEM
+		$finish = strpos( $pem_raw, $end, $start );
+		if ( false === $finish ) {
+			return '';
+		}
+
+		// Extrae exactamente desde BEGIN hasta END (inclusive)
+		$pem = substr( $pem_raw, $start, $finish - $start + strlen( $end ) );
+
+		// Normaliza line endings (todos los \r\n a \n)
+		$pem = str_replace( "\r\n", "\n", $pem );
+		$pem = str_replace( "\r", "\n", $pem );
+
+		// Divide en líneas y limpia
+		$lines = explode( "\n", $pem );
+		$clean_lines = array();
+
+		foreach ( $lines as $line ) {
+			$line = trim( $line );
+			// Solo incluye líneas que no estén vacías
+			if ( ! empty( $line ) ) {
+				$clean_lines[] = $line;
+			}
+		}
+
+		// Reconstruye el PEM con formato estándar
+		$clean_pem = implode( "\n", $clean_lines ) . "\n";
+
+		// Valida que sea un PEM válido
+		if ( 'CERTIFICATE' === $type ) {
+			$parsed = openssl_x509_parse( $clean_pem );
+			if ( false === $parsed ) {
+				return '';
+			}
+		} elseif ( 'PRIVATE KEY' === $type || 'RSA PRIVATE KEY' === $type ) {
+			$parsed = openssl_pkey_get_private( $clean_pem );
+			if ( false === $parsed ) {
+				return '';
+			}
+		}
+
+		return $clean_pem;
+	}
+
+	/**
+	 * Limpia y valida certificados de la cadena CA.
+	 * Extrae múltiples certificados y los valida.
+	 *
+	 * @param string $chain_output Raw output from openssl CLI.
+	 * @return string Cleaned PEM chain or empty string.
+	 */
+	private static function clean_chain_output( string $chain_output ): string {
+		$begin = "-----BEGIN CERTIFICATE-----";
+		$end   = "-----END CERTIFICATE-----";
+
+		$chain_certs = array();
+		$offset      = 0;
+
+		while ( false !== ( $start = strpos( $chain_output, $begin, $offset ) ) ) {
+			$finish = strpos( $chain_output, $end, $start );
+			if ( false === $finish ) {
+				break;
+			}
+
+			// Extrae un certificado
+			$cert_pem = substr( $chain_output, $start, $finish - $start + strlen( $end ) );
+
+			// Normaliza line endings
+			$cert_pem = str_replace( "\r\n", "\n", $cert_pem );
+			$cert_pem = str_replace( "\r", "\n", $cert_pem );
+
+			// Divide en líneas y limpia
+			$lines = explode( "\n", $cert_pem );
+			$clean_lines = array();
+
+			foreach ( $lines as $line ) {
+				$line = trim( $line );
+				if ( ! empty( $line ) ) {
+					$clean_lines[] = $line;
+				}
+			}
+
+			$clean_cert = implode( "\n", $clean_lines ) . "\n";
+
+			// Valida que sea certificado válido
+			$parsed = openssl_x509_parse( $clean_cert );
+			if ( false !== $parsed ) {
+				$chain_certs[] = $clean_cert;
+			}
+
+			$offset = $finish + strlen( $end );
+		}
+
+		return implode( "\n", $chain_certs );
+	}
+
+	/**
+	 * Extracts a PEM block from CLI output (legacy fallback).
 	 *
 	 * @param string $output  Raw CLI output.
 	 * @param string $type    PEM type (e.g. 'CERTIFICATE', 'PRIVATE KEY').
 	 * @return string PEM block or empty string.
 	 */
 	private static function extract_pem_block( string $output, string $type ): string {
-		$begin = "-----BEGIN {$type}-----";
-		$end   = "-----END {$type}-----";
-		$start = strpos( $output, $begin );
-		if ( false === $start ) {
-			return '';
-		}
-		$finish = strpos( $output, $end, $start );
-		if ( false === $finish ) {
-			return '';
-		}
-		return substr( $output, $start, $finish - $start + strlen( $end ) );
+		return self::clean_pem_output( $output, $type );
 	}
 
 	/**
-	 * Extracts ALL PEM blocks of a given type from CLI output (for CA chain).
+	 * Extracts ALL PEM blocks of a given type from CLI output (for CA chain - legacy fallback).
 	 *
 	 * @param string $output Raw CLI output.
 	 * @param string $type   PEM type (e.g. 'CERTIFICATE').
 	 * @return string Concatenated PEM blocks or empty string.
 	 */
 	private static function extract_all_pem_blocks( string $output, string $type ): string {
-		$begin  = "-----BEGIN {$type}-----";
-		$end    = "-----END {$type}-----";
-		$blocks = array();
-		$offset = 0;
-
-		while ( false !== ( $start = strpos( $output, $begin, $offset ) ) ) {
-			$finish = strpos( $output, $end, $start );
-			if ( false === $finish ) {
-				break;
-			}
-			$blocks[] = substr( $output, $start, $finish - $start + strlen( $end ) );
-			$offset   = $finish + strlen( $end );
-		}
-
-		return implode( "\n", $blocks );
+		return self::clean_chain_output( $output );
 	}
 }

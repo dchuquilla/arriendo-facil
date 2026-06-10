@@ -3,7 +3,7 @@
  * XAdES-BES digital signature for SRI Ecuador electronic documents.
  *
  * Produces an enveloped XAdES-BES XML signature that complies with
- * the SRI Ecuador technical specification (RSA-SHA1 + inclusive C14N).
+ * the SRI Ecuador technical specification (RSA-SHA256 + inclusive C14N).
  *
  * @package Arriendo_Facil\Billing
  */
@@ -19,11 +19,11 @@ class Arriendo_Facil_SRI_Signer {
 
 	// ─── XML namespace URIs ──────────────────────────────────────────────────
 
-	const XMLDSIG_NS = 'http://www.w3.org/2000/09/xmldsig#';
-	const XADES_NS   = 'http://uri.etsi.org/01903/v1.3.2#';
-	const C14N_URL   = 'http://www.w3.org/TR/2001/REC-xml-c14n-20010315';
-	const RSA_SHA1   = 'http://www.w3.org/2000/09/xmldsig#rsa-sha1';
-	const SHA1_URL   = 'http://www.w3.org/2000/09/xmldsig#sha1';
+	const XMLDSIG_NS  = 'http://www.w3.org/2000/09/xmldsig#';
+	const XADES_NS    = 'http://uri.etsi.org/01903/v1.3.2#';
+	const C14N_URL    = 'http://www.w3.org/TR/2001/REC-xml-c14n-20010315';
+	const RSA_SHA256  = 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256';
+	const SHA256_URL  = 'http://www.w3.org/2001/04/xmlenc#sha256';
 
 	/** @var string PEM-encoded certificate. */
 	private $cert_pem;
@@ -66,7 +66,7 @@ class Arriendo_Facil_SRI_Signer {
 
 		$cert_der        = $this->pem_to_der( $cert_pem );
 		$cert_b64        = base64_encode( $cert_der );
-		$cert_digest_b64 = base64_encode( hash( 'sha1', $cert_der, true ) );
+		$cert_digest_b64 = base64_encode( hash( 'sha256', $cert_der, true ) );
 
 		$cert_info = openssl_x509_parse( $cert_pem );
 		if ( false === $cert_info ) {
@@ -93,7 +93,7 @@ class Arriendo_Facil_SRI_Signer {
 
 		// Compute digest of #comprobante BEFORE Signature is inserted.
 		$comprobante_c14n   = $root->C14N( false, false );
-		$comprobante_digest = base64_encode( hash( 'sha1', $comprobante_c14n, true ) );
+		$comprobante_digest = base64_encode( hash( 'sha256', $comprobante_c14n, true ) );
 
 		// Build and insert Signature skeleton with proper ds:/etsi: prefixes.
 		$this->insert_signature_skeleton(
@@ -116,11 +116,11 @@ class Arriendo_Facil_SRI_Signer {
 
 		// Compute SignedProperties digest in document context.
 		$sp_node   = $xpath->query( '//*[@Id="Signature-XAdES-SignedProperties"]' )->item( 0 );
-		$sp_digest = base64_encode( hash( 'sha1', $sp_node->C14N( false, false ), true ) );
+		$sp_digest = base64_encode( hash( 'sha256', $sp_node->C14N( false, false ), true ) );
 
 		// Compute KeyInfo digest in document context.
 		$ki_node   = $xpath->query( '//*[@Id="Certificate1"]' )->item( 0 );
-		$ki_digest = base64_encode( hash( 'sha1', $ki_node->C14N( false, false ), true ) );
+		$ki_digest = base64_encode( hash( 'sha256', $ki_node->C14N( false, false ), true ) );
 
 		// Fill in DigestValues.
 		$this->set_text(
@@ -136,7 +136,7 @@ class Arriendo_Facil_SRI_Signer {
 			$sp_digest
 		);
 
-		// Canonicalise SignedInfo and compute RSA-SHA1 signature.
+		// Canonicalise SignedInfo and compute RSA-SHA256 signature.
 		$si_node = $xpath->query( '//ds:SignedInfo[@Id="Signature-SignedInfo"]' )->item( 0 );
 		$si_c14n = $si_node->C14N( false, false );
 
@@ -145,7 +145,7 @@ class Arriendo_Facil_SRI_Signer {
 			throw new RuntimeException( 'Cannot load private key from certificate.' );
 		}
 		$sig_raw = '';
-		if ( ! openssl_sign( $si_c14n, $sig_raw, $pk, OPENSSL_ALGO_SHA1 ) ) {
+		if ( ! openssl_sign( $si_c14n, $sig_raw, $pk, OPENSSL_ALGO_SHA256 ) ) {
 			throw new RuntimeException( 'openssl_sign failed: ' . openssl_error_string() );
 		}
 
@@ -196,7 +196,7 @@ class Arriendo_Facil_SRI_Signer {
 		$si->appendChild( $cm );
 
 		$sm = $doc->createElementNS( $ds, 'ds:SignatureMethod' );
-		$sm->setAttribute( 'Algorithm', self::RSA_SHA1 );
+		$sm->setAttribute( 'Algorithm', self::RSA_SHA256 );
 		$si->appendChild( $sm );
 
 		// Reference[0] — #comprobante
@@ -211,14 +211,14 @@ class Arriendo_Facil_SRI_Signer {
 		$t0->setAttribute( 'Algorithm', self::C14N_URL );
 		$trs0->appendChild( $t0 );
 		$ref0->appendChild( $trs0 );
-		$ref0->appendChild( $this->ds_el( $doc, 'ds:DigestMethod', '', array( 'Algorithm' => self::SHA1_URL ) ) );
+		$ref0->appendChild( $this->ds_el( $doc, 'ds:DigestMethod', '', array( 'Algorithm' => self::SHA256_URL ) ) );
 		$ref0->appendChild( $this->ds_el( $doc, 'ds:DigestValue', '' ) );
 		$si->appendChild( $ref0 );
 
 		// Reference[1] — #Certificate1
 		$ref1 = $doc->createElementNS( $ds, 'ds:Reference' );
 		$ref1->setAttribute( 'URI', '#Certificate1' );
-		$ref1->appendChild( $this->ds_el( $doc, 'ds:DigestMethod', '', array( 'Algorithm' => self::SHA1_URL ) ) );
+		$ref1->appendChild( $this->ds_el( $doc, 'ds:DigestMethod', '', array( 'Algorithm' => self::SHA256_URL ) ) );
 		$ref1->appendChild( $this->ds_el( $doc, 'ds:DigestValue', '' ) );
 		$si->appendChild( $ref1 );
 
@@ -232,7 +232,7 @@ class Arriendo_Facil_SRI_Signer {
 		$t2->setAttribute( 'Algorithm', self::C14N_URL );
 		$trs2->appendChild( $t2 );
 		$ref2->appendChild( $trs2 );
-		$ref2->appendChild( $this->ds_el( $doc, 'ds:DigestMethod', '', array( 'Algorithm' => self::SHA1_URL ) ) );
+		$ref2->appendChild( $this->ds_el( $doc, 'ds:DigestMethod', '', array( 'Algorithm' => self::SHA256_URL ) ) );
 		$ref2->appendChild( $this->ds_el( $doc, 'ds:DigestValue', '' ) );
 		$si->appendChild( $ref2 );
 
@@ -290,7 +290,7 @@ class Arriendo_Facil_SRI_Signer {
 		$crt = $doc->createElementNS( $xa, 'etsi:Cert' );
 
 		$cd  = $doc->createElementNS( $xa, 'etsi:CertDigest' );
-		$cd->appendChild( $this->ds_el( $doc, 'ds:DigestMethod', '', array( 'Algorithm' => self::SHA1_URL ) ) );
+		$cd->appendChild( $this->ds_el( $doc, 'ds:DigestMethod', '', array( 'Algorithm' => self::SHA256_URL ) ) );
 		$cd->appendChild( $this->ds_el( $doc, 'ds:DigestValue', $cert_digest ) );
 		$crt->appendChild( $cd );
 

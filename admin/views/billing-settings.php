@@ -195,7 +195,7 @@ if ( isset( $_POST['af_test_sign'] ) ) {
 			$signer   = new Arriendo_Facil_SRI_Signer( $pems['cert'], $pems['pkey'], $pems['chain'] );
 			$signed   = $signer->sign( $test_xml );
 
-			// Verify: parse signed XML and check RSA-SHA1 over SignedInfo.
+			// Verify: parse signed XML and check RSA-SHA256 over SignedInfo.
 			$vdoc = new DOMDocument();
 			$vdoc->loadXML( $signed );
 			$vxp  = new DOMXPath( $vdoc );
@@ -207,7 +207,7 @@ if ( isset( $_POST['af_test_sign'] ) ) {
 			$sig_b64 = trim( $sv_node->textContent );
 
 			$pub_key = openssl_pkey_get_public( $pems['cert'] );
-			$verify  = openssl_verify( $si_c14n, base64_decode( $sig_b64 ), $pub_key, OPENSSL_ALGO_SHA1 );
+			$verify  = openssl_verify( $si_c14n, base64_decode( $sig_b64 ), $pub_key, OPENSSL_ALGO_SHA256 );
 
 			if ( 1 === $verify ) {
 				$xml_size = strlen( $signed );
@@ -216,7 +216,7 @@ if ( isset( $_POST['af_test_sign'] ) ) {
 				$af_sri_notice = array(
 					'type' => 'success',
 					'msg'  => sprintf(
-						'✓ Firma XML verificada correctamente (RSA-SHA1 válida) | Tamaño: %d bytes | Enveloped-signature: %s | Cadena CA en firma: %s | El problema NO es el código de firma — es el trust store del SRI pruebas que no reconoce UANATACA.',
+						'✓ Firma XML verificada correctamente (RSA-SHA256 válida) | Tamaño: %d bytes | Enveloped-signature: %s | Cadena CA en firma: %s',
 						$xml_size,
 						$has_enveloped ? 'Sí' : 'No',
 						$has_chain ? 'Sí' : 'No'

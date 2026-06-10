@@ -201,37 +201,101 @@ class Arriendo_Facil_Billing_Manager {
 		try {
 			$xml    = $this->xml_builder->build( $xml_data );
 
-			// Logging de diagnóstico
-			error_log( '=== Diagnóstico de Firma ===' );
-			error_log( 'XML length: ' . strlen( $xml ) );
-			error_log( 'Cert bytes: ' . strlen( $pems['cert'] ) );
-			error_log( 'Pkey bytes: ' . strlen( $pems['pkey'] ) );
-			error_log( 'Chain bytes: ' . strlen( $pems['chain'] ?? '' ) );
+			// ═══════════════════════════════════════════════════════════════════
+			// LOGGING DETALLADO PARA DIAGNÓSTICO
+			// ═══════════════════════════════════════════════════════════════════
+			error_log( '╔════════════════════════════════════════════════════════════════╗' );
+			error_log( '║              DIAGNÓSTICO COMPLETO DE FACTURA                   ║' );
+			error_log( '╚════════════════════════════════════════════════════════════════╝' );
 
-			// Valida que cert y pkey puedan ser parseados
-			$cert_test = openssl_x509_parse( $pems['cert'] );
-			$key_test = openssl_pkey_get_private( $pems['pkey'] );
-			if ( false === $cert_test || false === $key_test ) {
-				error_log( 'ERROR: Certificado o clave privada inválidos!' );
-				if ( false === $cert_test ) {
-					error_log( 'Cert error: ' . openssl_error_string() );
-				}
-				if ( false === $key_test ) {
-					error_log( 'Key error: ' . openssl_error_string() );
-				}
-				return new WP_Error( 'sri_cert_invalid', 'Certificado o clave privada inválidos: ' . openssl_error_string() );
+			// 1. XML SIN FIRMAR
+			error_log( '[1] XML SIN FIRMAR' );
+			error_log( '    Longitud: ' . strlen( $xml ) . ' bytes' );
+			error_log( '    Primeras 300 caracteres:' );
+			error_log( '    ' . substr( $xml, 0, 300 ) );
+
+			// 2. CERTIFICADO
+			error_log( '[2] CERTIFICADO RECUPERADO' );
+			error_log( '    Cert bytes: ' . strlen( $pems['cert'] ) );
+			error_log( '    Pkey bytes: ' . strlen( $pems['pkey'] ) );
+			error_log( '    Chain bytes: ' . strlen( $pems['chain'] ?? '' ) );
+
+			if ( strlen( $pems['cert'] ) === 0 ) {
+				error_log( '    ❌ CRÍTICO: Certificado está VACÍO' );
+				return new WP_Error( 'sri_cert_empty', 'Certificado recuperado está vacío - Vuelve a cargarlo' );
+			}
+			if ( strlen( $pems['pkey'] ) === 0 ) {
+				error_log( '    ❌ CRÍTICO: Clave privada está VACÍA' );
+				return new WP_Error( 'sri_pkey_empty', 'Clave privada recuperada está vacía - Vuelve a cargarla' );
 			}
 
-			error_log( 'Certificado y clave privada válidos' );
+			// 3. VALIDACIÓN DE CERTIFICADO
+			error_log( '[3] VALIDACIÓN DE CERTIFICADO' );
+			$cert_test = openssl_x509_parse( $pems['cert'] );
+			if ( false === $cert_test ) {
+				error_log( '    ❌ No se puede parsear certificado: ' . openssl_error_string() );
+				return new WP_Error( 'sri_cert_parse_error', 'Certificado corrupto: ' . openssl_error_string() );
+			}
 
+			$subject = $cert_test['subject'] ?? array();
+			$issuer = $cert_test['issuer'] ?? array();
+			error_log( '    ✓ CN Sujeto: ' . ( $subject['CN'] ?? '?' ) );
+			error_log( '    ✓ Emisor: ' . ( $issuer['O'] ?? ( $issuer['CN'] ?? '?' ) ) );
+			error_log( '    ✓ Vigencia: ' . wp_date( 'd/m/Y', $cert_test['validFrom_time_t'] ?? 0 ) . ' → ' . wp_date( 'd/m/Y', $cert_test['validTo_time_t'] ?? 0 ) );
+
+			if ( isset( $cert_test['validTo_time_t'] ) && $cert_test['validTo_time_t'] < time() ) {
+				error_log( '    ❌ CERTIFICADO VENCIDO' );
+				return new WP_Error( 'sri_cert_expired', 'Certificado vencido' );
+			}
+
+			// 4. VALIDACIÓN DE CLAVE PRIVADA
+			error_log( '[4] VALIDACIÓN DE CLAVE PRIVADA' );
+			$key_test = openssl_pkey_get_private( $pems['pkey'] );
+			if ( false === $key_test ) {
+				error_log( '    ❌ Clave privada inválida: ' . openssl_error_string() );
+				return new WP_Error( 'sri_pkey_invalid', 'Clave privada inválida: ' . openssl_error_string() );
+			}
+			error_log( '    ✓ Clave privada válida' );
+
+			// 5. FIRMA
+			error_log( '[5] PROCESO DE FIRMA' );
 			$signer = call_user_func( $this->signer_factory, $pems['cert'], $pems['pkey'], $pems['chain'] ?? '' );
 			$xml_signed = $signer->sign( $xml );
+			error_log( '    ✓ XML firmado exitosamente' );
+			error_log( '    Tamaño XML firmado: ' . strlen( $xml_signed ) . ' bytes' );
 
-			error_log( 'XML firmado length: ' . strlen( $xml_signed ) );
-			error_log( 'Signature element present: ' . ( strpos( $xml_signed, '<Signature' ) !== false ? 'Sí' : 'No' ) );
-			error_log( '=== Fin Diagnóstico ===' );
+			// 6. VERIFICACIÓN DE ESTRUCTURA DE FIRMA
+			error_log( '[6] ESTRUCTURA DE FIRMA' );
+			$has_signature = strpos( $xml_signed, '<Signature' ) !== false;
+			$has_cert = strpos( $xml_signed, '<X509Certificate>' ) !== false;
+			error_log( '    Elemento <Signature>: ' . ( $has_signature ? '✓ Presente' : '❌ Falta' ) );
+			error_log( '    Elemento <X509Certificate>: ' . ( $has_cert ? '✓ Presente' : '❌ Falta' ) );
+
+			// Contar certificados incluidos
+			$cert_count = substr_count( $xml_signed, '<X509Certificate>' );
+			error_log( '    Certificados en firma: ' . $cert_count );
+			if ( $cert_count === 0 ) {
+				error_log( '    ⚠️ ADVERTENCIA: No hay certificados en la firma' );
+			} elseif ( $cert_count === 1 ) {
+				error_log( '    ⚠️ ADVERTENCIA: Solo hay el certificado principal, sin intermedios' );
+			} else {
+				error_log( '    ✓ Certificado + ' . ( $cert_count - 1 ) . ' intermedios incluidos' );
+			}
+
+			// 7. CLAVE DE ACCESO
+			error_log( '[7] DATOS DEL COMPROBANTE' );
+			error_log( '    Clave de acceso: ' . $clave );
+			error_log( '    Número comprobante: ' . $numero_comprobante );
+			error_log( '    RUC emisor: ' . ( $config['ruc'] ?? '?' ) );
+
+			// 8. LISTOS PARA ENVIAR AL SRI
+			error_log( '[8] LISTOS PARA ENVIAR AL SRI' );
+			error_log( '    ✓ Todo validado correctamente' );
+			error_log( '    Próximo paso: envío a SRI via SOAP' );
+			error_log( '╔════════════════════════════════════════════════════════════════╗' );
+
 		} catch ( \RuntimeException $e ) {
-			error_log( 'EXCEPTION al firmar: ' . $e->getMessage() );
+			error_log( '❌ EXCEPTION al firmar: ' . $e->getMessage() );
 			return new WP_Error( 'sri_sign_error', $e->getMessage() );
 		}
 
@@ -254,10 +318,32 @@ class Arriendo_Facil_Billing_Manager {
 			)
 		);
 
+		// LOGGING: XML que se envía al SRI
+		error_log( '╔════════════════════════════════════════════════════════════════╗' );
+		error_log( '║              XML QUE SE ENVÍA AL SRI (PRIMEROS 1000 CHARS)     ║' );
+		error_log( '╚════════════════════════════════════════════════════════════════╝' );
+		error_log( substr( $xml_signed, 0, 1000 ) );
+		error_log( '... (XML truncado) ...' );
+		error_log( '╔════════════════════════════════════════════════════════════════╗' );
+
 		$soap = call_user_func( $this->soap_factory, $ambiente );
 
 		$recepcion = $soap->enviar( $xml_signed );
 		$this->log_sri( $invoice_id, 'recepcion', $xml_signed, $recepcion );
+
+		// LOGGING: Respuesta del SRI
+		error_log( '╔════════════════════════════════════════════════════════════════╗' );
+		error_log( '║              RESPUESTA DEL SRI (RECEPCIÓN)                     ║' );
+		error_log( '╚════════════════════════════════════════════════════════════════╝' );
+		error_log( 'Respuesta completa: ' . wp_json_encode( $recepcion ) );
+		if ( is_wp_error( $recepcion ) ) {
+			error_log( '❌ ERROR: ' . $recepcion->get_error_message() );
+		} else {
+			error_log( 'Estado: ' . ( $recepcion['estado'] ?? '?' ) );
+			error_log( 'Mensajes: ' . wp_json_encode( $recepcion['mensajes'] ?? array() ) );
+		}
+		error_log( '╔════════════════════════════════════════════════════════════════╗' );
+		error_log( '' );
 
 		if ( is_wp_error( $recepcion ) ) {
 			$this->update_invoice_row(

@@ -601,6 +601,7 @@ class Arriendo_Facil_Billing_Manager {
 		if ( is_wp_error( $autorizacion ) ) {
 			if ( 'sri_en_proceso' === $autorizacion->get_error_code() ) {
 				// SRI still processing — keep invoice as 'enviada', retry cron will try again without backoff.
+				$this->update_invoice_row( (int) $invoice->id, array( 'estado' => 'enviada' ) );
 				return $autorizacion;
 			}
 			$this->update_invoice_row(

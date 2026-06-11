@@ -124,6 +124,18 @@ class Arriendo_Facil_SRI_Soap_Client {
 		$raw  = $this->http_post( $this->autorizacion_url(), $body );
 
 		if ( is_wp_error( $raw ) ) {
+			// El endpoint autorizacionComprobante del SRI (especialmente en el entorno
+			// de pruebas celcer) devuelve HTTP 500 con EntidadNoExisteException cuando
+			// el comprobante existe en la cola de recepción (RECIBIDA) pero todavía no
+			// tiene un registro en la tabla de autorizaciones (procesamiento asíncrono).
+			// En lugar de marcar la factura como error, la tratamos como EN PROCESO
+			// para que el cron de reintentos la consulte más tarde.
+			if ( 'sri_http_500' === $raw->get_error_code() ) {
+				return new WP_Error(
+					'sri_en_proceso',
+					'SRI devolvió HTTP 500 en autorización — comprobante posiblemente en cola. Se reintentará automáticamente.'
+				);
+			}
 			return $raw;
 		}
 

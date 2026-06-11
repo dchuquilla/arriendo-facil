@@ -38,6 +38,7 @@ class Arriendo_Facil_Billing_API {
 		add_action( 'wp_ajax_af_download_xml', array( $this, 'ajax_download_xml' ) );
 		add_action( 'wp_ajax_af_sri_ruc_lookup', array( $this, 'ajax_sri_ruc_lookup' ) );
 		add_action( 'wp_ajax_af_billing_lease_search', array( $this, 'ajax_billing_lease_search' ) );
+		add_action( 'wp_ajax_af_sri_log_view',         array( $this, 'ajax_sri_log_view' ) );
 
 		add_filter( 'cron_schedules', array( $this, 'register_retry_schedule' ) );
 		add_action( 'init', array( $this, 'maybe_schedule_retry_cron' ) );
@@ -396,6 +397,61 @@ class Arriendo_Facil_Billing_API {
 		wp_send_json_success( $result );
 	}
 
+
+	/**
+	 * AJAX: devuelve las últimas entradas de af_sri_log para una factura.
+	 * Permite diagnosticar errores del SRI desde el admin sin acceso a debug.log.
+	 */
+	public function ajax_sri_log_view(): void {
+		check_ajax_referer( 'af_billing_nonce', 'nonce' );
+
+		if ( ! $this->can_manage_billing() ) {
+			wp_send_json_error( array( 'message' => 'Permiso denegado.' ), 403 );
+		}
+
+		$invoice_id = isset( $_POST['invoice_id'] ) ? absint( wp_unslash( $_POST['invoice_id'] ) ) : 0;
+		if ( $invoice_id <= 0 ) {
+			wp_send_json_error( array( 'message' => 'Invoice ID inválido.' ), 400 );
+		}
+
+		global $wpdb;
+
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT tipo_operacion, response_payload, http_status, created_at
+				 FROM {$wpdb->prefix}af_sri_log
+				 WHERE invoice_id = %d
+				 ORDER BY id DESC
+				 LIMIT 10",
+				$invoice_id
+			)
+		);
+
+		$entries = array();
+		foreach ( (array) $rows as $row ) {
+			$payload = (string) ( $row->response_payload ?? '' );
+
+			// Desencriptar si está protegido.
+			if ( method_exists( 'Arriendo_Facil_SRI_Config', 'unprotect_sensitive' ) ) {
+				$decoded = Arriendo_Facil_SRI_Config::unprotect_sensitive( $payload );
+				if ( '' !== $decoded ) {
+					$payload = $decoded;
+				}
+			}
+
+			// Eliminar el hash SHA256 del prefijo si está presente.
+			$payload = (string) preg_replace( '/^\[sha256:[a-f0-9]{64}\] /', '', $payload );
+
+			$entries[] = array(
+				'tipo'       => (string) ( $row->tipo_operacion ?? '' ),
+				'respuesta'  => $payload,
+				'http'       => (int) ( $row->http_status ?? 0 ),
+				'fecha'      => (string) ( $row->created_at ?? '' ),
+			);
+		}
+
+		wp_send_json_success( array( 'entries' => $entries ) );
+	}
 
 	/**
 	 * AJAX: searches leases by guest id_number / name for billing issue form.

@@ -255,6 +255,12 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 									</button>
 								</form>
 							<?php endif; ?>
+							<button type="button" class="button button-small af-sri-log-btn"
+								data-invoice-id="<?php echo (int) $inv->id; ?>"
+								data-nonce="<?php echo esc_attr( wp_create_nonce( 'af_billing_nonce' ) ); ?>"
+								style="margin-left:4px; color:#0073aa;">
+								<?php esc_html_e( 'Log SRI', 'arriendo-facil' ); ?>
+							</button>
 						</td>
 					</tr>
 					<?php if ( ! empty( $inv->errores ) ) : ?>
@@ -356,5 +362,91 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 			}
 		} );
 	}
+}());
+
+// ── 3. Log SRI modal ───────────────────────────────────────────────────────
+(function () {
+	// Create modal overlay once.
+	var overlay = document.createElement( 'div' );
+	overlay.id  = 'af-sri-log-overlay';
+	overlay.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:999998;overflow:auto;';
+
+	var modal = document.createElement( 'div' );
+	modal.style.cssText = 'position:relative;background:#fff;margin:40px auto;padding:24px;max-width:860px;border-radius:4px;box-shadow:0 4px 24px rgba(0,0,0,.3);';
+
+	var closeBtn = document.createElement( 'button' );
+	closeBtn.type        = 'button';
+	closeBtn.textContent = '✕';
+	closeBtn.style.cssText = 'position:absolute;top:10px;right:14px;background:none;border:none;font-size:18px;cursor:pointer;color:#555;';
+	closeBtn.addEventListener( 'click', function () { overlay.style.display = 'none'; } );
+
+	var title = document.createElement( 'h2' );
+	title.style.margin = '0 0 16px';
+
+	var content = document.createElement( 'div' );
+	content.id = 'af-sri-log-content';
+
+	modal.appendChild( closeBtn );
+	modal.appendChild( title );
+	modal.appendChild( content );
+	overlay.appendChild( modal );
+	document.body.appendChild( overlay );
+
+	overlay.addEventListener( 'click', function ( e ) {
+		if ( e.target === overlay ) { overlay.style.display = 'none'; }
+	} );
+
+	document.addEventListener( 'keydown', function ( e ) {
+		if ( 'Escape' === e.key ) { overlay.style.display = 'none'; }
+	} );
+
+	document.querySelectorAll( '.af-sri-log-btn' ).forEach( function ( btn ) {
+		btn.addEventListener( 'click', function () {
+			var invoiceId = this.dataset.invoiceId;
+			var nonce     = this.dataset.nonce;
+
+			title.textContent = '<?php echo esc_js( __( 'Log SRI — factura #', 'arriendo-facil' ) ); ?>' + invoiceId;
+			content.innerHTML = '<p><?php echo esc_js( __( 'Cargando…', 'arriendo-facil' ) ); ?></p>';
+			overlay.style.display = 'block';
+
+			var fd = new FormData();
+			fd.append( 'action',     'af_sri_log_view' );
+			fd.append( 'invoice_id', invoiceId );
+			fd.append( 'nonce',      nonce );
+
+			fetch( '<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>', {
+				method: 'POST', body: fd, credentials: 'same-origin',
+			} )
+			.then( function ( r ) { return r.json(); } )
+			.then( function ( resp ) {
+				if ( ! resp.success ) {
+					content.innerHTML = '<p style="color:#c62828;">' + ( resp.data && resp.data.message ? resp.data.message : '<?php echo esc_js( __( 'Error al cargar el log.', 'arriendo-facil' ) ); ?>' ) + '</p>';
+					return;
+				}
+				var entries = resp.data.entries || [];
+				if ( ! entries.length ) {
+					content.innerHTML = '<p><?php echo esc_js( __( 'Sin registros en el log para esta factura.', 'arriendo-facil' ) ); ?></p>';
+					return;
+				}
+
+				var html = '';
+				entries.forEach( function ( e ) {
+					var color = e.http && e.http >= 400 ? '#c62828' : '#1b5e20';
+					html += '<details style="margin-bottom:12px;border:1px solid #ddd;border-radius:3px;">'
+						+ '<summary style="padding:8px 12px;cursor:pointer;font-weight:600;color:' + color + ';">'
+						+ e.tipo + ' &nbsp;<small style="font-weight:normal;color:#555;">' + e.fecha + '</small>'
+						+ ( e.http ? ' &nbsp;<code>HTTP ' + e.http + '</code>' : '' )
+						+ '</summary>'
+						+ '<pre style="margin:0;padding:12px;background:#f8f8f8;overflow:auto;font-size:11px;white-space:pre-wrap;word-break:break-all;">'
+						+ e.respuesta.replace( /&/g, '&amp;' ).replace( /</g, '&lt;' ).replace( />/g, '&gt;' )
+						+ '</pre></details>';
+				} );
+				content.innerHTML = html;
+			} )
+			.catch( function () {
+				content.innerHTML = '<p style="color:#c62828;"><?php echo esc_js( __( 'Error de red al consultar el log.', 'arriendo-facil' ) ); ?></p>';
+			} );
+		} );
+	} );
 }());
 </script>

@@ -319,6 +319,12 @@ class Arriendo_Facil_Billing_Manager {
 		);
 
 		// LOGGING: XML que se envía al SRI
+		// El XML completo se guarda en un archivo temporal de diagnóstico para
+		// poder validarlo en herramientas externas como:
+		//   https://dss.esig.europa.eu/validation/detailed-report
+		// Una vez validada la firma, eliminar este bloque de diagnóstico.
+		$this->dump_signed_xml_for_debug( $xml_signed, $clave );
+
 		error_log( '╔════════════════════════════════════════════════════════════════╗' );
 		error_log( '║              XML QUE SE ENVÍA AL SRI (PRIMEROS 1000 CHARS)     ║' );
 		error_log( '╚════════════════════════════════════════════════════════════════╝' );
@@ -1003,5 +1009,48 @@ class Arriendo_Facil_Billing_Manager {
 			return 0.0;
 		}
 		return (float) $totals['total_sin_impuestos'];
+	}
+
+	/**
+	 * Guarda el XML firmado completo en un archivo de diagnóstico temporal.
+	 *
+	 * DIAGNÓSTICO TEMPORAL — Eliminar este método cuando la firma sea confirmada.
+	 *
+	 * El archivo se guarda en wp-content/uploads/arriendo-facil/debug/
+	 * con nombre basado en la clave de acceso, inaccessible desde el navegador
+	 * porque el directorio tiene un .htaccess que bloquea acceso web.
+	 *
+	 * Pasos para validar externamente:
+	 *   1. Descargar el archivo por FTP/SSH desde esa carpeta.
+	 *   2. Subirlo a https://dss.esig.europa.eu/validation/detailed-report
+	 *   3. Si dice "TOTAL_PASSED" → la firma es válida, el problema está en otro lado.
+	 *      Si dice "INDETERMINATE/FAILED" → la firma tiene problemas estructurales.
+	 *
+	 * @param string $xml_firmado XML firmado completo.
+	 * @param string $clave_acceso Clave de acceso (usada para el nombre del archivo).
+	 */
+	protected function dump_signed_xml_for_debug( string $xml_firmado, string $clave_acceso ): void {
+		if ( ! defined( 'WP_DEBUG' ) || ! WP_DEBUG ) {
+			return;
+		}
+
+		$upload_dir = wp_upload_dir();
+		$debug_dir  = trailingslashit( $upload_dir['basedir'] ) . 'arriendo-facil/debug';
+
+		if ( ! is_dir( $debug_dir ) ) {
+			wp_mkdir_p( $debug_dir );
+			// Bloquear acceso web directo al directorio.
+			file_put_contents( $debug_dir . '/.htaccess', "Deny from all\n" );
+		}
+
+		$filename  = $debug_dir . '/xml-firmado-' . preg_replace( '/[^0-9]/', '', $clave_acceso ) . '.xml';
+		$resultado = file_put_contents( $filename, $xml_firmado );
+
+		if ( false !== $resultado ) {
+			error_log( '[DIAGNÓSTICO] XML firmado guardado en: ' . $filename );
+			error_log( '[DIAGNÓSTICO] Validar en: https://dss.esig.europa.eu/validation/detailed-report' );
+		} else {
+			error_log( '[DIAGNÓSTICO] No se pudo guardar el XML de diagnóstico en: ' . $debug_dir );
+		}
 	}
 }

@@ -154,22 +154,24 @@ class SRIBillingTest extends TestCase {
 	}
 
 	public function test_modulo11_known_value() {
-		// Construct a base whose check digit we can verify independently.
-		// Choose a simple string: "11111111111111111111111111111111111111111111111" (48 ones).
-		$base = str_repeat( '1', 48 );
+		// All-1s string: since every digit is equal, L→R and R→L give the same sum,
+		// so this test validates the formula but not the direction.
+		// 48/6 = 8 complete cycles; each cycle sums 2+3+4+5+6+7 = 27 → total 216.
+		// 216 % 11 = 7 → dígito = 11 - 7 = 4.
+		$base  = str_repeat( '1', 48 );
 		$digit = Arriendo_Facil_SRI_Clave_Acceso::modulo11( $base );
+		$this->assertSame( '4', $digit );
+	}
 
-		// Recompute manually: each 1 * factor; factors cycle [2..7] across 48 positions.
-		$factors = array( 2, 3, 4, 5, 6, 7 );
-		$sum     = 0;
-		for ( $i = 0; $i < 48; $i++ ) {
-			$sum += $factors[ $i % 6 ];
-		}
-		// 48/6 = 8 complete cycles; each cycle sums 2+3+4+5+6+7 = 27.
-		// Sum = 8 * 27 = 216.
-		$this->assertSame( 216, $sum );
-		$expected_verificador = 11 - ( 216 % 11 ); // 216 % 11 = 7 → 11-7 = 4
-		$this->assertSame( (string) $expected_verificador, $digit );
+	public function test_modulo11_direction_right_to_left() {
+		// Asymmetric string: 46 zeros, then '1', then '0' (positions 46 and 47).
+		// The SRI spec requires RIGHT-TO-LEFT: last digit (pos 47, '0') × 2 = 0,
+		// second-to-last (pos 46, '1') × 3 = 3.  Sum = 3.
+		// 3 % 11 = 3 → dígito = 11 - 3 = 8.
+		// (Left-to-right would yield pos 46 × factor[4]=6 → sum=6 → dígito=5, which is WRONG.)
+		$base  = str_repeat( '0', 46 ) . '10'; // 48 digits
+		$digit = Arriendo_Facil_SRI_Clave_Acceso::modulo11( $base );
+		$this->assertSame( '8', $digit, 'Módulo 11 must apply factors right-to-left per SRI spec.' );
 	}
 
 	public function test_format_numero_comprobante() {

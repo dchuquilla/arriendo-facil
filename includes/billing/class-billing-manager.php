@@ -955,6 +955,16 @@ class Arriendo_Facil_Billing_Manager {
 	 * @return string
 	 */
 	protected function summarize_payload( $payload ): string {
+		// Redact large XML blobs from arrays BEFORE JSON-encoding so mensajes SRI
+		// are never truncated. xml_autorizacion is already stored in its own column.
+		if ( is_array( $payload ) ) {
+			foreach ( array( 'xml_autorizacion', 'xml_firmado', 'comprobante' ) as $large_key ) {
+				if ( isset( $payload[ $large_key ] ) && strlen( (string) $payload[ $large_key ] ) > 200 ) {
+					$payload[ $large_key ] = '[XML redactado: ' . strlen( (string) $payload[ $large_key ] ) . ' bytes]';
+				}
+			}
+		}
+
 		if ( is_scalar( $payload ) ) {
 			$text = (string) $payload;
 		} else {

@@ -263,12 +263,36 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 							</button>
 						</td>
 					</tr>
-					<?php if ( ! empty( $inv->errores ) ) : ?>
+					<?php
+					$errores_raw      = (string) ( $inv->errores ?? '' );
+					$mensajes_decoded = '' !== $errores_raw ? json_decode( $errores_raw, true ) : null;
+					$has_mensajes     = is_array( $mensajes_decoded ) && ! empty( $mensajes_decoded );
+					if ( $has_mensajes || ( '' !== $errores_raw && '[]' !== $errores_raw ) ) :
+					?>
 						<tr>
 							<td></td>
-							<td colspan="7" style="background:#fff8f8; color:#7f1d1d; font-size:12px; word-break:break-word;">
-								<strong><?php esc_html_e( 'Detalle error:', 'arriendo-facil' ); ?></strong>
-								<?php echo esc_html( $inv->errores ); ?>
+							<td colspan="7" style="background:#fff8f8; color:#7f1d1d; font-size:12px; word-break:break-word; padding:6px 8px;">
+								<?php if ( $has_mensajes ) : ?>
+									<strong><?php esc_html_e( 'Mensajes SRI:', 'arriendo-facil' ); ?></strong>
+									<ul style="margin:4px 0 0 16px; padding:0;">
+									<?php foreach ( $mensajes_decoded as $msg ) :
+										$tipo  = strtoupper( (string) ( $msg['tipo'] ?? '' ) );
+										$id    = (string) ( $msg['identificador'] ?? '' );
+										$texto = (string) ( $msg['mensaje'] ?? '' );
+										$info  = (string) ( $msg['informacionAdicional'] ?? '' );
+										$color = 'ERROR' === $tipo ? '#c62828' : '#92400e';
+									?>
+										<li style="margin-bottom:2px; color:<?php echo esc_attr( $color ); ?>">
+											<strong>[<?php echo esc_html( $tipo ); ?><?php if ( $id ) echo ' ' . esc_html( $id ); ?>]</strong>
+											<?php echo esc_html( $texto ); ?>
+											<?php if ( $info ) echo ' &mdash; <em>' . esc_html( $info ) . '</em>'; ?>
+										</li>
+									<?php endforeach; ?>
+									</ul>
+								<?php else : ?>
+									<strong><?php esc_html_e( 'Detalle error:', 'arriendo-facil' ); ?></strong>
+									<?php echo esc_html( $errores_raw ); ?>
+								<?php endif; ?>
 							</td>
 						</tr>
 					<?php endif; ?>

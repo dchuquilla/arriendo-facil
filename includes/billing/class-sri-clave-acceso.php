@@ -132,18 +132,23 @@ class Arriendo_Facil_SRI_Clave_Acceso {
 	/**
 	 * Computes the Module-11 check digit over an arbitrary numeric string.
 	 *
-	 * Coefficients 2..7 are assigned left-to-right cycling over the input.
+	 * Per the SRI technical specification (Ficha Técnica Comprobantes Electrónicos),
+	 * coefficients 2..7 are assigned RIGHT-TO-LEFT: the last digit is multiplied by 2,
+	 * the second-to-last by 3, and so on, cycling 2→3→4→5→6→7→2→… until all digits
+	 * have been processed.
 	 *
 	 * @param string $base Numeric string (typically 48 digits).
 	 * @return string Single-digit string ('0'–'9').
 	 */
 	public static function modulo11( string $base ): string {
-		$factors = array( 2, 3, 4, 5, 6, 7 );
-		$sum     = 0;
-		$len     = strlen( $base );
+		$factors    = array( 2, 3, 4, 5, 6, 7 );
+		$sum        = 0;
+		$len        = strlen( $base );
+		$factor_idx = 0;
 
-		for ( $i = 0; $i < $len; $i++ ) {
-			$sum += (int) $base[ $i ] * $factors[ $i % 6 ];
+		for ( $i = $len - 1; $i >= 0; $i-- ) {
+			$sum += (int) $base[ $i ] * $factors[ $factor_idx % 6 ];
+			$factor_idx++;
 		}
 
 		$verificador = 11 - ( $sum % 11 );

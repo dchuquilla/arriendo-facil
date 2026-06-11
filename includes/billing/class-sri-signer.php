@@ -52,6 +52,23 @@ class Arriendo_Facil_SRI_Signer {
 	/**
 	 * Signs an unsigned SRI XML document with XAdES-BES.
 	 *
+	 * Implementation note — double-parse C14N safety
+	 * ------------------------------------------------
+	 * PHP's DOMNode::C14N() has a documented quirk: namespace declarations added
+	 * to an element via setAttributeNS() are sometimes NOT visible to the C14N
+	 * traversal on descendant nodes, while the same declarations ARE visible in
+	 * the XML produced by saveXML().  This divergence causes the SignedProperties
+	 * and KeyInfo digests we compute to differ from what the SRI's Java-based
+	 * OpenXades library computes from the received XML, producing FIRMA INVALIDA.
+	 *
+	 * The fix: after inserting the Signature skeleton we serialise the full
+	 * document to an XML string and immediately re-parse it into a fresh
+	 * DOMDocument.  All subsequent C14N computations (SignedProperties, KeyInfo,
+	 * SignedInfo) are performed on this fresh document, which has identical
+	 * namespace context to what the SRI will parse.  The #comprobante digest is
+	 * computed before the Signature is inserted (equivalent to the enveloped-
+	 * signature transform) and is thus unaffected by the re-parse.
+	 *
 	 * @param string $xml_unsigned Well-formed XML produced by Arriendo_Facil_SRI_XML_Factura.
 	 * @return string Signed XML with the <Signature> node appended to the root element.
 	 * @throws RuntimeException On certificate, key, or signing errors.
@@ -82,22 +99,22 @@ class Arriendo_Facil_SRI_Signer {
 		$signing_time = ( new DateTime( 'now', new DateTimeZone( 'America/Guayaquil' ) ) )->format( 'Y-m-d\TH:i:sP' );
 		$chain_b64    = $this->parse_chain_pem( $this->chain_pem );
 
-		// Load unsigned XML.
+		// ── PHASE 1: Compute #comprobante digest BEFORE Signature is inserted ──
+		// This is equivalent to the enveloped-signature transform: the signed
+		// document reference covers the root element without the Signature node.
 		$doc                     = new DOMDocument( '1.0', 'UTF-8' );
 		$doc->preserveWhiteSpace = false;
 		if ( ! $doc->loadXML( $xml_unsigned ) ) {
 			throw new RuntimeException( 'Cannot parse unsigned XML document.' );
 		}
 		$root = $doc->documentElement;
-
-		// Register 'id' attribute as XML ID so URI="#comprobante" resolves correctly.
 		$root->setIdAttribute( 'id', true );
 
-		// Compute digest of #comprobante BEFORE Signature is inserted.
-		$comprobante_c14n   = $root->C14N( false, false );
-		$comprobante_digest = base64_encode( hash( 'sha256', $comprobante_c14n, true ) );
+		$comprobante_digest = base64_encode(
+			hash( 'sha256', $root->C14N( false, false ), true )
+		);
 
-		// Build and insert Signature skeleton with proper ds:/etsi: prefixes.
+		// ── PHASE 2: Insert the Signature skeleton (empty DigestValues) ─────────
 		$this->insert_signature_skeleton(
 			$doc,
 			$root,
@@ -111,35 +128,50 @@ class Arriendo_Facil_SRI_Signer {
 			$chain_b64
 		);
 
-		// XPath helpers on the now-complete document.
-		$xpath = new DOMXPath( $doc );
-		$xpath->registerNamespace( 'ds',   self::XMLDSIG_NS );
-		$xpath->registerNamespace( 'etsi', self::XADES_NS );
+		// ── PHASE 3: Round-trip serialize → re-parse ─────────────────────────────
+		// This is the critical safety step: all C14N computations from this point
+		// forward are performed on doc2, whose namespace context is guaranteed to
+		// match what the SRI will parse from the received XML.
+		$xml_intermediate = $doc->saveXML();
+		if ( false === $xml_intermediate ) {
+			throw new RuntimeException( 'Cannot serialise intermediate XML document.' );
+		}
 
-		// Compute SignedProperties digest in document context.
-		$sp_node   = $xpath->query( '//*[@Id="Signature-XAdES-SignedProperties"]' )->item( 0 );
+		$doc2                     = new DOMDocument( '1.0', 'UTF-8' );
+		$doc2->preserveWhiteSpace = false;
+		if ( ! $doc2->loadXML( $xml_intermediate ) ) {
+			throw new RuntimeException( 'Cannot re-parse intermediate XML document.' );
+		}
+		$root2 = $doc2->documentElement;
+		$root2->setIdAttribute( 'id', true );
+
+		$xpath2 = new DOMXPath( $doc2 );
+		$xpath2->registerNamespace( 'ds',   self::XMLDSIG_NS );
+		$xpath2->registerNamespace( 'etsi', self::XADES_NS );
+
+		// ── PHASE 4: Compute digests from the re-parsed document ─────────────────
+		$sp_node   = $xpath2->query( '//*[@Id="Signature-XAdES-SignedProperties"]' )->item( 0 );
 		$sp_digest = base64_encode( hash( 'sha256', $sp_node->C14N( false, false ), true ) );
 
-		// Compute KeyInfo digest in document context.
-		$ki_node   = $xpath->query( '//*[@Id="Certificate1"]' )->item( 0 );
+		$ki_node   = $xpath2->query( '//*[@Id="Certificate1"]' )->item( 0 );
 		$ki_digest = base64_encode( hash( 'sha256', $ki_node->C14N( false, false ), true ) );
 
-		// Fill in DigestValues.
+		// ── PHASE 5: Fill DigestValues into doc2 ────────────────────────────────
 		$this->set_text(
-			$xpath->query( '//ds:Reference[@Id="comprobante-ref0"]/ds:DigestValue' )->item( 0 ),
+			$xpath2->query( '//ds:Reference[@Id="comprobante-ref0"]/ds:DigestValue' )->item( 0 ),
 			$comprobante_digest
 		);
 		$this->set_text(
-			$xpath->query( '//ds:Reference[@URI="#Certificate1"]/ds:DigestValue' )->item( 0 ),
+			$xpath2->query( '//ds:Reference[@URI="#Certificate1"]/ds:DigestValue' )->item( 0 ),
 			$ki_digest
 		);
 		$this->set_text(
-			$xpath->query( '//ds:Reference[@URI="#Signature-XAdES-SignedProperties"]/ds:DigestValue' )->item( 0 ),
+			$xpath2->query( '//ds:Reference[@URI="#Signature-XAdES-SignedProperties"]/ds:DigestValue' )->item( 0 ),
 			$sp_digest
 		);
 
-		// Canonicalise SignedInfo and compute RSA-SHA256 signature.
-		$si_node = $xpath->query( '//ds:SignedInfo[@Id="Signature-SignedInfo"]' )->item( 0 );
+		// ── PHASE 6: Sign SignedInfo ─────────────────────────────────────────────
+		$si_node = $xpath2->query( '//ds:SignedInfo[@Id="Signature-SignedInfo"]' )->item( 0 );
 		$si_c14n = $si_node->C14N( false, false );
 
 		$pk = openssl_pkey_get_private( $private_key_pem );
@@ -151,13 +183,12 @@ class Arriendo_Facil_SRI_Signer {
 			throw new RuntimeException( 'openssl_sign failed: ' . openssl_error_string() );
 		}
 
-		// Write SignatureValue.
 		$this->set_text(
-			$xpath->query( '//ds:SignatureValue[@Id="Signature-SignatureValue"]' )->item( 0 ),
+			$xpath2->query( '//ds:SignatureValue[@Id="Signature-SignatureValue"]' )->item( 0 ),
 			"\n" . chunk_split( base64_encode( $sig_raw ), 76, "\n" )
 		);
 
-		$result = $doc->saveXML();
+		$result = $doc2->saveXML();
 		if ( false === $result ) {
 			throw new RuntimeException( 'Cannot serialise signed XML document.' );
 		}
@@ -185,8 +216,13 @@ class Arriendo_Facil_SRI_Signer {
 		$xa = self::XADES_NS;
 
 		// <ds:Signature>
+		// Do NOT declare xmlns:etsi here via setAttributeNS – let DOMDocument
+		// place the declaration naturally on the first etsi: element
+		// (etsi:QualifyingProperties).  Explicit setAttributeNS causes a known
+		// PHP DOMNode::C14N() bug where the namespace is invisible to the C14N
+		// traversal on descendant nodes, producing digest values that differ
+		// from what the SRI's parser computes.
 		$sig = $doc->createElementNS( $ds, 'ds:Signature' );
-		$sig->setAttributeNS( 'http://www.w3.org/2000/xmlns/', 'xmlns:etsi', $xa );
 		$sig->setAttribute( 'Id', 'Signature' );
 
 		// ── <ds:SignedInfo> ──────────────────────────────────────────────────

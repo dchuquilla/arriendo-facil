@@ -77,7 +77,9 @@ class Arriendo_Facil_SRI_Signer {
 
 		list( $modulus_b64, $exponent_b64 ) = $this->extract_rsa_components( $cert_pem );
 
-		$signing_time = ( new DateTime() )->format( 'Y-m-d\TH:i:sP' );
+		// SRI requires the signing time in Ecuador local timezone (UTC-5 / America/Guayaquil).
+		// Using server-default timezone (often UTC) produces +00:00 and is rejected.
+		$signing_time = ( new DateTime( 'now', new DateTimeZone( 'America/Guayaquil' ) ) )->format( 'Y-m-d\TH:i:sP' );
 		$chain_b64    = $this->parse_chain_pem( $this->chain_pem );
 
 		// Load unsigned XML.
@@ -248,18 +250,29 @@ class Arriendo_Facil_SRI_Signer {
 		$ki = $doc->createElementNS( $ds, 'ds:KeyInfo' );
 		$ki->setAttribute( 'Id', 'Certificate1' );
 
+		// Entity certificate + X509IssuerSerial in the first X509Data block.
+		// SRI requires <ds:X509IssuerSerial> here (not only in etsi:IssuerSerial) to
+		// validate "El certificado firmante es válido".
 		$x509d = $doc->createElementNS( $ds, 'ds:X509Data' );
 		$x509c = $doc->createElementNS( $ds, 'ds:X509Certificate' );
 		$x509c->appendChild( $doc->createTextNode( "\n" . chunk_split( $cert_b64, 76, "\n" ) ) );
 		$x509d->appendChild( $x509c );
 
-		foreach ( $chain_b64 as $ca_b64 ) {
-			$ca_el = $doc->createElementNS( $ds, 'ds:X509Certificate' );
-			$ca_el->appendChild( $doc->createTextNode( "\n" . chunk_split( $ca_b64, 76, "\n" ) ) );
-			$x509d->appendChild( $ca_el );
-		}
+		$x509is  = $doc->createElementNS( $ds, 'ds:X509IssuerSerial' );
+		$x509is->appendChild( $this->ds_el( $doc, 'ds:X509IssuerName', $issuer_name ) );
+		$x509is->appendChild( $this->ds_el( $doc, 'ds:X509SerialNumber', $serial ) );
+		$x509d->appendChild( $x509is );
 
 		$ki->appendChild( $x509d );
+
+		// Each CA / intermediate certificate goes in its own X509Data block.
+		foreach ( $chain_b64 as $ca_b64 ) {
+			$ca_x509d = $doc->createElementNS( $ds, 'ds:X509Data' );
+			$ca_el    = $doc->createElementNS( $ds, 'ds:X509Certificate' );
+			$ca_el->appendChild( $doc->createTextNode( "\n" . chunk_split( $ca_b64, 76, "\n" ) ) );
+			$ca_x509d->appendChild( $ca_el );
+			$ki->appendChild( $ca_x509d );
+		}
 
 		$kv  = $doc->createElementNS( $ds, 'ds:KeyValue' );
 		$rsa = $doc->createElementNS( $ds, 'ds:RSAKeyValue' );
@@ -328,14 +341,21 @@ class Arriendo_Facil_SRI_Signer {
 
 	private function build_issuer_dn( array $issuer ): string {
 		$parts = array();
+		// RFC 2253 order: most-specific first (CN → C).
 		foreach ( array( 'CN', 'OU', 'O', 'L', 'ST', 'C' ) as $key ) {
-			if ( ! empty( $issuer[ $key ] ) ) {
-				$val = $issuer[ $key ];
-				if ( is_array( $val ) ) {
-					$val = $val[0];
-				}
-				$parts[] = $key . '=' . $val;
+			if ( ! isset( $issuer[ $key ] ) || '' === $issuer[ $key ] ) {
+				continue;
 			}
+			$val = $issuer[ $key ];
+			if ( is_array( $val ) ) {
+				$val = $val[0];
+			}
+			$val = (string) $val;
+			// RFC 2253 §2.4: escape , = + < > # ; \ " and leading/trailing spaces.
+			$escaped = addcslashes( $val, ',=+<>#;\\"' );
+			$escaped = preg_replace( '/^ /', '\\ ', $escaped );
+			$escaped = preg_replace( '/ $/', '\\ ', $escaped );
+			$parts[] = $key . '=' . $escaped;
 		}
 		return implode( ', ', $parts );
 	}

@@ -24,6 +24,24 @@ class SRIPhase4Test extends TestCase {
 		@mkdir( WP_CONTENT_DIR . '/uploads', 0755, true );
 	}
 
+	/**
+	 * Generates a real self-signed RSA certificate PEM for tests.
+	 * The billing manager validates the cert with openssl_x509_parse(), so fake
+	 * PEM strings cause sri_cert_parse_error before the signer is reached.
+	 *
+	 * @return array{ cert_pem: string, pkey_pem: string }
+	 */
+	private function make_test_cert_pem(): array {
+		$key = openssl_pkey_new( array( 'private_key_bits' => 1024, 'private_key_type' => OPENSSL_KEYTYPE_RSA ) );
+		$csr  = openssl_csr_new( array( 'CN' => 'Test SRI', 'C' => 'EC' ), $key, array( 'digest_alg' => 'sha256' ) );
+		$cert = openssl_csr_sign( $csr, null, $key, 1, array( 'digest_alg' => 'sha256' ), 1 );
+		$cert_pem = '';
+		openssl_x509_export( $cert, $cert_pem );
+		$pkey_pem = '';
+		openssl_pkey_export( $key, $pkey_pem );
+		return array( 'cert_pem' => $cert_pem, 'pkey_pem' => $pkey_pem );
+	}
+
 	public function test_ride_build_pdf_binary_has_valid_header() {
 		$ride = new Arriendo_Facil_SRI_Ride();
 		$pdf  = $ride->build_pdf_binary(
@@ -93,6 +111,8 @@ class SRIPhase4Test extends TestCase {
 		$cert_file = WP_CONTENT_DIR . '/af-certs/test_cert.p12';
 		file_put_contents( $cert_file, 'dummy-cert' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
 
+		$pems = $this->make_test_cert_pem();
+
 		update_option(
 			Arriendo_Facil_SRI_Config::OPTION_KEY,
 			array(
@@ -106,8 +126,8 @@ class SRIPhase4Test extends TestCase {
 				'tipo_emision'          => '1',
 				'cert_filename'         => 'test_cert.p12',
 				'cert_password_enc'     => Arriendo_Facil_SRI_Config::encrypt_password( 'testpass' ),
-				'cert_pem_enc'          => Arriendo_Facil_SRI_Config::protect_sensitive( 'FAKE_CERT_PEM' ),
-				'pkey_pem_enc'          => Arriendo_Facil_SRI_Config::protect_sensitive( 'FAKE_PKEY_PEM' ),
+				'cert_pem_enc'          => Arriendo_Facil_SRI_Config::protect_sensitive( $pems['cert_pem'] ),
+				'pkey_pem_enc'          => Arriendo_Facil_SRI_Config::protect_sensitive( $pems['pkey_pem'] ),
 			)
 		);
 
@@ -152,6 +172,8 @@ class SRIPhase4Test extends TestCase {
 		$cert_file = WP_CONTENT_DIR . '/af-certs/test_cert_2.p12';
 		file_put_contents( $cert_file, 'dummy-cert' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
 
+		$pems = $this->make_test_cert_pem();
+
 		update_option(
 			Arriendo_Facil_SRI_Config::OPTION_KEY,
 			array(
@@ -161,8 +183,8 @@ class SRIPhase4Test extends TestCase {
 				'tipo_emision'          => '1',
 				'cert_filename'         => 'test_cert_2.p12',
 				'cert_password_enc'     => Arriendo_Facil_SRI_Config::encrypt_password( 'testpass' ),
-				'cert_pem_enc'          => Arriendo_Facil_SRI_Config::protect_sensitive( 'FAKE_CERT_PEM' ),
-				'pkey_pem_enc'          => Arriendo_Facil_SRI_Config::protect_sensitive( 'FAKE_PKEY_PEM' ),
+				'cert_pem_enc'          => Arriendo_Facil_SRI_Config::protect_sensitive( $pems['cert_pem'] ),
+				'pkey_pem_enc'          => Arriendo_Facil_SRI_Config::protect_sensitive( $pems['pkey_pem'] ),
 			)
 		);
 

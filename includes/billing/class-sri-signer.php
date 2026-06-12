@@ -377,23 +377,44 @@ class Arriendo_Facil_SRI_Signer {
 
 	private function build_issuer_dn( array $issuer ): string {
 		$parts = array();
-		// RFC 2253 order: most-specific first (CN → C).
-		foreach ( array( 'CN', 'OU', 'O', 'L', 'ST', 'C' ) as $key ) {
-			if ( ! isset( $issuer[ $key ] ) || '' === $issuer[ $key ] ) {
+		// RFC 2253 order: most-specific first.
+		// Includes serialNumber (OID 2.5.4.5, DN attribute carrying RUC in some BCE/SecurityData
+		// issuer certs) and UID — missing these causes IssuerName mismatch → FIRMA INVALIDA.
+		foreach ( array( 'CN', 'UID', 'serialNumber', 'OU', 'O', 'L', 'ST', 'C' ) as $key ) {
+			if ( ! isset( $issuer[ $key ] ) ) {
 				continue;
 			}
-			$val = $issuer[ $key ];
-			if ( is_array( $val ) ) {
-				$val = $val[0];
+			$values = is_array( $issuer[ $key ] ) ? $issuer[ $key ] : array( $issuer[ $key ] );
+			foreach ( $values as $val ) {
+				$val = (string) $val;
+				if ( '' === $val ) {
+					continue;
+				}
+				// RFC 2253 §2.4: escape , = + < > # ; \ " and leading/trailing spaces.
+				$escaped = addcslashes( $val, ',=+<>#;\\"' );
+				$escaped = preg_replace( '/^ /', '\\ ', $escaped );
+				$escaped = preg_replace( '/ $/', '\\ ', (string) $escaped );
+				// RFC 2253 attribute type labels.
+				$label = ( 'serialNumber' === $key ) ? 'SERIALNUMBER' : $key;
+				$parts[] = $label . '=' . $escaped;
 			}
-			$val = (string) $val;
-			// RFC 2253 §2.4: escape , = + < > # ; \ " and leading/trailing spaces.
-			$escaped = addcslashes( $val, ',=+<>#;\\"' );
-			$escaped = preg_replace( '/^ /', '\\ ', $escaped );
-			$escaped = preg_replace( '/ $/', '\\ ', $escaped );
-			$parts[] = $key . '=' . $escaped;
 		}
 		return implode( ', ', $parts );
+	}
+
+	/**
+	 * Returns the RFC 2253 issuer DN that the signer would embed in X509IssuerName
+	 * for a given PEM certificate. Used for diagnostics.
+	 *
+	 * @param string $cert_pem PEM-encoded certificate.
+	 * @return string Formatted issuer DN, or empty string on parse failure.
+	 */
+	public static function compute_issuer_dn( string $cert_pem ): string {
+		$info = openssl_x509_parse( $cert_pem );
+		if ( false === $info || empty( $info['issuer'] ) ) {
+			return '';
+		}
+		return ( new self( $cert_pem, '' ) )->build_issuer_dn( (array) $info['issuer'] );
 	}
 
 	private function cert_serial( array $cert_info ): string {

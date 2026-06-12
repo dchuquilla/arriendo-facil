@@ -394,13 +394,17 @@ class Arriendo_Facil_SRI_Config {
 				break;
 			}
 
-			error_log( '[AF SRI] fetch_ca_chain: CA intermedia obtenida: ' . ( $ca_info['subject']['CN'] ?? $ca_info['subject']['O'] ?? '(desconocido)' ) );
-			$chain_pems[] = $ca_pem;
-
+			// Stop BEFORE adding root (self-signed) certs.  The SRI trust store already
+			// has the root; including it in the XML chain confuses the path builder and
+			// causes "El certificado firmante no es válido" (error 39).
 			$is_self_signed = ( ( $ca_info['subject'] ?? array() ) === ( $ca_info['issuer'] ?? array() ) );
 			if ( $is_self_signed ) {
+				error_log( '[AF SRI] fetch_ca_chain: cert autofirmado (root) encontrado, no se incluye en la cadena – deteniendo.' );
 				break;
 			}
+
+			error_log( '[AF SRI] fetch_ca_chain: CA intermedia obtenida: ' . ( $ca_info['subject']['CN'] ?? $ca_info['subject']['O'] ?? '(desconocido)' ) );
+			$chain_pems[] = $ca_pem;
 
 			$current = $ca_pem;
 		}
@@ -474,6 +478,126 @@ class Arriendo_Facil_SRI_Config {
 		update_option( self::OPTION_KEY, $current );
 
 		return true;
+	}
+
+	/**
+	 * Saves a manually supplied CA chain (one or more PEM certificates).
+	 * Validates each block before persisting. Use this when AIA download fails
+	 * or when the automatically-fetched chain is wrong.
+	 *
+	 * @param string $chain_pem One or more PEM-encoded CA certificates concatenated.
+	 * @return true|WP_Error
+	 */
+	public static function save_manual_chain( string $chain_pem ) {
+		$chain_pem = trim( $chain_pem );
+		if ( '' === $chain_pem ) {
+			return new WP_Error( 'empty_chain', __( 'El texto de la cadena está vacío.', 'arriendo-facil' ) );
+		}
+		if ( false === strpos( $chain_pem, '-----BEGIN CERTIFICATE-----' ) ) {
+			return new WP_Error( 'invalid_pem', __( 'El texto no contiene certificados PEM válidos (falta el encabezado -----BEGIN CERTIFICATE-----).',  'arriendo-facil' ) );
+		}
+
+		// Extract and validate each PEM block.
+		preg_match_all( '/-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----/s', $chain_pem, $matches );
+		if ( empty( $matches[0] ) ) {
+			return new WP_Error( 'no_certs', __( 'No se encontraron certificados PEM en el texto.', 'arriendo-facil' ) );
+		}
+
+		$normalized = array();
+		foreach ( $matches[0] as $i => $block ) {
+			$block = trim( $block );
+			if ( false === openssl_x509_parse( $block ) ) {
+				return new WP_Error(
+					'invalid_cert',
+					sprintf( __( 'El certificado #%d en la cadena no es válido (no se pudo parsear con OpenSSL).', 'arriendo-facil' ), $i + 1 )
+				);
+			}
+			$normalized[] = $block;
+		}
+
+		$pems = self::get_cert_pems();
+		if ( '' === $pems['cert'] || '' === $pems['pkey'] ) {
+			return new WP_Error( 'no_main_cert', __( 'No hay certificado de firma almacenado. Suba primero el archivo .p12.', 'arriendo-facil' ) );
+		}
+
+		self::save_cert_pems( $pems['cert'], $pems['pkey'], implode( "\n", $normalized ) );
+		return true;
+	}
+
+	/**
+	 * Returns a comprehensive diagnostic array for the stored certificate and chain.
+	 * Used by the admin "Diagnóstico Avanzado" section.
+	 *
+	 * @return array
+	 */
+	public static function get_full_cert_diagnostics(): array {
+		$pems   = self::get_cert_pems();
+		$config = self::get();
+		$out    = array(
+			'has_cert'          => '' !== $pems['cert'],
+			'has_pkey'          => '' !== $pems['pkey'],
+			'has_chain'         => '' !== trim( $pems['chain'] ),
+			'cert_subject'      => array(),
+			'cert_issuer'       => array(),
+			'issuer_dn_encoded' => '',
+			'cert_serial_hex'   => '',
+			'cert_valid_from'   => '',
+			'cert_valid_to'     => '',
+			'cert_is_expired'   => false,
+			'aia_url'           => '',
+			'config_ruc'        => $config['ruc'] ?? '',
+			'ruc_in_cert'       => '',
+			'ruc_match'         => false,
+			'chain_certs'       => array(),
+		);
+
+		if ( '' === $pems['cert'] ) {
+			return $out;
+		}
+
+		$info = openssl_x509_parse( $pems['cert'] );
+		if ( false === $info ) {
+			return $out;
+		}
+
+		$out['cert_subject']      = (array) ( $info['subject'] ?? array() );
+		$out['cert_issuer']       = (array) ( $info['issuer'] ?? array() );
+		$out['cert_serial_hex']   = $info['serialNumberHex'] ?? '';
+		$out['cert_valid_from']   = isset( $info['validFrom_time_t'] ) ? gmdate( 'Y-m-d H:i:s', (int) $info['validFrom_time_t'] ) : '';
+		$out['cert_valid_to']     = isset( $info['validTo_time_t'] ) ? gmdate( 'Y-m-d H:i:s', (int) $info['validTo_time_t'] ) : '';
+		$out['cert_is_expired']   = isset( $info['validTo_time_t'] ) && ( (int) $info['validTo_time_t'] < time() );
+		$out['issuer_dn_encoded'] = Arriendo_Facil_SRI_Signer::compute_issuer_dn( $pems['cert'] );
+
+		// AIA CA Issuers URL.
+		$out['aia_url'] = self::extract_aia_ca_issuer( $pems['cert'] );
+
+		// RUC embedded in certificate subject (BCE/SecurityData format).
+		$subj = $out['cert_subject'];
+		$cert_ruc = $subj['serialNumber'] ?? ( $subj['UID'] ?? ( $subj['dnQualifier'] ?? '' ) );
+		$out['ruc_in_cert'] = (string) $cert_ruc;
+		$out['ruc_match']   = ( '' !== $cert_ruc ) && ( $cert_ruc === $out['config_ruc'] );
+
+		// Chain cert details.
+		if ( '' !== trim( $pems['chain'] ) ) {
+			preg_match_all( '/-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----/s', $pems['chain'], $chain_matches );
+			foreach ( $chain_matches[0] as $chain_cert ) {
+				$ci = openssl_x509_parse( trim( $chain_cert ) );
+				if ( ! is_array( $ci ) ) {
+					$out['chain_certs'][] = array( 'error' => 'invalid cert' );
+					continue;
+				}
+				$is_root = ( ( $ci['subject'] ?? array() ) === ( $ci['issuer'] ?? array() ) );
+				$out['chain_certs'][] = array(
+					'subject_cn' => $ci['subject']['CN'] ?? $ci['subject']['O'] ?? '?',
+					'issuer_cn'  => $ci['issuer']['CN'] ?? $ci['issuer']['O'] ?? '?',
+					'valid_to'   => isset( $ci['validTo_time_t'] ) ? gmdate( 'Y-m-d', (int) $ci['validTo_time_t'] ) : '?',
+					'is_root'    => $is_root,
+					'is_expired' => isset( $ci['validTo_time_t'] ) && ( (int) $ci['validTo_time_t'] < time() ),
+				);
+			}
+		}
+
+		return $out;
 	}
 
 	/**

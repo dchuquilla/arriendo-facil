@@ -199,6 +199,24 @@ if ( isset( $_POST['af_rebuild_chain'] ) ) {
 	}
 }
 
+// Save manually pasted CA chain.
+if ( isset( $_POST['af_save_manual_chain'] ) ) {
+	check_admin_referer( 'af_sri_settings_nonce' );
+
+	$raw_chain = (string) wp_unslash( $_POST['af_manual_chain_pem'] ?? '' );
+	$result    = Arriendo_Facil_SRI_Config::save_manual_chain( $raw_chain );
+	if ( is_wp_error( $result ) ) {
+		$af_sri_notice = array( 'type' => 'error', 'msg' => $result->get_error_message() );
+	} else {
+		$pems_check  = Arriendo_Facil_SRI_Config::get_cert_pems();
+		$chain_count = preg_match_all( '/-----BEGIN CERTIFICATE-----/', $pems_check['chain'] );
+		$af_sri_notice = array(
+			'type' => 'success',
+			'msg'  => sprintf( __( 'Cadena CA guardada manualmente. %d certificado(s) almacenados. ✓ Prueba ahora "Test firma XML".', 'arriendo-facil' ), $chain_count ),
+		);
+	}
+}
+
 // Test sign: sign a sample XML and verify the signature locally.
 if ( isset( $_POST['af_test_sign'] ) ) {
 	check_admin_referer( 'af_sri_settings_nonce' );
@@ -602,6 +620,115 @@ $emission_points = $wpdb->get_results(
 				<span class="description"><?php esc_html_e( 'Comprueba que el certificado se abre correctamente y no ha vencido. Use "Reconstruir cadena CA" si los certificados intermedios están en 0.', 'arriendo-facil' ); ?></span>
 			</p>
 		</form>
+
+		<!-- ─── Diagnóstico Avanzado de Cadena CA ──────────────────────── -->
+		<?php
+		$diag = Arriendo_Facil_SRI_Config::get_full_cert_diagnostics();
+		?>
+		<h3 style="margin-top:1.5em;"><?php esc_html_e( 'Diagnóstico Avanzado del Certificado', 'arriendo-facil' ); ?></h3>
+		<table class="widefat striped" style="max-width:820px; font-size:13px;">
+			<tbody>
+				<tr>
+					<th style="width:250px;"><?php esc_html_e( 'RUC en configuración', 'arriendo-facil' ); ?></th>
+					<td><code><?php echo esc_html( $diag['config_ruc'] ?: '(vacío)' ); ?></code></td>
+				</tr>
+				<tr>
+					<th><?php esc_html_e( 'RUC en certificado (serialNumber/UID)', 'arriendo-facil' ); ?></th>
+					<td>
+						<code><?php echo esc_html( $diag['ruc_in_cert'] ?: '(no encontrado en el cert)' ); ?></code>
+						&nbsp;
+						<?php if ( $diag['ruc_in_cert'] && $diag['ruc_match'] ) : ?>
+							<span style="color:#2e7d32; font-weight:600;">✓ Coincide</span>
+						<?php elseif ( $diag['ruc_in_cert'] ) : ?>
+							<span style="color:#c62828; font-weight:600;">✗ NO coincide — el SRI rechazará la firma</span>
+						<?php endif; ?>
+					</td>
+				</tr>
+				<tr>
+					<th><?php esc_html_e( 'Sujeto completo del certificado', 'arriendo-facil' ); ?></th>
+					<td><code><?php echo esc_html( implode( ', ', array_map( fn( $k, $v ) => "$k=$v", array_keys( $diag['cert_subject'] ), $diag['cert_subject'] ) ) ); ?></code></td>
+				</tr>
+				<tr>
+					<th><?php esc_html_e( 'Emisor (como aparecerá en X509IssuerName)', 'arriendo-facil' ); ?></th>
+					<td><code style="word-break:break-all;"><?php echo esc_html( $diag['issuer_dn_encoded'] ?: '(no disponible)' ); ?></code></td>
+				</tr>
+				<tr>
+					<th><?php esc_html_e( 'Vigencia del certificado', 'arriendo-facil' ); ?></th>
+					<td>
+						<?php echo esc_html( $diag['cert_valid_from'] . ' → ' . $diag['cert_valid_to'] ); ?>
+						<?php if ( $diag['cert_is_expired'] ) : ?>
+							<span style="color:#c62828; font-weight:600;"> ✗ VENCIDO</span>
+						<?php endif; ?>
+					</td>
+				</tr>
+				<tr>
+					<th><?php esc_html_e( 'URL AIA del certificado', 'arriendo-facil' ); ?></th>
+					<td><code><?php echo esc_html( $diag['aia_url'] ?: '(sin AIA – cadena manual requerida)' ); ?></code></td>
+				</tr>
+				<tr>
+					<th><?php esc_html_e( 'Certificados en la cadena CA', 'arriendo-facil' ); ?></th>
+					<td>
+						<?php if ( empty( $diag['chain_certs'] ) ) : ?>
+							<span style="color:#c62828;">✗ Sin cadena CA — usa "Reconstruir" o la carga manual abajo</span>
+						<?php else : ?>
+							<table style="border-collapse:collapse; width:100%; font-size:12px;">
+								<tr style="background:#f0f0f0;">
+									<th style="padding:3px 8px; text-align:left;">#</th>
+									<th style="padding:3px 8px; text-align:left;"><?php esc_html_e( 'Sujeto CN', 'arriendo-facil' ); ?></th>
+									<th style="padding:3px 8px; text-align:left;"><?php esc_html_e( 'Emitido por', 'arriendo-facil' ); ?></th>
+									<th style="padding:3px 8px; text-align:left;"><?php esc_html_e( 'Válido hasta', 'arriendo-facil' ); ?></th>
+									<th style="padding:3px 8px; text-align:left;"><?php esc_html_e( 'Tipo', 'arriendo-facil' ); ?></th>
+								</tr>
+								<?php foreach ( $diag['chain_certs'] as $idx => $cc ) : ?>
+									<tr style="border-top:1px solid #ddd; <?php echo ( $cc['is_root'] ?? false ) ? 'background:#fff8e1;' : ''; ?>">
+										<td style="padding:3px 8px;"><?php echo esc_html( $idx + 1 ); ?></td>
+										<td style="padding:3px 8px;"><code><?php echo esc_html( $cc['subject_cn'] ?? '?' ); ?></code></td>
+										<td style="padding:3px 8px;"><code><?php echo esc_html( $cc['issuer_cn'] ?? '?' ); ?></code></td>
+										<td style="padding:3px 8px;">
+											<?php echo esc_html( $cc['valid_to'] ?? '?' ); ?>
+											<?php if ( $cc['is_expired'] ?? false ) : ?>
+												<span style="color:#c62828;"> ✗</span>
+											<?php endif; ?>
+										</td>
+										<td style="padding:3px 8px;">
+											<?php if ( $cc['is_root'] ?? false ) : ?>
+												<span style="color:#e65100;">Root CA ⚠</span>
+												<span class="description"> (no debería estar aquí)</span>
+											<?php else : ?>
+												<span style="color:#2e7d32;">Intermedia ✓</span>
+											<?php endif; ?>
+										</td>
+									</tr>
+								<?php endforeach; ?>
+							</table>
+						<?php endif; ?>
+					</td>
+				</tr>
+			</tbody>
+		</table>
+
+		<!-- ─── Carga manual de cadena CA ──────────────────────────────── -->
+		<h3 style="margin-top:1.5em;"><?php esc_html_e( 'Cargar Cadena CA Manualmente', 'arriendo-facil' ); ?></h3>
+		<p class="description">
+			<?php esc_html_e( 'Si "Reconstruir cadena CA" falla o sigue dando FIRMA INVALIDA, descarga los certificados intermedios directamente desde el BCE o SecurityData (en formato PEM), pégalos aquí y guarda.', 'arriendo-facil' ); ?>
+			<br/>
+			<strong><?php esc_html_e( 'BCE:', 'arriendo-facil' ); ?></strong>
+			<a href="https://www.eci.bce.ec/declaracion-de-practicas-de-certificacion" target="_blank" rel="noopener">eci.bce.ec</a>
+			&nbsp;|&nbsp;
+			<strong><?php esc_html_e( 'SecurityData:', 'arriendo-facil' ); ?></strong>
+			<a href="https://www.securitydata.net.ec/repositorio.html" target="_blank" rel="noopener">securitydata.net.ec</a>
+		</p>
+		<form method="post" action="">
+			<?php wp_nonce_field( 'af_sri_settings_nonce' ); ?>
+			<textarea name="af_manual_chain_pem" rows="8" style="width:100%; max-width:820px; font-family:monospace; font-size:12px;"
+				placeholder="-----BEGIN CERTIFICATE-----&#10;(pega aquí uno o más certificados CA intermedios en formato PEM)&#10;-----END CERTIFICATE-----"></textarea>
+			<p class="submit">
+				<button type="submit" name="af_save_manual_chain" class="button button-primary">
+					<?php esc_html_e( 'Guardar Cadena CA Manual', 'arriendo-facil' ); ?>
+				</button>
+			</p>
+		</form>
+
 	<?php endif; ?>
 
 	<hr />

@@ -21,7 +21,10 @@ $af_sri_notice = null;
 if ( isset( $_POST['af_save_sri_config'] ) ) {
 	check_admin_referer( 'af_sri_settings_nonce' );
 
-	$ruc = preg_replace( '/\D/', '', sanitize_text_field( wp_unslash( $_POST['af_ruc'] ?? '' ) ) );
+	// Normalize first: accept cédula (10 digits) → auto-expand to RUC (append 001).
+	$ruc = Arriendo_Facil_SRI_Config::normalize_ruc(
+		preg_replace( '/\D/', '', sanitize_text_field( wp_unslash( $_POST['af_ruc'] ?? '' ) ) )
+	);
 	$email = sanitize_email( wp_unslash( $_POST['af_email_notificacion'] ?? '' ) );
 	$dir_establecimiento = sanitize_text_field( wp_unslash( $_POST['af_dir_establecimiento'] ?? '' ) );
 
@@ -364,13 +367,13 @@ $emission_points = $wpdb->get_results(
 		<table class="form-table" role="presentation">
 			<tr>
 				<th scope="row">
-					<label for="af_ruc"><?php esc_html_e( 'RUC', 'arriendo-facil' ); ?> <span style="color:red;">*</span> <span class="description">(13 dígitos)</span></label>
+					<label for="af_ruc"><?php esc_html_e( 'RUC', 'arriendo-facil' ); ?> <span style="color:red;">*</span> <span class="description">(13 dígitos; o cédula de 10 dígitos para persona natural)</span></label>
 				</th>
 				<td>
 					<input type="text" id="af_ruc" name="af_ruc"
 						value="<?php echo esc_attr( $cfg['ruc'] ); ?>"
-						class="regular-text" maxlength="13" pattern="\d{13}"
-						placeholder="0912345678001"
+						class="regular-text" maxlength="13" pattern="\d{10,13}"
+						placeholder="1717012890 o 1717012890001"
 						required />
 					<button type="button" id="af-ruc-lookup-btn" class="button" style="margin-left:8px;">
 						<?php esc_html_e( '🔍 Consultar en SRI', 'arriendo-facil' ); ?>
@@ -836,8 +839,10 @@ $emission_points = $wpdb->get_results(
 
 	btn.addEventListener( 'click', function () {
 		var ruc = ( document.getElementById( 'af_ruc' ).value || '' ).replace( /\D/g, '' );
+		// Normalizar: cédula 10 dígitos → RUC 13 dígitos (persona natural).
+		if ( ruc.length === 10 ) { ruc = ruc + '001'; }
 		if ( ruc.length !== 13 ) {
-			status.innerHTML = '<span style="color:#c62828;">El RUC debe tener exactamente 13 dígitos.</span>';
+			status.innerHTML = '<span style="color:#c62828;">Ingresa el RUC (13 dígitos) o tu cédula (10 dígitos).</span>';
 			return;
 		}
 		btn.disabled = true;

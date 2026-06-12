@@ -96,11 +96,28 @@ if ( isset( $_POST['af_upload_certificate'] ) ) {
 				}
 				Arriendo_Facil_SRI_Config::save_cert_pems( $p12_result['cert'], $p12_result['pkey'], $chain );
 				$chain_count = ( '' !== trim( $chain ) ) ? preg_match_all( '/-----BEGIN CERTIFICATE-----/', $chain ) : 0;
-				$msg = __( 'Certificado subido y verificado correctamente. ✓', 'arriendo-facil' );
-				if ( $chain_count > 0 ) {
-					$msg .= sprintf( ' (%d certificado(s) intermedio(s) obtenidos)', $chain_count );
+				if ( (int) $chain_count > 0 ) {
+					$msg           = sprintf(
+						__( 'Certificado subido y verificado. ✓ Cadena CA: %d certificado(s) intermedio(s) obtenidos.', 'arriendo-facil' ),
+						$chain_count
+					);
+					$af_sri_notice = array( 'type' => 'success', 'msg' => $msg );
+				} else {
+					// Chain is empty — save what we have and warn loudly.
+					// Without the CA chain the SRI will return FIRMA INVALIDA (error 39)
+					// "El certificado firmante no es válido" at authorization time.
+					$af_sri_notice = array(
+						'type' => 'warning',
+						'msg'  => __(
+							'⚠️ Certificado subido, pero NO se pudo obtener la cadena de certificados CA intermedios. ' .
+							'Sin esta cadena el SRI rechazará las facturas con "El certificado firmante no es válido" (error 39). ' .
+							'Haz clic en "Reconstruir cadena CA" para intentar descargarla. ' .
+							'Si el botón falla, tu servidor bloquea las salidas HTTPS a los servidores BCE/SecurityData; ' .
+							'contacta a tu hosting para habilitarlas.',
+							'arriendo-facil'
+						),
+					);
 				}
-				$af_sri_notice = array( 'type' => 'success', 'msg' => $msg );
 			}
 		}
 	}

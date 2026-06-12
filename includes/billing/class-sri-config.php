@@ -361,29 +361,40 @@ class Arriendo_Facil_SRI_Config {
 		for ( $i = 0; $i < $max_depth; $i++ ) {
 			$issuer_url = self::extract_aia_ca_issuer( $current );
 			if ( '' === $issuer_url ) {
+				error_log( '[AF SRI] fetch_ca_chain: sin URL AIA en profundidad ' . $i . ' – deteniendo.' );
 				break;
 			}
 
+			error_log( '[AF SRI] fetch_ca_chain: descargando CA intermedia desde ' . $issuer_url );
 			$response = wp_remote_get( $issuer_url, array( 'timeout' => 15, 'sslverify' => true ) );
-			if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
+			if ( is_wp_error( $response ) ) {
+				error_log( '[AF SRI] fetch_ca_chain: ERROR al descargar ' . $issuer_url . ' → ' . $response->get_error_message() );
+				break;
+			}
+			if ( 200 !== wp_remote_retrieve_response_code( $response ) ) {
+				error_log( '[AF SRI] fetch_ca_chain: HTTP ' . wp_remote_retrieve_response_code( $response ) . ' al descargar ' . $issuer_url );
 				break;
 			}
 
 			$body = wp_remote_retrieve_body( $response );
 			if ( '' === $body ) {
+				error_log( '[AF SRI] fetch_ca_chain: respuesta vacía de ' . $issuer_url );
 				break;
 			}
 
 			$ca_pem = self::normalize_cert_to_pem( $body );
 			if ( '' === $ca_pem ) {
+				error_log( '[AF SRI] fetch_ca_chain: no se pudo convertir respuesta a PEM desde ' . $issuer_url );
 				break;
 			}
 
 			$ca_info = openssl_x509_parse( $ca_pem );
 			if ( false === $ca_info ) {
+				error_log( '[AF SRI] fetch_ca_chain: certificado descargado inválido desde ' . $issuer_url );
 				break;
 			}
 
+			error_log( '[AF SRI] fetch_ca_chain: CA intermedia obtenida: ' . ( $ca_info['subject']['CN'] ?? $ca_info['subject']['O'] ?? '(desconocido)' ) );
 			$chain_pems[] = $ca_pem;
 
 			$is_self_signed = ( ( $ca_info['subject'] ?? array() ) === ( $ca_info['issuer'] ?? array() ) );
@@ -392,6 +403,12 @@ class Arriendo_Facil_SRI_Config {
 			}
 
 			$current = $ca_pem;
+		}
+
+		if ( empty( $chain_pems ) ) {
+			error_log( '[AF SRI] fetch_ca_chain: ⚠️ RESULTADO VACÍO – la cadena CA no se pudo obtener. El SRI rechazará la firma con "El certificado firmante no es válido".' );
+		} else {
+			error_log( '[AF SRI] fetch_ca_chain: cadena obtenida con ' . count( $chain_pems ) . ' certificado(s) intermedio(s).' );
 		}
 
 		return implode( "\n", $chain_pems );

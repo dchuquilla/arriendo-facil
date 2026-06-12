@@ -571,11 +571,34 @@ class Arriendo_Facil_SRI_Config {
 		// AIA CA Issuers URL.
 		$out['aia_url'] = self::extract_aia_ca_issuer( $pems['cert'] );
 
-		// RUC embedded in certificate subject (BCE/SecurityData format).
+		// RUC embedded in certificate subject.
+		// Multiple formats depending on the CA:
+		//   Uanataca (Ecuador): organizationIdentifier=TINEC-1717012890001 → strip "TINEC-"
+		//   BCE / SecurityData:  serialNumber=1717012890001  (raw RUC, no prefix)
+		//   Some CAs:            serialNumber=IDCEC-1717012890 (cédula with prefix → append 001)
+		//   Fallback:            UID or dnQualifier.
 		$subj = $out['cert_subject'];
-		$cert_ruc = $subj['serialNumber'] ?? ( $subj['UID'] ?? ( $subj['dnQualifier'] ?? '' ) );
-		$out['ruc_in_cert'] = (string) $cert_ruc;
-		$out['ruc_match']   = ( '' !== $cert_ruc ) && ( $cert_ruc === $out['config_ruc'] );
+
+		// 1. Preferred: organizationIdentifier (OID 2.5.4.97) — Uanataca format.
+		$org_id = (string) ( $subj['organizationIdentifier'] ?? $subj['2.5.4.97'] ?? '' );
+		if ( '' !== $org_id ) {
+			// e.g. "TINEC-1717012890001" → strip country-prefixed TIN marker.
+			$cert_ruc_raw = preg_replace( '/^[A-Z]+-/i', '', $org_id );
+		} else {
+			$cert_ruc_raw = (string) ( $subj['serialNumber'] ?? ( $subj['UID'] ?? ( $subj['dnQualifier'] ?? '' ) ) );
+		}
+
+		// Strip any remaining non-numeric prefix (e.g. "IDCEC-") to get digits.
+		$cert_ruc_digits = preg_replace( '/^[A-Z]+-/i', '', $cert_ruc_raw );
+		$cert_ruc_digits = preg_replace( '/\D/', '', (string) $cert_ruc_digits );
+
+		// If we got a cédula (10 digits), normalize to RUC (append 001).
+		if ( 10 === strlen( $cert_ruc_digits ) ) {
+			$cert_ruc_digits .= '001';
+		}
+
+		$out['ruc_in_cert'] = '' !== $cert_ruc_digits ? $cert_ruc_digits : $cert_ruc_raw;
+		$out['ruc_match']   = ( '' !== $cert_ruc_digits ) && ( $cert_ruc_digits === $out['config_ruc'] );
 
 		// Chain cert details.
 		if ( '' !== trim( $pems['chain'] ) ) {
@@ -628,16 +651,34 @@ class Arriendo_Facil_SRI_Config {
 	// ─── RUC validation ──────────────────────────────────────────────────────
 
 	/**
-	 * Validates an Ecuadorian RUC number (all three entity types).
+	 * Normalizes a RUC or cédula string to a 13-digit RUC.
+	 * A 10-digit cédula (persona natural) is expanded by appending "001".
+	 * Returns the original string unchanged if it cannot be normalized.
 	 *
-	 * @param string $ruc RUC to validate.
+	 * @param string $value Raw input (digits only, or cédula/RUC with separators).
+	 * @return string 13-digit RUC, or original digits if unrecognized length.
+	 */
+	public static function normalize_ruc( string $value ): string {
+		$digits = preg_replace( '/\D/', '', $value );
+		if ( 10 === strlen( (string) $digits ) ) {
+			return (string) $digits . '001';
+		}
+		return (string) $digits;
+	}
+
+	/**
+	 * Validates an Ecuadorian RUC number (all three entity types).
+	 * Also accepts a 10-digit cédula (persona natural) — it is treated as
+	 * the RUC with suffix 001.
+	 *
+	 * @param string $ruc RUC (13 digits) or cédula (10 digits).
 	 * @return true|WP_Error
 	 */
 	public static function validate_ruc( string $ruc ) {
-		$ruc = preg_replace( '/\D/', '', $ruc );
+		$ruc = self::normalize_ruc( $ruc );
 
 		if ( 13 !== strlen( $ruc ) ) {
-			return new WP_Error( 'invalid_length', __( 'El RUC debe tener exactamente 13 dígitos.', 'arriendo-facil' ) );
+			return new WP_Error( 'invalid_length', __( 'El RUC debe tener 13 dígitos, o bien ingrese su cédula (10 dígitos) para persona natural.', 'arriendo-facil' ) );
 		}
 
 		$province = (int) substr( $ruc, 0, 2 );

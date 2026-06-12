@@ -160,6 +160,41 @@ class Arriendo_Facil_Billing_Manager {
 			return new WP_Error( 'sri_cert_missing', __( 'Debe cargar y configurar el certificado digital (.p12).', 'arriendo-facil' ) );
 		}
 
+		// ── Cadena CA obligatoria ─────────────────────────────────────────────
+		// Sin los certificados CA intermedios en el XML firmado el SRI devuelve:
+		// error 39 "FIRMA INVALIDA – El certificado firmante no es válido".
+		// Solo aplica cuando el certificado NO es autofirmado (tiene un emisor
+		// distinto al sujeto, es decir, viene de una CA como BCE o SecurityData).
+		if ( '' === trim( $pems['chain'] ?? '' ) ) {
+			$cert_info  = openssl_x509_parse( $pems['cert'] );
+			$is_self_signed = is_array( $cert_info )
+				&& isset( $cert_info['subject'], $cert_info['issuer'] )
+				&& ( $cert_info['subject'] === $cert_info['issuer'] );
+
+			if ( ! $is_self_signed ) {
+				error_log( '[AF Billing] ADVERTENCIA: cadena CA vacía – intentando reconstruir desde AIA…' );
+				$rebuild = Arriendo_Facil_SRI_Config::rebuild_chain();
+				if ( ! is_wp_error( $rebuild ) ) {
+					$pems        = Arriendo_Facil_SRI_Config::get_cert_pems();
+					$chain_count = (int) preg_match_all( '/-----BEGIN CERTIFICATE-----/', $pems['chain'] );
+					error_log( '[AF Billing] Cadena CA reconstruida: ' . $chain_count . ' certificado(s) intermedio(s).' );
+				} else {
+					error_log( '[AF Billing] ERROR: no se pudo reconstruir la cadena CA: ' . $rebuild->get_error_message() );
+					return new WP_Error(
+						'sri_chain_missing',
+						__(
+							'Falta la cadena de certificados CA intermedios. ' .
+							'Ve a Facturación → Configuración → "Reconstruir cadena CA". ' .
+							'Si el botón falla, tu servidor no puede alcanzar los servidores BCE/SecurityData; ' .
+							'contacta a tu hosting para habilitar salidas HTTPS al puerto 443. ' .
+							'Sin esta cadena el SRI rechaza la firma con "El certificado firmante no es válido".',
+							'arriendo-facil'
+						)
+					);
+				}
+			}
+		}
+
 		$emission = $this->reserve_next_sequence();
 		if ( is_wp_error( $emission ) ) {
 			return $emission;

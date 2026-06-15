@@ -1,9 +1,58 @@
 <?php
 /**
- * XAdES-BES digital signature for SRI Ecuador electronic documents.
+ * XAdES-BES digital signature for SRI Ecuador electronic invoices (XAdES-BES).
  *
- * Produces an enveloped XAdES-BES XML signature that complies with
- * the SRI Ecuador technical specification (RSA-SHA256 + inclusive C14N).
+ * Produces an enveloped XAdES-BES XML signature with strict compliance to
+ * the SRI Ecuador technical specifications and Java/OpenXades validator.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * CRITICAL DESIGN DECISIONS (to prevent "FIRMA INVALIDA" / Error 39)
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * 1. SERIAL NUMBER OVERFLOW PREVENTION
+ *    ─────────────────────────────────
+ *    Modern certificates (Uanataca, ANF, Banco Central, Security Data) have
+ *    128-bit serial numbers. PHP's hexdec() overflows to float with scientific
+ *    notation. This class extracts the serialNumber directly from the parsed
+ *    array, then uses GMP or BCMath for hex-to-decimal conversion.
+ *    Result: <ds:X509SerialNumber> is a pure decimal string, never scientific.
+ *
+ * 2. ISSUER DN FORMATTING (RFC 2253 STRICT)
+ *    ──────────────────────────────────────
+ *    Separators must be commas WITHOUT spaces: CN=Alice,OU=IT,O=ACME
+ *    Not: CN=Alice, OU=IT, O=ACME (space after comma = FIRMA INVALIDA).
+ *    Option: If validation fails, use reverse_issuer_dn() to switch to
+ *    X.500 order (O=ACME,OU=IT,CN=Alice).
+ *
+ * 3. CERTIFICATE CHAIN IN SAME X509Data BLOCK
+ *    ─────────────────────────────────────────
+ *    User certificate FIRST, then intermediate(s), then root (if provided).
+ *    All in a single <ds:X509Data> block, not separate blocks.
+ *    This prevents Error 39 (chain validation failure).
+ *
+ * 4. NAMESPACE VISIBILITY & C14N SAFETY
+ *    ──────────────────────────────────
+ *    PHP DOMNode::C14N() has a quirk: namespace declarations added via
+ *    setAttributeNS() may not be visible to C14N on descendant nodes.
+ *    Fix: Serialize the full document after inserting the Signature
+ *    skeleton, then re-parse it. All subsequent C14N operations use
+ *    the fresh document (whose namespace context matches the SRI's parser).
+ *
+ * 5. TIMESTAMP TIMEZONE
+ *    ───────────────────
+ *    Must use America/Guayaquil (UTC-5). Server timezone doesn't matter.
+ *    Format: ISO 8601 with offset (YYYY-MM-DDThh:mm:ss-05:00).
+ *
+ * 6. CANONICALIZATION
+ *    ────────────────
+ *    Exclusive C14N (http://www.w3.org/2001/10/xml-exc-c14n#) causes
+ *    validation failures. Use inclusive C14N ONLY:
+ *    http://www.w3.org/TR/2001/REC-xml-c14n-20010315
+ *
+ * USAGE
+ * ─────
+ *    $signer = new Arriendo_Facil_SRI_Signer( $cert_pem, $pkey_pem, $chain_pem );
+ *    $signed_xml = $signer->sign( $unsigned_xml );
  *
  * @package Arriendo_Facil\Billing
  */
@@ -95,8 +144,10 @@ class Arriendo_Facil_SRI_Signer {
 		list( $modulus_b64, $exponent_b64 ) = $this->extract_rsa_components( $cert_pem );
 
 		// SRI requires the signing time in Ecuador local timezone (UTC-5 / America/Guayaquil).
+		// Format: ISO 8601 strict (YYYY-MM-DDThh:mm:ss±HH:MM).
 		// Using server-default timezone (often UTC) produces +00:00 and is rejected.
 		$signing_time = ( new DateTime( 'now', new DateTimeZone( 'America/Guayaquil' ) ) )->format( 'Y-m-d\TH:i:sP' );
+		// Result example: 2026-06-15T12:00:00-05:00 ✓
 		$chain_b64    = $this->parse_chain_pem( $this->chain_pem );
 
 		// ── PHASE 1: Compute #comprobante digest BEFORE Signature is inserted ──
@@ -289,6 +340,9 @@ class Arriendo_Facil_SRI_Signer {
 		// Entity certificate + X509IssuerSerial in the first X509Data block.
 		// SRI requires <ds:X509IssuerSerial> here (not only in etsi:IssuerSerial) to
 		// validate "El certificado firmante es válido".
+		// CRITICAL: Place issuer cert FIRST, then inject each CA cert <ds:X509Certificate>
+		// in the SAME <ds:X509Data> block to satisfy Error 39 validation. Chain order
+		// must be: User Cert → Intermediate(s) → Root (in nested DER/X509 encoding).
 		$x509d = $doc->createElementNS( $ds, 'ds:X509Data' );
 		$x509c = $doc->createElementNS( $ds, 'ds:X509Certificate' );
 		$x509c->appendChild( $doc->createTextNode( "\n" . chunk_split( $cert_b64, 76, "\n" ) ) );
@@ -299,16 +353,15 @@ class Arriendo_Facil_SRI_Signer {
 		$x509is->appendChild( $this->ds_el( $doc, 'ds:X509SerialNumber', $serial ) );
 		$x509d->appendChild( $x509is );
 
-		$ki->appendChild( $x509d );
-
-		// Each CA / intermediate certificate goes in its own X509Data block.
+		// Inject intermediate / CA certificates in the SAME X509Data block.
+		// Order matters: chain should be in ascending order (issuer → root).
 		foreach ( $chain_b64 as $ca_b64 ) {
-			$ca_x509d = $doc->createElementNS( $ds, 'ds:X509Data' );
-			$ca_el    = $doc->createElementNS( $ds, 'ds:X509Certificate' );
+			$ca_el = $doc->createElementNS( $ds, 'ds:X509Certificate' );
 			$ca_el->appendChild( $doc->createTextNode( "\n" . chunk_split( $ca_b64, 76, "\n" ) ) );
-			$ca_x509d->appendChild( $ca_el );
-			$ki->appendChild( $ca_x509d );
+			$x509d->appendChild( $ca_el );
 		}
+
+		$ki->appendChild( $x509d );
 
 		$kv  = $doc->createElementNS( $ds, 'ds:KeyValue' );
 		$rsa = $doc->createElementNS( $ds, 'ds:RSAKeyValue' );
@@ -378,6 +431,7 @@ class Arriendo_Facil_SRI_Signer {
 	private function build_issuer_dn( array $issuer ): string {
 		$parts = array();
 		// RFC 2253 order: most-specific first.
+		// CRITICAL: Use commas WITHOUT spaces (,) not (, ).
 		// Includes serialNumber (OID 2.5.4.5, DN attribute carrying RUC in some BCE/SecurityData
 		// issuer certs) and UID — missing these causes IssuerName mismatch → FIRMA INVALIDA.
 		foreach ( array( 'CN', 'UID', 'serialNumber', 'OU', 'O', 'L', 'ST', 'C' ) as $key ) {
@@ -399,7 +453,8 @@ class Arriendo_Facil_SRI_Signer {
 				$parts[] = $label . '=' . $escaped;
 			}
 		}
-		return implode( ', ', $parts );
+		// RFC 2253 strict: comma WITHOUT space separator
+		return implode( ',', $parts );
 	}
 
 	/**
@@ -407,35 +462,83 @@ class Arriendo_Facil_SRI_Signer {
 	 * for a given PEM certificate. Used for diagnostics.
 	 *
 	 * @param string $cert_pem PEM-encoded certificate.
+	 * @param bool   $reverse  If true, reverses the DN to X.500 order (C=...→CN=...).
+	 *                         Set to true if SRI validation fails with "IssuerName mismatch".
 	 * @return string Formatted issuer DN, or empty string on parse failure.
 	 */
-	public static function compute_issuer_dn( string $cert_pem ): string {
+	public static function compute_issuer_dn( string $cert_pem, bool $reverse = false ): string {
 		$info = openssl_x509_parse( $cert_pem );
 		if ( false === $info || empty( $info['issuer'] ) ) {
 			return '';
 		}
-		return ( new self( $cert_pem, '' ) )->build_issuer_dn( (array) $info['issuer'] );
+		$signer = new self( $cert_pem, '' );
+		$dn = $signer->build_issuer_dn( (array) $info['issuer'] );
+		if ( $reverse ) {
+			$dn = $signer->reverse_issuer_dn( $dn );
+		}
+		return $dn;
+	}
+
+	/**
+	 * Reverses an RFC 2253 DN from most-specific-first to least-specific-first (X.500 order).
+	 * Example: CN=Alice,OU=IT,O=ACME → O=ACME,OU=IT,CN=Alice
+	 *
+	 * @param string $dn An RFC 2253-formatted distinguished name (with comma separators).
+	 * @return string The DN in reversed order.
+	 */
+	private function reverse_issuer_dn( string $dn ): string {
+		// Split by comma, reverse array, rejoin.
+		$parts = explode( ',', $dn );
+		$parts = array_reverse( $parts );
+		return implode( ',', $parts );
 	}
 
 	private function cert_serial( array $cert_info ): string {
+		// CRITICAL: Never use hexdec() on large serial numbers (Uanataca, etc.).
+		// Large hex strings cause integer overflow → scientific notation floats.
+		// Prefer: (1) direct 'serialNumber' string if available, (2) GMP, (3) BCMath.
+
+		// Option 1: PHP's openssl_x509_parse() sometimes returns 'serialNumber' as
+		// a pre-converted string decimal. Use it directly (safest).
+		if ( isset( $cert_info['serialNumber'] ) && ! empty( $cert_info['serialNumber'] ) ) {
+			$serial = (string) $cert_info['serialNumber'];
+			// Ensure it's a pure decimal string, not scientific notation.
+			if ( is_numeric( $serial ) && false === strpos( $serial, 'e' ) ) {
+				return $serial;
+			}
+		}
+
+		// Option 2: Manual hex-to-decimal using GMP (handles arbitrary precision).
 		if ( ! empty( $cert_info['serialNumberHex'] ) ) {
 			$hex = ltrim( (string) $cert_info['serialNumberHex'], '0' );
 			if ( '' === $hex ) {
 				return '0';
 			}
 			if ( function_exists( 'gmp_strval' ) ) {
-				return gmp_strval( gmp_init( '0x' . $hex ) );
+				$gmp = gmp_init( '0x' . $hex );
+				return (string) gmp_strval( $gmp );
 			}
+
+			// Option 3: BCMath fallback (slower, but reliable).
 			if ( function_exists( 'bcadd' ) ) {
 				$dec = '0';
 				for ( $i = 0, $len = strlen( $hex ); $i < $len; $i++ ) {
-					$dec = bcadd( bcmul( $dec, '16' ), (string) hexdec( $hex[ $i ] ) );
+					$dec = (string) bcadd( (string) bcmul( $dec, '16' ), (string) hexdec( $hex[ $i ] ) );
 				}
 				return $dec;
 			}
-			return (string) hexdec( $hex );
+
+			// Option 4: Last resort (safe for serial numbers < PHP_INT_MAX).
+			// If this returns scientific notation, it will fail SRI validation.
+			$decimal = (int) hexdec( $hex );
+			if ( $decimal < 0 ) {
+				// Overflow occurred; try to at least preserve as string.
+				return '0';
+			}
+			return (string) $decimal;
 		}
-		return isset( $cert_info['serialNumber'] ) ? (string) (int) $cert_info['serialNumber'] : '0';
+
+		return '0';
 	}
 
 	private function extract_rsa_components( string $cert_pem ): array {
@@ -502,5 +605,99 @@ class Arriendo_Facil_SRI_Signer {
 			}
 		}
 		return $certs;
+	}
+
+	// ─── Diagnostics & validation ────────────────────────────────────────────
+
+	/**
+	 * Extracts all relevant fields from a certificate for debugging.
+	 * Useful to verify serial number, issuer DN, validity, etc.
+	 *
+	 * @param string $cert_pem PEM-encoded certificate.
+	 * @return array Associative array with 'subject', 'issuer', 'serial', 'valid_from', 'valid_to', 'purposes'.
+	 * @throws RuntimeException On parse failure.
+	 */
+	public static function cert_info_detailed( string $cert_pem ): array {
+		$info = openssl_x509_parse( $cert_pem );
+		if ( false === $info ) {
+			throw new RuntimeException( 'Failed to parse certificate.' );
+		}
+
+		$signer = new self( $cert_pem, '' );
+		return array(
+			'subject'    => isset( $info['subject'] ) ? (array) $info['subject'] : array(),
+			'issuer'     => isset( $info['issuer'] ) ? (array) $info['issuer'] : array(),
+			'issuer_dn'  => $signer->build_issuer_dn( (array) ( $info['issuer'] ?? array() ) ),
+			'serial'     => $signer->cert_serial( $info ),
+			'serial_hex' => isset( $info['serialNumberHex'] ) ? (string) $info['serialNumberHex'] : '',
+			'valid_from' => isset( $info['validFrom_time_t'] ) ? (int) $info['validFrom_time_t'] : 0,
+			'valid_to'   => isset( $info['validTo_time_t'] ) ? (int) $info['validTo_time_t'] : 0,
+			'purposes'   => isset( $info['purposes'] ) ? (array) $info['purposes'] : array(),
+		);
+	}
+
+	/**
+	 * Validates that a signed XML document contains all required Signature elements
+	 * and that the digest references are syntactically correct (not semantically validated).
+	 *
+	 * @param string $signed_xml XML document with <ds:Signature>.
+	 * @return bool True if structure is valid.
+	 * @throws RuntimeException On parse or structure validation failure.
+	 */
+	public static function validate_signature_structure( string $signed_xml ): bool {
+		$doc = new DOMDocument( '1.0', 'UTF-8' );
+		if ( ! $doc->loadXML( $signed_xml ) ) {
+			throw new RuntimeException( 'Cannot parse signed XML.' );
+		}
+
+		$xpath = new DOMXPath( $doc );
+		$xpath->registerNamespace( 'ds', self::XMLDSIG_NS );
+		$xpath->registerNamespace( 'etsi', self::XADES_NS );
+
+		// Verify <ds:Signature> exists.
+		$sig = $xpath->query( '//ds:Signature' )->item( 0 );
+		if ( ! $sig ) {
+			throw new RuntimeException( 'No <ds:Signature> found in document.' );
+		}
+
+		// Verify <ds:SignedInfo>.
+		$si = $xpath->query( '//ds:SignedInfo' )->item( 0 );
+		if ( ! $si ) {
+			throw new RuntimeException( 'No <ds:SignedInfo> found.' );
+		}
+
+		// Verify <ds:SignatureValue>.
+		$sv = $xpath->query( '//ds:SignatureValue' )->item( 0 );
+		if ( ! $sv || '' === trim( (string) $sv->nodeValue ) ) {
+			throw new RuntimeException( 'No <ds:SignatureValue> or empty value found.' );
+		}
+
+		// Verify references.
+		$refs = $xpath->query( '//ds:Reference' );
+		if ( $refs->length < 3 ) {
+			throw new RuntimeException( "Expected 3+ <ds:Reference> elements, found {$refs->length}." );
+		}
+
+		foreach ( $refs as $ref ) {
+			$dv = $ref->getElementsByTagNameNS( self::XMLDSIG_NS, 'DigestValue' )->item( 0 );
+			if ( ! $dv || '' === trim( (string) $dv->nodeValue ) ) {
+				$uri = $ref->getAttribute( 'URI' );
+				throw new RuntimeException( "Reference URI='{$uri}' has empty DigestValue." );
+			}
+		}
+
+		// Verify <etsi:SignedProperties>.
+		$sp = $xpath->query( '//etsi:SignedProperties' )->item( 0 );
+		if ( ! $sp ) {
+			throw new RuntimeException( 'No <etsi:SignedProperties> found.' );
+		}
+
+		// Verify <etsi:SigningTime>.
+		$st = $xpath->query( '//etsi:SigningTime' )->item( 0 );
+		if ( ! $st || '' === trim( (string) $st->nodeValue ) ) {
+			throw new RuntimeException( 'No <etsi:SigningTime> or empty value found.' );
+		}
+
+		return true;
 	}
 }

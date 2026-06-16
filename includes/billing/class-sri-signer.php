@@ -604,6 +604,18 @@ class Arriendo_Facil_SRI_Signer {
 				}
 			}
 		}
+
+		// ═══════════════════════════════════════════════════════════════════
+		// CHANGE #2: Log cadena CA para diagnóstico
+		// ═══════════════════════════════════════════════════════════════════
+		$cert_count = count( $certs );
+		error_log( '[AF SRI Signer] Cadena CA procesada: ' . $cert_count . ' certificado(s) intermedio(s)' );
+		if ( 0 === $cert_count && '' !== trim( $chain_pem ) ) {
+			error_log( '[AF SRI Signer] ⚠️ ADVERTENCIA: Cadena CA contiene texto pero no se pudo extraer certificados PEM válidos' );
+		} elseif ( 0 === $cert_count ) {
+			error_log( '[AF SRI Signer] ⚠️ ADVERTENCIA: Cadena CA está vacía - firma se enviará sin certificados intermedios' );
+		}
+
 		return $certs;
 	}
 

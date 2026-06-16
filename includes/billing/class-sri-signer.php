@@ -274,7 +274,8 @@ class Arriendo_Facil_SRI_Signer {
 		// traversal on descendant nodes, producing digest values that differ
 		// from what the SRI's parser computes.
 		$sig = $doc->createElementNS( $ds, 'ds:Signature' );
-		$sig->setAttribute( 'Id', 'Signature' );
+		$sig_uuid = 'xmldsig-' . self::generate_uuid();
+		$sig->setAttribute( 'Id', $sig_uuid );
 
 		// ── <ds:SignedInfo> ──────────────────────────────────────────────────
 		$si = $doc->createElementNS( $ds, 'ds:SignedInfo' );
@@ -430,10 +431,22 @@ class Arriendo_Facil_SRI_Signer {
 
 	private function build_issuer_dn( array $issuer ): string {
 		$parts = array();
+
+		// CRITICAL: OID 2.5.4.97 (organizationIdentifier) must come FIRST
+		// This field is present in EU/Spanish certificates (e.g., UANATACA: VATES-A66721499)
+		// Encoded as: 2.5.4.97=#0c0f... where 0c0f = UTF-8 string of length 15
+		// Without this, SRI rejects with "certificado no válido" for EU certificates.
+		$org_id = $this->extract_organization_identifier_from_cert( $this->cert_pem );
+		if ( '' !== $org_id ) {
+			// Encode as UTF-8 BER/DER: 0c = UTF8String tag, length, then hex value
+			$hex_value = bin2hex( $org_id );
+			$length    = strlen( $org_id );
+			$parts[]   = '2.5.4.97=#0c' . str_pad( dechex( $length ), 2, '0', STR_PAD_LEFT ) . $hex_value;
+		}
+
 		// RFC 2253 order: most-specific first.
 		// CRITICAL: Use commas WITHOUT spaces (,) not (, ).
-		// Includes serialNumber (OID 2.5.4.5, DN attribute carrying RUC in some BCE/SecurityData
-		// issuer certs) and UID — missing these causes IssuerName mismatch → FIRMA INVALIDA.
+		// Includes serialNumber (OID 2.5.4.5) and UID — missing these causes IssuerName mismatch.
 		foreach ( array( 'CN', 'UID', 'serialNumber', 'OU', 'O', 'L', 'ST', 'C' ) as $key ) {
 			if ( ! isset( $issuer[ $key ] ) ) {
 				continue;
@@ -453,6 +466,7 @@ class Arriendo_Facil_SRI_Signer {
 				$parts[] = $label . '=' . $escaped;
 			}
 		}
+
 		// RFC 2253 strict: comma WITHOUT space separator
 		return implode( ',', $parts );
 	}
@@ -617,6 +631,71 @@ class Arriendo_Facil_SRI_Signer {
 		}
 
 		return $certs;
+	}
+
+	// ─── UUID generation ────────────────────────────────────────────────────
+
+	/**
+	 * Generates a random UUID v4 (RFC 4122).
+	 * Used for Signature Id to ensure uniqueness per signature.
+	 *
+	 * @return string UUID v4 without dashes, e.g. "8d7a6209eeca43f3be5963ecd71a42e3"
+	 */
+	private static function generate_uuid(): string {
+		$bytes = random_bytes( 16 );
+		$bytes[6] = chr( ( ord( $bytes[6] ) & 0x0f ) | 0x40 ); // Version 4
+		$bytes[8] = chr( ( ord( $bytes[8] ) & 0x3f ) | 0x80 ); // Variant 1
+
+		return vsprintf(
+			'%s%s%s%s-%s%s-%s%s-%s%s-%s%s%s%s%s%s',
+			str_split( bin2hex( $bytes ), 1 )
+		);
+	}
+
+	// ─── OID extraction ─────────────────────────────────────────────────────
+
+	/**
+	 * Extracts organizationIdentifier (OID 2.5.4.97) from certificate.
+	 * Present in EU/Spanish certificates (UANATACA, etc.).
+	 * Required for SRI signature validation.
+	 *
+	 * @param string $cert_pem PEM-encoded certificate.
+	 * @return string Organization ID (e.g., "VATES-A66721499"), or empty if not found.
+	 */
+	private function extract_organization_identifier_from_cert( string $cert_pem ): string {
+		// Method 1: Try openssl_x509_parse with shortnames=false to get raw OID names
+		$cert_info = openssl_x509_parse( $cert_pem, false );
+		if ( is_array( $cert_info ) && isset( $cert_info['issuer'] ) ) {
+			$issuer = (array) $cert_info['issuer'];
+			// Check if 2.5.4.97 was parsed
+			if ( isset( $issuer['2.5.4.97'] ) ) {
+				return (string) $issuer['2.5.4.97'];
+			}
+		}
+
+		// Method 2: Extract via openssl CLI
+		$temp_pem = tempnam( sys_get_temp_dir(), 'cert_' );
+		file_put_contents( $temp_pem, $cert_pem );
+
+		$output = @shell_exec( 'openssl x509 -in ' . escapeshellarg( $temp_pem ) . ' -issuer -noout 2>/dev/null' );
+		@unlink( $temp_pem );
+
+		if ( null === $output ) {
+			return '';
+		}
+
+		// Parse: issuer= 2.5.4.97=#0c0f... or issuer=...2.5.4.97=...
+		if ( preg_match( '/2\.5\.4\.97=([^,]+)/', $output, $m ) ) {
+			$val = trim( $m[1] );
+			// If hex-encoded (#0c...), decode it
+			if ( str_starts_with( $val, '#' ) ) {
+				$hex = substr( $val, 3 ); // Skip "#0c" prefix (BER tag + length)
+				return hex2bin( $hex ) ?: '';
+			}
+			return $val;
+		}
+
+		return '';
 	}
 
 	// ─── Diagnostics & validation ────────────────────────────────────────────

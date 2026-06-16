@@ -1,6 +1,6 @@
 <?php
 /**
- * SRI XML Factura generator — schema version 2.1.0.
+ * SRI XML Factura generator — schema version 1.1.0.
  *
  * Generates the unsigned XML for an Ecuadorian electronic invoice following
  * the SRI technical specification. This class is purely presentational:
@@ -195,7 +195,7 @@ class Arriendo_Facil_SRI_XML_Factura {
 	// ─── XML builder ─────────────────────────────────────────────────────────
 
 	/**
-	 * Builds the unsigned XML string for an SRI factura (schema v2.1.0).
+	 * Builds the unsigned XML string for an SRI factura (schema v1.1.0).
 	 *
 	 * @param array $data Structured invoice data (see class docblock).
 	 * @return string Well-formed UTF-8 XML string.
@@ -208,7 +208,7 @@ class Arriendo_Facil_SRI_XML_Factura {
 		// ── Root ────────────────────────────────────────────────────────────
 		$root = $dom->createElement( 'factura' );
 		$root->setAttribute( 'id', 'comprobante' );
-		$root->setAttribute( 'version', '2.1.0' );
+		$root->setAttribute( 'version', '1.1.0' );
 		$dom->appendChild( $root );
 
 		// ── infoTributaria ──────────────────────────────────────────────────

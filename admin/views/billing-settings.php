@@ -249,6 +249,10 @@ $emission_points = $wpdb->get_results(
 						class="regular-text" maxlength="13" pattern="\d{10,13}"
 						placeholder="1717012890 o 1717012890001"
 						required />
+					<button type="button" id="af-ruc-lookup-btn" class="button" style="margin-left:8px;">
+						<?php esc_html_e( '🔍 Consultar en SRI', 'arriendo-facil' ); ?>
+					</button>
+					<span id="af-ruc-lookup-status" style="margin-left:8px; font-style:italic;"></span>
 				</td>
 			</tr>
 			<tr>
@@ -259,7 +263,7 @@ $emission_points = $wpdb->get_results(
 					<input type="text" id="af_razon_social" name="af_razon_social"
 						value="<?php echo esc_attr( $cfg['razon_social'] ); ?>"
 						class="large-text" maxlength="300" required />
-					<p class="description"><?php esc_html_e( 'Tal como aparece en el RUC del SRI.', 'arriendo-facil' ); ?></p>
+					<p class="description"><?php esc_html_e( 'Tal como aparece en el RUC del SRI. Auto-completado al consultar el RUC.', 'arriendo-facil' ); ?></p>
 				</td>
 			</tr>
 			<tr>
@@ -284,7 +288,7 @@ $emission_points = $wpdb->get_results(
 						value="<?php echo esc_attr( $cfg['dir_establecimiento'] ); ?>"
 						class="large-text" maxlength="300" placeholder="Ej: Quito, Pichincha, Calle X Nº123" required />
 					<p class="description">
-						<?php esc_html_e( 'Dirección física del establecimiento registrada en el SRI.', 'arriendo-facil' ); ?>
+						<?php esc_html_e( 'Dirección física del establecimiento (se extrae del SRI al consultar el RUC). Si está vacía, completa manualmente.', 'arriendo-facil' ); ?>
 					</p>
 				</td>
 			</tr>
@@ -324,7 +328,7 @@ $emission_points = $wpdb->get_results(
 							<?php esc_html_e( 'SI', 'arriendo-facil' ); ?>
 						</label>
 					</fieldset>
-					<p class="description"><?php esc_html_e( 'Seleccione según su situación tributaria.', 'arriendo-facil' ); ?></p>
+					<p class="description"><?php esc_html_e( 'Auto-completado al consultar el RUC.', 'arriendo-facil' ); ?></p>
 				</td>
 			</tr>
 			<tr>

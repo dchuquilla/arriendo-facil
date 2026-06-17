@@ -1604,55 +1604,6 @@
 		}
 	} );
 
-	// RUC Lookup functionality
-	$( document ).on( 'click', '#af-ruc-lookup-btn', function ( e ) {
-		e.preventDefault();
-
-		var $btn = $( this );
-		var $status = $( '#af-ruc-lookup-status' );
-		var ruc = $( '#af_ruc' ).val().trim().replace( /\D/g, '' );
-
-		if ( ruc.length !== 13 ) {
-			$status.text( '❌ El RUC debe tener 13 dígitos' ).css( 'color', '#d32f2f' );
-			return;
-		}
-
-		$btn.prop( 'disabled', true ).text( '⏳ Consultando...' );
-		$status.text( '' ).css( 'color', '#666' );
-
-		$.post( afAdmin.ajaxUrl, {
-			action: 'af_sri_ruc_lookup',
-			nonce: afAdmin.billingNonce,
-			ruc: ruc,
-		} )
-			.done( function ( response ) {
-				if ( response.success && response.data ) {
-					$( '#af_razon_social' ).val( response.data.razon_social || '' );
-					$( '#af_nombre_comercial' ).val( response.data.nombre_comercial || '' );
-					var dirEstab = response.data.dir_establecimiento || '';
-					$( '#af_dir_establecimiento' ).val( dirEstab );
-					$( '#af_dir_matriz' ).val( dirEstab ).data( 'af-prev-estab', dirEstab.trim() );
-
-					// Set obligado_contabilidad radio button
-					if ( response.data.obligado_contabilidad ) {
-						$( 'input[name="af_obligado_contabilidad"][value="' + response.data.obligado_contabilidad + '"]' ).prop( 'checked', true );
-					}
-
-					$status.text( '✅ Datos cargados desde el SRI' ).css( 'color', '#2e7d32' );
-					$( '#af_dir_establecimiento' ).trigger( 'change' ); // Validate address
-					afUpdateDirMatrizBadge();
-				} else {
-					$status.text( '❌ ' + ( response.data ? response.data.message : 'No se pudo consultar el RUC' ) ).css( 'color', '#d32f2f' );
-				}
-			} )
-			.fail( function () {
-				$status.text( '❌ Error de conexión' ).css( 'color', '#d32f2f' );
-			} )
-			.always( function () {
-				$btn.prop( 'disabled', false ).text( '🔍 Consultar en SRI' );
-			} );
-	} );
-
 	// ─── Auto-fill y badge: Dirección Matriz = Dirección del Establecimiento ─
 	function afUpdateDirMatrizBadge() {
 		var $estabEl = $( '#af_dir_establecimiento' );

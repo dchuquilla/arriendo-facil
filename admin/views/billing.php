@@ -1,6 +1,6 @@
 <?php
 /**
- * Facturación Electrónica – listado de comprobantes.
+ * Facturación Electrónica – listado de comprobantes con actualización asincrónica.
  *
  * @package Arriendo_Facil
  */
@@ -53,17 +53,17 @@ if ( ! isset( $invoices ) ) {
 $cfg = Arriendo_Facil_SRI_Config::get();
 
 $estado_labels = array(
-	'generada'   => array( 'label' => __( 'Generada', 'arriendo-facil' ),   'color' => '#757575' ),
-	'firmada'    => array( 'label' => __( 'Firmada', 'arriendo-facil' ),    'color' => '#455a64' ),
-	'enviada'    => array( 'label' => __( 'Enviada', 'arriendo-facil' ),    'color' => '#1565c0' ),
-	'autorizada' => array( 'label' => __( 'Autorizada', 'arriendo-facil' ), 'color' => '#2e7d32' ),
-	'autorizada_sin_ride' => array( 'label' => __( 'Autorizada sin RIDE', 'arriendo-facil' ), 'color' => '#2e7d32' ),
-	'error_envio' => array( 'label' => __( 'Error envio', 'arriendo-facil' ), 'color' => '#c62828' ),
-	'error_autorizacion' => array( 'label' => __( 'Error autorizacion', 'arriendo-facil' ), 'color' => '#c62828' ),
-	'devuelta'   => array( 'label' => __( 'Devuelta', 'arriendo-facil' ),   'color' => '#c62828' ),
-	'no_autorizada' => array( 'label' => __( 'No autorizada', 'arriendo-facil' ), 'color' => '#c62828' ),
-	'rechazada'  => array( 'label' => __( 'Rechazada', 'arriendo-facil' ),  'color' => '#c62828' ),
-	'anulada'    => array( 'label' => __( 'Anulada', 'arriendo-facil' ),    'color' => '#e65100' ),
+	'generada'   => array( 'label' => __( 'Generada', 'arriendo-facil' ),   'color' => '#757575', 'icon' => '○', 'grupo' => 'en_proceso' ),
+	'firmada'    => array( 'label' => __( 'Firmada', 'arriendo-facil' ),    'color' => '#455a64', 'icon' => '○', 'grupo' => 'en_proceso' ),
+	'enviada'    => array( 'label' => __( 'Enviada', 'arriendo-facil' ),    'color' => '#1565c0', 'icon' => '⟳', 'grupo' => 'en_proceso' ),
+	'autorizada' => array( 'label' => __( 'Autorizada', 'arriendo-facil' ), 'color' => '#2e7d32', 'icon' => '✓', 'grupo' => 'autorizado' ),
+	'autorizada_sin_ride' => array( 'label' => __( 'Autorizada sin RIDE', 'arriendo-facil' ), 'color' => '#2e7d32', 'icon' => '✓', 'grupo' => 'autorizado' ),
+	'error_envio' => array( 'label' => __( 'Error envío', 'arriendo-facil' ), 'color' => '#c62828', 'icon' => '✕', 'grupo' => 'error' ),
+	'error_autorizacion' => array( 'label' => __( 'Error autorización', 'arriendo-facil' ), 'color' => '#c62828', 'icon' => '✕', 'grupo' => 'error' ),
+	'devuelta'   => array( 'label' => __( 'Devuelta', 'arriendo-facil' ),   'color' => '#c62828', 'icon' => '↺', 'grupo' => 'error' ),
+	'no_autorizada' => array( 'label' => __( 'No autorizada', 'arriendo-facil' ), 'color' => '#c62828', 'icon' => '✕', 'grupo' => 'error' ),
+	'rechazada'  => array( 'label' => __( 'Rechazada', 'arriendo-facil' ),  'color' => '#c62828', 'icon' => '✕', 'grupo' => 'error' ),
+	'anulada'    => array( 'label' => __( 'Anulada', 'arriendo-facil' ),    'color' => '#e65100', 'icon' => '–', 'grupo' => 'error' ),
 );
 
 $last_action_message = '';
@@ -112,7 +112,7 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 
 	<?php if ( '2' === $cfg['ambiente'] ) : ?>
 		<div class="notice notice-warning inline" style="margin-bottom:16px;">
-			<p><strong><?php esc_html_e( 'Ambiente: PRODUCCIÓN', 'arriendo-facil' ); ?></strong></p>
+			<p><strong><?php esc_html_e( '⚠ Ambiente: PRODUCCIÓN', 'arriendo-facil' ); ?></strong></p>
 		</div>
 	<?php else : ?>
 		<div class="notice notice-info inline" style="margin-bottom:16px;">
@@ -134,7 +134,6 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 	<div style="margin: 16px 0 18px; padding: 14px 16px; background: #fff; border: 1px solid #dcdcde; border-radius: 4px;">
 		<h2 style="margin-top:0;"><?php esc_html_e( 'Emisión Manual de Comprobante', 'arriendo-facil' ); ?></h2>
 
-		<!-- ── Live lease search ──────────────────────────────────── -->
 		<div style="margin-bottom:12px;">
 			<label for="af-lease-search-input" style="display:block; font-weight:600; margin-bottom:4px;">
 				<?php esc_html_e( 'Buscar contrato (cédula / RUC / pasaporte / nombre)', 'arriendo-facil' ); ?>
@@ -157,154 +156,168 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 		</form>
 	</div>
 
-	<!-- ── Search / filter issued invoices ───────────────────────────── -->
+	<!-- ── Tabs de Estado ───────────────────────────────────────────────── -->
 	<?php if ( ! empty( $invoices ) ) : ?>
-	<div style="margin-bottom:12px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-		<label for="af-invoice-filter" style="font-weight:600;"><?php esc_html_e( 'Filtrar comprobantes:', 'arriendo-facil' ); ?></label>
-		<input type="search" id="af-invoice-filter"
-			placeholder="<?php esc_attr_e( 'Cédula/RUC, nombre, inmueble, número…', 'arriendo-facil' ); ?>"
-			class="regular-text" />
-		<span id="af-invoice-filter-count" style="color:#555; font-size:13px;"></span>
-	</div>
-	<?php endif; ?>
+	<div style="margin-bottom:16px;">
+		<div style="display:flex; gap:0; border-bottom:2px solid #dcdcde; margin-bottom:0; flex-wrap:wrap;">
+			<button type="button" class="af-invoice-tab-btn" data-tab="autorizadas" style="padding:12px 16px; font-weight:600; border:none; background:none; cursor:pointer; color:#555; border-bottom:3px solid transparent; transition:all 0.2s;">
+				<span style="font-size:18px; margin-right:6px;">✓</span> <?php esc_html_e( 'Autorizadas', 'arriendo-facil' ); ?>
+				<span class="af-invoice-count" data-status="autorizadas" style="background:#2e7d32; color:#fff; border-radius:12px; padding:2px 8px; font-size:12px; margin-left:8px; min-width:24px; text-align:center;">0</span>
+			</button>
+			<button type="button" class="af-invoice-tab-btn" data-tab="en_proceso" style="padding:12px 16px; font-weight:600; border:none; background:none; cursor:pointer; color:#555; border-bottom:3px solid transparent; transition:all 0.2s;">
+				<span style="font-size:18px; margin-right:6px;">⟳</span> <?php esc_html_e( 'En Proceso', 'arriendo-facil' ); ?>
+				<span class="af-invoice-count" data-status="en_proceso" style="background:#1565c0; color:#fff; border-radius:12px; padding:2px 8px; font-size:12px; margin-left:8px; min-width:24px; text-align:center;">0</span>
+			</button>
+			<button type="button" class="af-invoice-tab-btn" data-tab="error" style="padding:12px 16px; font-weight:600; border:none; background:none; cursor:pointer; color:#555; border-bottom:3px solid transparent; transition:all 0.2s;">
+				<span style="font-size:18px; margin-right:6px;">✕</span> <?php esc_html_e( 'Con Errores', 'arriendo-facil' ); ?>
+				<span class="af-invoice-count" data-status="error" style="background:#c62828; color:#fff; border-radius:12px; padding:2px 8px; font-size:12px; margin-left:8px; min-width:24px; text-align:center;">0</span>
+			</button>
+			<span style="flex:1; display:flex; align-items:center; justify-content:flex-end; padding-right:16px; color:#999; font-size:12px; gap:8px;">
+				<span id="af-last-update-time" style="min-width:120px; text-align:right;">—</span>
+				<button type="button" id="af-refresh-invoices" style="background:none; border:none; color:#0073aa; cursor:pointer; font-weight:600; padding:4px 8px; white-space:nowrap;">
+					🔄 <?php esc_html_e( 'Actualizar', 'arriendo-facil' ); ?>
+				</button>
+			</span>
+		</div>
 
-	<?php if ( empty( $invoices ) ) : ?>
-		<p style="margin-top:24px; color:#555;">
-			<?php esc_html_e( 'Aún no se han emitido comprobantes electrónicos. Los comprobantes se generarán automáticamente al aprobar un contrato de arriendo.', 'arriendo-facil' ); ?>
-		</p>
-	<?php else : ?>
+		<!-- ── Search / filter ──────────────────────────────────────── -->
+		<div style="margin:12px 0 12px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; background:#f9f9f9; padding:10px 12px; border-radius:3px;">
+			<label for="af-invoice-filter" style="font-weight:600; margin:0;"><?php esc_html_e( 'Filtrar:', 'arriendo-facil' ); ?></label>
+			<input type="search" id="af-invoice-filter"
+				placeholder="<?php esc_attr_e( 'Cédula/RUC, nombre, inmueble, número…', 'arriendo-facil' ); ?>"
+				class="regular-text" />
+			<span id="af-invoice-filter-count" style="color:#999; font-size:12px; margin-left:auto;"></span>
+		</div>
+
+		<!-- ── Invoices Table ──────────────────────────────────────── -->
 		<table class="wp-list-table widefat fixed striped" id="af-invoices-table">
 			<thead>
 				<tr>
-					<th style="width:60px;"><?php esc_html_e( '#', 'arriendo-facil' ); ?></th>
+					<th style="width:50px;">#</th>
 					<th><?php esc_html_e( 'Comprobante', 'arriendo-facil' ); ?></th>
 					<th><?php esc_html_e( 'Cliente', 'arriendo-facil' ); ?></th>
 					<th><?php esc_html_e( 'Inmueble', 'arriendo-facil' ); ?></th>
-					<th><?php esc_html_e( 'Total', 'arriendo-facil' ); ?></th>
-					<th><?php esc_html_e( 'IVA', 'arriendo-facil' ); ?></th>
-					<th><?php esc_html_e( 'Estado SRI', 'arriendo-facil' ); ?></th>
-					<th><?php esc_html_e( 'Fecha', 'arriendo-facil' ); ?></th>
-					<th><?php esc_html_e( 'Acciones', 'arriendo-facil' ); ?></th>
+					<th style="width:90px;"><?php esc_html_e( 'Total', 'arriendo-facil' ); ?></th>
+					<th><?php esc_html_e( 'Estado', 'arriendo-facil' ); ?></th>
+					<th style="width:80px;"><?php esc_html_e( 'Fecha', 'arriendo-facil' ); ?></th>
+					<th style="width:120px;"><?php esc_html_e( 'Acciones', 'arriendo-facil' ); ?></th>
 				</tr>
 			</thead>
-			<tbody>
+			<tbody id="af-invoices-tbody">
 				<?php foreach ( $invoices as $inv ) : ?>
 					<?php
 					$estado_info = isset( $estado_labels[ $inv->estado ] )
 						? $estado_labels[ $inv->estado ]
-						: array( 'label' => esc_html( $inv->estado ), 'color' => '#555' );
+						: array( 'label' => esc_html( $inv->estado ), 'color' => '#555', 'icon' => '?', 'grupo' => 'otro' );
 					$guest_label = isset( $inv->guest_name ) ? trim( (string) $inv->guest_name ) : '';
 					$guest_id    = isset( $inv->guest_id_number ) ? (string) $inv->guest_id_number : '';
+					$grupo       = $estado_info['grupo'] ?? 'otro';
+					$errores_raw = (string) ( $inv->errores ?? '' );
+					$mensajes_decoded = '' !== $errores_raw ? json_decode( $errores_raw, true ) : null;
+					$has_mensajes = is_array( $mensajes_decoded ) && ! empty( $mensajes_decoded );
 					?>
-					<tr data-search="<?php echo esc_attr( strtolower( $guest_label . ' ' . $guest_id . ' ' . (string) $inv->accommodation_title . ' ' . (string) $inv->numero_comprobante . ' ' . (string) $inv->clave_acceso ) ); ?>">
-						<td><?php echo esc_html( $inv->id ); ?></td>
+					<tr data-search="<?php echo esc_attr( strtolower( $guest_label . ' ' . $guest_id . ' ' . (string) $inv->accommodation_title . ' ' . (string) $inv->numero_comprobante ) ); ?>" data-grupo="<?php echo esc_attr( $grupo ); ?>" data-invoice-id="<?php echo (int) $inv->id; ?>" data-estado="<?php echo esc_attr( $inv->estado ); ?>">
+						<td style="font-weight:600;"><?php echo esc_html( $inv->id ); ?></td>
 						<td>
 							<?php if ( $inv->numero_comprobante ) : ?>
-								<strong><?php echo esc_html( $inv->numero_comprobante ); ?></strong><br />
+								<strong style="font-size:13px;"><?php echo esc_html( $inv->numero_comprobante ); ?></strong><br />
 							<?php endif; ?>
 							<?php if ( $inv->clave_acceso ) : ?>
-								<small style="word-break:break-all; color:#555;">
-									<?php echo esc_html( $inv->clave_acceso ); ?>
+								<small style="word-break:break-all; color:#888;">
+									<?php echo esc_html( substr( (string) $inv->clave_acceso, 0, 16 ) . '…' ); ?>
 								</small>
 							<?php endif; ?>
 						</td>
 						<td>
 							<?php if ( '' !== $guest_label ) : ?>
-								<strong><?php echo esc_html( $guest_label ); ?></strong><br />
+								<strong style="font-size:13px;"><?php echo esc_html( $guest_label ); ?></strong><br />
 							<?php endif; ?>
 							<?php if ( '' !== $guest_id ) : ?>
-								<small style="color:#666;"><?php echo esc_html( $guest_id ); ?></small>
+								<small style="color:#888;"><?php echo esc_html( $guest_id ); ?></small>
 							<?php endif; ?>
 						</td>
-						<td><?php echo esc_html( $inv->accommodation_title ?: '—' ); ?></td>
-						<td>$ <?php echo esc_html( number_format( (float) $inv->total, 2 ) ); ?></td>
-						<td>$ <?php echo esc_html( number_format( (float) $inv->iva_valor, 2 ) ); ?></td>
+						<td style="font-size:13px;"><?php echo esc_html( $inv->accommodation_title ?: '—' ); ?></td>
+						<td style="font-weight:600; color:#2e7d32; text-align:right;">$ <?php echo esc_html( number_format( (float) $inv->total, 2 ) ); ?></td>
 						<td>
-							<span style="font-weight:600; color:<?php echo esc_attr( $estado_info['color'] ); ?>;">
+							<span style="font-weight:600; color:<?php echo esc_attr( $estado_info['color'] ); ?>; display:inline-flex; align-items:center; gap:6px;">
+								<span style="font-size:16px;"><?php echo esc_html( $estado_info['icon'] ); ?></span>
 								<?php echo esc_html( $estado_info['label'] ); ?>
 							</span>
+							<?php if ( $has_mensajes ) : ?>
+								<button type="button" class="af-toggle-error-details" style="margin-left:8px; background:none; border:none; color:#c62828; cursor:pointer; text-decoration:underline; padding:0; font-size:11px;">
+									<?php esc_html_e( 'detalles', 'arriendo-facil' ); ?>
+								</button>
+							<?php endif; ?>
+						</td>
+						<td style="font-size:12px; color:#888;">
+							<?php echo esc_html( wp_date( 'd/m/Y', strtotime( $inv->created_at ) ) ); ?>
 						</td>
 						<td>
-							<?php echo esc_html( wp_date( 'd/m/Y H:i', strtotime( $inv->created_at ) ) ); ?>
-						</td>
-						<td>
-							<?php if ( $inv->ride_path && file_exists( $inv->ride_path ) ) : ?>
-								<a href="<?php echo esc_url( admin_url( 'admin-ajax.php?action=af_download_ride&id=' . (int) $inv->id . '&nonce=' . wp_create_nonce( 'af_billing_nonce' ) ) ); ?>"
-									class="button button-small">
-									<?php esc_html_e( 'RIDE', 'arriendo-facil' ); ?>
-								</a>
-							<?php endif; ?>
-							<?php if ( $inv->xml_autorizacion ) : ?>
-								<a href="<?php echo esc_url( admin_url( 'admin-ajax.php?action=af_download_xml&id=' . (int) $inv->id . '&nonce=' . wp_create_nonce( 'af_billing_nonce' ) ) ); ?>"
-									class="button button-small">
-									<?php esc_html_e( 'XML', 'arriendo-facil' ); ?>
-								</a>
-							<?php elseif ( $inv->xml_firmado ) : ?>
-								<a href="<?php echo esc_url( admin_url( 'admin-ajax.php?action=af_download_xml&id=' . (int) $inv->id . '&nonce=' . wp_create_nonce( 'af_billing_nonce' ) ) ); ?>"
-									class="button button-small">
-									<?php esc_html_e( 'XML Firmado', 'arriendo-facil' ); ?>
-								</a>
-							<?php endif; ?>
-
-							<?php if ( in_array( (string) $inv->estado, array( 'error_envio', 'error_autorizacion', 'devuelta', 'no_autorizada', 'autorizada_sin_ride' ), true ) ) : ?>
-								<form method="post" style="display:inline-block; margin-left:4px;">
-									<?php wp_nonce_field( 'af_billing_retry_invoice' ); ?>
-									<input type="hidden" name="invoice_id" value="<?php echo (int) $inv->id; ?>" />
-									<button type="submit" name="af_retry_invoice_submit" class="button button-small">
-										<?php esc_html_e( 'Reintentar', 'arriendo-facil' ); ?>
-									</button>
-								</form>
-							<?php endif; ?>
-							<button type="button" class="button button-small af-sri-log-btn"
-								data-invoice-id="<?php echo (int) $inv->id; ?>"
-								data-nonce="<?php echo esc_attr( wp_create_nonce( 'af_billing_nonce' ) ); ?>"
-								style="margin-left:4px; color:#0073aa;">
-								<?php esc_html_e( 'Log SRI', 'arriendo-facil' ); ?>
-							</button>
+							<div style="display:flex; gap:4px; flex-wrap:wrap;">
+								<?php if ( $inv->ride_path && file_exists( $inv->ride_path ) ) : ?>
+									<a href="<?php echo esc_url( admin_url( 'admin-ajax.php?action=af_download_ride&id=' . (int) $inv->id . '&nonce=' . wp_create_nonce( 'af_billing_nonce' ) ) ); ?>"
+										class="button button-small" style="padding:4px 8px; font-size:11px;">
+										<?php esc_html_e( 'RIDE', 'arriendo-facil' ); ?>
+									</a>
+								<?php endif; ?>
+								<?php if ( $inv->xml_autorizacion ) : ?>
+									<a href="<?php echo esc_url( admin_url( 'admin-ajax.php?action=af_download_xml&id=' . (int) $inv->id . '&nonce=' . wp_create_nonce( 'af_billing_nonce' ) ) ); ?>"
+										class="button button-small" style="padding:4px 8px; font-size:11px;">
+										<?php esc_html_e( 'XML', 'arriendo-facil' ); ?>
+									</a>
+								<?php elseif ( $inv->xml_firmado ) : ?>
+									<a href="<?php echo esc_url( admin_url( 'admin-ajax.php?action=af_download_xml&id=' . (int) $inv->id . '&nonce=' . wp_create_nonce( 'af_billing_nonce' ) ) ); ?>"
+										class="button button-small" style="padding:4px 8px; font-size:11px;">
+										<?php esc_html_e( 'XML', 'arriendo-facil' ); ?>
+									</a>
+								<?php endif; ?>
+								<?php if ( in_array( (string) $inv->estado, array( 'error_envio', 'error_autorizacion', 'devuelta', 'no_autorizada', 'autorizada_sin_ride' ), true ) ) : ?>
+									<form method="post" style="display:inline;">
+										<?php wp_nonce_field( 'af_billing_retry_invoice' ); ?>
+										<input type="hidden" name="invoice_id" value="<?php echo (int) $inv->id; ?>" />
+										<button type="submit" name="af_retry_invoice_submit" class="button button-small" style="padding:4px 8px; font-size:11px;">
+											<?php esc_html_e( 'Reintentar', 'arriendo-facil' ); ?>
+										</button>
+									</form>
+								<?php endif; ?>
+							</div>
 						</td>
 					</tr>
-					<?php
-					$errores_raw      = (string) ( $inv->errores ?? '' );
-					$mensajes_decoded = '' !== $errores_raw ? json_decode( $errores_raw, true ) : null;
-					$has_mensajes     = is_array( $mensajes_decoded ) && ! empty( $mensajes_decoded );
-					if ( $has_mensajes || ( '' !== $errores_raw && '[]' !== $errores_raw ) ) :
-					?>
-						<tr>
-							<td></td>
-							<td colspan="7" style="background:#fff8f8; color:#7f1d1d; font-size:12px; word-break:break-word; padding:6px 8px;">
-								<?php if ( $has_mensajes ) : ?>
-									<strong><?php esc_html_e( 'Mensajes SRI:', 'arriendo-facil' ); ?></strong>
-									<ul style="margin:4px 0 0 16px; padding:0;">
+					<?php if ( $has_mensajes ) : ?>
+						<tr class="af-error-details" style="display:none; background:#fef5f5;">
+							<td colspan="8" style="padding:12px; border-left:4px solid #c62828;">
+								<strong style="color:#c62828; display:block; margin-bottom:6px;"><?php esc_html_e( 'Detalles del error:', 'arriendo-facil' ); ?></strong>
+								<ul style="margin:0; padding:0 0 0 20px;">
 									<?php foreach ( $mensajes_decoded as $msg ) :
-										$tipo  = strtoupper( (string) ( $msg['tipo'] ?? '' ) );
-										$id    = (string) ( $msg['identificador'] ?? '' );
+										$tipo = strtoupper( (string) ( $msg['tipo'] ?? '' ) );
 										$texto = (string) ( $msg['mensaje'] ?? '' );
-										$info  = (string) ( $msg['informacionAdicional'] ?? '' );
-										$color = 'ERROR' === $tipo ? '#c62828' : '#92400e';
+										$info = (string) ( $msg['informacionAdicional'] ?? '' );
+										$color = 'ERROR' === $tipo ? '#c62828' : '#b45700';
 									?>
-										<li style="margin-bottom:2px; color:<?php echo esc_attr( $color ); ?>">
-											<strong>[<?php echo esc_html( $tipo ); ?><?php if ( $id ) echo ' ' . esc_html( $id ); ?>]</strong>
+										<li style="margin:4px 0; color:<?php echo esc_attr( $color ); ?>; font-size:12px;">
+											<strong><?php echo esc_html( $tipo ); ?>:</strong>
 											<?php echo esc_html( $texto ); ?>
-											<?php if ( $info ) echo ' &mdash; <em>' . esc_html( $info ) . '</em>'; ?>
+											<?php if ( $info ) echo ' — ' . esc_html( $info ); ?>
 										</li>
 									<?php endforeach; ?>
-									</ul>
-								<?php else : ?>
-									<strong><?php esc_html_e( 'Detalle error:', 'arriendo-facil' ); ?></strong>
-									<?php echo esc_html( $errores_raw ); ?>
-								<?php endif; ?>
+								</ul>
 							</td>
 						</tr>
 					<?php endif; ?>
 				<?php endforeach; ?>
 			</tbody>
 		</table>
+	</div>
+	<?php else : ?>
+		<p style="margin-top:24px; color:#888; text-align:center; padding:40px 20px;">
+			<?php esc_html_e( 'Aún no se han emitido comprobantes. Los comprobantes se generarán automáticamente al aprobar un contrato.', 'arriendo-facil' ); ?>
+		</p>
 	<?php endif; ?>
 </div><!-- .wrap -->
 
 <script>
 (function () {
-	// ── 1. Live lease search for manual issue form ──────────────────────────
+	// ── 1. Live lease search ──────────────────────────────────────────
 	var searchInput  = document.getElementById( 'af-lease-search-input' );
 	var resultsList  = document.getElementById( 'af-lease-search-results' );
 	var spinner      = document.getElementById( 'af-lease-search-spinner' );
@@ -366,111 +379,170 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 		} );
 	}
 
-	// ── 2. Client-side filter for invoices table ────────────────────────────
+	// ── 2. Tab navigation & filtering ──────────────────────────────────
+	var tabBtns = document.querySelectorAll( '.af-invoice-tab-btn' );
 	var filterInput = document.getElementById( 'af-invoice-filter' );
 	var filterCount = document.getElementById( 'af-invoice-filter-count' );
-	var table       = document.getElementById( 'af-invoices-table' );
+	var tbody = document.getElementById( 'af-invoices-tbody' );
+	var table = document.getElementById( 'af-invoices-table' );
 
-	if ( filterInput && table ) {
-		filterInput.addEventListener( 'input', function () {
-			var q    = this.value.toLowerCase().trim();
-			var rows = table.querySelectorAll( 'tbody tr[data-search]' );
-			var vis  = 0;
-			rows.forEach( function ( row ) {
-				var match = q === '' || row.dataset.search.indexOf( q ) !== -1;
-				row.style.display = match ? '' : 'none';
-				if ( match ) vis++;
-			} );
-			if ( filterCount ) {
-				filterCount.textContent = q ? '(' + vis + ' <?php echo esc_js( __( 'resultados', 'arriendo-facil' ) ); ?>)' : '';
+	var activeTab = 'autorizadas';
+
+	function updateCounts() {
+		if ( ! tbody ) return;
+		var counts = { autorizadas: 0, en_proceso: 0, error: 0 };
+		tbody.querySelectorAll( 'tr[data-grupo]' ).forEach( function ( row ) {
+			var grupo = row.dataset.grupo;
+			if ( grupo && counts.hasOwnProperty( grupo ) ) {
+				counts[ grupo ]++;
 			}
 		} );
+
+		document.querySelectorAll( '.af-invoice-count' ).forEach( function ( el ) {
+			var status = el.dataset.status;
+			el.textContent = counts[ status ] || '0';
+		} );
 	}
-}());
 
-// ── 3. Log SRI modal ───────────────────────────────────────────────────────
-(function () {
-	// Create modal overlay once.
-	var overlay = document.createElement( 'div' );
-	overlay.id  = 'af-sri-log-overlay';
-	overlay.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:999998;overflow:auto;';
+	function filterTable() {
+		if ( ! tbody ) return;
+		var q = ( filterInput && filterInput.value.toLowerCase().trim() ) || '';
+		var visibleCount = 0;
 
-	var modal = document.createElement( 'div' );
-	modal.style.cssText = 'position:relative;background:#fff;margin:40px auto;padding:24px;max-width:860px;border-radius:4px;box-shadow:0 4px 24px rgba(0,0,0,.3);';
+		tbody.querySelectorAll( 'tr' ).forEach( function ( row ) {
+			var grupoRow = row.dataset.grupo;
+			var isDataRow = grupoRow !== undefined;
+			var isErrorDetail = row.classList.contains( 'af-error-details' );
 
-	var closeBtn = document.createElement( 'button' );
-	closeBtn.type        = 'button';
-	closeBtn.textContent = '✕';
-	closeBtn.style.cssText = 'position:absolute;top:10px;right:14px;background:none;border:none;font-size:18px;cursor:pointer;color:#555;';
-	closeBtn.addEventListener( 'click', function () { overlay.style.display = 'none'; } );
+			if ( isErrorDetail ) {
+				var prevRow = row.previousElementSibling;
+				row.style.display = prevRow && prevRow.style.display !== 'none' ? '' : 'none';
+				return;
+			}
 
-	var title = document.createElement( 'h2' );
-	title.style.margin = '0 0 16px';
+			if ( ! isDataRow ) return;
 
-	var content = document.createElement( 'div' );
-	content.id = 'af-sri-log-content';
+			var matchGroup = !activeTab || grupoRow === activeTab;
+			var matchFilter = !q || row.dataset.search.indexOf( q ) !== -1;
+			var show = matchGroup && matchFilter;
 
-	modal.appendChild( closeBtn );
-	modal.appendChild( title );
-	modal.appendChild( content );
-	overlay.appendChild( modal );
-	document.body.appendChild( overlay );
+			row.style.display = show ? '' : 'none';
+			if ( show ) visibleCount++;
+		} );
 
-	overlay.addEventListener( 'click', function ( e ) {
-		if ( e.target === overlay ) { overlay.style.display = 'none'; }
-	} );
+		if ( filterCount ) {
+			filterCount.textContent = q ? '(' + visibleCount + ' <?php echo esc_js( __( 'resultados', 'arriendo-facil' ) ); ?>)' : '';
+		}
+	}
 
-	document.addEventListener( 'keydown', function ( e ) {
-		if ( 'Escape' === e.key ) { overlay.style.display = 'none'; }
-	} );
-
-	document.querySelectorAll( '.af-sri-log-btn' ).forEach( function ( btn ) {
+	tabBtns.forEach( function ( btn ) {
 		btn.addEventListener( 'click', function () {
-			var invoiceId = this.dataset.invoiceId;
-			var nonce     = this.dataset.nonce;
+			var tab = this.dataset.tab;
+			activeTab = tab;
 
-			title.textContent = '<?php echo esc_js( __( 'Log SRI — factura #', 'arriendo-facil' ) ); ?>' + invoiceId;
-			content.innerHTML = '<p><?php echo esc_js( __( 'Cargando…', 'arriendo-facil' ) ); ?></p>';
-			overlay.style.display = 'block';
-
-			var fd = new FormData();
-			fd.append( 'action',     'af_sri_log_view' );
-			fd.append( 'invoice_id', invoiceId );
-			fd.append( 'nonce',      nonce );
-
-			fetch( '<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>', {
-				method: 'POST', body: fd, credentials: 'same-origin',
-			} )
-			.then( function ( r ) { return r.json(); } )
-			.then( function ( resp ) {
-				if ( ! resp.success ) {
-					content.innerHTML = '<p style="color:#c62828;">' + ( resp.data && resp.data.message ? resp.data.message : '<?php echo esc_js( __( 'Error al cargar el log.', 'arriendo-facil' ) ); ?>' ) + '</p>';
-					return;
-				}
-				var entries = resp.data.entries || [];
-				if ( ! entries.length ) {
-					content.innerHTML = '<p><?php echo esc_js( __( 'Sin registros en el log para esta factura.', 'arriendo-facil' ) ); ?></p>';
-					return;
-				}
-
-				var html = '';
-				entries.forEach( function ( e ) {
-					var color = e.http && e.http >= 400 ? '#c62828' : '#1b5e20';
-					html += '<details style="margin-bottom:12px;border:1px solid #ddd;border-radius:3px;">'
-						+ '<summary style="padding:8px 12px;cursor:pointer;font-weight:600;color:' + color + ';">'
-						+ e.tipo + ' &nbsp;<small style="font-weight:normal;color:#555;">' + e.fecha + '</small>'
-						+ ( e.http ? ' &nbsp;<code>HTTP ' + e.http + '</code>' : '' )
-						+ '</summary>'
-						+ '<pre style="margin:0;padding:12px;background:#f8f8f8;overflow:auto;font-size:11px;white-space:pre-wrap;word-break:break-all;">'
-						+ e.respuesta.replace( /&/g, '&amp;' ).replace( /</g, '&lt;' ).replace( />/g, '&gt;' )
-						+ '</pre></details>';
-				} );
-				content.innerHTML = html;
-			} )
-			.catch( function () {
-				content.innerHTML = '<p style="color:#c62828;"><?php echo esc_js( __( 'Error de red al consultar el log.', 'arriendo-facil' ) ); ?></p>';
+			tabBtns.forEach( function ( b ) {
+				b.style.borderBottomColor = b.dataset.tab === tab ? '#0073aa' : 'transparent';
+				b.style.color = b.dataset.tab === tab ? '#0073aa' : '#555';
 			} );
+
+			filterTable();
 		} );
 	} );
+
+	if ( filterInput ) {
+		filterInput.addEventListener( 'input', filterTable );
+	}
+
+	// Toggle error details
+	document.addEventListener( 'click', function ( e ) {
+		if ( e.target.classList.contains( 'af-toggle-error-details' ) ) {
+			var detailRow = e.target.closest( 'tr' ).nextElementSibling;
+			if ( detailRow && detailRow.classList.contains( 'af-error-details' ) ) {
+				detailRow.style.display = detailRow.style.display === 'none' ? '' : 'none';
+			}
+		}
+	} );
+
+	// Initial setup
+	updateCounts();
+	filterTable();
+
+	// ── 3. Async refresh ──────────────────────────────────────────────
+	var refreshBtn = document.getElementById( 'af-refresh-invoices' );
+	var lastUpdateTime = document.getElementById( 'af-last-update-time' );
+	var autoRefreshInterval = 30000;
+	var lastRefresh = Date.now();
+
+	function updateLastRefreshTime() {
+		var now = Date.now();
+		var diff = Math.floor( ( now - lastRefresh ) / 1000 );
+		if ( diff < 60 ) {
+			lastUpdateTime.textContent = '<?php echo esc_js( __( 'Actualizado hace', 'arriendo-facil' ) ); ?> ' + diff + ' seg.';
+		} else {
+			var mins = Math.floor( diff / 60 );
+			lastUpdateTime.textContent = '<?php echo esc_js( __( 'Actualizado hace', 'arriendo-facil' ) ); ?> ' + mins + ' min.';
+		}
+	}
+
+	function refreshInvoices() {
+		if ( ! tbody || ! table ) return;
+
+		var fd = new FormData();
+		fd.append( 'action', 'af_get_invoices_async' );
+		fd.append( 'nonce', '<?php echo esc_js( wp_create_nonce( 'af_billing_nonce' ) ); ?>' );
+
+		refreshBtn.style.opacity = '0.6';
+		refreshBtn.disabled = true;
+
+		fetch( '<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>', {
+			method: 'POST',
+			body: fd,
+			credentials: 'same-origin',
+		} )
+		.then( function ( r ) { return r.json(); } )
+		.then( function ( resp ) {
+			if ( resp.success && resp.data && resp.data.invoices ) {
+				var invoices = resp.data.invoices;
+				var currentIds = new Set();
+				tbody.querySelectorAll( 'tr[data-invoice-id]' ).forEach( function ( row ) {
+					currentIds.add( parseInt( row.dataset.invoiceId ) );
+				} );
+
+				invoices.forEach( function ( inv ) {
+					var row = tbody.querySelector( 'tr[data-invoice-id="' + inv.id + '"]' );
+					if ( row ) {
+						var statusCell = row.querySelectorAll( 'td' )[ 5 ];
+						if ( statusCell && row.dataset.estado !== inv.estado ) {
+							statusCell.style.animation = 'pulse 0.5s';
+							row.dataset.estado = inv.estado;
+							row.dataset.grupo = inv.grupo;
+						}
+					}
+				} );
+
+				updateCounts();
+				filterTable();
+				lastRefresh = Date.now();
+				updateLastRefreshTime();
+			}
+		} )
+		.catch( function () {} )
+		.finally( function () {
+			refreshBtn.style.opacity = '1';
+			refreshBtn.disabled = false;
+		} );
+	}
+
+	if ( refreshBtn ) {
+		refreshBtn.addEventListener( 'click', refreshInvoices );
+	}
+
+	setInterval( updateLastRefreshTime, 1000 );
+	setInterval( refreshInvoices, autoRefreshInterval );
+
+	// CSS animation
+	var style = document.createElement( 'style' );
+	style.textContent = '@keyframes pulse { 0% { background-color: #fff9e6; } 50% { background-color: #fff; } 100% { background-color: #fff9e6; } }';
+	document.head.appendChild( style );
 }());
 </script>

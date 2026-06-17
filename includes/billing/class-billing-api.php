@@ -39,6 +39,7 @@ class Arriendo_Facil_Billing_API {
 		add_action( 'wp_ajax_af_sri_ruc_lookup', array( $this, 'ajax_sri_ruc_lookup' ) );
 		add_action( 'wp_ajax_af_billing_lease_search', array( $this, 'ajax_billing_lease_search' ) );
 		add_action( 'wp_ajax_af_sri_log_view',         array( $this, 'ajax_sri_log_view' ) );
+		add_action( 'wp_ajax_af_get_invoices_async',   array( $this, 'ajax_get_invoices_async' ) );
 
 		add_filter( 'cron_schedules', array( $this, 'register_retry_schedule' ) );
 		add_action( 'init', array( $this, 'maybe_schedule_retry_cron' ) );
@@ -507,5 +508,65 @@ class Arriendo_Facil_Billing_API {
 		);
 
 		wp_send_json_success( array( 'leases' => array_values( (array) $results ) ) );
+	}
+
+	/**
+	 * AJAX: get invoices async for live UI updates (tab counts, status changes).
+	 * Returns basic invoice data to detect state changes without full page refresh.
+	 */
+	public function ajax_get_invoices_async(): void {
+		check_ajax_referer( 'af_billing_nonce', 'nonce' );
+
+		if ( ! $this->can_manage_billing() ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		global $wpdb;
+
+		$is_owner_view = class_exists( 'Arriendo_Facil_Accommodation' ) && Arriendo_Facil_Accommodation::user_is_owner();
+		$owner_where   = '';
+		if ( $is_owner_view ) {
+			$owner_acc_ids = Arriendo_Facil_Accommodation::get_owner_accommodation_ids( get_current_user_id() );
+			if ( empty( $owner_acc_ids ) ) {
+				wp_send_json_success( array( 'invoices' => array() ) );
+				return;
+			}
+			$owner_ids_sql = implode( ',', array_map( 'intval', $owner_acc_ids ) );
+			$owner_where   = " AND l.accommodation_id IN ($owner_ids_sql)";
+		}
+
+		$results = $wpdb->get_results(
+			"SELECT ei.id, ei.estado, ei.numero_comprobante
+			 FROM {$wpdb->prefix}af_electronic_invoices ei
+			 LEFT JOIN {$wpdb->prefix}af_leases l ON l.id = ei.lease_id
+			 WHERE 1=1 {$owner_where}
+			 ORDER BY ei.created_at DESC
+			 LIMIT 200"
+		);
+
+		$estado_labels = array(
+			'generada'   => 'en_proceso',
+			'firmada'    => 'en_proceso',
+			'enviada'    => 'en_proceso',
+			'autorizada' => 'autorizado',
+			'autorizada_sin_ride' => 'autorizado',
+			'error_envio' => 'error',
+			'error_autorizacion' => 'error',
+			'devuelta'   => 'error',
+			'no_autorizada' => 'error',
+			'rechazada'  => 'error',
+			'anulada'    => 'error',
+		);
+
+		$invoices = array_map( function ( $inv ) use ( $estado_labels ) {
+			return array(
+				'id'    => (int) $inv->id,
+				'estado' => (string) $inv->estado,
+				'grupo' => $estado_labels[ (string) $inv->estado ] ?? 'otro',
+				'numero' => (string) $inv->numero_comprobante,
+			);
+		}, (array) $results );
+
+		wp_send_json_success( array( 'invoices' => $invoices ) );
 	}
 }

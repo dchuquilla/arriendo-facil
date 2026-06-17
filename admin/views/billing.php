@@ -108,6 +108,13 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 		<div class="notice notice-info is-dismissible" style="margin-top:12px;">
 			<p><?php echo esc_html( $last_action_message ); ?></p>
 		</div>
+		<?php if ( strpos( $last_action_message, 'correctamente' ) !== false ) : ?>
+			<script>
+				setTimeout( function () {
+					location.reload();
+				}, 2000 );
+			</script>
+		<?php endif; ?>
 	<?php endif; ?>
 
 	<?php if ( '2' === $cfg['ambiente'] ) : ?>
@@ -467,11 +474,24 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 	updateCounts();
 	filterTable();
 
+	// Auto-refresh on page load if just submitted
+	if ( hasJustSubmitted && tbody ) {
+		setTimeout( function () {
+			refreshInvoices();
+		}, 1000 );
+	}
+
 	// ── 3. Async refresh ──────────────────────────────────────────────
 	var refreshBtn = document.getElementById( 'af-refresh-invoices' );
 	var lastUpdateTime = document.getElementById( 'af-last-update-time' );
-	var autoRefreshInterval = 30000;
+	var autoRefreshInterval = 15000;
 	var lastRefresh = Date.now();
+	var hasJustSubmitted = false;
+
+	// Detect if page just loaded after form submission
+	if ( window.performance && window.performance.navigation ) {
+		hasJustSubmitted = window.performance.navigation.type === 1; // Page reload
+	}
 
 	function updateLastRefreshTime() {
 		var now = Date.now();
@@ -491,8 +511,10 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 		fd.append( 'action', 'af_get_invoices_async' );
 		fd.append( 'nonce', '<?php echo esc_js( wp_create_nonce( 'af_billing_nonce' ) ); ?>' );
 
-		refreshBtn.style.opacity = '0.6';
-		refreshBtn.disabled = true;
+		if ( refreshBtn ) {
+			refreshBtn.style.opacity = '0.6';
+			refreshBtn.disabled = true;
+		}
 
 		fetch( '<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>', {
 			method: 'POST',
@@ -528,8 +550,10 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 		} )
 		.catch( function () {} )
 		.finally( function () {
-			refreshBtn.style.opacity = '1';
-			refreshBtn.disabled = false;
+			if ( refreshBtn ) {
+				refreshBtn.style.opacity = '1';
+				refreshBtn.disabled = false;
+			}
 		} );
 	}
 

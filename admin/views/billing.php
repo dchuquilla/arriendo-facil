@@ -56,8 +56,8 @@ $estado_labels = array(
 	'generada'   => array( 'label' => __( 'Generada', 'arriendo-facil' ),   'color' => '#757575', 'icon' => '○', 'grupo' => 'en_proceso' ),
 	'firmada'    => array( 'label' => __( 'Firmada', 'arriendo-facil' ),    'color' => '#455a64', 'icon' => '○', 'grupo' => 'en_proceso' ),
 	'enviada'    => array( 'label' => __( 'Enviada', 'arriendo-facil' ),    'color' => '#1565c0', 'icon' => '⟳', 'grupo' => 'en_proceso' ),
-	'autorizada' => array( 'label' => __( 'Autorizada', 'arriendo-facil' ), 'color' => '#2e7d32', 'icon' => '✓', 'grupo' => 'autorizado' ),
-	'autorizada_sin_ride' => array( 'label' => __( 'Autorizada sin RIDE', 'arriendo-facil' ), 'color' => '#2e7d32', 'icon' => '✓', 'grupo' => 'autorizado' ),
+	'autorizada' => array( 'label' => __( 'Autorizada', 'arriendo-facil' ), 'color' => '#2e7d32', 'icon' => '✓', 'grupo' => 'autorizadas' ),
+	'autorizada_sin_ride' => array( 'label' => __( 'Autorizada sin RIDE', 'arriendo-facil' ), 'color' => '#2e7d32', 'icon' => '✓', 'grupo' => 'autorizadas' ),
 	'error_envio' => array( 'label' => __( 'Error envío', 'arriendo-facil' ), 'color' => '#c62828', 'icon' => '✕', 'grupo' => 'error' ),
 	'error_autorizacion' => array( 'label' => __( 'Error autorización', 'arriendo-facil' ), 'color' => '#c62828', 'icon' => '✕', 'grupo' => 'error' ),
 	'devuelta'   => array( 'label' => __( 'Devuelta', 'arriendo-facil' ),   'color' => '#c62828', 'icon' => '↺', 'grupo' => 'error' ),
@@ -470,17 +470,6 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 		}
 	} );
 
-	// Initial setup
-	updateCounts();
-	filterTable();
-
-	// Auto-refresh on page load if just submitted
-	if ( hasJustSubmitted && tbody ) {
-		setTimeout( function () {
-			refreshInvoices();
-		}, 1000 );
-	}
-
 	// ── 3. Async refresh ──────────────────────────────────────────────
 	var refreshBtn = document.getElementById( 'af-refresh-invoices' );
 	var lastUpdateTime = document.getElementById( 'af-last-update-time' );
@@ -491,6 +480,17 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 	// Detect if page just loaded after form submission
 	if ( window.performance && window.performance.navigation ) {
 		hasJustSubmitted = window.performance.navigation.type === 1; // Page reload
+	}
+
+	// Initial setup
+	updateCounts();
+	filterTable();
+
+	// Auto-refresh on page load if just submitted
+	if ( hasJustSubmitted && tbody ) {
+		setTimeout( function () {
+			refreshInvoices();
+		}, 1000 );
 	}
 
 	function updateLastRefreshTime() {

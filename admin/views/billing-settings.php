@@ -208,9 +208,43 @@ $emission_points = $wpdb->get_results(
 	"SELECT * FROM {$wpdb->prefix}af_emission_points ORDER BY codigo_establecimiento, codigo_punto_emision"
 );
 
+$af_has_emitter_data = ( '' !== trim( (string) $cfg['ruc'] ) && '' !== trim( (string) $cfg['razon_social'] ) && '' !== trim( (string) $cfg['dir_establecimiento'] ) && '' !== trim( (string) $cfg['email_notificacion'] ) );
+$af_cert_ready       = ( '' !== $cert_path && $cert_has_pwd && $cert_has_pems );
+$af_points_ready     = ! empty( $emission_points );
+
 ?>
 <div class="wrap">
 	<h1><?php esc_html_e( 'Configuración SRI – Facturación Electrónica', 'arriendo-facil' ); ?></h1>
+
+	<div class="af-sri-hero">
+		<div class="af-sri-hero__content">
+			<p class="af-sri-hero__eyebrow"><?php esc_html_e( 'Guía rápida de configuración', 'arriendo-facil' ); ?></p>
+			<h2 class="af-sri-hero__title"><?php esc_html_e( 'Configura el SRI sin perderte en la pantalla', 'arriendo-facil' ); ?></h2>
+			<p class="af-sri-hero__text"><?php esc_html_e( 'Completa primero los datos del emisor, luego sube el certificado y finalmente crea tu punto de emisión. Todo lo necesario para emitir está reunido aquí.', 'arriendo-facil' ); ?></p>
+		</div>
+		<div class="af-sri-hero__links">
+			<a class="button button-secondary" href="#af-sri-datos-emisor"><?php esc_html_e( '1. Datos del emisor', 'arriendo-facil' ); ?></a>
+			<a class="button button-secondary" href="#af-sri-certificado"><?php esc_html_e( '2. Certificado', 'arriendo-facil' ); ?></a>
+			<a class="button button-secondary" href="#af-sri-puntos"><?php esc_html_e( '3. Puntos de emisión', 'arriendo-facil' ); ?></a>
+		</div>
+		<div class="af-sri-status-grid">
+			<div class="af-sri-status-card <?php echo $af_has_emitter_data ? 'is-ready' : 'is-pending'; ?>">
+				<span class="af-sri-status-card__label"><?php esc_html_e( 'Datos del emisor', 'arriendo-facil' ); ?></span>
+				<strong class="af-sri-status-card__value"><?php echo esc_html( $af_has_emitter_data ? __( 'Completo', 'arriendo-facil' ) : __( 'Pendiente', 'arriendo-facil' ) ); ?></strong>
+				<span class="af-sri-status-card__hint"><?php esc_html_e( 'RUC, razón social, dirección y email.', 'arriendo-facil' ); ?></span>
+			</div>
+			<div class="af-sri-status-card <?php echo $af_cert_ready ? 'is-ready' : 'is-pending'; ?>">
+				<span class="af-sri-status-card__label"><?php esc_html_e( 'Certificado', 'arriendo-facil' ); ?></span>
+				<strong class="af-sri-status-card__value"><?php echo esc_html( $af_cert_ready ? __( 'Listo', 'arriendo-facil' ) : __( 'Pendiente', 'arriendo-facil' ) ); ?></strong>
+				<span class="af-sri-status-card__hint"><?php esc_html_e( 'P12/PFX, contraseña y cadena CA.', 'arriendo-facil' ); ?></span>
+			</div>
+			<div class="af-sri-status-card <?php echo $af_points_ready ? 'is-ready' : 'is-pending'; ?>">
+				<span class="af-sri-status-card__label"><?php esc_html_e( 'Puntos de emisión', 'arriendo-facil' ); ?></span>
+				<strong class="af-sri-status-card__value"><?php echo esc_html( $af_points_ready ? __( 'Configurados', 'arriendo-facil' ) : __( 'Falta crear', 'arriendo-facil' ) ); ?></strong>
+				<span class="af-sri-status-card__hint"><?php esc_html_e( 'Serie y secuencial para facturar.', 'arriendo-facil' ); ?></span>
+			</div>
+		</div>
+	</div>
 
 	<?php if ( $af_sri_notice ) : ?>
 		<div class="notice notice-<?php echo esc_attr( $af_sri_notice['type'] ); ?> is-dismissible">
@@ -234,11 +268,18 @@ $emission_points = $wpdb->get_results(
 	<?php endif; ?>
 
 	<!-- ─── Datos del Emisor ──────────────────────────────────────────────── -->
+	<div class="af-sri-section" id="af-sri-datos-emisor">
+		<div class="af-sri-section__header">
+			<div>
+				<h2><?php esc_html_e( 'Datos del Emisor', 'arriendo-facil' ); ?></h2>
+				<p class="description"><?php esc_html_e( 'Esta es la base de la configuración. Si ya consultaste el RUC, revisa que el sistema haya traído los datos correctos antes de guardar.', 'arriendo-facil' ); ?></p>
+			</div>
+			<span class="af-sri-section__pill"><?php esc_html_e( 'Paso 1', 'arriendo-facil' ); ?></span>
+		</div>
 	<form method="post" action="">
 		<?php wp_nonce_field( 'af_sri_settings_nonce' ); ?>
 
-		<h2><?php esc_html_e( 'Datos del Emisor', 'arriendo-facil' ); ?></h2>
-		<p class="description" style="margin-bottom:20px;">
+		<p class="description af-sri-section__intro">
 			<?php esc_html_e( 'Información requerida por el SRI para emitir comprobantes válidos. Los campos marcados con * son obligatorios.', 'arriendo-facil' ); ?>
 		</p>
 		<table class="form-table" role="presentation">
@@ -414,11 +455,17 @@ $emission_points = $wpdb->get_results(
 			</button>
 		</p>
 	</form>
-
-	<hr />
+	</div>
 
 	<!-- ─── Certificado Digital ──────────────────────────────────────────── -->
-	<h2><?php esc_html_e( 'Certificado Digital (P12)', 'arriendo-facil' ); ?></h2>
+	<div class="af-sri-section" id="af-sri-certificado">
+		<div class="af-sri-section__header">
+			<div>
+				<h2><?php esc_html_e( 'Certificado Digital (P12)', 'arriendo-facil' ); ?></h2>
+				<p class="description"><?php esc_html_e( 'Sube el certificado, guarda su contraseña y confirma que la cadena CA quedó lista para evitar errores de firma.', 'arriendo-facil' ); ?></p>
+			</div>
+			<span class="af-sri-section__pill"><?php esc_html_e( 'Paso 2', 'arriendo-facil' ); ?></span>
+		</div>
 
 	<table class="form-table" role="presentation">
 		<tr>
@@ -496,14 +543,17 @@ $emission_points = $wpdb->get_results(
 		</form>
 
 	<?php endif; ?>
-
-	<hr />
+	</div>
 
 	<!-- ─── Puntos de Emisión ────────────────────────────────────────────── -->
-	<h2><?php esc_html_e( 'Puntos de Emisión', 'arriendo-facil' ); ?></h2>
-	<p class="description">
-		<?php esc_html_e( 'Cada comprobante se asocia a un establecimiento y punto de emisión (serie). El punto activo con el secuencial más bajo se utiliza por defecto.', 'arriendo-facil' ); ?>
-	</p>
+	<div class="af-sri-section" id="af-sri-puntos">
+		<div class="af-sri-section__header">
+			<div>
+				<h2><?php esc_html_e( 'Puntos de Emisión', 'arriendo-facil' ); ?></h2>
+				<p class="description"><?php esc_html_e( 'Cada comprobante se asocia a un establecimiento y punto de emisión (serie). El punto activo con el secuencial más bajo se utiliza por defecto.', 'arriendo-facil' ); ?></p>
+			</div>
+			<span class="af-sri-section__pill"><?php esc_html_e( 'Paso 3', 'arriendo-facil' ); ?></span>
+		</div>
 
 	<?php if ( $emission_points ) : ?>
 		<table class="wp-list-table widefat fixed striped" style="max-width:800px;">
@@ -538,7 +588,7 @@ $emission_points = $wpdb->get_results(
 		</table>
 		<br />
 	<?php else : ?>
-		<p style="color:#c62828;"><?php esc_html_e( 'No hay puntos de emisión configurados. Agregue al menos uno.', 'arriendo-facil' ); ?></p>
+		<p class="af-sri-empty-state"><?php esc_html_e( 'No hay puntos de emisión configurados. Agregue al menos uno para poder facturar.', 'arriendo-facil' ); ?></p>
 	<?php endif; ?>
 
 	<h3><?php esc_html_e( 'Agregar / Actualizar Punto de Emisión', 'arriendo-facil' ); ?></h3>
@@ -591,6 +641,7 @@ $emission_points = $wpdb->get_results(
 			</button>
 		</p>
 	</form>
+	</div>
 
 </div><!-- .wrap -->
 

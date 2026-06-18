@@ -33,7 +33,6 @@ class Arriendo_Facil_Billing_API {
 
 		add_action( 'af_lease_activated', array( $this, 'handle_lease_activated' ), 10, 1 );
 		add_action( 'wp_ajax_af_issue_invoice', array( $this, 'ajax_issue_invoice' ) );
-		add_action( 'wp_ajax_af_preview_invoice', array( $this, 'ajax_preview_invoice' ) );
 		add_action( 'wp_ajax_af_retry_invoice', array( $this, 'ajax_retry_invoice' ) );
 		add_action( 'wp_ajax_af_download_ride', array( $this, 'ajax_download_ride' ) );
 		add_action( 'wp_ajax_af_download_xml', array( $this, 'ajax_download_xml' ) );
@@ -102,17 +101,6 @@ class Arriendo_Facil_Billing_API {
 			wp_send_json_error( array( 'message' => __( 'Lease ID invalido.', 'arriendo-facil' ) ), 400 );
 		}
 
-		$overrides = $this->extract_issue_overrides();
-		if ( is_wp_error( $overrides ) ) {
-			wp_send_json_error(
-				array(
-					'message' => $overrides->get_error_message(),
-					'code'    => $overrides->get_error_code(),
-				),
-				400
-			);
-		}
-
 		// Server-side lock: prevents duplicate submissions within 30 s (double-click, race condition).
 		$period   = Arriendo_Facil_Billing_Manager::billing_period();
 		$lock_key = 'af_inv_lock_' . $lease_id . '_' . substr( md5( $period ), 0, 8 );
@@ -127,13 +115,7 @@ class Arriendo_Facil_Billing_API {
 		}
 		set_transient( $lock_key, 1, 30 );
 
-		$result = $this->manager->issue_lease_invoice(
-			$lease_id,
-			array_merge(
-				array( 'billing_period' => $period ),
-				$overrides
-			)
-		);
+		$result = $this->manager->issue_lease_invoice( $lease_id, array( 'billing_period' => $period ) );
 
 		// Release lock immediately if the request failed (allows fast retry on real errors).
 		if ( is_wp_error( $result ) ) {
@@ -164,52 +146,6 @@ class Arriendo_Facil_Billing_API {
 			}
 
 			wp_send_json_error( $response, 400 );
-		}
-
-		wp_send_json_success( $result );
-	}
-
-	/**
-	 * AJAX: returns editable preview data before issuing an invoice.
-	 */
-	public function ajax_preview_invoice(): void {
-		check_ajax_referer( 'af_billing_nonce', 'nonce' );
-
-		if ( ! $this->can_manage_billing() ) {
-			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
-		}
-
-		$lease_id = isset( $_POST['lease_id'] ) ? absint( wp_unslash( $_POST['lease_id'] ) ) : 0;
-		if ( $lease_id <= 0 ) {
-			wp_send_json_error( array( 'message' => __( 'Lease ID invalido.', 'arriendo-facil' ) ), 400 );
-		}
-
-		$overrides = $this->extract_issue_overrides();
-		if ( is_wp_error( $overrides ) ) {
-			wp_send_json_error(
-				array(
-					'message' => $overrides->get_error_message(),
-					'code'    => $overrides->get_error_code(),
-				),
-				400
-			);
-		}
-
-		$period  = Arriendo_Facil_Billing_Manager::billing_period();
-		$result  = $this->manager->preview_lease_invoice(
-			$lease_id,
-			$overrides,
-			array( 'billing_period' => $period )
-		);
-
-		if ( is_wp_error( $result ) ) {
-			wp_send_json_error(
-				array(
-					'message' => $result->get_error_message(),
-					'code'    => $result->get_error_code(),
-				),
-				400
-			);
 		}
 
 		wp_send_json_success( $result );
@@ -382,91 +318,6 @@ class Arriendo_Facil_Billing_API {
 	private function can_manage_billing(): bool {
 		$default_capability = apply_filters( 'af_billing_capability', 'manage_options' );
 		return current_user_can( (string) $default_capability );
-	}
-
-	/**
-	 * Reads and sanitizes supported invoice overrides from request payload.
-	 *
-	 * Accepts JSON object in POST field 'overrides'.
-	 * Supported keys: descripcion, cantidad, precio_unitario, descuento, email.
-	 *
-	 * @return array|WP_Error
-	 */
-	private function extract_issue_overrides() {
-		if ( ! isset( $_POST['overrides'] ) ) {
-			return array();
-		}
-
-		$raw = wp_unslash( $_POST['overrides'] );
-		if ( ! is_string( $raw ) || '' === trim( $raw ) ) {
-			return array();
-		}
-
-		$decoded = json_decode( $raw, true );
-		if ( ! is_array( $decoded ) ) {
-			return new WP_Error( 'invalid_overrides', __( 'Formato de edición inválido.', 'arriendo-facil' ) );
-		}
-
-		$overrides = array();
-		$item      = array();
-
-		if ( isset( $decoded['descripcion'] ) ) {
-			$descripcion = sanitize_text_field( (string) $decoded['descripcion'] );
-			if ( '' === trim( $descripcion ) ) {
-				return new WP_Error( 'invalid_description', __( 'La descripción no puede estar vacía.', 'arriendo-facil' ) );
-			}
-			$item['descripcion'] = $descripcion;
-		}
-
-		if ( isset( $decoded['cantidad'] ) ) {
-			$cantidad = (float) $decoded['cantidad'];
-			if ( $cantidad <= 0 ) {
-				return new WP_Error( 'invalid_quantity', __( 'La cantidad debe ser mayor a 0.', 'arriendo-facil' ) );
-			}
-			if ( $cantidad > 999999 ) {
-				return new WP_Error( 'invalid_quantity', __( 'La cantidad excede el límite permitido.', 'arriendo-facil' ) );
-			}
-			$item['cantidad'] = $cantidad;
-		}
-
-		if ( isset( $decoded['precio_unitario'] ) ) {
-			$precio_unitario = (float) $decoded['precio_unitario'];
-			if ( $precio_unitario < 0 ) {
-				return new WP_Error( 'invalid_unit_price', __( 'El precio unitario no puede ser negativo.', 'arriendo-facil' ) );
-			}
-			if ( $precio_unitario > 99999999 ) {
-				return new WP_Error( 'invalid_unit_price', __( 'El precio unitario excede el límite permitido.', 'arriendo-facil' ) );
-			}
-			$item['precio_unitario'] = $precio_unitario;
-		}
-
-		if ( isset( $decoded['descuento'] ) ) {
-			$descuento = (float) $decoded['descuento'];
-			if ( $descuento < 0 ) {
-				return new WP_Error( 'invalid_discount', __( 'El descuento no puede ser negativo.', 'arriendo-facil' ) );
-			}
-			$item['descuento'] = $descuento;
-		}
-
-		if ( ! empty( $item ) ) {
-			$overrides['items'] = array( $item );
-		}
-
-		if ( isset( $decoded['email'] ) ) {
-			$email_raw = trim( (string) $decoded['email'] );
-			if ( '' !== $email_raw ) {
-				$email = sanitize_email( $email_raw );
-				if ( '' === $email ) {
-					return new WP_Error( 'invalid_email', __( 'El email ingresado no es válido.', 'arriendo-facil' ) );
-				}
-
-				$overrides['info_adicional'] = array(
-					'email' => $email,
-				);
-			}
-		}
-
-		return $overrides;
 	}
 
 	/**

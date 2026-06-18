@@ -453,14 +453,17 @@ class Arriendo_Facil_Billing_API {
 		}
 
 		if ( isset( $decoded['email'] ) ) {
-			$email = sanitize_email( (string) $decoded['email'] );
-			if ( '' !== (string) $decoded['email'] && '' === $email ) {
-				return new WP_Error( 'invalid_email', __( 'El email ingresado no es válido.', 'arriendo-facil' ) );
-			}
+			$email_raw = trim( (string) $decoded['email'] );
+			if ( '' !== $email_raw ) {
+				$email = sanitize_email( $email_raw );
+				if ( '' === $email ) {
+					return new WP_Error( 'invalid_email', __( 'El email ingresado no es válido.', 'arriendo-facil' ) );
+				}
 
-			$overrides['info_adicional'] = array(
-				'email' => $email,
-			);
+				$overrides['info_adicional'] = array(
+					'email' => $email,
+				);
+			}
 		}
 
 		return $overrides;

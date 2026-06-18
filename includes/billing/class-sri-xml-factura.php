@@ -318,17 +318,24 @@ class Arriendo_Facil_SRI_XML_Factura {
 
 		// ── infoAdicional ───────────────────────────────────────────────────
 		if ( ! empty( $data['info_adicional'] ) ) {
-			$info_adic = $dom->createElement( 'infoAdicional' );
-			$root->appendChild( $info_adic );
-
+			$additional_fields = array();
 			foreach ( (array) $data['info_adicional'] as $nombre => $valor ) {
-				if ( '' === (string) $valor ) {
+				if ( '' === trim( (string) $valor ) ) {
 					continue;
 				}
-				$campo = $dom->createElement( 'campoAdicional' );
-				$campo->setAttribute( 'nombre', (string) $nombre );
-				$campo->appendChild( $dom->createTextNode( (string) $valor ) );
-				$info_adic->appendChild( $campo );
+				$additional_fields[ (string) $nombre ] = (string) $valor;
+			}
+
+			if ( ! empty( $additional_fields ) ) {
+				$info_adic = $dom->createElement( 'infoAdicional' );
+				$root->appendChild( $info_adic );
+
+				foreach ( $additional_fields as $nombre => $valor ) {
+					$campo = $dom->createElement( 'campoAdicional' );
+					$campo->setAttribute( 'nombre', $nombre );
+					$campo->appendChild( $dom->createTextNode( $valor ) );
+					$info_adic->appendChild( $campo );
+				}
 			}
 		}
 

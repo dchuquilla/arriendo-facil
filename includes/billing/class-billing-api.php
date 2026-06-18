@@ -33,6 +33,7 @@ class Arriendo_Facil_Billing_API {
 
 		add_action( 'af_lease_activated', array( $this, 'handle_lease_activated' ), 10, 1 );
 		add_action( 'wp_ajax_af_issue_invoice', array( $this, 'ajax_issue_invoice' ) );
+		add_action( 'wp_ajax_af_preview_invoice', array( $this, 'ajax_preview_invoice' ) );
 		add_action( 'wp_ajax_af_retry_invoice', array( $this, 'ajax_retry_invoice' ) );
 		add_action( 'wp_ajax_af_download_ride', array( $this, 'ajax_download_ride' ) );
 		add_action( 'wp_ajax_af_download_xml', array( $this, 'ajax_download_xml' ) );
@@ -101,6 +102,31 @@ class Arriendo_Facil_Billing_API {
 			wp_send_json_error( array( 'message' => __( 'Lease ID invalido.', 'arriendo-facil' ) ), 400 );
 		}
 
+		// Parse user-edited overrides from the preview modal.
+		$overrides_raw = isset( $_POST['overrides'] ) ? wp_unslash( $_POST['overrides'] ) : '';
+		$flat_overrides = array();
+		if ( '' !== $overrides_raw && is_string( $overrides_raw ) ) {
+			$decoded = json_decode( $overrides_raw, true );
+			if ( is_array( $decoded ) ) {
+				// Sanitize each allowed field.
+				if ( isset( $decoded['descripcion'] ) ) {
+					$flat_overrides['descripcion'] = sanitize_text_field( (string) $decoded['descripcion'] );
+				}
+				if ( isset( $decoded['precio_unitario'] ) ) {
+					$flat_overrides['precio_unitario'] = (float) $decoded['precio_unitario'];
+				}
+				if ( isset( $decoded['cantidad'] ) ) {
+					$flat_overrides['cantidad'] = (float) $decoded['cantidad'];
+				}
+				if ( isset( $decoded['descuento'] ) ) {
+					$flat_overrides['descuento'] = (float) $decoded['descuento'];
+				}
+				if ( isset( $decoded['email'] ) ) {
+					$flat_overrides['email'] = sanitize_email( (string) $decoded['email'] );
+				}
+			}
+		}
+
 		// Server-side lock: prevents duplicate submissions within 30 s (double-click, race condition).
 		$period   = Arriendo_Facil_Billing_Manager::billing_period();
 		$lock_key = 'af_inv_lock_' . $lease_id . '_' . substr( md5( $period ), 0, 8 );
@@ -115,7 +141,10 @@ class Arriendo_Facil_Billing_API {
 		}
 		set_transient( $lock_key, 1, 30 );
 
-		$result = $this->manager->issue_lease_invoice( $lease_id, array( 'billing_period' => $period ) );
+		$result = $this->manager->issue_lease_invoice(
+			$lease_id,
+			array_merge( array( 'billing_period' => $period ), $flat_overrides )
+		);
 
 		// Release lock immediately if the request failed (allows fast retry on real errors).
 		if ( is_wp_error( $result ) ) {
@@ -146,6 +175,59 @@ class Arriendo_Facil_Billing_API {
 			}
 
 			wp_send_json_error( $response, 400 );
+		}
+
+		wp_send_json_success( $result );
+	}
+
+	/**
+	 * AJAX: returns preview data for a lease invoice without issuing it.
+	 */
+	public function ajax_preview_invoice(): void {
+		check_ajax_referer( 'af_billing_nonce', 'nonce' );
+
+		if ( ! $this->can_manage_billing() ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$lease_id = isset( $_POST['lease_id'] ) ? absint( wp_unslash( $_POST['lease_id'] ) ) : 0;
+		if ( $lease_id <= 0 ) {
+			wp_send_json_error( array( 'message' => __( 'Lease ID invalido.', 'arriendo-facil' ) ), 400 );
+		}
+
+		$overrides_raw  = isset( $_POST['overrides'] ) ? wp_unslash( $_POST['overrides'] ) : '';
+		$flat_overrides = array();
+		if ( '' !== $overrides_raw && is_string( $overrides_raw ) ) {
+			$decoded = json_decode( $overrides_raw, true );
+			if ( is_array( $decoded ) ) {
+				if ( isset( $decoded['descripcion'] ) ) {
+					$flat_overrides['descripcion'] = sanitize_text_field( (string) $decoded['descripcion'] );
+				}
+				if ( isset( $decoded['precio_unitario'] ) ) {
+					$flat_overrides['precio_unitario'] = (float) $decoded['precio_unitario'];
+				}
+				if ( isset( $decoded['cantidad'] ) ) {
+					$flat_overrides['cantidad'] = (float) $decoded['cantidad'];
+				}
+				if ( isset( $decoded['descuento'] ) ) {
+					$flat_overrides['descuento'] = (float) $decoded['descuento'];
+				}
+				if ( isset( $decoded['email'] ) ) {
+					$flat_overrides['email'] = sanitize_email( (string) $decoded['email'] );
+				}
+			}
+		}
+
+		$result = $this->manager->preview_lease_invoice( $lease_id, $flat_overrides );
+
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error(
+				array(
+					'message' => $result->get_error_message(),
+					'code'    => $result->get_error_code(),
+				),
+				400
+			);
 		}
 
 		wp_send_json_success( $result );

@@ -124,7 +124,10 @@ class Arriendo_Facil_Billing_Manager {
 			return $context;
 		}
 
-		$payload = $this->build_payload_from_lease_context( $context, $overrides );
+		// Translate flat frontend overrides (descripcion, precio_unitario, etc.) to nested payload structure.
+		$nested_overrides = $this->translate_flat_overrides( $overrides );
+
+		$payload = $this->build_payload_from_lease_context( $context, $nested_overrides );
 		if ( is_wp_error( $payload ) ) {
 			return $payload;
 		}
@@ -748,6 +751,105 @@ class Arriendo_Facil_Billing_Manager {
 			'items'                    => (array) $totals['items'],
 			'info_adicional'           => (array) ( $payload['info_adicional'] ?? array() ),
 		);
+	}
+
+	/**
+	 * Builds a preview data structure for a lease invoice without issuing it.
+	 *
+	 * @param int   $lease_id  Lease ID.
+	 * @param array $overrides Optional flat overrides: descripcion, precio_unitario, cantidad, descuento, email.
+	 * @return array|WP_Error
+	 */
+	public function preview_lease_invoice( int $lease_id, array $overrides = array() ) {
+		$period = isset( $overrides['billing_period'] )
+			? (string) $overrides['billing_period']
+			: self::billing_period();
+		unset( $overrides['billing_period'] );
+
+		// Check for existing non-failed invoice.
+		$existing  = $this->get_invoice_by_lease_period( $lease_id, $period );
+		$can_issue = true;
+		$warning   = '';
+		if ( $existing ) {
+			$non_failed = array( 'generada', 'firmada', 'enviada', 'autorizada', 'autorizada_sin_ride' );
+			if ( in_array( (string) $existing->estado, $non_failed, true ) ) {
+				$can_issue = false;
+				$warning   = sprintf(
+					/* translators: 1: period YYYY-MM, 2: estado */
+					__( 'Ya existe un comprobante para el periodo %1$s (estado: %2$s). No se emitirá uno nuevo.', 'arriendo-facil' ),
+					$period,
+					(string) $existing->estado
+				);
+			}
+		}
+
+		$context = $this->fetch_lease_context( $lease_id );
+		if ( is_wp_error( $context ) ) {
+			return $context;
+		}
+
+		$nested_overrides = $this->translate_flat_overrides( $overrides );
+		$payload          = $this->build_payload_from_lease_context( $context, $nested_overrides );
+		if ( is_wp_error( $payload ) ) {
+			return $payload;
+		}
+
+		$iva_codigo_porcentaje = isset( $payload['iva_codigo_porcentaje'] ) ? (string) $payload['iva_codigo_porcentaje'] : '0';
+		$totals = Arriendo_Facil_SRI_XML_Factura::compute_totals(
+			(array) ( $payload['items'] ?? array() ),
+			$iva_codigo_porcentaje
+		);
+
+		$item = ! empty( $payload['items'] ) ? (array) $payload['items'][0] : array();
+
+		return array(
+			'can_issue'      => $can_issue,
+			'warning'        => $warning,
+			'billing_period' => $period,
+			'buyer'          => array(
+				'name'           => (string) ( $payload['razon_social_comprador'] ?? '' ),
+				'identification' => (string) ( $payload['identificacion_comprador'] ?? '' ),
+			),
+			'item'           => array(
+				'descripcion'      => (string) ( $item['descripcion'] ?? '' ),
+				'precio_unitario'  => (float) ( $item['precio_unitario'] ?? 0 ),
+				'cantidad'         => (float) ( $item['cantidad'] ?? 1 ),
+				'descuento'        => (float) ( $item['descuento'] ?? 0 ),
+			),
+			'totals'         => array(
+				'total_sin_impuestos' => (float) ( $totals['total_sin_impuestos'] ?? 0 ),
+				'iva_valor'           => (float) ( $totals['iva_valor'] ?? 0 ),
+				'importe_total'       => (float) ( $totals['importe_total'] ?? 0 ),
+			),
+			'info_adicional' => (array) ( $payload['info_adicional'] ?? array() ),
+		);
+	}
+
+	/**
+	 * Translates flat frontend overrides to the nested payload structure.
+	 *
+	 * @param array $flat Flat overrides: descripcion, precio_unitario, cantidad, descuento, email.
+	 * @return array Nested payload overrides.
+	 */
+	protected function translate_flat_overrides( array $flat ): array {
+		$nested = array();
+
+		$item_keys    = array( 'descripcion', 'precio_unitario', 'cantidad', 'descuento' );
+		$item_override = array();
+		foreach ( $item_keys as $key ) {
+			if ( array_key_exists( $key, $flat ) ) {
+				$item_override[ $key ] = $flat[ $key ];
+			}
+		}
+		if ( ! empty( $item_override ) ) {
+			$nested['items'] = array( $item_override );
+		}
+
+		if ( array_key_exists( 'email', $flat ) && '' !== (string) $flat['email'] ) {
+			$nested['info_adicional'] = array( 'email' => (string) $flat['email'] );
+		}
+
+		return $nested;
 	}
 
 	/**

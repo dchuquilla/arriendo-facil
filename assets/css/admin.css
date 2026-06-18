@@ -1,5 +1,155 @@
 /* Arriendo Fácil – Admin Styles */
 
+.af-sri-hero {
+	background: linear-gradient(135deg, #ffffff 0%, #f3f7ff 100%);
+	border: 1px solid #dbe7ff;
+	border-radius: 14px;
+	padding: 20px 24px;
+	margin: 18px 0 24px;
+	box-shadow: 0 10px 28px rgba(18, 38, 63, 0.06);
+}
+
+.af-sri-hero__content {
+	max-width: 900px;
+}
+
+.af-sri-hero__eyebrow {
+	margin: 0 0 6px;
+	font-size: 12px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: #2753a6;
+}
+
+.af-sri-hero__title {
+	margin: 0 0 8px;
+	font-size: 24px;
+	line-height: 1.2;
+}
+
+.af-sri-hero__text {
+	margin: 0;
+	max-width: 840px;
+	color: #3c434a;
+	font-size: 14px;
+	line-height: 1.6;
+}
+
+.af-sri-hero__links {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin: 18px 0 16px;
+}
+
+.af-sri-status-grid {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 12px;
+}
+
+.af-sri-status-card {
+	border-radius: 12px;
+	border: 1px solid #d8dee9;
+	padding: 14px 16px;
+	background: #fff;
+	box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+}
+
+.af-sri-status-card.is-ready {
+	border-color: #b7e1c2;
+	background: #f3fbf5;
+}
+
+.af-sri-status-card.is-pending {
+	background: #fffaf2;
+}
+
+.af-sri-status-card__label {
+	display: block;
+	margin-bottom: 4px;
+	font-size: 12px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: #5b6673;
+}
+
+.af-sri-status-card__value {
+	display: block;
+	font-size: 18px;
+	line-height: 1.2;
+	color: #1d2327;
+}
+
+.af-sri-status-card__hint {
+	display: block;
+	margin-top: 4px;
+	font-size: 13px;
+	color: #5b6673;
+}
+
+.af-sri-section {
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-radius: 12px;
+	padding: 20px 22px 8px;
+	margin: 0 0 24px;
+	box-shadow: 0 1px 2px rgba(16, 24, 40, 0.03);
+}
+
+.af-sri-section__header {
+	display: flex;
+	justify-content: space-between;
+	gap: 16px;
+	align-items: flex-start;
+	margin-bottom: 10px;
+}
+
+.af-sri-section__header h2 {
+	margin: 0 0 4px;
+}
+
+.af-sri-section__intro {
+	margin: 0 0 20px;
+}
+
+.af-sri-section__pill {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 6px 10px;
+	border-radius: 999px;
+	background: #eaf2ff;
+	color: #2753a6;
+	font-size: 12px;
+	font-weight: 700;
+	white-space: nowrap;
+}
+
+.af-sri-empty-state {
+	padding: 12px 14px;
+	border-left: 4px solid #d63638;
+	background: #fff5f5;
+	color: #8a1c1c;
+	border-radius: 6px;
+}
+
+@media (max-width: 960px) {
+	.af-sri-status-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.af-sri-section__header {
+		flex-direction: column;
+	}
+
+	.af-sri-hero {
+		padding: 18px;
+	}
+}
+
 .af-dashboard .af-stats {
 	display: flex;
 	flex-wrap: wrap;

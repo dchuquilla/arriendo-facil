@@ -393,6 +393,7 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 	var leaseIdField = document.getElementById( 'af-billing-lease-id' );
 	var leaseLabel   = document.getElementById( 'af-billing-lease-label' );
 	var searchTimer  = null;
+	var selectedLeaseData = null;
 
 	if ( searchInput ) {
 		searchInput.addEventListener( 'input', function () {
@@ -429,6 +430,7 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 							leaseIdField.value        = l.id;
 							leaseLabel.textContent    = ( l.guest_name || '' ) + ' — ' + ( l.accommodation_title || '' );
 							searchInput.value         = ( l.guest_name || '' ) + ' (' + ( l.id_number || '' ) + ')';
+							selectedLeaseData         = l;
 							resultsList.style.display = 'none';
 						} );
 						li.addEventListener( 'mouseenter', function () { this.style.background = '#f6f7f7'; } );
@@ -455,7 +457,7 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 	var summary = document.getElementById( 'af-billing-preview-summary' );
 	var warningEl = document.getElementById( 'af-billing-preview-warning' );
 	var feedback = document.getElementById( 'af-billing-preview-feedback' );
-	var refreshBtn = document.getElementById( 'af-billing-preview-refresh' );
+	var previewRefreshBtn = document.getElementById( 'af-billing-preview-refresh' );
 	var approveBtn = document.getElementById( 'af-billing-preview-approve' );
 	var inputDesc = document.getElementById( 'af-billing-preview-desc' );
 	var inputPrice = document.getElementById( 'af-billing-preview-price' );
@@ -483,6 +485,35 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 		}
 		feedback.textContent = text || '';
 		feedback.style.color = isError ? '#c62828' : '#555';
+	}
+
+	function prefillFromSelectedLease() {
+		if ( ! selectedLeaseData ) {
+			return;
+		}
+
+		var guestName = selectedLeaseData.guest_name || 'CONSUMIDOR FINAL';
+		var idNumber = selectedLeaseData.id_number || '9999999999999';
+		var rent = Number( selectedLeaseData.monthly_rent || 0 );
+
+		if ( inputDesc && ! inputDesc.value ) {
+			inputDesc.value = 'Canon de arriendo - ' + ( selectedLeaseData.accommodation_title || 'Inmueble' );
+		}
+		if ( inputQty && ! inputQty.value ) {
+			inputQty.value = '1.00';
+		}
+		if ( inputPrice && ! inputPrice.value ) {
+			inputPrice.value = rent.toFixed( 2 );
+		}
+		if ( inputDiscount && ! inputDiscount.value ) {
+			inputDiscount.value = '0.00';
+		}
+
+		if ( buyerName ) buyerName.textContent = guestName;
+		if ( buyerId ) buyerId.textContent = idNumber;
+		if ( subtotalEl ) subtotalEl.textContent = money( rent );
+		if ( ivaEl ) ivaEl.textContent = money( 0 );
+		if ( totalEl ) totalEl.textContent = money( rent );
 	}
 
 	function collectOverrides() {
@@ -533,6 +564,10 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 		issueState.leaseId = 0;
 		issueState.canIssue = false;
 		setPreviewFeedback( '', false );
+		if ( warningEl ) {
+			warningEl.style.display = 'none';
+			warningEl.textContent = '';
+		}
 	}
 
 	function openPreviewModal() {
@@ -548,7 +583,7 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 		}
 
 		setPreviewFeedback( '<?php echo esc_js( __( 'Calculando preview...', 'arriendo-facil' ) ); ?>', false );
-		if ( refreshBtn ) refreshBtn.disabled = true;
+		if ( previewRefreshBtn ) previewRefreshBtn.disabled = true;
 		if ( approveBtn ) approveBtn.disabled = true;
 
 		var fd = new FormData();
@@ -575,7 +610,7 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 			setPreviewFeedback( err.message || '<?php echo esc_js( __( 'Error de red.', 'arriendo-facil' ) ); ?>', true );
 		} )
 		.finally( function () {
-			if ( refreshBtn ) refreshBtn.disabled = false;
+			if ( previewRefreshBtn ) previewRefreshBtn.disabled = false;
 			if ( approveBtn ) approveBtn.disabled = ! issueState.canIssue;
 		} );
 	}
@@ -586,7 +621,7 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 		}
 
 		setPreviewFeedback( '<?php echo esc_js( __( 'Emitiendo comprobante...', 'arriendo-facil' ) ); ?>', false );
-		if ( refreshBtn ) refreshBtn.disabled = true;
+		if ( previewRefreshBtn ) previewRefreshBtn.disabled = true;
 		if ( approveBtn ) approveBtn.disabled = true;
 
 		var fd = new FormData();
@@ -613,7 +648,7 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 		} )
 		.catch( function ( err ) {
 			setPreviewFeedback( err.message || '<?php echo esc_js( __( 'Error de red.', 'arriendo-facil' ) ); ?>', true );
-			if ( refreshBtn ) refreshBtn.disabled = false;
+			if ( previewRefreshBtn ) previewRefreshBtn.disabled = false;
 			if ( approveBtn ) approveBtn.disabled = ! issueState.canIssue;
 		} );
 	}
@@ -628,12 +663,13 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 
 			issueState.leaseId = leaseId;
 			openPreviewModal();
+			prefillFromSelectedLease();
 			requestPreview();
 		} );
 	}
 
-	if ( refreshBtn ) {
-		refreshBtn.addEventListener( 'click', requestPreview );
+	if ( previewRefreshBtn ) {
+		previewRefreshBtn.addEventListener( 'click', requestPreview );
 	}
 
 	if ( approveBtn ) {
@@ -737,7 +773,7 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 	} );
 
 	// ── 4. Async refresh ──────────────────────────────────────────────
-	var refreshBtn = document.getElementById( 'af-refresh-invoices' );
+	var tableRefreshBtn = document.getElementById( 'af-refresh-invoices' );
 	var lastUpdateTime = document.getElementById( 'af-last-update-time' );
 	var autoRefreshInterval = 15000;
 	var lastRefresh = Date.now();
@@ -777,9 +813,9 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 		fd.append( 'action', 'af_get_invoices_async' );
 		fd.append( 'nonce', billingNonce );
 
-		if ( refreshBtn ) {
-			refreshBtn.style.opacity = '0.6';
-			refreshBtn.disabled = true;
+		if ( tableRefreshBtn ) {
+			tableRefreshBtn.style.opacity = '0.6';
+			tableRefreshBtn.disabled = true;
 		}
 
 		fetch( billingAjaxUrl, {
@@ -816,15 +852,15 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 		} )
 		.catch( function () {} )
 		.finally( function () {
-			if ( refreshBtn ) {
-				refreshBtn.style.opacity = '1';
-				refreshBtn.disabled = false;
+			if ( tableRefreshBtn ) {
+				tableRefreshBtn.style.opacity = '1';
+				tableRefreshBtn.disabled = false;
 			}
 		} );
 	}
 
-	if ( refreshBtn ) {
-		refreshBtn.addEventListener( 'click', refreshInvoices );
+	if ( tableRefreshBtn ) {
+		tableRefreshBtn.addEventListener( 'click', refreshInvoices );
 	}
 
 	setInterval( updateLastRefreshTime, 1000 );

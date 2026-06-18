@@ -278,6 +278,60 @@ $can_bill      = current_user_can( (string) apply_filters( 'af_billing_capabilit
 		</tbody>
 	</table>
 
+	<div id="af-invoice-preview-modal" class="af-modal af-invoice-preview-modal" hidden>
+		<div class="af-modal__backdrop" data-af-close-invoice-preview-modal></div>
+		<div class="af-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="af-invoice-preview-modal-title">
+			<div class="af-modal__header">
+				<h2 id="af-invoice-preview-modal-title"><?php esc_html_e( 'Preview de Factura', 'arriendo-facil' ); ?></h2>
+				<button type="button" class="af-modal__close" data-af-close-invoice-preview-modal aria-label="<?php esc_attr_e( 'Close', 'arriendo-facil' ); ?>">&times;</button>
+			</div>
+			<div class="af-modal__body">
+				<p id="af-invoice-preview-summary" style="margin-top:0; color:#555;"></p>
+
+				<div id="af-invoice-preview-warning" style="display:none; margin:8px 0; padding:10px; border-radius:6px; background:#fff4e5; color:#7a4b00; border:1px solid #f3d2a2;"></div>
+
+				<div style="display:grid; grid-template-columns:repeat(2,minmax(220px,1fr)); gap:10px; margin-bottom:10px;">
+					<label>
+						<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Descripcion', 'arriendo-facil' ); ?></span>
+						<input type="text" id="af-preview-descripcion" class="regular-text" style="width:100%;" />
+					</label>
+					<label>
+						<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Precio Unitario', 'arriendo-facil' ); ?></span>
+						<input type="number" id="af-preview-precio" min="0" step="0.01" style="width:100%;" />
+					</label>
+					<label>
+						<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Cantidad', 'arriendo-facil' ); ?></span>
+						<input type="number" id="af-preview-cantidad" min="0.01" step="0.01" style="width:100%;" />
+					</label>
+					<label>
+						<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Descuento', 'arriendo-facil' ); ?></span>
+						<input type="number" id="af-preview-descuento" min="0" step="0.01" style="width:100%;" />
+					</label>
+					<label style="grid-column:1 / -1;">
+						<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Email (info adicional)', 'arriendo-facil' ); ?></span>
+						<input type="email" id="af-preview-email" style="width:100%;" />
+					</label>
+				</div>
+
+				<div style="display:grid; grid-template-columns:repeat(2,minmax(220px,1fr)); gap:8px; margin-bottom:10px;">
+					<div><?php esc_html_e( 'Comprador:', 'arriendo-facil' ); ?> <strong id="af-preview-buyer-name">-</strong></div>
+					<div><?php esc_html_e( 'Identificacion:', 'arriendo-facil' ); ?> <strong id="af-preview-buyer-id">-</strong></div>
+					<div><?php esc_html_e( 'Subtotal:', 'arriendo-facil' ); ?> <strong id="af-preview-subtotal">$0.00</strong></div>
+					<div><?php esc_html_e( 'IVA:', 'arriendo-facil' ); ?> <strong id="af-preview-iva">$0.00</strong></div>
+					<div style="grid-column:1 / -1;"><?php esc_html_e( 'Total:', 'arriendo-facil' ); ?> <strong id="af-preview-total">$0.00</strong></div>
+				</div>
+
+				<p id="af-invoice-preview-feedback" aria-live="polite" style="min-height:20px; margin:0 0 10px; color:#555;"></p>
+
+				<div class="af-lease-upload-actions">
+					<button type="button" class="button" data-af-close-invoice-preview-modal><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
+					<button type="button" class="button" id="af-preview-recalculate"><?php esc_html_e( 'Actualizar Preview', 'arriendo-facil' ); ?></button>
+					<button type="button" class="button button-primary" id="af-preview-approve-issue"><?php esc_html_e( 'Aprobar y Emitir', 'arriendo-facil' ); ?></button>
+				</div>
+			</div>
+		</div>
+	</div>
+
 	<div id="af-lease-upload-modal" class="af-modal af-lease-upload-modal" hidden>
 		<div class="af-modal__backdrop" data-af-close-upload-modal></div>
 		<div class="af-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="af-lease-upload-modal-title">
@@ -308,97 +362,207 @@ $can_bill      = current_user_can( (string) apply_filters( 'af_billing_capabilit
 
 <script>
 (function () {
-	// Two-step confirmation: first click arms the button, second click fires the request.
-	// This prevents accidental double-clicks from generating duplicate invoices.
-	var CONFIRM_TIMEOUT = 5000; // ms to auto-disarm if second click doesn't come.
-	var armed = {}; // keyed by leaseId
+	var ajaxUrl = '<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>';
+	var modal = document.getElementById( 'af-invoice-preview-modal' );
+	var summary = document.getElementById( 'af-invoice-preview-summary' );
+	var warningEl = document.getElementById( 'af-invoice-preview-warning' );
+	var feedback = document.getElementById( 'af-invoice-preview-feedback' );
+	var btnRecalc = document.getElementById( 'af-preview-recalculate' );
+	var btnApprove = document.getElementById( 'af-preview-approve-issue' );
+	var inputDesc = document.getElementById( 'af-preview-descripcion' );
+	var inputPrecio = document.getElementById( 'af-preview-precio' );
+	var inputCantidad = document.getElementById( 'af-preview-cantidad' );
+	var inputDescuento = document.getElementById( 'af-preview-descuento' );
+	var inputEmail = document.getElementById( 'af-preview-email' );
+	var buyerName = document.getElementById( 'af-preview-buyer-name' );
+	var buyerId = document.getElementById( 'af-preview-buyer-id' );
+	var subtotalEl = document.getElementById( 'af-preview-subtotal' );
+	var ivaEl = document.getElementById( 'af-preview-iva' );
+	var totalEl = document.getElementById( 'af-preview-total' );
 
-	function disarm( leaseId, btn, origLabel ) {
-		clearTimeout( armed[ leaseId ] );
-		delete armed[ leaseId ];
-		if ( btn ) {
-			btn.textContent = origLabel;
-			btn.classList.remove( 'af-confirm-armed' );
-			btn.disabled = false;
-		}
+	var state = {
+		leaseId: 0,
+		nonce: '',
+		triggerBtn: null,
+		canIssue: true,
+	};
+
+	if ( ! modal ) {
+		return;
+	}
+
+	function money( value ) {
+		return '$' + Number( value || 0 ).toFixed( 2 );
+	}
+
+	function collectOverrides() {
+		return {
+			descripcion: inputDesc.value.trim(),
+			precio_unitario: Number( inputPrecio.value || 0 ),
+			cantidad: Number( inputCantidad.value || 0 ),
+			descuento: Number( inputDescuento.value || 0 ),
+			email: inputEmail.value.trim(),
+		};
+	}
+
+	function applyPreviewData( data ) {
+		var item = ( data && data.item ) ? data.item : {};
+		var buyer = ( data && data.buyer ) ? data.buyer : {};
+		var totals = ( data && data.totals ) ? data.totals : {};
+
+		if ( item.descripcion !== undefined ) inputDesc.value = item.descripcion;
+		if ( item.precio_unitario !== undefined ) inputPrecio.value = Number( item.precio_unitario ).toFixed( 2 );
+		if ( item.cantidad !== undefined ) inputCantidad.value = Number( item.cantidad ).toFixed( 2 );
+		if ( item.descuento !== undefined ) inputDescuento.value = Number( item.descuento ).toFixed( 2 );
+		if ( data && data.info_adicional && data.info_adicional.email !== undefined ) inputEmail.value = data.info_adicional.email || '';
+
+		buyerName.textContent = buyer.name || '-';
+		buyerId.textContent = buyer.identification || '-';
+		subtotalEl.textContent = money( totals.total_sin_impuestos );
+		ivaEl.textContent = money( totals.iva_valor );
+		totalEl.textContent = money( totals.importe_total );
+
+		state.canIssue = !!( data && data.can_issue );
+		warningEl.style.display = ( data && data.warning ) ? 'block' : 'none';
+		warningEl.textContent = ( data && data.warning ) ? data.warning : '';
+		btnApprove.disabled = ! state.canIssue;
+	}
+
+	function setFeedback( text, isError ) {
+		feedback.textContent = text || '';
+		feedback.style.color = isError ? '#c62828' : '#555';
+	}
+
+	function closeModal() {
+		modal.setAttribute( 'hidden', 'hidden' );
+		document.body.classList.remove( 'af-modal-open' );
+		setFeedback( '' );
+		warningEl.style.display = 'none';
+		warningEl.textContent = '';
+		state.leaseId = 0;
+		state.nonce = '';
+		state.triggerBtn = null;
+	}
+
+	function openModal() {
+		modal.removeAttribute( 'hidden' );
+		document.body.classList.add( 'af-modal-open' );
+	}
+
+	function fetchPreview( overrides ) {
+		setFeedback( '<?php echo esc_js( __( 'Calculando preview...', 'arriendo-facil' ) ); ?>' );
+		btnRecalc.disabled = true;
+		btnApprove.disabled = true;
+
+		var fd = new FormData();
+		fd.append( 'action', 'af_preview_invoice' );
+		fd.append( 'lease_id', String( state.leaseId ) );
+		fd.append( 'nonce', state.nonce );
+		fd.append( 'overrides', JSON.stringify( overrides || {} ) );
+
+		return fetch( ajaxUrl, {
+			method: 'POST',
+			body: fd,
+			credentials: 'same-origin',
+		} )
+		.then( function ( r ) { return r.json(); } )
+		.then( function ( resp ) {
+			if ( ! resp.success ) {
+				throw new Error( ( resp.data && resp.data.message ) ? resp.data.message : '<?php echo esc_js( __( 'No se pudo obtener el preview.', 'arriendo-facil' ) ); ?>' );
+			}
+
+			applyPreviewData( resp.data );
+			summary.textContent = '<?php echo esc_js( __( 'Periodo:', 'arriendo-facil' ) ); ?> ' + ( resp.data.billing_period || '-' );
+			setFeedback( state.canIssue ? '<?php echo esc_js( __( 'Revisa los datos y aprueba para emitir.', 'arriendo-facil' ) ); ?>' : '<?php echo esc_js( __( 'No se puede emitir en este periodo.', 'arriendo-facil' ) ); ?>', ! state.canIssue );
+		} )
+		.catch( function ( err ) {
+			setFeedback( err.message || '<?php echo esc_js( __( 'Error de red.', 'arriendo-facil' ) ); ?>', true );
+		} )
+		.finally( function () {
+			btnRecalc.disabled = false;
+			btnApprove.disabled = ! state.canIssue;
+		} );
+	}
+
+	function issueWithOverrides() {
+		var overrides = collectOverrides();
+		btnApprove.disabled = true;
+		setFeedback( '<?php echo esc_js( __( 'Emitiendo comprobante...', 'arriendo-facil' ) ); ?>' );
+
+		var fd = new FormData();
+		fd.append( 'action', 'af_issue_invoice' );
+		fd.append( 'lease_id', String( state.leaseId ) );
+		fd.append( 'nonce', state.nonce );
+		fd.append( 'overrides', JSON.stringify( overrides ) );
+
+		fetch( ajaxUrl, {
+			method: 'POST',
+			body: fd,
+			credentials: 'same-origin',
+		} )
+		.then( function ( r ) { return r.json(); } )
+		.then( function ( resp ) {
+			if ( ! resp.success ) {
+				throw new Error( ( resp.data && resp.data.message ) ? resp.data.message : '<?php echo esc_js( __( 'Error al emitir.', 'arriendo-facil' ) ); ?>' );
+			}
+
+			var cell = document.getElementById( 'af-billing-cell-' + state.leaseId );
+			if ( cell ) {
+				var estado = ( resp.data && resp.data.estado ) ? resp.data.estado : 'generada';
+				var color = ( 'autorizada' === estado || 'autorizada_sin_ride' === estado ) ? '#2e7d32'
+					: ( 'error_envio' === estado || 'error_autorizacion' === estado ? '#c62828' : '#1565c0' );
+				var invId = ( resp.data && resp.data.invoice_id ) ? '#' + resp.data.invoice_id : '';
+				var period = ( resp.data && resp.data.billing_period ) ? ' (' + resp.data.billing_period + ')' : '';
+				cell.innerHTML = '<span style="font-weight:600;color:' + color + ';font-size:12px;">' + estado + period + '</span><br><small style="color:#888;">' + invId + '</small>';
+			}
+
+			if ( state.triggerBtn ) {
+				state.triggerBtn.remove();
+			}
+
+			closeModal();
+		} )
+		.catch( function ( err ) {
+			setFeedback( err.message || '<?php echo esc_js( __( 'Error de red.', 'arriendo-facil' ) ); ?>', true );
+			btnApprove.disabled = ! state.canIssue;
+		} );
 	}
 
 	document.addEventListener( 'click', function ( e ) {
 		var btn = e.target.closest( '.af-lease-issue-invoice' );
-		if ( ! btn || btn.disabled ) return;
+		if ( btn ) {
+			state.leaseId = parseInt( btn.dataset.leaseId || '0', 10 );
+			state.nonce = btn.dataset.nonce || '';
+			state.triggerBtn = btn;
+			if ( ! state.leaseId || ! state.nonce ) {
+				return;
+			}
 
-		var leaseId   = btn.dataset.leaseId;
-		var nonce     = btn.dataset.nonce;
-		var origLabel = btn.dataset.origLabel || btn.textContent.trim();
-		btn.dataset.origLabel = origLabel;
-
-		// ---- First click: arm / confirm prompt ----
-		if ( ! armed[ leaseId ] ) {
-			btn.textContent = '<?php echo esc_js( __( '¿Confirmar? (clic para emitir)', 'arriendo-facil' ) ); ?>';
-			btn.classList.add( 'af-confirm-armed' );
-			armed[ leaseId ] = setTimeout( function () {
-				disarm( leaseId, btn, origLabel );
-			}, CONFIRM_TIMEOUT );
+			openModal();
+			fetchPreview( {} );
 			return;
 		}
 
-		// ---- Second click: confirmed — fire request ----
-		clearTimeout( armed[ leaseId ] );
-		delete armed[ leaseId ];
-
-		var cell = document.getElementById( 'af-billing-cell-' + leaseId );
-
-		btn.disabled    = true;
-		btn.classList.remove( 'af-confirm-armed' );
-		btn.textContent = '<?php echo esc_js( __( 'Emitiendo…', 'arriendo-facil' ) ); ?>';
-
-		var formData = new FormData();
-		formData.append( 'action',   'af_issue_invoice' );
-		formData.append( 'lease_id', leaseId );
-		formData.append( 'nonce',    nonce );
-
-		fetch( '<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>', {
-			method      : 'POST',
-			body        : formData,
-			credentials : 'same-origin',
-		} )
-		.then( function ( r ) { return r.json(); } )
-		.then( function ( resp ) {
-			if ( resp.success ) {
-				var estado = ( resp.data && resp.data.estado ) ? resp.data.estado : 'generada';
-				var color  = ( 'autorizada' === estado || 'autorizada_sin_ride' === estado ) ? '#2e7d32'
-				           : ( 'error_envio' === estado || 'error_autorizacion' === estado ? '#c62828' : '#1565c0' );
-				var invId  = ( resp.data && resp.data.invoice_id ) ? '#' + resp.data.invoice_id : '';
-				var period = ( resp.data && resp.data.billing_period ) ? ' (' + resp.data.billing_period + ')' : '';
-				cell.innerHTML = '<span style="font-weight:600;color:' + color + ';font-size:12px;">' + estado + period + '</span><br><small style="color:#888;">' + invId + '</small>';
-			} else {
-				var msg = ( resp.data && resp.data.message ) ? resp.data.message : '<?php echo esc_js( __( 'Error al emitir', 'arriendo-facil' ) ); ?>';
-				// Re-show button so admin can retry (server lock released on error).
-				btn.disabled    = false;
-				btn.textContent = origLabel;
-				cell.querySelector( '.af-issue-error' ) && cell.querySelector( '.af-issue-error' ).remove();
-				var errSpan = document.createElement( 'span' );
-				errSpan.className = 'af-issue-error';
-				errSpan.style.cssText = 'display:block;color:#c62828;font-size:11px;margin-top:2px;';
-				errSpan.title = msg;
-				errSpan.textContent = '⚠ ' + msg.substring( 0, 60 ) + ( msg.length > 60 ? '…' : '' );
-				cell.appendChild( errSpan );
-			}
-		} )
-		.catch( function () {
-			btn.disabled    = false;
-			btn.textContent = origLabel;
-			var errSpan = document.createElement( 'span' );
-			errSpan.className = 'af-issue-error';
-			errSpan.style.cssText = 'display:block;color:#c62828;font-size:11px;margin-top:2px;';
-			errSpan.textContent = '⚠ <?php echo esc_js( __( 'Error de red', 'arriendo-facil' ) ); ?>';
-			cell.appendChild( errSpan );
-		} );
+		if ( e.target.closest( '[data-af-close-invoice-preview-modal]' ) ) {
+			closeModal();
+		}
 	} );
 
-	// Style for armed state.
-	var style = document.createElement( 'style' );
-	style.textContent = '.af-confirm-armed{background:#c62828!important;border-color:#b71c1c!important;color:#fff!important;}';
-	document.head.appendChild( style );
+	document.addEventListener( 'keydown', function ( event ) {
+		if ( 'Escape' === event.key && ! modal.hasAttribute( 'hidden' ) ) {
+			closeModal();
+		}
+	} );
+
+	btnRecalc.addEventListener( 'click', function () {
+		fetchPreview( collectOverrides() );
+	} );
+
+	btnApprove.addEventListener( 'click', function () {
+		if ( ! state.canIssue ) {
+			return;
+		}
+		issueWithOverrides();
+	} );
 }());
 </script>

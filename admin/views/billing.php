@@ -473,6 +473,7 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 	var issueState = {
 		leaseId: 0,
 		canIssue: false,
+		baseline: null,
 	};
 
 	function money( value ) {
@@ -517,13 +518,38 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 	}
 
 	function collectOverrides() {
-		return {
+		var current = {
 			descripcion: inputDesc ? inputDesc.value.trim() : '',
 			precio_unitario: inputPrice ? Number( inputPrice.value || 0 ) : 0,
 			cantidad: inputQty ? Number( inputQty.value || 0 ) : 0,
 			descuento: inputDiscount ? Number( inputDiscount.value || 0 ) : 0,
 			email: inputEmail ? inputEmail.value.trim() : '',
 		};
+
+		if ( ! issueState.baseline ) {
+			return current;
+		}
+
+		var out = {};
+		if ( current.descripcion !== issueState.baseline.descripcion ) {
+			out.descripcion = current.descripcion;
+		}
+		if ( Math.abs( current.precio_unitario - issueState.baseline.precio_unitario ) > 0.0001 ) {
+			out.precio_unitario = current.precio_unitario;
+		}
+		if ( Math.abs( current.cantidad - issueState.baseline.cantidad ) > 0.0001 ) {
+			out.cantidad = current.cantidad;
+		}
+		if ( Math.abs( current.descuento - issueState.baseline.descuento ) > 0.0001 ) {
+			out.descuento = current.descuento;
+		}
+
+		// Email vacío significa mantener el valor base (flujo histórico).
+		if ( '' !== current.email && current.email !== issueState.baseline.email ) {
+			out.email = current.email;
+		}
+
+		return out;
 	}
 
 	function renderPreview( data ) {
@@ -536,6 +562,14 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 		if ( inputQty && item.cantidad !== undefined ) inputQty.value = Number( item.cantidad ).toFixed( 2 );
 		if ( inputDiscount && item.descuento !== undefined ) inputDiscount.value = Number( item.descuento ).toFixed( 2 );
 		if ( inputEmail && data && data.info_adicional && data.info_adicional.email !== undefined ) inputEmail.value = data.info_adicional.email || '';
+
+		issueState.baseline = {
+			descripcion: item.descripcion !== undefined ? String( item.descripcion ) : '',
+			precio_unitario: item.precio_unitario !== undefined ? Number( item.precio_unitario ) : 0,
+			cantidad: item.cantidad !== undefined ? Number( item.cantidad ) : 0,
+			descuento: item.descuento !== undefined ? Number( item.descuento ) : 0,
+			email: ( data && data.info_adicional && data.info_adicional.email ) ? String( data.info_adicional.email ) : '',
+		};
 
 		if ( buyerName ) buyerName.textContent = buyer.name || '-';
 		if ( buyerId ) buyerId.textContent = buyer.identification || '-';
@@ -563,6 +597,7 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 		document.body.classList.remove( 'af-modal-open' );
 		issueState.leaseId = 0;
 		issueState.canIssue = false;
+		issueState.baseline = null;
 		setPreviewFeedback( '', false );
 		if ( warningEl ) {
 			warningEl.style.display = 'none';

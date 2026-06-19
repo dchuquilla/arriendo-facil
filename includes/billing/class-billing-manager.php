@@ -356,6 +356,17 @@ class Arriendo_Facil_Billing_Manager {
 			)
 		);
 
+		if ( $invoice_id <= 0 ) {
+			$db_error = ( $this->wpdb && isset( $this->wpdb->last_error ) ) ? (string) $this->wpdb->last_error : '';
+			if ( '' !== $db_error ) {
+				error_log( '[AF Billing] Error insertando factura: ' . $db_error );
+			}
+			return new WP_Error(
+				'invoice_insert_failed',
+				__( 'No se pudo guardar el comprobante en la base de datos. Intente nuevamente.', 'arriendo-facil' )
+			);
+		}
+
 		// LOGGING: XML que se envía al SRI
 		// El XML completo se guarda en un archivo temporal de diagnóstico para
 		// poder validarlo en herramientas externas como:
@@ -943,39 +954,49 @@ class Arriendo_Facil_Billing_Manager {
 			return new WP_Error( 'db_unavailable', __( 'No hay conexion de base de datos.', 'arriendo-facil' ) );
 		}
 
-		$row = $this->wpdb->get_row(
-			"SELECT id, codigo_establecimiento, codigo_punto_emision, secuencial_actual
-			 FROM {$this->wpdb->prefix}af_emission_points
-			 WHERE activo = 1
-			 ORDER BY id ASC
-			 LIMIT 1"
-		);
+		$max_attempts = 5;
+		for ( $attempt = 1; $attempt <= $max_attempts; $attempt++ ) {
+			$row = $this->wpdb->get_row(
+				"SELECT id, codigo_establecimiento, codigo_punto_emision, secuencial_actual
+				 FROM {$this->wpdb->prefix}af_emission_points
+				 WHERE activo = 1
+				 ORDER BY id ASC
+				 LIMIT 1"
+			);
 
-		if ( ! $row ) {
-			return new WP_Error( 'no_emission_point', __( 'No existe un punto de emision activo configurado.', 'arriendo-facil' ) );
+			if ( ! $row ) {
+				return new WP_Error( 'no_emission_point', __( 'No existe un punto de emision activo configurado.', 'arriendo-facil' ) );
+			}
+
+			$current = (int) $row->secuencial_actual;
+			if ( $current < 1 ) {
+				$current = 1;
+			}
+
+			$updated = $this->wpdb->update(
+				$this->wpdb->prefix . 'af_emission_points',
+				array( 'secuencial_actual' => $current + 1 ),
+				array( 'id' => (int) $row->id, 'secuencial_actual' => (int) $row->secuencial_actual ),
+				array( '%d' ),
+				array( '%d', '%d' )
+			);
+
+			if ( false === $updated ) {
+				return new WP_Error( 'sequence_update_failed', __( 'No se pudo reservar el secuencial del punto de emision.', 'arriendo-facil' ) );
+			}
+
+			if ( 1 === (int) $updated ) {
+				return array(
+					'estab'      => str_pad( (string) $row->codigo_establecimiento, 3, '0', STR_PAD_LEFT ),
+					'pto_emi'    => str_pad( (string) $row->codigo_punto_emision, 3, '0', STR_PAD_LEFT ),
+					'secuencial' => $current,
+				);
+			}
 		}
 
-		$current = (int) $row->secuencial_actual;
-		if ( $current < 1 ) {
-			$current = 1;
-		}
-
-		$updated = $this->wpdb->update(
-			$this->wpdb->prefix . 'af_emission_points',
-			array( 'secuencial_actual' => $current + 1 ),
-			array( 'id' => (int) $row->id, 'secuencial_actual' => (int) $row->secuencial_actual ),
-			array( '%d' ),
-			array( '%d', '%d' )
-		);
-
-		if ( false === $updated ) {
-			return new WP_Error( 'sequence_update_failed', __( 'No se pudo reservar el secuencial del punto de emision.', 'arriendo-facil' ) );
-		}
-
-		return array(
-			'estab'      => str_pad( (string) $row->codigo_establecimiento, 3, '0', STR_PAD_LEFT ),
-			'pto_emi'    => str_pad( (string) $row->codigo_punto_emision, 3, '0', STR_PAD_LEFT ),
-			'secuencial' => $current,
+		return new WP_Error(
+			'sequence_race_conflict',
+			__( 'No se pudo reservar un secuencial unico en este momento. Intente nuevamente.', 'arriendo-facil' )
 		);
 	}
 

@@ -395,29 +395,59 @@ class Arriendo_Facil_SRI_Config {
 
 			error_log( '[AF SRI] fetch_ca_chain: AIA URL encontrada → ' . $issuer_url );
 
-			if ( ! self::is_valid_ca_issuer_url( $issuer_url ) ) {
-				error_log( '[AF SRI] fetch_ca_chain: URL de CA no válida/no permitida → ' . $issuer_url );
+			$body       = '';
+			$used_url   = '';
+			$last_error = '';
+			$candidates = self::build_ca_download_candidates( $issuer_url );
+
+			foreach ( $candidates as $candidate_url ) {
+				if ( ! self::is_valid_ca_issuer_url( $candidate_url ) ) {
+					error_log( '[AF SRI] fetch_ca_chain: URL candidata no permitida → ' . $candidate_url );
+					continue;
+				}
+
+				$ssl_verify = ( 0 === strpos( $candidate_url, 'https://' ) );
+				$response   = wp_remote_get(
+					$candidate_url,
+					array(
+						'timeout'            => 15,
+						'sslverify'          => $ssl_verify,
+						'redirection'        => 3,
+						'reject_unsafe_urls' => true,
+					)
+				);
+
+				if ( is_wp_error( $response ) ) {
+					$last_error = $response->get_error_message();
+					error_log( '[AF SRI] fetch_ca_chain: error en ' . $candidate_url . ' → ' . $last_error );
+					continue;
+				}
+
+				$http_code = (int) wp_remote_retrieve_response_code( $response );
+				if ( 200 !== $http_code ) {
+					$last_error = 'HTTP ' . $http_code;
+					error_log( '[AF SRI] fetch_ca_chain: respuesta inválida en ' . $candidate_url . ' → ' . $last_error );
+					continue;
+				}
+
+				$candidate_body = (string) wp_remote_retrieve_body( $response );
+				if ( '' === $candidate_body || strlen( $candidate_body ) > $max_response_size ) {
+					$last_error = 'respuesta vacía o demasiado grande';
+					error_log( '[AF SRI] fetch_ca_chain: payload inválido en ' . $candidate_url );
+					continue;
+				}
+
+				$body     = $candidate_body;
+				$used_url = $candidate_url;
 				break;
 			}
 
-			// BCE serves CA certs over plain HTTP; disable SSL verification only for http:// URLs.
-			$ssl_verify = ( 0 === strpos( $issuer_url, 'https://' ) );
-			$response   = wp_remote_get( $issuer_url, array( 'timeout' => 15, 'sslverify' => $ssl_verify ) );
-			if ( is_wp_error( $response ) ) {
-				error_log( '[AF SRI] fetch_ca_chain: error de conexión → ' . $response->get_error_message() );
-				break;
-			}
-			$http_code = wp_remote_retrieve_response_code( $response );
-			if ( 200 !== $http_code ) {
-				error_log( '[AF SRI] fetch_ca_chain: respuesta HTTP inválida → ' . $http_code );
+			if ( '' === $body ) {
+				error_log( '[AF SRI] fetch_ca_chain: no se pudo descargar CA desde ninguna URL candidata. Último error: ' . $last_error );
 				break;
 			}
 
-			$body = wp_remote_retrieve_body( $response );
-			if ( '' === $body || strlen( $body ) > $max_response_size ) {
-				error_log( '[AF SRI] fetch_ca_chain: respuesta vacía o demasiado grande' );
-				break;
-			}
+			error_log( '[AF SRI] fetch_ca_chain: descarga exitosa desde → ' . $used_url );
 
 			$ca_pem = self::normalize_cert_to_pem( $body );
 			if ( '' === $ca_pem ) {
@@ -448,6 +478,53 @@ class Arriendo_Facil_SRI_Config {
 		}
 
 		return implode( "\n", $chain_pems );
+	}
+
+	/**
+	 * Builds candidate URLs to download CA certs when AIA points to deprecated hosts.
+	 *
+	 * @param string $issuer_url URL extracted from authorityInfoAccess.
+	 * @return string[] Candidate URLs in priority order.
+	 */
+	private static function build_ca_download_candidates( string $issuer_url ): array {
+		$candidates = array();
+		$candidates[] = $issuer_url;
+
+		$parts = wp_parse_url( $issuer_url );
+		if ( ! is_array( $parts ) || empty( $parts['host'] ) ) {
+			return $candidates;
+		}
+
+		$host      = strtolower( (string) $parts['host'] );
+		$path      = isset( $parts['path'] ) ? (string) $parts['path'] : '';
+		$query     = isset( $parts['query'] ) ? '?' . (string) $parts['query'] : '';
+		$path_part = $path . $query;
+
+		$base_scheme = isset( $parts['scheme'] ) ? strtolower( (string) $parts['scheme'] ) : 'http';
+		$schemes     = array_values( array_unique( array( $base_scheme, 'https', 'http' ) ) );
+
+		$alias_map = array(
+			// BCE moved endpoints over time; old AIA hosts often no longer resolve.
+			'eci.bce.fin.ec'          => array( 'www.eci.bce.ec' ),
+			'www.eci.bce.fin.ec'      => array( 'www.eci.bce.ec' ),
+			'eci.bce.ec'              => array( 'www.eci.bce.ec' ),
+			// SecurityData TLS works reliably on www host.
+			'securitydata.net.ec'     => array( 'www.securitydata.net.ec' ),
+			'ocsp.securitydata.net.ec' => array( 'www.securitydata.net.ec' ),
+			'crl.securitydata.net.ec' => array( 'www.securitydata.net.ec' ),
+		);
+
+		$alias_hosts = $alias_map[ $host ] ?? array();
+		foreach ( $alias_hosts as $alias_host ) {
+			foreach ( $schemes as $scheme ) {
+				$candidate = $scheme . '://' . $alias_host . $path_part;
+				if ( ! in_array( $candidate, $candidates, true ) ) {
+					$candidates[] = $candidate;
+				}
+			}
+		}
+
+		return $candidates;
 	}
 
 	/**
@@ -482,6 +559,7 @@ class Arriendo_Facil_SRI_Config {
 			'www.eci.bce.fin.ec',
 			'eci.bce.ec',           // kept for backward compat / older certs
 			'www.eci.bce.ec',
+			'portal.sce.eci.bce.ec',
 			'securitydata.net.ec',
 			'www.securitydata.net.ec',
 			'ocsp.securitydata.net.ec',

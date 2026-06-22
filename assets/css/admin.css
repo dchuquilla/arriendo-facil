@@ -575,3 +575,94 @@ body.post-type-cleaning_service .page-title-action:focus {
 	border-radius: 8px;
 	border: 1px solid #c3c4c7;
 }
+
+/* Billing invoices table mobile responsiveness */
+@media (max-width: 782px) {
+	#af-invoices-table {
+		border: 0;
+		background: transparent;
+	}
+
+	#af-invoices-table thead {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		margin: -1px;
+		padding: 0;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		border: 0;
+	}
+
+	#af-invoices-table,
+	#af-invoices-table tbody,
+	#af-invoices-table tr,
+	#af-invoices-table td {
+		display: block;
+		width: 100%;
+		box-sizing: border-box;
+	}
+
+	#af-invoices-table tr {
+		margin-bottom: 12px;
+		background: #fff;
+		border: 1px solid #dcdcde;
+		border-radius: 8px;
+		overflow: hidden;
+	}
+
+	#af-invoices-table td {
+		position: relative;
+		padding: 10px 12px 10px 40%;
+		border: 0;
+		border-bottom: 1px solid #f0f0f1;
+		min-height: 40px;
+		text-align: left !important;
+	}
+
+	#af-invoices-table tr td:last-child {
+		border-bottom: 0;
+	}
+
+	#af-invoices-table td::before {
+		position: absolute;
+		top: 10px;
+		left: 12px;
+		width: calc(40% - 20px);
+		font-weight: 600;
+		font-size: 12px;
+		line-height: 1.35;
+		color: #50575e;
+		content: '';
+	}
+
+	#af-invoices-table tbody tr td:nth-child(1)::before { content: '#'; }
+	#af-invoices-table tbody tr td:nth-child(2)::before { content: 'Comprobante'; }
+	#af-invoices-table tbody tr td:nth-child(3)::before { content: 'Cliente'; }
+	#af-invoices-table tbody tr td:nth-child(4)::before { content: 'Inmueble'; }
+	#af-invoices-table tbody tr td:nth-child(5)::before { content: 'Total'; }
+	#af-invoices-table tbody tr td:nth-child(6)::before { content: 'Estado'; }
+	#af-invoices-table tbody tr td:nth-child(7)::before { content: 'Fecha'; }
+	#af-invoices-table tbody tr td:nth-child(8)::before { content: 'Acciones'; }
+
+	#af-invoices-table td > div[style*='display:flex'] {
+		gap: 6px !important;
+	}
+
+	#af-invoices-table td .button {
+		margin: 0;
+	}
+
+	#af-invoices-table .af-error-details {
+		border: 1px solid #f0d5d5;
+		background: #fef5f5;
+	}
+
+	#af-invoices-table .af-error-details td {
+		padding: 12px;
+	}
+
+	#af-invoices-table .af-error-details td::before {
+		content: none;
+	}
+}

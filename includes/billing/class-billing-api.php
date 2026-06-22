@@ -99,7 +99,7 @@ class Arriendo_Facil_Billing_API {
 
 		$lease_id = isset( $_POST['lease_id'] ) ? absint( wp_unslash( $_POST['lease_id'] ) ) : 0;
 		if ( $lease_id <= 0 ) {
-			wp_send_json_error( array( 'message' => __( 'Lease ID invalido.', 'arriendo-facil' ) ), 400 );
+			wp_send_json_error( array( 'message' => __( 'ID de contrato invalido.', 'arriendo-facil' ) ), 400 );
 		}
 
 		// Parse user-edited overrides from the preview modal.
@@ -192,7 +192,7 @@ class Arriendo_Facil_Billing_API {
 
 		$lease_id = isset( $_POST['lease_id'] ) ? absint( wp_unslash( $_POST['lease_id'] ) ) : 0;
 		if ( $lease_id <= 0 ) {
-			wp_send_json_error( array( 'message' => __( 'Lease ID invalido.', 'arriendo-facil' ) ), 400 );
+			wp_send_json_error( array( 'message' => __( 'ID de contrato invalido.', 'arriendo-facil' ) ), 400 );
 		}
 
 		$overrides_raw  = isset( $_POST['overrides'] ) ? wp_unslash( $_POST['overrides'] ) : '';

@@ -27,7 +27,7 @@ class Arriendo_Facil_Activator {
 		if ( ! $role ) {
 			$role = add_role(
 				'af_owner',
-				__( 'Property Owner', 'arriendo-facil' ),
+				__( 'Propietario', 'arriendo-facil' ),
 				array(
 					'read'                 => true,
 					'upload_files'         => true,

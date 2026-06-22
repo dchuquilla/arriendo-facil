@@ -300,7 +300,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 		$source_path = (string) $source_path;
 
 		if ( '' === $source_path || ! file_exists( $source_path ) || ! class_exists( 'ZipArchive' ) ) {
-			return new WP_Error( 'invalid_source', __( 'Invalid DOCX file.', 'arriendo-facil' ) );
+			return new WP_Error( 'invalid_source', __( 'Archivo DOCX invalido.', 'arriendo-facil' ) );
 		}
 
 		$zip = new ZipArchive();
@@ -319,7 +319,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 		$flat_text = $this->extract_flat_text_from_doc_xml( $doc_xml );
 
 		if ( '' === $flat_text ) {
-			return new WP_Error( 'text_empty', __( 'Could not extract text from document.', 'arriendo-facil' ) );
+			return new WP_Error( 'text_empty', __( 'No se pudo extraer texto del documento.', 'arriendo-facil' ) );
 		}
 
 		$blank_pattern = '/_{3,}|\.{4,}|…{2,}|-{4,}|\t{2,}/u';

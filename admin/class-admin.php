@@ -49,8 +49,8 @@ class Arriendo_Facil_Admin {
 
 		add_submenu_page(
 			'arriendo-facil',
-			__( 'Dashboard', 'arriendo-facil' ),
-			__( 'Dashboard', 'arriendo-facil' ),
+			__( 'Panel', 'arriendo-facil' ),
+			__( 'Panel', 'arriendo-facil' ),
 			'edit_posts',
 			'arriendo-facil',
 			array( $this, 'render_dashboard' )
@@ -58,8 +58,8 @@ class Arriendo_Facil_Admin {
 
 		add_submenu_page(
 			'arriendo-facil',
-			__( 'Leases', 'arriendo-facil' ),
-			__( 'Leases', 'arriendo-facil' ),
+			__( 'Contratos', 'arriendo-facil' ),
+			__( 'Contratos', 'arriendo-facil' ),
 			'edit_posts',
 			'af-leases',
 			array( $this, 'render_leases' )
@@ -67,8 +67,8 @@ class Arriendo_Facil_Admin {
 
 		add_submenu_page(
 			'arriendo-facil',
-			__( 'Cleaning Requests', 'arriendo-facil' ),
-			__( 'Cleaning Requests', 'arriendo-facil' ),
+			__( 'Solicitudes de limpieza', 'arriendo-facil' ),
+			__( 'Solicitudes de limpieza', 'arriendo-facil' ),
 			'edit_posts',
 			'af-cleaning-requests',
 			array( $this, 'render_cleaning_requests' )
@@ -76,8 +76,8 @@ class Arriendo_Facil_Admin {
 
 		add_submenu_page(
 			'arriendo-facil',
-			__( 'Owner Contacts', 'arriendo-facil' ),
-			__( 'Owner Contacts', 'arriendo-facil' ),
+			__( 'Contactos de propietarios', 'arriendo-facil' ),
+			__( 'Contactos de propietarios', 'arriendo-facil' ),
 			'manage_options',
 			'af-owner-contacts',
 			array( $this, 'render_owner_contacts' )
@@ -85,8 +85,8 @@ class Arriendo_Facil_Admin {
 
 		add_submenu_page(
 			'arriendo-facil',
-			__( 'Guests', 'arriendo-facil' ),
-			__( 'Guests', 'arriendo-facil' ),
+			__( 'Huespedes', 'arriendo-facil' ),
+			__( 'Huespedes', 'arriendo-facil' ),
 			'edit_posts',
 			'af-guests',
 			array( $this, 'render_guests' )
@@ -94,8 +94,8 @@ class Arriendo_Facil_Admin {
 
 		add_submenu_page(
 			'arriendo-facil',
-			__( 'AI Settings', 'arriendo-facil' ),
-			__( 'AI Settings', 'arriendo-facil' ),
+			__( 'Ajustes de IA', 'arriendo-facil' ),
+			__( 'Ajustes de IA', 'arriendo-facil' ),
 			'manage_options',
 			'af-ai-settings',
 			array( $this, 'render_ai_settings' )
@@ -423,12 +423,12 @@ class Arriendo_Facil_Admin {
 		check_ajax_referer( 'af_lease_nonce', 'nonce' );
 
 		if ( ! current_user_can( 'edit_posts' ) ) {
-			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
 		$accommodation_id = isset( $_POST['accommodation_id'] ) ? absint( $_POST['accommodation_id'] ) : 0;
 		if ( ! $accommodation_id ) {
-			wp_send_json_error( array( 'message' => __( 'Invalid accommodation ID.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'ID de alojamiento invalido.', 'arriendo-facil' ) ) );
 		}
 
 		$data = array(
@@ -456,32 +456,32 @@ class Arriendo_Facil_Admin {
 		check_ajax_referer( 'af_lease_nonce', 'nonce' );
 
 		if ( ! current_user_can( 'edit_posts' ) ) {
-			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
 		$lease_id = isset( $_POST['lease_id'] ) ? absint( $_POST['lease_id'] ) : 0;
 		if ( ! $lease_id ) {
-			wp_send_json_error( array( 'message' => __( 'Invalid lease ID.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'ID de contrato invalido.', 'arriendo-facil' ) ) );
 		}
 
 		$lease_obj = new Arriendo_Facil_Lease();
 		$lease     = $lease_obj->get_lease( $lease_id );
 
 		if ( ! $lease ) {
-			wp_send_json_error( array( 'message' => __( 'Lease not found.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'Contrato no encontrado.', 'arriendo-facil' ) ) );
 		}
 
 		$ai_payload = $this->build_lease_ai_payload( $lease );
 		$owner_template_exists = ! empty( $ai_payload['template_available'] );
 
-		$result = new WP_Error( 'af_ai_not_executed', __( 'AI document generation was not executed.', 'arriendo-facil' ) );
+		$result = new WP_Error( 'af_ai_not_executed', __( 'No se ejecuto la generacion del documento con IA.', 'arriendo-facil' ) );
 		if ( class_exists( 'Arriendo_Facil_AI_Service' ) ) {
 			try {
 				$ai     = new Arriendo_Facil_AI_Service();
 				$result = $ai->generate_document( $ai_payload );
 			} catch ( Throwable $throwable ) {
 				error_log( 'Arriendo Facil admin AI document generation exception: ' . $throwable->getMessage() );
-				$result = new WP_Error( 'af_ai_exception', __( 'AI document generation failed unexpectedly.', 'arriendo-facil' ) );
+				$result = new WP_Error( 'af_ai_exception', __( 'La generacion del documento con IA fallo inesperadamente.', 'arriendo-facil' ) );
 			}
 		}
 
@@ -543,7 +543,7 @@ class Arriendo_Facil_Admin {
 			$this->force_attach_lease_document( $lease_id, $document_url );
 			$result['document_url'] = $document_url;
 		} else {
-			wp_send_json_error( array( 'message' => __( 'Could not generate a usable contract document for this lease.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'No se pudo generar un documento de contrato utilizable para este contrato.', 'arriendo-facil' ) ) );
 		}
 
 		wp_send_json_success( $result );
@@ -2942,7 +2942,7 @@ class Arriendo_Facil_Admin {
 		$bucket     = $this->get_storage_setting( 'AF_R2_BUCKET_NAME', 'af_r2_bucket_name', '' );
 
 		if ( '' === $access_key || '' === $secret_key || '' === $endpoint || '' === $bucket ) {
-			return new WP_Error( 'af_r2_missing_config', __( 'Missing Cloudflare R2 credentials. Check Settings > Cloud Provider.', 'arriendo-facil' ) );
+			return new WP_Error( 'af_r2_missing_config', __( 'Faltan credenciales de Cloudflare R2. Revisa Ajustes > Proveedor en la nube.', 'arriendo-facil' ) );
 		}
 
 		$parsed = wp_parse_url( $endpoint );
@@ -2950,7 +2950,7 @@ class Arriendo_Facil_Admin {
 		$scheme = isset( $parsed['scheme'] ) ? (string) $parsed['scheme'] : '';
 
 		if ( '' === $host || '' === $scheme ) {
-			return new WP_Error( 'af_r2_invalid_endpoint', __( 'Invalid Cloudflare R2 endpoint URL.', 'arriendo-facil' ) );
+			return new WP_Error( 'af_r2_invalid_endpoint', __( 'URL de endpoint de Cloudflare R2 invalida.', 'arriendo-facil' ) );
 		}
 
 		return array(

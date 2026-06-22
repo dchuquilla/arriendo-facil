@@ -112,17 +112,17 @@ class Arriendo_Facil_Accommodation {
 	 */
 	public function register_post_type() {
 		$labels = array(
-			'name'               => __( 'Accommodations', 'arriendo-facil' ),
-			'singular_name'      => __( 'Accommodation', 'arriendo-facil' ),
-			'menu_name'          => __( 'Accommodations', 'arriendo-facil' ),
-			'add_new'            => __( 'Add New', 'arriendo-facil' ),
-			'add_new_item'       => __( 'Add New Accommodation', 'arriendo-facil' ),
-			'edit_item'          => __( 'Edit Accommodation', 'arriendo-facil' ),
-			'new_item'           => __( 'New Accommodation', 'arriendo-facil' ),
-			'view_item'          => __( 'View Accommodation', 'arriendo-facil' ),
-			'search_items'       => __( 'Search Accommodations', 'arriendo-facil' ),
-			'not_found'          => __( 'No accommodations found', 'arriendo-facil' ),
-			'not_found_in_trash' => __( 'No accommodations found in Trash', 'arriendo-facil' ),
+			'name'               => __( 'Inmuebles', 'arriendo-facil' ),
+			'singular_name'      => __( 'Inmueble', 'arriendo-facil' ),
+			'menu_name'          => __( 'Inmuebles', 'arriendo-facil' ),
+			'add_new'            => __( 'Agregar nuevo', 'arriendo-facil' ),
+			'add_new_item'       => __( 'Agregar nuevo inmueble', 'arriendo-facil' ),
+			'edit_item'          => __( 'Editar inmueble', 'arriendo-facil' ),
+			'new_item'           => __( 'Nuevo inmueble', 'arriendo-facil' ),
+			'view_item'          => __( 'Ver inmueble', 'arriendo-facil' ),
+			'search_items'       => __( 'Buscar inmuebles', 'arriendo-facil' ),
+			'not_found'          => __( 'No se encontraron inmuebles', 'arriendo-facil' ),
+			'not_found_in_trash' => __( 'No se encontraron inmuebles en la papelera', 'arriendo-facil' ),
 		);
 
 		$args = array(
@@ -151,7 +151,7 @@ class Arriendo_Facil_Accommodation {
 	public function add_meta_boxes() {
 		add_meta_box(
 			'af_accommodation_details',
-			__( 'Accommodation Details', 'arriendo-facil' ),
+			__( 'Detalles del inmueble', 'arriendo-facil' ),
 			array( $this, 'render_meta_box' ),
 			'accommodation',
 			'normal',
@@ -325,7 +325,7 @@ class Arriendo_Facil_Accommodation {
 					</article>
 				<?php endforeach; ?>
 			<?php else : ?>
-				<p><?php esc_html_e( 'No hay accommodations disponibles por el momento.', 'arriendo-facil' ); ?></p>
+				<p><?php esc_html_e( 'No hay alojamientos disponibles por el momento.', 'arriendo-facil' ); ?></p>
 			<?php endif; ?>
 		</div>
 		<?php

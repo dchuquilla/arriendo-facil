@@ -89,26 +89,26 @@ $cleaning_services = $wpdb->get_results(
 );
 ?>
 <div class="wrap">
-	<h1><?php esc_html_e( 'Cleaning Requests', 'arriendo-facil' ); ?></h1>
+	<h1><?php esc_html_e( 'Solicitudes de limpieza', 'arriendo-facil' ); ?></h1>
 
 	<div class="af-cleaning-actions" style="margin-bottom: 16px;">
 		<button type="button" class="button button-primary" id="af-new-cleaning-request">
-			<?php esc_html_e( '+ New Cleaning Request', 'arriendo-facil' ); ?>
+			<?php esc_html_e( '+ Nueva solicitud de limpieza', 'arriendo-facil' ); ?>
 		</button>
 	</div>
 
 	<div id="af-cleaning-request-form-card" class="card" style="max-width: 1000px; margin: 16px 0; padding: 16px; display: none;">
-		<h2><?php esc_html_e( 'New Cleaning Request', 'arriendo-facil' ); ?></h2>
+		<h2><?php esc_html_e( 'Nueva solicitud de limpieza', 'arriendo-facil' ); ?></h2>
 		<form id="af-cleaning-request-form" method="post" action="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>">
 			<input type="hidden" name="action" value="af_create_cleaning_request" />
 			<input type="hidden" name="nonce" value="<?php echo esc_attr( wp_create_nonce( 'af_cleaning_request_nonce' ) ); ?>" />
 
 			<table class="form-table" role="presentation">
 				<tr>
-					<th scope="row"><label for="af_cleaning_owner_select"><?php esc_html_e( 'Owner Name / RUC', 'arriendo-facil' ); ?></label></th>
+					<th scope="row"><label for="af_cleaning_owner_select"><?php esc_html_e( 'Nombre del propietario / RUC', 'arriendo-facil' ); ?></label></th>
 					<td>
 						<select id="af_cleaning_owner_select" class="regular-text" required>
-							<option value=""><?php esc_html_e( 'Select owner', 'arriendo-facil' ); ?></option>
+							<option value=""><?php esc_html_e( 'Seleccionar propietario', 'arriendo-facil' ); ?></option>
 							<?php foreach ( $owners as $owner ) : ?>
 								<?php
 								$owner_name    = (string) $owner->subject;
@@ -146,10 +146,10 @@ $cleaning_services = $wpdb->get_results(
 					</td>
 				</tr>
 				<tr>
-					<th scope="row"><label for="af_cleaning_service_select"><?php esc_html_e( 'Cleaning Services', 'arriendo-facil' ); ?></label></th>
+					<th scope="row"><label for="af_cleaning_service_select"><?php esc_html_e( 'Servicios de limpieza', 'arriendo-facil' ); ?></label></th>
 					<td>
 						<select id="af_cleaning_service_select" class="regular-text">
-							<option value=""><?php esc_html_e( 'Select cleaning service', 'arriendo-facil' ); ?></option>
+							<option value=""><?php esc_html_e( 'Seleccionar servicio de limpieza', 'arriendo-facil' ); ?></option>
 							<?php foreach ( $cleaning_services as $service ) : ?>
 								<?php
 								$service_name = '' !== trim( (string) $service->company_name ) ? (string) $service->company_name : (string) $service->post_title;
@@ -175,14 +175,14 @@ $cleaning_services = $wpdb->get_results(
 					<td><input type="date" id="af_cleaning_requested_date" name="requested_date" required /></td>
 				</tr>
 				<tr>
-					<th scope="row"><label for="af_cleaning_notes"><?php esc_html_e( 'Notes', 'arriendo-facil' ); ?></label></th>
+					<th scope="row"><label for="af_cleaning_notes"><?php esc_html_e( 'Notas', 'arriendo-facil' ); ?></label></th>
 					<td><textarea id="af_cleaning_notes" name="notes" rows="4" class="large-text"></textarea></td>
 				</tr>
 			</table>
 
 			<p class="submit">
-				<button type="submit" class="button button-primary" id="af-cleaning-request-submit"><?php esc_html_e( 'Create Cleaning Request', 'arriendo-facil' ); ?></button>
-				<button type="button" class="button" id="af-cancel-cleaning-request"><?php esc_html_e( 'Cancel', 'arriendo-facil' ); ?></button>
+				<button type="submit" class="button button-primary" id="af-cleaning-request-submit"><?php esc_html_e( 'Crear solicitud de limpieza', 'arriendo-facil' ); ?></button>
+				<button type="button" class="button" id="af-cancel-cleaning-request"><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
 			</p>
 		</form>
 	</div>
@@ -195,7 +195,7 @@ $cleaning_services = $wpdb->get_results(
 				<th><?php esc_html_e( 'Requested Date', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Completed Date', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Status', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Notes', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'Notas', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Actions', 'arriendo-facil' ); ?></th>
 			</tr>
 		</thead>
@@ -235,7 +235,7 @@ $cleaning_services = $wpdb->get_results(
 				<?php endforeach; ?>
 			<?php else : ?>
 				<tr>
-					<td colspan="7"><?php esc_html_e( 'No cleaning requests found.', 'arriendo-facil' ); ?></td>
+					<td colspan="7"><?php esc_html_e( 'No se encontraron solicitudes de limpieza.', 'arriendo-facil' ); ?></td>
 				</tr>
 			<?php endif; ?>
 		</tbody>

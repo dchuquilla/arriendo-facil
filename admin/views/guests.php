@@ -1,6 +1,6 @@
 <?php
 /**
- * Guests admin page view.
+ * Huespedes admin page view.
  *
  * @package Arriendo_Facil
  */
@@ -186,7 +186,7 @@ if ( $is_owner ) {
 }
 ?>
 <div class="wrap">
-	<h1><?php esc_html_e( 'Guests', 'arriendo-facil' ); ?></h1>
+	<h1><?php esc_html_e( 'Huespedes', 'arriendo-facil' ); ?></h1>
 
 	<?php if ( '' !== $action_notice ) : ?>
 		<div class="notice <?php echo esc_attr( $action_notice_class ); ?> is-dismissible">
@@ -196,12 +196,12 @@ if ( $is_owner ) {
 
 	<div class="af-guest-actions" style="margin-bottom: 16px;">
 		<button type="button" class="button button-primary" id="af-new-guest">
-			<?php esc_html_e( '+ New Guest', 'arriendo-facil' ); ?>
+			<?php esc_html_e( '+ Nuevo huesped', 'arriendo-facil' ); ?>
 		</button>
 	</div>
 
 	<div id="af-guest-form-card" class="card" style="max-width: 900px; margin: 16px 0; padding: 16px; display: none;">
-		<h2><?php esc_html_e( 'New Guest', 'arriendo-facil' ); ?></h2>
+		<h2><?php esc_html_e( 'Nuevo huesped', 'arriendo-facil' ); ?></h2>
 		<form id="af-guest-form" method="post" action="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>" enctype="multipart/form-data">
 			<input type="hidden" name="action" value="af_create_guest" />
 			<input type="hidden" name="nonce" value="<?php echo esc_attr( wp_create_nonce( 'af_guest_nonce' ) ); ?>" />
@@ -261,8 +261,8 @@ if ( $is_owner ) {
 			</table>
 
 			<p class="submit">
-				<button type="submit" class="button button-primary"><?php esc_html_e( 'Save Guest', 'arriendo-facil' ); ?></button>
-				<button type="button" class="button" id="af-cancel-new-guest"><?php esc_html_e( 'Cancel', 'arriendo-facil' ); ?></button>
+				<button type="submit" class="button button-primary"><?php esc_html_e( 'Guardar huesped', 'arriendo-facil' ); ?></button>
+				<button type="button" class="button" id="af-cancel-new-guest"><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
 			</p>
 		</form>
 	</div>
@@ -339,7 +339,7 @@ if ( $is_owner ) {
 				<?php endforeach; ?>
 			<?php else : ?>
 				<tr>
-					<td colspan="7"><?php esc_html_e( 'No visit requests found.', 'arriendo-facil' ); ?></td>
+					<td colspan="7"><?php esc_html_e( 'No se encontraron solicitudes de visita.', 'arriendo-facil' ); ?></td>
 				</tr>
 			<?php endif; ?>
 		</tbody>
@@ -379,7 +379,7 @@ if ( $is_owner ) {
 				<?php endforeach; ?>
 			<?php else : ?>
 				<tr>
-					<td colspan="7"><?php esc_html_e( 'No guests found.', 'arriendo-facil' ); ?></td>
+					<td colspan="7"><?php esc_html_e( 'No se encontraron huespedes.', 'arriendo-facil' ); ?></td>
 				</tr>
 			<?php endif; ?>
 		</tbody>

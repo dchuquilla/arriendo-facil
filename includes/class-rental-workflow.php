@@ -53,7 +53,7 @@ class Arriendo_Facil_Rental_Workflow {
 			return array(
 				'can_start_flow' => false,
 				'reason_code'    => 'invalid_accommodation',
-				'message'        => __( 'Invalid accommodation.', 'arriendo-facil' ),
+				'message'        => __( 'Inmueble invalido.', 'arriendo-facil' ),
 				'state'          => 'unavailable',
 			);
 		}
@@ -75,7 +75,7 @@ class Arriendo_Facil_Rental_Workflow {
 			return array(
 				'can_start_flow' => false,
 				'reason_code'    => $commercial_status,
-				'message'        => __( 'This accommodation is currently not available for a new rental flow.', 'arriendo-facil' ),
+				'message'        => __( 'Este inmueble no esta disponible en este momento para iniciar un nuevo proceso de arriendo.', 'arriendo-facil' ),
 				'state'          => $commercial_status,
 				'status'         => $status,
 			);
@@ -85,7 +85,7 @@ class Arriendo_Facil_Rental_Workflow {
 			return array(
 				'can_start_flow' => false,
 				'reason_code'    => 'maintenance_or_inactive',
-				'message'        => __( 'This accommodation is not available right now.', 'arriendo-facil' ),
+				'message'        => __( 'Este inmueble no esta disponible en este momento.', 'arriendo-facil' ),
 				'state'          => 'not_available',
 				'status'         => $status,
 			);
@@ -95,7 +95,7 @@ class Arriendo_Facil_Rental_Workflow {
 			return array(
 				'can_start_flow' => false,
 				'reason_code'    => 'active_lease',
-				'message'        => __( 'This accommodation already has an active lease.', 'arriendo-facil' ),
+				'message'        => __( 'Este inmueble ya tiene un contrato activo.', 'arriendo-facil' ),
 				'state'          => 'rented',
 				'status'         => $status,
 			);
@@ -107,7 +107,7 @@ class Arriendo_Facil_Rental_Workflow {
 			return array(
 				'can_start_flow' => false,
 				'reason_code'    => 'reserved_hold',
-				'message'        => __( 'This accommodation is currently reserved.', 'arriendo-facil' ),
+				'message'        => __( 'Este inmueble se encuentra reservado en este momento.', 'arriendo-facil' ),
 				'state'          => 'reserved',
 				'status'         => $status,
 				'hold_until'     => $hold_until,
@@ -119,7 +119,7 @@ class Arriendo_Facil_Rental_Workflow {
 			return array(
 				'can_start_flow'      => false,
 				'reason_code'         => 'requires_visit_booking',
-				'message'             => __( 'A confirmed visit is required before continuing the rental process.', 'arriendo-facil' ),
+				'message'             => __( 'Se requiere una visita confirmada antes de continuar el proceso de arriendo.', 'arriendo-facil' ),
 				'state'               => 'requires_visit',
 				'status'              => $status,
 				'requires_visit_step' => true,
@@ -129,7 +129,7 @@ class Arriendo_Facil_Rental_Workflow {
 		return array(
 			'can_start_flow' => true,
 			'reason_code'    => 'available',
-			'message'        => __( 'Accommodation available.', 'arriendo-facil' ),
+			'message'        => __( 'Inmueble disponible.', 'arriendo-facil' ),
 			'state'          => 'available',
 			'status'         => $status,
 		);
@@ -153,7 +153,7 @@ class Arriendo_Facil_Rental_Workflow {
 		check_ajax_referer( 'af_owner_contact_nonce', 'nonce' );
 
 		if ( ! current_user_can( 'edit_posts' ) ) {
-			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
 		$accommodation_id = isset( $_POST['accommodation_id'] ) ? absint( wp_unslash( $_POST['accommodation_id'] ) ) : 0;
@@ -162,11 +162,11 @@ class Arriendo_Facil_Rental_Workflow {
 		$end_time         = isset( $_POST['end_time'] ) ? sanitize_text_field( wp_unslash( $_POST['end_time'] ) ) : '';
 
 		if ( ! $this->can_manage_accommodation( $accommodation_id ) ) {
-			wp_send_json_error( array( 'message' => __( 'You cannot manage this accommodation.', 'arriendo-facil' ) ), 403 );
+			wp_send_json_error( array( 'message' => __( 'No puedes gestionar este inmueble.', 'arriendo-facil' ) ), 403 );
 		}
 
 		if ( ! $this->is_valid_date( $visit_date ) || ! $this->is_valid_time( $start_time ) || ! $this->is_valid_time( $end_time ) || $end_time <= $start_time ) {
-			wp_send_json_error( array( 'message' => __( 'Invalid date/time range.', 'arriendo-facil' ) ), 400 );
+			wp_send_json_error( array( 'message' => __( 'Rango de fecha u hora invalido.', 'arriendo-facil' ) ), 400 );
 		}
 
 		global $wpdb;
@@ -188,15 +188,15 @@ class Arriendo_Facil_Rental_Workflow {
 		if ( ! $inserted ) {
 			$db_error = isset( $wpdb->last_error ) ? (string) $wpdb->last_error : '';
 			$message  = '' !== $db_error && false !== stripos( $db_error, 'Duplicate' )
-				? __( 'That date and time is already reserved.', 'arriendo-facil' )
-				: __( 'Could not create visit slot.', 'arriendo-facil' );
+				? __( 'Esa fecha y hora ya estan reservadas.', 'arriendo-facil' )
+				: __( 'No se pudo crear el cupo de visita.', 'arriendo-facil' );
 			wp_send_json_error( array( 'message' => $message ), 400 );
 		}
 
 		wp_send_json_success(
 			array(
 				'id'      => (int) $wpdb->insert_id,
-				'message' => __( 'Visit slot created.', 'arriendo-facil' ),
+				'message' => __( 'Cupo de visita creado.', 'arriendo-facil' ),
 			)
 		);
 	}
@@ -209,7 +209,7 @@ class Arriendo_Facil_Rental_Workflow {
 
 		$accommodation_id = isset( $_REQUEST['accommodation_id'] ) ? absint( wp_unslash( $_REQUEST['accommodation_id'] ) ) : 0;
 		if ( ! $accommodation_id ) {
-			wp_send_json_error( array( 'message' => __( 'Invalid accommodation.', 'arriendo-facil' ) ), 400 );
+			wp_send_json_error( array( 'message' => __( 'Inmueble invalido.', 'arriendo-facil' ) ), 400 );
 		}
 
 		global $wpdb;
@@ -218,7 +218,7 @@ class Arriendo_Facil_Rental_Workflow {
 		$is_admin_owner_request = is_user_logged_in() && current_user_can( 'edit_posts' ) && '' !== $nonce && wp_verify_nonce( $nonce, 'af_owner_contact_nonce' );
 
 		if ( $is_admin_owner_request && ! $this->can_manage_accommodation( $accommodation_id ) ) {
-			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
 		if ( $is_admin_owner_request ) {
@@ -275,7 +275,7 @@ class Arriendo_Facil_Rental_Workflow {
 		$notes             = isset( $_POST['notes'] ) ? sanitize_textarea_field( wp_unslash( $_POST['notes'] ) ) : '';
 
 		if ( ! $slot_id || '' === $guest_name || ! is_email( $guest_email ) ) {
-			wp_send_json_error( array( 'message' => __( 'Missing required booking data.', 'arriendo-facil' ) ), 400 );
+			wp_send_json_error( array( 'message' => __( 'Faltan datos obligatorios para agendar la visita.', 'arriendo-facil' ) ), 400 );
 		}
 
 		global $wpdb;
@@ -290,7 +290,7 @@ class Arriendo_Facil_Rental_Workflow {
 		);
 
 		if ( ! $slot || 'open' !== (string) $slot->status ) {
-			wp_send_json_error( array( 'message' => __( 'This slot is no longer available.', 'arriendo-facil' ), 'code' => 409 ), 409 );
+			wp_send_json_error( array( 'message' => __( 'Este cupo ya no esta disponible.', 'arriendo-facil' ), 'code' => 409 ), 409 );
 		}
 
 		$inserted_booking = $wpdb->insert(
@@ -309,7 +309,7 @@ class Arriendo_Facil_Rental_Workflow {
 		);
 
 		if ( ! $inserted_booking ) {
-			wp_send_json_error( array( 'message' => __( 'That slot has already been booked.', 'arriendo-facil' ), 'code' => 409 ), 409 );
+			wp_send_json_error( array( 'message' => __( 'Ese cupo ya fue reservado.', 'arriendo-facil' ), 'code' => 409 ), 409 );
 		}
 
 		$wpdb->update(
@@ -320,12 +320,12 @@ class Arriendo_Facil_Rental_Workflow {
 			array( '%d' )
 		);
 
-		$this->notify_owner_about_interest( (int) $slot->accommodation_id, __( 'New visit booked.', 'arriendo-facil' ) );
+		$this->notify_owner_about_interest( (int) $slot->accommodation_id, __( 'Nueva visita agendada.', 'arriendo-facil' ) );
 		$this->send_booking_confirmation_email( $guest_email, $guest_name, (int) $slot->accommodation_id, (string) $slot->visit_date, (string) $slot->start_time, (string) $slot->end_time );
 
 		wp_send_json_success(
 			array(
-				'message' => __( 'Visit booked successfully.', 'arriendo-facil' ),
+				'message' => __( 'Visita agendada correctamente.', 'arriendo-facil' ),
 			)
 		);
 	}
@@ -343,7 +343,7 @@ class Arriendo_Facil_Rental_Workflow {
 		$message          = isset( $_POST['message'] ) ? sanitize_textarea_field( wp_unslash( $_POST['message'] ) ) : '';
 
 		if ( ! $accommodation_id || '' === $name || ! is_email( $email ) ) {
-			wp_send_json_error( array( 'message' => __( 'Missing required queue data.', 'arriendo-facil' ) ), 400 );
+			wp_send_json_error( array( 'message' => __( 'Faltan datos obligatorios para la cola de interesados.', 'arriendo-facil' ) ), 400 );
 		}
 
 		global $wpdb;
@@ -358,7 +358,7 @@ class Arriendo_Facil_Rental_Workflow {
 		);
 
 		if ( $exists ) {
-			wp_send_json_success( array( 'message' => __( 'You are already in the interest queue for this accommodation.', 'arriendo-facil' ) ) );
+			wp_send_json_success( array( 'message' => __( 'Ya estas en la cola de interesados para este inmueble.', 'arriendo-facil' ) ) );
 		}
 
 		$inserted = $wpdb->insert(
@@ -375,12 +375,12 @@ class Arriendo_Facil_Rental_Workflow {
 		);
 
 		if ( ! $inserted ) {
-			wp_send_json_error( array( 'message' => __( 'Could not add to interest queue.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'No se pudo agregar a la cola de interesados.', 'arriendo-facil' ) ) );
 		}
 
-		$this->notify_owner_about_interest( $accommodation_id, __( 'New interested lead added to queue.', 'arriendo-facil' ) );
+		$this->notify_owner_about_interest( $accommodation_id, __( 'Nuevo interesado agregado a la cola.', 'arriendo-facil' ) );
 
-		wp_send_json_success( array( 'message' => __( 'Added to queue. We will notify you when it is available.', 'arriendo-facil' ) ) );
+		wp_send_json_success( array( 'message' => __( 'Agregado a la cola. Te notificaremos cuando este disponible.', 'arriendo-facil' ) ) );
 	}
 
 	/**
@@ -390,12 +390,12 @@ class Arriendo_Facil_Rental_Workflow {
 		check_ajax_referer( 'af_owner_contact_nonce', 'nonce' );
 
 		if ( ! current_user_can( 'read' ) ) {
-			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
 		$accommodation_id = isset( $_GET['accommodation_id'] ) ? absint( wp_unslash( $_GET['accommodation_id'] ) ) : 0;
 		if ( ! $accommodation_id || ! $this->can_manage_accommodation( $accommodation_id ) ) {
-			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
 		global $wpdb;
@@ -442,12 +442,12 @@ class Arriendo_Facil_Rental_Workflow {
 		check_ajax_referer( 'af_owner_contact_nonce', 'nonce' );
 
 		if ( ! current_user_can( 'read' ) ) {
-			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
 		$accommodation_id = isset( $_GET['accommodation_id'] ) ? absint( wp_unslash( $_GET['accommodation_id'] ) ) : 0;
 		if ( ! $accommodation_id || ! $this->can_manage_accommodation( $accommodation_id ) ) {
-			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
 		global $wpdb;
@@ -478,7 +478,7 @@ class Arriendo_Facil_Rental_Workflow {
 		check_ajax_referer( 'af_owner_contact_nonce', 'nonce' );
 
 		if ( ! current_user_can( 'edit_posts' ) ) {
-			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
 		$accommodation_id  = isset( $_POST['accommodation_id'] ) ? absint( wp_unslash( $_POST['accommodation_id'] ) ) : 0;
@@ -489,16 +489,16 @@ class Arriendo_Facil_Rental_Workflow {
 		$notes             = isset( $_POST['notes'] ) ? sanitize_textarea_field( wp_unslash( $_POST['notes'] ) ) : '';
 
 		if ( ! $this->can_manage_accommodation( $accommodation_id ) ) {
-			wp_send_json_error( array( 'message' => __( 'You cannot manage this accommodation.', 'arriendo-facil' ) ), 403 );
+			wp_send_json_error( array( 'message' => __( 'No puedes gestionar este inmueble.', 'arriendo-facil' ) ), 403 );
 		}
 
 		if ( ! $this->is_valid_datetime( $hold_until ) || $deposit_amount < 0 ) {
-			wp_send_json_error( array( 'message' => __( 'Invalid reservation data.', 'arriendo-facil' ) ), 400 );
+			wp_send_json_error( array( 'message' => __( 'Datos de reserva invalidos.', 'arriendo-facil' ) ), 400 );
 		}
 
 		$availability = self::get_availability_summary( $accommodation_id );
 		if ( ! empty( $availability['reason_code'] ) && in_array( $availability['reason_code'], array( 'active_lease', 'reserved_hold' ), true ) ) {
-			wp_send_json_error( array( 'message' => __( 'Accommodation cannot be reserved right now.', 'arriendo-facil' ) ), 409 );
+			wp_send_json_error( array( 'message' => __( 'El inmueble no puede reservarse en este momento.', 'arriendo-facil' ) ), 409 );
 		}
 
 		global $wpdb;
@@ -522,7 +522,7 @@ class Arriendo_Facil_Rental_Workflow {
 		);
 
 		if ( ! $inserted ) {
-			wp_send_json_error( array( 'message' => __( 'Could not create reservation hold.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'No se pudo crear la reserva temporal.', 'arriendo-facil' ) ) );
 		}
 
 		self::set_commercial_state( $accommodation_id, 'reserved', 'public' );
@@ -532,7 +532,7 @@ class Arriendo_Facil_Rental_Workflow {
 		wp_send_json_success(
 			array(
 				'id'      => (int) $wpdb->insert_id,
-				'message' => __( 'Reservation hold created.', 'arriendo-facil' ),
+				'message' => __( 'Reserva temporal creada.', 'arriendo-facil' ),
 			)
 		);
 	}
@@ -544,13 +544,13 @@ class Arriendo_Facil_Rental_Workflow {
 		check_ajax_referer( 'af_owner_contact_nonce', 'nonce' );
 
 		if ( ! current_user_can( 'edit_posts' ) ) {
-			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
 		$reservation_id = isset( $_POST['reservation_id'] ) ? absint( wp_unslash( $_POST['reservation_id'] ) ) : 0;
 		$reason         = isset( $_POST['reason'] ) ? sanitize_text_field( wp_unslash( $_POST['reason'] ) ) : '';
 		if ( ! $reservation_id || '' === $reason ) {
-			wp_send_json_error( array( 'message' => __( 'Reservation ID and reason are required.', 'arriendo-facil' ) ), 400 );
+			wp_send_json_error( array( 'message' => __( 'El ID de reserva y el motivo son obligatorios.', 'arriendo-facil' ) ), 400 );
 		}
 
 		global $wpdb;
@@ -558,7 +558,7 @@ class Arriendo_Facil_Rental_Workflow {
 		$row   = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d LIMIT 1", $reservation_id ) );
 
 		if ( ! $row || ! $this->can_manage_accommodation( (int) $row->accommodation_id ) ) {
-			wp_send_json_error( array( 'message' => __( 'Reservation not found.', 'arriendo-facil' ) ), 404 );
+			wp_send_json_error( array( 'message' => __( 'Reserva no encontrada.', 'arriendo-facil' ) ), 404 );
 		}
 
 		$updated = $wpdb->update(
@@ -575,14 +575,14 @@ class Arriendo_Facil_Rental_Workflow {
 		);
 
 		if ( false === $updated ) {
-			wp_send_json_error( array( 'message' => __( 'Could not release reservation.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'No se pudo liberar la reserva.', 'arriendo-facil' ) ) );
 		}
 
 		self::set_commercial_state( (int) $row->accommodation_id, 'available', 'public' );
 		$this->notify_interest_queue_release( (int) $row->accommodation_id );
 		self::log_lease_event( 0, (int) $row->accommodation_id, 'reservation_released', array( 'reservation_id' => $reservation_id, 'reason' => $reason ) );
 
-		wp_send_json_success( array( 'message' => __( 'Reservation released and accommodation reopened.', 'arriendo-facil' ) ) );
+		wp_send_json_success( array( 'message' => __( 'Reserva liberada e inmueble reabierto.', 'arriendo-facil' ) ) );
 	}
 
 	/**
@@ -592,7 +592,7 @@ class Arriendo_Facil_Rental_Workflow {
 		check_ajax_referer( 'af_lease_nonce', 'nonce' );
 
 		if ( ! current_user_can( 'edit_posts' ) ) {
-			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
 		$lease_id      = isset( $_POST['lease_id'] ) ? absint( wp_unslash( $_POST['lease_id'] ) ) : 0;
@@ -600,13 +600,13 @@ class Arriendo_Facil_Rental_Workflow {
 		$reason        = isset( $_POST['reason'] ) ? sanitize_textarea_field( wp_unslash( $_POST['reason'] ) ) : '';
 
 		if ( ! $lease_id || ! $this->is_valid_date( $release_date ) || '' === trim( $reason ) ) {
-			wp_send_json_error( array( 'message' => __( 'Lease, release date, and reason are required.', 'arriendo-facil' ) ), 400 );
+			wp_send_json_error( array( 'message' => __( 'El contrato, la fecha de liberacion y el motivo son obligatorios.', 'arriendo-facil' ) ), 400 );
 		}
 
 		$lease_service = class_exists( 'Arriendo_Facil_Lease' ) ? new Arriendo_Facil_Lease() : null;
 		$lease         = $lease_service ? $lease_service->get_lease( $lease_id ) : null;
 		if ( ! $lease || ! $this->can_manage_accommodation( (int) $lease->accommodation_id ) ) {
-			wp_send_json_error( array( 'message' => __( 'Lease not found.', 'arriendo-facil' ) ), 404 );
+			wp_send_json_error( array( 'message' => __( 'Contrato no encontrado.', 'arriendo-facil' ) ), 404 );
 		}
 
 		global $wpdb;
@@ -621,7 +621,7 @@ class Arriendo_Facil_Rental_Workflow {
 		);
 
 		if ( false === $updated ) {
-			wp_send_json_error( array( 'message' => __( 'Could not finalize lease.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'No se pudo finalizar el contrato.', 'arriendo-facil' ) ) );
 		}
 
 		update_post_meta( (int) $lease->accommodation_id, '_af_release_date', $release_date );
@@ -629,7 +629,7 @@ class Arriendo_Facil_Rental_Workflow {
 		self::set_commercial_state( (int) $lease->accommodation_id, 'rented', 'private' );
 		self::log_lease_event( $lease_id, (int) $lease->accommodation_id, 'lease_finalized_pending_release', array( 'release_date' => $release_date, 'reason' => $reason ) );
 
-		wp_send_json_success( array( 'message' => __( 'Lease finalized. Awaiting manual release date.', 'arriendo-facil' ) ) );
+		wp_send_json_success( array( 'message' => __( 'Contrato finalizado. Esperando fecha de liberacion manual.', 'arriendo-facil' ) ) );
 	}
 
 	/**
@@ -639,7 +639,7 @@ class Arriendo_Facil_Rental_Workflow {
 		check_ajax_referer( 'af_lease_nonce', 'nonce' );
 
 		if ( ! current_user_can( 'edit_posts' ) ) {
-			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
 		$lease_id      = isset( $_POST['lease_id'] ) ? absint( wp_unslash( $_POST['lease_id'] ) ) : 0;
@@ -647,17 +647,17 @@ class Arriendo_Facil_Rental_Workflow {
 		$reason        = isset( $_POST['reason'] ) ? sanitize_textarea_field( wp_unslash( $_POST['reason'] ) ) : '';
 
 		if ( ! $lease_id || ! $this->is_valid_date( $new_end_date ) || '' === trim( $reason ) ) {
-			wp_send_json_error( array( 'message' => __( 'Lease, new end date, and reason are required.', 'arriendo-facil' ) ), 400 );
+			wp_send_json_error( array( 'message' => __( 'El contrato, la nueva fecha de fin y el motivo son obligatorios.', 'arriendo-facil' ) ), 400 );
 		}
 
 		$lease_service = class_exists( 'Arriendo_Facil_Lease' ) ? new Arriendo_Facil_Lease() : null;
 		$lease         = $lease_service ? $lease_service->get_lease( $lease_id ) : null;
 		if ( ! $lease || ! $this->can_manage_accommodation( (int) $lease->accommodation_id ) ) {
-			wp_send_json_error( array( 'message' => __( 'Lease not found.', 'arriendo-facil' ) ), 404 );
+			wp_send_json_error( array( 'message' => __( 'Contrato no encontrado.', 'arriendo-facil' ) ), 404 );
 		}
 
 		if ( $new_end_date <= (string) $lease->end_date ) {
-			wp_send_json_error( array( 'message' => __( 'New end date must be after current end date.', 'arriendo-facil' ) ), 400 );
+			wp_send_json_error( array( 'message' => __( 'La nueva fecha de fin debe ser posterior a la fecha de fin actual.', 'arriendo-facil' ) ), 400 );
 		}
 
 		global $wpdb;
@@ -673,7 +673,7 @@ class Arriendo_Facil_Rental_Workflow {
 		);
 
 		if ( false === $updated ) {
-			wp_send_json_error( array( 'message' => __( 'Could not renew lease.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'No se pudo renovar el contrato.', 'arriendo-facil' ) ) );
 		}
 
 		delete_post_meta( (int) $lease->accommodation_id, '_af_release_date' );
@@ -681,7 +681,7 @@ class Arriendo_Facil_Rental_Workflow {
 		self::set_commercial_state( (int) $lease->accommodation_id, 'rented', 'private' );
 		self::log_lease_event( $lease_id, (int) $lease->accommodation_id, 'lease_renewed', array( 'new_end_date' => $new_end_date, 'reason' => $reason ) );
 
-		wp_send_json_success( array( 'message' => __( 'Lease renewed successfully.', 'arriendo-facil' ) ) );
+		wp_send_json_success( array( 'message' => __( 'Contrato renovado correctamente.', 'arriendo-facil' ) ) );
 	}
 
 	/**
@@ -691,18 +691,18 @@ class Arriendo_Facil_Rental_Workflow {
 		check_ajax_referer( 'af_owner_contact_nonce', 'nonce' );
 
 		if ( ! current_user_can( 'edit_posts' ) ) {
-			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
 		$accommodation_id = isset( $_POST['accommodation_id'] ) ? absint( wp_unslash( $_POST['accommodation_id'] ) ) : 0;
 		$reason           = isset( $_POST['reason'] ) ? sanitize_textarea_field( wp_unslash( $_POST['reason'] ) ) : '';
 
 		if ( ! $this->can_manage_accommodation( $accommodation_id ) || '' === trim( $reason ) ) {
-			wp_send_json_error( array( 'message' => __( 'Accommodation and release reason are required.', 'arriendo-facil' ) ), 400 );
+			wp_send_json_error( array( 'message' => __( 'El inmueble y el motivo de liberacion son obligatorios.', 'arriendo-facil' ) ), 400 );
 		}
 
 		$this->release_accommodation_manually( $accommodation_id, $reason );
-		wp_send_json_success( array( 'message' => __( 'Accommodation released and published as available.', 'arriendo-facil' ) ) );
+		wp_send_json_success( array( 'message' => __( 'Inmueble liberado y publicado como disponible.', 'arriendo-facil' ) ) );
 	}
 
 	/**
@@ -1143,7 +1143,7 @@ class Arriendo_Facil_Rental_Workflow {
 
 		$nonce = sanitize_text_field( wp_unslash( $_REQUEST['nonce'] ) );
 		if ( ! wp_verify_nonce( $nonce, 'af_guest_frontend_nonce' ) ) {
-			wp_send_json_error( array( 'message' => __( 'Invalid security token.', 'arriendo-facil' ) ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Token de seguridad invalido.', 'arriendo-facil' ) ), 403 );
 		}
 	}
 
@@ -1154,7 +1154,7 @@ class Arriendo_Facil_Rental_Workflow {
 	 */
 	private function verify_frontend_nonce_required() {
 		if ( false === check_ajax_referer( 'af_guest_frontend_nonce', 'nonce', false ) ) {
-			wp_send_json_error( array( 'message' => __( 'Session expired. Reload and try again.', 'arriendo-facil' ) ), 403 );
+			wp_send_json_error( array( 'message' => __( 'La sesion expiro. Recarga la pagina e intenta nuevamente.', 'arriendo-facil' ) ), 403 );
 		}
 	}
 }

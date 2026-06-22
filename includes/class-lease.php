@@ -36,12 +36,12 @@ class Arriendo_Facil_Lease {
 		check_ajax_referer( 'af_lease_nonce', 'nonce' );
 
 		if ( ! current_user_can( 'edit_posts' ) ) {
-			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
 		$lease_id = isset( $_POST['lease_id'] ) ? absint( wp_unslash( $_POST['lease_id'] ) ) : 0;
 		if ( ! $lease_id || ! $this->get_lease( $lease_id ) ) {
-			wp_send_json_error( array( 'message' => __( 'Invalid lease ID.', 'arriendo-facil' ) ), 400 );
+			wp_send_json_error( array( 'message' => __( 'ID de contrato invalido.', 'arriendo-facil' ) ), 400 );
 		}
 
 		$pdf_password = $this->get_approved_pdf_password();
@@ -51,11 +51,11 @@ class Arriendo_Facil_Lease {
 		$version_entry  = $this->find_version_entry( $versions_data['versions'], $active_version );
 
 		if ( ! is_array( $version_entry ) ) {
-			wp_send_json_error( array( 'message' => __( 'No contract version found to approve.', 'arriendo-facil' ) ), 400 );
+			wp_send_json_error( array( 'message' => __( 'No se encontro una version de contrato para aprobar.', 'arriendo-facil' ) ), 400 );
 		}
 
 		if ( isset( $version_entry['approved_pdf'] ) && is_array( $version_entry['approved_pdf'] ) && ! empty( $version_entry['approved_pdf']['file_name'] ) ) {
-			wp_send_json_error( array( 'message' => __( 'Active contract version is already approved.', 'arriendo-facil' ) ), 400 );
+			wp_send_json_error( array( 'message' => __( 'La version activa del contrato ya esta aprobada.', 'arriendo-facil' ) ), 400 );
 		}
 
 		$source = $this->read_contract_version_source( $version_entry );
@@ -69,7 +69,7 @@ class Arriendo_Facil_Lease {
 		);
 
 		if ( '' === trim( $contract_text ) ) {
-			wp_send_json_error( array( 'message' => __( 'Could not read contract text from the active version. Upload a DOCX version and try again.', 'arriendo-facil' ) ), 400 );
+			wp_send_json_error( array( 'message' => __( 'No se pudo leer el texto del contrato de la version activa. Sube una version DOCX e intenta nuevamente.', 'arriendo-facil' ) ), 400 );
 		}
 
 		$approved_pdf = $this->create_approved_pdf_for_version(
@@ -90,7 +90,7 @@ class Arriendo_Facil_Lease {
 		);
 
 		if ( ! $saved ) {
-			wp_send_json_error( array( 'message' => __( 'Could not save approved PDF metadata.', 'arriendo-facil' ) ), 500 );
+			wp_send_json_error( array( 'message' => __( 'No se pudo guardar la metadata del PDF aprobado.', 'arriendo-facil' ) ), 500 );
 		}
 
 		$this->attach_document(
@@ -125,7 +125,7 @@ class Arriendo_Facil_Lease {
 
 		wp_send_json_success(
 			array(
-				'message' => __( 'Document approved. Protected PDF is now active for view/download.', 'arriendo-facil' ),
+				'message' => __( 'Documento aprobado. El PDF protegido ya esta activo para ver y descargar.', 'arriendo-facil' ),
 			)
 		);
 	}
@@ -137,26 +137,26 @@ class Arriendo_Facil_Lease {
 		check_ajax_referer( 'af_lease_nonce', 'nonce' );
 
 		if ( ! current_user_can( 'edit_posts' ) ) {
-			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
 		$lease_id = isset( $_POST['lease_id'] ) ? absint( wp_unslash( $_POST['lease_id'] ) ) : 0;
 		if ( ! $lease_id || ! $this->get_lease( $lease_id ) ) {
-			wp_send_json_error( array( 'message' => __( 'Invalid lease ID.', 'arriendo-facil' ) ), 400 );
+			wp_send_json_error( array( 'message' => __( 'ID de contrato invalido.', 'arriendo-facil' ) ), 400 );
 		}
 
 		if ( ! isset( $_FILES['lease_contract_file'] ) || ! is_array( $_FILES['lease_contract_file'] ) ) {
-			wp_send_json_error( array( 'message' => __( 'You must upload a Word file (.doc or .docx).', 'arriendo-facil' ) ), 400 );
+			wp_send_json_error( array( 'message' => __( 'Debes subir un archivo Word (.doc o .docx).', 'arriendo-facil' ) ), 400 );
 		}
 
 		$file_data = $_FILES['lease_contract_file'];
 		$file_error = isset( $file_data['error'] ) ? (int) $file_data['error'] : UPLOAD_ERR_NO_FILE;
 		if ( UPLOAD_ERR_OK !== $file_error ) {
-			wp_send_json_error( array( 'message' => __( 'Could not upload the selected file.', 'arriendo-facil' ) ), 400 );
+			wp_send_json_error( array( 'message' => __( 'No se pudo subir el archivo seleccionado.', 'arriendo-facil' ) ), 400 );
 		}
 
 		if ( ! empty( $file_data['size'] ) && (int) $file_data['size'] > ( 12 * 1024 * 1024 ) ) {
-			wp_send_json_error( array( 'message' => __( 'Word file exceeds maximum size (12 MB).', 'arriendo-facil' ) ), 400 );
+			wp_send_json_error( array( 'message' => __( 'El archivo Word supera el tamano maximo (12 MB).', 'arriendo-facil' ) ), 400 );
 		}
 
 		$allowed_mimes = array(
@@ -166,7 +166,7 @@ class Arriendo_Facil_Lease {
 
 		$checked = wp_check_filetype_and_ext( $file_data['tmp_name'], $file_data['name'], $allowed_mimes );
 		if ( ! in_array( (string) $checked['ext'], array( 'doc', 'docx' ), true ) ) {
-			wp_send_json_error( array( 'message' => __( 'Only Word files are allowed (.doc, .docx).', 'arriendo-facil' ) ), 400 );
+			wp_send_json_error( array( 'message' => __( 'Solo se permiten archivos Word (.doc, .docx).', 'arriendo-facil' ) ), 400 );
 		}
 
 		require_once ABSPATH . 'wp-admin/includes/file.php';
@@ -179,14 +179,14 @@ class Arriendo_Facil_Lease {
 		);
 
 		if ( ! is_array( $upload ) || isset( $upload['error'] ) ) {
-			$error_msg = is_array( $upload ) && isset( $upload['error'] ) ? (string) $upload['error'] : __( 'Could not save the uploaded Word file.', 'arriendo-facil' );
+			$error_msg = is_array( $upload ) && isset( $upload['error'] ) ? (string) $upload['error'] : __( 'No se pudo guardar el archivo Word cargado.', 'arriendo-facil' );
 			wp_send_json_error( array( 'message' => $error_msg ) );
 		}
 
 		$file_path = isset( $upload['file'] ) ? (string) $upload['file'] : '';
 		$file_url  = isset( $upload['url'] ) ? esc_url_raw( (string) $upload['url'] ) : '';
 		if ( '' === $file_path || ! file_exists( $file_path ) ) {
-			wp_send_json_error( array( 'message' => __( 'Uploaded file is missing on server.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'El archivo cargado no existe en el servidor.', 'arriendo-facil' ) ) );
 		}
 
 		$versions_data = $this->get_contract_versions( $lease_id );
@@ -249,7 +249,7 @@ class Arriendo_Facil_Lease {
 
 		wp_send_json_success(
 			array(
-				'message' => sprintf( __( 'Uploaded as version v%d.', 'arriendo-facil' ), $next_version ),
+				'message' => sprintf( __( 'Subido como version v%d.', 'arriendo-facil' ), $next_version ),
 				'version' => $next_version,
 				'url'     => $final_document_url,
 			)
@@ -263,7 +263,7 @@ class Arriendo_Facil_Lease {
 		check_ajax_referer( 'af_lease_nonce', 'nonce' );
 
 		if ( ! current_user_can( 'edit_posts' ) ) {
-			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
 		$accommodation_id = isset( $_POST['accommodation_id'] ) ? absint( $_POST['accommodation_id'] ) : 0;
@@ -273,7 +273,7 @@ class Arriendo_Facil_Lease {
 		$monthly_rent     = isset( $_POST['monthly_rent'] ) ? floatval( wp_unslash( $_POST['monthly_rent'] ) ) : 0.0;
 
 		if ( ! $accommodation_id || ! $guest_id || ! $start_date || ! $end_date ) {
-			wp_send_json_error( array( 'message' => __( 'Missing required fields.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'Faltan campos obligatorios.', 'arriendo-facil' ) ) );
 		}
 
 		global $wpdb;
@@ -293,7 +293,7 @@ class Arriendo_Facil_Lease {
 		if ( $inserted ) {
 			wp_send_json_success( array( 'id' => $wpdb->insert_id ) );
 		} else {
-			wp_send_json_error( array( 'message' => __( 'Could not create lease.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'No se pudo crear el contrato.', 'arriendo-facil' ) ) );
 		}
 	}
 
@@ -304,7 +304,7 @@ class Arriendo_Facil_Lease {
 		check_ajax_referer( 'af_lease_nonce', 'nonce' );
 
 		if ( ! current_user_can( 'edit_posts' ) ) {
-			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
 		$lease_id = isset( $_POST['lease_id'] ) ? absint( $_POST['lease_id'] ) : 0;
@@ -312,7 +312,7 @@ class Arriendo_Facil_Lease {
 
 		$allowed_statuses = array( 'draft', 'active', 'expired', 'terminated', 'pending_release' );
 		if ( ! $lease_id || ! in_array( $status, $allowed_statuses, true ) ) {
-			wp_send_json_error( array( 'message' => __( 'Invalid data.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'Datos invalidos.', 'arriendo-facil' ) ) );
 		}
 
 		global $wpdb;
@@ -327,7 +327,7 @@ class Arriendo_Facil_Lease {
 		if ( false !== $updated ) {
 			wp_send_json_success();
 		} else {
-			wp_send_json_error( array( 'message' => __( 'Could not update lease.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'No se pudo actualizar el contrato.', 'arriendo-facil' ) ) );
 		}
 	}
 
@@ -338,7 +338,7 @@ class Arriendo_Facil_Lease {
 		check_ajax_referer( 'af_lease_nonce', 'nonce' );
 
 		if ( ! current_user_can( 'read' ) ) {
-			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
 		$accommodation_id = isset( $_GET['accommodation_id'] ) ? absint( $_GET['accommodation_id'] ) : 0;
@@ -346,7 +346,7 @@ class Arriendo_Facil_Lease {
 		if ( Arriendo_Facil_Accommodation::user_is_owner() ) {
 			$owner_ids = Arriendo_Facil_Accommodation::get_owner_accommodation_ids( get_current_user_id() );
 			if ( ! in_array( $accommodation_id, $owner_ids, true ) ) {
-				wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+				wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 			}
 		}
 
@@ -995,23 +995,23 @@ class Arriendo_Facil_Lease {
 	 */
 	public function ajax_download_lease_contract() {
 		if ( ! current_user_can( 'edit_posts' ) ) {
-			wp_die( esc_html__( 'Permission denied.', 'arriendo-facil' ), 403 );
+			wp_die( esc_html__( 'Permiso denegado.', 'arriendo-facil' ), 403 );
 		}
 
 		$lease_id = isset( $_GET['lease_id'] ) ? absint( wp_unslash( $_GET['lease_id'] ) ) : 0;
 		if ( ! $lease_id ) {
-			wp_die( esc_html__( 'Invalid lease ID.', 'arriendo-facil' ), 400 );
+			wp_die( esc_html__( 'ID de contrato invalido.', 'arriendo-facil' ), 400 );
 		}
 
 		$lease = $this->get_lease( $lease_id );
 		if ( ! $lease ) {
-			wp_die( esc_html__( 'Lease not found.', 'arriendo-facil' ), 404 );
+			wp_die( esc_html__( 'Contrato no encontrado.', 'arriendo-facil' ), 404 );
 		}
 
 		if ( Arriendo_Facil_Accommodation::user_is_owner() ) {
 			$owner_ids = Arriendo_Facil_Accommodation::get_owner_accommodation_ids( get_current_user_id() );
 			if ( ! in_array( (int) $lease->accommodation_id, $owner_ids, true ) ) {
-				wp_die( esc_html__( 'Permission denied.', 'arriendo-facil' ), 403 );
+				wp_die( esc_html__( 'Permiso denegado.', 'arriendo-facil' ), 403 );
 			}
 		}
 
@@ -1056,7 +1056,7 @@ class Arriendo_Facil_Lease {
 			$this->redirect_to_contract_url( $document_url );
 		}
 
-		wp_die( esc_html__( 'Contract document is not available.', 'arriendo-facil' ), 404 );
+		wp_die( esc_html__( 'El documento del contrato no esta disponible.', 'arriendo-facil' ), 404 );
 	}
 
 	/**
@@ -1131,7 +1131,7 @@ class Arriendo_Facil_Lease {
 		$bucket     = $this->get_storage_setting( 'AF_R2_BUCKET_NAME', 'af_r2_bucket_name', '' );
 
 		if ( '' === $access_key || '' === $secret_key || '' === $endpoint || '' === $bucket ) {
-			return new WP_Error( 'af_r2_missing_config', __( 'Missing Cloudflare R2 credentials. Check Settings > Cloud Provider.', 'arriendo-facil' ) );
+			return new WP_Error( 'af_r2_missing_config', __( 'Faltan credenciales de Cloudflare R2. Revisa Ajustes > Proveedor en la nube.', 'arriendo-facil' ) );
 		}
 
 		$parsed = wp_parse_url( $endpoint );
@@ -1139,7 +1139,7 @@ class Arriendo_Facil_Lease {
 		$scheme = isset( $parsed['scheme'] ) ? (string) $parsed['scheme'] : '';
 
 		if ( '' === $host || '' === $scheme ) {
-			return new WP_Error( 'af_r2_invalid_endpoint', __( 'Invalid Cloudflare R2 endpoint URL.', 'arriendo-facil' ) );
+			return new WP_Error( 'af_r2_invalid_endpoint', __( 'URL de endpoint de Cloudflare R2 invalida.', 'arriendo-facil' ) );
 		}
 
 		return array(
@@ -1168,7 +1168,7 @@ class Arriendo_Facil_Lease {
 
 		$object_key = ltrim( (string) $object_key, '/' );
 		if ( '' === $object_key ) {
-			return new WP_Error( 'af_r2_missing_object_key', __( 'Missing R2 object key.', 'arriendo-facil' ) );
+			return new WP_Error( 'af_r2_missing_object_key', __( 'Falta la clave de objeto de R2.', 'arriendo-facil' ) );
 		}
 
 		$expires      = max( 60, min( 3600, absint( $expires ) ) );
@@ -1313,7 +1313,7 @@ class Arriendo_Facil_Lease {
 	private function redirect_to_contract_url( $url ) {
 		$target_url = esc_url_raw( (string) $url );
 		if ( '' === $target_url ) {
-			wp_die( esc_html__( 'Invalid contract URL.', 'arriendo-facil' ), 400 );
+			wp_die( esc_html__( 'URL de contrato invalida.', 'arriendo-facil' ), 400 );
 		}
 
 		wp_redirect( $target_url, 302, 'Arriendo Facil' );
@@ -1351,7 +1351,7 @@ class Arriendo_Facil_Lease {
 
 			$status = (int) wp_remote_retrieve_response_code( $response );
 			if ( $status < 200 || $status >= 300 ) {
-				return new WP_Error( 'af_lease_source_download_failed', __( 'Could not download active contract version from private storage.', 'arriendo-facil' ) );
+				return new WP_Error( 'af_lease_source_download_failed', __( 'No se pudo descargar la version activa del contrato desde almacenamiento privado.', 'arriendo-facil' ) );
 			}
 
 			$body = wp_remote_retrieve_body( $response );
@@ -1378,7 +1378,7 @@ class Arriendo_Facil_Lease {
 			}
 		}
 
-		return new WP_Error( 'af_lease_source_unavailable', __( 'Could not access active contract version source file.', 'arriendo-facil' ) );
+		return new WP_Error( 'af_lease_source_unavailable', __( 'No se pudo acceder al archivo fuente de la version activa del contrato.', 'arriendo-facil' ) );
 	}
 
 	/**
@@ -1453,7 +1453,7 @@ class Arriendo_Facil_Lease {
 
 		$approved_dir = trailingslashit( $uploads['basedir'] ) . 'arriendo-facil/contracts-approved';
 		if ( ! wp_mkdir_p( $approved_dir ) ) {
-			return new WP_Error( 'af_lease_pdf_dir_failed', __( 'Could not create approved contracts directory.', 'arriendo-facil' ) );
+			return new WP_Error( 'af_lease_pdf_dir_failed', __( 'No se pudo crear el directorio de contratos aprobados.', 'arriendo-facil' ) );
 		}
 
 		$file_name = sprintf( 'lease-%d-v%d-approved-%s.pdf', absint( $lease_id ), absint( $version ), gmdate( 'Ymd-His' ) );
@@ -1461,7 +1461,7 @@ class Arriendo_Facil_Lease {
 
 		$written = $this->write_password_protected_pdf_file( $file_path, (string) $contract_text, (string) $pdf_password );
 		if ( ! $written ) {
-			return new WP_Error( 'af_lease_pdf_write_failed', __( 'Could not generate protected PDF document.', 'arriendo-facil' ) );
+			return new WP_Error( 'af_lease_pdf_write_failed', __( 'No se pudo generar el documento PDF protegido.', 'arriendo-facil' ) );
 		}
 
 		$local_url    = trailingslashit( $uploads['baseurl'] ) . 'arriendo-facil/contracts-approved/' . rawurlencode( $file_name );

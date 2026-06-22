@@ -159,6 +159,26 @@ if ( isset( $_POST['af_test_certificate'] ) ) {
 	}
 }
 
+// Rebuild CA chain by re-downloading intermediates from AIA extension.
+if ( isset( $_POST['af_rebuild_chain'] ) ) {
+	check_admin_referer( 'af_sri_settings_nonce' );
+
+	$chain_result = Arriendo_Facil_SRI_Config::rebuild_chain();
+	if ( is_wp_error( $chain_result ) ) {
+		$af_sri_notice = array( 'type' => 'error', 'msg' => $chain_result->get_error_message() );
+	} else {
+		$pems_check  = Arriendo_Facil_SRI_Config::get_cert_pems();
+		$chain_count = (int) preg_match_all( '/-----BEGIN CERTIFICATE-----/', $pems_check['chain'] );
+		$af_sri_notice = array(
+			'type' => 'success',
+			'msg'  => sprintf(
+				/* translators: %d: number of intermediate certificates obtained */
+				__( '✓ Cadena CA reconstruida. Se obtuvieron %d certificado(s) intermedio(s).', 'arriendo-facil' ),
+				$chain_count
+			),
+		);
+	}
+}
 
 // Save/Add emission point.
 if ( isset( $_POST['af_save_emission_point'] ) ) {
@@ -552,7 +572,10 @@ $af_points_ready     = ! empty( $emission_points );
 				<button type="submit" name="af_test_certificate" class="button">
 					<?php esc_html_e( 'Verificar certificado', 'arriendo-facil' ); ?>
 				</button>
-				<span class="description"><?php esc_html_e( 'Verifica que el certificado sea válido y esté activo.', 'arriendo-facil' ); ?></span>
+				<button type="submit" name="af_rebuild_chain" class="button" style="margin-left:8px;">
+					<?php esc_html_e( 'Reconstruir cadena CA', 'arriendo-facil' ); ?>
+				</button>
+				<span class="description" style="display:block; margin-top:4px;"><?php esc_html_e( 'Verifica que el certificado sea válido y esté activo. Usa "Reconstruir cadena CA" si los certificados intermedios están en 0 o la firma es rechazada por el SRI.', 'arriendo-facil' ); ?></span>
 			</p>
 		</form>
 

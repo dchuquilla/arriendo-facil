@@ -393,18 +393,23 @@ class Arriendo_Facil_SRI_Config {
 				break;
 			}
 
+			error_log( '[AF SRI] fetch_ca_chain: AIA URL encontrada → ' . $issuer_url );
+
 			if ( ! self::is_valid_ca_issuer_url( $issuer_url ) ) {
-				error_log( '[AF SRI] fetch_ca_chain: URL de CA no válida' );
+				error_log( '[AF SRI] fetch_ca_chain: URL de CA no válida/no permitida → ' . $issuer_url );
 				break;
 			}
 
-			$response = wp_remote_get( $issuer_url, array( 'timeout' => 15, 'sslverify' => true ) );
+			// BCE serves CA certs over plain HTTP; disable SSL verification only for http:// URLs.
+			$ssl_verify = ( 0 === strpos( $issuer_url, 'https://' ) );
+			$response   = wp_remote_get( $issuer_url, array( 'timeout' => 15, 'sslverify' => $ssl_verify ) );
 			if ( is_wp_error( $response ) ) {
-				error_log( '[AF SRI] fetch_ca_chain: error de conexión' );
+				error_log( '[AF SRI] fetch_ca_chain: error de conexión → ' . $response->get_error_message() );
 				break;
 			}
-			if ( 200 !== wp_remote_retrieve_response_code( $response ) ) {
-				error_log( '[AF SRI] fetch_ca_chain: respuesta HTTP inválida' );
+			$http_code = wp_remote_retrieve_response_code( $response );
+			if ( 200 !== $http_code ) {
+				error_log( '[AF SRI] fetch_ca_chain: respuesta HTTP inválida → ' . $http_code );
 				break;
 			}
 
@@ -449,19 +454,38 @@ class Arriendo_Facil_SRI_Config {
 	 * Validates that a URL is a legitimate CA certificate issuer URL.
 	 * Whitelist known Ecuadorian CA domains.
 	 *
+	 * NOTE: The BCE (Banco Central del Ecuador) serves its intermediate CA
+	 * certificates over plain HTTP (not HTTPS). Rejecting http:// here would
+	 * silently break chain building for every BCE-issued certificate.
+	 * We allow both schemes but only for the explicitly trusted CA domains below.
+	 *
 	 * @param string $url URL to validate.
 	 * @return bool
 	 */
 	private static function is_valid_ca_issuer_url( string $url ): bool {
-		if ( ! filter_var( $url, FILTER_VALIDATE_URL ) || 0 !== strpos( $url, 'https://' ) ) {
+		if ( ! filter_var( $url, FILTER_VALIDATE_URL ) ) {
 			return false;
 		}
 
+		$scheme = strtolower( (string) wp_parse_url( $url, PHP_URL_SCHEME ) );
+		if ( ! in_array( $scheme, array( 'http', 'https' ), true ) ) {
+			return false;
+		}
+
+		// Trusted Ecuadorian CA issuer domains.
+		// eci.bce.fin.ec  → Banco Central del Ecuador (real domain; NOT eci.bce.ec).
+		// securitydata.net.ec → Security Data S.A.
+		// uanataca.com    → Uanataca S.A.
+		// anf.es          → ANF Autoridad de Certificación.
 		$allowed_domains = array(
-			'eci.bce.ec',
+			'eci.bce.fin.ec',
+			'www.eci.bce.fin.ec',
+			'eci.bce.ec',           // kept for backward compat / older certs
 			'www.eci.bce.ec',
 			'securitydata.net.ec',
 			'www.securitydata.net.ec',
+			'ocsp.securitydata.net.ec',
+			'crl.securitydata.net.ec',
 			'uanataca.com',
 			'www.uanataca.com',
 			'anf.es',
@@ -469,7 +493,7 @@ class Arriendo_Facil_SRI_Config {
 		);
 
 		$host = wp_parse_url( $url, PHP_URL_HOST );
-		return $host && in_array( $host, $allowed_domains, true );
+		return $host && in_array( strtolower( (string) $host ), $allowed_domains, true );
 	}
 
 	/**

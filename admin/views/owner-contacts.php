@@ -69,14 +69,14 @@ $current_user_id = (int) get_current_user_id();
 ?>
 <div class="wrap">
 	<h1>
-		<?php esc_html_e( 'Owner Contacts', 'arriendo-facil' ); ?>
+		<?php esc_html_e( 'Contactos de propietarios', 'arriendo-facil' ); ?>
 		<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-owner-contacts&action=new' ) ); ?>" class="page-title-action">
-			<?php esc_html_e( '+ New Owner Contact', 'arriendo-facil' ); ?>
+			<?php esc_html_e( '+ Nuevo contacto de propietario', 'arriendo-facil' ); ?>
 		</a>
 	</h1>
 
     <?php if ( 'owner_disabled' === $notice ) : ?>
-        <div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'Owner account disabled successfully.', 'arriendo-facil' ); ?></p></div>
+        <div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'Cuenta de propietario deshabilitada correctamente.', 'arriendo-facil' ); ?></p></div>
     <?php elseif ( 'owner_disable_error' === $notice ) : ?>
         <div class="notice notice-error is-dismissible">
             <p>
@@ -84,7 +84,7 @@ $current_user_id = (int) get_current_user_id();
                 echo esc_html(
                     $message
                         ? $message
-                        : __( 'Could not disable owner account.', 'arriendo-facil' )
+                        : __( 'No se pudo deshabilitar la cuenta del propietario.', 'arriendo-facil' )
                 );
                 ?>
             </p>
@@ -93,7 +93,7 @@ $current_user_id = (int) get_current_user_id();
 
 	<?php if ( $is_new ) : ?>
     <div class="card" style="max-width: 900px; margin: 16px 0; padding: 16px;">
-        <h2><?php esc_html_e( 'New Owner Contact', 'arriendo-facil' ); ?></h2>
+        <h2><?php esc_html_e( 'Nuevo contacto de propietario', 'arriendo-facil' ); ?></h2>
 
          <form id="af-owner-contact-form" method="post" action="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>" enctype="multipart/form-data">
             <input type="hidden" name="action" value="af_send_owner_contact" />
@@ -102,7 +102,7 @@ $current_user_id = (int) get_current_user_id();
 
             <table class="form-table" role="presentation">
 								<tr>
-                    <th scope="row"><label for="af_owner_id_type"><?php esc_html_e( 'Document Type*', 'arriendo-facil' ); ?></label></th>
+                    <th scope="row"><label for="af_owner_id_type"><?php esc_html_e( 'Tipo de documento*', 'arriendo-facil' ); ?></label></th>
                     <td>
                         <select id="af_owner_id_type" name="owner_id_type" required>
                             <option value="cedula"><?php esc_html_e( 'Cedula', 'arriendo-facil' ); ?></option>
@@ -112,18 +112,18 @@ $current_user_id = (int) get_current_user_id();
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row"><label for="af_owner_id"><?php esc_html_e( 'Owner ID*', 'arriendo-facil' ); ?></label></th>
+                    <th scope="row"><label for="af_owner_id"><?php esc_html_e( 'Documento del propietario*', 'arriendo-facil' ); ?></label></th>
                     <td><input type="text" required id="af_owner_id" name="owner_id" class="regular-text" /></td>
                 </tr>
 								<tr>
-										<th scope="row"><label for="af_owner_email"><?php esc_html_e( 'Owner Email*', 'arriendo-facil' ); ?></label></th>
+										<th scope="row"><label for="af_owner_email"><?php esc_html_e( 'Correo del propietario*', 'arriendo-facil' ); ?></label></th>
 										<td>
 												<input type="email" required id="af_owner_email" name="owner_email" class="regular-text" autocomplete="email" />
-                                                <p class="description"><?php esc_html_e( 'Activation instructions will be sent only to this email.', 'arriendo-facil' ); ?></p>
+                                                <p class="description"><?php esc_html_e( 'Las instrucciones de activacion se enviaran unicamente a este correo.', 'arriendo-facil' ); ?></p>
 										</td>
 								</tr>
                                 <tr>
-                                    <th scope="row"><?php esc_html_e( 'Has Legal Agent?', 'arriendo-facil' ); ?></th>
+                                    <th scope="row"><?php esc_html_e( '¿Tiene representante legal?', 'arriendo-facil' ); ?></th>
                                     <td>
                                         <fieldset>
                                             <label style="margin-right:16px;">
@@ -132,20 +132,20 @@ $current_user_id = (int) get_current_user_id();
                                             </label>
                                             <label>
                                                 <input type="radio" name="has_legal_agent" value="1" />
-                                                <?php esc_html_e( 'Yes', 'arriendo-facil' ); ?>
+                                                <?php esc_html_e( 'Si', 'arriendo-facil' ); ?>
                                             </label>
                                         </fieldset>
                                     </td>
                                 </tr>
                                 <tr id="af-legal-agent-fields" style="display:none;">
-                                    <th scope="row"><?php esc_html_e( 'Legal Agent Details', 'arriendo-facil' ); ?></th>
+                                    <th scope="row"><?php esc_html_e( 'Datos del representante legal', 'arriendo-facil' ); ?></th>
                                     <td>
                                         <p>
-                                            <label for="af_legal_agent_name"><?php esc_html_e( 'Name', 'arriendo-facil' ); ?></label><br />
+                                            <label for="af_legal_agent_name"><?php esc_html_e( 'Nombre', 'arriendo-facil' ); ?></label><br />
                                             <input type="text" id="af_legal_agent_name" name="legal_agent_name" class="regular-text" />
                                         </p>
                                         <p>
-                                            <label for="af_legal_agent_id_type"><?php esc_html_e( 'ID Type', 'arriendo-facil' ); ?></label><br />
+                                            <label for="af_legal_agent_id_type"><?php esc_html_e( 'Tipo de documento', 'arriendo-facil' ); ?></label><br />
                                             <select id="af_legal_agent_id_type" name="legal_agent_id_type">
                                                 <option value="cedula"><?php esc_html_e( 'Cedula', 'arriendo-facil' ); ?></option>
                                                 <option value="ruc"><?php esc_html_e( 'RUC', 'arriendo-facil' ); ?></option>
@@ -153,24 +153,24 @@ $current_user_id = (int) get_current_user_id();
                                             </select>
                                         </p>
                                         <p>
-                                            <label for="af_legal_agent_id"><?php esc_html_e( 'ID Number', 'arriendo-facil' ); ?></label><br />
+                                            <label for="af_legal_agent_id"><?php esc_html_e( 'Numero de documento', 'arriendo-facil' ); ?></label><br />
                                             <input type="text" id="af_legal_agent_id" name="legal_agent_id" class="regular-text" />
                                         </p>
                                         <p>
-                                            <label for="af_legal_agent_phone"><?php esc_html_e( 'Phone', 'arriendo-facil' ); ?></label><br />
-                                            <input type="text" id="af_legal_agent_phone" name="legal_agent_phone" class="regular-text" autocomplete="tel" inputmode="numeric" pattern="^[0-9]+$" title="Use only numbers" />
+                                            <label for="af_legal_agent_phone"><?php esc_html_e( 'Telefono', 'arriendo-facil' ); ?></label><br />
+                                            <input type="text" id="af_legal_agent_phone" name="legal_agent_phone" class="regular-text" autocomplete="tel" inputmode="numeric" pattern="^[0-9]+$" title="Use solo numeros" />
                                         </p>
                                         <p>
-                                            <label for="af_legal_agent_email"><?php esc_html_e( 'Email', 'arriendo-facil' ); ?></label><br />
+                                            <label for="af_legal_agent_email"><?php esc_html_e( 'Correo', 'arriendo-facil' ); ?></label><br />
                                             <input type="email" id="af_legal_agent_email" name="legal_agent_email" class="regular-text" autocomplete="email" />
                                             <span class="description" style="display:block;margin-top:6px;">
-                                                <?php esc_html_e( 'No activation email is sent to the legal agent.', 'arriendo-facil' ); ?>
+                                                <?php esc_html_e( 'No se envia correo de activacion al representante legal.', 'arriendo-facil' ); ?>
                                             </span>
                                         </p>
                                     </td>
                                 </tr>
                 <tr>
-                    <th scope="row"><label for="af_subject"><?php esc_html_e( 'Client Name*', 'arriendo-facil' ); ?></label></th>
+                    <th scope="row"><label for="af_subject"><?php esc_html_e( 'Nombre del cliente*', 'arriendo-facil' ); ?></label></th>
                     <td><input type="text" required id="af_subject" name="subject" class="regular-text" /></td>
                 </tr>
                 <tr>
@@ -192,7 +192,7 @@ $current_user_id = (int) get_current_user_id();
                             <label for="af_owner_additional_sensitive_pdf"><?php esc_html_e( 'Contratos de arrendamientos suscritos (PDF)', 'arriendo-facil' ); ?></label><br />
                             <input type="file" id="af_owner_additional_sensitive_pdf" name="owner_additional_sensitive_pdf" class="regular-text" accept="application/pdf,.pdf" required />
                         </p>
-                        <p class="description"><?php esc_html_e( 'Only PDF files are allowed.', 'arriendo-facil' ); ?></p>
+                        <p class="description"><?php esc_html_e( 'Solo se permiten archivos PDF.', 'arriendo-facil' ); ?></p>
                     </td>
                 </tr>
                 <tr>
@@ -218,9 +218,9 @@ $current_user_id = (int) get_current_user_id();
 
             <p class="submit">
                 <button id="af-owner-contact-submit" type="submit" class="button button-primary">
-                    <?php esc_html_e( 'Register Owner', 'arriendo-facil' ); ?>
+                    <?php esc_html_e( 'Registrar propietario', 'arriendo-facil' ); ?>
                 </button>
-                <a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=af-owner-contacts' ) ); ?>"><?php esc_html_e( 'Cancel', 'arriendo-facil' ); ?></a>
+                <a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=af-owner-contacts' ) ); ?>"><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></a>
             </p>
         </form>
     </div>
@@ -231,7 +231,7 @@ $current_user_id = (int) get_current_user_id();
 			<tr>
 				<th><?php esc_html_e( 'ID', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Document Type', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Owner ID', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'ID del propietario', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Client Name', 'arriendo-facil' ); ?></th>
                 <th><?php esc_html_e( 'Observations', 'arriendo-facil' ); ?></th>
                 <th><?php esc_html_e( 'Legal Agent', 'arriendo-facil' ); ?></th>
@@ -243,7 +243,7 @@ $current_user_id = (int) get_current_user_id();
 				<?php foreach ( $contacts as $contact ) : ?>
                     <?php
                     $account_status = '';
-					$status_label  = __( 'No user linked', 'arriendo-facil' );
+					$status_label  = __( 'Sin usuario vinculado', 'arriendo-facil' );
 					$status_class  = 'is-inactive';
                     $is_protected_admin_row = false;
                     $accommodations = array();
@@ -261,13 +261,13 @@ $current_user_id = (int) get_current_user_id();
                         }
 
                         if ( 'disabled' === $account_status ) {
-                            $status_label = __( 'Disabled', 'arriendo-facil' );
+                            $status_label = __( 'Deshabilitado', 'arriendo-facil' );
                             $status_class = 'is-disabled';
                         } elseif ( 'active' === $account_status ) {
-                            $status_label = __( 'Active', 'arriendo-facil' );
+                            $status_label = __( 'Activo', 'arriendo-facil' );
                             $status_class = 'is-active';
                         } else {
-                            $status_label = __( 'Inactive', 'arriendo-facil' );
+                            $status_label = __( 'Inactivo', 'arriendo-facil' );
                             $status_class = 'is-inactive';
                         }
 
@@ -330,7 +330,7 @@ $current_user_id = (int) get_current_user_id();
 				<?php endforeach; ?>
 			<?php else : ?>
 				<tr>
-                    <td colspan="7"><?php esc_html_e( 'No contacts found.', 'arriendo-facil' ); ?></td>
+                    <td colspan="7"><?php esc_html_e( 'No se encontraron contactos.', 'arriendo-facil' ); ?></td>
 				</tr>
 			<?php endif; ?>
 		</tbody>
@@ -340,22 +340,22 @@ $current_user_id = (int) get_current_user_id();
         <div class="af-modal__backdrop" data-af-close-modal="1"></div>
         <div class="af-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="af-legal-agent-modal-title">
             <div class="af-modal__header">
-                <h2 id="af-legal-agent-modal-title"><?php esc_html_e( 'Owner Details', 'arriendo-facil' ); ?></h2>
-                <button type="button" class="button-link af-modal__close" data-af-close-modal="1" aria-label="<?php esc_attr_e( 'Close', 'arriendo-facil' ); ?>">&times;</button>
+                <h2 id="af-legal-agent-modal-title"><?php esc_html_e( 'Detalles del propietario', 'arriendo-facil' ); ?></h2>
+                <button type="button" class="button-link af-modal__close" data-af-close-modal="1" aria-label="<?php esc_attr_e( 'Cerrar', 'arriendo-facil' ); ?>">&times;</button>
             </div>
             <div class="af-modal__body">
-                <h3><?php esc_html_e( 'Owner', 'arriendo-facil' ); ?></h3>
-                <p><strong><?php esc_html_e( 'Name', 'arriendo-facil' ); ?>:</strong> <span data-af-field="owner-name">-</span></p>
+                <h3><?php esc_html_e( 'Propietario', 'arriendo-facil' ); ?></h3>
+                <p><strong><?php esc_html_e( 'Nombre', 'arriendo-facil' ); ?>:</strong> <span data-af-field="owner-name">-</span></p>
                 <p><strong><?php esc_html_e( 'ID', 'arriendo-facil' ); ?>:</strong> <span data-af-field="owner-id">-</span></p>
-                <p><strong><?php esc_html_e( 'Email', 'arriendo-facil' ); ?>:</strong> <span data-af-field="owner-email">-</span></p>
-                <p><strong><?php esc_html_e( 'Accommodations', 'arriendo-facil' ); ?>:</strong> <span data-af-field="owner-accommodations">-</span></p>
+                <p><strong><?php esc_html_e( 'Correo', 'arriendo-facil' ); ?>:</strong> <span data-af-field="owner-email">-</span></p>
+                <p><strong><?php esc_html_e( 'Alojamientos', 'arriendo-facil' ); ?>:</strong> <span data-af-field="owner-accommodations">-</span></p>
 
                 <div data-af-legal-agent-section>
-                    <h3><?php esc_html_e( 'Legal Agent', 'arriendo-facil' ); ?></h3>
-                    <p><strong><?php esc_html_e( 'Name', 'arriendo-facil' ); ?>:</strong> <span data-af-field="legal-name">-</span></p>
+                    <h3><?php esc_html_e( 'Representante legal', 'arriendo-facil' ); ?></h3>
+                    <p><strong><?php esc_html_e( 'Nombre', 'arriendo-facil' ); ?>:</strong> <span data-af-field="legal-name">-</span></p>
                     <p><strong><?php esc_html_e( 'ID', 'arriendo-facil' ); ?>:</strong> <span data-af-field="legal-id">-</span></p>
-                    <p><strong><?php esc_html_e( 'Phone', 'arriendo-facil' ); ?>:</strong> <span data-af-field="legal-phone">-</span></p>
-                    <p><strong><?php esc_html_e( 'Email', 'arriendo-facil' ); ?>:</strong> <span data-af-field="legal-email">-</span></p>
+                    <p><strong><?php esc_html_e( 'Telefono', 'arriendo-facil' ); ?>:</strong> <span data-af-field="legal-phone">-</span></p>
+                    <p><strong><?php esc_html_e( 'Correo', 'arriendo-facil' ); ?>:</strong> <span data-af-field="legal-email">-</span></p>
                 </div>
             </div>
         </div>
@@ -366,7 +366,7 @@ $current_user_id = (int) get_current_user_id();
         <div class="af-modal__dialog af-modal__dialog--large" role="dialog" aria-modal="true" aria-labelledby="af-template-preview-title">
             <div class="af-modal__header">
                 <h2 id="af-template-preview-title"><?php esc_html_e( 'Vista previa de campos del contrato', 'arriendo-facil' ); ?></h2>
-                <button type="button" class="button-link af-modal__close" data-af-close-template-preview="1" aria-label="<?php esc_attr_e( 'Close', 'arriendo-facil' ); ?>">&times;</button>
+                <button type="button" class="button-link af-modal__close" data-af-close-template-preview="1" aria-label="<?php esc_attr_e( 'Cerrar', 'arriendo-facil' ); ?>">&times;</button>
             </div>
             <div class="af-modal__body">
                 <p class="af-template-preview-instructions">

@@ -34,17 +34,17 @@ class Arriendo_Facil_Cleaning_Service {
 	 */
 	public function register_post_type() {
 		$labels = array(
-			'name'               => __( 'Cleaning Services', 'arriendo-facil' ),
-			'singular_name'      => __( 'Cleaning Service', 'arriendo-facil' ),
-			'menu_name'          => __( 'Cleaning Services', 'arriendo-facil' ),
-			'add_new'            => __( 'Add New', 'arriendo-facil' ),
-			'add_new_item'       => __( 'Add New Cleaning Service', 'arriendo-facil' ),
-			'edit_item'          => __( 'Edit Cleaning Service', 'arriendo-facil' ),
-			'new_item'           => __( 'New Cleaning Service', 'arriendo-facil' ),
-			'view_item'          => __( 'View Cleaning Service', 'arriendo-facil' ),
-			'search_items'       => __( 'Search Cleaning Services', 'arriendo-facil' ),
-			'not_found'          => __( 'No cleaning services found', 'arriendo-facil' ),
-			'not_found_in_trash' => __( 'No cleaning services found in Trash', 'arriendo-facil' ),
+			'name'               => __( 'Servicios de limpieza', 'arriendo-facil' ),
+			'singular_name'      => __( 'Servicio de limpieza', 'arriendo-facil' ),
+			'menu_name'          => __( 'Servicios de limpieza', 'arriendo-facil' ),
+			'add_new'            => __( 'Agregar nuevo', 'arriendo-facil' ),
+			'add_new_item'       => __( 'Agregar nuevo servicio de limpieza', 'arriendo-facil' ),
+			'edit_item'          => __( 'Editar servicio de limpieza', 'arriendo-facil' ),
+			'new_item'           => __( 'Nuevo servicio de limpieza', 'arriendo-facil' ),
+			'view_item'          => __( 'Ver servicio de limpieza', 'arriendo-facil' ),
+			'search_items'       => __( 'Buscar servicios de limpieza', 'arriendo-facil' ),
+			'not_found'          => __( 'No se encontraron servicios de limpieza', 'arriendo-facil' ),
+			'not_found_in_trash' => __( 'No se encontraron servicios de limpieza en la papelera', 'arriendo-facil' ),
 		);
 
 		$args = array(
@@ -70,7 +70,7 @@ class Arriendo_Facil_Cleaning_Service {
 	public function add_meta_boxes() {
 		add_meta_box(
 			'af_cleaning_service_details',
-			__( 'Cleaning Service Details', 'arriendo-facil' ),
+			__( 'Detalles del servicio de limpieza', 'arriendo-facil' ),
 			array( $this, 'render_meta_box' ),
 			'cleaning_service',
 			'normal',
@@ -133,7 +133,7 @@ class Arriendo_Facil_Cleaning_Service {
 		check_ajax_referer( 'af_cleaning_request_nonce', 'nonce' );
 
 		if ( ! current_user_can( 'edit_posts' ) ) {
-			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
 		$accommodation_id = isset( $_POST['accommodation_id'] ) ? absint( $_POST['accommodation_id'] ) : 0;
@@ -141,7 +141,7 @@ class Arriendo_Facil_Cleaning_Service {
 		$notes            = isset( $_POST['notes'] ) ? sanitize_textarea_field( wp_unslash( $_POST['notes'] ) ) : '';
 
 		if ( ! $accommodation_id || ! $requested_date ) {
-			wp_send_json_error( array( 'message' => __( 'Missing required fields.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'Faltan campos obligatorios.', 'arriendo-facil' ) ) );
 		}
 
 		global $wpdb;
@@ -159,7 +159,7 @@ class Arriendo_Facil_Cleaning_Service {
 		if ( $inserted ) {
 			wp_send_json_success( array( 'id' => $wpdb->insert_id ) );
 		} else {
-			wp_send_json_error( array( 'message' => __( 'Could not create cleaning request.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'No se pudo crear la solicitud de limpieza.', 'arriendo-facil' ) ) );
 		}
 	}
 
@@ -170,7 +170,7 @@ class Arriendo_Facil_Cleaning_Service {
 		check_ajax_referer( 'af_cleaning_request_nonce', 'nonce' );
 
 		if ( ! current_user_can( 'edit_posts' ) ) {
-			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
 		$request_id = isset( $_POST['request_id'] ) ? absint( $_POST['request_id'] ) : 0;
@@ -178,7 +178,7 @@ class Arriendo_Facil_Cleaning_Service {
 
 		$allowed_statuses = array( 'pending', 'in_progress', 'completed', 'cancelled' );
 		if ( ! $request_id || ! in_array( $status, $allowed_statuses, true ) ) {
-			wp_send_json_error( array( 'message' => __( 'Invalid data.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'Datos invalidos.', 'arriendo-facil' ) ) );
 		}
 
 		global $wpdb;
@@ -198,7 +198,7 @@ class Arriendo_Facil_Cleaning_Service {
 		if ( false !== $updated ) {
 			wp_send_json_success();
 		} else {
-			wp_send_json_error( array( 'message' => __( 'Could not update cleaning request.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'No se pudo actualizar la solicitud de limpieza.', 'arriendo-facil' ) ) );
 		}
 	}
 
@@ -225,12 +225,12 @@ class Arriendo_Facil_Cleaning_Service {
 		check_ajax_referer( 'af_cleaning_request_nonce', 'nonce' );
 
 		if ( ! current_user_can( 'edit_posts' ) ) {
-			wp_die( esc_html__( 'Permission denied.', 'arriendo-facil' ) );
+			wp_die( esc_html__( 'Permiso denegado.', 'arriendo-facil' ) );
 		}
 
 		$request_id = isset( $_GET['request_id'] ) ? absint( $_GET['request_id'] ) : 0;
 		if ( ! $request_id ) {
-			wp_die( esc_html__( 'Invalid cleaning request.', 'arriendo-facil' ) );
+			wp_die( esc_html__( 'Solicitud de limpieza invalida.', 'arriendo-facil' ) );
 		}
 
 		global $wpdb;
@@ -246,7 +246,7 @@ class Arriendo_Facil_Cleaning_Service {
 		);
 
 		if ( ! $request ) {
-			wp_die( esc_html__( 'Cleaning request not found.', 'arriendo-facil' ) );
+			wp_die( esc_html__( 'Solicitud de limpieza no encontrada.', 'arriendo-facil' ) );
 		}
 
 		$contract_text = __( 'El cliente solicita un contrato de servicio de limpieza para el inmueble indicado, con alcance y condiciones por definir entre las partes.', 'arriendo-facil' );

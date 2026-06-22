@@ -37,7 +37,7 @@ class Arriendo_Facil_Owner_Register_API {
 		$nonce = $request->get_param( 'nonce' );
 		if ( ! $nonce || false === wp_verify_nonce( $nonce, 'af_owner_register' ) ) {
 			return new WP_REST_Response(
-				array( 'success' => false, 'message' => __( 'Invalid or expired security token. Please reload and try again.', 'arriendo-facil' ) ),
+				array( 'success' => false, 'message' => __( 'Token de seguridad invalido o expirado. Recarga la pagina e intenta nuevamente.', 'arriendo-facil' ) ),
 				403
 			);
 		}
@@ -47,7 +47,7 @@ class Arriendo_Facil_Owner_Register_API {
 		$attempts = (int) get_transient( $rate_key );
 		if ( $attempts >= 5 ) {
 			return new WP_REST_Response(
-				array( 'success' => false, 'message' => __( 'Too many registration attempts. Please try again in a few minutes.', 'arriendo-facil' ) ),
+				array( 'success' => false, 'message' => __( 'Demasiados intentos de registro. Intenta nuevamente en unos minutos.', 'arriendo-facil' ) ),
 				429
 			);
 		}
@@ -63,35 +63,35 @@ class Arriendo_Facil_Owner_Register_API {
 
 		if ( ! in_array( $owner_id_type, array( 'cedula', 'ruc', 'pasaporte' ), true ) ) {
 			return new WP_REST_Response(
-				array( 'success' => false, 'message' => __( 'Invalid document type.', 'arriendo-facil' ) ),
+				array( 'success' => false, 'message' => __( 'Tipo de documento invalido.', 'arriendo-facil' ) ),
 				400
 			);
 		}
 
 		if ( ! $this->is_valid_document( $owner_id_type, $owner_id ) ) {
 			return new WP_REST_Response(
-				array( 'success' => false, 'message' => __( 'Invalid document number.', 'arriendo-facil' ) ),
+				array( 'success' => false, 'message' => __( 'Numero de documento invalido.', 'arriendo-facil' ) ),
 				400
 			);
 		}
 
 		if ( ! $client_name ) {
 			return new WP_REST_Response(
-				array( 'success' => false, 'message' => __( 'Client name is required.', 'arriendo-facil' ) ),
+				array( 'success' => false, 'message' => __( 'El nombre del cliente es obligatorio.', 'arriendo-facil' ) ),
 				400
 			);
 		}
 
 		if ( ! is_email( $owner_email ) ) {
 			return new WP_REST_Response(
-				array( 'success' => false, 'message' => __( 'A valid email is required.', 'arriendo-facil' ) ),
+				array( 'success' => false, 'message' => __( 'Debes ingresar un correo electronico valido.', 'arriendo-facil' ) ),
 				400
 			);
 		}
 
 		if ( ! $observations ) {
 			return new WP_REST_Response(
-				array( 'success' => false, 'message' => __( 'Observations field is required.', 'arriendo-facil' ) ),
+				array( 'success' => false, 'message' => __( 'El campo de observaciones es obligatorio.', 'arriendo-facil' ) ),
 				400
 			);
 		}
@@ -117,7 +117,7 @@ class Arriendo_Facil_Owner_Register_API {
 				|| ! is_email( $legal_agent_email )
 			) {
 				return new WP_REST_Response(
-					array( 'success' => false, 'message' => __( 'Invalid legal agent data. All fields are required.', 'arriendo-facil' ) ),
+					array( 'success' => false, 'message' => __( 'Datos del representante legal invalidos. Todos los campos son obligatorios.', 'arriendo-facil' ) ),
 					400
 				);
 			}
@@ -133,7 +133,7 @@ class Arriendo_Facil_Owner_Register_API {
 
 		if ( $existing || get_user_by( 'email', $owner_email ) ) {
 			return new WP_REST_Response(
-				array( 'success' => false, 'message' => __( 'This email is already registered.', 'arriendo-facil' ) ),
+				array( 'success' => false, 'message' => __( 'Este correo ya esta registrado.', 'arriendo-facil' ) ),
 				409
 			);
 		}
@@ -166,7 +166,7 @@ class Arriendo_Facil_Owner_Register_API {
 		$user = get_user_by( 'id', (int) $user_id );
 		if ( ! $user ) {
 			return new WP_REST_Response(
-				array( 'success' => false, 'message' => __( 'Could not load created user.', 'arriendo-facil' ) ),
+				array( 'success' => false, 'message' => __( 'No se pudo cargar el usuario creado.', 'arriendo-facil' ) ),
 				500
 			);
 		}
@@ -205,7 +205,7 @@ class Arriendo_Facil_Owner_Register_API {
 		if ( false === $inserted ) {
 			wp_delete_user( (int) $user->ID );
 			return new WP_REST_Response(
-				array( 'success' => false, 'message' => __( 'Could not save registration.', 'arriendo-facil' ) ),
+				array( 'success' => false, 'message' => __( 'No se pudo guardar el registro.', 'arriendo-facil' ) ),
 				500
 			);
 		}
@@ -249,7 +249,7 @@ class Arriendo_Facil_Owner_Register_API {
 					'success'               => true,
 					'warning'               => true,
 					'activation_email_sent' => false,
-					'message'               => __( 'Registration was saved, but we could not send the activation email right now. Our team will resend it shortly.', 'arriendo-facil' ),
+					'message'               => __( 'El registro se guardo, pero no pudimos enviar el correo de activacion en este momento. Nuestro equipo lo reenviara en breve.', 'arriendo-facil' ),
 					'contact_id'            => $contact_id,
 				),
 				201
@@ -261,7 +261,7 @@ class Arriendo_Facil_Owner_Register_API {
 				'success'               => true,
 				'warning'               => false,
 				'activation_email_sent' => true,
-				'message'               => __( 'Registration successful. Please check your email to activate your account.', 'arriendo-facil' ),
+				'message'               => __( 'Registro exitoso. Revisa tu correo para activar tu cuenta.', 'arriendo-facil' ),
 				'contact_id'            => $contact_id,
 			),
 			201
@@ -310,20 +310,20 @@ class Arriendo_Facil_Owner_Register_API {
 
 	private function validate_and_upload_pdf( $field_name, $file_data, $contact_id, $user_id, $doc_type ) {
 		if ( UPLOAD_ERR_INI_SIZE === (int) $file_data['error'] || UPLOAD_ERR_FORM_SIZE === (int) $file_data['error'] ) {
-			return new WP_Error( 'af_upload_too_large', __( 'The uploaded file exceeds the size limit.', 'arriendo-facil' ) );
+			return new WP_Error( 'af_upload_too_large', __( 'El archivo cargado supera el limite de tamano.', 'arriendo-facil' ) );
 		}
 
 		if ( UPLOAD_ERR_OK !== (int) $file_data['error'] ) {
-			return new WP_Error( 'af_upload_error', __( 'File upload failed.', 'arriendo-facil' ) );
+			return new WP_Error( 'af_upload_error', __( 'La carga del archivo fallo.', 'arriendo-facil' ) );
 		}
 
 		if ( ! empty( $file_data['size'] ) && (int) $file_data['size'] > ( 5 * 1024 * 1024 ) ) {
-			return new WP_Error( 'af_upload_too_large', __( 'File exceeds maximum size (5 MB).', 'arriendo-facil' ) );
+			return new WP_Error( 'af_upload_too_large', __( 'El archivo supera el tamano maximo permitido (5 MB).', 'arriendo-facil' ) );
 		}
 
 		$checked = wp_check_filetype_and_ext( $file_data['tmp_name'], $file_data['name'], array( 'pdf' => 'application/pdf' ) );
 		if ( 'pdf' !== (string) $checked['ext'] ) {
-			return new WP_Error( 'af_upload_invalid_type', __( 'Only PDF files are allowed for this field.', 'arriendo-facil' ) );
+			return new WP_Error( 'af_upload_invalid_type', __( 'Solo se permiten archivos PDF en este campo.', 'arriendo-facil' ) );
 		}
 
 		$attachment_id = media_handle_upload(
@@ -334,7 +334,7 @@ class Arriendo_Facil_Owner_Register_API {
 		);
 
 		if ( is_wp_error( $attachment_id ) ) {
-			return new WP_Error( 'af_upload_failed', __( 'Could not save uploaded file.', 'arriendo-facil' ) );
+			return new WP_Error( 'af_upload_failed', __( 'No se pudo guardar el archivo cargado.', 'arriendo-facil' ) );
 		}
 
 		update_post_meta( (int) $attachment_id, '_af_sensitive_doc', '1' );
@@ -348,21 +348,21 @@ class Arriendo_Facil_Owner_Register_API {
 
 	private function validate_and_upload_docx( $field_name, $file_data, $contact_id, $user_id ) {
 		if ( UPLOAD_ERR_INI_SIZE === (int) $file_data['error'] || UPLOAD_ERR_FORM_SIZE === (int) $file_data['error'] ) {
-			return new WP_Error( 'af_upload_too_large', __( 'The uploaded file exceeds the size limit.', 'arriendo-facil' ) );
+			return new WP_Error( 'af_upload_too_large', __( 'El archivo cargado supera el limite de tamano.', 'arriendo-facil' ) );
 		}
 
 		if ( UPLOAD_ERR_OK !== (int) $file_data['error'] ) {
-			return new WP_Error( 'af_upload_error', __( 'File upload failed.', 'arriendo-facil' ) );
+			return new WP_Error( 'af_upload_error', __( 'La carga del archivo fallo.', 'arriendo-facil' ) );
 		}
 
 		if ( ! empty( $file_data['size'] ) && (int) $file_data['size'] > ( 5 * 1024 * 1024 ) ) {
-			return new WP_Error( 'af_upload_too_large', __( 'File exceeds maximum size (5 MB).', 'arriendo-facil' ) );
+			return new WP_Error( 'af_upload_too_large', __( 'El archivo supera el tamano maximo permitido (5 MB).', 'arriendo-facil' ) );
 		}
 
 		$allowed_mimes = array( 'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' );
 		$checked = wp_check_filetype_and_ext( $file_data['tmp_name'], $file_data['name'], $allowed_mimes );
 		if ( 'docx' !== (string) $checked['ext'] ) {
-			return new WP_Error( 'af_upload_invalid_type', __( 'Only Word (.docx) files are allowed for the contract template.', 'arriendo-facil' ) );
+			return new WP_Error( 'af_upload_invalid_type', __( 'Solo se permiten archivos Word (.docx) para la plantilla de contrato.', 'arriendo-facil' ) );
 		}
 
 		$attachment_id = media_handle_upload(
@@ -373,7 +373,7 @@ class Arriendo_Facil_Owner_Register_API {
 		);
 
 		if ( is_wp_error( $attachment_id ) ) {
-			return new WP_Error( 'af_upload_failed', __( 'Could not save uploaded contract file.', 'arriendo-facil' ) );
+			return new WP_Error( 'af_upload_failed', __( 'No se pudo guardar el archivo de contrato cargado.', 'arriendo-facil' ) );
 		}
 
 		update_post_meta( (int) $attachment_id, '_af_sensitive_doc', '1' );

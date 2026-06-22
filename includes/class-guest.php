@@ -734,7 +734,7 @@ class Arriendo_Facil_Guest {
 		check_ajax_referer( 'af_guest_nonce', 'nonce' );
 
 		if ( ! current_user_can( 'edit_posts' ) ) {
-			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
 		$name       = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
@@ -759,11 +759,11 @@ class Arriendo_Facil_Guest {
 		$last_name  = count( $name_parts ) > 1 ? trim( implode( ' ', array_slice( $name_parts, 1 ) ) ) : '';
 
 		if ( ! $first_name || ! $email || ! $phone || ! $id_number ) {
-			wp_send_json_error( array( 'message' => __( 'Missing required fields.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'Faltan campos obligatorios.', 'arriendo-facil' ) ) );
 		}
 
 		if ( $accommodation_id && 'accommodation' !== get_post_type( $accommodation_id ) ) {
-			wp_send_json_error( array( 'message' => __( 'Invalid accommodation ID.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'ID de alojamiento invalido.', 'arriendo-facil' ) ) );
 		}
 
 		if ( ! $referencia_personal_1 || ! $referencia_personal_2 ) {
@@ -771,7 +771,7 @@ class Arriendo_Facil_Guest {
 		}
 
 		if ( ! is_email( $email ) ) {
-			wp_send_json_error( array( 'message' => __( 'Invalid email.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'Correo electronico invalido.', 'arriendo-facil' ) ) );
 		}
 
 		if ( 1 !== preg_match( '/^[0-9]{1,10}$/', $phone ) ) {
@@ -835,7 +835,7 @@ class Arriendo_Facil_Guest {
 				)
 			);
 		} else {
-			wp_send_json_error( array( 'message' => __( 'Could not create guest.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'No se pudo crear el huesped.', 'arriendo-facil' ) ) );
 		}
 	}
 
@@ -877,7 +877,7 @@ class Arriendo_Facil_Guest {
 
 			$result = $wpdb->query( $sql );
 			if ( false === $result ) {
-				return new WP_Error( 'af_guest_schema_update_failed', __( 'Could not update guests table schema for additional fields.', 'arriendo-facil' ) );
+				return new WP_Error( 'af_guest_schema_update_failed', __( 'No se pudo actualizar el esquema de la tabla de huespedes para campos adicionales.', 'arriendo-facil' ) );
 			}
 		}
 
@@ -3800,7 +3800,7 @@ class Arriendo_Facil_Guest {
 		$bucket     = $this->get_storage_setting( 'AF_R2_BUCKET_NAME', 'af_r2_bucket_name', '' );
 
 		if ( '' === $access_key || '' === $secret_key || '' === $endpoint || '' === $bucket ) {
-			return new WP_Error( 'af_r2_missing_config', __( 'Missing Cloudflare R2 credentials. Check Settings > Cloud Provider.', 'arriendo-facil' ) );
+			return new WP_Error( 'af_r2_missing_config', __( 'Faltan credenciales de Cloudflare R2. Revisa Ajustes > Proveedor en la nube.', 'arriendo-facil' ) );
 		}
 
 		$parsed = wp_parse_url( $endpoint );
@@ -3808,7 +3808,7 @@ class Arriendo_Facil_Guest {
 		$scheme = isset( $parsed['scheme'] ) ? (string) $parsed['scheme'] : '';
 
 		if ( '' === $host || '' === $scheme ) {
-			return new WP_Error( 'af_r2_invalid_endpoint', __( 'Invalid Cloudflare R2 endpoint URL.', 'arriendo-facil' ) );
+			return new WP_Error( 'af_r2_invalid_endpoint', __( 'URL de endpoint de Cloudflare R2 invalida.', 'arriendo-facil' ) );
 		}
 
 		return array(
@@ -3961,16 +3961,16 @@ class Arriendo_Facil_Guest {
 			}
 
 			if ( UPLOAD_ERR_OK !== $file_error ) {
-				return new WP_Error( 'af_guest_pdf_upload_error', __( 'Could not upload one of the guest PDF documents.', 'arriendo-facil' ) );
+				return new WP_Error( 'af_guest_pdf_upload_error', __( 'No se pudo subir uno de los documentos PDF del huesped.', 'arriendo-facil' ) );
 			}
 
 			if ( ! empty( $file_data['size'] ) && (int) $file_data['size'] > ( 10 * 1024 * 1024 ) ) {
-				return new WP_Error( 'af_guest_pdf_upload_too_large', __( 'Guest PDF exceeds maximum size (10 MB).', 'arriendo-facil' ) );
+				return new WP_Error( 'af_guest_pdf_upload_too_large', __( 'El PDF del huesped supera el tamano maximo (10 MB).', 'arriendo-facil' ) );
 			}
 
 			$checked = wp_check_filetype_and_ext( $file_data['tmp_name'], $file_data['name'], array( 'pdf' => 'application/pdf' ) );
 			if ( 'pdf' !== (string) $checked['ext'] ) {
-				return new WP_Error( 'af_guest_pdf_invalid_type', __( 'Only PDF files are allowed for guest documents.', 'arriendo-facil' ) );
+				return new WP_Error( 'af_guest_pdf_invalid_type', __( 'Solo se permiten archivos PDF para documentos del huesped.', 'arriendo-facil' ) );
 			}
 
 			$attachment_id = media_handle_upload(
@@ -3984,7 +3984,7 @@ class Arriendo_Facil_Guest {
 			);
 
 			if ( is_wp_error( $attachment_id ) ) {
-				return new WP_Error( 'af_guest_pdf_save_failed', __( 'Could not save one of the guest PDF documents.', 'arriendo-facil' ) );
+				return new WP_Error( 'af_guest_pdf_save_failed', __( 'No se pudo guardar uno de los documentos PDF del huesped.', 'arriendo-facil' ) );
 			}
 
 			update_post_meta( (int) $attachment_id, '_af_guest_id', (int) $guest_id );
@@ -4003,7 +4003,7 @@ class Arriendo_Facil_Guest {
 		check_ajax_referer( 'af_guest_nonce', 'nonce' );
 
 		if ( ! current_user_can( 'edit_posts' ) ) {
-			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
 		$page     = isset( $_GET['page'] ) ? absint( $_GET['page'] ) : 1;
@@ -4046,12 +4046,12 @@ class Arriendo_Facil_Guest {
 		check_ajax_referer( 'af_guest_nonce', 'nonce' );
 
 		if ( ! current_user_can( 'edit_posts' ) ) {
-			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'arriendo-facil' ) ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
 		$guest_id = isset( $_POST['guest_id'] ) ? absint( $_POST['guest_id'] ) : 0;
 		if ( ! $guest_id ) {
-			wp_send_json_error( array( 'message' => __( 'Invalid guest ID.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'ID de huesped invalido.', 'arriendo-facil' ) ) );
 		}
 
 		global $wpdb;
@@ -4060,7 +4060,7 @@ class Arriendo_Facil_Guest {
 		);
 
 		if ( ! $guest ) {
-			wp_send_json_error( array( 'message' => __( 'Guest not found.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'Huesped no encontrado.', 'arriendo-facil' ) ) );
 		}
 
 		$ai      = new Arriendo_Facil_AI_Service();

@@ -155,7 +155,7 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 
 		<form method="post" style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
 			<?php wp_nonce_field( 'af_billing_manual_issue' ); ?>
-			<label for="af-billing-lease-id"><strong><?php esc_html_e( 'Lease ID', 'arriendo-facil' ); ?></strong></label>
+			<label for="af-billing-lease-id"><strong><?php esc_html_e( 'ID del contrato', 'arriendo-facil' ); ?></strong></label>
 			<input id="af-billing-lease-id" type="number" name="lease_id" min="1" required style="width:100px;" />
 			<span id="af-billing-lease-label" style="color:#555; font-size:13px;"></span>
 			<button type="button" id="af-open-issue-preview" class="button button-primary">
@@ -163,7 +163,7 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 			</button>
 			<noscript>
 				<button type="submit" name="af_issue_invoice_submit" class="button">
-					<?php esc_html_e( 'Emitir (sin preview)', 'arriendo-facil' ); ?>
+					<?php esc_html_e( 'Emitir (sin vista previa)', 'arriendo-facil' ); ?>
 				</button>
 			</noscript>
 		</form>
@@ -173,8 +173,8 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 		<div class="af-modal__backdrop" data-af-close-billing-preview></div>
 		<div class="af-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="af-billing-preview-title">
 			<div class="af-modal__header">
-				<h2 id="af-billing-preview-title"><?php esc_html_e( 'Preview de Comprobante', 'arriendo-facil' ); ?></h2>
-				<button type="button" class="af-modal__close" data-af-close-billing-preview aria-label="<?php esc_attr_e( 'Close', 'arriendo-facil' ); ?>">&times;</button>
+				<h2 id="af-billing-preview-title"><?php esc_html_e( 'Vista previa del comprobante', 'arriendo-facil' ); ?></h2>
+				<button type="button" class="af-modal__close" data-af-close-billing-preview aria-label="<?php esc_attr_e( 'Cerrar', 'arriendo-facil' ); ?>">&times;</button>
 			</div>
 			<div class="af-modal__body">
 				<p id="af-billing-preview-summary" style="margin-top:0; color:#555;"></p>
@@ -215,7 +215,7 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 
 				<div style="display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;">
 					<button type="button" class="button" data-af-close-billing-preview><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
-					<button type="button" class="button" id="af-billing-preview-refresh"><?php esc_html_e( 'Actualizar Preview', 'arriendo-facil' ); ?></button>
+					<button type="button" class="button" id="af-billing-preview-refresh"><?php esc_html_e( 'Actualizar vista previa', 'arriendo-facil' ); ?></button>
 					<button type="button" class="button button-primary" id="af-billing-preview-approve"><?php esc_html_e( 'Aprobar y Emitir', 'arriendo-facil' ); ?></button>
 				</div>
 			</div>
@@ -586,7 +586,7 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 			approveBtn.disabled = ! issueState.canIssue;
 		}
 		if ( summary ) {
-			summary.textContent = '<?php echo esc_js( __( 'Lease ID:', 'arriendo-facil' ) ); ?> ' + issueState.leaseId + ' · <?php echo esc_js( __( 'Periodo:', 'arriendo-facil' ) ); ?> ' + ( data.billing_period || '-' );
+			summary.textContent = '<?php echo esc_js( __( 'ID del contrato:', 'arriendo-facil' ) ); ?> ' + issueState.leaseId + ' · <?php echo esc_js( __( 'Periodo:', 'arriendo-facil' ) ); ?> ' + ( data.billing_period || '-' );
 		}
 	}
 
@@ -617,7 +617,7 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 			return;
 		}
 
-		setPreviewFeedback( '<?php echo esc_js( __( 'Calculando preview...', 'arriendo-facil' ) ); ?>', false );
+		setPreviewFeedback( '<?php echo esc_js( __( 'Calculando vista previa...', 'arriendo-facil' ) ); ?>', false );
 		if ( previewRefreshBtn ) previewRefreshBtn.disabled = true;
 		if ( approveBtn ) approveBtn.disabled = true;
 
@@ -692,7 +692,7 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 		previewOpenBtn.addEventListener( 'click', function () {
 			var leaseId = leaseIdFieldIssue ? parseInt( leaseIdFieldIssue.value || '0', 10 ) : 0;
 			if ( ! leaseId ) {
-				window.alert( '<?php echo esc_js( __( 'Selecciona un Lease ID válido antes de emitir.', 'arriendo-facil' ) ); ?>' );
+				window.alert( '<?php echo esc_js( __( 'Selecciona un ID de contrato valido antes de emitir.', 'arriendo-facil' ) ); ?>' );
 				return;
 			}
 

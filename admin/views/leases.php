@@ -1,6 +1,6 @@
 <?php
 /**
- * Leases admin page view.
+ * Contratos admin page view.
  *
  * @package Arriendo_Facil
  */
@@ -105,7 +105,7 @@ $billing_nonce = wp_create_nonce( 'af_billing_nonce' );
 $can_bill      = current_user_can( (string) apply_filters( 'af_billing_capability', 'manage_options' ) );
 ?>
 <div class="wrap">
-	<h1><?php esc_html_e( 'Leases', 'arriendo-facil' ); ?></h1>
+	<h1><?php esc_html_e( 'Contratos', 'arriendo-facil' ); ?></h1>
 
 	<div class="af-lease-actions">
 		<button type="button" class="button button-primary" id="af-new-lease">
@@ -118,7 +118,7 @@ $can_bill      = current_user_can( (string) apply_filters( 'af_billing_capabilit
 			<tr>
 				<th><?php esc_html_e( 'ID', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Accommodation', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Guest ID', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'ID de huesped', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Start Date', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'End Date', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Monthly Rent', 'arriendo-facil' ); ?></th>
@@ -230,20 +230,20 @@ $can_bill      = current_user_can( (string) apply_filters( 'af_billing_capabilit
 					</td>					<td class="af-lease-document-cell">
 							<?php if ( $versions_count > 0 || $lease->document_url ) : ?>
 								<a class="af-lease-view-link" href="<?php echo esc_url( $download_active ); ?>" target="_blank">
-									<?php esc_html_e( 'View', 'arriendo-facil' ); ?>
+									<?php esc_html_e( 'Ver', 'arriendo-facil' ); ?>
 								</a>
 								<?php if ( $versions_count > 0 ) : ?>
 									<div class="af-lease-version-meta">
-										<?php echo esc_html( sprintf( __( 'Active version: v%d (%d total)', 'arriendo-facil' ), max( 1, $active_version ), $versions_count ) ); ?>
+										<?php echo esc_html( sprintf( __( 'Version activa: v%d (%d en total)', 'arriendo-facil' ), max( 1, $active_version ), $versions_count ) ); ?>
 									</div>
 									<?php if ( $has_approved_pdf ) : ?>
 										<div class="af-lease-version-meta">
-											<?php esc_html_e( 'Security: Approved PDF active (read/print only).', 'arriendo-facil' ); ?>
+											<?php esc_html_e( 'Seguridad: PDF aprobado activo (solo lectura/impresion).', 'arriendo-facil' ); ?>
 										</div>
 									<?php endif; ?>
 								<?php endif; ?>
 							<?php else : ?>
-								<span class="af-lease-empty-document"><?php esc_html_e( 'No contract yet. It is generated from chatbot flow.', 'arriendo-facil' ); ?></span>
+								<span class="af-lease-empty-document"><?php esc_html_e( 'Aun no hay contrato. Se genera desde el flujo del chatbot.', 'arriendo-facil' ); ?></span>
 							<?php endif; ?>
 						</td>
 						<td class="af-lease-actions-cell">
@@ -251,20 +251,20 @@ $can_bill      = current_user_can( (string) apply_filters( 'af_billing_capabilit
 								<button type="button" class="button button-secondary af-open-upload-version-modal"
 									data-lease-id="<?php echo esc_attr( $lease->id ); ?>"
 									data-next-version="<?php echo esc_attr( $next_version ); ?>">
-									<?php echo esc_html( sprintf( __( 'Upload v%d', 'arriendo-facil' ), $next_version ) ); ?>
+									<?php echo esc_html( sprintf( __( 'Subir v%d', 'arriendo-facil' ), $next_version ) ); ?>
 								</button>
 								<?php if ( $versions_count > 0 || $lease->document_url ) : ?>
 									<button type="button" class="button button-primary af-approve-lease-document"
 										data-lease-id="<?php echo esc_attr( $lease->id ); ?>"
 										data-active-version="<?php echo esc_attr( max( 1, $active_version ) ); ?>"
 										<?php disabled( $has_approved_pdf ); ?>>
-										<?php echo esc_html( $has_approved_pdf ? __( 'Document Approved', 'arriendo-facil' ) : __( 'Approve Document', 'arriendo-facil' ) ); ?>
+										<?php echo esc_html( $has_approved_pdf ? __( 'Documento aprobado', 'arriendo-facil' ) : __( 'Aprobar documento', 'arriendo-facil' ) ); ?>
 									</button>
 								<?php endif; ?>
 							<button type="button" class="button af-change-lease-status af-lease-activate-button"
 								data-lease-id="<?php echo esc_attr( $lease->id ); ?>"
 								data-status="active">
-								<?php esc_html_e( 'Activate', 'arriendo-facil' ); ?>
+								<?php esc_html_e( 'Activar', 'arriendo-facil' ); ?>
 							</button>
 							</div>
 						</td>
@@ -272,7 +272,7 @@ $can_bill      = current_user_can( (string) apply_filters( 'af_billing_capabilit
 				<?php endforeach; ?>
 			<?php else : ?>
 				<tr>
-					<td colspan="10"><?php esc_html_e( 'No leases found.', 'arriendo-facil' ); ?></td>
+					<td colspan="10"><?php esc_html_e( 'No se encontraron contratos.', 'arriendo-facil' ); ?></td>
 				</tr>
 			<?php endif; ?>
 		</tbody>
@@ -282,24 +282,24 @@ $can_bill      = current_user_can( (string) apply_filters( 'af_billing_capabilit
 		<div class="af-modal__backdrop" data-af-close-upload-modal></div>
 		<div class="af-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="af-lease-upload-modal-title">
 			<div class="af-modal__header">
-				<h2 id="af-lease-upload-modal-title"><?php esc_html_e( 'Upload New Contract Version', 'arriendo-facil' ); ?></h2>
-				<button type="button" class="af-modal__close" data-af-close-upload-modal aria-label="<?php esc_attr_e( 'Close', 'arriendo-facil' ); ?>">&times;</button>
+				<h2 id="af-lease-upload-modal-title"><?php esc_html_e( 'Subir nueva version de contrato', 'arriendo-facil' ); ?></h2>
+				<button type="button" class="af-modal__close" data-af-close-upload-modal aria-label="<?php esc_attr_e( 'Cerrar', 'arriendo-facil' ); ?>">&times;</button>
 			</div>
 			<div class="af-modal__body">
-				<p class="af-lease-upload-help"><?php esc_html_e( 'Upload your edited Word file as the next version for this lease.', 'arriendo-facil' ); ?></p>
-				<p class="af-lease-upload-rules"><?php esc_html_e( 'Allowed: .doc, .docx | Max: 12 MB', 'arriendo-facil' ); ?></p>
+				<p class="af-lease-upload-help"><?php esc_html_e( 'Sube tu archivo Word editado como la siguiente version de este contrato.', 'arriendo-facil' ); ?></p>
+				<p class="af-lease-upload-rules"><?php esc_html_e( 'Permitidos: .doc, .docx | Max: 12 MB', 'arriendo-facil' ); ?></p>
 
 				<div class="af-lease-upload-picker">
 					<input type="file" id="af-lease-upload-file" accept=".doc,.docx" hidden />
-					<button type="button" class="button" id="af-lease-upload-select-btn"><?php esc_html_e( 'Select Word File', 'arriendo-facil' ); ?></button>
-					<span id="af-lease-upload-file-name" class="af-lease-upload-file-name"><?php esc_html_e( 'No file selected.', 'arriendo-facil' ); ?></span>
+					<button type="button" class="button" id="af-lease-upload-select-btn"><?php esc_html_e( 'Seleccionar archivo Word', 'arriendo-facil' ); ?></button>
+					<span id="af-lease-upload-file-name" class="af-lease-upload-file-name"><?php esc_html_e( 'Ningun archivo seleccionado.', 'arriendo-facil' ); ?></span>
 				</div>
 
 				<p id="af-lease-upload-feedback" class="af-lease-upload-feedback" aria-live="polite"></p>
 
 				<div class="af-lease-upload-actions">
-					<button type="button" class="button" data-af-close-upload-modal><?php esc_html_e( 'Cancel', 'arriendo-facil' ); ?></button>
-					<button type="button" class="button button-primary" id="af-lease-upload-submit" disabled><?php esc_html_e( 'Upload Version', 'arriendo-facil' ); ?></button>
+					<button type="button" class="button" data-af-close-upload-modal><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
+					<button type="button" class="button button-primary" id="af-lease-upload-submit" disabled><?php esc_html_e( 'Subir version', 'arriendo-facil' ); ?></button>
 				</div>
 			</div>
 		</div>

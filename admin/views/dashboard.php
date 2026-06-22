@@ -47,13 +47,13 @@ if ( $is_owner ) {
 
 		<div class="af-stat-card">
 			<span class="af-stat-number"><?php echo esc_html( $lease_count ); ?></span>
-			<span class="af-stat-label"><?php esc_html_e( 'Leases', 'arriendo-facil' ); ?></span>
+			<span class="af-stat-label"><?php esc_html_e( 'Contratos', 'arriendo-facil' ); ?></span>
 			<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-leases' ) ); ?>"><?php esc_html_e( 'View all', 'arriendo-facil' ); ?></a>
 		</div>
 
 		<div class="af-stat-card">
 			<span class="af-stat-number"><?php echo esc_html( $pending_cleaning ); ?></span>
-			<span class="af-stat-label"><?php esc_html_e( 'Pending Cleanings', 'arriendo-facil' ); ?></span>
+			<span class="af-stat-label"><?php esc_html_e( 'Limpiezas pendientes', 'arriendo-facil' ); ?></span>
 			<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-cleaning-requests' ) ); ?>"><?php esc_html_e( 'View all', 'arriendo-facil' ); ?></a>
 		</div>
 
@@ -67,7 +67,7 @@ if ( $is_owner ) {
 
 		<div class="af-stat-card">
 			<span class="af-stat-number"><?php echo esc_html( $guest_count ); ?></span>
-			<span class="af-stat-label"><?php esc_html_e( 'Guests', 'arriendo-facil' ); ?></span>
+			<span class="af-stat-label"><?php esc_html_e( 'Huespedes', 'arriendo-facil' ); ?></span>
 			<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-guests' ) ); ?>"><?php esc_html_e( 'View all', 'arriendo-facil' ); ?></a>
 		</div>
 	</div>
@@ -78,14 +78,14 @@ if ( $is_owner ) {
 			<?php esc_html_e( '+ New Accommodation', 'arriendo-facil' ); ?>
 		</a>
 		<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-leases' ) ); ?>" class="button">
-			<?php esc_html_e( 'Manage Leases', 'arriendo-facil' ); ?>
+			<?php esc_html_e( 'Manage Contratos', 'arriendo-facil' ); ?>
 		</a>
 		<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-cleaning-requests' ) ); ?>" class="button">
-			<?php esc_html_e( 'Cleaning Requests', 'arriendo-facil' ); ?>
+			<?php esc_html_e( 'Solicitudes de limpieza', 'arriendo-facil' ); ?>
 		</a>
 		<?php if ( ! $is_owner ) : ?>
 		<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-ai-settings' ) ); ?>" class="button">
-			<?php esc_html_e( 'AI Settings', 'arriendo-facil' ); ?>
+			<?php esc_html_e( 'Ajustes de IA', 'arriendo-facil' ); ?>
 		</a>
 		<?php endif; ?>
 	</div>

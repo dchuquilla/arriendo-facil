@@ -1,6 +1,6 @@
 <?php
 /**
- * AI Settings admin page view.
+ * AI Ajustes admin page view.
  *
  * @package Arriendo_Facil
  */
@@ -61,7 +61,7 @@ if ( isset( $_POST['af_save_ai_settings'] ) ) {
 		}
 	}
 
-	echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Settings saved.', 'arriendo-facil' ) . '</p></div>';
+	echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Ajustes saved.', 'arriendo-facil' ) . '</p></div>';
 }
 
 if ( isset( $_POST['af_save_storage_credentials'] ) ) {
@@ -131,7 +131,7 @@ if ( isset( $_POST['af_test_storage_connection'] ) ) {
 		update_option( 'af_r2_last_check', current_time( 'mysql' ) );
 
 		if ( $connected ) {
-			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Connected: endpoint reachable.', 'arriendo-facil' ) . '</p></div>';
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Conectado: endpoint accesible.', 'arriendo-facil' ) . '</p></div>';
 		} else {
 			$error_message = is_wp_error( $response ) ? $response->get_error_message() : __( 'Unexpected response.', 'arriendo-facil' );
 			echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__( 'Connection failed:', 'arriendo-facil' ) . ' ' . esc_html( $error_message ) . '</p></div>';
@@ -214,7 +214,7 @@ $any_storage_field_locked = $provider_locked || $access_key_locked || $secret_ke
 ?>
 
 <div class="wrap">
-	<h1><?php esc_html_e( 'Settings', 'arriendo-facil' ); ?></h1>
+	<h1><?php esc_html_e( 'Ajustes', 'arriendo-facil' ); ?></h1>
 	<p><?php esc_html_e( 'Configure AI and cloud storage integrations for Arriendo Facil.', 'arriendo-facil' ); ?></p>
 
 	<form method="post" action="">
@@ -286,19 +286,19 @@ $any_storage_field_locked = $provider_locked || $access_key_locked || $secret_ke
 
 		<p class="submit">
 			<input type="submit" name="af_save_ai_settings" class="button button-primary"
-				value="<?php esc_attr_e( 'Save Settings', 'arriendo-facil' ); ?>" />
+				value="<?php esc_attr_e( 'Save Ajustes', 'arriendo-facil' ); ?>" />
 			<input type="submit" name="af_test_owner_data" class="button button-secondary"
 				value="<?php esc_attr_e( 'Test Claude Connection', 'arriendo-facil' ); ?>" />
 		</p>
 		<p class="description">
-			<?php esc_html_e( 'This test sends owner records to Claude and validates Anthropic connectivity. It is not related to Cloud Provider settings.', 'arriendo-facil' ); ?>
+			<?php esc_html_e( 'Esta prueba envia registros de propietarios a Claude y valida la conectividad con Anthropic. No esta relacionada con la configuracion del proveedor en la nube.', 'arriendo-facil' ); ?>
 		</p>
 
 		<hr />
 		<h2><?php esc_html_e( 'Cloud Provider', 'arriendo-facil' ); ?></h2>
 		<p><?php esc_html_e( 'Select a cloud storage provider and provide the necessary credentials.', 'arriendo-facil' ); ?></p>
 		<p class="description">
-			<?php esc_html_e( 'Note: You can configure credentials here or define them in wp-config.php for enhanced security. Constants defined in wp-config.php will take priority and disable these fields.', 'arriendo-facil' ); ?>
+			<?php esc_html_e( 'Nota: Puedes configurar las credenciales aqui o definirlas en wp-config.php para mayor seguridad. Las constantes definidas en wp-config.php tendran prioridad y desactivaran estos campos.', 'arriendo-facil' ); ?>
 		</p>
 
 		<table class="form-table">
@@ -328,31 +328,31 @@ $any_storage_field_locked = $provider_locked || $access_key_locked || $secret_ke
 				<td><input type="url" id="af_r2_endpoint_url" name="af_r2_endpoint_url" value="<?php echo esc_attr( $r2_endpoint_url ); ?>" class="regular-text" placeholder="https://accountid.r2.cloudflarestorage.com" <?php disabled( $endpoint_locked ); ?> /></td>
 			</tr>
 			<tr>
-				<th scope="row"><label for="af_r2_bucket_name"><?php esc_html_e( 'Bucket Name', 'arriendo-facil' ); ?></label></th>
+				<th scope="row"><label for="af_r2_bucket_name"><?php esc_html_e( 'Nombre del bucket', 'arriendo-facil' ); ?></label></th>
 				<td><input type="text" id="af_r2_bucket_name" name="af_r2_bucket_name" value="<?php echo esc_attr( $r2_bucket_name ); ?>" class="regular-text" <?php disabled( $bucket_locked ); ?> /></td>
 			</tr>
 			<tr>
-				<th scope="row"><label for="af_r2_custom_domain"><?php esc_html_e( 'Custom Domain (CDN URL)', 'arriendo-facil' ); ?></label></th>
+				<th scope="row"><label for="af_r2_custom_domain"><?php esc_html_e( 'Dominio personalizado (URL CDN)', 'arriendo-facil' ); ?></label></th>
 				<td><input type="url" id="af_r2_custom_domain" name="af_r2_custom_domain" value="<?php echo esc_attr( $r2_custom_domain ); ?>" class="regular-text" placeholder="https://cdn.example.com" <?php disabled( $custom_domain_locked ); ?> /></td>
 			</tr>
 			<tr>
-				<th scope="row"><?php esc_html_e( 'Connected', 'arriendo-facil' ); ?></th>
+				<th scope="row"><?php esc_html_e( 'Conectado', 'arriendo-facil' ); ?></th>
 				<td>
-					<strong><?php echo $r2_connected ? esc_html__( 'Yes', 'arriendo-facil' ) : esc_html__( 'No', 'arriendo-facil' ); ?></strong>
+					<strong><?php echo $r2_connected ? esc_html__( 'Si', 'arriendo-facil' ) : esc_html__( 'No', 'arriendo-facil' ); ?></strong>
 					<?php if ( $r2_last_check ) : ?>
-						<p class="description"><?php echo esc_html__( 'Last check:', 'arriendo-facil' ) . ' ' . esc_html( $r2_last_check ); ?></p>
+						<p class="description"><?php echo esc_html__( 'Ultima verificacion:', 'arriendo-facil' ) . ' ' . esc_html( $r2_last_check ); ?></p>
 					<?php endif; ?>
 				</td>
 			</tr>
 			<tr>
-				<th scope="row"><?php esc_html_e( 'Upload Limits', 'arriendo-facil' ); ?></th>
+				<th scope="row"><?php esc_html_e( 'Limites de carga', 'arriendo-facil' ); ?></th>
 				<td>
 					<p class="description">
 						<?php
 						echo esc_html(
 							sprintf(
 								/* translators: 1: upload_max_filesize, 2: post_max_size, 3: plugin safe request cap */
-								__( 'PHP upload_max_filesize: %1$s | PHP post_max_size: %2$s | Plugin safe request cap: %3$s', 'arriendo-facil' ),
+								__( 'PHP upload_max_filesize: %1$s | PHP post_max_size: %2$s | Limite seguro de solicitud del plugin: %3$s', 'arriendo-facil' ),
 								$php_upload_max_human,
 								$php_post_max_human,
 								$owner_safe_human

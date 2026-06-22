@@ -370,7 +370,7 @@ class Arriendo_Facil_AI_Service {
 		$parsed_content = $this->decode_json_flexible( $content );
 		if ( null === $parsed_content ) {
 			$preview = $this->preview_body( $content );
-			return new WP_Error( 'invalid_response', sprintf( __( 'Claude did not return valid JSON. Preview: %s', 'arriendo-facil' ), $preview ) );
+			return new WP_Error( 'invalid_response', sprintf( __( 'Claude no devolvio JSON valido. Vista previa: %s', 'arriendo-facil' ), $preview ) );
 		}
 
 		return $parsed_content;

@@ -234,17 +234,35 @@ class Arriendo_Facil_Owner_Register_API {
 		$owner_contact = new Arriendo_Facil_Owner_Contact();
 		$mail_result = $owner_contact->send_owner_activation_email( $owner_email, $client_name, $reset_url );
 		if ( is_wp_error( $mail_result ) ) {
+			error_log(
+				sprintf(
+					'Arriendo Facil: owner registration %d created without activation email for user %d (%s). Reason: %s',
+					$contact_id,
+					(int) $user->ID,
+					$owner_email,
+					$mail_result->get_error_message()
+				)
+			);
+
 			return new WP_REST_Response(
-				array( 'success' => false, 'message' => $mail_result->get_error_message() ),
-				500
+				array(
+					'success'               => true,
+					'warning'               => true,
+					'activation_email_sent' => false,
+					'message'               => __( 'Registration was saved, but we could not send the activation email right now. Our team will resend it shortly.', 'arriendo-facil' ),
+					'contact_id'            => $contact_id,
+				),
+				201
 			);
 		}
 
 		return new WP_REST_Response(
 			array(
-				'success'    => true,
-				'message'    => __( 'Registration successful. Please check your email to activate your account.', 'arriendo-facil' ),
-				'contact_id' => $contact_id,
+				'success'               => true,
+				'warning'               => false,
+				'activation_email_sent' => true,
+				'message'               => __( 'Registration successful. Please check your email to activate your account.', 'arriendo-facil' ),
+				'contact_id'            => $contact_id,
 			),
 			201
 		);

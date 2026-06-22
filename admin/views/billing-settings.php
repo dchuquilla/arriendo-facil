@@ -67,29 +67,38 @@ if ( isset( $_POST['af_save_sri_config'] ) ) {
 // Upload certificate.
 if ( isset( $_POST['af_upload_certificate'] ) ) {
 	check_admin_referer( 'af_sri_settings_nonce' );
+	$uploaded_new_certificate = false;
 
 	if ( ! empty( $_FILES['af_cert_file']['name'] ) ) {
 		$upload_result = Arriendo_Facil_SRI_Config::upload_certificate( $_FILES['af_cert_file'] );
 		if ( is_wp_error( $upload_result ) ) {
 			$af_sri_notice = array( 'type' => 'error', 'msg' => $upload_result->get_error_message() );
 		} else {
+			$uploaded_new_certificate = true;
 			$af_sri_notice = array( 'type' => 'success', 'msg' => __( 'Certificado subido correctamente.', 'arriendo-facil' ) );
 		}
 	}
 
 	// Save password if provided (no sanitize_text_field — it strips %XX and special chars).
 	$new_password = (string) wp_unslash( $_POST['af_cert_password'] ?? '' );
+	$password_for_processing = '';
 	if ( '' !== $new_password ) {
 		Arriendo_Facil_SRI_Config::save_cert_password( $new_password );
+		$password_for_processing = $new_password;
+	} elseif ( $uploaded_new_certificate ) {
+		$password_for_processing = Arriendo_Facil_SRI_Config::cert_password();
+	}
 
+	$should_process_p12 = $uploaded_new_certificate || ( '' !== $new_password );
+	if ( $should_process_p12 ) {
 		// Extract PEMs from the P12 and store them encrypted.
 		$cert_path = Arriendo_Facil_SRI_Config::cert_path();
-		if ( $cert_path ) {
-			$p12_result = Arriendo_Facil_SRI_Config::read_p12( $cert_path, $new_password );
+		if ( $cert_path && '' !== $password_for_processing ) {
+			$p12_result = Arriendo_Facil_SRI_Config::read_p12( $cert_path, $password_for_processing );
 			if ( is_wp_error( $p12_result ) ) {
 				$af_sri_notice = array(
 					'type' => 'error',
-					'msg'  => __( 'Certificado subido, pero no se pudo leer: ', 'arriendo-facil' ) . $p12_result->get_error_message(),
+					'msg'  => __( 'No se pudo leer el certificado activo: ', 'arriendo-facil' ) . $p12_result->get_error_message(),
 				);
 			} elseif ( empty( $p12_result['cert'] ) || empty( $p12_result['pkey'] ) ) {
 				$af_sri_notice = array(
@@ -126,6 +135,11 @@ if ( isset( $_POST['af_upload_certificate'] ) ) {
 					);
 				}
 			}
+		} elseif ( $uploaded_new_certificate && '' === $password_for_processing ) {
+			$af_sri_notice = array(
+				'type' => 'warning',
+				'msg'  => __( 'Certificado subido, pero falta contraseña para activarlo. Ingresa la contraseña del P12 y vuelve a guardar para generar la firma.', 'arriendo-facil' ),
+			);
 		}
 	}
 }

@@ -181,6 +181,11 @@ class Arriendo_Facil_SRI_Config {
 		}
 
 		$current['cert_filename'] = $filename;
+		// Invalidate cached PEM material when certificate file changes.
+		// A new upload must always regenerate PEMs to avoid signing with stale keys.
+		$current['cert_pem_enc']  = '';
+		$current['pkey_pem_enc']  = '';
+		$current['chain_pem_enc'] = '';
 		if ( ! update_option( self::OPTION_KEY, $current ) ) {
 			unlink( $dest_path );
 			return new WP_Error( 'config_error', __( 'No se pudo guardar la configuración del certificado.', 'arriendo-facil' ) );

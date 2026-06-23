@@ -165,7 +165,13 @@ if ( isset( $_POST['af_rebuild_chain'] ) ) {
 
 	$chain_result = Arriendo_Facil_SRI_Config::rebuild_chain();
 	if ( is_wp_error( $chain_result ) ) {
-		$af_sri_notice = array( 'type' => 'error', 'msg' => $chain_result->get_error_message() );
+		$af_sri_notice = array(
+			'type'          => 'error',
+			'msg'           => $chain_result->get_error_message(),
+			'error_code'    => $chain_result->get_error_code(),
+			'error_data'    => $chain_result->get_error_data(),
+			'console_log'   => true,
+		);
 	} else {
 		$pems_check  = Arriendo_Facil_SRI_Config::get_cert_pems();
 		$chain_count = (int) preg_match_all( '/-----BEGIN CERTIFICATE-----/', $pems_check['chain'] );
@@ -284,6 +290,15 @@ $af_points_ready     = ! empty( $emission_points );
 		<div class="notice notice-<?php echo esc_attr( $af_sri_notice['type'] ); ?> is-dismissible">
 			<p><?php echo esc_html( $af_sri_notice['msg'] ); ?></p>
 		</div>
+		<?php if ( ! empty( $af_sri_notice['console_log'] ) ) : ?>
+		<script>
+		console.error( '[AF SRI] rebuild_chain error', {
+			code:    <?php echo wp_json_encode( $af_sri_notice['error_code'] ); ?>,
+			message: <?php echo wp_json_encode( $af_sri_notice['msg'] ); ?>,
+			data:    <?php echo wp_json_encode( $af_sri_notice['error_data'] ); ?>
+		} );
+		</script>
+		<?php endif; ?>
 	<?php endif; ?>
 
 	<?php if ( '2' === $cfg['ambiente'] ) : ?>

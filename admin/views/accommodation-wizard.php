@@ -49,7 +49,8 @@ $steps = array(
 	2 => array( 'title' => __( 'Ubicación', 'arriendo-facil' ),        'icon' => '&#x1F4CD;' ),
 	3 => array( 'title' => __( 'Características', 'arriendo-facil' ),  'icon' => '&#x1F4D0;' ),
 	4 => array( 'title' => __( 'Fotos', 'arriendo-facil' ),            'icon' => '&#x1F4F7;' ),
-	5 => array( 'title' => __( 'Precio y publicación', 'arriendo-facil' ), 'icon' => '&#x1F4B0;' ),
+	5 => array( 'title' => __( 'Precio y propietario', 'arriendo-facil' ), 'icon' => '&#x1F4B0;' ),
+	6 => array( 'title' => __( 'Resumen y publicar', 'arriendo-facil' ),   'icon' => '&#x1F4DD;' ),
 );
 
 $wizard_class = 'af-wizard af-wizard--' . esc_attr( $mode );
@@ -380,14 +381,16 @@ $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data[
 								class="af-input af-input--rent"
 								placeholder="0.00" />
 						</div>
-						<button type="button" class="button af-predict-cost af-predict-btn"
-							data-id="<?php echo esc_attr( (string) $post_id ); ?>"
-							<?php echo $post_id ? '' : 'disabled'; ?>
-							title="<?php echo $post_id ? '' : esc_attr__( 'Guarda primero como borrador para sugerir precio con IA.', 'arriendo-facil' ); ?>">
-							&#x2728; <?php esc_html_e( 'Sugerir precio (IA)', 'arriendo-facil' ); ?>
-						</button>
+						<?php // Sugerir precio (IA) — temporalmente oculto. Mantener marcado para reactivar más adelante. ?>
+						<span class="af-predict-cost-wrapper" style="display:none;">
+							<button type="button" class="button af-predict-cost af-predict-btn"
+								data-id="<?php echo esc_attr( (string) $post_id ); ?>"
+								<?php echo $post_id ? '' : 'disabled'; ?>>
+								&#x2728; <?php esc_html_e( 'Sugerir precio (IA)', 'arriendo-facil' ); ?>
+							</button>
+						</span>
 					</div>
-					<span class="af-predict-result"></span>
+					<span class="af-predict-result" style="display:none;"></span>
 				</div>
 
 				<div class="af-field">
@@ -411,6 +414,93 @@ $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data[
 				</div>
 			</section>
 
+			<!-- ============ PASO 6: RESUMEN ============ -->
+			<section class="af-wizard__step" data-step="6">
+				<div class="af-wizard__step-head">
+					<span class="af-wizard__step-icon"><?php echo $steps[6]['icon']; // phpcs:ignore WordPress.Security.EscapeOutput ?></span>
+					<div>
+						<h2><?php esc_html_e( 'Resumen', 'arriendo-facil' ); ?></h2>
+						<p><?php esc_html_e( 'Revisa toda la información antes de publicar. Puedes volver a cualquier paso para corregir.', 'arriendo-facil' ); ?></p>
+					</div>
+				</div>
+
+				<div class="af-summary" id="af-summary">
+					<div class="af-summary__card" data-jump-step="1">
+						<div class="af-summary__card-head">
+							<h3><?php esc_html_e( 'Tipo y nombre', 'arriendo-facil' ); ?></h3>
+							<button type="button" class="button-link af-summary__edit" data-jump-step="1"><?php esc_html_e( 'Editar', 'arriendo-facil' ); ?></button>
+						</div>
+						<dl class="af-summary__list">
+							<dt><?php esc_html_e( 'Nombre', 'arriendo-facil' ); ?></dt>
+							<dd data-af-summary="post_title">—</dd>
+							<dt><?php esc_html_e( 'Tipo', 'arriendo-facil' ); ?></dt>
+							<dd data-af-summary="af_property_type">—</dd>
+							<dt><?php esc_html_e( 'Estado', 'arriendo-facil' ); ?></dt>
+							<dd data-af-summary="af_status">—</dd>
+						</dl>
+					</div>
+
+					<div class="af-summary__card">
+						<div class="af-summary__card-head">
+							<h3><?php esc_html_e( 'Ubicación', 'arriendo-facil' ); ?></h3>
+							<button type="button" class="button-link af-summary__edit" data-jump-step="2"><?php esc_html_e( 'Editar', 'arriendo-facil' ); ?></button>
+						</div>
+						<dl class="af-summary__list">
+							<dt><?php esc_html_e( 'Dirección', 'arriendo-facil' ); ?></dt>
+							<dd data-af-summary="af_address">—</dd>
+							<dt><?php esc_html_e( 'Ciudad', 'arriendo-facil' ); ?></dt>
+							<dd data-af-summary="af_city">—</dd>
+							<dt><?php esc_html_e( 'Sector', 'arriendo-facil' ); ?></dt>
+							<dd data-af-summary="af_location_text">—</dd>
+							<dt><?php esc_html_e( 'Coordenadas', 'arriendo-facil' ); ?></dt>
+							<dd data-af-summary="coords">—</dd>
+						</dl>
+					</div>
+
+					<div class="af-summary__card">
+						<div class="af-summary__card-head">
+							<h3><?php esc_html_e( 'Características', 'arriendo-facil' ); ?></h3>
+							<button type="button" class="button-link af-summary__edit" data-jump-step="3"><?php esc_html_e( 'Editar', 'arriendo-facil' ); ?></button>
+						</div>
+						<dl class="af-summary__list">
+							<dt><?php esc_html_e( 'Dormitorios', 'arriendo-facil' ); ?></dt>
+							<dd data-af-summary="af_bedrooms">—</dd>
+							<dt><?php esc_html_e( 'Baños', 'arriendo-facil' ); ?></dt>
+							<dd data-af-summary="af_bathrooms">—</dd>
+							<dt><?php esc_html_e( 'Metros cuadrados', 'arriendo-facil' ); ?></dt>
+							<dd data-af-summary="af_square_meters">—</dd>
+							<dt><?php esc_html_e( 'Amenidades', 'arriendo-facil' ); ?></dt>
+							<dd data-af-summary="af_amenities">—</dd>
+							<dt><?php esc_html_e( 'Descripción', 'arriendo-facil' ); ?></dt>
+							<dd data-af-summary="post_content">—</dd>
+						</dl>
+					</div>
+
+					<div class="af-summary__card">
+						<div class="af-summary__card-head">
+							<h3><?php esc_html_e( 'Fotos', 'arriendo-facil' ); ?></h3>
+							<button type="button" class="button-link af-summary__edit" data-jump-step="4"><?php esc_html_e( 'Editar', 'arriendo-facil' ); ?></button>
+						</div>
+						<div class="af-summary__photos" data-af-summary="photos">
+							<p class="af-summary__empty"><?php esc_html_e( 'Sin fotos', 'arriendo-facil' ); ?></p>
+						</div>
+					</div>
+
+					<div class="af-summary__card">
+						<div class="af-summary__card-head">
+							<h3><?php esc_html_e( 'Precio y propietario', 'arriendo-facil' ); ?></h3>
+							<button type="button" class="button-link af-summary__edit" data-jump-step="5"><?php esc_html_e( 'Editar', 'arriendo-facil' ); ?></button>
+						</div>
+						<dl class="af-summary__list">
+							<dt><?php esc_html_e( 'Arriendo mensual', 'arriendo-facil' ); ?></dt>
+							<dd data-af-summary="af_monthly_rent">—</dd>
+							<dt><?php esc_html_e( 'Propietario', 'arriendo-facil' ); ?></dt>
+							<dd data-af-summary="af_owner_id">—</dd>
+						</dl>
+					</div>
+				</div>
+			</section>
+
 			<!-- Sticky action bar -->
 			<div class="af-wizard__actions">
 				<div class="af-wizard__actions-left">
@@ -428,12 +518,20 @@ $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data[
 					<button type="button" class="button button-primary af-wizard__next" data-af-next>
 						<?php esc_html_e( 'Siguiente →', 'arriendo-facil' ); ?>
 					</button>
-					<button type="submit" class="button button-primary af-wizard__publish" data-af-action="publish" hidden>
+					<button type="submit" class="button button-primary af-wizard__publish" data-af-action="publish" disabled>
 						<?php echo 'edit' === $mode ? esc_html__( 'Guardar cambios', 'arriendo-facil' ) : esc_html__( 'Publicar inmueble', 'arriendo-facil' ); ?>
 					</button>
 				</div>
 			</div>
 
 		</form>
+	</div>
+
+	<div class="af-wizard__loading" id="af-wizard-loading" hidden aria-live="polite" aria-busy="true">
+		<div class="af-wizard__loading-card">
+			<div class="af-wizard__spinner" aria-hidden="true"></div>
+			<p class="af-wizard__loading-text" id="af-wizard-loading-text"><?php esc_html_e( 'Publicando inmueble...', 'arriendo-facil' ); ?></p>
+			<p class="af-wizard__loading-hint"><?php esc_html_e( 'Esto puede tardar unos segundos. No cierres la ventana.', 'arriendo-facil' ); ?></p>
+		</div>
 	</div>
 </div>

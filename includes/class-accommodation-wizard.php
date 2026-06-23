@@ -25,6 +25,7 @@ class Arriendo_Facil_Accommodation_Wizard {
 		add_action( 'admin_init', array( $this, 'maybe_redirect' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
 		add_action( 'admin_post_' . self::SUBMIT_ACTION, array( $this, 'handle_submit' ) );
+		add_action( 'admin_notices', array( $this, 'render_post_publish_notice' ) );
 	}
 
 	/**
@@ -157,6 +158,10 @@ class Arriendo_Facil_Accommodation_Wizard {
 					'pickFeatured'     => __( 'Seleccionar foto principal', 'arriendo-facil' ),
 					'useAsFeatured'    => __( 'Usar como portada', 'arriendo-facil' ),
 					'needSaveForAI'    => __( 'Guarda primero como borrador para sugerir precio con IA.', 'arriendo-facil' ),
+					'publishing'       => __( 'Publicando inmueble...', 'arriendo-facil' ),
+					'savingChanges'    => __( 'Guardando cambios...', 'arriendo-facil' ),
+					'savingDraft'      => __( 'Guardando borrador...', 'arriendo-facil' ),
+					'ownerSelf'        => __( 'Tu cuenta', 'arriendo-facil' ),
 				),
 			)
 		);
@@ -253,6 +258,7 @@ class Arriendo_Facil_Accommodation_Wizard {
 		check_admin_referer( self::NONCE_ACTION, self::NONCE_NAME );
 
 		$post_id     = isset( $_POST['af_post_id'] ) ? absint( wp_unslash( $_POST['af_post_id'] ) ) : 0;
+		$post_id_was_existing = $post_id > 0;
 		$form_action = isset( $_POST['af_form_action'] ) ? sanitize_key( wp_unslash( $_POST['af_form_action'] ) ) : 'publish';
 
 		if ( 'cancel' === $form_action ) {
@@ -336,16 +342,62 @@ class Arriendo_Facil_Accommodation_Wizard {
 			delete_post_thumbnail( $post_id );
 		}
 
-		$redirect = add_query_arg(
-			array(
-				'page'  => self::PAGE_SLUG,
-				'id'    => $post_id,
-				'saved' => ( 'draft' === $form_action ) ? 'draft' : '1',
-			),
-			admin_url( 'admin.php' )
-		);
+		$is_first_publish = ! $post_id_was_existing && 'draft' !== $form_action;
+
+		if ( 'draft' === $form_action ) {
+			$redirect = add_query_arg(
+				array(
+					'page'  => self::PAGE_SLUG,
+					'id'    => $post_id,
+					'saved' => 'draft',
+				),
+				admin_url( 'admin.php' )
+			);
+		} elseif ( $is_first_publish ) {
+			set_transient(
+				'af_wizard_notice_' . get_current_user_id(),
+				array(
+					'type'    => 'success',
+					'message' => __( 'Inmueble publicado correctamente.', 'arriendo-facil' ),
+				),
+				60
+			);
+			$redirect = admin_url( 'edit.php?post_type=accommodation' );
+		} else {
+			$redirect = add_query_arg(
+				array(
+					'page'  => self::PAGE_SLUG,
+					'id'    => $post_id,
+					'saved' => '1',
+				),
+				admin_url( 'admin.php' )
+			);
+		}
+
 		wp_safe_redirect( $redirect );
 		exit;
+	}
+
+	/**
+	 * Emits a one-time admin notice on the accommodation list screen after publish.
+	 */
+	public function render_post_publish_notice() {
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( ! $screen || 'edit-accommodation' !== $screen->id ) {
+			return;
+		}
+		$key    = 'af_wizard_notice_' . get_current_user_id();
+		$notice = get_transient( $key );
+		if ( ! $notice || empty( $notice['message'] ) ) {
+			return;
+		}
+		delete_transient( $key );
+		$class = 'success' === ( $notice['type'] ?? 'info' ) ? 'notice-success' : 'notice-info';
+		printf(
+			'<div class="notice %1$s is-dismissible"><p>%2$s</p></div>',
+			esc_attr( $class ),
+			esc_html( $notice['message'] )
+		);
 	}
 
 	/**

@@ -21,11 +21,19 @@
 	var btnPrev = root.querySelector( '[data-af-prev]' );
 	var btnPub  = root.querySelector( '.af-wizard__publish' );
 	var hiddenAction = document.getElementById( 'af_form_action' );
+	var loading = document.getElementById( 'af-wizard-loading' );
+	var loadingText = document.getElementById( 'af-wizard-loading-text' );
 
 	var totalSteps = steps.length;
 	var current    = 1;
 
 	/* ---------- Step navigation (create mode) ---------- */
+
+	function setPublishEnabled( on ) {
+		if ( ! btnPub ) return;
+		btnPub.disabled = ! on;
+		btnPub.classList.toggle( 'is-disabled', ! on );
+	}
 
 	function showStep( n ) {
 		current = Math.max( 1, Math.min( totalSteps, n ) );
@@ -40,10 +48,12 @@
 		if ( btnPrev ) {
 			btnPrev.hidden = current === 1;
 		}
-		if ( btnNext && btnPub ) {
-			var isLast = current === totalSteps;
-			btnNext.hidden = isLast;
-			btnPub.hidden  = ! isLast;
+		if ( btnNext ) {
+			btnNext.hidden = current === totalSteps;
+		}
+		setPublishEnabled( current === totalSteps );
+		if ( current === totalSteps ) {
+			renderSummary();
 		}
 		try { window.scrollTo( { top: 0, behavior: 'smooth' } ); } catch ( e ) { window.scrollTo( 0, 0 ); }
 	}
@@ -71,16 +81,23 @@
 					showStep( target );
 					return;
 				}
-				// only allow jumping forward if all previous steps validate
 				for ( var s = current; s < target; s++ ) {
 					if ( ! validateStep( s ) ) { showStep( s ); return; }
 				}
 				showStep( target );
 			} );
 		} );
+
+		// Summary "Editar" buttons jump back to a step
+		root.querySelectorAll( '.af-summary__edit' ).forEach( function ( btn ) {
+			btn.addEventListener( 'click', function () {
+				var target = parseInt( btn.getAttribute( 'data-jump-step' ), 10 );
+				if ( target ) showStep( target );
+			} );
+		} );
 	} else {
-		// Edit mode: always show publish button, jump nav scrolls to step
-		if ( btnPub ) btnPub.hidden = false;
+		// Edit mode: publish always enabled, jump nav scrolls to step
+		setPublishEnabled( true );
 		if ( btnNext ) btnNext.hidden = true;
 		if ( btnPrev ) btnPrev.hidden = true;
 
@@ -93,6 +110,16 @@
 				if ( section ) section.scrollIntoView( { behavior: 'smooth', block: 'start' } );
 				navItems.forEach( function ( i ) { i.classList.remove( 'is-current' ); } );
 				item.classList.add( 'is-current' );
+			} );
+		} );
+
+		// In edit mode the summary is also visible (last section). Render it once.
+		renderSummary();
+		root.querySelectorAll( '.af-summary__edit' ).forEach( function ( btn ) {
+			btn.addEventListener( 'click', function () {
+				var target = parseInt( btn.getAttribute( 'data-jump-step' ), 10 );
+				var section = root.querySelector( '.af-wizard__step[data-step="' + target + '"]' );
+				if ( section ) section.scrollIntoView( { behavior: 'smooth', block: 'start' } );
 			} );
 		} );
 	}
@@ -140,15 +167,127 @@
 		return true;
 	}
 
-	/* ---------- Submit action ---------- */
+	/* ---------- Summary rendering ---------- */
+
+	function getRadioLabel( name ) {
+		var input = document.querySelector( 'input[name="' + name + '"]:checked' );
+		if ( ! input ) return '';
+		var label = input.closest( 'label' );
+		if ( ! label ) return input.value;
+		var labelText = label.querySelector( '.af-prop-type-card__label, .af-status-option__dot' );
+		// Use full label textContent minus extra whitespace
+		return ( label.textContent || '' ).replace( /\s+/g, ' ' ).trim();
+	}
+
+	function getCheckboxLabels( name ) {
+		var inputs = document.querySelectorAll( 'input[name="' + name + '"]:checked' );
+		var out = [];
+		inputs.forEach( function ( inp ) {
+			var label = inp.closest( 'label' );
+			out.push( label ? ( label.textContent || '' ).replace( /\s+/g, ' ' ).trim() : inp.value );
+		} );
+		return out;
+	}
+
+	function getSelectLabel( id ) {
+		var sel = document.getElementById( id );
+		if ( ! sel || ! sel.options ) return '';
+		var opt = sel.options[ sel.selectedIndex ];
+		return opt ? opt.textContent.trim() : '';
+	}
+
+	function val( id ) {
+		var el = document.getElementById( id );
+		return el ? ( el.value || '' ).trim() : '';
+	}
+
+	function setSummary( key, value ) {
+		var el = root.querySelector( '[data-af-summary="' + key + '"]' );
+		if ( ! el ) return;
+		if ( ! value ) {
+			el.textContent = '—';
+			el.classList.add( 'is-empty' );
+		} else {
+			el.textContent = value;
+			el.classList.remove( 'is-empty' );
+		}
+	}
+
+	function renderSummary() {
+		setSummary( 'post_title',        val( 'post_title' ) );
+		setSummary( 'af_property_type',  getRadioLabel( 'af_property_type' ) );
+		setSummary( 'af_status',         getRadioLabel( 'af_status' ) );
+
+		setSummary( 'af_address',        val( 'af_address' ) );
+		setSummary( 'af_city',           val( 'af_city' ) );
+		setSummary( 'af_location_text',  val( 'af_location_text' ) );
+		var lat = val( 'af_latitude' );
+		var lng = val( 'af_longitude' );
+		setSummary( 'coords', ( lat && lng ) ? ( lat + ', ' + lng ) : '' );
+
+		setSummary( 'af_bedrooms',       val( 'af_bedrooms' ) );
+		setSummary( 'af_bathrooms',      val( 'af_bathrooms' ) );
+		var sqm = val( 'af_square_meters' );
+		setSummary( 'af_square_meters',  sqm ? sqm + ' m²' : '' );
+		setSummary( 'af_amenities',      getCheckboxLabels( 'af_amenities[]' ).join( ', ' ) );
+		setSummary( 'post_content',      val( 'post_content' ) );
+
+		// Photos: featured + gallery
+		var photosWrap = root.querySelector( '[data-af-summary="photos"]' );
+		if ( photosWrap ) {
+			photosWrap.innerHTML = '';
+			var featuredInput = document.getElementById( 'af_featured_image_id' );
+			var featuredPreviewImg = root.querySelector( '#af-featured-preview img' );
+			if ( featuredInput && featuredInput.value && featuredPreviewImg ) {
+				var fImg = document.createElement( 'img' );
+				fImg.src = featuredPreviewImg.src;
+				fImg.alt = '';
+				fImg.className = 'af-summary__photo af-summary__photo--featured';
+				fImg.title = 'Portada';
+				photosWrap.appendChild( fImg );
+			}
+			root.querySelectorAll( '#af-gallery-grid .af-gallery-item img' ).forEach( function ( img ) {
+				var gImg = document.createElement( 'img' );
+				gImg.src = img.src;
+				gImg.alt = '';
+				gImg.className = 'af-summary__photo';
+				photosWrap.appendChild( gImg );
+			} );
+			if ( ! photosWrap.children.length ) {
+				var empty = document.createElement( 'p' );
+				empty.className = 'af-summary__empty';
+				empty.textContent = i18n.photosRecommended || 'Sin fotos';
+				photosWrap.appendChild( empty );
+			}
+		}
+
+		var rent = val( 'af_monthly_rent' );
+		setSummary( 'af_monthly_rent', rent ? '$' + parseFloat( rent ).toFixed( 2 ) : '' );
+		var ownerSelect = document.getElementById( 'af_owner_id' );
+		var ownerLabel = '';
+		if ( ownerSelect && ownerSelect.tagName === 'SELECT' ) {
+			ownerLabel = getSelectLabel( 'af_owner_id' );
+		} else if ( ownerSelect ) {
+			ownerLabel = i18n.ownerSelf || 'Tu cuenta';
+		}
+		setSummary( 'af_owner_id', ownerLabel );
+	}
+
+	/* ---------- Submit action & loading overlay ---------- */
+
+	function showLoading( actionLabel ) {
+		if ( ! loading ) return;
+		if ( loadingText && actionLabel ) loadingText.textContent = actionLabel;
+		loading.hidden = false;
+	}
 
 	form.addEventListener( 'click', function ( e ) {
 		var btn = e.target.closest( '[data-af-action]' );
 		if ( ! btn ) return;
 		var action = btn.getAttribute( 'data-af-action' );
 		if ( hiddenAction ) hiddenAction.value = action;
+
 		if ( 'publish' === action ) {
-			// Validate all steps before publishing
 			for ( var s = 1; s <= totalSteps; s++ ) {
 				if ( ! validateStep( s ) ) {
 					e.preventDefault();
@@ -158,9 +297,22 @@
 			}
 		}
 		if ( 'cancel' === action ) {
-			// Skip dirty guard on explicit cancel
 			dirty = false;
 		}
+	} );
+
+	form.addEventListener( 'submit', function ( e ) {
+		var action = hiddenAction ? hiddenAction.value : 'publish';
+		dirty = false;
+		var label;
+		if ( 'publish' === action ) {
+			label = ( 'edit' === mode ) ? ( i18n.savingChanges || 'Guardando cambios...' ) : ( i18n.publishing || 'Publicando inmueble...' );
+		} else if ( 'draft' === action ) {
+			label = i18n.savingDraft || 'Guardando borrador...';
+		} else {
+			label = '';
+		}
+		if ( label ) showLoading( label );
 	} );
 
 	/* ---------- Stepper buttons ---------- */
@@ -258,7 +410,6 @@
 	var dirty = false;
 	form.addEventListener( 'input',  function () { dirty = true; } );
 	form.addEventListener( 'change', function () { dirty = true; } );
-	form.addEventListener( 'submit', function () { dirty = false; } );
 
 	window.addEventListener( 'beforeunload', function ( e ) {
 		if ( ! dirty ) return undefined;

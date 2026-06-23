@@ -1705,3 +1705,115 @@
 	}
 
 } )( jQuery );
+
+// ── Accommodation Gallery – media picker (no jQuery dependency) ─────────────
+( function () {
+	'use strict';
+
+	var galleryGrid   = document.getElementById( 'af-gallery-grid' );
+	var galleryInput  = document.getElementById( 'af_gallery_ids' );
+	var galleryAddBtn = document.getElementById( 'af-gallery-add-btn' );
+	var countNum      = document.getElementById( 'af-gallery-count-num' );
+
+	if ( ! galleryGrid || ! galleryInput || ! galleryAddBtn ) {
+		return;
+	}
+
+	var MAX_PHOTOS = 20;
+
+	function getIds() {
+		var val = galleryInput.value.trim();
+		if ( ! val ) {
+			return [];
+		}
+		return val.split( ',' ).map( Number ).filter( Boolean );
+	}
+
+	function setIds( ids ) {
+		galleryInput.value = ids.join( ',' );
+		if ( countNum ) {
+			countNum.textContent = String( ids.length );
+		}
+	}
+
+	function removeId( id ) {
+		var ids = getIds().filter( function ( i ) { return i !== id; } );
+		setIds( ids );
+	}
+
+	function renderItem( id, url ) {
+		var item = document.createElement( 'div' );
+		item.className = 'af-gallery-item';
+		item.dataset.id = String( id );
+
+		var img = document.createElement( 'img' );
+		img.src = url;
+		img.alt = '';
+
+		var btn = document.createElement( 'button' );
+		btn.type = 'button';
+		btn.className = 'af-gallery-item__remove';
+		btn.title = 'Eliminar foto';
+		btn.innerHTML = '&#x2715;';
+		btn.addEventListener( 'click', function () {
+			item.remove();
+			removeId( id );
+		} );
+
+		item.appendChild( img );
+		item.appendChild( btn );
+		return item;
+	}
+
+	// Bind existing remove buttons
+	galleryGrid.querySelectorAll( '.af-gallery-item__remove' ).forEach( function ( btn ) {
+		btn.addEventListener( 'click', function () {
+			var item = btn.closest( '.af-gallery-item' );
+			var id   = parseInt( item.dataset.id, 10 );
+			item.remove();
+			removeId( id );
+		} );
+	} );
+
+	// Open media frame
+	galleryAddBtn.addEventListener( 'click', function () {
+		if ( typeof wp === 'undefined' || ! wp.media ) {
+			return;
+		}
+
+		var currentIds = getIds();
+		if ( currentIds.length >= MAX_PHOTOS ) {
+			// eslint-disable-next-line no-alert
+			alert( 'Máximo ' + MAX_PHOTOS + ' fotos permitidas.' );
+			return;
+		}
+
+		var frame = wp.media( {
+			title: 'Seleccionar fotos del inmueble',
+			button: { text: 'Agregar fotos seleccionadas' },
+			multiple: 'add',
+			library: { type: 'image' },
+		} );
+
+		frame.on( 'select', function () {
+			var selection = frame.state().get( 'selection' );
+			var ids = getIds();
+
+			selection.each( function ( attachment ) {
+				var id  = attachment.id;
+				var url = attachment.attributes.sizes && attachment.attributes.sizes.thumbnail
+					? attachment.attributes.sizes.thumbnail.url
+					: attachment.attributes.url;
+
+				if ( ids.indexOf( id ) === -1 && ids.length < MAX_PHOTOS ) {
+					ids.push( id );
+					galleryGrid.appendChild( renderItem( id, url ) );
+				}
+			} );
+
+			setIds( ids );
+		} );
+
+		frame.open();
+	} );
+} )();

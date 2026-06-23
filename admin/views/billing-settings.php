@@ -165,11 +165,35 @@ if ( isset( $_POST['af_rebuild_chain'] ) ) {
 
 	$chain_result = Arriendo_Facil_SRI_Config::rebuild_chain();
 	if ( is_wp_error( $chain_result ) ) {
+		$error_data = $chain_result->get_error_data();
+		if ( is_array( $error_data ) && ! empty( $error_data['reason'] ) ) {
+			$chain_msg = __( 'No se pudo obtener la cadena de certificados CA. Verifique la conexión a internet del servidor.', 'arriendo-facil' );
+			$detail    = sprintf(
+				/* translators: %s: technical reason code */
+				__( ' Motivo técnico: %s.', 'arriendo-facil' ),
+				sanitize_text_field( (string) $error_data['reason'] )
+			);
+			if ( ! empty( $error_data['issuer_url'] ) ) {
+				$detail .= ' ' . sprintf(
+					/* translators: %s: issuer URL from certificate AIA extension */
+					__( 'URL AIA: %s', 'arriendo-facil' ),
+					esc_url_raw( (string) $error_data['issuer_url'] )
+				);
+			}
+
+			$msg = $chain_result->get_error_message();
+			if ( false !== strpos( $msg, $chain_msg ) ) {
+				$msg = $chain_msg . $detail;
+			}
+		} else {
+			$msg = $chain_result->get_error_message();
+		}
+
 		$af_sri_notice = array(
 			'type'          => 'error',
-			'msg'           => $chain_result->get_error_message(),
+			'msg'           => $msg,
 			'error_code'    => $chain_result->get_error_code(),
-			'error_data'    => $chain_result->get_error_data(),
+			'error_data'    => $error_data,
 			'console_log'   => true,
 		);
 	} else {
@@ -292,11 +316,20 @@ $af_points_ready     = ! empty( $emission_points );
 		</div>
 		<?php if ( ! empty( $af_sri_notice['console_log'] ) ) : ?>
 		<script>
-		console.error( '[AF SRI] rebuild_chain error', {
-			code:    <?php echo wp_json_encode( $af_sri_notice['error_code'] ); ?>,
-			message: <?php echo wp_json_encode( $af_sri_notice['msg'] ); ?>,
-			data:    <?php echo wp_json_encode( $af_sri_notice['error_data'] ); ?>
-		} );
+		(function() {
+			const payload = {
+				code:    <?php echo wp_json_encode( $af_sri_notice['error_code'] ); ?>,
+				message: <?php echo wp_json_encode( $af_sri_notice['msg'] ); ?>,
+				data:    <?php echo wp_json_encode( $af_sri_notice['error_data'] ); ?>
+			};
+
+			console.error( '[AF SRI] rebuild_chain error', payload );
+			console.error( '[AF SRI] rebuild_chain error JSON', JSON.stringify( payload, null, 2 ) );
+
+			if ( payload.data && Array.isArray( payload.data.attempts ) && payload.data.attempts.length ) {
+				console.table( payload.data.attempts );
+			}
+		})();
 		</script>
 		<?php endif; ?>
 	<?php endif; ?>

@@ -254,7 +254,7 @@ class Arriendo_Facil_Accommodation {
 	 */
 	public function customize_title_placeholder( $text, $post ) {
 		if ( isset( $post->post_type ) && 'accommodation' === $post->post_type ) {
-			return __( 'Ej: Apartamento moderno en La Carolina, Quito', 'arriendo-facil' );
+			return __( 'Ej: La Carolina', 'arriendo-facil' );
 		}
 		return $text;
 	}

@@ -127,7 +127,7 @@ $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data[
 					<input type="text" id="post_title" name="post_title" required maxlength="200"
 						value="<?php echo esc_attr( $data['post_title'] ); ?>"
 						class="af-input af-input--full af-input--lg"
-						placeholder="<?php esc_attr_e( 'Ej: Apartamento moderno en La Carolina, Quito', 'arriendo-facil' ); ?>" />
+						placeholder="<?php esc_attr_e( 'Ej: La Carolina', 'arriendo-facil' ); ?>" />
 					<p class="af-field__hint"><?php esc_html_e( 'Este nombre se mostrará en los listados y en la página del inmueble.', 'arriendo-facil' ); ?></p>
 				</div>
 

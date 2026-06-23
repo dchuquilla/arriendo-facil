@@ -23,6 +23,10 @@ class Arriendo_Facil_Accommodation {
 		add_action( 'init', array( $this, 'register_post_type' ) );
 		add_action( 'add_meta_boxes', array( $this, 'add_meta_boxes' ) );
 		add_action( 'save_post_accommodation', array( $this, 'save_meta' ) );
+		add_action( 'save_post_accommodation', array( $this, 'save_gallery_meta' ) );
+		add_filter( 'enter_title_here', array( $this, 'customize_title_placeholder' ), 10, 2 );
+		add_action( 'edit_form_after_title', array( $this, 'render_editor_intro' ) );
+		add_filter( 'admin_post_thumbnail_html', array( $this, 'customize_thumbnail_label' ), 10, 3 );
 		add_action( 'pre_get_posts', array( $this, 'force_home_queries_to_accommodations' ) );
 		add_shortcode( 'af_propiedad_destacada', array( $this, 'render_featured_accommodation_shortcode' ) );
 		add_shortcode( 'propiedad_destacada', array( $this, 'render_featured_accommodation_shortcode' ) );
@@ -157,6 +161,15 @@ class Arriendo_Facil_Accommodation {
 			'normal',
 			'high'
 		);
+
+		add_meta_box(
+			'af_accommodation_gallery',
+			__( 'Galería de fotos', 'arriendo-facil' ),
+			array( $this, 'render_gallery_meta_box' ),
+			'accommodation',
+			'normal',
+			'high'
+		);
 	}
 
 	/**
@@ -187,6 +200,105 @@ class Arriendo_Facil_Accommodation {
 		$is_owner_user = self::user_is_owner( get_current_user_id() );
 
 		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/accommodation-meta-box.php';
+	}
+
+	/**
+	 * Renders the gallery meta box.
+	 *
+	 * @param WP_Post $post Current post object.
+	 */
+	public function render_gallery_meta_box( $post ) {
+		wp_nonce_field( 'af_save_gallery', 'af_gallery_nonce' );
+		$gallery_ids = get_post_meta( $post->ID, '_af_gallery', true );
+		if ( ! is_array( $gallery_ids ) ) {
+			$gallery_ids = array();
+		}
+		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/accommodation-gallery.php';
+	}
+
+	/**
+	 * Saves the gallery meta data.
+	 *
+	 * @param int $post_id Post ID.
+	 */
+	public function save_gallery_meta( $post_id ) {
+		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+			return;
+		}
+		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+			return;
+		}
+		if ( ! isset( $_POST['af_gallery_nonce'] ) ) {
+			return;
+		}
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['af_gallery_nonce'] ) ), 'af_save_gallery' ) ) {
+			return;
+		}
+
+		$raw_ids = isset( $_POST['af_gallery_ids'] ) ? sanitize_text_field( wp_unslash( $_POST['af_gallery_ids'] ) ) : '';
+		if ( '' === $raw_ids ) {
+			update_post_meta( $post_id, '_af_gallery', array() );
+			return;
+		}
+		$ids = array_map( 'absint', explode( ',', $raw_ids ) );
+		$ids = array_filter( $ids );
+		update_post_meta( $post_id, '_af_gallery', array_values( $ids ) );
+	}
+
+	/**
+	 * Customizes the title input placeholder for accommodations.
+	 *
+	 * @param string  $text Default placeholder.
+	 * @param WP_Post $post Current post.
+	 * @return string
+	 */
+	public function customize_title_placeholder( $text, $post ) {
+		if ( isset( $post->post_type ) && 'accommodation' === $post->post_type ) {
+			return __( 'Ej: Apartamento moderno en La Carolina, Quito', 'arriendo-facil' );
+		}
+		return $text;
+	}
+
+	/**
+	 * Renders a helpful intro section between the title and the content editor.
+	 *
+	 * @param WP_Post $post Current post.
+	 */
+	public function render_editor_intro( $post ) {
+		if ( ! isset( $post->post_type ) || 'accommodation' !== $post->post_type ) {
+			return;
+		}
+		?>
+		<div class="af-editor-intro">
+			<div class="af-editor-intro__body">
+				<div class="af-editor-intro__icon">&#x1F4DD;</div>
+				<div>
+					<strong><?php esc_html_e( 'Descripción del inmueble', 'arriendo-facil' ); ?></strong>
+					<p class="af-editor-intro__hint">
+						<?php esc_html_e( 'Escribe una descripción atractiva del inmueble: características especiales, ambiente, entorno, qué lo hace único. Esta descripción se mostrará en la publicación.', 'arriendo-facil' ); ?>
+					</p>
+				</div>
+			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Customizes the featured image box label for the accommodation CPT.
+	 *
+	 * @param string $content   Default HTML.
+	 * @param int    $post_id   Post ID.
+	 * @param int    $thumbnail_id Thumbnail attachment ID.
+	 * @return string
+	 */
+	public function customize_thumbnail_label( $content, $post_id, $thumbnail_id ) {
+		$post = get_post( $post_id );
+		if ( ! $post || 'accommodation' !== $post->post_type ) {
+			return $content;
+		}
+		return '<p class="af-thumbnail-hint">' .
+			esc_html__( 'Esta será la foto principal que aparece en los listados y como portada del inmueble.', 'arriendo-facil' ) .
+			'</p>' . $content;
 	}
 
 	/**

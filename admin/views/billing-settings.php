@@ -266,6 +266,9 @@ $cfg          = Arriendo_Facil_SRI_Config::get();
 $cert_path    = Arriendo_Facil_SRI_Config::cert_path();
 $cert_has_pwd = ( '' !== $cfg['cert_password_enc'] );
 $cert_has_pems = ( '' !== $cfg['cert_pem_enc'] && '' !== $cfg['pkey_pem_enc'] );
+// P12 file on disk is only needed to re-extract PEMs; signing uses PEMs from DB.
+// If the file disappeared (deploy wipe, hosting cleanup) but PEMs are stored, cert is still usable.
+$cert_p12_missing    = ( '' !== $cfg['cert_filename'] && '' === $cert_path );
 
 global $wpdb;
 $emission_points = $wpdb->get_results(
@@ -273,7 +276,8 @@ $emission_points = $wpdb->get_results(
 );
 
 $af_has_emitter_data = ( '' !== trim( (string) $cfg['ruc'] ) && '' !== trim( (string) $cfg['razon_social'] ) && '' !== trim( (string) $cfg['dir_establecimiento'] ) && '' !== trim( (string) $cfg['email_notificacion'] ) );
-$af_cert_ready       = ( '' !== $cert_path && $cert_has_pwd && $cert_has_pems );
+// Cert is ready for signing as long as PEMs and password are in DB (P12 file not required).
+$af_cert_ready       = ( $cert_has_pwd && $cert_has_pems );
 $af_points_ready     = ! empty( $emission_points );
 
 ?>
@@ -310,6 +314,11 @@ $af_points_ready     = ! empty( $emission_points );
 		</div>
 	</div>
 
+	<?php if ( $cert_p12_missing ) : ?>
+		<div class="notice notice-warning is-dismissible">
+			<p><?php esc_html_e( '⚠️ El archivo .p12 ya no se encuentra en el servidor (puede haberse borrado en un deploy o limpieza). La firma sigue funcionando con los PEM almacenados, pero si necesitas cambiar la contraseña o resubir el certificado, sube de nuevo el archivo .p12.', 'arriendo-facil' ); ?></p>
+		</div>
+	<?php endif; ?>
 	<?php if ( $af_sri_notice ) : ?>
 		<div class="notice notice-<?php echo esc_attr( $af_sri_notice['type'] ); ?> is-dismissible">
 			<p><?php echo esc_html( $af_sri_notice['msg'] ); ?></p>

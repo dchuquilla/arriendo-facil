@@ -98,9 +98,15 @@ class Arriendo_Facil_Accommodation {
 		$paged = get_query_var( 'paged' ) ? absint( get_query_var( 'paged' ) ) : 1;
 		$query->set( 'paged', $paged );
 
-		$featured_tax_query = $this->get_featured_tax_query();
-		if ( ! empty( $featured_tax_query ) ) {
-			$query->set( 'tax_query', $featured_tax_query );
+		$featured_args = $this->get_featured_query_args();
+		if ( ! empty( $featured_args['tax_query'] ) ) {
+			$query->set( 'tax_query', $featured_args['tax_query'] );
+		}
+		if ( ! empty( $featured_args['meta_query'] ) ) {
+			$query->set( 'meta_query', $featured_args['meta_query'] );
+		}
+		if ( ! empty( $featured_args['post__in'] ) ) {
+			$query->set( 'post__in', $featured_args['post__in'] );
 		}
 
 		if ( ! $query->get( 'orderby' ) ) {
@@ -369,9 +375,9 @@ class Arriendo_Facil_Accommodation {
 	 * @return string
 	 */
 	public function render_managed_accommodations_shortcode() {
-		$featured_tax_query = $this->get_featured_tax_query();
+		$featured_args = $this->get_featured_query_args();
 
-		$cache_key   = 'af_managed_accommodations_' . md5( wp_json_encode( $featured_tax_query ) );
+		$cache_key   = 'af_managed_accommodations_' . md5( wp_json_encode( $featured_args ) );
 		$cached_html = get_transient( $cache_key );
 
 		if ( false !== $cached_html ) {
@@ -379,13 +385,15 @@ class Arriendo_Facil_Accommodation {
 		}
 
 		$accommodations = get_posts(
-			array(
-				'post_type'      => 'accommodation',
-				'post_status'    => 'publish',
-				'posts_per_page' => 100,
-				'orderby'        => 'date',
-				'order'          => 'DESC',
-				'tax_query'      => $featured_tax_query,
+			array_merge(
+				array(
+					'post_type'      => 'accommodation',
+					'post_status'    => 'publish',
+					'posts_per_page' => 100,
+					'orderby'        => 'date',
+					'order'          => 'DESC',
+				),
+				$featured_args
 			)
 		);
 
@@ -454,9 +462,9 @@ class Arriendo_Facil_Accommodation {
 	 * @return string
 	 */
 	public function render_featured_accommodation_shortcode() {
-		$featured_tax_query = $this->get_featured_tax_query();
+		$featured_args = $this->get_featured_query_args();
 
-		$cache_key   = 'af_featured_accommodations_' . md5( wp_json_encode( $featured_tax_query ) );
+		$cache_key   = 'af_featured_accommodations_' . md5( wp_json_encode( $featured_args ) );
 		$cached_html = get_transient( $cache_key );
 
 		if ( false !== $cached_html ) {
@@ -464,13 +472,15 @@ class Arriendo_Facil_Accommodation {
 		}
 
 		$accommodations = get_posts(
-			array(
-				'post_type'      => 'accommodation',
-				'post_status'    => 'publish',
-				'posts_per_page' => 12,
-				'orderby'        => 'date',
-				'order'          => 'DESC',
-				'tax_query'      => $featured_tax_query,
+			array_merge(
+				array(
+					'post_type'      => 'accommodation',
+					'post_status'    => 'publish',
+					'posts_per_page' => 12,
+					'orderby'        => 'date',
+					'order'          => 'DESC',
+				),
+				$featured_args
 			)
 		);
 
@@ -677,7 +687,15 @@ class Arriendo_Facil_Accommodation {
 	/**
 	 * Returns featured-taxonomy query (tagged accommodations).
 	 *
-	 * @return array
+	 * Considers two sources, OR-merged:
+	 *   - `post_tag` slugs `destacada` / `featured` (legacy).
+	 *   - Post meta `_af_is_featured = 1` (new admin toggle).
+	 *
+	 * When neither source has at least one published accommodation, returns
+	 * an empty array so callers fall back to "show all" — preserving the
+	 * original behavior before the admin toggle existed.
+	 *
+	 * @return array tax_query-compatible structure (may include meta clause for OR).
 	 */
 	private function get_featured_tax_query() {
 		$terms = get_terms(
@@ -688,34 +706,139 @@ class Arriendo_Facil_Accommodation {
 				'fields'     => 'ids',
 			)
 		);
+		$term_ids = ( is_wp_error( $terms ) || empty( $terms ) ) ? array() : array_map( 'absint', $terms );
 
-		if ( is_wp_error( $terms ) || empty( $terms ) ) {
-			return array();
+		$has_tag_featured = false;
+		if ( ! empty( $term_ids ) ) {
+			$has_tag_featured = ! empty(
+				get_posts(
+					array(
+						'post_type'      => 'accommodation',
+						'post_status'    => 'publish',
+						'posts_per_page' => 1,
+						'fields'         => 'ids',
+						'tax_query'      => array(
+							array(
+								'taxonomy' => 'post_tag',
+								'field'    => 'term_id',
+								'terms'    => $term_ids,
+							),
+						),
+					)
+				)
+			);
 		}
 
-		$featured_tax_query = array(
-			array(
-				'taxonomy' => 'post_tag',
-				'field'    => 'term_id',
-				'terms'    => array_map( 'absint', $terms ),
-			),
-		);
-
-		$has_featured_accommodations = get_posts(
-			array(
-				'post_type'      => 'accommodation',
-				'post_status'    => 'publish',
-				'posts_per_page' => 1,
-				'fields'         => 'ids',
-				'tax_query'      => $featured_tax_query,
+		$has_meta_featured = ! empty(
+			get_posts(
+				array(
+					'post_type'      => 'accommodation',
+					'post_status'    => 'publish',
+					'posts_per_page' => 1,
+					'fields'         => 'ids',
+					'meta_query'     => array(
+						array(
+							'key'     => '_af_is_featured',
+							'value'   => '1',
+							'compare' => '=',
+						),
+					),
+				)
 			)
 		);
 
-		if ( empty( $has_featured_accommodations ) ) {
+		if ( ! $has_tag_featured && ! $has_meta_featured ) {
 			return array();
 		}
 
-		return $featured_tax_query;
+		if ( $has_tag_featured && ! $has_meta_featured ) {
+			return array(
+				array(
+					'taxonomy' => 'post_tag',
+					'field'    => 'term_id',
+					'terms'    => $term_ids,
+				),
+			);
+		}
+
+		if ( $has_meta_featured && ! $has_tag_featured ) {
+			return array(
+				'_af_meta_only' => array(
+					array(
+						'key'     => '_af_is_featured',
+						'value'   => '1',
+						'compare' => '=',
+					),
+				),
+			);
+		}
+
+		// Both sources have hits — return a marker so callers can apply the
+		// OR-merged query via get_featured_query_args().
+		return array(
+			'_af_mixed' => array(
+				'tax_term_ids' => $term_ids,
+			),
+		);
+	}
+
+	/**
+	 * Returns WP_Query args that filter to featured accommodations using
+	 * tag and/or meta, falling back to "no filter" when nothing is featured.
+	 *
+	 * @return array
+	 */
+	private function get_featured_query_args() {
+		$marker = $this->get_featured_tax_query();
+		if ( empty( $marker ) ) {
+			return array();
+		}
+
+		if ( isset( $marker['_af_mixed'] ) ) {
+			$term_ids = $marker['_af_mixed']['tax_term_ids'];
+			// Match posts that have the tag OR the meta.
+			$tag_ids = get_posts(
+				array(
+					'post_type'      => 'accommodation',
+					'post_status'    => 'publish',
+					'posts_per_page' => -1,
+					'fields'         => 'ids',
+					'tax_query'      => array(
+						array(
+							'taxonomy' => 'post_tag',
+							'field'    => 'term_id',
+							'terms'    => $term_ids,
+						),
+					),
+				)
+			);
+			$meta_ids = get_posts(
+				array(
+					'post_type'      => 'accommodation',
+					'post_status'    => 'publish',
+					'posts_per_page' => -1,
+					'fields'         => 'ids',
+					'meta_query'     => array(
+						array(
+							'key'     => '_af_is_featured',
+							'value'   => '1',
+							'compare' => '=',
+						),
+					),
+				)
+			);
+			$ids = array_values( array_unique( array_map( 'absint', array_merge( (array) $tag_ids, (array) $meta_ids ) ) ) );
+			if ( empty( $ids ) ) {
+				return array();
+			}
+			return array( 'post__in' => $ids );
+		}
+
+		if ( isset( $marker['_af_meta_only'] ) ) {
+			return array( 'meta_query' => $marker['_af_meta_only'] );
+		}
+
+		return array( 'tax_query' => $marker );
 	}
 
 	/**

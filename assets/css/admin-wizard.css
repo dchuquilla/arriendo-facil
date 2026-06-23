@@ -1,0 +1,344 @@
+/**
+ * Accommodation wizard chrome.
+ * Reuses field/section primitives from admin.css.
+ */
+
+/* ----- Hide WP admin chrome on the wizard screen ----- */
+.toplevel_page_af-accommodation-form #wpcontent,
+.admin_page_af-accommodation-form #wpcontent {
+	padding-left: 0;
+}
+.admin_page_af-accommodation-form #wpbody-content > .updated,
+.admin_page_af-accommodation-form #wpbody-content > .notice {
+	margin-left: 24px;
+	margin-right: 24px;
+}
+.admin_page_af-accommodation-form .wrap > h1 {
+	display: none;
+}
+#wpwrap.af-wizard-mounted #wpfooter {
+	display: none;
+}
+
+/* ----- Wizard shell ----- */
+.af-wizard {
+	background: #f3f4f6;
+	min-height: calc(100vh - 32px);
+	margin: -10px -20px 0 -20px;
+	padding: 0 0 96px 0;
+	color: #1f2937;
+	font-size: 14px;
+}
+
+.af-wizard__header {
+	background: #fff;
+	border-bottom: 1px solid #e5e7eb;
+	padding: 20px 32px;
+}
+
+.af-wizard__back {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	color: #4b5563;
+	text-decoration: none;
+	font-size: 13px;
+	margin-bottom: 8px;
+}
+.af-wizard__back:hover { color: #111827; }
+
+.af-wizard__title h1 {
+	margin: 0;
+	font-size: 26px;
+	font-weight: 600;
+	color: #111827;
+	padding: 0;
+}
+.af-wizard__subtitle {
+	margin: 4px 0 0 0;
+	color: #6b7280;
+}
+
+/* ----- Toasts ----- */
+.af-wizard__toast {
+	margin: 16px 32px 0;
+	padding: 12px 16px;
+	border-radius: 8px;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	font-weight: 500;
+}
+.af-wizard__toast--success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+.af-wizard__toast--info    { background: #eff6ff; color: #1e3a8a; border: 1px solid #bfdbfe; }
+.af-wizard__toast--error   { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+
+/* ----- Layout: side nav + form ----- */
+.af-wizard__layout {
+	display: grid;
+	grid-template-columns: 260px 1fr;
+	gap: 32px;
+	max-width: 1200px;
+	margin: 24px auto 0;
+	padding: 0 32px;
+}
+
+.af-wizard__nav {
+	position: sticky;
+	top: 56px;
+	align-self: start;
+	background: #fff;
+	border-radius: 12px;
+	border: 1px solid #e5e7eb;
+	padding: 16px 8px;
+}
+.af-wizard__steps {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	counter-reset: af-step;
+}
+.af-wizard__step-item {
+	margin: 0;
+}
+.af-wizard__step-btn {
+	width: 100%;
+	background: transparent;
+	border: 0;
+	padding: 10px 12px;
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	border-radius: 8px;
+	cursor: pointer;
+	color: #4b5563;
+	font-size: 14px;
+	text-align: left;
+	transition: background .15s ease;
+}
+.af-wizard__step-btn:hover { background: #f9fafb; color: #111827; }
+.af-wizard__step-item.is-current .af-wizard__step-btn {
+	background: #eef2ff;
+	color: #312e81;
+	font-weight: 600;
+}
+.af-wizard__step-item.is-done .af-wizard__step-btn {
+	color: #065f46;
+}
+.af-wizard__step-num {
+	width: 26px;
+	height: 26px;
+	border-radius: 50%;
+	background: #e5e7eb;
+	color: #374151;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-weight: 600;
+	font-size: 13px;
+	flex-shrink: 0;
+}
+.af-wizard__step-item.is-current .af-wizard__step-num { background: #6366f1; color: #fff; }
+.af-wizard__step-item.is-done .af-wizard__step-num    { background: #10b981; color: #fff; }
+.af-wizard__step-item.is-done .af-wizard__step-num::before { content: '✓'; }
+.af-wizard__step-item.is-done .af-wizard__step-num         { font-size: 0; }
+.af-wizard__step-item.is-done .af-wizard__step-num::before { font-size: 14px; }
+
+/* ----- Form ----- */
+.af-wizard__form {
+	background: #fff;
+	border-radius: 12px;
+	border: 1px solid #e5e7eb;
+	padding: 0;
+	overflow: hidden;
+}
+
+.af-wizard__step {
+	padding: 32px 36px;
+	border-bottom: 1px solid #f3f4f6;
+}
+.af-wizard__step:last-of-type { border-bottom: 0; }
+
+.af-wizard__step-head {
+	display: flex;
+	gap: 16px;
+	align-items: flex-start;
+	margin-bottom: 24px;
+}
+.af-wizard__step-icon {
+	font-size: 28px;
+	flex-shrink: 0;
+	width: 48px;
+	height: 48px;
+	border-radius: 10px;
+	background: #f3f4f6;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+.af-wizard__step-head h2 {
+	margin: 0;
+	font-size: 20px;
+	font-weight: 600;
+	color: #111827;
+}
+.af-wizard__step-head p {
+	margin: 4px 0 0 0;
+	color: #6b7280;
+}
+
+/* Create-mode: only the current step is visible, one at a time */
+.af-wizard--create .af-wizard__step { display: none; }
+.af-wizard--create .af-wizard__step.is-current { display: block; }
+
+/* Edit-mode: all steps visible */
+.af-wizard--edit .af-wizard__step { display: block; }
+
+/* ----- Field tweaks specific to wizard ----- */
+.af-wizard .af-field { margin-bottom: 20px; }
+.af-wizard .af-field:last-child { margin-bottom: 0; }
+.af-required { color: #dc2626; margin-left: 2px; }
+.af-input--lg { font-size: 17px; padding: 12px 14px; }
+.af-textarea { font-family: inherit; line-height: 1.5; resize: vertical; min-height: 120px; }
+
+/* ----- Featured image picker ----- */
+.af-featured-picker {
+	display: grid;
+	grid-template-columns: 220px 1fr;
+	gap: 20px;
+	align-items: start;
+}
+.af-featured-preview {
+	width: 220px;
+	height: 160px;
+	border-radius: 10px;
+	border: 2px dashed #d1d5db;
+	background: #f9fafb;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+	color: #9ca3af;
+}
+.af-featured-preview.has-image {
+	border-style: solid;
+	border-color: #d1d5db;
+}
+.af-featured-preview img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+.af-featured-preview__placeholder {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 8px;
+	font-size: 13px;
+}
+.af-featured-preview__placeholder span[aria-hidden="true"] {
+	font-size: 32px;
+}
+.af-featured-actions {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	align-items: flex-start;
+}
+.af-featured-remove {
+	color: #b91c1c !important;
+}
+
+/* ----- Owner badge ----- */
+.af-owner-auto-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 10px;
+	background: #ecfdf5;
+	border: 1px solid #a7f3d0;
+	color: #065f46;
+	padding: 10px 14px;
+	border-radius: 8px;
+}
+
+/* ----- Sticky action bar ----- */
+.af-wizard__actions {
+	position: sticky;
+	bottom: 0;
+	background: #fff;
+	border-top: 1px solid #e5e7eb;
+	padding: 16px 36px;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 12px;
+	z-index: 5;
+}
+.af-wizard__actions-left,
+.af-wizard__actions-right {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+.af-wizard__cancel {
+	color: #6b7280 !important;
+	text-decoration: none !important;
+}
+.af-wizard__cancel:hover { color: #b91c1c !important; }
+
+.af-wizard__publish.button-primary,
+.af-wizard__next.button-primary {
+	background: #4f46e5;
+	border-color: #4338ca;
+	color: #fff;
+	padding: 6px 22px;
+	min-height: 36px;
+}
+.af-wizard__publish.button-primary:hover,
+.af-wizard__next.button-primary:hover {
+	background: #4338ca;
+	border-color: #3730a3;
+}
+
+/* Edit mode action bar (no next/prev) */
+.af-wizard--edit .af-wizard__prev,
+.af-wizard--edit .af-wizard__next { display: none !important; }
+.af-wizard--edit .af-wizard__publish { display: inline-block !important; }
+
+/* ----- Responsive ----- */
+@media (max-width: 900px) {
+	.af-wizard__layout {
+		grid-template-columns: 1fr;
+	}
+	.af-wizard__nav {
+		position: static;
+	}
+	.af-wizard__steps {
+		display: flex;
+		overflow-x: auto;
+		gap: 4px;
+	}
+	.af-wizard__step-btn {
+		white-space: nowrap;
+	}
+	.af-featured-picker {
+		grid-template-columns: 1fr;
+	}
+}
+
+@media (max-width: 600px) {
+	.af-wizard__step {
+		padding: 24px 20px;
+	}
+	.af-wizard__actions {
+		padding: 14px 20px;
+		flex-wrap: wrap;
+	}
+	.af-wizard__header {
+		padding: 16px 20px;
+	}
+	.af-wizard__title h1 {
+		font-size: 22px;
+	}
+}

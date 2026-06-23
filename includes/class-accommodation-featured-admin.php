@@ -1,11 +1,9 @@
 <?php
 /**
  * Admin-only quick toggle to mark an accommodation as featured (destacada)
- * directly from the post list table.
- *
- * Reuses the existing `destacada` post_tag so the public shortcodes
- * (`af_propiedad_destacada`, `propiedad_destacada`) and the managed-properties
- * shortcode pick up the change without any other plumbing.
+ * from the post list table. Uses post meta `_af_is_featured` as the source of
+ * truth; the read path in class-accommodation.php OR-merges this with the
+ * legacy `destacada`/`featured` tag so frontends keep working in harmony.
  *
  * @package Arriendo_Facil
  */
@@ -16,9 +14,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Arriendo_Facil_Accommodation_Featured_Admin {
 
-	const FEATURED_TAG_SLUG = 'destacada';
-	const NONCE_ACTION      = 'af_toggle_featured';
-	const AJAX_ACTION       = 'af_toggle_featured';
+	const META_KEY     = '_af_is_featured';
+	const NONCE_ACTION = 'af_toggle_featured';
+	const AJAX_ACTION  = 'af_toggle_featured';
 
 	public function __construct() {
 		add_filter( 'manage_accommodation_posts_columns', array( $this, 'add_column' ) );
@@ -62,14 +60,28 @@ class Arriendo_Facil_Accommodation_Featured_Admin {
 			return;
 		}
 
-		$is_featured = has_tag( self::FEATURED_TAG_SLUG, $post_id );
+		$is_featured = $this->is_featured( $post_id );
 		printf(
-			'<label class="af-featured-toggle-wrap" title="%4$s"><input type="checkbox" class="af-featured-toggle" data-id="%1$d" %2$s /><span class="af-featured-toggle-state">%3$s</span></label>',
+			'<label class="af-featured-toggle-wrap %5$s" title="%4$s"><input type="checkbox" class="af-featured-toggle" data-id="%1$d" %2$s /><span class="af-featured-toggle-state">%3$s</span></label>',
 			(int) $post_id,
 			checked( $is_featured, true, false ),
 			$is_featured ? esc_html__( 'Sí', 'arriendo-facil' ) : esc_html__( 'No', 'arriendo-facil' ),
-			esc_attr__( 'Marcar/Quitar como destacada en la portada', 'arriendo-facil' )
+			esc_attr__( 'Marcar/Quitar como destacada en la portada', 'arriendo-facil' ),
+			$is_featured ? 'is-on' : ''
 		);
+	}
+
+	/**
+	 * Returns true when the accommodation is featured (meta or legacy tag).
+	 *
+	 * @param int $post_id Post ID.
+	 * @return bool
+	 */
+	private function is_featured( $post_id ) {
+		if ( '1' === (string) get_post_meta( $post_id, self::META_KEY, true ) ) {
+			return true;
+		}
+		return has_tag( array( 'destacada', 'featured' ), $post_id );
 	}
 
 	/**
@@ -104,9 +116,9 @@ class Arriendo_Facil_Accommodation_Featured_Admin {
 			'action'  => self::AJAX_ACTION,
 			'nonce'   => wp_create_nonce( self::NONCE_ACTION ),
 			'i18n'    => array(
-				'yes'    => __( 'Sí', 'arriendo-facil' ),
-				'no'     => __( 'No', 'arriendo-facil' ),
-				'error'  => __( 'No se pudo actualizar. Intenta nuevamente.', 'arriendo-facil' ),
+				'yes'   => __( 'Sí', 'arriendo-facil' ),
+				'no'    => __( 'No', 'arriendo-facil' ),
+				'error' => __( 'No se pudo actualizar. Intenta nuevamente.', 'arriendo-facil' ),
 			),
 		);
 
@@ -143,12 +155,6 @@ class Arriendo_Facil_Accommodation_Featured_Admin {
 						if (wrap) wrap.classList.remove('is-loading');
 					});
 			});
-			document.querySelectorAll('.af-featured-toggle').forEach(function(input){
-				if (input.checked) {
-					var w = input.closest('.af-featured-toggle-wrap');
-					if (w) w.classList.add('is-on');
-				}
-			});
 		})();";
 
 		wp_register_script( 'af-featured-toggle', '', array(), ARRIENDO_FACIL_VERSION, true );
@@ -157,7 +163,7 @@ class Arriendo_Facil_Accommodation_Featured_Admin {
 	}
 
 	/**
-	 * AJAX handler: toggles the `destacada` tag on a given accommodation.
+	 * AJAX handler: toggles `_af_is_featured` meta and syncs legacy tag.
 	 */
 	public function handle_toggle() {
 		if ( ! current_user_can( 'manage_options' ) ) {
@@ -172,36 +178,10 @@ class Arriendo_Facil_Accommodation_Featured_Admin {
 			wp_send_json_error( array( 'message' => __( 'Inmueble inválido.', 'arriendo-facil' ) ), 400 );
 		}
 
-		$term = get_term_by( 'slug', self::FEATURED_TAG_SLUG, 'post_tag' );
-		if ( ! $term && $featured ) {
-			$created = wp_insert_term(
-				__( 'Destacada', 'arriendo-facil' ),
-				'post_tag',
-				array( 'slug' => self::FEATURED_TAG_SLUG )
-			);
-			if ( is_wp_error( $created ) ) {
-				wp_send_json_error( array( 'message' => $created->get_error_message() ), 500 );
-			}
-			$term = get_term( (int) $created['term_id'], 'post_tag' );
-		}
-
-		$current_ids = wp_get_post_terms( $post_id, 'post_tag', array( 'fields' => 'ids' ) );
-		if ( is_wp_error( $current_ids ) ) {
-			wp_send_json_error( array( 'message' => $current_ids->get_error_message() ), 500 );
-		}
-
-		$current_ids = array_map( 'absint', (array) $current_ids );
-		$term_id     = $term ? (int) $term->term_id : 0;
-
-		if ( $featured && $term_id && ! in_array( $term_id, $current_ids, true ) ) {
-			$current_ids[] = $term_id;
-		} elseif ( ! $featured && $term_id ) {
-			$current_ids = array_values( array_diff( $current_ids, array( $term_id ) ) );
-		}
-
-		$set = wp_set_post_terms( $post_id, $current_ids, 'post_tag', false );
-		if ( is_wp_error( $set ) ) {
-			wp_send_json_error( array( 'message' => $set->get_error_message() ), 500 );
+		if ( $featured ) {
+			update_post_meta( $post_id, self::META_KEY, '1' );
+		} else {
+			delete_post_meta( $post_id, self::META_KEY );
 		}
 
 		$this->purge_featured_caches();
@@ -215,7 +195,7 @@ class Arriendo_Facil_Accommodation_Featured_Admin {
 	}
 
 	/**
-	 * Clears transients that depend on the featured tag.
+	 * Clears transients that depend on featured filtering.
 	 */
 	private function purge_featured_caches() {
 		global $wpdb;

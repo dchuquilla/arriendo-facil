@@ -382,12 +382,28 @@ class Arriendo_Facil_SRI_Config {
 	 * @return string Concatenated PEM chain (intermediates only, no root), or empty string.
 	 */
 	public static function fetch_ca_chain( string $cert_pem, int $max_depth = 5 ): string {
+		$result = self::fetch_ca_chain_detailed( $cert_pem, $max_depth );
+		return (string) ( $result['chain'] ?? '' );
+	}
+
+	/**
+	 * Fetches the CA chain and returns diagnostics when it fails.
+	 *
+	 * @param string $cert_pem PEM-encoded end-entity certificate.
+	 * @param int    $max_depth Maximum chain depth to follow (default 5).
+	 * @return array{chain:string,error:?array}
+	 */
+	public static function fetch_ca_chain_detailed( string $cert_pem, int $max_depth = 5 ): array {
 		$chain_pems = array();
 		$current    = $cert_pem;
 		$max_response_size = 512 * 1024;
+		$last_error = '';
+		$attempts   = array();
+		$last_issuer_url = '';
 
 		for ( $i = 0; $i < $max_depth; $i++ ) {
 			$issuer_url = self::extract_aia_ca_issuer( $current );
+			$last_issuer_url = $issuer_url;
 			if ( '' === $issuer_url ) {
 				error_log( '[AF SRI] fetch_ca_chain: sin URL AIA en profundidad ' . $i );
 				break;
@@ -397,11 +413,15 @@ class Arriendo_Facil_SRI_Config {
 
 			$body       = '';
 			$used_url   = '';
-			$last_error = '';
 			$candidates = self::build_ca_download_candidates( $issuer_url );
 
 			foreach ( $candidates as $candidate_url ) {
 				if ( ! self::is_valid_ca_issuer_url( $candidate_url ) ) {
+					$attempts[] = array(
+						'url'    => $candidate_url,
+						'result' => 'blocked_by_allowlist',
+					);
+					$last_error = 'blocked_by_allowlist';
 					error_log( '[AF SRI] fetch_ca_chain: URL candidata no permitida → ' . $candidate_url );
 					continue;
 				}
@@ -419,6 +439,11 @@ class Arriendo_Facil_SRI_Config {
 
 				if ( is_wp_error( $response ) ) {
 					$last_error = $response->get_error_message();
+					$attempts[] = array(
+						'url'    => $candidate_url,
+						'result' => 'wp_error',
+						'detail' => $last_error,
+					);
 					error_log( '[AF SRI] fetch_ca_chain: error en ' . $candidate_url . ' → ' . $last_error );
 					continue;
 				}
@@ -426,6 +451,11 @@ class Arriendo_Facil_SRI_Config {
 				$http_code = (int) wp_remote_retrieve_response_code( $response );
 				if ( 200 !== $http_code ) {
 					$last_error = 'HTTP ' . $http_code;
+					$attempts[] = array(
+						'url'    => $candidate_url,
+						'result' => 'http_error',
+						'detail' => $last_error,
+					);
 					error_log( '[AF SRI] fetch_ca_chain: respuesta inválida en ' . $candidate_url . ' → ' . $last_error );
 					continue;
 				}
@@ -433,12 +463,21 @@ class Arriendo_Facil_SRI_Config {
 				$candidate_body = (string) wp_remote_retrieve_body( $response );
 				if ( '' === $candidate_body || strlen( $candidate_body ) > $max_response_size ) {
 					$last_error = 'respuesta vacía o demasiado grande';
+					$attempts[] = array(
+						'url'    => $candidate_url,
+						'result' => 'invalid_payload',
+						'detail' => $last_error,
+					);
 					error_log( '[AF SRI] fetch_ca_chain: payload inválido en ' . $candidate_url );
 					continue;
 				}
 
 				$body     = $candidate_body;
 				$used_url = $candidate_url;
+				$attempts[] = array(
+					'url'    => $candidate_url,
+					'result' => 'ok',
+				);
 				break;
 			}
 
@@ -451,12 +490,14 @@ class Arriendo_Facil_SRI_Config {
 
 			$ca_pem = self::normalize_cert_to_pem( $body );
 			if ( '' === $ca_pem ) {
+				$last_error = 'invalid_ca_certificate';
 				error_log( '[AF SRI] fetch_ca_chain: no se pudo procesar certificado' );
 				break;
 			}
 
 			$ca_info = openssl_x509_parse( $ca_pem );
 			if ( false === $ca_info ) {
+				$last_error = 'invalid_ca_certificate';
 				error_log( '[AF SRI] fetch_ca_chain: certificado inválido' );
 				break;
 			}
@@ -477,7 +518,31 @@ class Arriendo_Facil_SRI_Config {
 			error_log( '[AF SRI] fetch_ca_chain: cadena obtenida (' . count( $chain_pems ) . ' cert(s))' );
 		}
 
-		return implode( "\n", $chain_pems );
+		$chain = implode( "\n", $chain_pems );
+		if ( '' === $chain ) {
+			$error_reason = '';
+			if ( '' === $last_issuer_url ) {
+				$error_reason = 'aia_missing';
+			} elseif ( '' !== $last_error ) {
+				$error_reason = $last_error;
+			} else {
+				$error_reason = 'download_failed';
+			}
+
+			return array(
+				'chain' => '',
+				'error' => array(
+					'reason'      => $error_reason,
+					'issuer_url'  => $last_issuer_url,
+					'attempts'    => $attempts,
+				),
+			);
+		}
+
+		return array(
+			'chain' => $chain,
+			'error' => null,
+		);
 	}
 
 	/**
@@ -625,9 +690,14 @@ class Arriendo_Facil_SRI_Config {
 			return new WP_Error( 'no_cert', __( 'No hay certificado almacenado.', 'arriendo-facil' ) );
 		}
 
-		$chain = self::fetch_ca_chain( $pems['cert'] );
+		$chain_result = self::fetch_ca_chain_detailed( $pems['cert'] );
+		$chain        = (string) ( $chain_result['chain'] ?? '' );
 		if ( '' === $chain ) {
-			return new WP_Error( 'chain_empty', __( 'No se pudo obtener la cadena de certificados CA. Verifique la conexión a internet del servidor.', 'arriendo-facil' ) );
+			return new WP_Error(
+				'chain_empty',
+				__( 'No se pudo obtener la cadena de certificados CA. Verifique la conexión a internet del servidor.', 'arriendo-facil' ),
+				$chain_result['error'] ?? null
+			);
 		}
 
 		$current               = self::get();

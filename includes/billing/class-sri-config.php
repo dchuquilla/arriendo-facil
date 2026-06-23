@@ -577,6 +577,10 @@ class Arriendo_Facil_SRI_Config {
 			'securitydata.net.ec'     => array( 'www.securitydata.net.ec' ),
 			'ocsp.securitydata.net.ec' => array( 'www.securitydata.net.ec' ),
 			'crl.securitydata.net.ec' => array( 'www.securitydata.net.ec' ),
+			// UANATACA AIA endpoints may use web/www/root host variants.
+			'web.uanataca.com'        => array( 'www.uanataca.com', 'uanataca.com' ),
+			'www.uanataca.com'        => array( 'web.uanataca.com', 'uanataca.com' ),
+			'uanataca.com'            => array( 'www.uanataca.com', 'web.uanataca.com' ),
 		);
 
 		$alias_hosts = $alias_map[ $host ] ?? array();
@@ -631,6 +635,7 @@ class Arriendo_Facil_SRI_Config {
 			'crl.securitydata.net.ec',
 			'uanataca.com',
 			'www.uanataca.com',
+			'web.uanataca.com',
 			'anf.es',
 			'www.anf.es',
 		);

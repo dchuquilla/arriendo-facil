@@ -25,6 +25,7 @@ if ( file_exists( $af_composer_autoload ) ) {
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-activator.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-wizard.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-featured-admin.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-search-api.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-cleaning-service.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-docx-template-processor.php';
@@ -82,6 +83,7 @@ function arriendo_facil_init() {
 
 	new Arriendo_Facil_Accommodation();
 	new Arriendo_Facil_Accommodation_Wizard();
+	new Arriendo_Facil_Accommodation_Featured_Admin();
 	new Arriendo_Facil_Accommodation_Search_API();
 	new Arriendo_Facil_Cleaning_Service();
 	new Arriendo_Facil_Lease();

@@ -107,7 +107,7 @@ function arriendo_facil_maybe_upgrade_schema() {
 		return;
 	}
 
-	$target_schema_version = '2026-06-leases-deleted-at';
+	$target_schema_version = '2026-06-guest-onboarding-token-v1';
 	$current_schema_version = (string) get_option( 'af_db_schema_version', '' );
 
 	if ( $current_schema_version === $target_schema_version ) {

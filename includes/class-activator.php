@@ -304,6 +304,32 @@ class Arriendo_Facil_Activator {
 				KEY delivery_status (delivery_status)
 			) $charset_collate;",
 
+			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_guest_onboarding_tokens (
+				id                BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+				selector          VARCHAR(64) NOT NULL,
+				token_hash        VARCHAR(255) NOT NULL,
+				guest_id          BIGINT(20) UNSIGNED NOT NULL,
+				accommodation_id  BIGINT(20) UNSIGNED NOT NULL,
+				visit_booking_id  BIGINT(20) UNSIGNED DEFAULT NULL,
+				purpose           VARCHAR(50) NOT NULL DEFAULT 'legal_profile',
+				recipient_email   VARCHAR(190) NOT NULL,
+				expires_at        DATETIME NOT NULL,
+				used_at           DATETIME DEFAULT NULL,
+				max_attempts      SMALLINT(5) UNSIGNED NOT NULL DEFAULT 8,
+				attempts          SMALLINT(5) UNSIGNED NOT NULL DEFAULT 0,
+				status            VARCHAR(20) NOT NULL DEFAULT 'active',
+				created_by        BIGINT(20) UNSIGNED DEFAULT NULL,
+				created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				UNIQUE KEY selector (selector),
+				KEY guest_id (guest_id),
+				KEY accommodation_id (accommodation_id),
+				KEY visit_booking_id (visit_booking_id),
+				KEY recipient_email (recipient_email),
+				KEY status_expires (status, expires_at)
+			) $charset_collate;",
+
 			// ── Facturación Electrónica SRI ──────────────────────────────────
 
 			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_emission_points (

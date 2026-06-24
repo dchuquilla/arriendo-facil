@@ -24,6 +24,11 @@ class Arriendo_Facil_Guest {
 		add_action( 'wp_ajax_af_create_guest', array( $this, 'ajax_create_guest' ) );
 		add_action( 'wp_ajax_af_create_guest_frontend', array( $this, 'ajax_create_guest_frontend' ) );
 		add_action( 'wp_ajax_nopriv_af_create_guest_frontend', array( $this, 'ajax_create_guest_frontend' ) );
+		add_action( 'wp_ajax_af_send_guest_profile_link', array( $this, 'ajax_send_guest_profile_link' ) );
+		add_action( 'wp_ajax_af_validate_guest_profile_token', array( $this, 'ajax_validate_guest_profile_token' ) );
+		add_action( 'wp_ajax_nopriv_af_validate_guest_profile_token', array( $this, 'ajax_validate_guest_profile_token' ) );
+		add_action( 'wp_ajax_af_submit_guest_profile_by_token', array( $this, 'ajax_submit_guest_profile_by_token' ) );
+		add_action( 'wp_ajax_nopriv_af_submit_guest_profile_by_token', array( $this, 'ajax_submit_guest_profile_by_token' ) );
 		add_action( 'wp_ajax_af_refresh_nonce', array( $this, 'ajax_refresh_nonce' ) );
 		add_action( 'wp_ajax_nopriv_af_refresh_nonce', array( $this, 'ajax_refresh_nonce' ) );
 		add_action( 'wp_ajax_af_get_guests', array( $this, 'ajax_get_guests' ) );
@@ -32,6 +37,281 @@ class Arriendo_Facil_Guest {
 
 	public function ajax_refresh_nonce() {
 		wp_send_json_success( array( 'nonce' => wp_create_nonce( 'af_guest_frontend_nonce' ) ) );
+	}
+
+	/**
+	 * Sends unique legal-profile onboarding link to a guest email.
+	 *
+	 * Expected for owner/admin after visit confirmation.
+	 */
+	public function ajax_send_guest_profile_link() {
+		check_ajax_referer( 'af_owner_contact_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$guest_id         = isset( $_POST['guest_id'] ) ? absint( wp_unslash( $_POST['guest_id'] ) ) : 0;
+		$accommodation_id = isset( $_POST['accommodation_id'] ) ? absint( wp_unslash( $_POST['accommodation_id'] ) ) : 0;
+		$visit_booking_id = isset( $_POST['visit_booking_id'] ) ? absint( wp_unslash( $_POST['visit_booking_id'] ) ) : 0;
+		$expires_hours    = isset( $_POST['expires_hours'] ) ? absint( wp_unslash( $_POST['expires_hours'] ) ) : 72;
+		$form_path        = isset( $_POST['form_path'] ) ? sanitize_text_field( wp_unslash( $_POST['form_path'] ) ) : '/completar-perfil-arriendo/';
+
+		if ( ! $guest_id ) {
+			wp_send_json_error( array( 'message' => __( 'ID de huesped invalido.', 'arriendo-facil' ) ), 400 );
+		}
+
+		global $wpdb;
+		$guest = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT * FROM {$wpdb->prefix}af_guests WHERE id = %d LIMIT 1",
+				$guest_id
+			)
+		);
+
+		if ( ! $guest || ! isset( $guest->email ) || ! is_email( (string) $guest->email ) ) {
+			wp_send_json_error( array( 'message' => __( 'No se encontro un huesped valido para enviar el enlace.', 'arriendo-facil' ) ), 404 );
+		}
+
+		if ( ! $accommodation_id && isset( $guest->accommodation_id ) ) {
+			$accommodation_id = absint( $guest->accommodation_id );
+		}
+
+		$expires_hours = max( 6, min( 168, $expires_hours ) );
+		$token_data    = $this->create_guest_onboarding_token(
+			$guest_id,
+			$accommodation_id,
+			$visit_booking_id,
+			(string) $guest->email,
+			$expires_hours
+		);
+
+		if ( is_wp_error( $token_data ) ) {
+			wp_send_json_error( array( 'message' => $token_data->get_error_message() ), 500 );
+		}
+
+		$selector = isset( $token_data['selector'] ) ? (string) $token_data['selector'] : '';
+		$token    = isset( $token_data['token'] ) ? (string) $token_data['token'] : '';
+
+		if ( '' === $selector || '' === $token ) {
+			wp_send_json_error( array( 'message' => __( 'No se pudo generar el token de onboarding.', 'arriendo-facil' ) ), 500 );
+		}
+
+		$form_url = home_url( '/' . ltrim( $form_path, '/' ) );
+		$form_url = add_query_arg(
+			array(
+				'selector' => rawurlencode( $selector ),
+				'token'    => rawurlencode( $token ),
+			),
+			$form_url
+		);
+
+		$sent = $this->send_guest_legal_profile_link_email(
+			sanitize_email( (string) $guest->email ),
+			sanitize_text_field( trim( (string) $guest->first_name . ' ' . (string) $guest->last_name ) ),
+			$form_url,
+			$accommodation_id,
+			isset( $token_data['expires_at'] ) ? (string) $token_data['expires_at'] : ''
+		);
+
+		if ( ! $sent ) {
+			wp_send_json_error( array( 'message' => __( 'No se pudo enviar el correo con el enlace de perfil legal.', 'arriendo-facil' ) ), 500 );
+		}
+
+		wp_send_json_success(
+			array(
+				'message'    => __( 'Enlace de perfil legal enviado al correo del arrendatario.', 'arriendo-facil' ),
+				'guest_id'   => $guest_id,
+				'expires_at' => isset( $token_data['expires_at'] ) ? (string) $token_data['expires_at'] : '',
+			)
+		);
+	}
+
+	/**
+	 * Validates onboarding token and returns minimal context for frontend form.
+	 */
+	public function ajax_validate_guest_profile_token() {
+		$selector = isset( $_REQUEST['selector'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['selector'] ) ) : '';
+		$token    = isset( $_REQUEST['token'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['token'] ) ) : '';
+
+		$result = $this->resolve_guest_onboarding_token( $selector, $token, false );
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message(), 'code' => $result->get_error_code() ), 400 );
+		}
+
+		global $wpdb;
+		$guest_id = isset( $result['guest_id'] ) ? absint( $result['guest_id'] ) : 0;
+		$guest    = $guest_id ? $wpdb->get_row( $wpdb->prepare( "SELECT id, first_name, last_name, email, phone, accommodation_id FROM {$wpdb->prefix}af_guests WHERE id = %d LIMIT 1", $guest_id ) ) : null;
+
+		if ( ! $guest ) {
+			wp_send_json_error( array( 'message' => __( 'No se encontro el huesped asociado al token.', 'arriendo-facil' ) ), 404 );
+		}
+
+		wp_send_json_success(
+			array(
+				'guest_id'          => (int) $guest->id,
+				'accommodation_id'  => isset( $result['accommodation_id'] ) ? absint( $result['accommodation_id'] ) : absint( $guest->accommodation_id ),
+				'name'              => sanitize_text_field( trim( (string) $guest->first_name . ' ' . (string) $guest->last_name ) ),
+				'email'             => sanitize_email( (string) $guest->email ),
+				'phone'             => sanitize_text_field( (string) $guest->phone ),
+				'expires_at'        => isset( $result['expires_at'] ) ? (string) $result['expires_at'] : '',
+			)
+		);
+	}
+
+	/**
+	 * Submits legal profile payload using a unique onboarding token.
+	 *
+	 * Reuses existing guest/lease contract generation logic.
+	 */
+	public function ajax_submit_guest_profile_by_token() {
+		$selector = isset( $_POST['selector'] ) ? sanitize_text_field( wp_unslash( $_POST['selector'] ) ) : '';
+		$token    = isset( $_POST['token'] ) ? sanitize_text_field( wp_unslash( $_POST['token'] ) ) : '';
+
+		$resolved = $this->resolve_guest_onboarding_token( $selector, $token, true );
+		if ( is_wp_error( $resolved ) ) {
+			wp_send_json_error( array( 'message' => $resolved->get_error_message(), 'code' => $resolved->get_error_code() ), 400 );
+		}
+
+		$guest_id         = isset( $resolved['guest_id'] ) ? absint( $resolved['guest_id'] ) : 0;
+		$accommodation_id = isset( $resolved['accommodation_id'] ) ? absint( $resolved['accommodation_id'] ) : 0;
+
+		if ( ! $guest_id || ! $accommodation_id ) {
+			wp_send_json_error( array( 'message' => __( 'Token invalido para completar perfil.', 'arriendo-facil' ) ), 400 );
+		}
+
+		global $wpdb;
+		$guest = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT * FROM {$wpdb->prefix}af_guests WHERE id = %d LIMIT 1",
+				$guest_id
+			)
+		);
+
+		if ( ! $guest ) {
+			wp_send_json_error( array( 'message' => __( 'No se encontro el huesped para completar el perfil.', 'arriendo-facil' ) ), 404 );
+		}
+
+		$name_input       = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
+		$phone            = isset( $_POST['phone'] ) ? sanitize_text_field( wp_unslash( $_POST['phone'] ) ) : '';
+		$id_number        = isset( $_POST['id_number'] ) ? sanitize_text_field( wp_unslash( $_POST['id_number'] ) ) : '';
+		$rental_start_date = isset( $_POST['rental_start_date'] ) ? sanitize_text_field( wp_unslash( $_POST['rental_start_date'] ) ) : '';
+		$rental_years      = isset( $_POST['rental_years'] ) ? max( 1, absint( wp_unslash( $_POST['rental_years'] ) ) ) : 1;
+		$mascotas          = isset( $_POST['mascotas'] ) ? absint( wp_unslash( $_POST['mascotas'] ) ) : 0;
+		$personas_viviran  = isset( $_POST['personas_viviran'] ) ? absint( wp_unslash( $_POST['personas_viviran'] ) ) : 1;
+		$guarantee_text    = isset( $_POST['guarantee_text'] ) ? sanitize_text_field( wp_unslash( $_POST['guarantee_text'] ) ) : 'Garantía equivalente a dos (2) meses del canon de arrendamiento';
+		$ref1_name         = isset( $_POST['reference_1_name'] ) ? sanitize_text_field( wp_unslash( $_POST['reference_1_name'] ) ) : '';
+		$ref1_phone        = isset( $_POST['reference_1_phone'] ) ? sanitize_text_field( wp_unslash( $_POST['reference_1_phone'] ) ) : '';
+		$ref2_name         = isset( $_POST['reference_2_name'] ) ? sanitize_text_field( wp_unslash( $_POST['reference_2_name'] ) ) : '';
+		$ref2_phone        = isset( $_POST['reference_2_phone'] ) ? sanitize_text_field( wp_unslash( $_POST['reference_2_phone'] ) ) : '';
+
+		if ( '' === $name_input ) {
+			$name_input = trim( (string) $guest->first_name . ' ' . (string) $guest->last_name );
+		}
+
+		if ( '' === $phone ) {
+			$phone = isset( $guest->phone ) ? sanitize_text_field( (string) $guest->phone ) : '';
+		}
+
+		if ( '' === $id_number ) {
+			$id_number = isset( $guest->id_number ) ? sanitize_text_field( (string) $guest->id_number ) : '';
+		}
+
+		if ( ! is_email( (string) $guest->email ) || '' === $phone || '' === $id_number || '' === $rental_start_date ) {
+			wp_send_json_error( array( 'message' => __( 'Faltan datos obligatorios para completar el perfil legal.', 'arriendo-facil' ) ), 400 );
+		}
+
+		if ( 1 !== preg_match( '/^[0-9]{10}$/', (string) $phone ) ) {
+			wp_send_json_error( array( 'message' => __( 'Telefono invalido. Debe tener exactamente 10 digitos.', 'arriendo-facil' ) ), 400 );
+		}
+
+		if ( 1 !== preg_match( '/^[0-9]{10}$/', (string) $id_number ) ) {
+			wp_send_json_error( array( 'message' => __( 'Cedula invalida. Debe tener exactamente 10 digitos.', 'arriendo-facil' ) ), 400 );
+		}
+
+		if ( 1 !== preg_match( '/^\d{4}-\d{2}-\d{2}$/', (string) $rental_start_date ) ) {
+			wp_send_json_error( array( 'message' => __( 'La fecha de inicio debe tener formato YYYY-MM-DD.', 'arriendo-facil' ) ), 400 );
+		}
+
+		$rental_end_date = gmdate( 'Y-m-d', strtotime( '+' . $rental_years . ' years', strtotime( $rental_start_date ) ) );
+
+		$name_parts = preg_split( '/\s+/', trim( $name_input ) );
+		$first_name = ! empty( $name_parts[0] ) ? sanitize_text_field( (string) $name_parts[0] ) : '';
+		$last_name  = count( $name_parts ) > 1 ? sanitize_text_field( trim( implode( ' ', array_slice( $name_parts, 1 ) ) ) ) : '';
+
+		$ref1 = $this->build_reference_entry( $ref1_name, $ref1_phone );
+		$ref2 = $this->build_reference_entry( $ref2_name, $ref2_phone );
+
+		$updated = $wpdb->update(
+			$wpdb->prefix . 'af_guests',
+			array(
+				'first_name'            => $first_name,
+				'last_name'             => $last_name,
+				'phone'                 => $phone,
+				'id_number'             => $id_number,
+				'accommodation_id'      => $accommodation_id,
+				'rental_mode'           => 'years',
+				'rental_start_date'     => $rental_start_date,
+				'rental_end_date'       => $rental_end_date,
+				'rental_months'         => null,
+				'rental_years'          => $rental_years,
+				'desired_price'         => '',
+				'guarantee_text'        => $guarantee_text,
+				'mascotas'              => $mascotas,
+				'personas_viviran'      => $personas_viviran,
+				'referencia_personal_1' => $ref1,
+				'referencia_personal_2' => $ref2,
+			),
+			array( 'id' => $guest_id ),
+			array( '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%d', '%d', '%s', '%s' ),
+			array( '%d' )
+		);
+
+		if ( false === $updated ) {
+			wp_send_json_error( array( 'message' => __( 'No se pudo actualizar el perfil legal del arrendatario.', 'arriendo-facil' ) ), 500 );
+		}
+
+		$upload_result = $this->upload_guest_documents( $guest_id );
+		if ( is_wp_error( $upload_result ) ) {
+			wp_send_json_error( array( 'message' => $upload_result->get_error_message() ), 400 );
+		}
+
+		try {
+			$contract_info = $this->create_lease_contract_for_guest(
+				$guest_id,
+				array(
+					'accommodation_id'  => $accommodation_id,
+					'rental_mode'       => 'years',
+					'rental_start_date' => $rental_start_date,
+					'rental_end_date'   => $rental_end_date,
+					'rental_months'     => 0,
+					'rental_years'      => $rental_years,
+					'phone'             => $phone,
+					'id_number'         => $id_number,
+					'mascotas'          => $mascotas,
+					'personas_viviran'  => $personas_viviran,
+					'name'              => trim( $first_name . ' ' . $last_name ),
+					'email'             => sanitize_email( (string) $guest->email ),
+				)
+			);
+		} catch ( Throwable $throwable ) {
+			error_log( 'Arriendo Facil onboarding token lease generation error: ' . $throwable->getMessage() );
+			$contract_info = array(
+				'generated' => false,
+				'error'     => 'lease_generation_failed',
+			);
+		}
+
+		$this->consume_guest_onboarding_token( isset( $resolved['token_id'] ) ? absint( $resolved['token_id'] ) : 0 );
+
+		wp_send_json_success(
+			array(
+				'guest_id'             => $guest_id,
+				'uploaded_documents'   => $upload_result,
+				'contract'             => $contract_info,
+				'message'              => __( 'Perfil legal completado. Tu contrato fue generado para revision.', 'arriendo-facil' ),
+			)
+		);
 	}
 
 	/**
@@ -3994,6 +4274,229 @@ class Arriendo_Facil_Guest {
 		}
 
 		return $uploaded;
+	}
+
+	/**
+	 * Creates onboarding token row for post-visit legal profile completion.
+	 *
+	 * @param int    $guest_id Guest ID.
+	 * @param int    $accommodation_id Accommodation ID.
+	 * @param int    $visit_booking_id Visit booking ID.
+	 * @param string $recipient_email Guest email.
+	 * @param int    $expires_hours Expiration in hours.
+	 * @return array|WP_Error
+	 */
+	private function create_guest_onboarding_token( $guest_id, $accommodation_id, $visit_booking_id, $recipient_email, $expires_hours = 72 ) {
+		$guest_id         = absint( $guest_id );
+		$accommodation_id = absint( $accommodation_id );
+		$visit_booking_id = absint( $visit_booking_id );
+		$recipient_email  = sanitize_email( (string) $recipient_email );
+		$expires_hours    = max( 6, min( 168, absint( $expires_hours ) ) );
+
+		if ( ! $guest_id || ! $accommodation_id || ! is_email( $recipient_email ) ) {
+			return new WP_Error( 'af_guest_onboarding_invalid_input', __( 'Datos insuficientes para generar token seguro.', 'arriendo-facil' ) );
+		}
+
+		global $wpdb;
+		$table = $wpdb->prefix . 'af_guest_onboarding_tokens';
+
+		$selector = wp_generate_password( 18, false, false ) . dechex( random_int( 1000, 65535 ) );
+		$token    = wp_generate_password( 48, false, false ) . dechex( random_int( 4096, 65535 ) );
+		$hash     = password_hash( $token, PASSWORD_DEFAULT );
+
+		if ( ! is_string( $hash ) || '' === $hash ) {
+			return new WP_Error( 'af_guest_onboarding_hash_failed', __( 'No se pudo generar hash de seguridad para el token.', 'arriendo-facil' ) );
+		}
+
+		$expires_at = gmdate( 'Y-m-d H:i:s', strtotime( '+' . $expires_hours . ' hours' ) );
+
+		$inserted = $wpdb->insert(
+			$table,
+			array(
+				'selector'         => sanitize_text_field( (string) $selector ),
+				'token_hash'       => $hash,
+				'guest_id'         => $guest_id,
+				'accommodation_id' => $accommodation_id,
+				'visit_booking_id' => $visit_booking_id ? $visit_booking_id : null,
+				'purpose'          => 'legal_profile',
+				'recipient_email'  => $recipient_email,
+				'expires_at'       => $expires_at,
+				'max_attempts'     => 8,
+				'attempts'         => 0,
+				'status'           => 'active',
+				'created_by'       => get_current_user_id(),
+			),
+			array( '%s', '%s', '%d', '%d', '%d', '%s', '%s', '%s', '%d', '%d', '%s', '%d' )
+		);
+
+		if ( ! $inserted ) {
+			return new WP_Error( 'af_guest_onboarding_insert_failed', __( 'No se pudo guardar el token de onboarding.', 'arriendo-facil' ) );
+		}
+
+		return array(
+			'token_id'    => (int) $wpdb->insert_id,
+			'selector'    => (string) $selector,
+			'token'       => (string) $token,
+			'expires_at'  => (string) $expires_at,
+		);
+	}
+
+	/**
+	 * Resolves and validates onboarding token.
+	 *
+	 * @param string $selector Selector component.
+	 * @param string $token Plain token component.
+	 * @param bool   $increment_attempts Whether to increment attempt counter.
+	 * @return array|WP_Error
+	 */
+	private function resolve_guest_onboarding_token( $selector, $token, $increment_attempts = false ) {
+		$selector = sanitize_text_field( (string) $selector );
+		$token    = sanitize_text_field( (string) $token );
+
+		if ( '' === $selector || '' === $token ) {
+			return new WP_Error( 'af_guest_onboarding_missing_token', __( 'Token incompleto.', 'arriendo-facil' ) );
+		}
+
+		global $wpdb;
+		$table = $wpdb->prefix . 'af_guest_onboarding_tokens';
+
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT * FROM {$table} WHERE selector = %s LIMIT 1",
+				$selector
+			)
+		);
+
+		if ( ! $row ) {
+			return new WP_Error( 'af_guest_onboarding_not_found', __( 'El enlace no es valido.', 'arriendo-facil' ) );
+		}
+
+		$status = isset( $row->status ) ? sanitize_key( (string) $row->status ) : '';
+		if ( 'active' !== $status ) {
+			return new WP_Error( 'af_guest_onboarding_inactive', __( 'Este enlace ya no esta activo.', 'arriendo-facil' ) );
+		}
+
+		$expires_at = isset( $row->expires_at ) ? strtotime( (string) $row->expires_at ) : false;
+		if ( false === $expires_at || $expires_at < time() ) {
+			$wpdb->update(
+				$table,
+				array( 'status' => 'expired' ),
+				array( 'id' => absint( $row->id ) ),
+				array( '%s' ),
+				array( '%d' )
+			);
+			return new WP_Error( 'af_guest_onboarding_expired', __( 'Este enlace ya expiro. Solicita uno nuevo.', 'arriendo-facil' ) );
+		}
+
+		$max_attempts = isset( $row->max_attempts ) ? absint( $row->max_attempts ) : 8;
+		$attempts     = isset( $row->attempts ) ? absint( $row->attempts ) : 0;
+
+		if ( $attempts >= $max_attempts ) {
+			$wpdb->update(
+				$table,
+				array( 'status' => 'blocked' ),
+				array( 'id' => absint( $row->id ) ),
+				array( '%s' ),
+				array( '%d' )
+			);
+			return new WP_Error( 'af_guest_onboarding_blocked', __( 'Enlace bloqueado por demasiados intentos.', 'arriendo-facil' ) );
+		}
+
+		$verified = password_verify( $token, (string) $row->token_hash );
+
+		if ( $increment_attempts ) {
+			$wpdb->query(
+				$wpdb->prepare(
+					"UPDATE {$table} SET attempts = attempts + 1 WHERE id = %d",
+					absint( $row->id )
+				)
+			);
+		}
+
+		if ( ! $verified ) {
+			return new WP_Error( 'af_guest_onboarding_invalid_token', __( 'Token de acceso invalido.', 'arriendo-facil' ) );
+		}
+
+		return array(
+			'token_id'         => absint( $row->id ),
+			'guest_id'         => absint( $row->guest_id ),
+			'accommodation_id' => absint( $row->accommodation_id ),
+			'visit_booking_id' => absint( $row->visit_booking_id ),
+			'expires_at'       => sanitize_text_field( (string) $row->expires_at ),
+		);
+	}
+
+	/**
+	 * Marks onboarding token as consumed.
+	 *
+	 * @param int $token_id Token row ID.
+	 * @return void
+	 */
+	private function consume_guest_onboarding_token( $token_id ) {
+		$token_id = absint( $token_id );
+		if ( ! $token_id ) {
+			return;
+		}
+
+		global $wpdb;
+		$table = $wpdb->prefix . 'af_guest_onboarding_tokens';
+		$wpdb->update(
+			$table,
+			array(
+				'status'  => 'used',
+				'used_at' => gmdate( 'Y-m-d H:i:s' ),
+			),
+			array( 'id' => $token_id ),
+			array( '%s', '%s' ),
+			array( '%d' )
+		);
+	}
+
+	/**
+	 * Sends onboarding email with secure legal-profile link.
+	 *
+	 * @param string $tenant_email Recipient email.
+	 * @param string $tenant_name Recipient display name.
+	 * @param string $form_url Link URL.
+	 * @param int    $accommodation_id Accommodation ID.
+	 * @param string $expires_at Expiration date/time.
+	 * @return bool
+	 */
+	private function send_guest_legal_profile_link_email( $tenant_email, $tenant_name, $form_url, $accommodation_id, $expires_at ) {
+		$tenant_email = sanitize_email( (string) $tenant_email );
+		if ( ! is_email( $tenant_email ) ) {
+			return false;
+		}
+
+		$tenant_name = sanitize_text_field( (string) $tenant_name );
+		if ( '' === trim( $tenant_name ) ) {
+			$tenant_name = __( 'arrendatario', 'arriendo-facil' );
+		}
+
+		$title   = (string) get_the_title( absint( $accommodation_id ) );
+		$subject = sprintf( __( '[Arriendo Facil] Completa tu perfil legal para %s', 'arriendo-facil' ), $title ? $title : __( 'tu arriendo', 'arriendo-facil' ) );
+
+		$expires_line = '';
+		if ( '' !== trim( (string) $expires_at ) ) {
+			$expires_line = '<p style="margin:0 0 14px;color:#334155;line-height:1.6;">' . sprintf( esc_html__( 'Este enlace estara disponible hasta: %s', 'arriendo-facil' ), esc_html( $expires_at ) ) . '</p>';
+		}
+
+		$message = '<div style="margin:0;padding:24px;background:#f8fafc;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#0f172a;">';
+		$message .= '<div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">';
+		$message .= '<div style="padding:18px 22px;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#ffffff;">';
+		$message .= '<h2 style="margin:0;font-size:20px;line-height:1.3;">' . esc_html__( 'Completa tu perfil legal de arriendo', 'arriendo-facil' ) . '</h2>';
+		$message .= '</div>';
+		$message .= '<div style="padding:22px;">';
+		$message .= '<p style="margin:0 0 12px;line-height:1.6;">' . sprintf( esc_html__( 'Hola %s, para continuar con tu proceso necesitamos tu informacion legal y documentos.', 'arriendo-facil' ), esc_html( $tenant_name ) ) . '</p>';
+		$message .= '<p style="margin:0 0 16px;line-height:1.6;">' . esc_html__( 'Haz clic en el siguiente boton para completar el formulario seguro:', 'arriendo-facil' ) . '</p>';
+		$message .= '<p style="margin:0 0 18px;"><a href="' . esc_url( (string) $form_url ) . '" style="display:inline-block;padding:12px 18px;border-radius:8px;background:#2563eb;color:#ffffff;text-decoration:none;font-weight:600;">' . esc_html__( 'Completar perfil legal', 'arriendo-facil' ) . '</a></p>';
+		$message .= $expires_line;
+		$message .= '<p style="margin:0;line-height:1.6;color:#475569;">' . esc_html__( 'Si el enlace expira, solicita uno nuevo al propietario o soporte.', 'arriendo-facil' ) . '</p>';
+		$message .= '</div></div>';
+		$message .= '<p style="max-width:640px;margin:12px auto 0;font-size:12px;color:#64748b;text-align:center;">Arriendo Facil</p>';
+		$message .= '</div>';
+
+		return (bool) wp_mail( $tenant_email, $subject, $message, array( 'Content-Type: text/html; charset=UTF-8' ) );
 	}
 
 	/**

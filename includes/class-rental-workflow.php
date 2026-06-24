@@ -26,6 +26,8 @@ class Arriendo_Facil_Rental_Workflow {
 		add_action( 'wp_ajax_nopriv_af_get_visit_slots', array( $this, 'ajax_get_visit_slots' ) );
 		add_action( 'wp_ajax_af_book_visit_slot', array( $this, 'ajax_book_visit_slot' ) );
 		add_action( 'wp_ajax_nopriv_af_book_visit_slot', array( $this, 'ajax_book_visit_slot' ) );
+		add_action( 'wp_ajax_af_create_reservation_intent', array( $this, 'ajax_create_reservation_intent' ) );
+		add_action( 'wp_ajax_nopriv_af_create_reservation_intent', array( $this, 'ajax_create_reservation_intent' ) );
 		add_action( 'wp_ajax_af_join_interest_queue', array( $this, 'ajax_join_interest_queue' ) );
 		add_action( 'wp_ajax_nopriv_af_join_interest_queue', array( $this, 'ajax_join_interest_queue' ) );
 		add_action( 'wp_ajax_af_get_interest_stats', array( $this, 'ajax_get_interest_stats' ) );
@@ -326,6 +328,156 @@ class Arriendo_Facil_Rental_Workflow {
 		wp_send_json_success(
 			array(
 				'message' => __( 'Visita agendada correctamente.', 'arriendo-facil' ),
+			)
+		);
+	}
+
+	/**
+	 * AJAX: creates a lightweight reservation intent from frontend CTA.
+	 *
+	 * Allows two paths:
+	 * - Book a concrete visit slot when slot_id is provided.
+	 * - Register a visit request in interest queue with preferred date/time.
+	 */
+	public function ajax_create_reservation_intent() {
+		$this->verify_frontend_nonce_required();
+
+		$accommodation_id = isset( $_POST['accommodation_id'] ) ? absint( wp_unslash( $_POST['accommodation_id'] ) ) : 0;
+		$slot_id          = isset( $_POST['slot_id'] ) ? absint( wp_unslash( $_POST['slot_id'] ) ) : 0;
+		$guest_name       = isset( $_POST['guest_name'] ) ? sanitize_text_field( wp_unslash( $_POST['guest_name'] ) ) : '';
+		$guest_email      = isset( $_POST['guest_email'] ) ? sanitize_email( wp_unslash( $_POST['guest_email'] ) ) : '';
+		$guest_phone      = isset( $_POST['guest_phone'] ) ? sanitize_text_field( wp_unslash( $_POST['guest_phone'] ) ) : '';
+		$notes            = isset( $_POST['notes'] ) ? sanitize_textarea_field( wp_unslash( $_POST['notes'] ) ) : '';
+		$preferred_date   = isset( $_POST['preferred_date'] ) ? sanitize_text_field( wp_unslash( $_POST['preferred_date'] ) ) : '';
+		$preferred_time   = isset( $_POST['preferred_time'] ) ? sanitize_text_field( wp_unslash( $_POST['preferred_time'] ) ) : '';
+
+		if ( ! $accommodation_id || '' === $guest_name || ! is_email( $guest_email ) ) {
+			wp_send_json_error( array( 'message' => __( 'Faltan datos obligatorios para reservar.', 'arriendo-facil' ) ), 400 );
+		}
+
+		$availability = self::get_availability_summary( $accommodation_id, $guest_email );
+		if ( empty( $availability['can_start_flow'] ) && ! in_array( (string) ( $availability['reason_code'] ?? '' ), array( 'requires_visit_booking', 'available' ), true ) ) {
+			wp_send_json_error(
+				array(
+					'code'         => (string) ( $availability['reason_code'] ?? 'accommodation_unavailable' ),
+					'message'      => (string) ( $availability['message'] ?? __( 'La acomodacion no esta disponible.', 'arriendo-facil' ) ),
+					'availability' => $availability,
+				),
+				409
+			);
+		}
+
+		global $wpdb;
+		$slots_table    = $wpdb->prefix . 'af_visit_slots';
+		$bookings_table = $wpdb->prefix . 'af_visit_bookings';
+		$queue_table    = $wpdb->prefix . 'af_interest_queue';
+
+		if ( $slot_id > 0 ) {
+			$slot = $wpdb->get_row(
+				$wpdb->prepare(
+					"SELECT * FROM {$slots_table} WHERE id = %d LIMIT 1",
+					$slot_id
+				)
+			);
+
+			if ( ! $slot || (int) $slot->accommodation_id !== $accommodation_id || 'open' !== (string) $slot->status ) {
+				wp_send_json_error( array( 'message' => __( 'El cupo seleccionado ya no esta disponible.', 'arriendo-facil' ), 'code' => 409 ), 409 );
+			}
+
+			$inserted_booking = $wpdb->insert(
+				$bookings_table,
+				array(
+					'slot_id'          => $slot_id,
+					'accommodation_id' => $accommodation_id,
+					'guest_name'       => $guest_name,
+					'guest_email'      => $guest_email,
+					'guest_phone'      => $guest_phone,
+					'guest_id_number'  => '',
+					'status'           => 'confirmed',
+					'notes'            => $notes,
+				),
+				array( '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s' )
+			);
+
+			if ( ! $inserted_booking ) {
+				wp_send_json_error( array( 'message' => __( 'Ese cupo ya fue reservado.', 'arriendo-facil' ), 'code' => 409 ), 409 );
+			}
+
+			$wpdb->update(
+				$slots_table,
+				array( 'status' => 'booked' ),
+				array( 'id' => $slot_id ),
+				array( '%s' ),
+				array( '%d' )
+			);
+
+			$this->notify_owner_about_interest( $accommodation_id, __( 'Nueva visita agendada.', 'arriendo-facil' ) );
+			$this->send_booking_confirmation_email( $guest_email, $guest_name, $accommodation_id, (string) $slot->visit_date, (string) $slot->start_time, (string) $slot->end_time );
+
+			wp_send_json_success(
+				array(
+					'status'       => 'visit_booked',
+					'booking_id'   => (int) $wpdb->insert_id,
+					'accommodation_id' => $accommodation_id,
+					'message'      => __( 'Reserva registrada. Tu visita ya esta confirmada.', 'arriendo-facil' ),
+				)
+			);
+		}
+
+		$request_message = __( 'Solicitud de visita desde boton de reserva.', 'arriendo-facil' );
+		if ( '' !== $preferred_date && $this->is_valid_date( $preferred_date ) ) {
+			$request_message .= ' ' . sprintf( __( 'Fecha sugerida: %s.', 'arriendo-facil' ), $preferred_date );
+		}
+		if ( '' !== $preferred_time && $this->is_valid_time( $preferred_time ) ) {
+			$request_message .= ' ' . sprintf( __( 'Hora sugerida: %s.', 'arriendo-facil' ), $preferred_time );
+		}
+		if ( '' !== trim( $notes ) ) {
+			$request_message .= ' ' . sprintf( __( 'Notas: %s', 'arriendo-facil' ), $notes );
+		}
+
+		$existing_queue_id = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT id FROM {$queue_table} WHERE accommodation_id = %d AND email = %s ORDER BY id DESC LIMIT 1",
+				$accommodation_id,
+				$guest_email
+			)
+		);
+
+		if ( $existing_queue_id > 0 ) {
+			$wpdb->update(
+				$queue_table,
+				array(
+					'name'    => $guest_name,
+					'phone'   => $guest_phone,
+					'message' => $request_message,
+					'status'  => 'visit_requested',
+				),
+				array( 'id' => $existing_queue_id ),
+				array( '%s', '%s', '%s', '%s' ),
+				array( '%d' )
+			);
+		} else {
+			$wpdb->insert(
+				$queue_table,
+				array(
+					'accommodation_id' => $accommodation_id,
+					'name'             => $guest_name,
+					'email'            => $guest_email,
+					'phone'            => $guest_phone,
+					'message'          => $request_message,
+					'status'           => 'visit_requested',
+				),
+				array( '%d', '%s', '%s', '%s', '%s', '%s' )
+			);
+		}
+
+		$this->notify_owner_about_interest( $accommodation_id, __( 'Nueva solicitud de visita recibida.', 'arriendo-facil' ) );
+
+		wp_send_json_success(
+			array(
+				'status'          => 'visit_requested',
+				'accommodation_id' => $accommodation_id,
+				'message'         => __( 'Solicitud registrada. Te contactaremos para confirmar la visita.', 'arriendo-facil' ),
 			)
 		);
 	}

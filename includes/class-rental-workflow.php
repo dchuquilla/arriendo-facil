@@ -322,8 +322,9 @@ class Arriendo_Facil_Rental_Workflow {
 			array( '%d' )
 		);
 
-		$this->notify_owner_about_interest( (int) $slot->accommodation_id, __( 'Nueva visita agendada.', 'arriendo-facil' ) );
+		$this->notify_owner_about_interest( (int) $slot->accommodation_id, __( 'Nueva visita agendada.', 'arriendo-facil' ), $guest_name, $guest_email, $guest_phone, (string) $slot->visit_date, (string) $slot->start_time, $notes );
 		$this->send_booking_confirmation_email( $guest_email, $guest_name, (int) $slot->accommodation_id, (string) $slot->visit_date, (string) $slot->start_time, (string) $slot->end_time );
+		$this->dispatch_guest_profile_link_email_after_booking( (int) $slot->accommodation_id, (int) $wpdb->insert_id, $guest_name, $guest_email, $guest_phone );
 
 		wp_send_json_success(
 			array(
@@ -411,8 +412,9 @@ class Arriendo_Facil_Rental_Workflow {
 				array( '%d' )
 			);
 
-			$this->notify_owner_about_interest( $accommodation_id, __( 'Nueva visita agendada.', 'arriendo-facil' ) );
+			$this->notify_owner_about_interest( $accommodation_id, __( 'Nueva visita agendada.', 'arriendo-facil' ), $guest_name, $guest_email, $guest_phone );
 			$this->send_booking_confirmation_email( $guest_email, $guest_name, $accommodation_id, (string) $slot->visit_date, (string) $slot->start_time, (string) $slot->end_time );
+			$this->dispatch_guest_profile_link_email_after_booking( $accommodation_id, (int) $wpdb->insert_id, $guest_name, $guest_email, $guest_phone );
 
 			wp_send_json_success(
 				array(
@@ -471,7 +473,7 @@ class Arriendo_Facil_Rental_Workflow {
 			);
 		}
 
-		$this->notify_owner_about_interest( $accommodation_id, __( 'Nueva solicitud de visita recibida.', 'arriendo-facil' ) );
+		$this->notify_owner_about_interest( $accommodation_id, __( 'Nueva solicitud de visita recibida.', 'arriendo-facil' ), $guest_name, $guest_email, $guest_phone, $preferred_date, $preferred_time, $notes );
 
 		wp_send_json_success(
 			array(
@@ -530,7 +532,7 @@ class Arriendo_Facil_Rental_Workflow {
 			wp_send_json_error( array( 'message' => __( 'No se pudo agregar a la cola de interesados.', 'arriendo-facil' ) ) );
 		}
 
-		$this->notify_owner_about_interest( $accommodation_id, __( 'Nuevo interesado agregado a la cola.', 'arriendo-facil' ) );
+		$this->notify_owner_about_interest( $accommodation_id, __( 'Nuevo interesado agregado a la cola.', 'arriendo-facil' ), $name, $email, $phone, '', '', $message );
 
 		wp_send_json_success( array( 'message' => __( 'Agregado a la cola. Te notificaremos cuando este disponible.', 'arriendo-facil' ) ) );
 	}
@@ -1031,15 +1033,68 @@ class Arriendo_Facil_Rental_Workflow {
 	}
 
 	/**
-	 * Notifies owner with interest summary.
+	 * Sends the secure legal-profile form link after visit booking confirmation.
 	 *
 	 * @param int    $accommodation_id Accommodation ID.
-	 * @param string $context Context message.
+	 * @param int    $visit_booking_id Visit booking ID.
+	 * @param string $guest_name Guest full name.
+	 * @param string $guest_email Guest email.
+	 * @param string $guest_phone Guest phone.
 	 * @return void
 	 */
-	private function notify_owner_about_interest( $accommodation_id, $context ) {
-		$owner_id = (int) get_post_meta( $accommodation_id, '_af_owner_id', true );
-		$owner    = $owner_id ? get_user_by( 'ID', $owner_id ) : null;
+	private function dispatch_guest_profile_link_email_after_booking( $accommodation_id, $visit_booking_id, $guest_name, $guest_email, $guest_phone ) {
+		$accommodation_id = absint( $accommodation_id );
+		$visit_booking_id = absint( $visit_booking_id );
+		$guest_name       = sanitize_text_field( (string) $guest_name );
+		$guest_email      = sanitize_email( (string) $guest_email );
+		$guest_phone      = sanitize_text_field( (string) $guest_phone );
+
+		if ( ! $accommodation_id || ! $visit_booking_id || ! is_email( $guest_email ) || ! class_exists( 'Arriendo_Facil_Guest' ) ) {
+			return;
+		}
+
+		$guest_service = new Arriendo_Facil_Guest();
+		if ( ! method_exists( $guest_service, 'send_guest_profile_link_for_booking' ) ) {
+			return;
+		}
+
+		$result = $guest_service->send_guest_profile_link_for_booking(
+			$accommodation_id,
+			$visit_booking_id,
+			$guest_name,
+			$guest_email,
+			$guest_phone,
+			'/completar-perfil-arriendo/',
+			72
+		);
+
+		if ( is_array( $result ) ) {
+			$status = ! empty( $result['sent'] ) ? 'sent' : 'failed';
+			$this->log_notification( $accommodation_id, 'guest_profile_link', $guest_email, $status );
+
+			if ( 'failed' === $status && ! empty( $result['error'] ) ) {
+				error_log( 'Arriendo Facil onboarding email failed: ' . sanitize_text_field( (string) $result['error'] ) );
+			}
+		}
+	}
+
+	/**
+	 * Notifies owner with interest summary via a formatted HTML email.
+	 *
+	 * @param int    $accommodation_id Accommodation ID.
+	 * @param string $context          Context message shown in the email header.
+	 * @param string $lead_name        Name of the interested lead.
+	 * @param string $lead_email       Email of the interested lead.
+	 * @param string $lead_phone       Phone of the interested lead.
+	 * @param string $preferred_date   Preferred visit date (optional).
+	 * @param string $preferred_time   Preferred visit time (optional).
+	 * @param string $lead_notes       Additional notes from the lead (optional).
+	 * @return void
+	 */
+	private function notify_owner_about_interest( $accommodation_id, $context, $lead_name = '', $lead_email = '', $lead_phone = '', $preferred_date = '', $preferred_time = '', $lead_notes = '' ) {
+		$accommodation_id = absint( $accommodation_id );
+		$owner_id         = (int) get_post_meta( $accommodation_id, '_af_owner_id', true );
+		$owner            = $owner_id ? get_user_by( 'ID', $owner_id ) : null;
 		if ( ! $owner || empty( $owner->user_email ) ) {
 			return;
 		}
@@ -1048,6 +1103,7 @@ class Arriendo_Facil_Rental_Workflow {
 		$queue_table    = $wpdb->prefix . 'af_interest_queue';
 		$bookings_table = $wpdb->prefix . 'af_visit_bookings';
 
+		$acc_title    = (string) get_the_title( $accommodation_id );
 		$queued_count = (int) $wpdb->get_var(
 			$wpdb->prepare( "SELECT COUNT(*) FROM {$queue_table} WHERE accommodation_id = %d AND status IN ('queued','notified','visit_requested')", $accommodation_id )
 		);
@@ -1055,17 +1111,111 @@ class Arriendo_Facil_Rental_Workflow {
 			$wpdb->prepare( "SELECT COUNT(*) FROM {$bookings_table} WHERE accommodation_id = %d AND status IN ('confirmed','completed')", $accommodation_id )
 		);
 
-		$subject = sprintf( __( '[Arriendo Facil] Resumen de actividad: %s', 'arriendo-facil' ), get_the_title( $accommodation_id ) );
-		$message = sprintf(
-			/* translators: 1: context, 2: queue count, 3: visit count */
-			__( "Hola,\n\n%1\$s\n\nResumen actual de tu acomodacion:\n- Interesados en cola: %2\$d\n- Visitas agendadas: %3\$d\n\nRevisa los detalles en tu panel para continuar con tranquilidad y sin cruces.\n\nArriendo Facil", 'arriendo-facil' ),
-			sanitize_text_field( $context ),
-			$queued_count,
-			$visit_count
-		);
+		// Collect stats for owner's OTHER accommodations.
+		$other_acc_rows = array();
+		if ( class_exists( 'Arriendo_Facil_Accommodation' ) && $owner_id ) {
+			$all_owner_ids = Arriendo_Facil_Accommodation::get_owner_accommodation_ids( $owner_id );
+			foreach ( $all_owner_ids as $other_id ) {
+				$other_id = absint( $other_id );
+				if ( $other_id === $accommodation_id ) {
+					continue;
+				}
+				$other_queued = (int) $wpdb->get_var(
+					$wpdb->prepare( "SELECT COUNT(*) FROM {$queue_table} WHERE accommodation_id = %d AND status IN ('queued','notified','visit_requested')", $other_id )
+				);
+				$other_visits = (int) $wpdb->get_var(
+					$wpdb->prepare( "SELECT COUNT(*) FROM {$bookings_table} WHERE accommodation_id = %d AND status IN ('confirmed','completed')", $other_id )
+				);
+				$other_acc_rows[] = array(
+					'title'   => (string) get_the_title( $other_id ),
+					'queued'  => $other_queued,
+					'visited' => $other_visits,
+				);
+			}
+		}
 
 		$owner_email = sanitize_email( (string) $owner->user_email );
-		$sent = wp_mail( $owner_email, $subject, $message );
+		$subject     = sprintf( __( '[Arriendo Facil] Nueva solicitud recibida para %s', 'arriendo-facil' ), $acc_title );
+
+		// --- HTML email ---
+		$html  = '<div style="margin:0;padding:24px;background:#f1f5f9;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#0f172a;">';
+		$html .= '<div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">';
+
+		// Header.
+		$html .= '<div style="padding:18px 22px;background:linear-gradient(135deg,#0f766e,#0ea5a4);color:#ffffff;">';
+		$html .= '<h2 style="margin:0;font-size:20px;line-height:1.3;">' . esc_html__( 'Nueva solicitud recibida en Arriendo Facil', 'arriendo-facil' ) . '</h2>';
+		$html .= '</div>';
+
+		// Body.
+		$html .= '<div style="padding:22px;">';
+		$html .= '<p style="margin:0 0 16px;line-height:1.6;">' . esc_html( sanitize_text_field( $context ) ) . '</p>';
+
+		// Lead details table (only when we have a name/email).
+		if ( '' !== trim( $lead_name ) || '' !== trim( $lead_email ) ) {
+			$html .= '<h3 style="margin:0 0 10px;font-size:15px;color:#0f172a;">' . esc_html__( 'Datos del interesado', 'arriendo-facil' ) . '</h3>';
+			$html .= '<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;margin:0 0 20px;">';
+			if ( '' !== trim( $lead_name ) ) {
+				$html .= '<tr><td style="padding:8px 0;border-top:1px solid #e2e8f0;"><strong>' . esc_html__( 'Nombre', 'arriendo-facil' ) . ':</strong> ' . esc_html( sanitize_text_field( $lead_name ) ) . '</td></tr>';
+			}
+			if ( '' !== trim( $lead_email ) ) {
+				$html .= '<tr><td style="padding:8px 0;border-top:1px solid #e2e8f0;"><strong>' . esc_html__( 'Correo', 'arriendo-facil' ) . ':</strong> ' . esc_html( sanitize_email( $lead_email ) ) . '</td></tr>';
+			}
+			if ( '' !== trim( $lead_phone ) ) {
+				$html .= '<tr><td style="padding:8px 0;border-top:1px solid #e2e8f0;"><strong>' . esc_html__( 'Telefono', 'arriendo-facil' ) . ':</strong> ' . esc_html( sanitize_text_field( $lead_phone ) ) . '</td></tr>';
+			}
+			if ( '' !== trim( $preferred_date ) ) {
+				$html .= '<tr><td style="padding:8px 0;border-top:1px solid #e2e8f0;"><strong>' . esc_html__( 'Fecha sugerida', 'arriendo-facil' ) . ':</strong> ' . esc_html( sanitize_text_field( $preferred_date ) ) . '</td></tr>';
+			}
+			if ( '' !== trim( $preferred_time ) ) {
+				$html .= '<tr><td style="padding:8px 0;border-top:1px solid #e2e8f0;"><strong>' . esc_html__( 'Hora sugerida', 'arriendo-facil' ) . ':</strong> ' . esc_html( sanitize_text_field( $preferred_time ) ) . '</td></tr>';
+			}
+			$html .= '</table>';
+
+			if ( '' !== trim( $lead_notes ) ) {
+				$html .= '<p style="margin:0 0 8px;"><strong>' . esc_html__( 'Mensaje adicional:', 'arriendo-facil' ) . '</strong></p>';
+				$html .= '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;line-height:1.6;color:#334155;margin-bottom:20px;">' . nl2br( esc_html( sanitize_textarea_field( $lead_notes ) ) ) . '</div>';
+			}
+		}
+
+		// Current accommodation summary box.
+		$html .= '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px;margin-bottom:20px;">';
+		$html .= '<h3 style="margin:0 0 10px;font-size:15px;color:#166534;">' . esc_html( $acc_title ) . '</h3>';
+		$html .= '<p style="margin:4px 0;color:#14532d;">';
+		/* translators: %d: number of queued interested leads */
+		$html .= sprintf( esc_html__( 'Interesados en cola: <strong>%d</strong>', 'arriendo-facil' ), $queued_count );
+		$html .= ' &nbsp;|&nbsp; ';
+		/* translators: %d: number of confirmed visits */
+		$html .= sprintf( esc_html__( 'Visitas agendadas: <strong>%d</strong>', 'arriendo-facil' ), $visit_count );
+		$html .= '</p>';
+		$html .= '</div>';
+
+		// Other accommodations summary.
+		if ( ! empty( $other_acc_rows ) ) {
+			$html .= '<h3 style="margin:0 0 10px;font-size:14px;color:#475569;">' . esc_html__( 'Resumen de tus otras acomodaciones', 'arriendo-facil' ) . '</h3>';
+			$html .= '<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;margin:0 0 16px;font-size:13px;">';
+			$html .= '<tr style="background:#f1f5f9;">';
+			$html .= '<th style="padding:8px 10px;text-align:left;border:1px solid #e2e8f0;">' . esc_html__( 'Acomodacion', 'arriendo-facil' ) . '</th>';
+			$html .= '<th style="padding:8px 10px;text-align:center;border:1px solid #e2e8f0;">' . esc_html__( 'En cola', 'arriendo-facil' ) . '</th>';
+			$html .= '<th style="padding:8px 10px;text-align:center;border:1px solid #e2e8f0;">' . esc_html__( 'Visitas', 'arriendo-facil' ) . '</th>';
+			$html .= '</tr>';
+			foreach ( $other_acc_rows as $row ) {
+				$html .= '<tr>';
+				$html .= '<td style="padding:7px 10px;border:1px solid #e2e8f0;">' . esc_html( $row['title'] ) . '</td>';
+				$html .= '<td style="padding:7px 10px;text-align:center;border:1px solid #e2e8f0;">' . absint( $row['queued'] ) . '</td>';
+				$html .= '<td style="padding:7px 10px;text-align:center;border:1px solid #e2e8f0;">' . absint( $row['visited'] ) . '</td>';
+				$html .= '</tr>';
+			}
+			$html .= '</table>';
+		}
+
+		$html .= '<p style="margin:16px 0 0;line-height:1.6;color:#334155;">' . esc_html__( 'Revisa los detalles en tu panel para continuar con tranquilidad y sin cruces.', 'arriendo-facil' ) . '</p>';
+		$html .= '</div>';
+		$html .= '</div>';
+		$html .= '<p style="max-width:640px;margin:12px auto 0;font-size:12px;color:#64748b;text-align:center;">Arriendo Facil</p>';
+		$html .= '</div>';
+
+		$headers = array( 'Content-Type: text/html; charset=UTF-8' );
+		$sent    = wp_mail( $owner_email, $subject, $html, $headers );
 		$this->log_notification( $accommodation_id, 'owner_interest_update', $owner_email, $sent ? 'sent' : 'failed' );
 	}
 

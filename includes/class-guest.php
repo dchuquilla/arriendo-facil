@@ -333,18 +333,11 @@ class Arriendo_Facil_Guest {
 			wp_send_json_error( array( 'message' => __( 'No se encontro el huesped para completar el perfil.', 'arriendo-facil' ) ), 404 );
 		}
 
-		$name_input       = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
-		$phone            = isset( $_POST['phone'] ) ? sanitize_text_field( wp_unslash( $_POST['phone'] ) ) : '';
-		$id_number        = isset( $_POST['id_number'] ) ? sanitize_text_field( wp_unslash( $_POST['id_number'] ) ) : '';
+		$name_input        = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
+		$phone             = isset( $_POST['phone'] ) ? sanitize_text_field( wp_unslash( $_POST['phone'] ) ) : '';
+		$id_number         = isset( $_POST['id_number'] ) ? sanitize_text_field( wp_unslash( $_POST['id_number'] ) ) : '';
 		$rental_start_date = isset( $_POST['rental_start_date'] ) ? sanitize_text_field( wp_unslash( $_POST['rental_start_date'] ) ) : '';
-		$rental_years      = isset( $_POST['rental_years'] ) ? max( 1, absint( wp_unslash( $_POST['rental_years'] ) ) ) : 1;
-		$mascotas          = isset( $_POST['mascotas'] ) ? absint( wp_unslash( $_POST['mascotas'] ) ) : 0;
-		$personas_viviran  = isset( $_POST['personas_viviran'] ) ? absint( wp_unslash( $_POST['personas_viviran'] ) ) : 1;
-		$guarantee_text    = isset( $_POST['guarantee_text'] ) ? sanitize_text_field( wp_unslash( $_POST['guarantee_text'] ) ) : 'Garantía equivalente a dos (2) meses del canon de arrendamiento';
-		$ref1_name         = isset( $_POST['reference_1_name'] ) ? sanitize_text_field( wp_unslash( $_POST['reference_1_name'] ) ) : '';
-		$ref1_phone        = isset( $_POST['reference_1_phone'] ) ? sanitize_text_field( wp_unslash( $_POST['reference_1_phone'] ) ) : '';
-		$ref2_name         = isset( $_POST['reference_2_name'] ) ? sanitize_text_field( wp_unslash( $_POST['reference_2_name'] ) ) : '';
-		$ref2_phone        = isset( $_POST['reference_2_phone'] ) ? sanitize_text_field( wp_unslash( $_POST['reference_2_phone'] ) ) : '';
+		$personas_viviran  = isset( $_POST['personas_viviran'] ) ? max( 1, absint( wp_unslash( $_POST['personas_viviran'] ) ) ) : 1;
 
 		if ( '' === $name_input ) {
 			$name_input = trim( (string) $guest->first_name . ' ' . (string) $guest->last_name );
@@ -374,14 +367,11 @@ class Arriendo_Facil_Guest {
 			wp_send_json_error( array( 'message' => __( 'La fecha de inicio debe tener formato YYYY-MM-DD.', 'arriendo-facil' ) ), 400 );
 		}
 
-		$rental_end_date = gmdate( 'Y-m-d', strtotime( '+' . $rental_years . ' years', strtotime( $rental_start_date ) ) );
+		$rental_end_date = gmdate( 'Y-m-d', strtotime( '+1 year', strtotime( $rental_start_date ) ) );
 
 		$name_parts = preg_split( '/\s+/', trim( $name_input ) );
 		$first_name = ! empty( $name_parts[0] ) ? sanitize_text_field( (string) $name_parts[0] ) : '';
 		$last_name  = count( $name_parts ) > 1 ? sanitize_text_field( trim( implode( ' ', array_slice( $name_parts, 1 ) ) ) ) : '';
-
-		$ref1 = $this->build_reference_entry( $ref1_name, $ref1_phone );
-		$ref2 = $this->build_reference_entry( $ref2_name, $ref2_phone );
 
 		$updated = $wpdb->update(
 			$wpdb->prefix . 'af_guests',
@@ -395,13 +385,13 @@ class Arriendo_Facil_Guest {
 				'rental_start_date'     => $rental_start_date,
 				'rental_end_date'       => $rental_end_date,
 				'rental_months'         => null,
-				'rental_years'          => $rental_years,
+				'rental_years'          => 1,
 				'desired_price'         => '',
-				'guarantee_text'        => $guarantee_text,
-				'mascotas'              => $mascotas,
+				'guarantee_text'        => 'Garantia equivalente a dos (2) meses del canon de arrendamiento',
+				'mascotas'              => 0,
 				'personas_viviran'      => $personas_viviran,
-				'referencia_personal_1' => $ref1,
-				'referencia_personal_2' => $ref2,
+				'referencia_personal_1' => '',
+				'referencia_personal_2' => '',
 			),
 			array( 'id' => $guest_id ),
 			array( '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%d', '%d', '%s', '%s' ),
@@ -426,10 +416,10 @@ class Arriendo_Facil_Guest {
 					'rental_start_date' => $rental_start_date,
 					'rental_end_date'   => $rental_end_date,
 					'rental_months'     => 0,
-					'rental_years'      => $rental_years,
+					'rental_years'      => 1,
 					'phone'             => $phone,
 					'id_number'         => $id_number,
-					'mascotas'          => $mascotas,
+					'mascotas'          => 0,
 					'personas_viviran'  => $personas_viviran,
 					'name'              => trim( $first_name . ' ' . $last_name ),
 					'email'             => sanitize_email( (string) $guest->email ),

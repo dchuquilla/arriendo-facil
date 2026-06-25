@@ -148,7 +148,7 @@ class Arriendo_Facil_Guest {
 		$form_path        = sanitize_text_field( (string) $form_path );
 		$expires_hours    = max( 6, min( 168, absint( $expires_hours ) ) );
 
-		if ( ! $accommodation_id || ! $visit_booking_id || ! is_email( $guest_email ) ) {
+		if ( ! $accommodation_id || ! is_email( $guest_email ) ) {
 			return array(
 				'sent'  => false,
 				'error' => 'invalid_booking_input',

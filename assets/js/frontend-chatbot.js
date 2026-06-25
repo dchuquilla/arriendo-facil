@@ -28,6 +28,10 @@
 
 		var accommodations = Array.isArray(afChatbot.accommodations) ? afChatbot.accommodations : [];
 		var currentAccommodationId = parseInt(afChatbot.currentAccommodationId || 0, 10);
+		var submitTimeoutMs = parseInt(afChatbot.submitTimeoutMs || 120000, 10);
+		if (isNaN(submitTimeoutMs) || submitTimeoutMs < 30000) {
+			submitTimeoutMs = 120000;
+		}
 
 		var state = {
 			started: false,
@@ -37,7 +41,9 @@
 			pendingExistingChoice: null,
 				lastSubmitFailed: false,
 				isSubmitting: false,
-				activeRequestController: null
+				activeRequestController: null,
+				submitTimeoutId: null,
+				requestTimedOut: false
 		};
 
 		var menuOptions = [];
@@ -501,6 +507,11 @@
 				state.pendingExistingChoice = null;
 				state.lastSubmitFailed = false;
 				state.isSubmitting = false;
+				if (state.submitTimeoutId) {
+					clearTimeout(state.submitTimeoutId);
+					state.submitTimeoutId = null;
+				}
+				state.requestTimedOut = false;
 				state.activeRequestController = null;
 				if (currentAccommodationId > 0) {
 					state.values.accommodation_id = String(currentAccommodationId);
@@ -633,6 +644,17 @@
 
 			state.isSubmitting = true;
 			state.activeRequestController = new AbortController();
+			state.requestTimedOut = false;
+			if (state.submitTimeoutId) {
+				clearTimeout(state.submitTimeoutId);
+			}
+			state.submitTimeoutId = setTimeout(function () {
+				if (!state.isSubmitting || !state.activeRequestController) {
+					return;
+				}
+				state.requestTimedOut = true;
+				state.activeRequestController.abort();
+			}, submitTimeoutMs);
 			setFormDisabled(true);
 			state.lastSubmitFailed = false;
 			botReply(afChatbot.doneText || 'Perfecto, ya tengo tus datos. Estoy enviando tu solicitud de arriendo...');
@@ -720,9 +742,16 @@
 				})
 					.catch(function (error) {
 						if (error && error.name === 'AbortError') {
-							message.className = '';
-							message.textContent = '';
-							appendBubble('Envio cancelado por ti. Puedes continuar corrigiendo datos o reiniciar.', 'bot');
+							if (state.requestTimedOut) {
+								state.lastSubmitFailed = true;
+								message.className = 'af-chatbot-error';
+								message.textContent = 'La solicitud esta tardando demasiado y se cancelo automaticamente. Puedes reintentar ahora.';
+								appendBubble(message.textContent, 'bot');
+							} else {
+								message.className = '';
+								message.textContent = '';
+								appendBubble('Envio cancelado por ti. Puedes continuar corrigiendo datos o reiniciar.', 'bot');
+							}
 							return;
 						}
 					state.lastSubmitFailed = true;
@@ -732,7 +761,12 @@
 						appendBubble('Error de conexion. Puedes reintentar con Enviar, volver un paso o cancelar.', 'bot');
 				})
 				.finally(function () {
+					if (state.submitTimeoutId) {
+						clearTimeout(state.submitTimeoutId);
+						state.submitTimeoutId = null;
+					}
 						state.isSubmitting = false;
+						state.requestTimedOut = false;
 						state.activeRequestController = null;
 					setFormDisabled(false);
 				});

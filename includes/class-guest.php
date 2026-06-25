@@ -128,6 +128,147 @@ class Arriendo_Facil_Guest {
 	}
 
 	/**
+	 * Sends onboarding link for a confirmed visit booking without requiring AJAX.
+	 *
+	 * @param int    $accommodation_id Accommodation ID.
+	 * @param int    $visit_booking_id Visit booking ID.
+	 * @param string $guest_name Guest full name.
+	 * @param string $guest_email Guest email.
+	 * @param string $guest_phone Guest phone.
+	 * @param string $form_path Relative form path.
+	 * @param int    $expires_hours Link lifetime in hours.
+	 * @return array<string,mixed>
+	 */
+	public function send_guest_profile_link_for_booking( $accommodation_id, $visit_booking_id, $guest_name, $guest_email, $guest_phone = '', $form_path = '/completar-perfil-arriendo/', $expires_hours = 72 ) {
+		$accommodation_id = absint( $accommodation_id );
+		$visit_booking_id = absint( $visit_booking_id );
+		$guest_name       = sanitize_text_field( (string) $guest_name );
+		$guest_email      = sanitize_email( (string) $guest_email );
+		$guest_phone      = sanitize_text_field( (string) $guest_phone );
+		$form_path        = sanitize_text_field( (string) $form_path );
+		$expires_hours    = max( 6, min( 168, absint( $expires_hours ) ) );
+
+		if ( ! $accommodation_id || ! $visit_booking_id || ! is_email( $guest_email ) ) {
+			return array(
+				'sent'  => false,
+				'error' => 'invalid_booking_input',
+			);
+		}
+
+		$schema_result = $this->ensure_guest_extra_columns();
+		if ( is_wp_error( $schema_result ) ) {
+			return array(
+				'sent'  => false,
+				'error' => $schema_result->get_error_message(),
+			);
+		}
+
+		global $wpdb;
+		$guest = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT id, first_name, last_name, email FROM {$wpdb->prefix}af_guests WHERE email = %s ORDER BY id DESC LIMIT 1",
+				$guest_email
+			)
+		);
+
+		$guest_id = $guest && isset( $guest->id ) ? absint( $guest->id ) : 0;
+		if ( ! $guest_id ) {
+			$name_parts = preg_split( '/\s+/', trim( $guest_name ) );
+			if ( ! is_array( $name_parts ) ) {
+				$name_parts = array();
+			}
+
+			$first_name = ! empty( $name_parts[0] ) ? sanitize_text_field( (string) $name_parts[0] ) : __( 'Arrendatario', 'arriendo-facil' );
+			$last_name  = count( $name_parts ) > 1 ? sanitize_text_field( trim( implode( ' ', array_slice( $name_parts, 1 ) ) ) ) : '';
+
+			$inserted = $wpdb->insert(
+				$wpdb->prefix . 'af_guests',
+				array(
+					'first_name' => $first_name,
+					'last_name'  => $last_name,
+					'email'      => $guest_email,
+					'phone'      => $guest_phone,
+					'id_number'  => '',
+				),
+				array( '%s', '%s', '%s', '%s', '%s' )
+			);
+
+			if ( ! $inserted ) {
+				return array(
+					'sent'  => false,
+					'error' => 'guest_insert_failed',
+				);
+			}
+
+			$guest_id = absint( $wpdb->insert_id );
+		} else {
+			$wpdb->update(
+				$wpdb->prefix . 'af_guests',
+				array( 'phone' => $guest_phone ),
+				array( 'id' => $guest_id ),
+				array( '%s' ),
+				array( '%d' )
+			);
+		}
+
+		if ( ! $guest_id ) {
+			return array(
+				'sent'  => false,
+				'error' => 'guest_id_missing',
+			);
+		}
+
+		$token_data = $this->create_guest_onboarding_token( $guest_id, $accommodation_id, $visit_booking_id, $guest_email, $expires_hours );
+		if ( is_wp_error( $token_data ) ) {
+			return array(
+				'sent'  => false,
+				'error' => $token_data->get_error_message(),
+			);
+		}
+
+		$selector = isset( $token_data['selector'] ) ? (string) $token_data['selector'] : '';
+		$token    = isset( $token_data['token'] ) ? (string) $token_data['token'] : '';
+		if ( '' === $selector || '' === $token ) {
+			return array(
+				'sent'  => false,
+				'error' => 'token_build_failed',
+			);
+		}
+
+		$form_url = home_url( '/' . ltrim( $form_path, '/' ) );
+		$form_url = add_query_arg(
+			array(
+				'selector' => rawurlencode( $selector ),
+				'token'    => rawurlencode( $token ),
+			),
+			$form_url
+		);
+
+		$sent = $this->send_guest_legal_profile_link_email(
+			$guest_email,
+			$guest_name,
+			$form_url,
+			$accommodation_id,
+			isset( $token_data['expires_at'] ) ? (string) $token_data['expires_at'] : ''
+		);
+
+		if ( ! $sent ) {
+			return array(
+				'sent'       => false,
+				'guest_id'   => $guest_id,
+				'expires_at' => isset( $token_data['expires_at'] ) ? (string) $token_data['expires_at'] : '',
+				'error'      => 'wp_mail_failed',
+			);
+		}
+
+		return array(
+			'sent'       => true,
+			'guest_id'   => $guest_id,
+			'expires_at' => isset( $token_data['expires_at'] ) ? (string) $token_data['expires_at'] : '',
+		);
+	}
+
+	/**
 	 * Validates onboarding token and returns minimal context for frontend form.
 	 */
 	public function ajax_validate_guest_profile_token() {

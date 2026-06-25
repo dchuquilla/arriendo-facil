@@ -24,6 +24,8 @@ class Arriendo_Facil_Guest {
 		add_action( 'wp_ajax_af_create_guest', array( $this, 'ajax_create_guest' ) );
 		add_action( 'wp_ajax_af_create_guest_frontend', array( $this, 'ajax_create_guest_frontend' ) );
 		add_action( 'wp_ajax_nopriv_af_create_guest_frontend', array( $this, 'ajax_create_guest_frontend' ) );
+		add_action( 'wp_ajax_af_process_guest_post_submit_now', array( $this, 'ajax_process_guest_post_submit_now' ) );
+		add_action( 'wp_ajax_nopriv_af_process_guest_post_submit_now', array( $this, 'ajax_process_guest_post_submit_now' ) );
 		add_action( 'wp_ajax_af_send_guest_profile_link', array( $this, 'ajax_send_guest_profile_link' ) );
 		add_action( 'wp_ajax_af_validate_guest_profile_token', array( $this, 'ajax_validate_guest_profile_token' ) );
 		add_action( 'wp_ajax_nopriv_af_validate_guest_profile_token', array( $this, 'ajax_validate_guest_profile_token' ) );
@@ -786,16 +788,21 @@ class Arriendo_Facil_Guest {
 			return false;
 		}
 
+		$job_id = function_exists( 'wp_generate_password' )
+			? strtolower( wp_generate_password( 20, false, false ) )
+			: strtolower( substr( md5( uniqid( '', true ) ), 0, 20 ) );
+
 		$event_payload = array(
+			'job_id'        => $job_id,
 			'guest_id'      => $guest_id,
 			'lease_payload' => $lease_payload,
 			'visit_payload' => $visit_payload,
 		);
 
-		$already_scheduled = wp_next_scheduled( 'af_process_guest_post_submit', array( $event_payload ) );
-		if ( false !== $already_scheduled ) {
-			return true;
-		}
+		$job_key = 'af_guest_job_' . $job_id;
+		set_transient( $job_key, $event_payload, 15 * MINUTE_IN_SECONDS );
+
+		$http_triggered = $this->trigger_guest_post_submit_async_http( $job_id );
 
 		$scheduled = wp_schedule_single_event( time() + 2, 'af_process_guest_post_submit', array( $event_payload ) );
 
@@ -803,7 +810,58 @@ class Arriendo_Facil_Guest {
 			spawn_cron( time() );
 		}
 
-		return false !== $scheduled;
+		return $http_triggered || false !== $scheduled;
+	}
+
+	/**
+	 * Triggers immediate async processing through admin-ajax.
+	 *
+	 * @param string $job_id Job ID.
+	 * @return bool
+	 */
+	private function trigger_guest_post_submit_async_http( $job_id ) {
+		$job_id = preg_replace( '/[^a-z0-9]/', '', strtolower( (string) $job_id ) );
+		if ( '' === $job_id ) {
+			return false;
+		}
+
+		$response = wp_remote_post(
+			admin_url( 'admin-ajax.php' ),
+			array(
+				'timeout'  => 1,
+				'blocking' => false,
+				'body'     => array(
+					'action' => 'af_process_guest_post_submit_now',
+					'job_id' => $job_id,
+				),
+			)
+		);
+
+		return ! is_wp_error( $response );
+	}
+
+	/**
+	 * AJAX endpoint to run queued guest post-submit processing immediately.
+	 *
+	 * @return void
+	 */
+	public function ajax_process_guest_post_submit_now() {
+		$job_id = isset( $_REQUEST['job_id'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['job_id'] ) ) : '';
+		$job_id = preg_replace( '/[^a-z0-9]/', '', strtolower( (string) $job_id ) );
+
+		if ( '' === $job_id ) {
+			wp_die( '0', 400 );
+		}
+
+		$job_key = 'af_guest_job_' . $job_id;
+		$payload = get_transient( $job_key );
+		if ( ! is_array( $payload ) ) {
+			wp_die( '0', 404 );
+		}
+
+		delete_transient( $job_key );
+		$this->process_guest_post_submit_async( $payload );
+		wp_die( '1' );
 	}
 
 	/**
@@ -817,6 +875,18 @@ class Arriendo_Facil_Guest {
 			return;
 		}
 
+		$job_id = isset( $event_payload['job_id'] ) ? preg_replace( '/[^a-z0-9]/', '', strtolower( (string) $event_payload['job_id'] ) ) : '';
+		if ( '' !== $job_id ) {
+			$done_key = 'af_guest_job_done_' . $job_id;
+			$lock_key = 'af_guest_job_lock_' . $job_id;
+
+			if ( get_transient( $done_key ) || get_transient( $lock_key ) ) {
+				return;
+			}
+
+			set_transient( $lock_key, 1, 10 * MINUTE_IN_SECONDS );
+		}
+
 		$guest_id      = isset( $event_payload['guest_id'] ) ? absint( $event_payload['guest_id'] ) : 0;
 		$lease_payload = isset( $event_payload['lease_payload'] ) && is_array( $event_payload['lease_payload'] )
 			? $event_payload['lease_payload']
@@ -826,6 +896,9 @@ class Arriendo_Facil_Guest {
 			: array();
 
 		if ( ! $guest_id ) {
+			if ( '' !== $job_id ) {
+				delete_transient( 'af_guest_job_lock_' . $job_id );
+			}
 			return;
 		}
 
@@ -847,6 +920,11 @@ class Arriendo_Facil_Guest {
 			);
 		} catch ( Throwable $throwable ) {
 			error_log( 'Arriendo Facil async visit request error: ' . $throwable->getMessage() );
+		}
+
+		if ( '' !== $job_id ) {
+			delete_transient( 'af_guest_job_lock_' . $job_id );
+			set_transient( 'af_guest_job_done_' . $job_id, 1, DAY_IN_SECONDS );
 		}
 	}
 

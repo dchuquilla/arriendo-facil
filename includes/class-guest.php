@@ -33,6 +33,7 @@ class Arriendo_Facil_Guest {
 		add_action( 'wp_ajax_nopriv_af_refresh_nonce', array( $this, 'ajax_refresh_nonce' ) );
 		add_action( 'wp_ajax_af_get_guests', array( $this, 'ajax_get_guests' ) );
 		add_action( 'wp_ajax_af_score_guest', array( $this, 'ajax_score_guest' ) );
+		add_action( 'af_process_guest_post_submit', array( $this, 'process_guest_post_submit_async' ), 10, 1 );
 	}
 
 	public function ajax_refresh_nonce() {
@@ -619,38 +620,42 @@ class Arriendo_Facil_Guest {
 				);
 			}
 
-			try {
-				$contract_info = $this->create_lease_contract_for_guest(
-					$guest_id,
-					array(
-						'accommodation_id'  => $accommodation_id,
-						'rental_mode'       => $rental_mode,
-						'rental_start_date' => $rental_start_date,
-						'rental_end_date'   => $rental_end_date,
-						'rental_months'     => $rental_months,
-						'rental_years'      => $rental_years,
-						'phone'             => $phone,
-						'id_number'         => $id_number,
-						'mascotas'          => $mascotas,
-						'personas_viviran'  => $personas_viviran,
-						'name'              => trim( $first_name . ' ' . $last_name ),
-						'email'             => $email,
-					)
-				);
-			} catch ( Throwable $throwable ) {
-				error_log( 'Arriendo Facil lease auto-generation error: ' . $throwable->getMessage() );
-				$contract_info = array(
-					'generated' => false,
-					'error'     => 'lease_generation_failed',
-				);
-			}
+			$queue_payload = array(
+				'accommodation_id'  => $accommodation_id,
+				'rental_mode'       => $rental_mode,
+				'rental_start_date' => $rental_start_date,
+				'rental_end_date'   => $rental_end_date,
+				'rental_months'     => $rental_months,
+				'rental_years'      => $rental_years,
+				'phone'             => $phone,
+				'id_number'         => $id_number,
+				'mascotas'          => $mascotas,
+				'personas_viviran'  => $personas_viviran,
+				'name'              => trim( $first_name . ' ' . $last_name ),
+				'email'             => $email,
+			);
 
-			$visit_request = array( 'saved' => false, 'message' => 'visit_request_not_processed' );
-			try {
-				$visit_request = $this->create_or_update_visit_request( $accommodation_id, trim( $first_name . ' ' . $last_name ), $email, $phone, $visit_preferred_date, $visit_preferred_time, $visit_notes );
-			} catch ( Throwable $throwable ) {
-				error_log( 'Arriendo Facil visit request error (existing guest): ' . $throwable->getMessage() );
-			}
+			$visit_request_payload = array(
+				'accommodation_id' => $accommodation_id,
+				'name'             => trim( $first_name . ' ' . $last_name ),
+				'email'            => $email,
+				'phone'            => $phone,
+				'preferred_date'   => $visit_preferred_date,
+				'preferred_time'   => $visit_preferred_time,
+				'visit_notes'      => $visit_notes,
+			);
+
+			$scheduled = $this->schedule_guest_post_submit_processing( $guest_id, $queue_payload, $visit_request_payload );
+			$contract_info = array(
+				'generated' => false,
+				'status'    => $scheduled ? 'queued' : 'not_queued',
+			);
+			$visit_request = array(
+				'saved'          => true,
+				'preferred_date' => $visit_preferred_date,
+				'preferred_time' => $visit_preferred_time,
+				'status'         => $scheduled ? 'queued' : 'not_queued',
+			);
 
 			wp_send_json_success(
 				array(
@@ -690,43 +695,48 @@ class Arriendo_Facil_Guest {
 
 		if ( $inserted ) {
 			$guest_id = (int) $wpdb->insert_id;
-			try {
-				$contract_info = $this->create_lease_contract_for_guest(
-					$guest_id,
-					array(
-						'accommodation_id'  => $accommodation_id,
-						'rental_mode'       => $rental_mode,
-						'rental_start_date' => $rental_start_date,
-						'rental_end_date'   => $rental_end_date,
-						'rental_months'     => $rental_months,
-						'rental_years'      => $rental_years,
-						'phone'             => $phone,
-						'id_number'         => $id_number,
-						'mascotas'          => $mascotas,
-						'personas_viviran'  => $personas_viviran,
-						'name'              => trim( $first_name . ' ' . $last_name ),
-						'email'             => $email,
-					)
-				);
-			} catch ( Throwable $throwable ) {
-				error_log( 'Arriendo Facil lease auto-generation error: ' . $throwable->getMessage() );
-				$contract_info = array(
-					'generated' => false,
-					'error'     => 'lease_generation_failed',
-				);
-			}
 
-			$visit_request = array( 'saved' => false, 'message' => 'visit_request_not_processed' );
-			try {
-				$visit_request = $this->create_or_update_visit_request( $accommodation_id, trim( $first_name . ' ' . $last_name ), $email, $phone, $visit_preferred_date, $visit_preferred_time, $visit_notes );
-			} catch ( Throwable $throwable ) {
-				error_log( 'Arriendo Facil visit request error (new guest): ' . $throwable->getMessage() );
-			}
+			$queue_payload = array(
+				'accommodation_id'  => $accommodation_id,
+				'rental_mode'       => $rental_mode,
+				'rental_start_date' => $rental_start_date,
+				'rental_end_date'   => $rental_end_date,
+				'rental_months'     => $rental_months,
+				'rental_years'      => $rental_years,
+				'phone'             => $phone,
+				'id_number'         => $id_number,
+				'mascotas'          => $mascotas,
+				'personas_viviran'  => $personas_viviran,
+				'name'              => trim( $first_name . ' ' . $last_name ),
+				'email'             => $email,
+			);
+
+			$visit_request_payload = array(
+				'accommodation_id' => $accommodation_id,
+				'name'             => trim( $first_name . ' ' . $last_name ),
+				'email'            => $email,
+				'phone'            => $phone,
+				'preferred_date'   => $visit_preferred_date,
+				'preferred_time'   => $visit_preferred_time,
+				'visit_notes'      => $visit_notes,
+			);
+
+			$scheduled = $this->schedule_guest_post_submit_processing( $guest_id, $queue_payload, $visit_request_payload );
+			$contract_info = array(
+				'generated' => false,
+				'status'    => $scheduled ? 'queued' : 'not_queued',
+			);
+			$visit_request = array(
+				'saved'          => true,
+				'preferred_date' => $visit_preferred_date,
+				'preferred_time' => $visit_preferred_time,
+				'status'         => $scheduled ? 'queued' : 'not_queued',
+			);
 
 			wp_send_json_success(
 				array(
 					'id'      => $guest_id,
-					'message' => __( 'Registro enviado. Pronto nos contactaremos contigo.', 'arriendo-facil' ),
+					'message' => __( 'Registro enviado. Estamos procesando tu contrato y visita en segundo plano.', 'arriendo-facil' ),
 					'contract' => $contract_info,
 					'visit_request' => $visit_request,
 				)
@@ -759,6 +769,84 @@ class Arriendo_Facil_Guest {
 				),
 				500
 			);
+		}
+	}
+
+	/**
+	 * Schedules heavy post-submit processing so AJAX can return quickly.
+	 *
+	 * @param int   $guest_id Guest ID.
+	 * @param array $lease_payload Lease creation payload.
+	 * @param array $visit_payload Visit request payload.
+	 * @return bool
+	 */
+	private function schedule_guest_post_submit_processing( $guest_id, array $lease_payload, array $visit_payload ) {
+		$guest_id = absint( $guest_id );
+		if ( ! $guest_id ) {
+			return false;
+		}
+
+		$event_payload = array(
+			'guest_id'      => $guest_id,
+			'lease_payload' => $lease_payload,
+			'visit_payload' => $visit_payload,
+		);
+
+		$already_scheduled = wp_next_scheduled( 'af_process_guest_post_submit', array( $event_payload ) );
+		if ( false !== $already_scheduled ) {
+			return true;
+		}
+
+		$scheduled = wp_schedule_single_event( time() + 2, 'af_process_guest_post_submit', array( $event_payload ) );
+
+		if ( false !== $scheduled && function_exists( 'spawn_cron' ) ) {
+			spawn_cron( time() );
+		}
+
+		return false !== $scheduled;
+	}
+
+	/**
+	 * Executes heavy guest processing asynchronously via WP-Cron.
+	 *
+	 * @param array $event_payload Scheduled payload.
+	 * @return void
+	 */
+	public function process_guest_post_submit_async( $event_payload ) {
+		if ( ! is_array( $event_payload ) ) {
+			return;
+		}
+
+		$guest_id      = isset( $event_payload['guest_id'] ) ? absint( $event_payload['guest_id'] ) : 0;
+		$lease_payload = isset( $event_payload['lease_payload'] ) && is_array( $event_payload['lease_payload'] )
+			? $event_payload['lease_payload']
+			: array();
+		$visit_payload = isset( $event_payload['visit_payload'] ) && is_array( $event_payload['visit_payload'] )
+			? $event_payload['visit_payload']
+			: array();
+
+		if ( ! $guest_id ) {
+			return;
+		}
+
+		try {
+			$this->create_lease_contract_for_guest( $guest_id, $lease_payload );
+		} catch ( Throwable $throwable ) {
+			error_log( 'Arriendo Facil async lease generation error: ' . $throwable->getMessage() );
+		}
+
+		try {
+			$this->create_or_update_visit_request(
+				isset( $visit_payload['accommodation_id'] ) ? absint( $visit_payload['accommodation_id'] ) : 0,
+				isset( $visit_payload['name'] ) ? (string) $visit_payload['name'] : '',
+				isset( $visit_payload['email'] ) ? (string) $visit_payload['email'] : '',
+				isset( $visit_payload['phone'] ) ? (string) $visit_payload['phone'] : '',
+				isset( $visit_payload['preferred_date'] ) ? (string) $visit_payload['preferred_date'] : '',
+				isset( $visit_payload['preferred_time'] ) ? (string) $visit_payload['preferred_time'] : '',
+				isset( $visit_payload['visit_notes'] ) ? (string) $visit_payload['visit_notes'] : ''
+			);
+		} catch ( Throwable $throwable ) {
+			error_log( 'Arriendo Facil async visit request error: ' . $throwable->getMessage() );
 		}
 	}
 
@@ -3363,7 +3451,30 @@ class Arriendo_Facil_Guest {
 
 		$path          = get_attached_file( $attachment_id );
 		$mime_type     = (string) get_post_mime_type( $attachment_id );
-		$template_text = $this->extract_contract_template_text( $path, $mime_type );
+		$cache_signature = '';
+		if ( $path && file_exists( $path ) ) {
+			$file_size = @filesize( $path );
+			$file_mtime = @filemtime( $path );
+			$cache_signature = sha1( $path . '|' . (string) $file_size . '|' . (string) $file_mtime . '|' . $mime_type );
+		}
+
+		$cached_signature = (string) get_post_meta( $attachment_id, '_af_template_text_cache_sig', true );
+		$cached_text      = get_post_meta( $attachment_id, '_af_template_text_cache', true );
+		$cached_text      = is_string( $cached_text ) ? $cached_text : '';
+
+		if ( '' !== $cache_signature && '' !== $cached_text && hash_equals( $cached_signature, $cache_signature ) ) {
+			$template_text = $cached_text;
+		} else {
+			$template_text = $this->extract_contract_template_text( $path, $mime_type );
+			if ( '' === $template_text && '' !== $cached_text ) {
+				$template_text = $cached_text;
+			}
+
+			if ( '' !== $cache_signature ) {
+				update_post_meta( $attachment_id, '_af_template_text_cache_sig', $cache_signature );
+				update_post_meta( $attachment_id, '_af_template_text_cache', $template_text );
+			}
+		}
 		$owner_user    = get_user_by( 'id', $owner_user_id );
 
 		return array(

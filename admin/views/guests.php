@@ -54,7 +54,7 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['af_queue_action'], 
 	} else {
 			$request_row = $wpdb->get_row(
 			$wpdb->prepare(
-					"SELECT id, accommodation_id, email, status FROM {$queue_table} WHERE id = %d LIMIT 1",
+					"SELECT id, accommodation_id, name, email, phone, status FROM {$queue_table} WHERE id = %d LIMIT 1",
 				$request_id
 			)
 		);
@@ -128,6 +128,39 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['af_queue_action'], 
 						max( 0, $other_rejected ),
 						max( 0, $terminated_drafts )
 					);
+
+					// Send legal-profile form link to the approved guest.
+					if ( '' !== $selected_email && class_exists( 'Arriendo_Facil_Guest' ) ) {
+						$guest_service      = new Arriendo_Facil_Guest();
+						$approved_name      = isset( $request_row->name ) ? sanitize_text_field( (string) $request_row->name ) : '';
+						$approved_phone     = isset( $request_row->phone ) ? sanitize_text_field( (string) $request_row->phone ) : '';
+						$approved_acc_id    = absint( $request_row->accommodation_id );
+
+						// Check for an existing confirmed booking to link the token.
+						$existing_booking_id = (int) $wpdb->get_var(
+							$wpdb->prepare(
+								"SELECT id FROM {$wpdb->prefix}af_visit_bookings WHERE accommodation_id = %d AND guest_email = %s AND status IN ('confirmed','completed') ORDER BY id DESC LIMIT 1",
+								$approved_acc_id,
+								$selected_email
+							)
+						);
+
+						$profile_result = $guest_service->send_guest_profile_link_for_booking(
+							$approved_acc_id,
+							$existing_booking_id,
+							$approved_name,
+							$selected_email,
+							$approved_phone,
+							'/completar-perfil-arriendo/',
+							72
+						);
+
+						if ( ! empty( $profile_result['sent'] ) ) {
+							$action_notice .= ' ' . __( 'Se envio el formulario de perfil legal al interesado.', 'arriendo-facil' );
+						} else {
+							$action_notice .= ' ' . __( 'Atencion: no se pudo enviar el formulario de perfil legal al interesado.', 'arriendo-facil' );
+						}
+					}
 				}
 			} elseif ( 'reject' === $queue_action ) {
 				$updated_selected = $wpdb->update(

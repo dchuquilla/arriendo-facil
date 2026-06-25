@@ -1181,11 +1181,9 @@ class Arriendo_Facil_Rental_Workflow {
 		$html .= '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px;margin-bottom:20px;">';
 		$html .= '<h3 style="margin:0 0 10px;font-size:15px;color:#166534;">' . esc_html( $acc_title ) . '</h3>';
 		$html .= '<p style="margin:4px 0;color:#14532d;">';
-		/* translators: %d: number of queued interested leads */
-		$html .= sprintf( esc_html__( 'Interesados en cola: <strong>%d</strong>', 'arriendo-facil' ), $queued_count );
+		$html .= esc_html__( 'Interesados en cola:', 'arriendo-facil' ) . ' <strong>' . absint( $queued_count ) . '</strong>';
 		$html .= ' &nbsp;|&nbsp; ';
-		/* translators: %d: number of confirmed visits */
-		$html .= sprintf( esc_html__( 'Visitas agendadas: <strong>%d</strong>', 'arriendo-facil' ), $visit_count );
+		$html .= esc_html__( 'Visitas agendadas:', 'arriendo-facil' ) . ' <strong>' . absint( $visit_count ) . '</strong>';
 		$html .= '</p>';
 		$html .= '</div>';
 

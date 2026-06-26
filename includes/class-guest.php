@@ -309,6 +309,8 @@ class Arriendo_Facil_Guest {
 	 * Reuses existing guest/lease contract generation logic.
 	 */
 	public function ajax_submit_guest_profile_by_token() {
+		try {
+
 		$selector = isset( $_POST['selector'] ) ? sanitize_text_field( wp_unslash( $_POST['selector'] ) ) : '';
 		$token    = isset( $_POST['token'] ) ? sanitize_text_field( wp_unslash( $_POST['token'] ) ) : '';
 
@@ -334,6 +336,12 @@ class Arriendo_Facil_Guest {
 
 		if ( ! $guest ) {
 			wp_send_json_error( array( 'message' => __( 'No se encontro el huesped para completar el perfil.', 'arriendo-facil' ) ), 404 );
+		}
+
+		// Ensure extra columns exist before attempting the UPDATE.
+		$schema_result = $this->ensure_guest_extra_columns();
+		if ( is_wp_error( $schema_result ) ) {
+			wp_send_json_error( array( 'message' => $schema_result->get_error_message() ), 500 );
 		}
 
 		$name_input        = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
@@ -410,42 +418,84 @@ class Arriendo_Facil_Guest {
 			wp_send_json_error( array( 'message' => $upload_result->get_error_message() ), 400 );
 		}
 
-		try {
-			$contract_info = $this->create_lease_contract_for_guest(
-				$guest_id,
-				array(
-					'accommodation_id'  => $accommodation_id,
-					'rental_mode'       => 'years',
-					'rental_start_date' => $rental_start_date,
-					'rental_end_date'   => $rental_end_date,
-					'rental_months'     => 0,
-					'rental_years'      => 1,
-					'phone'             => $phone,
-					'id_number'         => $id_number,
-					'mascotas'          => 0,
-					'personas_viviran'  => $personas_viviran,
-					'name'              => trim( $first_name . ' ' . $last_name ),
-					'email'             => sanitize_email( (string) $guest->email ),
-				)
-			);
-		} catch ( Throwable $throwable ) {
-			error_log( 'Arriendo Facil onboarding token lease generation error: ' . $throwable->getMessage() );
-			$contract_info = array(
-				'generated' => false,
-				'error'     => 'lease_generation_failed',
-			);
-		}
+		$lease_payload = array(
+			'accommodation_id'  => $accommodation_id,
+			'rental_mode'       => 'years',
+			'rental_start_date' => $rental_start_date,
+			'rental_end_date'   => $rental_end_date,
+			'rental_months'     => 0,
+			'rental_years'      => 1,
+			'phone'             => $phone,
+			'id_number'         => $id_number,
+			'mascotas'          => 0,
+			'personas_viviran'  => $personas_viviran,
+			'name'              => trim( $first_name . ' ' . $last_name ),
+			'email'             => sanitize_email( (string) $guest->email ),
+		);
 
+		// Consume the token before responding (one-time use).
 		$this->consume_guest_onboarding_token( isset( $resolved['token_id'] ) ? absint( $resolved['token_id'] ) : 0 );
+
+		// Queue the heavy work (contract generation) to run AFTER the HTTP response
+		// is delivered to the browser, using the PHP shutdown hook.
+		// This prevents blocking the AJAX response on outbound HTTP requests or
+		// slow cron triggers that are common on development/staging servers.
+		$job_id = function_exists( 'wp_generate_password' )
+			? strtolower( wp_generate_password( 20, false, false ) )
+			: strtolower( substr( md5( uniqid( '', true ) ), 0, 20 ) );
+
+		$event_payload = array(
+			'job_id'        => $job_id,
+			'guest_id'      => $guest_id,
+			'lease_payload' => $lease_payload,
+			'visit_payload' => array(),
+		);
+
+		// Store transient so the cron fallback can find the payload.
+		set_transient( 'af_guest_job_' . $job_id, $event_payload, 15 * MINUTE_IN_SECONDS );
+
+		// Schedule WP-Cron as a fallback (fires 30 s after, does NOT make an HTTP
+		// request during this request – no spawn_cron either).
+		wp_schedule_single_event( time() + 30, 'af_process_guest_post_submit', array( $event_payload ) );
+
+		// Primary path: shutdown hook runs the job in this very PHP process,
+		// right after wp_send_json_success() closes the connection.
+		$self = $this;
+		add_action(
+			'shutdown',
+			function () use ( $event_payload, $self ) {
+				// Flush the response to the browser before the heavy work.
+				if ( function_exists( 'fastcgi_finish_request' ) ) {
+					fastcgi_finish_request();
+				} elseif ( function_exists( 'litespeed_finish_request' ) ) {
+					litespeed_finish_request();
+				}
+				$self->process_guest_post_submit_async( $event_payload );
+			},
+			99
+		);
 
 		wp_send_json_success(
 			array(
-				'guest_id'             => $guest_id,
-				'uploaded_documents'   => $upload_result,
-				'contract'             => $contract_info,
-				'message'              => __( 'Perfil legal completado. Tu contrato fue generado para revision.', 'arriendo-facil' ),
+				'guest_id'           => $guest_id,
+				'uploaded_documents' => $upload_result,
+				'contract'           => array(
+					'generated' => false,
+					'status'    => 'queued',
+				),
+				'message'            => __( 'Perfil legal recibido. Estamos generando tu contrato en segundo plano y te avisaremos por correo cuando este listo.', 'arriendo-facil' ),
 			)
 		);
+
+		} catch ( Throwable $throwable ) {
+			error_log( 'Arriendo Facil ajax_submit_guest_profile_by_token exception: ' . $throwable->getMessage() . ' | ' . $throwable->getFile() . ':' . $throwable->getLine() );
+			wp_send_json_error(
+				array(
+					'message' => __( 'Error interno procesando tu perfil legal. Intenta nuevamente en unos minutos.', 'arriendo-facil' ),
+				),
+				500
+			);
+		}
 	}
 
 	/**
@@ -908,18 +958,20 @@ class Arriendo_Facil_Guest {
 			error_log( 'Arriendo Facil async lease generation error: ' . $throwable->getMessage() );
 		}
 
-		try {
-			$this->create_or_update_visit_request(
-				isset( $visit_payload['accommodation_id'] ) ? absint( $visit_payload['accommodation_id'] ) : 0,
-				isset( $visit_payload['name'] ) ? (string) $visit_payload['name'] : '',
-				isset( $visit_payload['email'] ) ? (string) $visit_payload['email'] : '',
-				isset( $visit_payload['phone'] ) ? (string) $visit_payload['phone'] : '',
-				isset( $visit_payload['preferred_date'] ) ? (string) $visit_payload['preferred_date'] : '',
-				isset( $visit_payload['preferred_time'] ) ? (string) $visit_payload['preferred_time'] : '',
-				isset( $visit_payload['visit_notes'] ) ? (string) $visit_payload['visit_notes'] : ''
-			);
-		} catch ( Throwable $throwable ) {
-			error_log( 'Arriendo Facil async visit request error: ' . $throwable->getMessage() );
+		if ( ! empty( $visit_payload ) ) {
+			try {
+				$this->create_or_update_visit_request(
+					isset( $visit_payload['accommodation_id'] ) ? absint( $visit_payload['accommodation_id'] ) : 0,
+					isset( $visit_payload['name'] ) ? (string) $visit_payload['name'] : '',
+					isset( $visit_payload['email'] ) ? (string) $visit_payload['email'] : '',
+					isset( $visit_payload['phone'] ) ? (string) $visit_payload['phone'] : '',
+					isset( $visit_payload['preferred_date'] ) ? (string) $visit_payload['preferred_date'] : '',
+					isset( $visit_payload['preferred_time'] ) ? (string) $visit_payload['preferred_time'] : '',
+					isset( $visit_payload['visit_notes'] ) ? (string) $visit_payload['visit_notes'] : ''
+				);
+			} catch ( Throwable $throwable ) {
+				error_log( 'Arriendo Facil async visit request error: ' . $throwable->getMessage() );
+			}
 		}
 
 		if ( '' !== $job_id ) {

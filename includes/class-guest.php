@@ -436,54 +436,24 @@ class Arriendo_Facil_Guest {
 		// Consume the token before responding (one-time use).
 		$this->consume_guest_onboarding_token( isset( $resolved['token_id'] ) ? absint( $resolved['token_id'] ) : 0 );
 
-		// Queue the heavy work (contract generation) to run AFTER the HTTP response
-		// is delivered to the browser, using the PHP shutdown hook.
-		// This prevents blocking the AJAX response on outbound HTTP requests or
-		// slow cron triggers that are common on development/staging servers.
-		$job_id = function_exists( 'wp_generate_password' )
-			? strtolower( wp_generate_password( 20, false, false ) )
-			: strtolower( substr( md5( uniqid( '', true ) ), 0, 20 ) );
-
-		$event_payload = array(
-			'job_id'        => $job_id,
-			'guest_id'      => $guest_id,
-			'lease_payload' => $lease_payload,
-			'visit_payload' => array(),
+		$contract_info = array(
+			'generated' => false,
+			'status'    => 'processed_with_errors',
 		);
 
-		// Store transient so the cron fallback can find the payload.
-		set_transient( 'af_guest_job_' . $job_id, $event_payload, 15 * MINUTE_IN_SECONDS );
-
-		// Schedule WP-Cron as a fallback (fires 30 s after, does NOT make an HTTP
-		// request during this request – no spawn_cron either).
-		wp_schedule_single_event( time() + 30, 'af_process_guest_post_submit', array( $event_payload ) );
-
-		// Primary path: shutdown hook runs the job in this very PHP process,
-		// right after wp_send_json_success() closes the connection.
-		$self = $this;
-		add_action(
-			'shutdown',
-			function () use ( $event_payload, $self ) {
-				// Flush the response to the browser before the heavy work.
-				if ( function_exists( 'fastcgi_finish_request' ) ) {
-					fastcgi_finish_request();
-				} elseif ( function_exists( 'litespeed_finish_request' ) ) {
-					litespeed_finish_request();
-				}
-				$self->process_guest_post_submit_async( $event_payload );
-			},
-			99
-		);
+		try {
+			$contract_info = $this->create_lease_contract_for_guest( $guest_id, $lease_payload );
+			$contract_info['status'] = ! empty( $contract_info['generated'] ) ? 'generated' : 'processed_without_document';
+		} catch ( Throwable $throwable ) {
+			error_log( 'Arriendo Facil sync token submit lease generation error: ' . $throwable->getMessage() );
+		}
 
 		wp_send_json_success(
 			array(
 				'guest_id'           => $guest_id,
 				'uploaded_documents' => $upload_result,
-				'contract'           => array(
-					'generated' => false,
-					'status'    => 'queued',
-				),
-				'message'            => __( 'Perfil legal recibido. Estamos generando tu contrato en segundo plano y te avisaremos por correo cuando este listo.', 'arriendo-facil' ),
+				'contract'           => $contract_info,
+				'message'            => __( 'Perfil legal completado. Tu contrato fue procesado inmediatamente.', 'arriendo-facil' ),
 			)
 		);
 
@@ -697,17 +667,40 @@ class Arriendo_Facil_Guest {
 				'visit_notes'      => $visit_notes,
 			);
 
-			$scheduled = $this->schedule_guest_post_submit_processing( $guest_id, $queue_payload, $visit_request_payload );
 			$contract_info = array(
 				'generated' => false,
-				'status'    => $scheduled ? 'queued' : 'not_queued',
+				'status'    => 'processed_with_errors',
 			);
+			try {
+				$contract_info = $this->create_lease_contract_for_guest( $guest_id, $queue_payload );
+				$contract_info['status'] = ! empty( $contract_info['generated'] ) ? 'generated' : 'processed_without_document';
+			} catch ( Throwable $throwable ) {
+				error_log( 'Arriendo Facil sync guest submit lease generation error (existing): ' . $throwable->getMessage() );
+			}
+
 			$visit_request = array(
-				'saved'          => true,
+				'saved'          => false,
 				'preferred_date' => $visit_preferred_date,
 				'preferred_time' => $visit_preferred_time,
-				'status'         => $scheduled ? 'queued' : 'not_queued',
+				'status'         => 'processed_with_errors',
 			);
+			try {
+				$visit_request_result = $this->create_or_update_visit_request(
+					$accommodation_id,
+					trim( $first_name . ' ' . $last_name ),
+					$email,
+					$phone,
+					$visit_preferred_date,
+					$visit_preferred_time,
+					$visit_notes
+				);
+				if ( is_array( $visit_request_result ) ) {
+					$visit_request = array_merge( $visit_request, $visit_request_result );
+				}
+				$visit_request['status'] = ! empty( $visit_request['saved'] ) ? 'processed' : 'processed_with_errors';
+			} catch ( Throwable $throwable ) {
+				error_log( 'Arriendo Facil sync guest submit visit request error (existing): ' . $throwable->getMessage() );
+			}
 
 			wp_send_json_success(
 				array(
@@ -773,22 +766,45 @@ class Arriendo_Facil_Guest {
 				'visit_notes'      => $visit_notes,
 			);
 
-			$scheduled = $this->schedule_guest_post_submit_processing( $guest_id, $queue_payload, $visit_request_payload );
 			$contract_info = array(
 				'generated' => false,
-				'status'    => $scheduled ? 'queued' : 'not_queued',
+				'status'    => 'processed_with_errors',
 			);
+			try {
+				$contract_info = $this->create_lease_contract_for_guest( $guest_id, $queue_payload );
+				$contract_info['status'] = ! empty( $contract_info['generated'] ) ? 'generated' : 'processed_without_document';
+			} catch ( Throwable $throwable ) {
+				error_log( 'Arriendo Facil sync guest submit lease generation error (new): ' . $throwable->getMessage() );
+			}
+
 			$visit_request = array(
-				'saved'          => true,
+				'saved'          => false,
 				'preferred_date' => $visit_preferred_date,
 				'preferred_time' => $visit_preferred_time,
-				'status'         => $scheduled ? 'queued' : 'not_queued',
+				'status'         => 'processed_with_errors',
 			);
+			try {
+				$visit_request_result = $this->create_or_update_visit_request(
+					$accommodation_id,
+					trim( $first_name . ' ' . $last_name ),
+					$email,
+					$phone,
+					$visit_preferred_date,
+					$visit_preferred_time,
+					$visit_notes
+				);
+				if ( is_array( $visit_request_result ) ) {
+					$visit_request = array_merge( $visit_request, $visit_request_result );
+				}
+				$visit_request['status'] = ! empty( $visit_request['saved'] ) ? 'processed' : 'processed_with_errors';
+			} catch ( Throwable $throwable ) {
+				error_log( 'Arriendo Facil sync guest submit visit request error (new): ' . $throwable->getMessage() );
+			}
 
 			wp_send_json_success(
 				array(
 					'id'      => $guest_id,
-					'message' => __( 'Registro enviado. Estamos procesando tu contrato y visita en segundo plano.', 'arriendo-facil' ),
+					'message' => __( 'Registro enviado. El contrato y la solicitud de visita se procesaron inmediatamente.', 'arriendo-facil' ),
 					'contract' => $contract_info,
 					'visit_request' => $visit_request,
 				)
@@ -852,15 +868,27 @@ class Arriendo_Facil_Guest {
 		$job_key = 'af_guest_job_' . $job_id;
 		set_transient( $job_key, $event_payload, 15 * MINUTE_IN_SECONDS );
 
-		$http_triggered = $this->trigger_guest_post_submit_async_http( $job_id );
+		// Cron fallback: keep an async backup job without forcing loopback HTTP
+		// from this request (that can hang in some servers/environments).
+		$scheduled = wp_schedule_single_event( time() + 30, 'af_process_guest_post_submit', array( $event_payload ) );
 
-		$scheduled = wp_schedule_single_event( time() + 2, 'af_process_guest_post_submit', array( $event_payload ) );
+		// Primary path: execute right after this HTTP response is flushed.
+		$self = $this;
+		add_action(
+			'shutdown',
+			function () use ( $event_payload, $self ) {
+				if ( function_exists( 'fastcgi_finish_request' ) ) {
+					fastcgi_finish_request();
+				} elseif ( function_exists( 'litespeed_finish_request' ) ) {
+					litespeed_finish_request();
+				}
 
-		if ( false !== $scheduled && function_exists( 'spawn_cron' ) ) {
-			spawn_cron( time() );
-		}
+				$self->process_guest_post_submit_async( $event_payload );
+			},
+			99
+		);
 
-		return $http_triggered || false !== $scheduled;
+		return true;
 	}
 
 	/**

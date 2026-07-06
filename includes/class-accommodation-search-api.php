@@ -246,10 +246,6 @@ class Arriendo_Facil_Accommodation_Search_API {
 				)
 			WHERE p.post_type = 'accommodation'
 			  AND p.post_status = 'publish'
-			  AND p.ID NOT IN (
-			  	SELECT post_id FROM {$wpdb->postmeta}
-			  	WHERE meta_key = '_af_is_occupied' AND meta_value = '1'
-			  )
 			GROUP BY p.ID, p.post_title, p.post_name, p.post_date
 			ORDER BY p.post_date DESC
 			LIMIT 500"
@@ -370,6 +366,7 @@ class Arriendo_Facil_Accommodation_Search_API {
 			'image_url'             => $image_url,
 			'url'                   => get_permalink( (int) $row->ID ),
 			'amenities'             => $amenities,
+			'is_occupied'           => '1' === (string) ( $row->is_occupied ?? '' ),
 		);
 	}
 

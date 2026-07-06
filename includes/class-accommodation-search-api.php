@@ -232,6 +232,7 @@ class Arriendo_Facil_Accommodation_Search_API {
 				MAX(CASE WHEN pm.meta_key = '_af_commercial_status'     THEN pm.meta_value END) AS commercial_status,
 				MAX(CASE WHEN pm.meta_key = '_af_commercial_state'      THEN pm.meta_value END) AS commercial_state,
 				MAX(CASE WHEN pm.meta_key = '_af_commercial_visibility' THEN pm.meta_value END) AS commercial_visibility,
+				MAX(CASE WHEN pm.meta_key = '_af_is_occupied'           THEN pm.meta_value END) AS is_occupied,
 				MAX(CASE WHEN pm.meta_key = '_thumbnail_id'             THEN pm.meta_value END) AS thumbnail_id
 			FROM {$wpdb->posts} p
 			LEFT JOIN {$wpdb->postmeta} pm
@@ -241,10 +242,14 @@ class Arriendo_Facil_Accommodation_Search_API {
 					'_af_bedrooms','_af_bathrooms','_af_monthly_rent',
 					'_af_property_type','_af_amenities','_af_status',
 					'_af_commercial_status','_af_commercial_state','_af_commercial_visibility',
-					'_thumbnail_id'
+					'_af_is_occupied','_thumbnail_id'
 				)
 			WHERE p.post_type = 'accommodation'
 			  AND p.post_status = 'publish'
+			  AND p.ID NOT IN (
+			  	SELECT post_id FROM {$wpdb->postmeta}
+			  	WHERE meta_key = '_af_is_occupied' AND meta_value = '1'
+			  )
 			GROUP BY p.ID, p.post_title, p.post_name, p.post_date
 			ORDER BY p.post_date DESC
 			LIMIT 500"

@@ -1,0 +1,159 @@
+/* Occupied Accommodations Badge and Overlay Styles */
+
+.af-occupied-overlay {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background-color: rgba(0, 0, 0, 0.6);
+	backdrop-filter: blur(2px);
+	z-index: 10;
+	border-radius: 4px;
+}
+
+.af-occupied-badge {
+	background-color: #dc2626;
+	color: white;
+	font-weight: 700;
+	font-size: 16px;
+	padding: 10px 20px;
+	border-radius: 4px;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* Featured Accommodation with Occupied State */
+
+.af-featured-accommodation {
+	position: relative;
+	border-radius: 8px;
+	overflow: hidden;
+	transition: opacity 0.2s ease-in-out;
+}
+
+.af-featured-accommodation--occupied {
+	opacity: 0.75;
+}
+
+.af-featured-accommodation-image {
+	position: relative;
+	overflow: hidden;
+}
+
+.af-featured-accommodation-image a {
+	display: block;
+}
+
+.af-featured-accommodation-image img {
+	display: block;
+	width: 100%;
+	height: auto;
+}
+
+/* Occupied Accommodations Section */
+
+.af-occupied-accommodations {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+	gap: 24px;
+	padding: 20px 0;
+}
+
+.af-occupied-accommodation {
+	border: 1px solid #e5e7eb;
+	border-radius: 8px;
+	overflow: hidden;
+	background-color: #f9fafb;
+	transition: transform 0.2s ease-in-out;
+}
+
+.af-occupied-accommodation:hover {
+	transform: translateY(2px);
+}
+
+.af-occupied-accommodation-image {
+	position: relative;
+	width: 100%;
+	height: 200px;
+	overflow: hidden;
+	background-color: #e5e7eb;
+}
+
+.af-occupied-accommodation-image img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.af-occupied-accommodation-content {
+	padding: 16px;
+}
+
+.af-occupied-accommodation-content h3 {
+	margin: 0 0 8px;
+	font-size: 18px;
+	font-weight: 600;
+	color: #1f2937;
+	line-height: 1.4;
+}
+
+.af-occupied-accommodation-content p {
+	margin: 0 0 12px;
+	color: #6b7280;
+	font-size: 14px;
+}
+
+.af-occupied-accommodation-content ul {
+	list-style: none;
+	padding: 0;
+	margin: 0 0 16px;
+}
+
+.af-occupied-accommodation-content li {
+	padding: 4px 0;
+	color: #4b5563;
+	font-size: 14px;
+}
+
+.af-occupied-accommodation-content .button {
+	width: 100%;
+	padding: 10px 16px;
+	text-align: center;
+	background-color: #e5e7eb;
+	color: #6b7280;
+	border: 1px solid #d1d5db;
+	border-radius: 4px;
+	font-size: 14px;
+	font-weight: 500;
+	cursor: not-allowed;
+}
+
+.af-occupied-accommodation-content .button-disabled {
+	opacity: 0.7;
+	pointer-events: none;
+}
+
+/* Mobile Responsive */
+
+@media (max-width: 768px) {
+	.af-occupied-accommodations {
+		grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+		gap: 16px;
+	}
+
+	.af-occupied-badge {
+		font-size: 14px;
+		padding: 8px 16px;
+	}
+}
+
+@media (max-width: 480px) {
+	.af-occupied-accommodations {
+		grid-template-columns: 1fr;
+	}
+}

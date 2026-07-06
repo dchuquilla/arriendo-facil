@@ -28,8 +28,11 @@ class Arriendo_Facil_Accommodation {
 		add_action( 'edit_form_after_title', array( $this, 'render_editor_intro' ) );
 		add_filter( 'admin_post_thumbnail_html', array( $this, 'customize_thumbnail_label' ), 10, 3 );
 		add_action( 'pre_get_posts', array( $this, 'force_home_queries_to_accommodations' ) );
+		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_frontend_styles' ) );
 		add_shortcode( 'af_propiedad_destacada', array( $this, 'render_featured_accommodation_shortcode' ) );
 		add_shortcode( 'propiedad_destacada', array( $this, 'render_featured_accommodation_shortcode' ) );
+		add_shortcode( 'af_acomodaciones_ocupadas', array( $this, 'render_occupied_accommodations_shortcode' ) );
+		add_shortcode( 'acomodaciones_ocupadas', array( $this, 'render_occupied_accommodations_shortcode' ) );
 		add_shortcode( 'af_propiedades_gestion', array( $this, 'render_managed_accommodations_shortcode' ) );
 		add_shortcode( 'propiedades_bajo_gestion', array( $this, 'render_managed_accommodations_shortcode' ) );
 		add_shortcode( 'accommodations', array( $this, 'render_managed_accommodations_shortcode' ) );
@@ -153,6 +156,18 @@ class Arriendo_Facil_Accommodation {
 		);
 
 		register_post_type( 'accommodation', $args );
+	}
+
+	/**
+	 * Enqueues frontend styles for occupied accommodations.
+	 */
+	public function enqueue_frontend_styles() {
+		wp_register_style(
+			'af-occupied-badge-style',
+			ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/accommodations-occupied.css',
+			array(),
+			ARRIENDO_FACIL_VERSION
+		);
 	}
 
 	/**
@@ -492,27 +507,43 @@ class Arriendo_Facil_Accommodation {
 		update_meta_cache( 'post', wp_list_pluck( $accommodations, 'ID' ) );
 
 		ob_start();
+		wp_enqueue_style( 'af-occupied-badge-style' );
 		?>
 		<div class="af-featured-accommodations" aria-live="polite">
 			<?php foreach ( $accommodations as $accommodation ) : ?>
 				<?php
-				$address      = (string) get_post_meta( $accommodation->ID, '_af_address', true );
-				$bedrooms     = (int) get_post_meta( $accommodation->ID, '_af_bedrooms', true );
-				$bathrooms    = (int) get_post_meta( $accommodation->ID, '_af_bathrooms', true );
-				$monthly_rent = (string) get_post_meta( $accommodation->ID, '_af_monthly_rent', true );
-				$details_url  = get_permalink( $accommodation->ID );
+				$address       = (string) get_post_meta( $accommodation->ID, '_af_address', true );
+				$bedrooms      = (int) get_post_meta( $accommodation->ID, '_af_bedrooms', true );
+				$bathrooms     = (int) get_post_meta( $accommodation->ID, '_af_bathrooms', true );
+				$monthly_rent  = (string) get_post_meta( $accommodation->ID, '_af_monthly_rent', true );
+				$details_url   = get_permalink( $accommodation->ID );
+				$is_occupied   = Arriendo_Facil_Accommodation_Occupied_Admin::is_occupied( $accommodation->ID );
+				$article_class = $is_occupied ? 'af-featured-accommodation af-featured-accommodation--occupied' : 'af-featured-accommodation';
 				?>
-				<article class="af-featured-accommodation">
+				<article class="<?php echo esc_attr( $article_class ); ?>">
 					<?php if ( has_post_thumbnail( $accommodation->ID ) ) : ?>
-						<div class="af-featured-accommodation-image">
-							<a href="<?php echo esc_url( $details_url ); ?>">
+						<?php if ( $is_occupied ) : ?>
+							<div class="af-featured-accommodation-image">
 								<?php echo get_the_post_thumbnail( $accommodation->ID, 'large' ); ?>
-							</a>
-						</div>
+								<div class="af-occupied-overlay">
+									<span class="af-occupied-badge"><?php esc_html_e( 'Ocupada', 'arriendo-facil' ); ?></span>
+								</div>
+							</div>
+						<?php else : ?>
+							<div class="af-featured-accommodation-image">
+								<a href="<?php echo esc_url( $details_url ); ?>">
+									<?php echo get_the_post_thumbnail( $accommodation->ID, 'large' ); ?>
+								</a>
+							</div>
+						<?php endif; ?>
 					<?php endif; ?>
 					<div class="af-featured-accommodation-content">
 						<h3>
-							<a href="<?php echo esc_url( $details_url ); ?>"><?php echo esc_html( get_the_title( $accommodation->ID ) ); ?></a>
+							<?php if ( $is_occupied ) : ?>
+								<span><?php echo esc_html( get_the_title( $accommodation->ID ) ); ?></span>
+							<?php else : ?>
+								<a href="<?php echo esc_url( $details_url ); ?>"><?php echo esc_html( get_the_title( $accommodation->ID ) ); ?></a>
+							<?php endif; ?>
 						</h3>
 						<?php if ( '' !== $address ) : ?>
 							<p><?php echo esc_html( $address ); ?></p>
@@ -524,7 +555,11 @@ class Arriendo_Facil_Accommodation {
 								<li><?php echo esc_html( sprintf( __( 'Renta mensual: %s', 'arriendo-facil' ), $monthly_rent ) ); ?></li>
 							<?php endif; ?>
 						</ul>
-						<a class="button" href="<?php echo esc_url( $details_url ); ?>"><?php esc_html_e( 'Ver detalles', 'arriendo-facil' ); ?></a>
+						<?php if ( ! $is_occupied ) : ?>
+							<a class="button" href="<?php echo esc_url( $details_url ); ?>"><?php esc_html_e( 'Ver detalles', 'arriendo-facil' ); ?></a>
+						<?php else : ?>
+							<button class="button button-disabled" disabled><?php esc_html_e( 'No disponible', 'arriendo-facil' ); ?></button>
+						<?php endif; ?>
 					</div>
 				</article>
 			<?php endforeach; ?>
@@ -938,6 +973,103 @@ class Arriendo_Facil_Accommodation {
 		}
 
 		return $options;
+	}
+
+	/**
+	 * Renders acomodaciones ocupadas (occupied accommodations).
+	 * Shows them with overlay and disabled state.
+	 *
+	 * @return string
+	 */
+	public function render_occupied_accommodations_shortcode() {
+		$occupied_args = $this->get_occupied_query_args();
+
+		$cache_key   = 'af_occupied_accommodations_' . md5( wp_json_encode( $occupied_args ) );
+		$cached_html = get_transient( $cache_key );
+
+		if ( false !== $cached_html ) {
+			return (string) $cached_html;
+		}
+
+		$accommodations = get_posts(
+			array_merge(
+				array(
+					'post_type'      => 'accommodation',
+					'post_status'    => 'publish',
+					'posts_per_page' => 12,
+					'orderby'        => 'date',
+					'order'          => 'DESC',
+				),
+				$occupied_args
+			)
+		);
+
+		if ( empty( $accommodations ) ) {
+			return '<p>' . esc_html__( 'No hay acomodaciones ocupadas para mostrar.', 'arriendo-facil' ) . '</p>';
+		}
+
+		update_meta_cache( 'post', wp_list_pluck( $accommodations, 'ID' ) );
+
+		ob_start();
+		wp_enqueue_style( 'af-occupied-badge-style' );
+		?>
+		<div class="af-occupied-accommodations" aria-live="polite">
+			<?php foreach ( $accommodations as $accommodation ) : ?>
+				<?php
+				$address      = (string) get_post_meta( $accommodation->ID, '_af_address', true );
+				$bedrooms     = (int) get_post_meta( $accommodation->ID, '_af_bedrooms', true );
+				$bathrooms    = (int) get_post_meta( $accommodation->ID, '_af_bathrooms', true );
+				$monthly_rent = (string) get_post_meta( $accommodation->ID, '_af_monthly_rent', true );
+				?>
+				<article class="af-occupied-accommodation">
+					<?php if ( has_post_thumbnail( $accommodation->ID ) ) : ?>
+						<div class="af-occupied-accommodation-image">
+							<?php echo get_the_post_thumbnail( $accommodation->ID, 'large' ); ?>
+							<div class="af-occupied-overlay">
+								<span class="af-occupied-badge"><?php esc_html_e( 'Ocupada', 'arriendo-facil' ); ?></span>
+							</div>
+						</div>
+					<?php endif; ?>
+					<div class="af-occupied-accommodation-content">
+						<h3><?php echo esc_html( get_the_title( $accommodation->ID ) ); ?></h3>
+						<?php if ( '' !== $address ) : ?>
+							<p><?php echo esc_html( $address ); ?></p>
+						<?php endif; ?>
+						<ul>
+							<li><?php echo esc_html( sprintf( __( 'Dormitorios: %d', 'arriendo-facil' ), $bedrooms ) ); ?></li>
+							<li><?php echo esc_html( sprintf( __( 'Banos: %d', 'arriendo-facil' ), $bathrooms ) ); ?></li>
+							<?php if ( '' !== trim( $monthly_rent ) ) : ?>
+								<li><?php echo esc_html( sprintf( __( 'Renta mensual: %s', 'arriendo-facil' ), $monthly_rent ) ); ?></li>
+							<?php endif; ?>
+						</ul>
+						<button class="button button-disabled" disabled><?php esc_html_e( 'No disponible - Ocupada', 'arriendo-facil' ); ?></button>
+					</div>
+				</article>
+			<?php endforeach; ?>
+		</div>
+		<?php
+
+		$html = (string) ob_get_clean();
+		set_transient( $cache_key, $html, 12 * HOUR_IN_SECONDS );
+
+		return $html;
+	}
+
+	/**
+	 * Returns query args for occupied accommodations (meta-based filtering).
+	 *
+	 * @return array
+	 */
+	private function get_occupied_query_args() {
+		return array(
+			'meta_query' => array(
+				array(
+					'key'     => '_af_is_occupied',
+					'value'   => '1',
+					'compare' => '=',
+				),
+			),
+		);
 	}
 
 }

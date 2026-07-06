@@ -475,11 +475,12 @@ class Arriendo_Facil_Rental_Workflow {
 
 		$this->notify_owner_about_interest( $accommodation_id, __( 'Nueva solicitud de visita recibida.', 'arriendo-facil' ), $guest_name, $guest_email, $guest_phone, $preferred_date, $preferred_time, $notes );
 
+		// Profile link is sent after the admin confirms the visit (via admin panel or ajax_book_visit_slot).
 		wp_send_json_success(
 			array(
-				'status'          => 'visit_requested',
+				'status'           => 'visit_requested',
 				'accommodation_id' => $accommodation_id,
-				'message'         => __( 'Solicitud registrada. Te contactaremos para confirmar la visita.', 'arriendo-facil' ),
+				'message'          => __( 'Solicitud registrada. Te contactaremos para confirmar la visita.', 'arriendo-facil' ),
 			)
 		);
 	}

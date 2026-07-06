@@ -22,8 +22,6 @@ class Arriendo_Facil_Guest {
 	 */
 	public function __construct() {
 		add_action( 'wp_ajax_af_create_guest', array( $this, 'ajax_create_guest' ) );
-		add_action( 'wp_ajax_af_create_guest_frontend', array( $this, 'ajax_create_guest_frontend' ) );
-		add_action( 'wp_ajax_nopriv_af_create_guest_frontend', array( $this, 'ajax_create_guest_frontend' ) );
 		add_action( 'wp_ajax_af_process_guest_post_submit_now', array( $this, 'ajax_process_guest_post_submit_now' ) );
 		add_action( 'wp_ajax_nopriv_af_process_guest_post_submit_now', array( $this, 'ajax_process_guest_post_submit_now' ) );
 		add_action( 'wp_ajax_af_send_guest_profile_link', array( $this, 'ajax_send_guest_profile_link' ) );
@@ -348,6 +346,7 @@ class Arriendo_Facil_Guest {
 		$phone             = isset( $_POST['phone'] ) ? sanitize_text_field( wp_unslash( $_POST['phone'] ) ) : '';
 		$id_number         = isset( $_POST['id_number'] ) ? sanitize_text_field( wp_unslash( $_POST['id_number'] ) ) : '';
 		$rental_start_date = isset( $_POST['rental_start_date'] ) ? sanitize_text_field( wp_unslash( $_POST['rental_start_date'] ) ) : '';
+		$rental_years      = isset( $_POST['rental_years'] ) ? max( 1, min( 20, absint( wp_unslash( $_POST['rental_years'] ) ) ) ) : 1;
 		$personas_viviran  = isset( $_POST['personas_viviran'] ) ? max( 1, absint( wp_unslash( $_POST['personas_viviran'] ) ) ) : 1;
 
 		if ( '' === $name_input ) {
@@ -378,7 +377,7 @@ class Arriendo_Facil_Guest {
 			wp_send_json_error( array( 'message' => __( 'La fecha de inicio debe tener formato YYYY-MM-DD.', 'arriendo-facil' ) ), 400 );
 		}
 
-		$rental_end_date = gmdate( 'Y-m-d', strtotime( '+1 year', strtotime( $rental_start_date ) ) );
+		$rental_end_date = gmdate( 'Y-m-d', strtotime( '+' . $rental_years . ' years', strtotime( $rental_start_date ) ) );
 
 		$name_parts = preg_split( '/\s+/', trim( $name_input ) );
 		$first_name = ! empty( $name_parts[0] ) ? sanitize_text_field( (string) $name_parts[0] ) : '';
@@ -396,7 +395,7 @@ class Arriendo_Facil_Guest {
 				'rental_start_date'     => $rental_start_date,
 				'rental_end_date'       => $rental_end_date,
 				'rental_months'         => null,
-				'rental_years'          => 1,
+				'rental_years'          => $rental_years,
 				'desired_price'         => '',
 				'guarantee_text'        => 'Garantia equivalente a dos (2) meses del canon de arrendamiento',
 				'mascotas'              => 0,
@@ -424,7 +423,7 @@ class Arriendo_Facil_Guest {
 			'rental_start_date' => $rental_start_date,
 			'rental_end_date'   => $rental_end_date,
 			'rental_months'     => 0,
-			'rental_years'      => 1,
+			'rental_years'      => $rental_years,
 			'phone'             => $phone,
 			'id_number'         => $id_number,
 			'mascotas'          => 0,
@@ -462,378 +461,6 @@ class Arriendo_Facil_Guest {
 			wp_send_json_error(
 				array(
 					'message' => __( 'Error interno procesando tu perfil legal. Intenta nuevamente en unos minutos.', 'arriendo-facil' ),
-				),
-				500
-			);
-		}
-	}
-
-	/**
-	 * Creates a new guest record from frontend chatbot via AJAX.
-	 */
-	public function ajax_create_guest_frontend() {
-		if ( false === check_ajax_referer( 'af_guest_frontend_nonce', 'nonce', false ) ) {
-			wp_send_json_error(
-				array(
-					'message' => __( 'Tu sesion expiro. Recarga la pagina y vuelve a intentarlo.', 'arriendo-facil' ),
-				),
-				403
-			);
-		}
-
-		try {
-
-		$name       = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
-		$email      = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
-		$phone      = isset( $_POST['phone'] ) ? sanitize_text_field( wp_unslash( $_POST['phone'] ) ) : '';
-		$id_number  = isset( $_POST['id_number'] ) ? sanitize_text_field( wp_unslash( $_POST['id_number'] ) ) : '';
-		$accommodation_id = isset( $_POST['accommodation_id'] ) ? absint( wp_unslash( $_POST['accommodation_id'] ) ) : 0;
-		$rental_start_date = isset( $_POST['rental_start_date'] ) ? sanitize_text_field( wp_unslash( $_POST['rental_start_date'] ) ) : '';
-		$rental_years      = isset( $_POST['rental_years'] ) ? max( 1, absint( wp_unslash( $_POST['rental_years'] ) ) ) : 1;
-		$visit_preferred_date = isset( $_POST['visit_preferred_date'] ) ? sanitize_text_field( wp_unslash( $_POST['visit_preferred_date'] ) ) : '';
-		$visit_preferred_time = isset( $_POST['visit_preferred_time'] ) ? sanitize_text_field( wp_unslash( $_POST['visit_preferred_time'] ) ) : '';
-		$visit_notes = isset( $_POST['visit_notes'] ) ? sanitize_textarea_field( wp_unslash( $_POST['visit_notes'] ) ) : '';
-		$mascotas   = isset( $_POST['mascotas'] ) ? absint( wp_unslash( $_POST['mascotas'] ) ) : 0;
-		$personas_viviran = isset( $_POST['personas_viviran'] ) ? absint( wp_unslash( $_POST['personas_viviran'] ) ) : 0;
-		$existing_mode = isset( $_POST['existing_mode'] ) ? sanitize_key( wp_unslash( $_POST['existing_mode'] ) ) : '';
-
-		$rental_mode = 'years';
-		$rental_end_date = '';
-		$rental_months = 0;
-		$desired_price = '';
-		$guarantee_text = 'Garantía equivalente a dos (2) meses del canon de arrendamiento';
-		$referencia_personal_1 = '';
-		$referencia_personal_2 = '';
-
-		$name_parts = preg_split( '/\s+/', trim( $name ) );
-		$first_name = ! empty( $name_parts[0] ) ? $name_parts[0] : '';
-		$last_name  = count( $name_parts ) > 1 ? trim( implode( ' ', array_slice( $name_parts, 1 ) ) ) : '';
-
-		if ( ! $first_name || ! $email || ! $phone || ! $id_number ) {
-			wp_send_json_error( array( 'message' => __( 'Faltan campos requeridos.', 'arriendo-facil' ) ) );
-		}
-
-		if ( ! $accommodation_id || 'accommodation' !== get_post_type( $accommodation_id ) ) {
-			wp_send_json_error( array( 'message' => __( 'Debes seleccionar una propiedad o habitacion valida.', 'arriendo-facil' ) ) );
-		}
-
-		if ( class_exists( 'Arriendo_Facil_Rental_Workflow' ) ) {
-			$availability = Arriendo_Facil_Rental_Workflow::get_availability_summary( $accommodation_id, $email );
-			error_log( 'Availability Data: ' . print_r( $availability, true ) );
-			if ( empty( $availability['can_start_flow'] ) ) {
-				$reason_code = isset( $availability['reason_code'] ) ? (string) $availability['reason_code'] : 'accommodation_unavailable';
-				if ( 'requires_visit_booking' !== $reason_code ) {
-					wp_send_json_error(
-						array(
-							'code'         => $reason_code,
-							'message'      => isset( $availability['message'] ) ? (string) $availability['message'] : __( 'La acomodacion no esta disponible para iniciar un nuevo arriendo.', 'arriendo-facil' ),
-							'availability' => $availability,
-						),
-						409
-					);
-				}
-			}
-		}
-
-		if ( 1 !== preg_match( '/^\d{4}-\d{2}-\d{2}$/', $rental_start_date ) ) {
-			wp_send_json_error( array( 'message' => __( 'La fecha de inicio no es valida (formato YYYY-MM-DD).', 'arriendo-facil' ) ) );
-		}
-
-		if ( $rental_years < 1 || $rental_years > 20 ) {
-			wp_send_json_error( array( 'message' => __( 'La duración debe ser entre 1 y 20 años.', 'arriendo-facil' ) ) );
-		}
-
-		$rental_end_date = gmdate( 'Y-m-d', strtotime( '+' . $rental_years . ' years', strtotime( $rental_start_date ) ) );
-
-		if ( ! is_email( $email ) ) {
-			wp_send_json_error( array( 'message' => __( 'Correo invalido.', 'arriendo-facil' ) ) );
-		}
-
-		if ( 1 !== preg_match( '/^[0-9]{10}$/', $phone ) ) {
-			wp_send_json_error( array( 'message' => __( 'Telefono invalido. Debe tener exactamente 10 digitos numericos.', 'arriendo-facil' ) ) );
-		}
-
-		if ( 1 !== preg_match( '/^[0-9]{10}$/', $id_number ) ) {
-			wp_send_json_error( array( 'message' => __( 'Documento invalido. La cedula debe tener exactamente 10 digitos numericos.', 'arriendo-facil' ) ) );
-		}
-
-		if ( $mascotas < 0 || $mascotas > 10 ) {
-			wp_send_json_error( array( 'message' => __( 'Mascotas debe estar entre 0 y 10.', 'arriendo-facil' ) ) );
-		}
-
-		if ( $personas_viviran < 1 || $personas_viviran > 10 ) {
-			wp_send_json_error( array( 'message' => __( 'Personas debe estar entre 1 y 10.', 'arriendo-facil' ) ) );
-		}
-
-		if ( ! $this->is_valid_date( $visit_preferred_date ) ) {
-			wp_send_json_error( array( 'message' => __( 'Debes indicar una fecha valida para la visita (YYYY-MM-DD).', 'arriendo-facil' ) ) );
-		}
-
-		if ( ! $this->is_valid_time( $visit_preferred_time ) || ! $this->is_prudent_visit_time( $visit_preferred_time ) ) {
-			wp_send_json_error( array( 'message' => __( 'La hora sugerida de visita debe estar entre 09:00 y 18:00.', 'arriendo-facil' ) ) );
-		}
-
-		$schema_result = $this->ensure_guest_extra_columns();
-		if ( is_wp_error( $schema_result ) ) {
-			wp_send_json_error( array( 'message' => $schema_result->get_error_message() ) );
-		}
-
-		global $wpdb;
-		$existing_guest = $wpdb->get_row(
-			$wpdb->prepare(
-				"SELECT id, first_name, last_name, email, phone, id_number
-				 FROM {$wpdb->prefix}af_guests
-				 WHERE email = %s
-				 ORDER BY id DESC
-				 LIMIT 1",
-				$email
-			)
-		);
-		$existing_guest_id = ( $existing_guest && isset( $existing_guest->id ) ) ? (int) $existing_guest->id : 0;
-
-		if ( $existing_guest_id > 0 ) {
-			if ( ! in_array( $existing_mode, array( 'reuse', 'refresh' ), true ) ) {
-				wp_send_json_error(
-					array(
-						'code'     => 'af_guest_email_exists',
-						'message'  => __( 'Encontramos una solicitud previa con ese correo.', 'arriendo-facil' ),
-						'existing' => $this->build_masked_guest_snapshot( $existing_guest ),
-					)
-				);
-			}
-
-			$guest_id = $existing_guest_id;
-
-			if ( 'reuse' === $existing_mode ) {
-				$first_name = ! empty( $existing_guest->first_name ) ? sanitize_text_field( (string) $existing_guest->first_name ) : $first_name;
-				$last_name  = ! empty( $existing_guest->last_name ) ? sanitize_text_field( (string) $existing_guest->last_name ) : $last_name;
-				$phone      = ! empty( $existing_guest->phone ) ? sanitize_text_field( (string) $existing_guest->phone ) : $phone;
-				$id_number  = ! empty( $existing_guest->id_number ) ? sanitize_text_field( (string) $existing_guest->id_number ) : $id_number;
-			}
-
-			$updated = $wpdb->update(
-				$wpdb->prefix . 'af_guests',
-				array(
-					'first_name'        => $first_name,
-					'last_name'         => $last_name,
-					'phone'             => $phone,
-					'id_number'         => $id_number,
-					'accommodation_id'  => $accommodation_id,
-					'rental_mode'       => $rental_mode,
-					'rental_start_date' => $rental_start_date ? $rental_start_date : null,
-					'rental_end_date'   => $rental_end_date ? $rental_end_date : null,
-					'rental_months'     => $rental_months ? $rental_months : null,
-					'rental_years'      => $rental_years ? $rental_years : null,
-					'desired_price'     => $desired_price,
-					'guarantee_text'    => $guarantee_text,
-					'mascotas'          => $mascotas,
-					'personas_viviran'  => $personas_viviran,
-				),
-				array( 'id' => $guest_id ),
-				array( '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%d', '%d' ),
-				array( '%d' )
-			);
-
-			if ( false === $updated ) {
-				wp_send_json_error(
-					array(
-						'message' => __( 'No se pudo actualizar la solicitud existente.', 'arriendo-facil' ),
-					)
-				);
-			}
-
-			$queue_payload = array(
-				'accommodation_id'  => $accommodation_id,
-				'rental_mode'       => $rental_mode,
-				'rental_start_date' => $rental_start_date,
-				'rental_end_date'   => $rental_end_date,
-				'rental_months'     => $rental_months,
-				'rental_years'      => $rental_years,
-				'phone'             => $phone,
-				'id_number'         => $id_number,
-				'mascotas'          => $mascotas,
-				'personas_viviran'  => $personas_viviran,
-				'name'              => trim( $first_name . ' ' . $last_name ),
-				'email'             => $email,
-			);
-
-			$visit_request_payload = array(
-				'accommodation_id' => $accommodation_id,
-				'name'             => trim( $first_name . ' ' . $last_name ),
-				'email'            => $email,
-				'phone'            => $phone,
-				'preferred_date'   => $visit_preferred_date,
-				'preferred_time'   => $visit_preferred_time,
-				'visit_notes'      => $visit_notes,
-			);
-
-			$contract_info = array(
-				'generated' => false,
-				'status'    => 'processed_with_errors',
-			);
-			try {
-				$contract_info = $this->create_lease_contract_for_guest( $guest_id, $queue_payload );
-				$contract_info['status'] = ! empty( $contract_info['generated'] ) ? 'generated' : 'processed_without_document';
-			} catch ( Throwable $throwable ) {
-				error_log( 'Arriendo Facil sync guest submit lease generation error (existing): ' . $throwable->getMessage() );
-			}
-
-			$visit_request = array(
-				'saved'          => false,
-				'preferred_date' => $visit_preferred_date,
-				'preferred_time' => $visit_preferred_time,
-				'status'         => 'processed_with_errors',
-			);
-			try {
-				$visit_request_result = $this->create_or_update_visit_request(
-					$accommodation_id,
-					trim( $first_name . ' ' . $last_name ),
-					$email,
-					$phone,
-					$visit_preferred_date,
-					$visit_preferred_time,
-					$visit_notes
-				);
-				if ( is_array( $visit_request_result ) ) {
-					$visit_request = array_merge( $visit_request, $visit_request_result );
-				}
-				$visit_request['status'] = ! empty( $visit_request['saved'] ) ? 'processed' : 'processed_with_errors';
-			} catch ( Throwable $throwable ) {
-				error_log( 'Arriendo Facil sync guest submit visit request error (existing): ' . $throwable->getMessage() );
-			}
-
-			wp_send_json_success(
-				array(
-					'id'      => $guest_id,
-					'message' => 'reuse' === $existing_mode
-						? __( 'Encontramos tus datos y los reutilizamos para continuar tu proceso de arriendo.', 'arriendo-facil' )
-						: __( 'Actualizamos tu informacion y continuamos con tu nuevo proceso de arriendo.', 'arriendo-facil' ),
-					'contract' => $contract_info,
-					'visit_request' => $visit_request,
-				)
-			);
-		}
-
-		$inserted = $wpdb->insert(
-			$wpdb->prefix . 'af_guests',
-			array(
-				'first_name'            => $first_name,
-				'last_name'             => $last_name,
-				'email'                 => $email,
-				'phone'                 => $phone,
-				'id_number'             => $id_number,
-				'accommodation_id'      => $accommodation_id,
-				'rental_mode'           => $rental_mode,
-				'rental_start_date'     => $rental_start_date ? $rental_start_date : null,
-				'rental_end_date'       => $rental_end_date ? $rental_end_date : null,
-				'rental_months'         => $rental_months ? $rental_months : null,
-				'rental_years'          => $rental_years ? $rental_years : null,
-				'desired_price'         => $desired_price,
-				'guarantee_text'        => $guarantee_text,
-				'mascotas'              => $mascotas,
-				'referencia_personal_1' => $referencia_personal_1,
-				'referencia_personal_2' => $referencia_personal_2,
-				'personas_viviran'      => $personas_viviran,
-			),
-			array( '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%d', '%s', '%s', '%d' )
-		);
-
-		if ( $inserted ) {
-			$guest_id = (int) $wpdb->insert_id;
-
-			$queue_payload = array(
-				'accommodation_id'  => $accommodation_id,
-				'rental_mode'       => $rental_mode,
-				'rental_start_date' => $rental_start_date,
-				'rental_end_date'   => $rental_end_date,
-				'rental_months'     => $rental_months,
-				'rental_years'      => $rental_years,
-				'phone'             => $phone,
-				'id_number'         => $id_number,
-				'mascotas'          => $mascotas,
-				'personas_viviran'  => $personas_viviran,
-				'name'              => trim( $first_name . ' ' . $last_name ),
-				'email'             => $email,
-			);
-
-			$visit_request_payload = array(
-				'accommodation_id' => $accommodation_id,
-				'name'             => trim( $first_name . ' ' . $last_name ),
-				'email'            => $email,
-				'phone'            => $phone,
-				'preferred_date'   => $visit_preferred_date,
-				'preferred_time'   => $visit_preferred_time,
-				'visit_notes'      => $visit_notes,
-			);
-
-			$contract_info = array(
-				'generated' => false,
-				'status'    => 'processed_with_errors',
-			);
-			try {
-				$contract_info = $this->create_lease_contract_for_guest( $guest_id, $queue_payload );
-				$contract_info['status'] = ! empty( $contract_info['generated'] ) ? 'generated' : 'processed_without_document';
-			} catch ( Throwable $throwable ) {
-				error_log( 'Arriendo Facil sync guest submit lease generation error (new): ' . $throwable->getMessage() );
-			}
-
-			$visit_request = array(
-				'saved'          => false,
-				'preferred_date' => $visit_preferred_date,
-				'preferred_time' => $visit_preferred_time,
-				'status'         => 'processed_with_errors',
-			);
-			try {
-				$visit_request_result = $this->create_or_update_visit_request(
-					$accommodation_id,
-					trim( $first_name . ' ' . $last_name ),
-					$email,
-					$phone,
-					$visit_preferred_date,
-					$visit_preferred_time,
-					$visit_notes
-				);
-				if ( is_array( $visit_request_result ) ) {
-					$visit_request = array_merge( $visit_request, $visit_request_result );
-				}
-				$visit_request['status'] = ! empty( $visit_request['saved'] ) ? 'processed' : 'processed_with_errors';
-			} catch ( Throwable $throwable ) {
-				error_log( 'Arriendo Facil sync guest submit visit request error (new): ' . $throwable->getMessage() );
-			}
-
-			wp_send_json_success(
-				array(
-					'id'      => $guest_id,
-					'message' => __( 'Registro enviado. El contrato y la solicitud de visita se procesaron inmediatamente.', 'arriendo-facil' ),
-					'contract' => $contract_info,
-					'visit_request' => $visit_request,
-				)
-			);
-		}
-
-		$db_error = isset( $wpdb->last_error ) ? trim( (string) $wpdb->last_error ) : '';
-		if ( '' !== $db_error && false !== stripos( $db_error, 'duplicate' ) && false !== stripos( $db_error, 'email' ) ) {
-			wp_send_json_error(
-				array(
-					'message' => __( 'Ya existe una solicitud con ese correo. Si necesitas actualizar tus datos, contactanos para ayudarte.', 'arriendo-facil' ),
-				)
-			);
-		}
-
-		if ( '' !== $db_error ) {
-			error_log( 'Arriendo Facil guest registration DB error: ' . $db_error );
-		}
-
-		wp_send_json_error(
-			array(
-				'message' => __( 'No se pudo registrar tu solicitud de arriendo. Intenta nuevamente en unos minutos.', 'arriendo-facil' ),
-			)
-		);
-		} catch ( Throwable $throwable ) {
-			error_log( 'Arriendo Facil ajax_create_guest_frontend exception: ' . $throwable->getMessage() );
-			wp_send_json_error(
-				array(
-					'message' => __( 'Error interno procesando tu solicitud. Intenta nuevamente en unos minutos.', 'arriendo-facil' ),
 				),
 				500
 			);

@@ -208,6 +208,7 @@ class Arriendo_Facil_Accommodation_Wizard {
 			'longitude'     => '',
 			'bedrooms'      => 0,
 			'bathrooms'     => 0,
+			'shared_bathroom' => 0,
 			'monthly_rent'  => '',
 			'property_type' => '',
 			'square_meters' => '',
@@ -231,6 +232,7 @@ class Arriendo_Facil_Accommodation_Wizard {
 			$data['longitude']     = get_post_meta( $post_id, '_af_longitude', true );
 			$data['bedrooms']      = (int) get_post_meta( $post_id, '_af_bedrooms', true );
 			$data['bathrooms']     = (int) get_post_meta( $post_id, '_af_bathrooms', true );
+			$data['shared_bathroom'] = (int) get_post_meta( $post_id, '_af_shared_bathroom', true );
 			$data['monthly_rent']  = get_post_meta( $post_id, '_af_monthly_rent', true );
 			$data['property_type'] = get_post_meta( $post_id, '_af_property_type', true );
 			$data['square_meters'] = get_post_meta( $post_id, '_af_square_meters', true );

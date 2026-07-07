@@ -362,6 +362,7 @@ class Arriendo_Facil_Accommodation_Search_API {
 			'price'                 => floatval( $row->monthly_rent ?? 0 ),
 			'bedrooms'              => absint( $row->bedrooms ?? 0 ),
 			'bathrooms'             => absint( $row->bathrooms ?? 0 ),
+			'shared_bathroom'       => (bool) get_post_meta( (int) $row->ID, '_af_shared_bathroom', true ),
 			'property_type'         => (string) ( $row->property_type ?? '' ),
 			'image_url'             => $image_url,
 			'url'                   => get_permalink( (int) $row->ID ),

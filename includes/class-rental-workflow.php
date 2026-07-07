@@ -920,6 +920,13 @@ class Arriendo_Facil_Rental_Workflow {
 		if ( 'rented' === $state ) {
 			update_post_meta( $accommodation_id, '_af_status', 'rented' );
 		}
+
+		// Auto-marcar como ocupada cuando el estado no es 'available'.
+		if ( in_array( $state, array( 'reserved', 'rented' ), true ) ) {
+			update_post_meta( $accommodation_id, '_af_is_occupied', '1' );
+		} elseif ( 'available' === $state && 'public' === $visibility ) {
+			delete_post_meta( $accommodation_id, '_af_is_occupied' );
+		}
 	}
 
 	/**

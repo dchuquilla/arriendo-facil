@@ -58,7 +58,7 @@ class Arriendo_Facil_Owner_Register_API {
 		$owner_id        = $this->normalize_document( $owner_id_type, $owner_id_raw );
 		$client_name     = sanitize_text_field( $request->get_param( 'client_name' ) );
 		$owner_email     = sanitize_email( $request->get_param( 'email' ) );
-		$observations    = sanitize_textarea_field( $request->get_param( 'observations' ) );
+		$observations    = '';
 		$has_legal_agent = 'yes' === $request->get_param( 'has_legal_agent' ) ? 1 : 0;
 
 		if ( ! in_array( $owner_id_type, array( 'cedula', 'ruc', 'pasaporte' ), true ) ) {
@@ -85,13 +85,6 @@ class Arriendo_Facil_Owner_Register_API {
 		if ( ! is_email( $owner_email ) ) {
 			return new WP_REST_Response(
 				array( 'success' => false, 'message' => __( 'Debes ingresar un correo electronico valido.', 'arriendo-facil' ) ),
-				400
-			);
-		}
-
-		if ( ! $observations ) {
-			return new WP_REST_Response(
-				array( 'success' => false, 'message' => __( 'El campo de observaciones es obligatorio.', 'arriendo-facil' ) ),
 				400
 			);
 		}

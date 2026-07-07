@@ -72,53 +72,114 @@ if ( isset( $_POST['af_save_sri_config'] ) ) {
 	elseif ( empty( $email ) || ! is_email( $email ) ) {
 		$af_sri_notice = array( 'type' => 'error', 'msg' => __( '❌ El email para notificaciones es OBLIGATORIO y debe ser válido. El SRI envía las autorizaciones a este correo.', 'arriendo-facil' ) );
 	}
-	// Validate establishment address
-	elseif ( empty( $dir_establecimiento ) ) {
+	// Validate establishment address (owners may have it locked and posted via readonly field).
+	elseif ( empty( $dir_establecimiento ) && '' === trim( (string) $af_current_cfg['dir_establecimiento'] ) ) {
 		$af_sri_notice = array( 'type' => 'error', 'msg' => __( '❌ La dirección del establecimiento es OBLIGATORIA. Debe contener una dirección física real (calle, número, ciudad).', 'arriendo-facil' ) );
 	}
 	else {
-		// For owners: preserve any RUC-derived field that already has a value; only
-		// admins can freely edit these. Owners can still populate an empty field
-		// (e.g. when the RUC lookup couldn't return it) but can't overwrite it.
+		// Read raw posted values (they will be replaced for owners below).
 		$posted_razon      = sanitize_text_field( wp_unslash( $_POST['af_razon_social'] ?? '' ) );
 		$posted_nombre_com = sanitize_text_field( wp_unslash( $_POST['af_nombre_comercial'] ?? '' ) );
 		$posted_dir_matriz = sanitize_text_field( wp_unslash( $_POST['af_dir_matriz'] ?? '' ) );
 		$posted_obligado   = sanitize_text_field( wp_unslash( $_POST['af_obligado_contabilidad'] ?? 'NO' ) );
 		$posted_ambiente   = sanitize_key( wp_unslash( $_POST['af_ambiente'] ?? '1' ) );
 
+		$af_skip_save = false;
+
 		if ( $af_is_owner ) {
-			if ( '' !== trim( (string) $af_current_cfg['razon_social'] ) ) {
-				$posted_razon = (string) $af_current_cfg['razon_social'];
+			// For owners, RUC-derived fields must come from a canonical SRI lookup
+			// (not from the browser), and ambiente is always Production. This prevents
+			// bypass via devtools of the readonly attributes on the UI fields.
+			$sri_data = null;
+			if ( class_exists( 'Arriendo_Facil_SRI_Soap_Client' ) ) {
+				$soap_lookup   = new Arriendo_Facil_SRI_Soap_Client( '2' );
+				$lookup_result = $soap_lookup->consultar_contribuyente( $ruc );
+				if ( ! is_wp_error( $lookup_result ) && is_array( $lookup_result ) ) {
+					$sri_data = $lookup_result;
+				}
 			}
-			if ( '' !== trim( (string) $af_current_cfg['nombre_comercial'] ) ) {
-				$posted_nombre_com = (string) $af_current_cfg['nombre_comercial'];
+
+			// Canonical values from SRI, or fall back to whatever is already stored
+			// (preserves prior successful lookup if SRI is momentarily unavailable).
+			$posted_razon      = ! empty( $sri_data['razon_social'] )         ? (string) $sri_data['razon_social']         : (string) $af_current_cfg['razon_social'];
+			$posted_nombre_com = ! empty( $sri_data['nombre_comercial'] )     ? (string) $sri_data['nombre_comercial']     : (string) $af_current_cfg['nombre_comercial'];
+			$posted_dir_matriz = ! empty( $sri_data['dir_matriz'] )           ? (string) $sri_data['dir_matriz']           : (string) $af_current_cfg['dir_matriz'];
+			$posted_obligado   = ! empty( $sri_data['obligado_contabilidad'] ) ? (string) $sri_data['obligado_contabilidad'] : ( (string) $af_current_cfg['obligado_contabilidad'] ?: 'NO' );
+
+			// dir_establecimiento: prefer SRI, then previously saved, then posted (locked in UI).
+			if ( ! empty( $sri_data['dir_establecimiento'] ) ) {
+				$dir_establecimiento = (string) $sri_data['dir_establecimiento'];
+			} elseif ( '' !== trim( (string) $af_current_cfg['dir_establecimiento'] ) ) {
+				$dir_establecimiento = (string) $af_current_cfg['dir_establecimiento'];
 			}
-			if ( '' !== trim( (string) $af_current_cfg['dir_matriz'] ) ) {
-				$posted_dir_matriz = (string) $af_current_cfg['dir_matriz'];
+
+			// Owners can never toggle ambiente — always Production.
+			$posted_ambiente = '2';
+
+			// Critical field must be present after the merge.
+			if ( '' === trim( $posted_razon ) ) {
+				$af_sri_notice = array(
+					'type' => 'error',
+					'msg'  => __( '❌ No se pudo obtener la información del RUC desde el SRI. Verifica el RUC, tu conexión, o intenta de nuevo en unos minutos.', 'arriendo-facil' ),
+				);
+				$af_skip_save = true;
 			}
-			if ( '' !== trim( (string) $af_current_cfg['obligado_contabilidad'] ) ) {
-				$posted_obligado = (string) $af_current_cfg['obligado_contabilidad'];
-			}
-			// Ambiente: owners cannot change it once set — defaults to whatever admin/lookup left.
-			$posted_ambiente = (string) ( $af_current_cfg['ambiente'] ?? '1' );
 		}
 
-		Arriendo_Facil_SRI_Config::save(
-			array(
-				'ruc'                   => $ruc,
-				'razon_social'          => $posted_razon,
-				'nombre_comercial'      => $posted_nombre_com,
-				'dir_establecimiento'   => $dir_establecimiento,
-				'dir_matriz'            => $posted_dir_matriz,
-				'obligado_contabilidad' => $posted_obligado,
-				'ambiente'              => $posted_ambiente,
-				'email_notificacion'    => sanitize_email( wp_unslash( $_POST['af_email_notificacion'] ?? '' ) ),
-				'sri_soap_timeout'      => (string) absint( wp_unslash( $_POST['af_sri_soap_timeout'] ?? 30 ) ),
-				'sri_soap_max_retries'  => (string) absint( wp_unslash( $_POST['af_sri_soap_max_retries'] ?? 3 ) ),
-			),
-			$af_owner_scope_arg
-		);
-		$af_sri_notice = array( 'type' => 'success', 'msg' => __( 'Configuración guardada.', 'arriendo-facil' ) );
+		if ( ! $af_skip_save ) {
+			// Owners don't render the Advanced section; preserve existing SOAP tuning
+			// values instead of overwriting with defaults on every save.
+			$soap_timeout     = $af_is_owner
+				? (string) ( $af_current_cfg['sri_soap_timeout'] ?? 30 )
+				: (string) absint( wp_unslash( $_POST['af_sri_soap_timeout'] ?? 30 ) );
+			$soap_max_retries = $af_is_owner
+				? (string) ( $af_current_cfg['sri_soap_max_retries'] ?? 3 )
+				: (string) absint( wp_unslash( $_POST['af_sri_soap_max_retries'] ?? 3 ) );
+
+			Arriendo_Facil_SRI_Config::save(
+				array(
+					'ruc'                   => $ruc,
+					'razon_social'          => $posted_razon,
+					'nombre_comercial'      => $posted_nombre_com,
+					'dir_establecimiento'   => $dir_establecimiento,
+					'dir_matriz'            => $posted_dir_matriz,
+					'obligado_contabilidad' => $posted_obligado,
+					'ambiente'              => $posted_ambiente,
+					'email_notificacion'    => sanitize_email( wp_unslash( $_POST['af_email_notificacion'] ?? '' ) ),
+					'sri_soap_timeout'      => $soap_timeout,
+					'sri_soap_max_retries'  => $soap_max_retries,
+				),
+				$af_owner_scope_arg
+			);
+
+			// Owners get a default emission point (001-001) auto-provisioned so they
+			// never have to touch the Puntos de Emisión UI — it's hidden for them.
+			if ( $af_is_owner ) {
+				global $wpdb;
+				$already = (int) $wpdb->get_var(
+					$wpdb->prepare(
+						"SELECT COUNT(*) FROM {$wpdb->prefix}af_emission_points WHERE owner_id = %d",
+						$af_scope_user_id
+					)
+				);
+				if ( 0 === $already ) {
+					$wpdb->insert(
+						$wpdb->prefix . 'af_emission_points',
+						array(
+							'owner_id'               => $af_scope_user_id,
+							'codigo_establecimiento' => '001',
+							'codigo_punto_emision'   => '001',
+							'descripcion'            => __( 'Punto de emisión principal', 'arriendo-facil' ),
+							'activo'                 => 1,
+							'secuencial_actual'      => 1,
+						),
+						array( '%d', '%s', '%s', '%s', '%d', '%d' )
+					);
+				}
+			}
+
+			$af_sri_notice = array( 'type' => 'success', 'msg' => __( 'Configuración guardada.', 'arriendo-facil' ) );
+		}
 	}
 }
 
@@ -305,7 +366,8 @@ if ( isset( $_POST['af_rebuild_chain'] ) ) {
 }
 
 // Save/Add emission point.
-if ( isset( $_POST['af_save_emission_point'] ) ) {
+// Blocked for owners: they get a fixed 001-001 seeded on config save.
+if ( isset( $_POST['af_save_emission_point'] ) && ! $af_is_owner ) {
 	check_admin_referer( 'af_sri_settings_nonce' );
 
 	global $wpdb;
@@ -410,7 +472,9 @@ $af_points_ready     = ! empty( $emission_points );
 		<div class="af-sri-hero__links">
 			<a class="button button-secondary" href="#af-sri-datos-emisor"><?php esc_html_e( '1. Datos del emisor', 'arriendo-facil' ); ?></a>
 			<a class="button button-secondary" href="#af-sri-certificado"><?php esc_html_e( '2. Certificado', 'arriendo-facil' ); ?></a>
-			<a class="button button-secondary" href="#af-sri-puntos"><?php esc_html_e( '3. Puntos de emisión', 'arriendo-facil' ); ?></a>
+			<?php if ( ! $af_is_owner ) : ?>
+				<a class="button button-secondary" href="#af-sri-puntos"><?php esc_html_e( '3. Puntos de emisión', 'arriendo-facil' ); ?></a>
+			<?php endif; ?>
 		</div>
 		<div class="af-sri-status-grid">
 			<div class="af-sri-status-card <?php echo $af_has_emitter_data ? 'is-ready' : 'is-pending'; ?>">
@@ -423,11 +487,13 @@ $af_points_ready     = ! empty( $emission_points );
 				<strong class="af-sri-status-card__value"><?php echo esc_html( $af_cert_ready ? __( 'Listo', 'arriendo-facil' ) : __( 'Pendiente', 'arriendo-facil' ) ); ?></strong>
 				<span class="af-sri-status-card__hint"><?php esc_html_e( 'P12/PFX, contraseña y cadena CA.', 'arriendo-facil' ); ?></span>
 			</div>
+			<?php if ( ! $af_is_owner ) : ?>
 			<div class="af-sri-status-card <?php echo $af_points_ready ? 'is-ready' : 'is-pending'; ?>">
 				<span class="af-sri-status-card__label"><?php esc_html_e( 'Puntos de emisión', 'arriendo-facil' ); ?></span>
 				<strong class="af-sri-status-card__value"><?php echo esc_html( $af_points_ready ? __( 'Configurados', 'arriendo-facil' ) : __( 'Falta crear', 'arriendo-facil' ) ); ?></strong>
 				<span class="af-sri-status-card__hint"><?php esc_html_e( 'Serie y secuencial para facturar.', 'arriendo-facil' ); ?></span>
 			</div>
+			<?php endif; ?>
 		</div>
 	</div>
 
@@ -514,7 +580,7 @@ $af_points_ready     = ! empty( $emission_points );
 				<td>
 					<input type="text" id="af_razon_social" name="af_razon_social"
 						value="<?php echo esc_attr( $cfg['razon_social'] ); ?>"
-						class="large-text" maxlength="300" required <?php echo esc_attr( $af_ro_if_filled( (string) $cfg['razon_social'] ) ); ?> />
+						class="large-text" maxlength="300" required <?php echo esc_attr( $af_readonly_attr ); ?> />
 					<p class="description"><?php esc_html_e( 'Tal como aparece en el RUC del SRI. Auto-completado al consultar el RUC.', 'arriendo-facil' ); ?></p>
 				</td>
 			</tr>
@@ -525,7 +591,7 @@ $af_points_ready     = ! empty( $emission_points );
 				<td>
 					<input type="text" id="af_nombre_comercial" name="af_nombre_comercial"
 						value="<?php echo esc_attr( $cfg['nombre_comercial'] ); ?>"
-						class="large-text" maxlength="300" <?php echo esc_attr( $af_ro_if_filled( (string) $cfg['nombre_comercial'] ) ); ?> />
+						class="large-text" maxlength="300" <?php echo esc_attr( $af_readonly_attr ); ?> />
 					<p class="description" style="color:#666;">
 						<?php esc_html_e( '❌ Opcional. Solo si es diferente a la razón social. Aparece en los comprobantes.', 'arriendo-facil' ); ?>
 					</p>
@@ -538,7 +604,7 @@ $af_points_ready     = ! empty( $emission_points );
 				<td>
 					<input type="text" id="af_dir_establecimiento" name="af_dir_establecimiento"
 						value="<?php echo esc_attr( $cfg['dir_establecimiento'] ); ?>"
-						class="large-text" maxlength="300" placeholder="Ej: Quito, Pichincha, Calle X Nº123" required />
+						class="large-text" maxlength="300" placeholder="Ej: Quito, Pichincha, Calle X Nº123" required <?php echo esc_attr( $af_readonly_attr ); ?> />
 					<p class="description">
 						<?php esc_html_e( 'Dirección física del establecimiento (se extrae del SRI al consultar el RUC). Si está vacía, completa manualmente.', 'arriendo-facil' ); ?>
 					</p>
@@ -552,7 +618,7 @@ $af_points_ready     = ! empty( $emission_points );
 					<?php $af_dir_match = ( ! empty( $cfg['dir_establecimiento'] ) && $cfg['dir_establecimiento'] === $cfg['dir_matriz'] ); ?>
 					<input type="text" id="af_dir_matriz" name="af_dir_matriz"
 						value="<?php echo esc_attr( $cfg['dir_matriz'] ); ?>"
-						class="large-text" maxlength="300" <?php echo esc_attr( $af_ro_if_filled( (string) $cfg['dir_matriz'] ) ); ?> />
+						class="large-text" maxlength="300" <?php echo esc_attr( $af_readonly_attr ); ?> />
 					<p class="description" id="af-dir-matriz-desc">
 						<?php if ( $af_dir_match ) : ?>
 							<span style="color:#2e7d32; font-weight:500;">✓ Igual a la dirección del establecimiento.</span>
@@ -571,14 +637,14 @@ $af_points_ready     = ! empty( $emission_points );
 						<label>
 							<input type="radio" name="af_obligado_contabilidad" value="NO"
 								<?php checked( $cfg['obligado_contabilidad'], 'NO' ); ?>
-								<?php echo $af_is_owner && '' !== trim( (string) $cfg['obligado_contabilidad'] ) ? 'disabled' : ''; ?> />
+								<?php echo esc_attr( $af_disabled_attr ); ?> />
 							<?php esc_html_e( 'NO', 'arriendo-facil' ); ?>
 						</label>
 						&nbsp;&nbsp;
 						<label>
 							<input type="radio" name="af_obligado_contabilidad" value="SI"
 								<?php checked( $cfg['obligado_contabilidad'], 'SI' ); ?>
-								<?php echo $af_is_owner && '' !== trim( (string) $cfg['obligado_contabilidad'] ) ? 'disabled' : ''; ?> />
+								<?php echo esc_attr( $af_disabled_attr ); ?> />
 							<?php esc_html_e( 'SI', 'arriendo-facil' ); ?>
 						</label>
 					</fieldset>
@@ -607,27 +673,37 @@ $af_points_ready     = ! empty( $emission_points );
 			<tr>
 				<th scope="row"><?php esc_html_e( 'Ambiente de emisión', 'arriendo-facil' ); ?></th>
 				<td>
-					<fieldset>
-						<label>
-							<input type="radio" name="af_ambiente" value="1"
-								<?php checked( $cfg['ambiente'], '1' ); ?>
-								<?php echo $af_is_owner ? 'disabled' : ''; ?> />
-							<strong><?php esc_html_e( 'Pruebas (Certificación)', 'arriendo-facil' ); ?></strong>
-							<span class="description"> — <?php esc_html_e( 'Servidor de certificación SRI. Sin validez tributaria.', 'arriendo-facil' ); ?></span>
-						</label>
-						<br />
-						<label>
-							<input type="radio" name="af_ambiente" value="2"
-								<?php checked( $cfg['ambiente'], '2' ); ?>
-								<?php echo $af_is_owner ? 'disabled' : ''; ?> />
-							<strong><?php esc_html_e( 'Producción', 'arriendo-facil' ); ?></strong>
-							<span class="description"> — <?php esc_html_e( 'Servidor productivo SRI. Comprobantes con validez legal.', 'arriendo-facil' ); ?></span>
-						</label>
-					</fieldset>
+					<?php if ( $af_is_owner ) : ?>
+						<fieldset>
+							<label>
+								<input type="radio" name="af_ambiente_display" value="2" checked disabled />
+								<strong><?php esc_html_e( 'Producción', 'arriendo-facil' ); ?></strong>
+								<span class="description"> — <?php esc_html_e( 'Comprobantes con validez legal ante el SRI.', 'arriendo-facil' ); ?></span>
+							</label>
+						</fieldset>
+						<p class="description"><?php esc_html_e( 'Los owners emiten siempre en ambiente de producción.', 'arriendo-facil' ); ?></p>
+					<?php else : ?>
+						<fieldset>
+							<label>
+								<input type="radio" name="af_ambiente" value="1"
+									<?php checked( $cfg['ambiente'], '1' ); ?> />
+								<strong><?php esc_html_e( 'Pruebas (Certificación)', 'arriendo-facil' ); ?></strong>
+								<span class="description"> — <?php esc_html_e( 'Servidor de certificación SRI. Sin validez tributaria.', 'arriendo-facil' ); ?></span>
+							</label>
+							<br />
+							<label>
+								<input type="radio" name="af_ambiente" value="2"
+									<?php checked( $cfg['ambiente'], '2' ); ?> />
+								<strong><?php esc_html_e( 'Producción', 'arriendo-facil' ); ?></strong>
+								<span class="description"> — <?php esc_html_e( 'Servidor productivo SRI. Comprobantes con validez legal.', 'arriendo-facil' ); ?></span>
+							</label>
+						</fieldset>
+					<?php endif; ?>
 				</td>
 			</tr>
 		</table>
 
+		<?php if ( ! $af_is_owner ) : ?>
 		<h2><?php esc_html_e( 'Configuración Avanzada', 'arriendo-facil' ); ?> <span class="description" style="font-size:0.9em;">(Opcional)</span></h2>
 		<p class="description" style="color:#666; margin-bottom:15px;">
 			<?php esc_html_e( 'Parámetros técnicos. Los valores por defecto funcionan para la mayoría de casos. Modifica solo si tienes problemas de conexión.', 'arriendo-facil' ); ?>
@@ -660,6 +736,7 @@ $af_points_ready     = ! empty( $emission_points );
 				</td>
 			</tr>
 		</table>
+		<?php endif; ?>
 
 		<p class="submit">
 			<button type="submit" name="af_save_sri_config" class="button button-primary">
@@ -761,6 +838,7 @@ $af_points_ready     = ! empty( $emission_points );
 	</div>
 
 	<!-- ─── Puntos de Emisión ────────────────────────────────────────────── -->
+	<?php if ( ! $af_is_owner ) : ?>
 	<div class="af-sri-section" id="af-sri-puntos">
 		<div class="af-sri-section__header">
 			<div>
@@ -857,6 +935,7 @@ $af_points_ready     = ! empty( $emission_points );
 		</p>
 	</form>
 	</div>
+	<?php endif; ?>
 
 </div><!-- .wrap -->
 

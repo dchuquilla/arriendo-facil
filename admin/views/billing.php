@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-$billing_capability = apply_filters( 'af_billing_capability', 'manage_options' );
+$billing_capability = apply_filters( 'af_billing_capability', 'af_view_billing' );
 if ( ! current_user_can( (string) $billing_capability ) ) {
 	wp_die( esc_html__( 'No tienes permisos suficientes para acceder a esta página.', 'arriendo-facil' ) );
 }
@@ -76,13 +76,22 @@ if ( isset( $_POST['af_issue_invoice_submit'] ) ) {
 	check_admin_referer( 'af_billing_manual_issue' );
 	$lease_id = isset( $_POST['lease_id'] ) ? absint( wp_unslash( $_POST['lease_id'] ) ) : 0;
 	if ( $lease_id > 0 ) {
-		$manager = new Arriendo_Facil_Billing_Manager();
-		$result  = $manager->issue_lease_invoice( $lease_id );
-		if ( is_wp_error( $result ) ) {
-			$last_action_message = __( 'Error al emitir:', 'arriendo-facil' ) . ' ' . $result->get_error_message();
+		$allowed_lease = true;
+		if ( $is_owner_view ) {
+			$acc_id = (int) $wpdb->get_var( $wpdb->prepare( "SELECT accommodation_id FROM {$wpdb->prefix}af_leases WHERE id = %d LIMIT 1", $lease_id ) );
+			$allowed_lease = $acc_id > 0 && in_array( $acc_id, array_map( 'intval', (array) ( $owner_acc_ids ?? array() ) ), true );
+		}
+		if ( ! $allowed_lease ) {
+			$last_action_message = __( 'No tienes acceso a este contrato.', 'arriendo-facil' );
 		} else {
-			$last_action_message = __( 'Comprobante emitido correctamente.', 'arriendo-facil' );
-			$invoices = $base_invoice_query();
+			$manager = new Arriendo_Facil_Billing_Manager();
+			$result  = $manager->issue_lease_invoice( $lease_id );
+			if ( is_wp_error( $result ) ) {
+				$last_action_message = __( 'Error al emitir:', 'arriendo-facil' ) . ' ' . $result->get_error_message();
+			} else {
+				$last_action_message = __( 'Comprobante emitido correctamente.', 'arriendo-facil' );
+				$invoices = $base_invoice_query();
+			}
 		}
 	}
 }
@@ -91,13 +100,25 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 	check_admin_referer( 'af_billing_retry_invoice' );
 	$invoice_id = isset( $_POST['invoice_id'] ) ? absint( wp_unslash( $_POST['invoice_id'] ) ) : 0;
 	if ( $invoice_id > 0 ) {
-		$manager = new Arriendo_Facil_Billing_Manager();
-		$result  = $manager->retry_invoice( $invoice_id );
-		if ( is_wp_error( $result ) ) {
-			$last_action_message = __( 'Error al reintentar:', 'arriendo-facil' ) . ' ' . $result->get_error_message();
+		$allowed_invoice = true;
+		if ( $is_owner_view ) {
+			$lease_id_for_invoice = (int) $wpdb->get_var( $wpdb->prepare( "SELECT lease_id FROM {$wpdb->prefix}af_electronic_invoices WHERE id = %d LIMIT 1", $invoice_id ) );
+			$acc_id_for_invoice   = $lease_id_for_invoice > 0
+				? (int) $wpdb->get_var( $wpdb->prepare( "SELECT accommodation_id FROM {$wpdb->prefix}af_leases WHERE id = %d LIMIT 1", $lease_id_for_invoice ) )
+				: 0;
+			$allowed_invoice = $acc_id_for_invoice > 0 && in_array( $acc_id_for_invoice, array_map( 'intval', (array) ( $owner_acc_ids ?? array() ) ), true );
+		}
+		if ( ! $allowed_invoice ) {
+			$last_action_message = __( 'No tienes acceso a este comprobante.', 'arriendo-facil' );
 		} else {
-			$last_action_message = __( 'Reintento ejecutado correctamente.', 'arriendo-facil' );
-			$invoices = $base_invoice_query();
+			$manager = new Arriendo_Facil_Billing_Manager();
+			$result  = $manager->retry_invoice( $invoice_id );
+			if ( is_wp_error( $result ) ) {
+				$last_action_message = __( 'Error al reintentar:', 'arriendo-facil' ) . ' ' . $result->get_error_message();
+			} else {
+				$last_action_message = __( 'Reintento ejecutado correctamente.', 'arriendo-facil' );
+				$invoices = $base_invoice_query();
+			}
 		}
 	}
 }

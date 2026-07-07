@@ -105,7 +105,7 @@ class Arriendo_Facil_Admin {
 			'arriendo-facil',
 			__( 'Facturación Electrónica', 'arriendo-facil' ),
 			__( 'Facturación', 'arriendo-facil' ),
-			(string) apply_filters( 'af_billing_capability', 'manage_options' ),
+			(string) apply_filters( 'af_billing_capability', 'af_view_billing' ),
 			'af-billing',
 			array( $this, 'render_billing' )
 		);
@@ -114,7 +114,7 @@ class Arriendo_Facil_Admin {
 			'arriendo-facil',
 			__( 'Configuración SRI', 'arriendo-facil' ),
 			__( 'Config. SRI', 'arriendo-facil' ),
-			'manage_options',
+			(string) apply_filters( 'af_billing_capability', 'af_view_billing' ),
 			'af-billing-settings',
 			array( $this, 'render_billing_settings' )
 		);

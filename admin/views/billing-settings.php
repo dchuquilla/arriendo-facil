@@ -9,13 +9,37 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-if ( ! current_user_can( 'manage_options' ) ) {
+if ( ! current_user_can( 'af_view_billing' ) && ! current_user_can( 'manage_options' ) ) {
 	wp_die( esc_html__( 'No tienes permisos suficientes para acceder a esta página.', 'arriendo-facil' ) );
 }
 
 if ( ! function_exists( 'check_admin_referer' ) || ! function_exists( 'wp_nonce_field' ) ) {
 	wp_die( esc_html__( 'Error de seguridad: funciones de nonce no disponibles.', 'arriendo-facil' ) );
 }
+
+// ─── Multi-tenant scope resolution ───────────────────────────────────────────
+// Admins operate on the global config (scope 0). Owners operate on their own
+// per-user config (scope = their user_id). All SRI_Config calls in this page
+// are explicitly scoped so the two never collide.
+$af_is_owner        = class_exists( 'Arriendo_Facil_Accommodation' ) && Arriendo_Facil_Accommodation::user_is_owner() && ! current_user_can( 'manage_options' );
+$af_scope_user_id   = $af_is_owner ? (int) get_current_user_id() : 0;
+$af_readonly_attr   = $af_is_owner ? 'readonly' : '';
+$af_disabled_attr   = $af_is_owner ? 'disabled' : '';
+$af_owner_scope_arg = $af_is_owner ? $af_scope_user_id : null;
+
+/**
+ * Owners can only edit a RUC-derived field when it is still empty (i.e. the SRI
+ * RUC lookup was unable to fill it). Once populated, the value is locked.
+ *
+ * @param string $current_value Current stored value.
+ * @return string HTML attribute string (readonly / disabled) or empty.
+ */
+$af_ro_if_filled = function ( string $current_value ) use ( $af_is_owner ): string {
+	if ( ! $af_is_owner ) {
+		return '';
+	}
+	return '' !== trim( $current_value ) ? 'readonly' : '';
+};
 
 // ─── POST handlers ───────────────────────────────────────────────────────────
 
@@ -25,11 +49,18 @@ $af_sri_notice = null;
 if ( isset( $_POST['af_save_sri_config'] ) ) {
 	check_admin_referer( 'af_sri_settings_nonce' );
 
+	// Load the current scoped config so we can protect owner-locked fields.
+	$af_current_cfg = Arriendo_Facil_SRI_Config::get( $af_owner_scope_arg );
+
 	// Normalize first: accept cédula (10 digits) → auto-expand to RUC (append 001).
 	$ruc = Arriendo_Facil_SRI_Config::normalize_ruc(
 		preg_replace( '/\D/', '', sanitize_text_field( wp_unslash( $_POST['af_ruc'] ?? '' ) ) )
 	);
-	$email = sanitize_email( wp_unslash( $_POST['af_email_notificacion'] ?? '' ) );
+	// If owner already has a RUC locked, ignore any attempt to change it via POST.
+	if ( $af_is_owner && '' !== trim( (string) $af_current_cfg['ruc'] ) ) {
+		$ruc = (string) $af_current_cfg['ruc'];
+	}
+	$email               = sanitize_email( wp_unslash( $_POST['af_email_notificacion'] ?? '' ) );
 	$dir_establecimiento = sanitize_text_field( wp_unslash( $_POST['af_dir_establecimiento'] ?? '' ) );
 
 	// Validate RUC
@@ -46,19 +77,46 @@ if ( isset( $_POST['af_save_sri_config'] ) ) {
 		$af_sri_notice = array( 'type' => 'error', 'msg' => __( '❌ La dirección del establecimiento es OBLIGATORIA. Debe contener una dirección física real (calle, número, ciudad).', 'arriendo-facil' ) );
 	}
 	else {
+		// For owners: preserve any RUC-derived field that already has a value; only
+		// admins can freely edit these. Owners can still populate an empty field
+		// (e.g. when the RUC lookup couldn't return it) but can't overwrite it.
+		$posted_razon      = sanitize_text_field( wp_unslash( $_POST['af_razon_social'] ?? '' ) );
+		$posted_nombre_com = sanitize_text_field( wp_unslash( $_POST['af_nombre_comercial'] ?? '' ) );
+		$posted_dir_matriz = sanitize_text_field( wp_unslash( $_POST['af_dir_matriz'] ?? '' ) );
+		$posted_obligado   = sanitize_text_field( wp_unslash( $_POST['af_obligado_contabilidad'] ?? 'NO' ) );
+		$posted_ambiente   = sanitize_key( wp_unslash( $_POST['af_ambiente'] ?? '1' ) );
+
+		if ( $af_is_owner ) {
+			if ( '' !== trim( (string) $af_current_cfg['razon_social'] ) ) {
+				$posted_razon = (string) $af_current_cfg['razon_social'];
+			}
+			if ( '' !== trim( (string) $af_current_cfg['nombre_comercial'] ) ) {
+				$posted_nombre_com = (string) $af_current_cfg['nombre_comercial'];
+			}
+			if ( '' !== trim( (string) $af_current_cfg['dir_matriz'] ) ) {
+				$posted_dir_matriz = (string) $af_current_cfg['dir_matriz'];
+			}
+			if ( '' !== trim( (string) $af_current_cfg['obligado_contabilidad'] ) ) {
+				$posted_obligado = (string) $af_current_cfg['obligado_contabilidad'];
+			}
+			// Ambiente: owners cannot change it once set — defaults to whatever admin/lookup left.
+			$posted_ambiente = (string) ( $af_current_cfg['ambiente'] ?? '1' );
+		}
+
 		Arriendo_Facil_SRI_Config::save(
 			array(
 				'ruc'                   => $ruc,
-				'razon_social'          => sanitize_text_field( wp_unslash( $_POST['af_razon_social'] ?? '' ) ),
-				'nombre_comercial'      => sanitize_text_field( wp_unslash( $_POST['af_nombre_comercial'] ?? '' ) ),
-				'dir_establecimiento'   => sanitize_text_field( wp_unslash( $_POST['af_dir_establecimiento'] ?? '' ) ),
-				'dir_matriz'            => sanitize_text_field( wp_unslash( $_POST['af_dir_matriz'] ?? '' ) ),
-				'obligado_contabilidad' => sanitize_text_field( wp_unslash( $_POST['af_obligado_contabilidad'] ?? 'NO' ) ),
-				'ambiente'              => sanitize_key( wp_unslash( $_POST['af_ambiente'] ?? '1' ) ),
+				'razon_social'          => $posted_razon,
+				'nombre_comercial'      => $posted_nombre_com,
+				'dir_establecimiento'   => $dir_establecimiento,
+				'dir_matriz'            => $posted_dir_matriz,
+				'obligado_contabilidad' => $posted_obligado,
+				'ambiente'              => $posted_ambiente,
 				'email_notificacion'    => sanitize_email( wp_unslash( $_POST['af_email_notificacion'] ?? '' ) ),
 				'sri_soap_timeout'      => (string) absint( wp_unslash( $_POST['af_sri_soap_timeout'] ?? 30 ) ),
 				'sri_soap_max_retries'  => (string) absint( wp_unslash( $_POST['af_sri_soap_max_retries'] ?? 3 ) ),
-			)
+			),
+			$af_owner_scope_arg
 		);
 		$af_sri_notice = array( 'type' => 'success', 'msg' => __( 'Configuración guardada.', 'arriendo-facil' ) );
 	}
@@ -69,8 +127,17 @@ if ( isset( $_POST['af_upload_certificate'] ) ) {
 	check_admin_referer( 'af_sri_settings_nonce' );
 	$uploaded_new_certificate = false;
 
-	if ( ! empty( $_FILES['af_cert_file']['name'] ) ) {
-		$upload_result = Arriendo_Facil_SRI_Config::upload_certificate( $_FILES['af_cert_file'] );
+	// Verify the RUC is already saved for this scope — cert-vs-RUC check needs it.
+	$af_cfg_precheck = Arriendo_Facil_SRI_Config::get( $af_owner_scope_arg );
+	$af_ruc_precheck = (string) ( $af_cfg_precheck['ruc'] ?? '' );
+
+	if ( '' === trim( $af_ruc_precheck ) ) {
+		$af_sri_notice = array(
+			'type' => 'error',
+			'msg'  => __( '❌ Antes de subir el certificado debe guardar el RUC del emisor. La firma digital se valida contra el RUC configurado.', 'arriendo-facil' ),
+		);
+	} elseif ( ! empty( $_FILES['af_cert_file']['name'] ) ) {
+		$upload_result = Arriendo_Facil_SRI_Config::upload_certificate( $_FILES['af_cert_file'], $af_owner_scope_arg );
 		if ( is_wp_error( $upload_result ) ) {
 			$af_sri_notice = array( 'type' => 'error', 'msg' => $upload_result->get_error_message() );
 		} else {
@@ -83,16 +150,16 @@ if ( isset( $_POST['af_upload_certificate'] ) ) {
 	$new_password = (string) wp_unslash( $_POST['af_cert_password'] ?? '' );
 	$password_for_processing = '';
 	if ( '' !== $new_password ) {
-		Arriendo_Facil_SRI_Config::save_cert_password( $new_password );
+		Arriendo_Facil_SRI_Config::save_cert_password( $new_password, $af_owner_scope_arg );
 		$password_for_processing = $new_password;
 	} elseif ( $uploaded_new_certificate ) {
-		$password_for_processing = Arriendo_Facil_SRI_Config::cert_password();
+		$password_for_processing = Arriendo_Facil_SRI_Config::cert_password( $af_owner_scope_arg );
 	}
 
 	$should_process_p12 = $uploaded_new_certificate || ( '' !== $new_password );
 	if ( $should_process_p12 ) {
 		// Extract PEMs from the P12 and store them encrypted.
-		$cert_path = Arriendo_Facil_SRI_Config::cert_path();
+		$cert_path = Arriendo_Facil_SRI_Config::cert_path( $af_owner_scope_arg );
 		if ( $cert_path && '' !== $password_for_processing ) {
 			$p12_result = Arriendo_Facil_SRI_Config::read_p12( $cert_path, $password_for_processing );
 			if ( is_wp_error( $p12_result ) ) {
@@ -106,33 +173,60 @@ if ( isset( $_POST['af_upload_certificate'] ) ) {
 					'msg'  => __( 'El certificado no contiene los datos esperados (certificado + clave privada).', 'arriendo-facil' ),
 				);
 			} else {
-				$chain = $p12_result['chain'] ?? '';
-				if ( '' === trim( $chain ) ) {
-					$chain = Arriendo_Facil_SRI_Config::fetch_ca_chain( $p12_result['cert'] );
-				}
-				Arriendo_Facil_SRI_Config::save_cert_pems( $p12_result['cert'], $p12_result['pkey'], $chain );
-				$chain_count = ( '' !== trim( $chain ) ) ? preg_match_all( '/-----BEGIN CERTIFICATE-----/', $chain ) : 0;
-				if ( (int) $chain_count > 0 ) {
-					$msg           = sprintf(
-						__( 'Certificado subido y verificado. ✓ Cadena CA: %d certificado(s) intermedio(s) obtenidos.', 'arriendo-facil' ),
-						$chain_count
-					);
-					$af_sri_notice = array( 'type' => 'success', 'msg' => $msg );
-				} else {
-					// Chain is empty — save what we have and warn loudly.
-					// Without the CA chain the SRI will return FIRMA INVALIDA (error 39)
-					// "El certificado firmante no es válido" at authorization time.
+				// ── Cert-vs-RUC validation (security). Rejects certificates that do not
+				// belong to the configured RUC. Applied to admins and owners alike so
+				// nobody can sign SRI invoices with a foreign identity by mistake.
+				$identity_check = Arriendo_Facil_SRI_Config::validate_cert_matches_ruc(
+					$p12_result['cert'],
+					$af_ruc_precheck
+				);
+				if ( is_wp_error( $identity_check ) ) {
+					// Wipe the just-uploaded file and any stored cert metadata so a
+					// mismatched certificate never sits around ready to be trusted.
+					$bad_path = Arriendo_Facil_SRI_Config::cert_path( $af_owner_scope_arg );
+					if ( $bad_path && file_exists( $bad_path ) ) {
+						@unlink( $bad_path );
+					}
+					$cfg_reset                          = Arriendo_Facil_SRI_Config::get( $af_owner_scope_arg );
+					$cfg_reset['cert_filename']         = '';
+					$cfg_reset['cert_pem_enc']          = '';
+					$cfg_reset['pkey_pem_enc']          = '';
+					$cfg_reset['chain_pem_enc']         = '';
+					Arriendo_Facil_SRI_Config::save( $cfg_reset, $af_owner_scope_arg );
+
 					$af_sri_notice = array(
-						'type' => 'warning',
-						'msg'  => __(
-							'⚠️ Certificado subido, pero NO se pudo obtener la cadena de certificados CA intermedios. ' .
-							'Sin esta cadena el SRI rechazará las facturas con "El certificado firmante no es válido" (error 39). ' .
-							'Haz clic en "Reconstruir cadena CA" para intentar descargarla. ' .
-							'Si el botón falla, tu servidor bloquea las salidas HTTPS a los servidores BCE/SecurityData; ' .
-							'contacta a tu hosting para habilitarlas.',
-							'arriendo-facil'
-						),
+						'type' => 'error',
+						'msg'  => $identity_check->get_error_message(),
 					);
+				} else {
+					$chain = $p12_result['chain'] ?? '';
+					if ( '' === trim( $chain ) ) {
+						$chain = Arriendo_Facil_SRI_Config::fetch_ca_chain( $p12_result['cert'] );
+					}
+					Arriendo_Facil_SRI_Config::save_cert_pems( $p12_result['cert'], $p12_result['pkey'], $chain, $af_owner_scope_arg );
+					$chain_count = ( '' !== trim( $chain ) ) ? preg_match_all( '/-----BEGIN CERTIFICATE-----/', $chain ) : 0;
+					if ( (int) $chain_count > 0 ) {
+						$msg           = sprintf(
+							__( 'Certificado subido y verificado. ✓ Cadena CA: %d certificado(s) intermedio(s) obtenidos.', 'arriendo-facil' ),
+							$chain_count
+						);
+						$af_sri_notice = array( 'type' => 'success', 'msg' => $msg );
+					} else {
+						// Chain is empty — save what we have and warn loudly.
+						// Without the CA chain the SRI will return FIRMA INVALIDA (error 39)
+						// "El certificado firmante no es válido" at authorization time.
+						$af_sri_notice = array(
+							'type' => 'warning',
+							'msg'  => __(
+								'⚠️ Certificado subido, pero NO se pudo obtener la cadena de certificados CA intermedios. ' .
+								'Sin esta cadena el SRI rechazará las facturas con "El certificado firmante no es válido" (error 39). ' .
+								'Haz clic en "Reconstruir cadena CA" para intentar descargarla. ' .
+								'Si el botón falla, tu servidor bloquea las salidas HTTPS a los servidores BCE/SecurityData; ' .
+								'contacta a tu hosting para habilitarlas.',
+								'arriendo-facil'
+							),
+						);
+					}
 				}
 			}
 		} elseif ( $uploaded_new_certificate && '' === $password_for_processing ) {
@@ -148,7 +242,7 @@ if ( isset( $_POST['af_upload_certificate'] ) ) {
 if ( isset( $_POST['af_test_certificate'] ) ) {
 	check_admin_referer( 'af_sri_settings_nonce' );
 
-	$test_result = Arriendo_Facil_SRI_Config::test_stored_certificate();
+	$test_result = Arriendo_Facil_SRI_Config::test_stored_certificate( $af_owner_scope_arg );
 	if ( is_wp_error( $test_result ) ) {
 		$af_sri_notice = array( 'type' => 'error', 'msg' => $test_result->get_error_message() );
 	} else {
@@ -163,7 +257,7 @@ if ( isset( $_POST['af_test_certificate'] ) ) {
 if ( isset( $_POST['af_rebuild_chain'] ) ) {
 	check_admin_referer( 'af_sri_settings_nonce' );
 
-	$chain_result = Arriendo_Facil_SRI_Config::rebuild_chain();
+	$chain_result = Arriendo_Facil_SRI_Config::rebuild_chain( $af_owner_scope_arg );
 	if ( is_wp_error( $chain_result ) ) {
 		$error_data = $chain_result->get_error_data();
 		if ( is_array( $error_data ) && ! empty( $error_data['reason'] ) ) {
@@ -197,7 +291,7 @@ if ( isset( $_POST['af_rebuild_chain'] ) ) {
 			'console_log'   => true,
 		);
 	} else {
-		$pems_check  = Arriendo_Facil_SRI_Config::get_cert_pems();
+		$pems_check  = Arriendo_Facil_SRI_Config::get_cert_pems( $af_owner_scope_arg );
 		$chain_count = (int) preg_match_all( '/-----BEGIN CERTIFICATE-----/', $pems_check['chain'] );
 		$af_sri_notice = array(
 			'type' => 'success',
@@ -223,13 +317,26 @@ if ( isset( $_POST['af_save_emission_point'] ) ) {
 	if ( strlen( $estab ) !== 3 || strlen( $punto ) !== 3 ) {
 		$af_sri_notice = array( 'type' => 'error', 'msg' => __( 'Los códigos de establecimiento y punto de emisión deben tener exactamente 3 dígitos.', 'arriendo-facil' ) );
 	} else {
-		$existing = $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT id FROM {$wpdb->prefix}af_emission_points WHERE codigo_establecimiento = %s AND codigo_punto_emision = %s",
-				$estab,
-				$punto
-			)
-		);
+		// Owners can only touch their own emission points; admins operate on the
+		// shared/global (owner_id IS NULL) set.
+		if ( $af_is_owner ) {
+			$existing = $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT id FROM {$wpdb->prefix}af_emission_points WHERE owner_id = %d AND codigo_establecimiento = %s AND codigo_punto_emision = %s",
+					$af_scope_user_id,
+					$estab,
+					$punto
+				)
+			);
+		} else {
+			$existing = $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT id FROM {$wpdb->prefix}af_emission_points WHERE owner_id IS NULL AND codigo_establecimiento = %s AND codigo_punto_emision = %s",
+					$estab,
+					$punto
+				)
+			);
+		}
 
 		if ( $existing ) {
 			$wpdb->update(
@@ -247,13 +354,14 @@ if ( isset( $_POST['af_save_emission_point'] ) ) {
 			$wpdb->insert(
 				$wpdb->prefix . 'af_emission_points',
 				array(
+					'owner_id'               => $af_is_owner ? $af_scope_user_id : null,
 					'codigo_establecimiento' => $estab,
 					'codigo_punto_emision'   => $punto,
 					'descripcion'            => $desc,
 					'activo'                 => $activo,
 					'secuencial_actual'      => 1,
 				),
-				array( '%s', '%s', '%s', '%d', '%d' )
+				array( '%d', '%s', '%s', '%s', '%d', '%d' )
 			);
 			$af_sri_notice = array( 'type' => 'success', 'msg' => __( 'Punto de emisión creado.', 'arriendo-facil' ) );
 		}
@@ -262,8 +370,8 @@ if ( isset( $_POST['af_save_emission_point'] ) ) {
 
 // ─── Load current values ─────────────────────────────────────────────────────
 
-$cfg          = Arriendo_Facil_SRI_Config::get();
-$cert_path    = Arriendo_Facil_SRI_Config::cert_path();
+$cfg          = Arriendo_Facil_SRI_Config::get( $af_owner_scope_arg );
+$cert_path    = Arriendo_Facil_SRI_Config::cert_path( $af_owner_scope_arg );
 $cert_has_pwd = ( '' !== $cfg['cert_password_enc'] );
 $cert_has_pems = ( '' !== $cfg['cert_pem_enc'] && '' !== $cfg['pkey_pem_enc'] );
 // P12 file on disk is only needed to re-extract PEMs; signing uses PEMs from DB.
@@ -271,9 +379,18 @@ $cert_has_pems = ( '' !== $cfg['cert_pem_enc'] && '' !== $cfg['pkey_pem_enc'] );
 $cert_p12_missing    = ( '' !== $cfg['cert_filename'] && '' === $cert_path );
 
 global $wpdb;
-$emission_points = $wpdb->get_results(
-	"SELECT * FROM {$wpdb->prefix}af_emission_points ORDER BY codigo_establecimiento, codigo_punto_emision"
-);
+if ( $af_is_owner ) {
+	$emission_points = $wpdb->get_results(
+		$wpdb->prepare(
+			"SELECT * FROM {$wpdb->prefix}af_emission_points WHERE owner_id = %d ORDER BY codigo_establecimiento, codigo_punto_emision",
+			$af_scope_user_id
+		)
+	);
+} else {
+	$emission_points = $wpdb->get_results(
+		"SELECT * FROM {$wpdb->prefix}af_emission_points WHERE owner_id IS NULL ORDER BY codigo_establecimiento, codigo_punto_emision"
+	);
+}
 
 $af_has_emitter_data = ( '' !== trim( (string) $cfg['ruc'] ) && '' !== trim( (string) $cfg['razon_social'] ) && '' !== trim( (string) $cfg['dir_establecimiento'] ) && '' !== trim( (string) $cfg['email_notificacion'] ) );
 // Cert is ready for signing as long as PEMs and password are in DB (P12 file not required).
@@ -383,7 +500,7 @@ $af_points_ready     = ! empty( $emission_points );
 						value="<?php echo esc_attr( $cfg['ruc'] ); ?>"
 						class="regular-text" maxlength="13" pattern="\d{10,13}"
 						placeholder="1717012890 o 1717012890001"
-						required />
+						required <?php echo esc_attr( $af_ro_if_filled( (string) $cfg['ruc'] ) ); ?> />
 					<button type="button" id="af-ruc-lookup-btn" class="button" style="margin-left:8px;">
 						<?php esc_html_e( '🔍 Consultar en SRI', 'arriendo-facil' ); ?>
 					</button>
@@ -397,7 +514,7 @@ $af_points_ready     = ! empty( $emission_points );
 				<td>
 					<input type="text" id="af_razon_social" name="af_razon_social"
 						value="<?php echo esc_attr( $cfg['razon_social'] ); ?>"
-						class="large-text" maxlength="300" required />
+						class="large-text" maxlength="300" required <?php echo esc_attr( $af_ro_if_filled( (string) $cfg['razon_social'] ) ); ?> />
 					<p class="description"><?php esc_html_e( 'Tal como aparece en el RUC del SRI. Auto-completado al consultar el RUC.', 'arriendo-facil' ); ?></p>
 				</td>
 			</tr>
@@ -408,7 +525,7 @@ $af_points_ready     = ! empty( $emission_points );
 				<td>
 					<input type="text" id="af_nombre_comercial" name="af_nombre_comercial"
 						value="<?php echo esc_attr( $cfg['nombre_comercial'] ); ?>"
-						class="large-text" maxlength="300" />
+						class="large-text" maxlength="300" <?php echo esc_attr( $af_ro_if_filled( (string) $cfg['nombre_comercial'] ) ); ?> />
 					<p class="description" style="color:#666;">
 						<?php esc_html_e( '❌ Opcional. Solo si es diferente a la razón social. Aparece en los comprobantes.', 'arriendo-facil' ); ?>
 					</p>
@@ -435,7 +552,7 @@ $af_points_ready     = ! empty( $emission_points );
 					<?php $af_dir_match = ( ! empty( $cfg['dir_establecimiento'] ) && $cfg['dir_establecimiento'] === $cfg['dir_matriz'] ); ?>
 					<input type="text" id="af_dir_matriz" name="af_dir_matriz"
 						value="<?php echo esc_attr( $cfg['dir_matriz'] ); ?>"
-						class="large-text" maxlength="300" />
+						class="large-text" maxlength="300" <?php echo esc_attr( $af_ro_if_filled( (string) $cfg['dir_matriz'] ) ); ?> />
 					<p class="description" id="af-dir-matriz-desc">
 						<?php if ( $af_dir_match ) : ?>
 							<span style="color:#2e7d32; font-weight:500;">✓ Igual a la dirección del establecimiento.</span>
@@ -453,13 +570,15 @@ $af_points_ready     = ! empty( $emission_points );
 					<fieldset>
 						<label>
 							<input type="radio" name="af_obligado_contabilidad" value="NO"
-								<?php checked( $cfg['obligado_contabilidad'], 'NO' ); ?> />
+								<?php checked( $cfg['obligado_contabilidad'], 'NO' ); ?>
+								<?php echo $af_is_owner && '' !== trim( (string) $cfg['obligado_contabilidad'] ) ? 'disabled' : ''; ?> />
 							<?php esc_html_e( 'NO', 'arriendo-facil' ); ?>
 						</label>
 						&nbsp;&nbsp;
 						<label>
 							<input type="radio" name="af_obligado_contabilidad" value="SI"
-								<?php checked( $cfg['obligado_contabilidad'], 'SI' ); ?> />
+								<?php checked( $cfg['obligado_contabilidad'], 'SI' ); ?>
+								<?php echo $af_is_owner && '' !== trim( (string) $cfg['obligado_contabilidad'] ) ? 'disabled' : ''; ?> />
 							<?php esc_html_e( 'SI', 'arriendo-facil' ); ?>
 						</label>
 					</fieldset>
@@ -491,14 +610,16 @@ $af_points_ready     = ! empty( $emission_points );
 					<fieldset>
 						<label>
 							<input type="radio" name="af_ambiente" value="1"
-								<?php checked( $cfg['ambiente'], '1' ); ?> />
+								<?php checked( $cfg['ambiente'], '1' ); ?>
+								<?php echo $af_is_owner ? 'disabled' : ''; ?> />
 							<strong><?php esc_html_e( 'Pruebas (Certificación)', 'arriendo-facil' ); ?></strong>
 							<span class="description"> — <?php esc_html_e( 'Servidor de certificación SRI. Sin validez tributaria.', 'arriendo-facil' ); ?></span>
 						</label>
 						<br />
 						<label>
 							<input type="radio" name="af_ambiente" value="2"
-								<?php checked( $cfg['ambiente'], '2' ); ?> />
+								<?php checked( $cfg['ambiente'], '2' ); ?>
+								<?php echo $af_is_owner ? 'disabled' : ''; ?> />
 							<strong><?php esc_html_e( 'Producción', 'arriendo-facil' ); ?></strong>
 							<span class="description"> — <?php esc_html_e( 'Servidor productivo SRI. Comprobantes con validez legal.', 'arriendo-facil' ); ?></span>
 						</label>

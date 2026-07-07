@@ -18,8 +18,11 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class Arriendo_Facil_SRI_Config {
 
-	/** WordPress option key that stores all SRI general settings. */
+	/** WordPress option key that stores the ADMIN/global SRI settings. */
 	const OPTION_KEY = 'af_sri_config';
+
+	/** User meta key that stores each OWNER's per-user SRI settings. */
+	const USER_META_KEY = 'af_sri_config';
 
 	/** OpenSSL cipher used to protect the certificate password at rest. */
 	const CIPHER = 'aes-256-cbc';
@@ -33,15 +36,95 @@ class Arriendo_Facil_SRI_Config {
 	/** Prefix for legacy CBC encrypted payloads. */
 	const LEGACY_PREFIX = 'ENC1:';
 
+	// ─── Scope resolution (multi-tenant: admin=global, owner=per-user) ───────
+
+	/**
+	 * Resolves the effective scope user id.
+	 *
+	 * Returns 0 for the admin/global scope (stored in wp_options),
+	 * or a positive user_id for an owner scope (stored in wp_usermeta).
+	 *
+	 * Priority:
+	 * - Explicit $user_id (>0): use that user id (owner scope).
+	 * - Explicit 0:              admin/global scope.
+	 * - null (default):          infer from current user — owners map to their own
+	 *                            user_id; admins/super users map to 0 (global).
+	 *
+	 * @param int|null $user_id Explicit scope override or null to infer from current user.
+	 * @return int 0 for admin/global, positive user_id for owner scope.
+	 */
+	public static function resolve_scope( ?int $user_id = null ): int {
+		if ( null !== $user_id ) {
+			return max( 0, (int) $user_id );
+		}
+
+		if ( ! function_exists( 'get_current_user_id' ) ) {
+			return 0;
+		}
+
+		$current = (int) get_current_user_id();
+		if ( $current <= 0 ) {
+			return 0;
+		}
+
+		// Admins/super users always use the global config unless an explicit user id
+		// is passed. This preserves existing behavior for admin-facing pages.
+		if ( function_exists( 'current_user_can' ) && current_user_can( 'manage_options' ) ) {
+			return 0;
+		}
+
+		// Owners get their own scoped config.
+		if ( class_exists( 'Arriendo_Facil_Accommodation' )
+			&& method_exists( 'Arriendo_Facil_Accommodation', 'user_is_owner' )
+			&& Arriendo_Facil_Accommodation::user_is_owner() ) {
+			return $current;
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Reads the raw stored config array for the given scope (no defaults merged).
+	 *
+	 * @param int $scope 0 for admin/global, positive user_id for owner.
+	 * @return array
+	 */
+	private static function read_storage( int $scope ): array {
+		if ( $scope > 0 ) {
+			$data = get_user_meta( $scope, self::USER_META_KEY, true );
+		} else {
+			$data = get_option( self::OPTION_KEY, array() );
+		}
+		return is_array( $data ) ? $data : array();
+	}
+
+	/**
+	 * Persists the raw stored config array for the given scope.
+	 *
+	 * @param array $data  Raw storage array.
+	 * @param int   $scope 0 for admin/global, positive user_id for owner.
+	 * @return bool
+	 */
+	private static function write_storage( array $data, int $scope ): bool {
+		if ( $scope > 0 ) {
+			$result = update_user_meta( $scope, self::USER_META_KEY, $data );
+			// update_user_meta() returns false when the value is unchanged; treat that as success.
+			return false !== $result;
+		}
+		return (bool) update_option( self::OPTION_KEY, $data );
+	}
+
 	// ─── Config read / write ─────────────────────────────────────────────────
 
 	/**
 	 * Returns the full SRI configuration merged with defaults.
 	 *
+	 * @param int|null $user_id Optional owner scope. null = infer from current user.
 	 * @return array<string, string>
 	 */
-	public static function get(): array {
-		$saved = get_option( self::OPTION_KEY, array() );
+	public static function get( ?int $user_id = null ): array {
+		$scope = self::resolve_scope( $user_id );
+		$saved = self::read_storage( $scope );
 		if ( ! is_array( $saved ) ) {
 			$saved = array();
 		}
@@ -72,15 +155,17 @@ class Arriendo_Facil_SRI_Config {
 	/**
 	 * Persists the general SRI configuration (does NOT touch cert fields).
 	 *
-	 * @param array<string, string> $data Unsanitized input values.
+	 * @param array<string, string> $data    Unsanitized input values.
+	 * @param int|null              $user_id Optional owner scope. null = infer from current user.
 	 * @return bool
 	 */
-	public static function save( array $data ): bool {
+	public static function save( array $data, ?int $user_id = null ): bool {
 		if ( ! is_array( $data ) || empty( $data ) ) {
 			return false;
 		}
 
-		$current = self::get();
+		$scope   = self::resolve_scope( $user_id );
+		$current = self::get( $scope );
 
 		$allowed_text = array(
 			'ruc', 'razon_social', 'nombre_comercial',
@@ -114,23 +199,25 @@ class Arriendo_Facil_SRI_Config {
 			$current['sri_soap_max_retries'] = (string) max( 1, min( 5, $retries ) );
 		}
 
-		return (bool) update_option( self::OPTION_KEY, $current );
+		return self::write_storage( $current, $scope );
 	}
 
 	/**
 	 * Encrypts and persists the certificate password.
 	 * Only updates if a non-empty password is provided.
 	 *
-	 * @param string $plain_password Plain-text P12 password.
+	 * @param string   $plain_password Plain-text P12 password.
+	 * @param int|null $user_id        Optional owner scope. null = infer from current user.
 	 * @return bool
 	 */
-	public static function save_cert_password( string $plain_password ): bool {
+	public static function save_cert_password( string $plain_password, ?int $user_id = null ): bool {
 		if ( '' === trim( $plain_password ) ) {
 			return false;
 		}
-		$current                      = self::get();
+		$scope                        = self::resolve_scope( $user_id );
+		$current                      = self::get( $scope );
 		$current['cert_password_enc'] = self::encrypt_password( $plain_password );
-		return (bool) update_option( self::OPTION_KEY, $current );
+		return self::write_storage( $current, $scope );
 	}
 
 	// ─── Certificate management ──────────────────────────────────────────────
@@ -139,10 +226,11 @@ class Arriendo_Facil_SRI_Config {
 	 * Handles a P12/PFX certificate file upload.
 	 * Validates the file, moves it to the secure directory, and updates config.
 	 *
-	 * @param array $file $_FILES element (e.g. $_FILES['af_cert_file']).
+	 * @param array    $file    $_FILES element (e.g. $_FILES['af_cert_file']).
+	 * @param int|null $user_id Optional owner scope. null = infer from current user.
 	 * @return true|WP_Error
 	 */
-	public static function upload_certificate( array $file ) {
+	public static function upload_certificate( array $file, ?int $user_id = null ) {
 		if ( empty( $file['tmp_name'] ) || ! is_uploaded_file( $file['tmp_name'] ) ) {
 			return new WP_Error( 'no_file', __( 'No se recibió ningún archivo.', 'arriendo-facil' ) );
 		}
@@ -156,7 +244,8 @@ class Arriendo_Facil_SRI_Config {
 			return new WP_Error( 'file_too_large', __( 'El certificado no puede superar 1 MB.', 'arriendo-facil' ) );
 		}
 
-		$cert_dir = self::cert_dir();
+		$scope    = self::resolve_scope( $user_id );
+		$cert_dir = self::cert_dir( $scope );
 		if ( ! $cert_dir ) {
 			return new WP_Error( 'dir_error', __( 'No se pudo crear el directorio seguro para certificados.', 'arriendo-facil' ) );
 		}
@@ -170,7 +259,7 @@ class Arriendo_Facil_SRI_Config {
 		}
 
 		// Remove old certificate file if one existed.
-		$current = self::get();
+		$current = self::get( $scope );
 		if ( ! empty( $current['cert_filename'] ) ) {
 			$old_path = $cert_dir . DIRECTORY_SEPARATOR . basename( (string) $current['cert_filename'] );
 			if ( file_exists( $old_path ) && is_file( $old_path ) ) {
@@ -186,7 +275,7 @@ class Arriendo_Facil_SRI_Config {
 		$current['cert_pem_enc']  = '';
 		$current['pkey_pem_enc']  = '';
 		$current['chain_pem_enc'] = '';
-		if ( ! update_option( self::OPTION_KEY, $current ) ) {
+		if ( ! self::write_storage( $current, $scope ) ) {
 			unlink( $dest_path );
 			return new WP_Error( 'config_error', __( 'No se pudo guardar la configuración del certificado.', 'arriendo-facil' ) );
 		}
@@ -197,24 +286,27 @@ class Arriendo_Facil_SRI_Config {
 	/**
 	 * Returns the absolute path to the active certificate, or empty string if none.
 	 *
+	 * @param int|null $user_id Optional owner scope. null = infer from current user.
 	 * @return string
 	 */
-	public static function cert_path(): string {
-		$config = self::get();
+	public static function cert_path( ?int $user_id = null ): string {
+		$scope  = self::resolve_scope( $user_id );
+		$config = self::get( $scope );
 		if ( empty( $config['cert_filename'] ) ) {
 			return '';
 		}
-		$path = self::cert_dir() . DIRECTORY_SEPARATOR . basename( (string) $config['cert_filename'] );
+		$path = self::cert_dir( $scope ) . DIRECTORY_SEPARATOR . basename( (string) $config['cert_filename'] );
 		return file_exists( $path ) ? $path : '';
 	}
 
 	/**
 	 * Returns the decrypted certificate password, or empty string.
 	 *
+	 * @param int|null $user_id Optional owner scope. null = infer from current user.
 	 * @return string
 	 */
-	public static function cert_password(): string {
-		$config = self::get();
+	public static function cert_password( ?int $user_id = null ): string {
+		$config = self::get( $user_id );
 		if ( empty( $config['cert_password_enc'] ) ) {
 			return '';
 		}
@@ -224,29 +316,32 @@ class Arriendo_Facil_SRI_Config {
 	/**
 	 * Encrypts and persists the extracted PEM certificate, private key, and CA chain.
 	 *
-	 * @param string $cert_pem  PEM-encoded certificate.
-	 * @param string $pkey_pem  PEM-encoded private key.
-	 * @param string $chain_pem PEM-encoded CA chain (concatenated intermediates).
+	 * @param string   $cert_pem  PEM-encoded certificate.
+	 * @param string   $pkey_pem  PEM-encoded private key.
+	 * @param string   $chain_pem PEM-encoded CA chain (concatenated intermediates).
+	 * @param int|null $user_id   Optional owner scope. null = infer from current user.
 	 * @return bool
 	 */
-	public static function save_cert_pems( string $cert_pem, string $pkey_pem, string $chain_pem = '' ): bool {
+	public static function save_cert_pems( string $cert_pem, string $pkey_pem, string $chain_pem = '', ?int $user_id = null ): bool {
 		if ( '' === $cert_pem || '' === $pkey_pem ) {
 			return false;
 		}
-		$current                  = self::get();
+		$scope                    = self::resolve_scope( $user_id );
+		$current                  = self::get( $scope );
 		$current['cert_pem_enc']  = self::protect_sensitive( $cert_pem );
 		$current['pkey_pem_enc']  = self::protect_sensitive( $pkey_pem );
 		$current['chain_pem_enc'] = '' !== $chain_pem ? self::protect_sensitive( $chain_pem ) : '';
-		return (bool) update_option( self::OPTION_KEY, $current );
+		return self::write_storage( $current, $scope );
 	}
 
 	/**
 	 * Returns the decrypted PEM certificate, private key, and CA chain.
 	 *
+	 * @param int|null $user_id Optional owner scope. null = infer from current user.
 	 * @return array{cert: string, pkey: string, chain: string} Empty strings if not available.
 	 */
-	public static function get_cert_pems(): array {
-		$config = self::get();
+	public static function get_cert_pems( ?int $user_id = null ): array {
+		$config = self::get( $user_id );
 		$cert   = '';
 		$pkey   = '';
 		$chain  = '';
@@ -282,10 +377,11 @@ class Arriendo_Facil_SRI_Config {
 	/**
 	 * Validates stored PEM certificate: checks it is complete and not expired.
 	 *
+	 * @param int|null $user_id Optional owner scope. null = infer from current user.
 	 * @return true|WP_Error
 	 */
-	public static function test_stored_certificate() {
-		$pems = self::get_cert_pems();
+	public static function test_stored_certificate( ?int $user_id = null ) {
+		$pems = self::get_cert_pems( $user_id );
 		if ( '' === $pems['cert'] || '' === $pems['pkey'] ) {
 			return new WP_Error( 'no_pems', __( 'No hay datos de certificado almacenados. Suba el certificado nuevamente.', 'arriendo-facil' ) );
 		}
@@ -325,12 +421,118 @@ class Arriendo_Facil_SRI_Config {
 	}
 
 	/**
+	 * Extracts the Ecuadorian cédula/RUC identifier from an X.509 certificate.
+	 *
+	 * Looks for the identifier in (in order of preference):
+	 *  1) subject.serialNumber   (most common in Ecuadorian firmas — BCE, SecurityData)
+	 *  2) subject.UID
+	 *  3) SAN otherName / rfc822Name    (fallback — rare)
+	 *
+	 * Returns only the numeric digits found (10 for cédula, 13 for RUC).
+	 *
+	 * @param string $cert_pem PEM-encoded certificate.
+	 * @return string 10 or 13 digits, or empty string if none could be extracted.
+	 */
+	public static function extract_cert_identifier( string $cert_pem ): string {
+		if ( '' === trim( $cert_pem ) ) {
+			return '';
+		}
+		$info = openssl_x509_parse( $cert_pem );
+		if ( ! is_array( $info ) ) {
+			return '';
+		}
+
+		$candidates = array();
+
+		if ( isset( $info['subject'] ) && is_array( $info['subject'] ) ) {
+			$s = $info['subject'];
+			foreach ( array( 'serialNumber', 'UID', 'uid', 'CN' ) as $key ) {
+				if ( isset( $s[ $key ] ) ) {
+					$val = is_array( $s[ $key ] ) ? implode( ',', $s[ $key ] ) : (string) $s[ $key ];
+					$candidates[] = $val;
+				}
+			}
+		}
+
+		if ( isset( $info['extensions']['subjectAltName'] ) ) {
+			$candidates[] = (string) $info['extensions']['subjectAltName'];
+		}
+
+		foreach ( $candidates as $candidate ) {
+			// Prefer 13-digit RUC over 10-digit cédula when both appear in the same string.
+			if ( preg_match( '/\b(\d{13})\b/', $candidate, $m ) ) {
+				return $m[1];
+			}
+		}
+		foreach ( $candidates as $candidate ) {
+			if ( preg_match( '/\b(\d{10})\b/', $candidate, $m ) ) {
+				return $m[1];
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * Verifies that the certificate's subject identifier matches a configured RUC.
+	 *
+	 * Both values are normalized to a 13-digit RUC before comparison (a 10-digit
+	 * cédula is expanded by appending "001"). This lets a persona-natural cert
+	 * (whose subject.serialNumber contains only the 10-digit cédula) still match
+	 * a configured 13-digit RUC that shares the same cédula prefix.
+	 *
+	 * @param string $cert_pem       PEM-encoded certificate.
+	 * @param string $configured_ruc RUC (10 or 13 digits) currently saved in config.
+	 * @return true|WP_Error true when they match; WP_Error with actionable message otherwise.
+	 */
+	public static function validate_cert_matches_ruc( string $cert_pem, string $configured_ruc ) {
+		$configured_ruc = self::normalize_ruc( $configured_ruc );
+		if ( 13 !== strlen( $configured_ruc ) ) {
+			return new WP_Error(
+				'ruc_not_configured',
+				__( 'No se puede validar el certificado porque el RUC configurado aún no es válido. Complete y guarde el RUC primero.', 'arriendo-facil' )
+			);
+		}
+
+		$cert_id = self::extract_cert_identifier( $cert_pem );
+		if ( '' === $cert_id ) {
+			return new WP_Error(
+				'cert_id_not_found',
+				__( 'No se pudo extraer el número de cédula/RUC del certificado. Verifique que sea un certificado válido emitido por una entidad autorizada.', 'arriendo-facil' )
+			);
+		}
+
+		$cert_ruc = self::normalize_ruc( $cert_id );
+
+		if ( $cert_ruc === $configured_ruc ) {
+			return true;
+		}
+
+		// Persona natural: compare cédula prefixes (first 10 digits) in case one
+		// side stores only the cédula and the other the full RUC.
+		if ( substr( $cert_ruc, 0, 10 ) === substr( $configured_ruc, 0, 10 ) ) {
+			return true;
+		}
+
+		return new WP_Error(
+			'cert_ruc_mismatch',
+			sprintf(
+				/* translators: 1: identifier extracted from the certificate, 2: configured RUC. */
+				__( '❌ El certificado digital pertenece a %1$s pero el RUC configurado es %2$s. Debe subir la firma digital que corresponde exactamente al RUC configurado.', 'arriendo-facil' ),
+				$cert_id,
+				$configured_ruc
+			)
+		);
+	}
+
+	/**
 	 * Returns detailed certificate diagnostics for troubleshooting SRI issues.
 	 *
+	 * @param int|null $user_id Optional owner scope. null = infer from current user.
 	 * @return array{valid: bool, details: array<string, string>}
 	 */
-	public static function certificate_diagnostics(): array {
-		$pems = self::get_cert_pems();
+	public static function certificate_diagnostics( ?int $user_id = null ): array {
+		$pems = self::get_cert_pems( $user_id );
 		if ( '' === $pems['cert'] ) {
 			return array( 'valid' => false, 'details' => array( 'error' => 'No certificate stored' ) );
 		}
@@ -687,10 +889,12 @@ class Arriendo_Facil_SRI_Config {
 	/**
 	 * Fetches the CA chain for the stored certificate and persists it.
 	 *
+	 * @param int|null $user_id Optional owner scope. null = infer from current user.
 	 * @return true|WP_Error
 	 */
-	public static function rebuild_chain() {
-		$pems = self::get_cert_pems();
+	public static function rebuild_chain( ?int $user_id = null ) {
+		$scope = self::resolve_scope( $user_id );
+		$pems  = self::get_cert_pems( $scope );
 		if ( '' === $pems['cert'] ) {
 			return new WP_Error( 'no_cert', __( 'No hay certificado almacenado.', 'arriendo-facil' ) );
 		}
@@ -705,9 +909,9 @@ class Arriendo_Facil_SRI_Config {
 			);
 		}
 
-		$current               = self::get();
+		$current                  = self::get( $scope );
 		$current['chain_pem_enc'] = self::protect_sensitive( $chain );
-		update_option( self::OPTION_KEY, $current );
+		self::write_storage( $current, $scope );
 
 		return true;
 	}
@@ -716,26 +920,50 @@ class Arriendo_Facil_SRI_Config {
 	/**
 	 * Returns the secure directory for P12 certificates, creating it if needed.
 	 *
+	 * Admin/global scope uses WP_CONTENT_DIR/af-certs/. Owner scopes get
+	 * their own subdirectory WP_CONTENT_DIR/af-certs/owner-{user_id}/ so
+	 * that per-owner certificates never collide with the admin's certificate.
+	 *
+	 * @param int|null $user_id Optional owner scope. null = infer from current user.
 	 * @return string Absolute path, or empty string on failure.
 	 */
-	public static function cert_dir(): string {
-		$dir = WP_CONTENT_DIR . '/af-certs';
+	public static function cert_dir( ?int $user_id = null ): string {
+		$scope    = self::resolve_scope( $user_id );
+		$base_dir = WP_CONTENT_DIR . '/af-certs';
 
-		if ( ! file_exists( $dir ) && ! wp_mkdir_p( $dir ) ) {
+		if ( ! file_exists( $base_dir ) && ! wp_mkdir_p( $base_dir ) ) {
 			return '';
 		}
 
-		// Ensure protection files always exist.
-		$htaccess = $dir . '/.htaccess';
+		// Ensure protection files always exist at the base dir.
+		$htaccess = $base_dir . '/.htaccess';
 		if ( ! file_exists( $htaccess ) ) {
 			file_put_contents( $htaccess, "Require all denied\nDeny from all\n" ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
 		}
-		$index = $dir . '/index.php';
+		$index = $base_dir . '/index.php';
 		if ( ! file_exists( $index ) ) {
 			file_put_contents( $index, "<?php // Silence is golden.\n" ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
 		}
 
-		return $dir;
+		if ( $scope <= 0 ) {
+			return $base_dir;
+		}
+
+		$owner_dir = $base_dir . '/owner-' . $scope;
+		if ( ! file_exists( $owner_dir ) && ! wp_mkdir_p( $owner_dir ) ) {
+			return '';
+		}
+		// Redundant protection at the owner subdir (defense in depth).
+		$owner_htaccess = $owner_dir . '/.htaccess';
+		if ( ! file_exists( $owner_htaccess ) ) {
+			file_put_contents( $owner_htaccess, "Require all denied\nDeny from all\n" ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+		}
+		$owner_index = $owner_dir . '/index.php';
+		if ( ! file_exists( $owner_index ) ) {
+			file_put_contents( $owner_index, "<?php // Silence is golden.\n" ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+		}
+
+		return $owner_dir;
 	}
 
 	// ─── RUC validation ──────────────────────────────────────────────────────

@@ -47,6 +47,7 @@ class Arriendo_Facil_Activator {
 				'edit_published_posts',
 				'publish_posts',
 				'delete_posts',
+				'af_view_billing',
 			);
 
 			foreach ( $required_caps as $cap ) {
@@ -54,6 +55,11 @@ class Arriendo_Facil_Activator {
 					$role->add_cap( $cap );
 				}
 			}
+		}
+
+		$admin_role = get_role( 'administrator' );
+		if ( $admin_role instanceof WP_Role && ! $admin_role->has_cap( 'af_view_billing' ) ) {
+			$admin_role->add_cap( 'af_view_billing' );
 		}
 
 		self::sync_existing_owner_users_to_role();
@@ -334,6 +340,7 @@ class Arriendo_Facil_Activator {
 
 			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_emission_points (
 				id                       BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+				owner_id                 BIGINT(20) UNSIGNED DEFAULT NULL COMMENT 'NULL = admin/global, otherwise wp_users.ID del owner',
 				codigo_establecimiento   CHAR(3) NOT NULL DEFAULT '001',
 				codigo_punto_emision     CHAR(3) NOT NULL DEFAULT '001',
 				descripcion              VARCHAR(255) DEFAULT NULL,
@@ -342,7 +349,8 @@ class Arriendo_Facil_Activator {
 				created_at               DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 				updated_at               DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 				PRIMARY KEY (id),
-				UNIQUE KEY uniq_punto (codigo_establecimiento, codigo_punto_emision)
+				UNIQUE KEY uniq_punto_owner (owner_id, codigo_establecimiento, codigo_punto_emision),
+				KEY idx_owner_active (owner_id, activo)
 			) $charset_collate;",
 
 			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_electronic_invoices (
@@ -726,6 +734,57 @@ class Arriendo_Facil_Activator {
 
 		// Seed a default emission point if none exists yet.
 		$emission_table = $wpdb->prefix . 'af_emission_points';
+
+		// ── Multi-tenant upgrade for af_emission_points ────────────────────────
+		// Ensure the owner_id column exists on installs created before v2026-07.
+		$owner_id_col = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+				 WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'owner_id'",
+				DB_NAME,
+				$emission_table
+			)
+		);
+		if ( ! (int) $owner_id_col ) {
+			$wpdb->query( "ALTER TABLE {$emission_table} ADD COLUMN owner_id BIGINT(20) UNSIGNED DEFAULT NULL AFTER id" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		}
+
+		// Replace the legacy unique key (estab, pto_emi) with the owner-aware one so
+		// multiple owners can share the same establishment / emission-point codes.
+		$legacy_unique = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS
+				 WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND INDEX_NAME = 'uniq_punto'",
+				DB_NAME,
+				$emission_table
+			)
+		);
+		if ( (int) $legacy_unique > 0 ) {
+			$wpdb->query( "ALTER TABLE {$emission_table} DROP INDEX uniq_punto" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		}
+		$owner_unique = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS
+				 WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND INDEX_NAME = 'uniq_punto_owner'",
+				DB_NAME,
+				$emission_table
+			)
+		);
+		if ( ! (int) $owner_unique ) {
+			$wpdb->query( "ALTER TABLE {$emission_table} ADD UNIQUE KEY uniq_punto_owner (owner_id, codigo_establecimiento, codigo_punto_emision)" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		}
+		$owner_active_idx = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS
+				 WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND INDEX_NAME = 'idx_owner_active'",
+				DB_NAME,
+				$emission_table
+			)
+		);
+		if ( ! (int) $owner_active_idx ) {
+			$wpdb->query( "ALTER TABLE {$emission_table} ADD KEY idx_owner_active (owner_id, activo)" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		}
+
 		$ep_count       = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$emission_table}" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		if ( 0 === $ep_count ) {
 			$wpdb->insert(

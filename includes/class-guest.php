@@ -377,6 +377,26 @@ class Arriendo_Facil_Guest {
 			wp_send_json_error( array( 'message' => __( 'La fecha de inicio debe tener formato YYYY-MM-DD.', 'arriendo-facil' ) ), 400 );
 		}
 
+		// Validación del nombre completo: solo letras, mínimo dos palabras, sin insultos.
+		$name_trimmed = trim( (string) $name_input );
+		if ( '' === $name_trimmed ) {
+			wp_send_json_error( array( 'message' => __( 'El nombre completo es obligatorio.', 'arriendo-facil' ) ), 400 );
+		}
+		if ( mb_strlen( $name_trimmed ) < 5 || mb_strlen( $name_trimmed ) > 80 ) {
+			wp_send_json_error( array( 'message' => __( 'El nombre debe tener entre 5 y 80 caracteres.', 'arriendo-facil' ) ), 400 );
+		}
+		if ( 1 !== preg_match( '/^[A-Za-zÀ-ÿÑñ]+(?:\s+[A-Za-zÀ-ÿÑñ]+)+$/u', $name_trimmed ) ) {
+			wp_send_json_error( array( 'message' => __( 'Ingresa nombres y apellidos completos, solo letras (mínimo dos palabras).', 'arriendo-facil' ) ), 400 );
+		}
+		$blocked_words = array( 'mierda', 'puta', 'puto', 'carajo', 'maldito', 'maldita', 'estupido', 'estupida', 'idiota', 'pendejo', 'pendeja', 'marica', 'coño', 'cabron', 'cabrón', 'joder', 'gilipollas', 'fuck', 'shit', 'bitch', 'asshole', 'damn' );
+		$name_lower = mb_strtolower( $name_trimmed );
+		foreach ( $blocked_words as $word ) {
+			if ( false !== mb_strpos( $name_lower, $word ) ) {
+				wp_send_json_error( array( 'message' => __( 'El nombre contiene lenguaje no permitido.', 'arriendo-facil' ) ), 400 );
+			}
+		}
+		$name_input = $name_trimmed;
+
 		$rental_end_date = gmdate( 'Y-m-d', strtotime( '+' . $rental_years . ' years', strtotime( $rental_start_date ) ) );
 
 		$name_parts = preg_split( '/\s+/', trim( $name_input ) );
@@ -1225,6 +1245,9 @@ class Arriendo_Facil_Guest {
 		}
 
 		$lease_id = (int) $wpdb->insert_id;
+
+		// Auto-marcar acomodación como ocupada al crear contrato en borrador.
+		update_post_meta( $accommodation_id, '_af_is_occupied', '1' );
 
 		$this->send_tenant_processing_email(
 			isset( $data['email'] ) ? sanitize_email( (string) $data['email'] ) : '',

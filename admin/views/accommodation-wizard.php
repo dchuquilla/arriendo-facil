@@ -250,6 +250,10 @@ $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data[
 								value="<?php echo esc_attr( (string) $data['bathrooms'] ); ?>" class="af-stepper__input" readonly />
 							<button type="button" class="af-stepper__btn af-stepper__btn--plus" aria-label="<?php esc_attr_e( 'Aumentar', 'arriendo-facil' ); ?>">+</button>
 						</div>
+						<label class="af-field__inline-check" style="margin-top:8px;display:flex;align-items:center;gap:6px;font-size:13px;">
+							<input type="checkbox" id="af_shared_bathroom" name="af_shared_bathroom" value="1" <?php checked( ! empty( $data['shared_bathroom'] ) ); ?> />
+							<?php esc_html_e( 'Baño compartido', 'arriendo-facil' ); ?>
+						</label>
 					</div>
 					<div class="af-field">
 						<label class="af-field__label" for="af_square_meters">&#x1F4CF; <?php esc_html_e( 'Metros cuadrados', 'arriendo-facil' ); ?></label>

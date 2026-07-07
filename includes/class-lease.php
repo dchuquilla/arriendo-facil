@@ -291,6 +291,7 @@ class Arriendo_Facil_Lease {
 		);
 
 		if ( $inserted ) {
+			update_post_meta( $accommodation_id, '_af_is_occupied', '1' );
 			wp_send_json_success( array( 'id' => $wpdb->insert_id ) );
 		} else {
 			wp_send_json_error( array( 'message' => __( 'No se pudo crear el contrato.', 'arriendo-facil' ) ) );

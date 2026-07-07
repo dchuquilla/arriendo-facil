@@ -226,7 +226,9 @@
 		setSummary( 'coords', ( lat && lng ) ? ( lat + ', ' + lng ) : '' );
 
 		setSummary( 'af_bedrooms',       val( 'af_bedrooms' ) );
-		setSummary( 'af_bathrooms',      val( 'af_bathrooms' ) );
+		var sharedBath = document.getElementById( 'af_shared_bathroom' );
+		var bathroomsVal = val( 'af_bathrooms' );
+		setSummary( 'af_bathrooms', ( sharedBath && sharedBath.checked ) ? 'Compartido' : bathroomsVal );
 		var sqm = val( 'af_square_meters' );
 		setSummary( 'af_square_meters',  sqm ? sqm + ' m²' : '' );
 		setSummary( 'af_amenities',      getCheckboxLabels( 'af_amenities[]' ).join( ', ' ) );
@@ -322,6 +324,7 @@
 		var plus  = stepper.querySelector( '.af-stepper__btn--plus' );
 		if ( minus ) {
 			minus.addEventListener( 'click', function () {
+				if ( input.disabled ) return;
 				var v = parseInt( input.value, 10 ) || 0;
 				var min = parseInt( input.min || 0, 10 );
 				if ( v > min ) input.value = v - 1;
@@ -329,12 +332,31 @@
 		}
 		if ( plus ) {
 			plus.addEventListener( 'click', function () {
+				if ( input.disabled ) return;
 				var v = parseInt( input.value, 10 ) || 0;
 				var max = parseInt( input.max || 99, 10 );
 				if ( v < max ) input.value = v + 1;
 			} );
 		}
 	} );
+
+	/* ---------- Baño compartido: deshabilita contador de baños ---------- */
+	var sharedBathCb = document.getElementById( 'af_shared_bathroom' );
+	var bathroomsInput = document.getElementById( 'af_bathrooms' );
+	if ( sharedBathCb && bathroomsInput ) {
+		var applySharedBathState = function () {
+			if ( sharedBathCb.checked ) {
+				bathroomsInput.value = 0;
+				bathroomsInput.disabled = true;
+				bathroomsInput.closest( '.af-stepper' ).classList.add( 'is-disabled' );
+			} else {
+				bathroomsInput.disabled = false;
+				bathroomsInput.closest( '.af-stepper' ).classList.remove( 'is-disabled' );
+			}
+		};
+		sharedBathCb.addEventListener( 'change', applySharedBathState );
+		applySharedBathState();
+	}
 
 	/* ---------- Property type & amenity & status visual selection ---------- */
 	root.querySelectorAll( '.af-prop-type-card input[type="radio"]' ).forEach( function ( radio ) {

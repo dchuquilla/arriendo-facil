@@ -242,17 +242,17 @@ $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data[
 							<button type="button" class="af-stepper__btn af-stepper__btn--plus" aria-label="<?php esc_attr_e( 'Aumentar', 'arriendo-facil' ); ?>">+</button>
 						</div>
 					</div>
-					<div class="af-field">
+					<div class="af-field" data-af-bathrooms-field>
 						<label class="af-field__label" for="af_bathrooms">&#x1F6BF; <?php esc_html_e( 'Baños', 'arriendo-facil' ); ?></label>
 						<div class="af-stepper">
 							<button type="button" class="af-stepper__btn af-stepper__btn--minus" aria-label="<?php esc_attr_e( 'Reducir', 'arriendo-facil' ); ?>">&minus;</button>
 							<input type="number" id="af_bathrooms" name="af_bathrooms" min="0" max="20"
-								value="<?php echo esc_attr( (string) $data['bathrooms'] ); ?>" class="af-stepper__input" readonly />
+								value="<?php echo esc_attr( (string) $data['bathrooms'] ); ?>" class="af-stepper__input" readonly<?php echo ! empty( $data['shared_bathroom'] ) ? ' disabled' : ''; ?> />
 							<button type="button" class="af-stepper__btn af-stepper__btn--plus" aria-label="<?php esc_attr_e( 'Aumentar', 'arriendo-facil' ); ?>">+</button>
 						</div>
 						<label class="af-field__inline-check" style="margin-top:8px;display:flex;align-items:center;gap:6px;font-size:13px;">
 							<input type="checkbox" id="af_shared_bathroom" name="af_shared_bathroom" value="1" <?php checked( ! empty( $data['shared_bathroom'] ) ); ?> />
-							<?php esc_html_e( 'Baño compartido', 'arriendo-facil' ); ?>
+							<?php esc_html_e( 'Baño compartido (no cuenta baños privados)', 'arriendo-facil' ); ?>
 						</label>
 					</div>
 					<div class="af-field">

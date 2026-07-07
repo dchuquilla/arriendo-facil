@@ -149,18 +149,34 @@ class Arriendo_Facil_Billing_Manager {
 	 * Useful in tests and for future cleaning service invoices.
 	 *
 	 * @param array $payload Business payload (buyer/items/totals).
-	 * @param array $context Optional context keys: lease_id, cleaning_request_id.
+	 * @param array $context Optional context keys: lease_id, cleaning_request_id, owner_id.
 	 * @return array|WP_Error
 	 */
 	public function issue_from_payload( array $payload, array $context = array() ) {
-		$config = Arriendo_Facil_SRI_Config::get();
-		$pems   = Arriendo_Facil_SRI_Config::get_cert_pems();
+		// Resolve the scope owner_id for this invoice: explicit context, or infer
+		// from the lease's accommodation. This drives which SRI config and cert
+		// are loaded and which emission-point sequence is reserved.
+		$owner_id = isset( $context['owner_id'] ) ? (int) $context['owner_id'] : 0;
+		if ( $owner_id <= 0 && isset( $context['lease_id'] ) ) {
+			$owner_id = $this->owner_id_for_lease( (int) $context['lease_id'] );
+		}
+		$scope = $owner_id > 0 ? $owner_id : null; // null = admin/global scope
+
+		$config = Arriendo_Facil_SRI_Config::get( $scope );
+		$pems   = Arriendo_Facil_SRI_Config::get_cert_pems( $scope );
 
 		if ( empty( $config['ruc'] ) ) {
 			return new WP_Error( 'sri_config_missing_ruc', __( 'Debe configurar el RUC del emisor en Facturacion SRI.', 'arriendo-facil' ) );
 		}
 		if ( '' === $pems['cert'] || '' === $pems['pkey'] ) {
 			return new WP_Error( 'sri_cert_missing', __( 'Debe cargar y configurar el certificado digital (.p12).', 'arriendo-facil' ) );
+		}
+
+		// Defense in depth: never sign under a certificate whose subject does not
+		// match the configured RUC. Prevents cross-tenant identity leaks.
+		$identity_check = Arriendo_Facil_SRI_Config::validate_cert_matches_ruc( $pems['cert'], (string) $config['ruc'] );
+		if ( is_wp_error( $identity_check ) ) {
+			return $identity_check;
 		}
 
 		// ── Cadena CA obligatoria ─────────────────────────────────────────────
@@ -176,9 +192,9 @@ class Arriendo_Facil_Billing_Manager {
 
 			if ( ! $is_self_signed ) {
 				error_log( '[AF Billing] ADVERTENCIA: cadena CA vacía – intentando reconstruir desde AIA…' );
-				$rebuild = Arriendo_Facil_SRI_Config::rebuild_chain();
+				$rebuild = Arriendo_Facil_SRI_Config::rebuild_chain( $scope );
 				if ( ! is_wp_error( $rebuild ) ) {
-					$pems        = Arriendo_Facil_SRI_Config::get_cert_pems();
+					$pems        = Arriendo_Facil_SRI_Config::get_cert_pems( $scope );
 					$chain_count = (int) preg_match_all( '/-----BEGIN CERTIFICATE-----/', $pems['chain'] );
 					error_log( '[AF Billing] Cadena CA reconstruida: ' . $chain_count . ' certificado(s) intermedio(s).' );
 				} else {
@@ -198,7 +214,7 @@ class Arriendo_Facil_Billing_Manager {
 			}
 		}
 
-		$emission = $this->reserve_next_sequence();
+		$emission = $this->reserve_next_sequence( $owner_id );
 		if ( is_wp_error( $emission ) ) {
 			return $emission;
 		}
@@ -948,18 +964,25 @@ class Arriendo_Facil_Billing_Manager {
 
 	/**
 	 * Gets active emission point and reserves next sequence atomically.
+	 *
+	 * @param int $owner_id 0 for admin/global scope, or the owner user_id for per-owner scope.
 	 */
-	protected function reserve_next_sequence() {
+	protected function reserve_next_sequence( int $owner_id = 0 ) {
 		if ( ! $this->wpdb ) {
 			return new WP_Error( 'db_unavailable', __( 'No hay conexion de base de datos.', 'arriendo-facil' ) );
 		}
+
+		// Owners see only their own emission points; admin uses points with NULL owner_id.
+		$owner_where = $owner_id > 0
+			? $this->wpdb->prepare( 'owner_id = %d', $owner_id )
+			: 'owner_id IS NULL';
 
 		$max_attempts = 5;
 		for ( $attempt = 1; $attempt <= $max_attempts; $attempt++ ) {
 			$row = $this->wpdb->get_row(
 				"SELECT id, codigo_establecimiento, codigo_punto_emision, secuencial_actual
 				 FROM {$this->wpdb->prefix}af_emission_points
-				 WHERE activo = 1
+				 WHERE activo = 1 AND {$owner_where}
 				 ORDER BY id ASC
 				 LIMIT 1"
 			);
@@ -1221,5 +1244,36 @@ class Arriendo_Facil_Billing_Manager {
 		} else {
 			error_log( '[DIAGNÓSTICO] No se pudo guardar el XML de diagnóstico en: ' . $debug_dir );
 		}
+	}
+
+	/**
+	 * Resolves the owner user_id that owns the accommodation linked to a lease.
+	 *
+	 * Chain: lease → accommodation_id (post) → `_af_owner_id` meta.
+	 * Returns 0 when the lease has no linked accommodation, no owner meta, or
+	 * belongs to an admin-managed accommodation. Callers treat 0 as "admin scope"
+	 * so the global SRI config + shared cert are used.
+	 *
+	 * @param int $lease_id Lease ID.
+	 * @return int Owner WP user ID, or 0 when unresolvable / admin scope.
+	 */
+	protected function owner_id_for_lease( int $lease_id ): int {
+		if ( ! $this->wpdb || $lease_id <= 0 ) {
+			return 0;
+		}
+
+		$accommodation_id = (int) $this->wpdb->get_var(
+			$this->wpdb->prepare(
+				"SELECT accommodation_id FROM {$this->wpdb->prefix}af_leases WHERE id = %d LIMIT 1",
+				$lease_id
+			)
+		);
+
+		if ( $accommodation_id <= 0 ) {
+			return 0;
+		}
+
+		$owner_id = (int) get_post_meta( $accommodation_id, '_af_owner_id', true );
+		return $owner_id > 0 ? $owner_id : 0;
 	}
 }

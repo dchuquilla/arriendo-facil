@@ -102,6 +102,10 @@ class Arriendo_Facil_Billing_API {
 			wp_send_json_error( array( 'message' => __( 'ID de contrato invalido.', 'arriendo-facil' ) ), 400 );
 		}
 
+		if ( ! $this->current_user_owns_lease( $lease_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes acceso a este contrato.', 'arriendo-facil' ) ), 403 );
+		}
+
 		// Parse user-edited overrides from the preview modal.
 		$overrides_raw = isset( $_POST['overrides'] ) ? wp_unslash( $_POST['overrides'] ) : '';
 		$flat_overrides = array();
@@ -195,6 +199,10 @@ class Arriendo_Facil_Billing_API {
 			wp_send_json_error( array( 'message' => __( 'ID de contrato invalido.', 'arriendo-facil' ) ), 400 );
 		}
 
+		if ( ! $this->current_user_owns_lease( $lease_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes acceso a este contrato.', 'arriendo-facil' ) ), 403 );
+		}
+
 		$overrides_raw  = isset( $_POST['overrides'] ) ? wp_unslash( $_POST['overrides'] ) : '';
 		$flat_overrides = array();
 		if ( '' !== $overrides_raw && is_string( $overrides_raw ) ) {
@@ -248,6 +256,10 @@ class Arriendo_Facil_Billing_API {
 			wp_send_json_error( array( 'message' => __( 'Invoice ID invalido.', 'arriendo-facil' ) ), 400 );
 		}
 
+		if ( ! $this->current_user_owns_invoice( $invoice_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes acceso a este comprobante.', 'arriendo-facil' ) ), 403 );
+		}
+
 		$result = $this->manager->retry_invoice( $invoice_id );
 		if ( is_wp_error( $result ) ) {
 			wp_send_json_error(
@@ -276,6 +288,9 @@ class Arriendo_Facil_Billing_API {
 		}
 
 		$invoice_id = isset( $_GET['id'] ) ? absint( wp_unslash( $_GET['id'] ) ) : 0;
+		if ( ! $this->current_user_owns_invoice( $invoice_id ) ) {
+			wp_die( esc_html__( 'No tienes acceso a este comprobante.', 'arriendo-facil' ), 403 );
+		}
 		$invoice    = $this->manager->get_invoice( $invoice_id );
 		if ( ! $invoice || empty( $invoice->ride_path ) ) {
 			wp_die( esc_html__( 'RIDE no disponible.', 'arriendo-facil' ), 404 );
@@ -317,6 +332,9 @@ class Arriendo_Facil_Billing_API {
 		}
 
 		$invoice_id = isset( $_GET['id'] ) ? absint( wp_unslash( $_GET['id'] ) ) : 0;
+		if ( ! $this->current_user_owns_invoice( $invoice_id ) ) {
+			wp_die( esc_html__( 'No tienes acceso a este comprobante.', 'arriendo-facil' ), 403 );
+		}
 		$invoice    = $this->manager->get_invoice( $invoice_id );
 		if ( ! $invoice ) {
 			wp_die( esc_html__( 'Comprobante no encontrado.', 'arriendo-facil' ), 404 );
@@ -398,8 +416,63 @@ class Arriendo_Facil_Billing_API {
 	 * @return bool
 	 */
 	private function can_manage_billing(): bool {
-		$default_capability = apply_filters( 'af_billing_capability', 'manage_options' );
+		$default_capability = apply_filters( 'af_billing_capability', 'af_view_billing' );
 		return current_user_can( (string) $default_capability );
+	}
+
+	/**
+	 * Returns whether the current user owns the given lease. Admins always pass.
+	 *
+	 * @param int $lease_id Lease ID.
+	 * @return bool
+	 */
+	private function current_user_owns_lease( int $lease_id ): bool {
+		if ( $lease_id <= 0 ) {
+			return false;
+		}
+		if ( current_user_can( 'manage_options' ) ) {
+			return true;
+		}
+		if ( ! class_exists( 'Arriendo_Facil_Accommodation' ) ) {
+			return false;
+		}
+		if ( ! Arriendo_Facil_Accommodation::user_is_owner() ) {
+			return false;
+		}
+
+		global $wpdb;
+		$accommodation_id = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT accommodation_id FROM {$wpdb->prefix}af_leases WHERE id = %d LIMIT 1",
+				$lease_id
+			)
+		);
+		if ( $accommodation_id <= 0 ) {
+			return false;
+		}
+
+		$owner_ids = Arriendo_Facil_Accommodation::get_owner_accommodation_ids( get_current_user_id() );
+		return in_array( $accommodation_id, array_map( 'intval', (array) $owner_ids ), true );
+	}
+
+	/**
+	 * Returns whether the current user owns the invoice's related lease.
+	 *
+	 * @param int $invoice_id Invoice ID.
+	 * @return bool
+	 */
+	private function current_user_owns_invoice( int $invoice_id ): bool {
+		if ( $invoice_id <= 0 ) {
+			return false;
+		}
+		if ( current_user_can( 'manage_options' ) ) {
+			return true;
+		}
+		$invoice = $this->manager->get_invoice( $invoice_id );
+		if ( ! $invoice || empty( $invoice->lease_id ) ) {
+			return false;
+		}
+		return $this->current_user_owns_lease( (int) $invoice->lease_id );
 	}
 
 	/**
@@ -424,12 +497,13 @@ class Arriendo_Facil_Billing_API {
 	/**
 	 * AJAX: consults SRI via SOAP (with REST fallback) to auto-fill issuer data by RUC.
 	 * Uses the same SOAP infrastructure as invoice emission for consistency.
-	 * Only accessible by admins (manage_options).
+	 * Accessible by admins and by owners with the `af_view_billing` capability
+	 * (owners need this to prefill their own scoped SRI config).
 	 */
 	public function ajax_sri_ruc_lookup(): void {
 		check_ajax_referer( 'af_sri_ruc_lookup', 'nonce' );
 
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! current_user_can( 'manage_options' ) && ! current_user_can( 'af_view_billing' ) ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
@@ -439,7 +513,8 @@ class Arriendo_Facil_Billing_API {
 			wp_send_json_error( array( 'message' => __( 'El RUC debe tener exactamente 13 dígitos.', 'arriendo-facil' ) ), 400 );
 		}
 
-		$config = Arriendo_Facil_SRI_Config::get();
+		// Read ambiente from the caller's scope: admins → global, owners → their own.
+		$config   = Arriendo_Facil_SRI_Config::get();
 		$ambiente = isset( $config['ambiente'] ) ? (string) $config['ambiente'] : '1';
 
 		$soap_client = new Arriendo_Facil_SRI_Soap_Client( $ambiente );
@@ -495,6 +570,10 @@ class Arriendo_Facil_Billing_API {
 		$invoice_id = isset( $_POST['invoice_id'] ) ? absint( wp_unslash( $_POST['invoice_id'] ) ) : 0;
 		if ( $invoice_id <= 0 ) {
 			wp_send_json_error( array( 'message' => 'Invoice ID inválido.' ), 400 );
+		}
+
+		if ( ! $this->current_user_owns_invoice( $invoice_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes acceso a este comprobante.', 'arriendo-facil' ) ), 403 );
 		}
 
 		global $wpdb;

@@ -541,6 +541,10 @@ class Arriendo_Facil_Guest {
 	/**
 	 * Triggers immediate async processing through admin-ajax.
 	 *
+	 * The job_id is signed with HMAC-SHA256 (wp_salt('auth')) so that the public
+	 * `wp_ajax_nopriv_*` endpoint can verify authenticity without a WP session.
+	 * Prevents replay/forgery even if the job_id leaks via logs or referer.
+	 *
 	 * @param string $job_id Job ID.
 	 * @return bool
 	 */
@@ -550,6 +554,8 @@ class Arriendo_Facil_Guest {
 			return false;
 		}
 
+		$signature = hash_hmac( 'sha256', $job_id, wp_salt( 'auth' ) );
+
 		$response = wp_remote_post(
 			admin_url( 'admin-ajax.php' ),
 			array(
@@ -558,6 +564,7 @@ class Arriendo_Facil_Guest {
 				'body'     => array(
 					'action' => 'af_process_guest_post_submit_now',
 					'job_id' => $job_id,
+					'sig'    => $signature,
 				),
 			)
 		);
@@ -566,27 +573,83 @@ class Arriendo_Facil_Guest {
 	}
 
 	/**
+	 * Enforces a per-IP rate limit for the public async trigger endpoint.
+	 * Uses REMOTE_ADDR only (not X-Forwarded-For) because the caller is always
+	 * a loopback request from this server; spoofable headers must not be trusted.
+	 *
+	 * @return bool True when within limit; false when exceeded.
+	 */
+	private function guest_async_endpoint_within_rate_limit() {
+		$remote_ip = isset( $_SERVER['REMOTE_ADDR'] ) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+		if ( '' === $remote_ip || false === filter_var( $remote_ip, FILTER_VALIDATE_IP ) ) {
+			return false;
+		}
+
+		$rate_key = 'af_guest_async_rl_' . md5( $remote_ip );
+		$attempts = (int) get_transient( $rate_key );
+		if ( $attempts >= 10 ) {
+			return false;
+		}
+		set_transient( $rate_key, $attempts + 1, MINUTE_IN_SECONDS );
+		return true;
+	}
+
+	/**
 	 * AJAX endpoint to run queued guest post-submit processing immediately.
+	 *
+	 * Defense-in-depth (OWASP A01 / A04):
+	 * - HMAC-SHA256 signature verification (constant-time via hash_equals) so
+	 *   this public endpoint cannot be triggered by a forged/leaked job_id.
+	 * - Per-IP rate limit (10 req/min) against burst/spam.
+	 * - Uniform 50ms floor before responding to reduce timing side-channel
+	 *   between "invalid" and "valid" job_ids.
+	 * - Generic error responses; details go to error_log only.
 	 *
 	 * @return void
 	 */
 	public function ajax_process_guest_post_submit_now() {
-		$job_id = isset( $_REQUEST['job_id'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['job_id'] ) ) : '';
-		$job_id = preg_replace( '/[^a-z0-9]/', '', strtolower( (string) $job_id ) );
+		$start_time = microtime( true );
+		$remote_ip  = isset( $_SERVER['REMOTE_ADDR'] ) ? (string) $_SERVER['REMOTE_ADDR'] : 'unknown';
 
-		if ( '' === $job_id ) {
-			wp_die( '0', 400 );
+		$respond = function ( $body, $code ) use ( $start_time ) {
+			$elapsed_us = (int) ( ( microtime( true ) - $start_time ) * 1000000 );
+			$min_us     = 50000;
+			if ( $elapsed_us < $min_us ) {
+				usleep( $min_us - $elapsed_us );
+			}
+			wp_die( $body, '', array( 'response' => $code ) );
+		};
+
+		if ( ! $this->guest_async_endpoint_within_rate_limit() ) {
+			error_log( sprintf( '[AF Security] guest_async rate-limit exceeded from %s', $remote_ip ) );
+			$respond( '0', 429 );
+		}
+
+		$job_id_raw = isset( $_REQUEST['job_id'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['job_id'] ) ) : '';
+		$job_id     = preg_replace( '/[^a-z0-9]/', '', strtolower( (string) $job_id_raw ) );
+		$signature  = isset( $_REQUEST['sig'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['sig'] ) ) : '';
+		$signature  = preg_replace( '/[^a-f0-9]/', '', strtolower( (string) $signature ) );
+
+		if ( '' === $job_id || strlen( $job_id ) < 16 || '' === $signature || 64 !== strlen( $signature ) ) {
+			error_log( sprintf( '[AF Security] guest_async malformed request from %s', $remote_ip ) );
+			$respond( '0', 400 );
+		}
+
+		$expected = hash_hmac( 'sha256', $job_id, wp_salt( 'auth' ) );
+		if ( ! hash_equals( $expected, $signature ) ) {
+			error_log( sprintf( '[AF Security] guest_async invalid HMAC from %s', $remote_ip ) );
+			$respond( '0', 403 );
 		}
 
 		$job_key = 'af_guest_job_' . $job_id;
 		$payload = get_transient( $job_key );
 		if ( ! is_array( $payload ) ) {
-			wp_die( '0', 404 );
+			$respond( '0', 404 );
 		}
 
 		delete_transient( $job_key );
 		$this->process_guest_post_submit_async( $payload );
-		wp_die( '1' );
+		$respond( '1', 200 );
 	}
 
 	/**

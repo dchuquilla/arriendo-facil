@@ -370,24 +370,61 @@ class Arriendo_Facil_Admin {
 
 	/**
 	 * AJAX handler: resolve a short Google Maps URL to extract the final redirect URL.
+	 *
+	 * Defense-in-depth against SSRF (OWASP A10):
+	 * - Nonce + capability check (edit_posts).
+	 * - Host allow-list: only Google Maps domains permitted.
+	 * - DNS pre-resolution: rejects hosts resolving to loopback / private /
+	 *   link-local / reserved IPs (blocks 169.254.169.254 metadata, LAN, etc.).
+	 * - Redirects capped at 3 and re-validated via http_request_args filter.
+	 * - Generic error messages; details logged with [AF Security] prefix.
 	 */
 	public function ajax_resolve_short_url() {
 		check_ajax_referer( 'af_location_nonce', 'nonce' );
 
-		$url = isset( $_POST['url'] ) ? esc_url_raw( wp_unslash( $_POST['url'] ) ) : '';
-		if ( ! $url ) {
-			wp_send_json_error( 'No URL provided' );
+		$actor_id  = get_current_user_id();
+		$remote_ip = isset( $_SERVER['REMOTE_ADDR'] ) ? (string) $_SERVER['REMOTE_ADDR'] : 'unknown';
+
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			error_log( sprintf( '[AF Security] resolve_short_url denied (user=%d ip=%s)', $actor_id, $remote_ip ) );
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
-		$response = wp_remote_get( $url, array(
-			'redirection' => 10,
-			'timeout'     => 15,
-			'user-agent'  => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-			'headers'     => array( 'Accept' => 'text/html' ),
-		) );
+		$url = isset( $_POST['url'] ) ? esc_url_raw( wp_unslash( $_POST['url'] ) ) : '';
+		if ( ! $url ) {
+			wp_send_json_error( array( 'message' => __( 'URL no permitida.', 'arriendo-facil' ) ), 400 );
+		}
+
+		if ( ! $this->is_url_safe_for_short_resolve( $url ) ) {
+			error_log( sprintf( '[AF Security] resolve_short_url blocked SSRF candidate (user=%d ip=%s url=%s)', $actor_id, $remote_ip, $url ) );
+			wp_send_json_error( array( 'message' => __( 'URL no permitida.', 'arriendo-facil' ) ), 400 );
+		}
+
+		$block_redirect = function ( $args, $redirect_url ) {
+			if ( is_string( $redirect_url ) && '' !== $redirect_url && ! $this->is_url_safe_for_short_resolve( $redirect_url ) ) {
+				return new WP_Error( 'af_ssrf_blocked', 'Redirect target not allowed' );
+			}
+			return $args;
+		};
+		add_filter( 'http_request_redirection_count', array( $this, 'cap_short_resolve_redirects' ) );
+		add_filter( 'http_request_args', $block_redirect, 10, 2 );
+
+		$response = wp_remote_get(
+			$url,
+			array(
+				'redirection' => 3,
+				'timeout'     => 8,
+				'user-agent'  => 'Mozilla/5.0 (compatible; ArriendoFacilResolver/1.0)',
+				'headers'     => array( 'Accept' => 'text/html' ),
+			)
+		);
+
+		remove_filter( 'http_request_args', $block_redirect, 10 );
+		remove_filter( 'http_request_redirection_count', array( $this, 'cap_short_resolve_redirects' ) );
 
 		if ( is_wp_error( $response ) ) {
-			wp_send_json_error( $response->get_error_message() );
+			error_log( sprintf( '[AF Security] resolve_short_url wp_remote_get failed: %s', $response->get_error_message() ) );
+			wp_send_json_error( array( 'message' => __( 'No se pudo resolver la URL.', 'arriendo-facil' ) ), 502 );
 		}
 
 		$body      = wp_remote_retrieve_body( $response );
@@ -415,6 +452,77 @@ class Arriendo_Facil_Admin {
 		}
 
 		wp_send_json_success( array( 'resolved_url' => $final_url ) );
+	}
+
+	/**
+	 * Filter helper: cap redirects at 3 for the short-url resolver.
+	 *
+	 * @param int $count Redirection count.
+	 * @return int
+	 */
+	public function cap_short_resolve_redirects( $count ) {
+		return min( (int) $count, 3 );
+	}
+
+	/**
+	 * Validates a URL for the short-URL resolver: allow-listed Google host,
+	 * https/http scheme, and DNS resolves only to public IPs.
+	 *
+	 * @param string $url URL to validate.
+	 * @return bool
+	 */
+	private function is_url_safe_for_short_resolve( $url ) {
+		$parts = wp_parse_url( (string) $url );
+		if ( ! is_array( $parts ) || empty( $parts['host'] ) || empty( $parts['scheme'] ) ) {
+			return false;
+		}
+
+		$scheme = strtolower( (string) $parts['scheme'] );
+		if ( ! in_array( $scheme, array( 'http', 'https' ), true ) ) {
+			return false;
+		}
+
+		$host = strtolower( (string) $parts['host'] );
+
+		$allowed_hosts = array(
+			'maps.app.goo.gl',
+			'goo.gl',
+			'app.goo.gl',
+			'maps.google.com',
+			'www.google.com',
+			'google.com',
+			'g.co',
+			'maps.googleapis.com',
+		);
+
+		$host_allowed = false;
+		foreach ( $allowed_hosts as $allowed ) {
+			if ( $host === $allowed || substr( $host, -( strlen( $allowed ) + 1 ) ) === '.' . $allowed ) {
+				$host_allowed = true;
+				break;
+			}
+		}
+		if ( ! $host_allowed ) {
+			return false;
+		}
+
+		$ips = @gethostbynamel( $host );
+		if ( ! is_array( $ips ) || empty( $ips ) ) {
+			return false;
+		}
+
+		foreach ( $ips as $ip ) {
+			$public = filter_var(
+				$ip,
+				FILTER_VALIDATE_IP,
+				FILTER_FLAG_IPV4 | FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+			);
+			if ( false === $public ) {
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	/**

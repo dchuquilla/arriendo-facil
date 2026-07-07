@@ -169,6 +169,7 @@ $can_bill      = current_user_can( (string) apply_filters( 'af_billing_capabilit
 						array(
 							'action'   => 'af_download_lease_contract',
 							'lease_id' => (int) $lease->id,
+							'nonce'    => wp_create_nonce( 'af_lease_nonce' ),
 						),
 						admin_url( 'admin-ajax.php' )
 					);

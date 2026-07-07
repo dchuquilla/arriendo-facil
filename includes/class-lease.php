@@ -993,10 +993,23 @@ class Arriendo_Facil_Lease {
 
 	/**
 	 * Downloads a lease contract via secure redirect.
+	 *
+	 * Defense (OWASP A01 Broken Access Control / CSRF):
+	 * - Nonce check first: prevents CSRF that would leak short-lived R2 presigned
+	 *   URLs to attacker-controlled sites via redirect chain.
+	 * - Capability check: only editors/admins.
+	 * - Ownership check: owners are restricted to their own accommodations.
+	 *   Users with `manage_options` (site admins) bypass ownership by design.
 	 */
 	public function ajax_download_lease_contract() {
+		if ( false === check_ajax_referer( 'af_lease_nonce', 'nonce', false ) ) {
+			$actor = get_current_user_id();
+			error_log( sprintf( '[AF Security] lease_download invalid nonce (user=%d)', $actor ) );
+			wp_die( esc_html__( 'Solicitud invalida.', 'arriendo-facil' ), '', array( 'response' => 403 ) );
+		}
+
 		if ( ! current_user_can( 'edit_posts' ) ) {
-			wp_die( esc_html__( 'Permiso denegado.', 'arriendo-facil' ), 403 );
+			wp_die( esc_html__( 'Permiso denegado.', 'arriendo-facil' ), '', array( 'response' => 403 ) );
 		}
 
 		$lease_id = isset( $_GET['lease_id'] ) ? absint( wp_unslash( $_GET['lease_id'] ) ) : 0;

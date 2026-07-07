@@ -379,10 +379,13 @@ class Arriendo_Facil_Accommodation {
 			update_post_meta( $post_id, '_af_amenities', $amenities );
 		}
 
-		// Baño compartido (checkbox).
+		// Baño compartido (checkbox). Si está marcado, forzar baños a 0.
 		if ( isset( $_POST['af_form_action'] ) || isset( $_POST['af_bathrooms'] ) ) {
 			$shared = ! empty( $_POST['af_shared_bathroom'] ) ? 1 : 0;
 			update_post_meta( $post_id, '_af_shared_bathroom', $shared );
+			if ( $shared ) {
+				update_post_meta( $post_id, '_af_bathrooms', 0 );
+			}
 		}
 
 		if ( ! $is_owner_user && isset( $_POST['af_owner_id'] ) ) {

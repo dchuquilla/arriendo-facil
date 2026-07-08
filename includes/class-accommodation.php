@@ -354,17 +354,20 @@ class Arriendo_Facil_Accommodation {
 		}
 
 		$fields = array(
-			'_af_address'       => 'sanitize_text_field',
-			'_af_location_text' => 'sanitize_text_field',
-			'_af_city'          => 'sanitize_text_field',
-			'_af_latitude'      => 'floatval',
-			'_af_longitude'     => 'floatval',
-			'_af_bedrooms'      => 'absint',
-			'_af_bathrooms'     => 'absint',
-			'_af_monthly_rent'  => 'floatval',
-			'_af_status'        => 'sanitize_text_field',
-			'_af_property_type' => 'sanitize_text_field',
-			'_af_square_meters' => 'floatval',
+			'_af_address'              => 'sanitize_text_field',
+			'_af_location_text'        => 'sanitize_text_field',
+			'_af_city'                 => 'sanitize_text_field',
+			'_af_latitude'             => 'floatval',
+			'_af_longitude'            => 'floatval',
+			'_af_bedrooms'             => 'absint',
+			'_af_bathrooms'            => 'absint',
+			'_af_monthly_rent'         => 'floatval',
+			'_af_status'               => 'sanitize_text_field',
+			'_af_property_type'        => 'sanitize_text_field',
+			'_af_square_meters'        => 'floatval',
+			'_af_booking_property_id'  => 'sanitize_text_field',
+			'_af_airbnb_listing_id'    => 'sanitize_text_field',
+			'_af_sync_enabled'         => 'absint',
 		);
 
 		foreach ( $fields as $key => $sanitize_cb ) {

@@ -397,6 +397,47 @@ class Arriendo_Facil_Activator {
 				KEY invoice_id (invoice_id),
 				KEY tipo_operacion (tipo_operacion)
 			) $charset_collate;",
+
+			// ── Integraciones OTA (Booking.com, Airbnb) ──────────────────────
+
+			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_ota_credentials (
+				id                 BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+				owner_id           BIGINT(20) UNSIGNED NOT NULL,
+				ota_platform       VARCHAR(20) NOT NULL COMMENT 'booking, airbnb, etc',
+				api_key_encrypted  VARCHAR(255) NOT NULL COMMENT 'Encrypted with Sodium',
+				account_identifier VARCHAR(100) NOT NULL COMMENT 'Partner ID, account ID, etc',
+				connected          TINYINT(1) NOT NULL DEFAULT 0,
+				last_verified      DATETIME DEFAULT NULL,
+				status             VARCHAR(20) NOT NULL DEFAULT 'inactive',
+				created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				UNIQUE KEY uniq_owner_platform (owner_id, ota_platform),
+				KEY ota_platform (ota_platform),
+				KEY owner_id (owner_id)
+			) $charset_collate;",
+
+			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_otas_sync_log (
+				id                   BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+				accommodation_id     BIGINT(20) UNSIGNED NOT NULL,
+				ota_source           VARCHAR(20) NOT NULL COMMENT 'booking, airbnb',
+				sync_type            VARCHAR(50) NOT NULL DEFAULT 'availability' COMMENT 'availability, full, manual',
+				remote_property_id   VARCHAR(100) NOT NULL,
+				status               VARCHAR(20) NOT NULL DEFAULT 'pending' COMMENT 'pending, success, failed',
+				local_was_occupied   TINYINT(1) DEFAULT NULL,
+				remote_is_occupied   TINYINT(1) DEFAULT NULL,
+				remote_booked_dates  JSON DEFAULT NULL COMMENT 'Array of booked date ranges',
+				error_message        TEXT DEFAULT NULL,
+				request_payload      LONGTEXT DEFAULT NULL,
+				response_payload     LONGTEXT DEFAULT NULL,
+				created_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				KEY accommodation_id (accommodation_id),
+				KEY ota_source (ota_source),
+				KEY status (status),
+				KEY created_at (created_at)
+			) $charset_collate;",
 		);
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';

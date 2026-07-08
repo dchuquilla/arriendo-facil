@@ -69,6 +69,7 @@ class Arriendo_Facil_OTA_Sync_Manager {
 
 		try {
 			$results = array();
+			$errors = array();
 
 			foreach ( $sources as $source ) {
 				$source = sanitize_key( $source );
@@ -76,9 +77,11 @@ class Arriendo_Facil_OTA_Sync_Manager {
 				// Get credentials
 				$credentials = Arriendo_Facil_OTA_Credentials::get_decrypted( $owner_id, $source );
 				if ( ! $credentials ) {
+					$error_msg = "No credentials configured for {$source}";
+					$errors[ $source ] = $error_msg;
 					$results[ $source ] = array(
 						'status' => 'error',
-						'message' => 'No credentials configured',
+						'message' => $error_msg,
 					);
 					continue;
 				}
@@ -92,34 +95,58 @@ class Arriendo_Facil_OTA_Sync_Manager {
 					);
 
 					if ( ! $remote_property_id ) {
+						$error_msg = "No {$source} property ID configured";
+						$errors[ $source ] = $error_msg;
 						$results[ $source ] = array(
 							'status' => 'error',
-							'message' => "No {$source} property ID configured",
+							'message' => $error_msg,
 						);
 						continue;
 					}
 
-					// TODO: In Phase 2, implement actual API client instantiation
-					// $client = $this->get_client( $source, $credentials );
-					// $remote_status = $client->check_property_occupied( $remote_property_id );
-					// $this->reconcile_occupancy( $accommodation_id, $source, $remote_status );
-					// $this->log_sync( $accommodation_id, $source, $remote_status, 'success' );
+					// Get client and check occupancy
+					$client = $this->get_client( $source, $credentials );
+					if ( is_wp_error( $client ) ) {
+						throw new Exception( $client->get_error_message() );
+					}
+
+					// Get remote status
+					$remote_status = $client->check_property_occupied( $remote_property_id );
+					if ( is_wp_error( $remote_status ) ) {
+						throw new Exception( $remote_status->get_error_message() );
+					}
+
+					// Reconcile with local status
+					$this->reconcile_occupancy( $accommodation_id, $source, $remote_status );
+
+					// Log successful sync
+					$this->log_sync( $accommodation_id, $source, $remote_status, 'success' );
 
 					$results[ $source ] = array(
-						'status' => 'pending',
-						'message' => 'Client implementation pending (Phase 2)',
+						'status' => 'success',
+						'message' => 'Synced successfully',
+						'is_occupied' => $remote_status['is_occupied'],
 					);
+
 				} catch ( Exception $e ) {
+					$error_msg = $e->getMessage();
+					$errors[ $source ] = $error_msg;
 					$this->handle_sync_error( $accommodation_id, $source, $e );
+					$this->log_sync( $accommodation_id, $source, array(), 'failed', $e );
 					$results[ $source ] = array(
 						'status' => 'error',
-						'message' => $e->getMessage(),
+						'message' => $error_msg,
 					);
 				}
 			}
 
-			// Update last sync timestamp
+			// Update last sync timestamp and errors
 			update_post_meta( $accommodation_id, '_af_last_sync_timestamp', time() );
+			if ( ! empty( $errors ) ) {
+				update_post_meta( $accommodation_id, '_af_ota_last_errors', $errors );
+			} else {
+				delete_post_meta( $accommodation_id, '_af_ota_last_errors' );
+			}
 
 			return $results;
 
@@ -162,18 +189,33 @@ class Arriendo_Facil_OTA_Sync_Manager {
 	/**
 	 * Gets an OTA API client instance for a platform.
 	 *
-	 * TODO: Implement in Phase 2 with actual clients.
-	 *
 	 * @param string $platform    Platform identifier.
 	 * @param array  $credentials Decrypted credentials array.
 	 * @return Arriendo_Facil_OTA_API_Client_Base|WP_Error Client or error.
 	 */
 	private function get_client( $platform, $credentials ) {
-		// Stub for Phase 2 implementation
-		return new WP_Error(
-			'client_not_implemented',
-			"Client for {$platform} not yet implemented"
-		);
+		$platform = sanitize_key( $platform );
+		$api_key = $credentials['api_key'] ?? null;
+		$account_id = $credentials['account_id'] ?? null;
+
+		if ( ! $api_key || ! $account_id ) {
+			return new WP_Error( 'invalid_credentials', 'Invalid credentials' );
+		}
+
+		try {
+			switch ( $platform ) {
+				case 'booking':
+					return new Arriendo_Facil_Booking_API_Client( $api_key, $account_id );
+
+				case 'airbnb':
+					return new Arriendo_Facil_Airbnb_API_Client( $api_key, $account_id );
+
+				default:
+					return new WP_Error( 'unknown_platform', "Unknown platform: {$platform}" );
+			}
+		} catch ( Exception $e ) {
+			return new WP_Error( 'client_error', $e->getMessage() );
+		}
 	}
 
 	/**
@@ -181,9 +223,7 @@ class Arriendo_Facil_OTA_Sync_Manager {
 	 *
 	 * Strategy: Remote status is source of truth. If remote says occupied,
 	 * mark locally as occupied. If mismatch (remote free, local occupied),
-	 * alert owner.
-	 *
-	 * TODO: Implement in Phase 2.
+	 * alert owner via hook.
 	 *
 	 * @param int    $accommodation_id Accommodation post ID.
 	 * @param string $source          OTA platform source.
@@ -191,30 +231,60 @@ class Arriendo_Facil_OTA_Sync_Manager {
 	 * @return void
 	 */
 	private function reconcile_occupancy( $accommodation_id, $source, $remote_status ) {
-		// Stub for Phase 2
+		$local_occupied = Arriendo_Facil_Accommodation_Occupied_Admin::is_occupied( $accommodation_id );
+		$remote_occupied = $remote_status['is_occupied'] ?? false;
+
+		// If remote says occupied, mark locally as occupied (safer strategy)
+		if ( $remote_occupied && ! $local_occupied ) {
+			update_post_meta( $accommodation_id, '_af_is_occupied', 1 );
+			do_action( 'af_accommodation_marked_occupied', $accommodation_id, $source, $remote_status );
+		}
+
+		// If remote says free but local occupied, alert owner
+		if ( ! $remote_occupied && $local_occupied ) {
+			do_action( 'af_occupancy_mismatch_detected', $accommodation_id, $source, $remote_status );
+		}
 	}
 
 	/**
 	 * Logs a sync attempt to the database.
 	 *
-	 * TODO: Implement in Phase 2.
-	 *
-	 * @param int    $accommodation_id Accommodation post ID.
-	 * @param string $source          OTA platform source.
-	 * @param array  $remote_status   Remote status.
-	 * @param string $status          Sync status (success, failed).
-	 * @param Exception $error        Error object if failed.
+	 * @param int       $accommodation_id Accommodation post ID.
+	 * @param string    $source          OTA platform source.
+	 * @param array     $remote_status   Remote status.
+	 * @param string    $status          Sync status (success, failed).
+	 * @param Exception $error           Error object if failed.
 	 * @return bool True if logged, false otherwise.
 	 */
-	private function log_sync( $accommodation_id, $source, $remote_status, $status = 'success', $error = null ) {
-		// Stub for Phase 2
-		return true;
+	private function log_sync( $accommodation_id, $source, $remote_status = array(), $status = 'success', $error = null ) {
+		global $wpdb;
+
+		$local_occupied = Arriendo_Facil_Accommodation_Occupied_Admin::is_occupied( $accommodation_id );
+
+		$result = $wpdb->insert(
+			$wpdb->prefix . 'af_otas_sync_log',
+			array(
+				'accommodation_id'   => $accommodation_id,
+				'ota_source'         => $source,
+				'sync_type'          => 'availability',
+				'remote_property_id' => $remote_status['property_id'] ?? '',
+				'status'             => $status,
+				'local_was_occupied' => (int) $local_occupied,
+				'remote_is_occupied' => (int) ( $remote_status['is_occupied'] ?? 0 ),
+				'remote_booked_dates' => ! empty( $remote_status['booked_dates'] ) ? wp_json_encode( $remote_status['booked_dates'] ) : null,
+				'error_message'      => $error ? substr( $error->getMessage(), 0, 500 ) : null,
+				'created_at'         => current_time( 'mysql' ),
+			),
+			array( '%d', '%s', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%s' )
+		);
+
+		return false !== $result;
 	}
 
 	/**
 	 * Handles sync errors with retry scheduling.
 	 *
-	 * TODO: Implement in Phase 2.
+	 * Schedules automatic retry after 1 hour (max 3 times).
 	 *
 	 * @param int       $accommodation_id Accommodation post ID.
 	 * @param string    $source          OTA platform.
@@ -222,18 +292,76 @@ class Arriendo_Facil_OTA_Sync_Manager {
 	 * @return void
 	 */
 	private function handle_sync_error( $accommodation_id, $source, Exception $e ) {
-		// Stub for Phase 2
-		error_log( "OTA sync error for accommodation {$accommodation_id} ({$source}): " . $e->getMessage() );
+		$retry_count = (int) get_post_meta( $accommodation_id, "_af_{$source}_retry_count", true );
+
+		// Log error
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( "OTA sync error for accommodation {$accommodation_id} ({$source}): " . $e->getMessage() );
+		}
+
+		// Schedule retry if under limit
+		if ( $retry_count < 3 ) {
+			wp_schedule_single_event(
+				time() + HOUR_IN_SECONDS,
+				'af_retry_ota_sync',
+				array( $accommodation_id, $source )
+			);
+			update_post_meta( $accommodation_id, "_af_{$source}_retry_count", $retry_count + 1 );
+		} else {
+			// Notify owner after max retries
+			do_action( 'af_ota_sync_failed_critical', $accommodation_id, $source, $e );
+			update_post_meta( $accommodation_id, "_af_{$source}_retry_count", 0 );
+		}
 	}
 
 	/**
 	 * Processes all scheduled syncs (called via WP-Cron).
 	 *
-	 * TODO: Implement in Phase 2.
+	 * Batch syncs all accommodations with sync enabled.
 	 *
 	 * @return void
 	 */
 	public static function process_scheduled_sync() {
-		// Stub for Phase 2 - will batch sync all enabled accommodations
+		// Get all accommodations with sync enabled
+		$accommodations = get_posts( array(
+			'post_type' => 'accommodation',
+			'posts_per_page' => -1,
+			'post_status' => 'publish',
+			'meta_query' => array(
+				array(
+					'key' => '_af_sync_enabled',
+					'value' => 1,
+					'compare' => '=',
+				),
+			),
+		) );
+
+		if ( empty( $accommodations ) ) {
+			return;
+		}
+
+		$manager = new self();
+
+		foreach ( $accommodations as $accommodation ) {
+			// Sync each accommodation
+			$manager->sync_accommodation( $accommodation->ID );
+
+			// Small delay to respect rate limits
+			sleep( 1 );
+		}
+	}
+
+	/**
+	 * Processes manual retry for failed sync.
+	 *
+	 * Called via WP-Cron action: af_retry_ota_sync
+	 *
+	 * @param int    $accommodation_id Accommodation post ID.
+	 * @param string $source          OTA platform.
+	 * @return void
+	 */
+	public static function process_retry_sync( $accommodation_id, $source ) {
+		$manager = new self();
+		$manager->sync_accommodation( $accommodation_id, array( $source ) );
 	}
 }

@@ -39,6 +39,11 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ai-service.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ota-credentials.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ota-api-client-base.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ota-sync-manager.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-booking-api-client.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-airbnb-api-client.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ota-webhook-handler.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ota-notifications.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'admin/class-ota-handlers.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-sri-config.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-sri-clave-acceso.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-sri-xml-factura.php';
@@ -79,11 +84,41 @@ add_filter( 'upload_size_limit', 'arriendo_facil_max_upload_size' );
 add_filter( 'wp_max_upload_size', 'arriendo_facil_max_upload_size' );
 
 /**
+ * Registers OTA sync cron jobs.
+ */
+function arriendo_facil_register_cron_jobs() {
+	// Register WP-Cron action for OTA sync
+	add_action( 'af_sync_ota_availability', array( 'Arriendo_Facil_OTA_Sync_Manager', 'process_scheduled_sync' ) );
+	add_action( 'af_retry_ota_sync', array( 'Arriendo_Facil_OTA_Sync_Manager', 'process_retry_sync' ), 10, 2 );
+
+	// Schedule main sync if not already scheduled
+	if ( ! wp_next_scheduled( 'af_sync_ota_availability' ) ) {
+		wp_schedule_event( time(), 'every_2_hours', 'af_sync_ota_availability' );
+	}
+}
+
+/**
+ * Registers custom cron interval for every 2 hours.
+ */
+function arriendo_facil_add_cron_intervals( $schedules ) {
+	$schedules['every_2_hours'] = array(
+		'interval' => 2 * HOUR_IN_SECONDS,
+		'display' => esc_html__( 'Every 2 Hours', 'arriendo-facil' ),
+	);
+
+	return $schedules;
+}
+add_filter( 'cron_schedules', 'arriendo_facil_add_cron_intervals' );
+
+/**
  * Initialises all plugin components.
  */
 function arriendo_facil_init() {
 	load_plugin_textdomain( 'arriendo-facil', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
 	Arriendo_Facil_Activator::ensure_owner_role();
+
+	// Register cron jobs
+	arriendo_facil_register_cron_jobs();
 
 	new Arriendo_Facil_Accommodation();
 	new Arriendo_Facil_Accommodation_Wizard();
@@ -97,6 +132,9 @@ function arriendo_facil_init() {
 	new Arriendo_Facil_Owner_Register_API();
 	new Arriendo_Facil_Guest();
 	new Arriendo_Facil_Billing_API();
+	new Arriendo_Facil_OTA_Webhook_Handler();
+	new Arriendo_Facil_OTA_Notifications();
+	new Arriendo_Facil_OTA_Handlers();
 	new Arriendo_Facil_Admin();
 }
 add_action( 'plugins_loaded', 'arriendo_facil_init' );

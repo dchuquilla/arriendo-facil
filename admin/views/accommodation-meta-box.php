@@ -268,6 +268,9 @@ $amenities_options = array(
 		</div>
 	</div>
 
+	<!-- OTA INTEGRATIONS SECTION -->
+	<?php include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/accommodation-ota-section.php'; ?>
+
 </div><!-- /.af-accom-form -->
 
 <script>

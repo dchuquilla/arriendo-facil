@@ -118,6 +118,24 @@ class Arriendo_Facil_Admin {
 			'af-billing-settings',
 			array( $this, 'render_billing_settings' )
 		);
+
+		add_submenu_page(
+			'arriendo-facil',
+			__( 'Integraciones OTA', 'arriendo-facil' ),
+			__( 'Integraciones OTA', 'arriendo-facil' ),
+			'edit_posts',
+			'af-ota-integrations',
+			array( $this, 'render_ota_integrations' )
+		);
+
+		add_submenu_page(
+			'arriendo-facil',
+			__( 'Panel de Sincronización OTA', 'arriendo-facil' ),
+			__( 'Sincronización OTA', 'arriendo-facil' ),
+			'manage_options',
+			'af-ota-sync-dashboard',
+			array( $this, 'render_ota_sync_dashboard' )
+		);
 	}
 
 	/**
@@ -277,6 +295,16 @@ class Arriendo_Facil_Admin {
 				'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
 				'nonce'         => wp_create_nonce( 'af_location_nonce' ),
 			) );
+
+			// OTA Sync
+			$sync_js_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/admin-ota-sync.js';
+			wp_enqueue_script(
+				'af-ota-sync',
+				ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/admin-ota-sync.js',
+				array( 'jquery', 'af-admin' ),
+				file_exists( $sync_js_path ) ? (string) filemtime( $sync_js_path ) : ARRIENDO_FACIL_VERSION,
+				true
+			);
 		}
 	}
 
@@ -3144,6 +3172,26 @@ class Arriendo_Facil_Admin {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Renders OTA Integrations settings page.
+	 */
+	public function render_ota_integrations() {
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			wp_die( esc_html__( 'No tienes permisos para acceder a esta página.', 'arriendo-facil' ) );
+		}
+		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/ota-integrations-settings.php';
+	}
+
+	/**
+	 * Renders the OTA Sync Dashboard page.
+	 */
+	public function render_ota_sync_dashboard() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'No tienes permisos para acceder a esta página.', 'arriendo-facil' ) );
+		}
+		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/ota-sync-dashboard.php';
 	}
 
 	/**

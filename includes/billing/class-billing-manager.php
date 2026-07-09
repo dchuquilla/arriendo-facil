@@ -166,9 +166,36 @@ class Arriendo_Facil_Billing_Manager {
 		$pems   = Arriendo_Facil_SRI_Config::get_cert_pems( $scope );
 
 		if ( empty( $config['ruc'] ) ) {
-			return new WP_Error( 'sri_config_missing_ruc', __( 'Debe configurar el RUC del emisor en Facturacion SRI.', 'arriendo-facil' ) );
+			if ( $owner_id > 0 ) {
+				$owner       = function_exists( 'get_userdata' ) ? get_userdata( $owner_id ) : null;
+				$owner_label = $owner ? sprintf( '%s (user_id %d)', $owner->display_name, $owner_id ) : sprintf( 'user_id %d', $owner_id );
+				return new WP_Error(
+					'sri_config_missing_ruc',
+					sprintf(
+						/* translators: %s = owner display name and id. */
+						__( 'El propietario %s aún no configuró su facturación SRI. Debe ingresar a Facturación → Configuración SRI y registrar su RUC, datos de emisor y certificado digital. Cada propietario factura con su propia identidad tributaria.', 'arriendo-facil' ),
+						$owner_label
+					)
+				);
+			}
+			return new WP_Error(
+				'sri_config_missing_ruc',
+				__( 'Debe configurar el RUC del emisor en Facturación SRI (configuración global del administrador).', 'arriendo-facil' )
+			);
 		}
 		if ( '' === $pems['cert'] || '' === $pems['pkey'] ) {
+			if ( $owner_id > 0 ) {
+				$owner       = function_exists( 'get_userdata' ) ? get_userdata( $owner_id ) : null;
+				$owner_label = $owner ? sprintf( '%s (user_id %d)', $owner->display_name, $owner_id ) : sprintf( 'user_id %d', $owner_id );
+				return new WP_Error(
+					'sri_cert_missing',
+					sprintf(
+						/* translators: %s = owner display name and id. */
+						__( 'El propietario %s aún no cargó su certificado digital (.p12) en Facturación → Configuración SRI.', 'arriendo-facil' ),
+						$owner_label
+					)
+				);
+			}
 			return new WP_Error( 'sri_cert_missing', __( 'Debe cargar y configurar el certificado digital (.p12).', 'arriendo-facil' ) );
 		}
 

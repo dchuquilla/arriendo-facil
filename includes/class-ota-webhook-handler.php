@@ -108,9 +108,29 @@ class Arriendo_Facil_OTA_Webhook_Handler {
 			return new WP_REST_Response( array( 'status' => 'ignored', 'reason' => 'property_not_found' ), 200 );
 		}
 
-		// Trigger sync for this accommodation
-		$manager = new Arriendo_Facil_OTA_Sync_Manager();
-		$manager->sync_accommodation( $accommodation->ID );
+		// Idempotency: dedupe repeated webhooks (Booking retries on 5xx) by payload hash.
+		$fingerprint = Arriendo_Facil_Idempotency::fingerprint( $data );
+		$dedupe      = Arriendo_Facil_Idempotency::dedupe_by_fingerprint(
+			'ota_webhook_booking',
+			$fingerprint,
+			5 * MINUTE_IN_SECONDS,
+			static function () use ( $accommodation ) {
+				$manager = new Arriendo_Facil_OTA_Sync_Manager();
+				$manager->sync_accommodation( $accommodation->ID );
+				return array( 'synced' => true );
+			}
+		);
+
+		if ( ! empty( $dedupe['duplicate'] ) ) {
+			return new WP_REST_Response(
+				array(
+					'status'           => 'duplicate',
+					'accommodation_id' => $accommodation->ID,
+					'property_id'      => $property_id,
+				),
+				200
+			);
+		}
 
 		return new WP_REST_Response(
 			array(
@@ -150,32 +170,47 @@ class Arriendo_Facil_OTA_Webhook_Handler {
 			return new WP_REST_Response( array( 'status' => 'ignored', 'reason' => 'no_listings' ), 200 );
 		}
 
-		// Process each listing
-		$processed = 0;
-		$manager   = new Arriendo_Facil_OTA_Sync_Manager();
-
-		foreach ( $listing_ids as $listing_id ) {
-			if ( empty( $listing_id ) ) {
-				continue;
+		// Idempotency: dedupe repeated webhooks by payload hash.
+		$fingerprint = Arriendo_Facil_Idempotency::fingerprint( $data );
+		$dedupe      = Arriendo_Facil_Idempotency::dedupe_by_fingerprint(
+			'ota_webhook_airbnb',
+			$fingerprint,
+			5 * MINUTE_IN_SECONDS,
+			function () use ( $listing_ids ) {
+				$processed = 0;
+				$manager   = new Arriendo_Facil_OTA_Sync_Manager();
+				foreach ( $listing_ids as $listing_id ) {
+					if ( empty( $listing_id ) ) {
+						continue;
+					}
+					$accommodation = $this->find_accommodation_by_airbnb_id( $listing_id );
+					if ( ! $accommodation ) {
+						continue;
+					}
+					$manager->sync_accommodation( $accommodation->ID );
+					$processed++;
+				}
+				return array( 'processed' => $processed, 'total' => count( $listing_ids ) );
 			}
+		);
 
-			// Find accommodation linked to this Airbnb listing ID
-			$accommodation = $this->find_accommodation_by_airbnb_id( $listing_id );
-
-			if ( ! $accommodation ) {
-				continue;
-			}
-
-			// Trigger sync for this accommodation
-			$manager->sync_accommodation( $accommodation->ID );
-			$processed++;
+		if ( ! empty( $dedupe['duplicate'] ) ) {
+			return new WP_REST_Response(
+				array(
+					'status'    => 'duplicate',
+					'total'     => count( $listing_ids ),
+				),
+				200
+			);
 		}
+
+		$result = is_array( $dedupe['result'] ?? null ) ? $dedupe['result'] : array( 'processed' => 0, 'total' => count( $listing_ids ) );
 
 		return new WP_REST_Response(
 			array(
-				'status'      => 'processed',
-				'processed'   => $processed,
-				'total'       => count( $listing_ids ),
+				'status'    => 'processed',
+				'processed' => (int) ( $result['processed'] ?? 0 ),
+				'total'     => (int) ( $result['total'] ?? count( $listing_ids ) ),
 			),
 			200
 		);

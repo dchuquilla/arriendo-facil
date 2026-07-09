@@ -23,6 +23,7 @@ if ( file_exists( $af_composer_autoload ) ) {
 }
 
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-activator.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-idempotency.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-wizard.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-featured-admin.php';
@@ -91,6 +92,12 @@ function arriendo_facil_register_cron_jobs() {
 	// Schedule main sync if not already scheduled
 	if ( ! wp_next_scheduled( 'af_sync_ota_availability' ) ) {
 		wp_schedule_event( time(), 'every_30_minutes', 'af_sync_ota_availability' );
+	}
+
+	// Daily purge of expired idempotency keys.
+	add_action( 'af_idempotency_purge', array( 'Arriendo_Facil_Idempotency', 'purge_expired' ) );
+	if ( ! wp_next_scheduled( 'af_idempotency_purge' ) ) {
+		wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', 'af_idempotency_purge' );
 	}
 }
 

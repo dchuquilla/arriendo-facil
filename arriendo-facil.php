@@ -131,7 +131,7 @@ function arriendo_facil_init() {
 	new Arriendo_Facil_Billing_API();
 	new Arriendo_Facil_OTA_Webhook_Handler();
 	new Arriendo_Facil_OTA_Notifications();
-	new Arriendo_Facil_OTA_Handlers();
+	new Arriendo_Facil_OTA_AJAX_Handlers();
 	new Arriendo_Facil_Admin();
 }
 add_action( 'plugins_loaded', 'arriendo_facil_init' );

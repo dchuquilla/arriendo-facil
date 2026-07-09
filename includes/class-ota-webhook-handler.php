@@ -190,14 +190,21 @@ class Arriendo_Facil_OTA_Webhook_Handler {
 	private function find_accommodation_by_booking_id( $property_id ) {
 		$property_id = absint( $property_id );
 
-		$posts = get_posts( array(
-			'post_type'  => 'accommodation',
-			'meta_key'   => '_af_booking_property_id',
-			'meta_value' => $property_id,
-			'num_posts'  => 1,
+		$query = new WP_Query( array(
+			'post_type'      => 'accommodation',
+			'post_status'    => array( 'publish', 'draft' ),
+			'meta_query'     => array(
+				array(
+					'key'     => '_af_booking_property_id',
+					'value'   => $property_id,
+					'compare' => '=',
+					'type'    => 'NUMERIC',
+				),
+			),
+			'posts_per_page' => 1,
 		) );
 
-		return ! empty( $posts ) ? $posts[0] : null;
+		return ! empty( $query->posts ) ? $query->posts[0] : null;
 	}
 
 	/**
@@ -209,14 +216,20 @@ class Arriendo_Facil_OTA_Webhook_Handler {
 	private function find_accommodation_by_airbnb_id( $listing_id ) {
 		$listing_id = sanitize_text_field( $listing_id );
 
-		$posts = get_posts( array(
-			'post_type'  => 'accommodation',
-			'meta_key'   => '_af_airbnb_listing_id',
-			'meta_value' => $listing_id,
-			'num_posts'  => 1,
+		$query = new WP_Query( array(
+			'post_type'      => 'accommodation',
+			'post_status'    => array( 'publish', 'draft' ),
+			'meta_query'     => array(
+				array(
+					'key'     => '_af_airbnb_listing_id',
+					'value'   => $listing_id,
+					'compare' => '=',
+				),
+			),
+			'posts_per_page' => 1,
 		) );
 
-		return ! empty( $posts ) ? $posts[0] : null;
+		return ! empty( $query->posts ) ? $query->posts[0] : null;
 	}
 
 	/**

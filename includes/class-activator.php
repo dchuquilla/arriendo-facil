@@ -438,8 +438,27 @@ class Arriendo_Facil_Activator {
 				KEY status (status),
 				KEY created_at (created_at)
 			) $charset_collate;",
-		);
 
+			// ── Idempotency keys (anti-duplication guard) ────────────────────
+			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_idempotency_keys (
+				id                BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+				scope             VARCHAR(120) NOT NULL,
+				idempotency_key   VARCHAR(128) NOT NULL,
+				user_id           BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+				request_hash      CHAR(64) NOT NULL DEFAULT '',
+				status            VARCHAR(20) NOT NULL DEFAULT 'in_progress',
+				response_body     LONGTEXT DEFAULT NULL,
+				resource_id       VARCHAR(64) DEFAULT NULL,
+				locked_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				completed_at      DATETIME DEFAULT NULL,
+				expires_at        DATETIME NOT NULL,
+				created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				UNIQUE KEY uniq_scope_key (scope, idempotency_key),
+				KEY idx_expires_at (expires_at),
+				KEY idx_status (status)
+			) $charset_collate;",
+		);
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		foreach ( $tables as $sql ) {
 			dbDelta( $sql );

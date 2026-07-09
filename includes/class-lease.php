@@ -276,6 +276,66 @@ class Arriendo_Facil_Lease {
 			wp_send_json_error( array( 'message' => __( 'Faltan campos obligatorios.', 'arriendo-facil' ) ) );
 		}
 
+		// Optional idempotency guard: activates only when the client sends the key.
+		$idempotency_key = Arriendo_Facil_Idempotency::key_from_request();
+		if ( null !== $idempotency_key ) {
+			$scope         = 'af_create_lease_' . get_current_user_id();
+			$fingerprint   = Arriendo_Facil_Idempotency::fingerprint(
+				array(
+					'accommodation_id' => $accommodation_id,
+					'guest_id'         => $guest_id,
+					'start_date'       => $start_date,
+					'end_date'         => $end_date,
+					'monthly_rent'     => $monthly_rent,
+				)
+			);
+			$idem_response = Arriendo_Facil_Idempotency::remember(
+				$scope,
+				$idempotency_key,
+				DAY_IN_SECONDS,
+				function () use ( $accommodation_id, $guest_id, $start_date, $end_date, $monthly_rent ) {
+					return $this->insert_lease_record( $accommodation_id, $guest_id, $start_date, $end_date, $monthly_rent );
+				},
+				$fingerprint
+			);
+
+			if ( Arriendo_Facil_Idempotency::is_in_flight( $idem_response ) ) {
+				wp_send_json_error(
+					array( 'message' => __( 'Solicitud en progreso.', 'arriendo-facil' ), 'code' => 'request_locked' ),
+					429
+				);
+			}
+			if ( Arriendo_Facil_Idempotency::is_conflict( $idem_response ) ) {
+				wp_send_json_error(
+					array( 'message' => __( 'Idempotency-Key reutilizada con datos distintos.', 'arriendo-facil' ), 'code' => 'idempotency_conflict' ),
+					422
+				);
+			}
+
+			if ( is_array( $idem_response ) && ! empty( $idem_response['id'] ) ) {
+				wp_send_json_success( array( 'id' => (int) $idem_response['id'] ) );
+			}
+			wp_send_json_error( array( 'message' => __( 'No se pudo crear el contrato.', 'arriendo-facil' ) ) );
+		}
+
+		$result = $this->insert_lease_record( $accommodation_id, $guest_id, $start_date, $end_date, $monthly_rent );
+		if ( is_array( $result ) && ! empty( $result['id'] ) ) {
+			wp_send_json_success( array( 'id' => (int) $result['id'] ) );
+		}
+		wp_send_json_error( array( 'message' => __( 'No se pudo crear el contrato.', 'arriendo-facil' ) ) );
+	}
+
+	/**
+	 * Inserts the lease row and sets side-effects. Returns ['id' => int] on success, [] on failure.
+	 *
+	 * @param int    $accommodation_id Accommodation ID.
+	 * @param int    $guest_id         Guest ID.
+	 * @param string $start_date       Start date (Y-m-d).
+	 * @param string $end_date         End date (Y-m-d).
+	 * @param float  $monthly_rent     Monthly rent.
+	 * @return array
+	 */
+	private function insert_lease_record( int $accommodation_id, int $guest_id, string $start_date, string $end_date, float $monthly_rent ): array {
 		global $wpdb;
 		$inserted = $wpdb->insert(
 			$wpdb->prefix . 'af_leases',
@@ -290,12 +350,13 @@ class Arriendo_Facil_Lease {
 			array( '%d', '%d', '%s', '%s', '%f', '%s' )
 		);
 
-		if ( $inserted ) {
-			update_post_meta( $accommodation_id, '_af_is_occupied', '1' );
-			wp_send_json_success( array( 'id' => $wpdb->insert_id ) );
-		} else {
-			wp_send_json_error( array( 'message' => __( 'No se pudo crear el contrato.', 'arriendo-facil' ) ) );
+		if ( ! $inserted ) {
+			return array();
 		}
+
+		$new_id = (int) $wpdb->insert_id;
+		update_post_meta( $accommodation_id, '_af_is_occupied', '1' );
+		return array( 'id' => $new_id );
 	}
 
 	/**

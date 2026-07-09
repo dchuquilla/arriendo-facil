@@ -656,6 +656,70 @@ class Arriendo_Facil_Rental_Workflow {
 			wp_send_json_error( array( 'message' => __( 'El inmueble no puede reservarse en este momento.', 'arriendo-facil' ) ), 409 );
 		}
 
+		// Optional idempotency guard: activates only when the client sends the key.
+		$idempotency_key = Arriendo_Facil_Idempotency::key_from_request();
+		if ( null !== $idempotency_key ) {
+			$scope       = 'af_create_reservation_hold_' . $accommodation_id;
+			$fingerprint = Arriendo_Facil_Idempotency::fingerprint(
+				array(
+					'accommodation_id'  => $accommodation_id,
+					'guest_id'          => $guest_id,
+					'deposit_amount'    => $deposit_amount,
+					'hold_until'        => $hold_until,
+					'payment_reference' => $payment_reference,
+				)
+			);
+			$idem = Arriendo_Facil_Idempotency::remember(
+				$scope,
+				$idempotency_key,
+				DAY_IN_SECONDS,
+				function () use ( $accommodation_id, $guest_id, $deposit_amount, $hold_until, $payment_reference, $notes ) {
+					return $this->insert_reservation_hold_row( $accommodation_id, $guest_id, $deposit_amount, $hold_until, $payment_reference, $notes );
+				},
+				$fingerprint
+			);
+
+			if ( Arriendo_Facil_Idempotency::is_in_flight( $idem ) ) {
+				wp_send_json_error( array( 'message' => __( 'Solicitud en progreso.', 'arriendo-facil' ), 'code' => 'request_locked' ), 429 );
+			}
+			if ( Arriendo_Facil_Idempotency::is_conflict( $idem ) ) {
+				wp_send_json_error( array( 'message' => __( 'Idempotency-Key reutilizada con datos distintos.', 'arriendo-facil' ), 'code' => 'idempotency_conflict' ), 422 );
+			}
+			if ( is_array( $idem ) && ! empty( $idem['id'] ) ) {
+				wp_send_json_success(
+					array(
+						'id'      => (int) $idem['id'],
+						'message' => __( 'Reserva temporal creada.', 'arriendo-facil' ),
+					)
+				);
+			}
+			wp_send_json_error( array( 'message' => __( 'No se pudo crear la reserva temporal.', 'arriendo-facil' ) ) );
+		}
+
+		$result = $this->insert_reservation_hold_row( $accommodation_id, $guest_id, $deposit_amount, $hold_until, $payment_reference, $notes );
+		if ( is_array( $result ) && ! empty( $result['id'] ) ) {
+			wp_send_json_success(
+				array(
+					'id'      => (int) $result['id'],
+					'message' => __( 'Reserva temporal creada.', 'arriendo-facil' ),
+				)
+			);
+		}
+		wp_send_json_error( array( 'message' => __( 'No se pudo crear la reserva temporal.', 'arriendo-facil' ) ) );
+	}
+
+	/**
+	 * Inserts a reservation hold row and dispatches its side-effects.
+	 *
+	 * @param int    $accommodation_id  Accommodation ID.
+	 * @param int    $guest_id          Guest ID.
+	 * @param float  $deposit_amount    Deposit amount.
+	 * @param string $hold_until        Hold-until datetime string.
+	 * @param string $payment_reference Payment reference.
+	 * @param string $notes             Optional notes.
+	 * @return array{id?:int}
+	 */
+	private function insert_reservation_hold_row( int $accommodation_id, int $guest_id, float $deposit_amount, string $hold_until, string $payment_reference, string $notes ): array {
 		global $wpdb;
 		$table = $wpdb->prefix . 'af_reservations';
 
@@ -677,19 +741,15 @@ class Arriendo_Facil_Rental_Workflow {
 		);
 
 		if ( ! $inserted ) {
-			wp_send_json_error( array( 'message' => __( 'No se pudo crear la reserva temporal.', 'arriendo-facil' ) ) );
+			return array();
 		}
 
+		$reservation_id = (int) $wpdb->insert_id;
 		self::set_commercial_state( $accommodation_id, 'reserved', 'public' );
 		$this->cancel_and_notify_interest_queue_unavailable( $accommodation_id );
-		self::log_lease_event( 0, $accommodation_id, 'reservation_created', array( 'reservation_id' => (int) $wpdb->insert_id, 'hold_until' => $hold_until ) );
+		self::log_lease_event( 0, $accommodation_id, 'reservation_created', array( 'reservation_id' => $reservation_id, 'hold_until' => $hold_until ) );
 
-		wp_send_json_success(
-			array(
-				'id'      => (int) $wpdb->insert_id,
-				'message' => __( 'Reserva temporal creada.', 'arriendo-facil' ),
-			)
-		);
+		return array( 'id' => $reservation_id );
 	}
 
 	/**

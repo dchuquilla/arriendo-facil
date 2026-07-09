@@ -145,10 +145,65 @@ class Arriendo_Facil_Billing_API {
 		}
 		set_transient( $lock_key, 1, 30 );
 
-		$result = $this->manager->issue_lease_invoice(
-			$lease_id,
-			array_merge( array( 'billing_period' => $period ), $flat_overrides )
+		// Idempotency guard: if the client provides a key (or reuses the transient window
+		// with the same period), reissue must return the cached response instead of
+		// generating a new invoice at the SRI (irreversible operation).
+		$idempotency_key = Arriendo_Facil_Idempotency::key_from_request();
+		if ( null === $idempotency_key ) {
+			// Auto-derive one from the payload so a double-submit within TTL is deduped
+			// even for legacy callers that do not send the header.
+			$idempotency_key = 'auto_' . Arriendo_Facil_Idempotency::fingerprint(
+				array(
+					'lease_id'  => $lease_id,
+					'period'    => $period,
+					'overrides' => $flat_overrides,
+					'user_id'   => get_current_user_id(),
+				)
+			);
+		}
+
+		$scope       = 'af_issue_invoice_' . $lease_id . '_' . $period;
+		$fingerprint = Arriendo_Facil_Idempotency::fingerprint(
+			array( 'lease_id' => $lease_id, 'period' => $period, 'overrides' => $flat_overrides )
 		);
+
+		$manager        = $this->manager;
+		$idem_response  = Arriendo_Facil_Idempotency::remember(
+			$scope,
+			$idempotency_key,
+			24 * HOUR_IN_SECONDS,
+			static function () use ( $manager, $lease_id, $period, $flat_overrides ) {
+				return $manager->issue_lease_invoice(
+					$lease_id,
+					array_merge( array( 'billing_period' => $period ), $flat_overrides )
+				);
+			},
+			$fingerprint
+		);
+
+		if ( Arriendo_Facil_Idempotency::is_in_flight( $idem_response ) ) {
+			delete_transient( $lock_key );
+			wp_send_json_error(
+				array(
+					'message' => __( 'Operación en progreso. Espere un momento antes de reintentar.', 'arriendo-facil' ),
+					'code'    => 'request_locked',
+				),
+				429
+			);
+		}
+
+		if ( Arriendo_Facil_Idempotency::is_conflict( $idem_response ) ) {
+			delete_transient( $lock_key );
+			wp_send_json_error(
+				array(
+					'message' => __( 'La clave de idempotencia fue reutilizada con datos diferentes.', 'arriendo-facil' ),
+					'code'    => 'idempotency_conflict',
+				),
+				422
+			);
+		}
+
+		$result = $idem_response;
 
 		// Release lock immediately if the request failed (allows fast retry on real errors).
 		if ( is_wp_error( $result ) ) {
@@ -260,7 +315,37 @@ class Arriendo_Facil_Billing_API {
 			wp_send_json_error( array( 'message' => __( 'No tienes acceso a este comprobante.', 'arriendo-facil' ) ), 403 );
 		}
 
-		$result = $this->manager->retry_invoice( $invoice_id );
+		// Idempotency guard: deduplicate rapid retries (double-click) so we do not
+		// resubmit the same invoice to the SRI more than once per window.
+		$idempotency_key = Arriendo_Facil_Idempotency::key_from_request();
+		if ( null === $idempotency_key ) {
+			$idempotency_key = 'auto_retry_' . $invoice_id;
+		}
+		$scope       = 'af_retry_invoice_' . $invoice_id;
+		$fingerprint = Arriendo_Facil_Idempotency::fingerprint( array( 'invoice_id' => $invoice_id ) );
+		$manager     = $this->manager;
+
+		$idem_response = Arriendo_Facil_Idempotency::remember(
+			$scope,
+			$idempotency_key,
+			HOUR_IN_SECONDS,
+			static function () use ( $manager, $invoice_id ) {
+				return $manager->retry_invoice( $invoice_id );
+			},
+			$fingerprint
+		);
+
+		if ( Arriendo_Facil_Idempotency::is_in_flight( $idem_response ) ) {
+			wp_send_json_error(
+				array(
+					'message' => __( 'Reintento en progreso. Espere un momento.', 'arriendo-facil' ),
+					'code'    => 'request_locked',
+				),
+				429
+			);
+		}
+
+		$result = $idem_response;
 		if ( is_wp_error( $result ) ) {
 			wp_send_json_error(
 				array(

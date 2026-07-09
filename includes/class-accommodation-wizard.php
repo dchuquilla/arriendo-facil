@@ -165,6 +165,20 @@ class Arriendo_Facil_Accommodation_Wizard {
 				),
 			)
 		);
+
+		// OTA Sync script
+		$ota_sync_js_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/admin-ota-sync.js';
+		wp_enqueue_script(
+			'af-ota-sync',
+			ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/admin-ota-sync.js',
+			array( 'jquery', 'af-admin' ),
+			file_exists( $ota_sync_js_path ) ? (string) filemtime( $ota_sync_js_path ) : ARRIENDO_FACIL_VERSION,
+			true
+		);
+
+		wp_localize_script( 'af-ota-sync', 'afOtaSync', array(
+			'nonce' => wp_create_nonce( 'af_ota_nonce' ),
+		) );
 	}
 
 	/**

@@ -27,6 +27,17 @@
 	var totalSteps = steps.length;
 	var current    = 1;
 
+	// Locate the summary step dynamically (it is not necessarily the last one:
+	// e.g. the OTA-sync step lives after the summary in create mode).
+	var summaryStep = 0;
+	( function () {
+		var summaryHost = root.querySelector( '#af-summary' );
+		if ( ! summaryHost ) return;
+		var section = summaryHost.closest( '.af-wizard__step' );
+		if ( ! section ) return;
+		summaryStep = parseInt( section.dataset.step, 10 ) || 0;
+	} )();
+
 	/* ---------- Step navigation (create mode) ---------- */
 
 	function setPublishEnabled( on ) {
@@ -52,7 +63,7 @@
 			btnNext.hidden = current === totalSteps;
 		}
 		setPublishEnabled( current === totalSteps );
-		if ( current === totalSteps ) {
+		if ( summaryStep && current === summaryStep ) {
 			renderSummary();
 		}
 		try { window.scrollTo( { top: 0, behavior: 'smooth' } ); } catch ( e ) { window.scrollTo( 0, 0 ); }

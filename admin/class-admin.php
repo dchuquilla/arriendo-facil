@@ -305,6 +305,10 @@ class Arriendo_Facil_Admin {
 				file_exists( $sync_js_path ) ? (string) filemtime( $sync_js_path ) : ARRIENDO_FACIL_VERSION,
 				true
 			);
+
+			wp_localize_script( 'af-ota-sync', 'afOtaSync', array(
+				'nonce' => wp_create_nonce( 'af_ota_nonce' ),
+			) );
 		}
 	}
 

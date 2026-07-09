@@ -366,7 +366,9 @@ class Arriendo_Facil_Accommodation {
 			'_af_property_type'        => 'sanitize_text_field',
 			'_af_square_meters'        => 'floatval',
 			'_af_booking_property_id'  => 'sanitize_text_field',
+			'_af_booking_ical_url'     => 'esc_url_raw',
 			'_af_airbnb_listing_id'    => 'sanitize_text_field',
+			'_af_airbnb_ical_url'      => 'esc_url_raw',
 			'_af_sync_enabled'         => 'absint',
 		);
 

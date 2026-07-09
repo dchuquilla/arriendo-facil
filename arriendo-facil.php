@@ -36,14 +36,11 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-owner-contact.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-owner-register-api.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-guest.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ai-service.php';
-require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ota-credentials.php';
-require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ota-api-client-base.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ical-parser.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ota-sync-manager.php';
-require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-booking-api-client.php';
-require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-airbnb-api-client.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ota-webhook-handler.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ota-notifications.php';
-require_once ARRIENDO_FACIL_PLUGIN_DIR . 'admin/class-ota-handlers.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'admin/class-ota-ajax-handlers.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-sri-config.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-sri-clave-acceso.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-sri-xml-factura.php';
@@ -93,17 +90,17 @@ function arriendo_facil_register_cron_jobs() {
 
 	// Schedule main sync if not already scheduled
 	if ( ! wp_next_scheduled( 'af_sync_ota_availability' ) ) {
-		wp_schedule_event( time(), 'every_2_hours', 'af_sync_ota_availability' );
+		wp_schedule_event( time(), 'every_30_minutes', 'af_sync_ota_availability' );
 	}
 }
 
 /**
- * Registers custom cron interval for every 2 hours.
+ * Registers custom cron interval for every 30 minutes.
  */
 function arriendo_facil_add_cron_intervals( $schedules ) {
-	$schedules['every_2_hours'] = array(
-		'interval' => 2 * HOUR_IN_SECONDS,
-		'display' => esc_html__( 'Every 2 Hours', 'arriendo-facil' ),
+	$schedules['every_30_minutes'] = array(
+		'interval' => 30 * MINUTE_IN_SECONDS,
+		'display' => esc_html__( 'Every 30 Minutes', 'arriendo-facil' ),
 	);
 
 	return $schedules;

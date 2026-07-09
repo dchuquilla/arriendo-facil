@@ -51,6 +51,7 @@ $steps = array(
 	4 => array( 'title' => __( 'Fotos', 'arriendo-facil' ),            'icon' => '&#x1F4F7;' ),
 	5 => array( 'title' => __( 'Precio y propietario', 'arriendo-facil' ), 'icon' => '&#x1F4B0;' ),
 	6 => array( 'title' => __( 'Resumen y publicar', 'arriendo-facil' ),   'icon' => '&#x1F4DD;' ),
+	7 => array( 'title' => __( 'Sincronización OTA', 'arriendo-facil' ),   'icon' => '&#x1F4F1;' ),
 );
 
 $wizard_class = 'af-wizard af-wizard--' . esc_attr( $mode );
@@ -505,6 +506,129 @@ $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data[
 				</div>
 			</section>
 
+			<!-- PASO 7: SINCRONIZACIÓN OTA -->
+			<section class="af-wizard__step" data-step="7">
+				<h2 class="af-wizard__step-title">
+					<span class="af-wizard__step-icon" aria-hidden="true">&#x1F4F1;</span>
+					<?php esc_html_e( 'Sincronización OTA (Opcional)', 'arriendo-facil' ); ?>
+				</h2>
+
+				<p class="af-wizard__step-description">
+					<?php esc_html_e( 'Sincroniza la disponibilidad de este inmueble con Booking.com y Airbnb. Esto previene overbooking automáticamente.', 'arriendo-facil' ); ?>
+				</p>
+
+				<div class="af-wizard__step-content">
+					<!-- Booking -->
+					<div class="af-ota-form-section">
+						<h3>📅 Booking.com</h3>
+
+						<div class="af-form-group">
+							<label for="af_booking_property_id">
+								<?php esc_html_e( 'Property ID (números)', 'arriendo-facil' ); ?>
+							</label>
+							<input
+								type="text"
+								id="af_booking_property_id"
+								name="af_booking_property_id"
+								value="<?php echo esc_attr( $data['booking_property_id'] ?? '' ); ?>"
+								placeholder="Ej: 12345678"
+								class="af-form-input"
+							/>
+							<small><?php esc_html_e( 'Encuentra tu Property ID en: Booking → Tu propiedad → URL: /property/[ID]', 'arriendo-facil' ); ?></small>
+						</div>
+
+						<div class="af-form-group">
+							<label for="af_booking_ical_url">
+								<?php esc_html_e( 'URL del Calendario iCal', 'arriendo-facil' ); ?>
+							</label>
+							<input
+								type="url"
+								id="af_booking_ical_url"
+								name="af_booking_ical_url"
+								value="<?php echo esc_url( $data['booking_ical_url'] ?? '' ); ?>"
+								placeholder="https://..."
+								class="af-form-input"
+							/>
+							<small><?php esc_html_e( 'Booking → Precios y disponibilidad → Sincronización del calendario → Exportar calendario', 'arriendo-facil' ); ?></small>
+						</div>
+
+						<button type="button" class="button af-test-ical-btn" data-platform="booking" data-accommodation-id="<?php echo absint( $post_id ); ?>">
+							<?php esc_html_e( 'Probar URL', 'arriendo-facil' ); ?>
+						</button>
+						<span class="af-test-result" data-platform="booking"></span>
+					</div>
+
+					<!-- Airbnb -->
+					<div class="af-ota-form-section">
+						<h3>🏠 Airbnb</h3>
+
+						<div class="af-form-group">
+							<label for="af_airbnb_listing_id">
+								<?php esc_html_e( 'Listing ID (números)', 'arriendo-facil' ); ?>
+							</label>
+							<input
+								type="text"
+								id="af_airbnb_listing_id"
+								name="af_airbnb_listing_id"
+								value="<?php echo esc_attr( $data['airbnb_listing_id'] ?? '' ); ?>"
+								placeholder="Ej: 12345678"
+								class="af-form-input"
+							/>
+							<small><?php esc_html_e( 'Tu Listing ID está en: airbnb.com/rooms/[ID]', 'arriendo-facil' ); ?></small>
+						</div>
+
+						<div class="af-form-group">
+							<label for="af_airbnb_ical_url">
+								<?php esc_html_e( 'URL del Calendario iCal', 'arriendo-facil' ); ?>
+							</label>
+							<input
+								type="url"
+								id="af_airbnb_ical_url"
+								name="af_airbnb_ical_url"
+								value="<?php echo esc_url( $data['airbnb_ical_url'] ?? '' ); ?>"
+								placeholder="https://..."
+								class="af-form-input"
+							/>
+							<small><?php esc_html_e( 'Airbnb → Calendario → Engranaje (⚙) → Opciones del calendario → Exportar', 'arriendo-facil' ); ?></small>
+						</div>
+
+						<button type="button" class="button af-test-ical-btn" data-platform="airbnb" data-accommodation-id="<?php echo absint( $post_id ); ?>">
+							<?php esc_html_e( 'Probar URL', 'arriendo-facil' ); ?>
+						</button>
+						<span class="af-test-result" data-platform="airbnb"></span>
+					</div>
+
+					<!-- Opciones -->
+					<div class="af-ota-form-section">
+						<div class="af-form-group checkbox">
+							<label>
+								<input
+									type="hidden"
+									name="af_sync_enabled"
+									value="0"
+								/>
+								<input
+									type="checkbox"
+									name="af_sync_enabled"
+									value="1"
+									<?php checked( $data['sync_enabled'] ?? 0, 1 ); ?>
+								/>
+								<?php esc_html_e( 'Habilitar sincronización automática (cada 30 minutos)', 'arriendo-facil' ); ?>
+							</label>
+						</div>
+					</div>
+
+					<div class="af-ota-info-box">
+						<p>
+							<strong><?php esc_html_e( 'ℹ Cómo funciona:', 'arriendo-facil' ); ?></strong><br/>
+							<?php esc_html_e( '• Cada 30 minutos, ArriendoFácil descargará tus calendarios de Booking y Airbnb', 'arriendo-facil' ); ?><br/>
+							<?php esc_html_e( '• Si hay reservas, el inmueble se marcará automáticamente como ocupado', 'arriendo-facil' ); ?><br/>
+							<?php esc_html_e( '• Verás el estado de las sincronizaciones en: Arriendo Fácil → Sincronización OTA', 'arriendo-facil' ); ?>
+						</p>
+					</div>
+				</div>
+			</section>
+
 			<!-- Sticky action bar -->
 			<div class="af-wizard__actions">
 				<div class="af-wizard__actions-left">
@@ -539,3 +663,115 @@ $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data[
 		</div>
 	</div>
 </div>
+
+<style>
+.af-ota-form-section {
+	background: white;
+	border: 1px solid #ddd;
+	border-radius: 4px;
+	padding: 20px;
+	margin-bottom: 20px;
+}
+
+.af-ota-form-section h3 {
+	margin-top: 0;
+	margin-bottom: 15px;
+	color: #333;
+	font-size: 16px;
+}
+
+.af-form-group {
+	margin-bottom: 15px;
+}
+
+.af-form-group label {
+	display: block;
+	margin-bottom: 8px;
+	font-weight: 500;
+	color: #333;
+}
+
+.af-form-group.checkbox label {
+	display: flex;
+	align-items: center;
+	font-weight: normal;
+	gap: 8px;
+}
+
+.af-form-group.checkbox input {
+	margin: 0;
+}
+
+.af-form-input {
+	width: 100%;
+	padding: 8px 12px;
+	border: 1px solid #ccc;
+	border-radius: 4px;
+	font-size: 14px;
+	font-family: inherit;
+	box-sizing: border-box;
+}
+
+.af-form-input:focus {
+	border-color: #0073aa;
+	outline: none;
+	box-shadow: 0 0 0 2px rgba(0, 115, 170, 0.2);
+}
+
+.af-form-group small {
+	display: block;
+	margin-top: 5px;
+	color: #666;
+	font-size: 12px;
+	line-height: 1.4;
+}
+
+.af-test-ical-btn {
+	margin-top: 10px;
+	margin-right: 10px;
+}
+
+.af-test-result {
+	margin-left: 10px;
+	padding: 5px 10px;
+	border-radius: 3px;
+	font-size: 13px;
+	display: none;
+}
+
+.af-test-result.success {
+	background: #e8f5e9;
+	color: #2e7d32;
+	border: 1px solid #a5d6a7;
+	display: inline-block;
+}
+
+.af-test-result.error {
+	background: #ffebee;
+	color: #d32f2f;
+	border: 1px solid #ef9a9a;
+	display: inline-block;
+}
+
+.af-test-result.loading {
+	background: #fff3cd;
+	color: #856404;
+	border: 1px solid #ffeaa7;
+	display: inline-block;
+}
+
+.af-ota-info-box {
+	background: #e7f3ff;
+	border-left: 4px solid #0073aa;
+	padding: 15px;
+	border-radius: 2px;
+	margin-top: 20px;
+	font-size: 14px;
+}
+
+.af-ota-info-box p {
+	margin: 0;
+	color: #0073aa;
+	line-height: 1.6;
+}
+</style>

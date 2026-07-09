@@ -218,4 +218,15 @@ class Arriendo_Facil_OTA_Webhook_Handler {
 
 		return ! empty( $posts ) ? $posts[0] : null;
 	}
+
+	/**
+	 * Gets the webhook URL for configuration on OTA platform.
+	 *
+	 * @param string $platform OTA platform (booking, airbnb).
+	 * @return string Full webhook URL.
+	 */
+	public static function get_webhook_url( $platform ) {
+		$platform = sanitize_key( $platform );
+		return rest_url( "af/v1/ota/webhook/{$platform}" );
+	}
 }

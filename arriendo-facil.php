@@ -37,9 +37,14 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-owner-register-api.php'
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-guest.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ai-service.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ical-parser.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ota-credentials.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ota-api-client-base.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-booking-api-client.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-airbnb-api-client.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ota-sync-manager.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ota-webhook-handler.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ota-notifications.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'admin/class-ota-handlers.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'admin/class-ota-ajax-handlers.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-sri-config.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-sri-clave-acceso.php';
@@ -134,6 +139,7 @@ function arriendo_facil_init() {
 		'Arriendo_Facil_Billing_API',
 		'Arriendo_Facil_OTA_Webhook_Handler',
 		'Arriendo_Facil_OTA_Notifications',
+		'Arriendo_Facil_OTA_Handlers',
 		'Arriendo_Facil_OTA_AJAX_Handlers',
 		'Arriendo_Facil_Admin',
 	);

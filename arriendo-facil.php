@@ -117,22 +117,34 @@ function arriendo_facil_init() {
 	// Register cron jobs
 	arriendo_facil_register_cron_jobs();
 
-	new Arriendo_Facil_Accommodation();
-	new Arriendo_Facil_Accommodation_Wizard();
-	new Arriendo_Facil_Accommodation_Featured_Admin();
-	new Arriendo_Facil_Accommodation_Occupied_Admin();
-	new Arriendo_Facil_Accommodation_Search_API();
-	new Arriendo_Facil_Cleaning_Service();
-	new Arriendo_Facil_Lease();
-	new Arriendo_Facil_Rental_Workflow();
-	new Arriendo_Facil_Owner_Contact();
-	new Arriendo_Facil_Owner_Register_API();
-	new Arriendo_Facil_Guest();
-	new Arriendo_Facil_Billing_API();
-	new Arriendo_Facil_OTA_Webhook_Handler();
-	new Arriendo_Facil_OTA_Notifications();
-	new Arriendo_Facil_OTA_AJAX_Handlers();
-	new Arriendo_Facil_Admin();
+	// Instantiate each component defensively so a missing/renamed class does
+	// not tumble the entire site with a fatal error during plugin_loaded.
+	$components = array(
+		'Arriendo_Facil_Accommodation',
+		'Arriendo_Facil_Accommodation_Wizard',
+		'Arriendo_Facil_Accommodation_Featured_Admin',
+		'Arriendo_Facil_Accommodation_Occupied_Admin',
+		'Arriendo_Facil_Accommodation_Search_API',
+		'Arriendo_Facil_Cleaning_Service',
+		'Arriendo_Facil_Lease',
+		'Arriendo_Facil_Rental_Workflow',
+		'Arriendo_Facil_Owner_Contact',
+		'Arriendo_Facil_Owner_Register_API',
+		'Arriendo_Facil_Guest',
+		'Arriendo_Facil_Billing_API',
+		'Arriendo_Facil_OTA_Webhook_Handler',
+		'Arriendo_Facil_OTA_Notifications',
+		'Arriendo_Facil_OTA_AJAX_Handlers',
+		'Arriendo_Facil_Admin',
+	);
+
+	foreach ( $components as $component_class ) {
+		if ( class_exists( $component_class ) ) {
+			new $component_class();
+		} elseif ( function_exists( 'error_log' ) ) {
+			error_log( sprintf( '[arriendo-facil] Skipped missing component class: %s', $component_class ) );
+		}
+	}
 }
 add_action( 'plugins_loaded', 'arriendo_facil_init' );
 

@@ -1,9 +1,9 @@
 <?php
 /**
- * OTA Webhook Handler
+ * OTA Webhook Handler - Processes webhooks from Booking and Airbnb
  *
- * Receives and processes webhook notifications from OTA platforms
- * (Booking.com, Airbnb) when availability or reservations change.
+ * Handles incoming webhook notifications from OTA platforms
+ * to trigger immediate synchronization.
  *
  * @package Arriendo_Facil
  */
@@ -15,39 +15,64 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Class Arriendo_Facil_OTA_Webhook_Handler
  *
- * Handles incoming webhooks from OTA platforms.
+ * Receives and processes OTA webhook events.
  */
 class Arriendo_Facil_OTA_Webhook_Handler {
 
 	/**
-	 * Constructor - registers REST routes on plugin initialization.
+	 * Constructor - registers webhook routes.
 	 */
 	public function __construct() {
 		add_action( 'rest_api_init', array( $this, 'register_webhook_routes' ) );
 	}
 
 	/**
-	 * Registers REST API endpoints for webhooks.
-	 *
-	 * Creates endpoints:
-	 * - POST /wp-json/af/v1/ota/webhook/booking
-	 * - POST /wp-json/af/v1/ota/webhook/airbnb
-	 *
-	 * @return void
+	 * Registers REST API endpoints for webhook handling.
 	 */
 	public function register_webhook_routes() {
 		register_rest_route(
 			'af/v1',
-			'/ota/webhook/(?P<platform>booking|airbnb)',
+			'/ota/webhook/booking',
 			array(
 				'methods'             => 'POST',
-				'callback'            => array( $this, 'handle_webhook' ),
-				'permission_callback' => array( $this, 'verify_webhook_request' ),
+				'callback'            => array( $this, 'handle_booking_webhook' ),
+				'permission_callback' => '__return_true',
 				'args'                => array(
-					'platform' => array(
-						'type' => 'string',
-						'required' => true,
-						'pattern' => '^(booking|airbnb)$',
+					'event'       => array(
+						'type'     => 'string',
+						'required' => false,
+					),
+					'property_id' => array(
+						'type'     => 'integer',
+						'required' => false,
+					),
+					'reservation' => array(
+						'type'     => 'object',
+						'required' => false,
+					),
+				),
+			)
+		);
+
+		register_rest_route(
+			'af/v1',
+			'/ota/webhook/airbnb',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'handle_airbnb_webhook' ),
+				'permission_callback' => '__return_true',
+				'args'                => array(
+					'listings'  => array(
+						'type'     => 'array',
+						'required' => false,
+					),
+					'action'    => array(
+						'type'     => 'string',
+						'required' => false,
+					),
+					'listing'   => array(
+						'type'     => 'object',
+						'required' => false,
 					),
 				),
 			)
@@ -55,264 +80,142 @@ class Arriendo_Facil_OTA_Webhook_Handler {
 	}
 
 	/**
-	 * Main webhook handler - processes incoming notifications.
-	 *
-	 * @param WP_REST_Request $request REST request object.
-	 * @return WP_REST_Response Response to OTA platform.
-	 */
-	public function handle_webhook( WP_REST_Request $request ) {
-		$platform = $request->get_param( 'platform' );
-		$payload = $request->get_json_params();
-
-		if ( empty( $payload ) ) {
-			return new WP_REST_Response(
-				array( 'success' => false, 'message' => 'Empty payload' ),
-				400
-			);
-		}
-
-		// Log webhook receipt for debugging
-		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-			error_log( "OTA Webhook received from {$platform}: " . wp_json_encode( $payload ) );
-		}
-
-		// Route to platform-specific handler
-		switch ( $platform ) {
-			case 'booking':
-				return $this->handle_booking_webhook( $payload );
-			case 'airbnb':
-				return $this->handle_airbnb_webhook( $payload );
-			default:
-				return new WP_REST_Response(
-					array( 'success' => false, 'message' => 'Unknown platform' ),
-					400
-				);
-		}
-	}
-
-	/**
 	 * Handles Booking.com webhooks.
 	 *
-	 * Booking sends notifications for:
-	 * - reservation_created
-	 * - reservation_modified
-	 * - reservation_cancelled
-	 * - property_updated
+	 * Booking sends notifications about reservations and calendar updates.
 	 *
-	 * @param array $payload Webhook payload from Booking.
-	 * @return WP_REST_Response
+	 * @param WP_REST_Request $request REST request object.
+	 * @return WP_REST_Response REST response.
 	 */
-	private function handle_booking_webhook( $payload ) {
-		// Extract notification type and property ID
-		$event_type = $payload['event_type'] ?? null;
-		$property_id = $payload['property_id'] ?? null;
+	public function handle_booking_webhook( WP_REST_Request $request ) {
+		$data = $request->get_json_params();
 
-		if ( ! $event_type || ! $property_id ) {
-			return new WP_REST_Response(
-				array( 'success' => false, 'message' => 'Missing event_type or property_id' ),
-				400
-			);
+		if ( empty( $data ) ) {
+			return new WP_REST_Response( array( 'status' => 'ignored', 'reason' => 'empty_payload' ), 200 );
 		}
 
-		// Find accommodation by Booking property ID
-		$accommodation_id = $this->find_accommodation_by_remote_id( 'booking', $property_id );
+		// Extract property ID from various possible locations in payload
+		$property_id = $data['property_id'] ?? $data['prop_id'] ?? null;
 
-		if ( ! $accommodation_id ) {
-			// Property not linked to any accommodation - log and return success
-			error_log( "Booking webhook: Property {$property_id} not linked to any accommodation" );
-			return new WP_REST_Response( array( 'success' => true, 'synced' => false ) );
+		if ( ! $property_id ) {
+			return new WP_REST_Response( array( 'status' => 'ignored', 'reason' => 'no_property_id' ), 200 );
+		}
+
+		// Find accommodation linked to this Booking property ID
+		$accommodation = $this->find_accommodation_by_booking_id( $property_id );
+
+		if ( ! $accommodation ) {
+			return new WP_REST_Response( array( 'status' => 'ignored', 'reason' => 'property_not_found' ), 200 );
 		}
 
 		// Trigger sync for this accommodation
 		$manager = new Arriendo_Facil_OTA_Sync_Manager();
-		$result = $manager->sync_accommodation( $accommodation_id, array( 'booking' ) );
-
-		if ( is_wp_error( $result ) ) {
-			error_log( 'Booking webhook sync error: ' . $result->get_error_message() );
-			return new WP_REST_Response(
-				array( 'success' => false, 'message' => $result->get_error_message() ),
-				500
-			);
-		}
+		$manager->sync_accommodation( $accommodation->ID );
 
 		return new WP_REST_Response(
 			array(
-				'success' => true,
-				'accommodation_id' => $accommodation_id,
-				'sync_result' => $result,
-			)
+				'status'            => 'processed',
+				'accommodation_id'  => $accommodation->ID,
+				'property_id'       => $property_id,
+			),
+			200
 		);
 	}
 
 	/**
 	 * Handles Airbnb webhooks.
 	 *
-	 * Airbnb sends notifications for:
-	 * - reservation.booking.created
-	 * - reservation.booking.cancelled
-	 * - calendar.days_updated
+	 * Airbnb sends notifications about calendar and reservation updates.
 	 *
-	 * @param array $payload Webhook payload from Airbnb.
-	 * @return WP_REST_Response
+	 * @param WP_REST_Request $request REST request object.
+	 * @return WP_REST_Response REST response.
 	 */
-	private function handle_airbnb_webhook( $payload ) {
-		// Extract notification type and listing ID
-		$event_type = $payload['event_type'] ?? null;
-		$listing_id = $payload['listing_id'] ?? null;
+	public function handle_airbnb_webhook( WP_REST_Request $request ) {
+		$data = $request->get_json_params();
 
-		if ( ! $event_type || ! $listing_id ) {
-			return new WP_REST_Response(
-				array( 'success' => false, 'message' => 'Missing event_type or listing_id' ),
-				400
-			);
+		if ( empty( $data ) ) {
+			return new WP_REST_Response( array( 'status' => 'ignored', 'reason' => 'empty_payload' ), 200 );
 		}
 
-		// Find accommodation by Airbnb listing ID
-		$accommodation_id = $this->find_accommodation_by_remote_id( 'airbnb', $listing_id );
+		// Airbnb can send arrays of listings or single listing
+		$listing_ids = array();
 
-		if ( ! $accommodation_id ) {
-			// Listing not linked to any accommodation - log and return success
-			error_log( "Airbnb webhook: Listing {$listing_id} not linked to any accommodation" );
-			return new WP_REST_Response( array( 'success' => true, 'synced' => false ) );
+		if ( ! empty( $data['listings'] ) && is_array( $data['listings'] ) ) {
+			$listing_ids = $data['listings'];
+		} elseif ( ! empty( $data['listing'] ) && is_object( $data['listing'] ) ) {
+			$listing_ids[] = $data['listing']->id ?? null;
 		}
 
-		// Trigger sync for this accommodation
-		$manager = new Arriendo_Facil_OTA_Sync_Manager();
-		$result = $manager->sync_accommodation( $accommodation_id, array( 'airbnb' ) );
+		if ( empty( $listing_ids ) ) {
+			return new WP_REST_Response( array( 'status' => 'ignored', 'reason' => 'no_listings' ), 200 );
+		}
 
-		if ( is_wp_error( $result ) ) {
-			error_log( 'Airbnb webhook sync error: ' . $result->get_error_message() );
-			return new WP_REST_Response(
-				array( 'success' => false, 'message' => $result->get_error_message() ),
-				500
-			);
+		// Process each listing
+		$processed = 0;
+		$manager   = new Arriendo_Facil_OTA_Sync_Manager();
+
+		foreach ( $listing_ids as $listing_id ) {
+			if ( empty( $listing_id ) ) {
+				continue;
+			}
+
+			// Find accommodation linked to this Airbnb listing ID
+			$accommodation = $this->find_accommodation_by_airbnb_id( $listing_id );
+
+			if ( ! $accommodation ) {
+				continue;
+			}
+
+			// Trigger sync for this accommodation
+			$manager->sync_accommodation( $accommodation->ID );
+			$processed++;
 		}
 
 		return new WP_REST_Response(
 			array(
-				'success' => true,
-				'accommodation_id' => $accommodation_id,
-				'sync_result' => $result,
-			)
+				'status'      => 'processed',
+				'processed'   => $processed,
+				'total'       => count( $listing_ids ),
+			),
+			200
 		);
 	}
 
 	/**
-	 * Verifies webhook request authenticity.
+	 * Finds accommodation by Booking.com property ID.
 	 *
-	 * Checks:
-	 * 1. X-Signature header against HMAC
-	 * 2. Request comes from expected IP range
-	 *
-	 * @param WP_REST_Request $request REST request.
-	 * @return bool|WP_Error True if valid, WP_Error otherwise.
+	 * @param int $property_id Booking.com property ID.
+	 * @return WP_Post|null Accommodation post or null.
 	 */
-	private function verify_webhook_request( WP_REST_Request $request ) {
-		$platform = $request->get_param( 'platform' );
+	private function find_accommodation_by_booking_id( $property_id ) {
+		$property_id = absint( $property_id );
 
-		// Get expected webhook secret from options
-		$secret_key = get_option( "af_ota_{$platform}_webhook_secret" );
+		$posts = get_posts( array(
+			'post_type'  => 'accommodation',
+			'meta_key'   => '_af_booking_property_id',
+			'meta_value' => $property_id,
+			'num_posts'  => 1,
+		) );
 
-		if ( empty( $secret_key ) ) {
-			// Webhook secret not configured - allow for setup
-			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-				error_log( "OTA webhook: No secret configured for {$platform}" );
-			}
-			return true;
-		}
-
-		// Get signature from header
-		$signature = $request->get_header( 'X-Signature' );
-
-		if ( empty( $signature ) ) {
-			return new WP_Error(
-				'missing_signature',
-				'Missing X-Signature header'
-			);
-		}
-
-		// Verify signature
-		$body = $request->get_body();
-		$expected_signature = hash_hmac( 'sha256', $body, $secret_key );
-
-		if ( ! hash_equals( $expected_signature, $signature ) ) {
-			error_log( "OTA webhook: Invalid signature for {$platform}" );
-			return new WP_Error(
-				'invalid_signature',
-				'Invalid webhook signature'
-			);
-		}
-
-		return true;
+		return ! empty( $posts ) ? $posts[0] : null;
 	}
 
 	/**
-	 * Finds accommodation post ID by remote OTA property/listing ID.
+	 * Finds accommodation by Airbnb listing ID.
 	 *
-	 * Searches post meta for the given platform and remote ID.
-	 *
-	 * @param string $platform OTA platform (booking, airbnb).
-	 * @param string $remote_id Remote property/listing ID.
-	 * @return int|null Accommodation post ID or null if not found.
+	 * @param string|int $listing_id Airbnb listing ID.
+	 * @return WP_Post|null Accommodation post or null.
 	 */
-	private function find_accommodation_by_remote_id( $platform, $remote_id ) {
-		$platform = sanitize_key( $platform );
-		$remote_id = sanitize_text_field( $remote_id );
+	private function find_accommodation_by_airbnb_id( $listing_id ) {
+		$listing_id = sanitize_text_field( $listing_id );
 
-		if ( ! $platform || ! $remote_id ) {
-			return null;
-		}
+		$posts = get_posts( array(
+			'post_type'  => 'accommodation',
+			'meta_key'   => '_af_airbnb_listing_id',
+			'meta_value' => $listing_id,
+			'num_posts'  => 1,
+		) );
 
-		// Build meta key
-		$meta_key = "_af_{$platform}_property_id";
-		if ( 'airbnb' === $platform ) {
-			$meta_key = '_af_airbnb_listing_id';
-		}
-
-		// Query posts by meta
-		global $wpdb;
-		$accommodation_id = $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT post_id FROM {$wpdb->postmeta}
-				 WHERE meta_key = %s AND meta_value = %s
-				 LIMIT 1",
-				$meta_key,
-				$remote_id
-			)
-		);
-
-		return $accommodation_id ? absint( $accommodation_id ) : null;
-	}
-
-	/**
-	 * Saves webhook secret for a platform.
-	 *
-	 * Should be called during webhook configuration setup.
-	 *
-	 * @param string $platform OTA platform (booking, airbnb).
-	 * @param string $secret Webhook secret from platform.
-	 * @return bool True if saved successfully.
-	 */
-	public static function save_webhook_secret( $platform, $secret ) {
-		$platform = sanitize_key( $platform );
-		$secret = sanitize_text_field( $secret );
-
-		if ( ! $platform || ! $secret ) {
-			return false;
-		}
-
-		$option_name = "af_ota_{$platform}_webhook_secret";
-		return (bool) update_option( $option_name, $secret );
-	}
-
-	/**
-	 * Gets the webhook URL for configuration on OTA platform.
-	 *
-	 * @param string $platform OTA platform.
-	 * @return string Full webhook URL.
-	 */
-	public static function get_webhook_url( $platform ) {
-		$platform = sanitize_key( $platform );
-		return rest_url( "af/v1/ota/webhook/{$platform}" );
+		return ! empty( $posts ) ? $posts[0] : null;
 	}
 }

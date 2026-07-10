@@ -399,7 +399,11 @@ class Arriendo_Facil_Billing_Manager {
 			)
 		);
 
-		if ( $invoice_id <= 0 ) {
+		if ( is_wp_error( $invoice_id ) ) {
+			return $invoice_id;
+		}
+
+		if ( (int) $invoice_id <= 0 ) {
 			$db_error = ( $this->wpdb && isset( $this->wpdb->last_error ) ) ? (string) $this->wpdb->last_error : '';
 			if ( '' !== $db_error ) {
 				error_log( '[AF Billing] Error insertando factura: ' . $db_error );
@@ -409,6 +413,8 @@ class Arriendo_Facil_Billing_Manager {
 				__( 'No se pudo guardar el comprobante en la base de datos. Intente nuevamente.', 'arriendo-facil' )
 			);
 		}
+
+		$invoice_id = (int) $invoice_id;
 
 		// LOGGING: XML que se envía al SRI
 		// El XML completo se guarda en un archivo temporal de diagnóstico para
@@ -1053,7 +1059,7 @@ class Arriendo_Facil_Billing_Manager {
 	/**
 	 * Persists a new invoice row.
 	 */
-	protected function insert_invoice_row( array $row ): int {
+	protected function insert_invoice_row( array $row ) {
 		if ( ! $this->wpdb ) {
 			return 0;
 		}
@@ -1074,7 +1080,142 @@ class Arriendo_Facil_Billing_Manager {
 			'xml_firmado'         => $this->protect_db_text( (string) $row['xml_firmado'] ),
 		);
 
-		$this->wpdb->insert( $this->wpdb->prefix . 'af_electronic_invoices', $data );
+		$table = $this->wpdb->prefix . 'af_electronic_invoices';
+
+		$autorizados = array( 'autorizada', 'autorizada_sin_ride', 'enviada', 'en proceso' );
+
+		// Detectar factura previa (misma combinación lease_id + billing_period).
+		// Si el intento anterior falló antes de autorizarse, reutilizamos la fila
+		// para no chocar con el UNIQUE KEY uniq_lease_period. Nunca sobrescribimos
+		// una factura ya autorizada por el SRI (obligación tributaria).
+		$existing = null;
+		if ( ! empty( $data['lease_id'] ) && ! empty( $data['billing_period'] ) ) {
+			$existing = $this->wpdb->get_row(
+				$this->wpdb->prepare(
+					"SELECT id, estado FROM {$table} WHERE lease_id = %d AND billing_period = %s LIMIT 1",
+					(int) $data['lease_id'],
+					(string) $data['billing_period']
+				)
+			);
+		}
+
+		// También verificar colisión por clave_acceso (UNIQUE KEY clave_acceso).
+		// Un intento previo pudo haberse guardado con clave distinta pero también
+		// pudo generar la misma en algún flujo excepcional.
+		if ( ! $existing && ! empty( $data['clave_acceso'] ) ) {
+			$existing = $this->wpdb->get_row(
+				$this->wpdb->prepare(
+					"SELECT id, estado FROM {$table} WHERE clave_acceso = %s LIMIT 1",
+					(string) $data['clave_acceso']
+				)
+			);
+		}
+
+		if ( $existing ) {
+			$estado_previo = (string) $existing->estado;
+			if ( in_array( $estado_previo, $autorizados, true ) ) {
+				return new WP_Error(
+					'invoice_already_exists',
+					sprintf(
+						/* translators: 1: billing period YYYY-MM, 2: estado previo. */
+						__( 'Ya existe una factura para este arriendo en el período %1$s (estado: %2$s). No se puede reemplazar por regulación tributaria.', 'arriendo-facil' ),
+						(string) ( $data['billing_period'] ?? '' ),
+						$estado_previo
+					)
+				);
+			}
+
+			$update_data = $data;
+			$update_data['numero_autorizacion'] = null;
+			$update_data['fecha_autorizacion']  = null;
+			$update_data['xml_autorizacion']    = null;
+			$update_data['ride_path']           = null;
+			$update_data['errores']             = null;
+
+			$updated = $this->wpdb->update( $table, $update_data, array( 'id' => (int) $existing->id ) );
+			if ( false === $updated ) {
+				$db_error = (string) ( $this->wpdb->last_error ?? '' );
+				error_log( '[AF Billing] UPDATE factura ID ' . (int) $existing->id . ' falló: ' . $db_error );
+				return new WP_Error(
+					'invoice_update_failed',
+					sprintf(
+						/* translators: %s = MySQL error message */
+						__( 'No se pudo actualizar el comprobante existente (id %1$d): %2$s', 'arriendo-facil' ),
+						(int) $existing->id,
+						$db_error
+					)
+				);
+			}
+			return (int) $existing->id;
+		}
+
+		$inserted = $this->wpdb->insert( $table, $data );
+		if ( false === $inserted ) {
+			$db_error = (string) ( $this->wpdb->last_error ?? '' );
+			error_log( '[AF Billing] INSERT factura falló: ' . $db_error . ' | data=' . wp_json_encode( array(
+				'lease_id'           => $data['lease_id'],
+				'billing_period'     => $data['billing_period'],
+				'clave_acceso'       => $data['clave_acceso'],
+				'numero_comprobante' => $data['numero_comprobante'],
+			) ) );
+
+			// Si el error indica duplicado por alguna UNIQUE key, intentar
+			// resolver la fila colisionada por cualquiera de las claves y
+			// reutilizarla (segundo intento).
+			if ( false !== stripos( $db_error, 'Duplicate' ) || false !== stripos( $db_error, 'duplicate entry' ) ) {
+				$collide = null;
+				if ( ! empty( $data['clave_acceso'] ) ) {
+					$collide = $this->wpdb->get_row(
+						$this->wpdb->prepare(
+							"SELECT id, estado FROM {$table} WHERE clave_acceso = %s LIMIT 1",
+							(string) $data['clave_acceso']
+						)
+					);
+				}
+				if ( ! $collide && ! empty( $data['lease_id'] ) && ! empty( $data['billing_period'] ) ) {
+					$collide = $this->wpdb->get_row(
+						$this->wpdb->prepare(
+							"SELECT id, estado FROM {$table} WHERE lease_id = %d AND billing_period = %s LIMIT 1",
+							(int) $data['lease_id'],
+							(string) $data['billing_period']
+						)
+					);
+				}
+
+				if ( $collide ) {
+					$estado_previo = (string) $collide->estado;
+					if ( in_array( $estado_previo, $autorizados, true ) ) {
+						return new WP_Error(
+							'invoice_already_exists',
+							sprintf(
+								__( 'Ya existe una factura para este arriendo en el período %1$s (estado: %2$s). No se puede reemplazar por regulación tributaria.', 'arriendo-facil' ),
+								(string) ( $data['billing_period'] ?? '' ),
+								$estado_previo
+							)
+						);
+					}
+					$update_data = $data;
+					$update_data['numero_autorizacion'] = null;
+					$update_data['fecha_autorizacion']  = null;
+					$update_data['xml_autorizacion']    = null;
+					$update_data['ride_path']           = null;
+					$update_data['errores']             = null;
+					$updated = $this->wpdb->update( $table, $update_data, array( 'id' => (int) $collide->id ) );
+					if ( false !== $updated ) {
+						return (int) $collide->id;
+					}
+				}
+			}
+
+			return new WP_Error(
+				'invoice_insert_failed',
+				sprintf(
+					/* translators: %s = MySQL error message */
+					__( 'No se pudo guardar el comprobante en la base de datos: %s', 'arriendo-facil' ),
+					'' !== $db_error ? $db_error : __( 'error desconocido', 'arriendo-facil' )
+				)
+			);
+		}
 		return isset( $this->wpdb->insert_id ) ? (int) $this->wpdb->insert_id : 0;
 	}
 

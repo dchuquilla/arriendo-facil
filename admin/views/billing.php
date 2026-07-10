@@ -111,6 +111,12 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 		if ( ! $allowed_invoice ) {
 			$last_action_message = __( 'No tienes acceso a este comprobante.', 'arriendo-facil' );
 		} else {
+			$retry_meta = get_option( 'af_sri_retry_meta', array() );
+			if ( is_array( $retry_meta ) && isset( $retry_meta[ $invoice_id ] ) ) {
+				unset( $retry_meta[ $invoice_id ] );
+				update_option( 'af_sri_retry_meta', $retry_meta, false );
+			}
+
 			$manager = new Arriendo_Facil_Billing_Manager();
 			$result  = $manager->retry_invoice( $invoice_id );
 			if ( is_wp_error( $result ) ) {

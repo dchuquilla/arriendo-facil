@@ -20,6 +20,12 @@ class Arriendo_Facil_Billing_API {
 	/** Cron lock transient key. */
 	const RETRY_LOCK_TRANSIENT = 'af_sri_retry_lock';
 
+	/** Maximum age for SRI "en proceso" before escalating to manual review. */
+	const EN_PROCESO_MAX_AGE = 72 * HOUR_IN_SECONDS;
+
+	/** Maximum retry attempts while SRI keeps returning "en proceso". */
+	const EN_PROCESO_MAX_ATTEMPTS = 96;
+
 	/** @var Arriendo_Facil_Billing_Manager */
 	private $manager;
 
@@ -315,6 +321,10 @@ class Arriendo_Facil_Billing_API {
 			wp_send_json_error( array( 'message' => __( 'No tienes acceso a este comprobante.', 'arriendo-facil' ) ), 403 );
 		}
 
+		// Manual retry explicitly resumes any invoice paused by cron after
+		// excessive EN PROCESO time.
+		$this->clear_retry_meta_for_invoice( $invoice_id );
+
 		// Idempotency guard: deduplicate rapid retries (double-click) so we do not
 		// resubmit the same invoice to the SRI more than once per window.
 		$idempotency_key = Arriendo_Facil_Idempotency::key_from_request();
@@ -461,6 +471,7 @@ class Arriendo_Facil_Billing_API {
 		}
 
 		$retry_meta = $this->get_retry_meta();
+		$now        = time();
 		foreach ( $candidates as $invoice ) {
 			if ( ! isset( $invoice->id ) ) {
 				continue;
@@ -468,8 +479,11 @@ class Arriendo_Facil_Billing_API {
 
 			$invoice_id = (int) $invoice->id;
 			$meta       = isset( $retry_meta[ $invoice_id ] ) && is_array( $retry_meta[ $invoice_id ] ) ? $retry_meta[ $invoice_id ] : array();
+			if ( ! empty( $meta['paused'] ) ) {
+				continue;
+			}
 			$next_ts    = isset( $meta['next_ts'] ) ? (int) $meta['next_ts'] : 0;
-			if ( $next_ts > time() ) {
+			if ( $next_ts > $now ) {
 				continue;
 			}
 
@@ -477,6 +491,55 @@ class Arriendo_Facil_Billing_API {
 			if ( is_wp_error( $result ) ) {
 				// sri_en_proceso: SRI still queuing the document — no backoff, just try next cron run.
 				if ( 'sri_en_proceso' === $result->get_error_code() ) {
+					$created_ts = isset( $invoice->created_at ) ? strtotime( (string) $invoice->created_at ) : false;
+					if ( false === $created_ts ) {
+						$created_ts = $now;
+					}
+
+					$en_proceso_since = isset( $meta['en_proceso_since'] ) ? (int) $meta['en_proceso_since'] : (int) $created_ts;
+					$en_proceso_attempts = isset( $meta['en_proceso_attempts'] ) ? (int) $meta['en_proceso_attempts'] + 1 : 1;
+					$max_age = (int) apply_filters( 'af_billing_en_proceso_max_age', self::EN_PROCESO_MAX_AGE );
+					$max_attempts = (int) apply_filters( 'af_billing_en_proceso_max_attempts', self::EN_PROCESO_MAX_ATTEMPTS );
+
+					$retry_meta[ $invoice_id ] = array_merge(
+						$meta,
+						array(
+							'en_proceso_since'    => $en_proceso_since,
+							'en_proceso_attempts' => $en_proceso_attempts,
+							'next_ts'             => $now + ( 15 * MINUTE_IN_SECONDS ),
+						)
+					);
+
+					if ( ( $now - $en_proceso_since ) >= $max_age || $en_proceso_attempts >= $max_attempts ) {
+						global $wpdb;
+						if ( $wpdb ) {
+							$mensaje = sprintf(
+								/* translators: 1: retry attempts, 2: max hours in queue */
+								__( 'SRI mantiene este comprobante en "EN PROCESO" (%1$d intentos, más de %2$d horas). Se pausaron reintentos automáticos; revisa el log SRI y reintenta manualmente.', 'arriendo-facil' ),
+								$en_proceso_attempts,
+								max( 1, (int) floor( $max_age / HOUR_IN_SECONDS ) )
+							);
+
+							$wpdb->update(
+								$wpdb->prefix . 'af_electronic_invoices',
+								array(
+									'estado'  => 'error_autorizacion',
+									'errores' => $mensaje,
+								),
+								array( 'id' => $invoice_id ),
+								array( '%s', '%s' ),
+								array( '%d' )
+							);
+						}
+
+						$retry_meta[ $invoice_id ] = array(
+							'paused'   => 1,
+							'attempts' => isset( $meta['attempts'] ) ? (int) $meta['attempts'] + 1 : 1,
+							'next_ts'  => 0,
+						);
+						error_log( 'Arriendo Facil billing retry invoice ' . $invoice_id . ' escalada desde EN PROCESO a error_autorizacion tras ' . $en_proceso_attempts . ' intentos.' );
+					}
+
 					continue;
 				}
 				$attempts = isset( $meta['attempts'] ) ? (int) $meta['attempts'] + 1 : 1;
@@ -577,6 +640,23 @@ class Arriendo_Facil_Billing_API {
 	 */
 	private function save_retry_meta( array $meta ): void {
 		update_option( self::RETRY_META_OPTION, $meta, false );
+	}
+
+	/**
+	 * Removes retry metadata for a single invoice (resume retries/manual attempts).
+	 *
+	 * @param int $invoice_id Invoice ID.
+	 */
+	private function clear_retry_meta_for_invoice( int $invoice_id ): void {
+		if ( $invoice_id <= 0 ) {
+			return;
+		}
+
+		$meta = $this->get_retry_meta();
+		if ( isset( $meta[ $invoice_id ] ) ) {
+			unset( $meta[ $invoice_id ] );
+			$this->save_retry_meta( $meta );
+		}
 	}
 
 	/**

@@ -236,7 +236,7 @@ class Arriendo_Facil_Accommodation_Occupied_Admin {
 					});
 			});
 
-			/* Confirm button: call early-terminate then toggle */
+			/* Confirm button: call early-terminate; only uncheck if it succeeds */
 			document.addEventListener('click', function(e){
 				if (!e.target || e.target.id !== 'af-unoccupy-confirm') return;
 				if (!pendingToggle) return;
@@ -251,7 +251,7 @@ class Arriendo_Facil_Accommodation_Occupied_Admin {
 
 				var ctx = pendingToggle;
 
-				/* Step 1: call early termination (handles lease + release + notify) */
+				/* Step 1: early termination (terminates lease, frees accommodation, notifies) */
 				var earlyBody = new FormData();
 				earlyBody.append('action',           'af_early_terminate_lease');
 				earlyBody.append('nonce',            cfg.leaseNonce);
@@ -260,29 +260,44 @@ class Arriendo_Facil_Accommodation_Occupied_Admin {
 
 				fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: earlyBody })
 					.then(function(r){ return r.json(); })
-					.then(function(res){
-						/* Step 2: always update the toggle meta regardless of whether a lease existed */
+					.then(function(earlyRes){
+						if (!earlyRes || !earlyRes.success) {
+							/* Step 1 failed — show error, keep checkbox checked, stay in modal */
+							var msg = (earlyRes && earlyRes.data && earlyRes.data.message)
+								? earlyRes.data.message
+								: cfg.i18n.error;
+							fbEl.textContent = msg;
+							btnConf.disabled = false;
+							btnConf.textContent = cfg.i18n.btnConfirm;
+							return;
+						}
+
+						/* Step 2: Step 1 succeeded — now update the _af_is_occupied meta */
 						var toggleBody = new FormData();
 						toggleBody.append('action',   cfg.action);
 						toggleBody.append('nonce',    cfg.nonce);
 						toggleBody.append('post_id',  ctx.postId);
 						toggleBody.append('occupied', 0);
-						return fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: toggleBody })
+
+						fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: toggleBody })
 							.then(function(r2){ return r2.json(); })
-							.then(function(res2){
-								return { earlyRes: res, toggleRes: res2 };
+							.then(function(){
+								/* Both steps succeeded — update UI */
+								if (modalEl) modalEl.style.display = 'none';
+								pendingToggle = null;
+								finishToggle(ctx, false);
+								var msg = (earlyRes.data && earlyRes.data.message)
+									? earlyRes.data.message
+									: cfg.i18n.yes;
+								window.alert(msg);
+							})
+							.catch(function(){
+								/* Toggle meta failed — early termination already happened;
+								   close modal and update UI anyway (lease IS terminated) */
+								if (modalEl) modalEl.style.display = 'none';
+								pendingToggle = null;
+								finishToggle(ctx, false);
 							});
-					})
-					.then(function(combined){
-						if (modalEl) modalEl.style.display = 'none';
-						pendingToggle = null;
-						finishToggle(ctx, false);
-						if (combined.earlyRes && combined.earlyRes.success) {
-							var msg = combined.earlyRes.data && combined.earlyRes.data.message
-								? combined.earlyRes.data.message
-								: cfg.i18n.yes;
-							window.alert(msg);
-						}
 					})
 					.catch(function(){
 						fbEl.textContent = cfg.i18n.error;

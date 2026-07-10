@@ -288,7 +288,7 @@ $can_bill      = current_user_can( (string) apply_filters( 'af_billing_capabilit
 		</tbody>
 	</table>
 
-	<div id="af-early-terminate-modal" class="af-modal" hidden style="position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;">
+	<div id="af-early-terminate-modal" class="af-modal" style="display:none;position:fixed;inset:0;z-index:100000;align-items:center;justify-content:center;">
 		<div class="af-modal__backdrop" id="af-early-terminate-backdrop" style="position:absolute;inset:0;background:rgba(0,0,0,.55);"></div>
 		<div class="af-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="af-early-terminate-modal-title"
 			style="position:relative;background:#fff;border-radius:10px;max-width:480px;width:92%;padding:28px 28px 22px;box-shadow:0 8px 32px rgba(0,0,0,.22);">
@@ -458,12 +458,12 @@ $can_bill      = current_user_can( (string) apply_filters( 'af_billing_capabilit
 			feedback.textContent = '';
 			btnConfirm.disabled = false;
 			btnConfirm.textContent = '<?php echo esc_js( __( 'Confirmar terminacion', 'arriendo-facil' ) ); ?>';
-			modal.hidden = false;
+			modal.style.display = 'flex';
 			reasonArea.focus();
 		}
 
 		function closeModal() {
-			modal.hidden = true;
+			modal.style.display = 'none';
 			activeLease = null;
 		}
 

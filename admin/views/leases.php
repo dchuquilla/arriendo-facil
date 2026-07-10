@@ -267,6 +267,15 @@ $can_bill      = current_user_can( (string) apply_filters( 'af_billing_capabilit
 								data-status="active">
 								<?php esc_html_e( 'Activar', 'arriendo-facil' ); ?>
 							</button>
+							<?php if ( in_array( (string) $lease->status, array( 'active', 'pending_release' ), true ) ) : ?>
+								<button type="button"
+									class="button af-early-terminate-lease-btn"
+									data-lease-id="<?php echo esc_attr( $lease->id ); ?>"
+									data-nonce="<?php echo esc_attr( wp_create_nonce( 'af_lease_nonce' ) ); ?>"
+									style="background:#b91c1c;border-color:#991b1b;color:#fff;">
+									<?php esc_html_e( 'Terminar anticipadamente', 'arriendo-facil' ); ?>
+								</button>
+							<?php endif; ?>
 							</div>
 						</td>
 					</tr>
@@ -278,6 +287,35 @@ $can_bill      = current_user_can( (string) apply_filters( 'af_billing_capabilit
 			<?php endif; ?>
 		</tbody>
 	</table>
+
+	<div id="af-early-terminate-modal" class="af-modal" hidden style="position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;">
+		<div class="af-modal__backdrop" id="af-early-terminate-backdrop" style="position:absolute;inset:0;background:rgba(0,0,0,.55);"></div>
+		<div class="af-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="af-early-terminate-modal-title"
+			style="position:relative;background:#fff;border-radius:10px;max-width:480px;width:92%;padding:28px 28px 22px;box-shadow:0 8px 32px rgba(0,0,0,.22);">
+			<h2 id="af-early-terminate-modal-title" style="margin:0 0 6px;font-size:18px;color:#b91c1c;">
+				<?php esc_html_e( 'Terminar contrato anticipadamente', 'arriendo-facil' ); ?>
+			</h2>
+			<p style="margin:0 0 16px;color:#374151;font-size:14px;line-height:1.5;">
+				<?php esc_html_e( 'Esta accion terminara el contrato antes de la fecha acordada, liberara el inmueble, cancelara reservas activas y notificara al arrendatario y a los interesados en cola.', 'arriendo-facil' ); ?>
+			</p>
+			<label for="af-early-terminate-reason" style="display:block;font-weight:600;margin-bottom:6px;font-size:13px;">
+				<?php esc_html_e( 'Motivo de terminacion anticipada *', 'arriendo-facil' ); ?>
+			</label>
+			<textarea id="af-early-terminate-reason" rows="4"
+				placeholder="<?php esc_attr_e( 'Ej: Acuerdo mutuo, incumplimiento de contrato, venta del inmueble...', 'arriendo-facil' ); ?>"
+				style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;resize:vertical;"></textarea>
+			<p id="af-early-terminate-feedback" style="margin:8px 0 0;font-size:13px;color:#b91c1c;" aria-live="polite"></p>
+			<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px;">
+				<button type="button" id="af-early-terminate-cancel" class="button">
+					<?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?>
+				</button>
+				<button type="button" id="af-early-terminate-confirm" class="button"
+					style="background:#b91c1c;border-color:#991b1b;color:#fff;">
+					<?php esc_html_e( 'Confirmar terminacion', 'arriendo-facil' ); ?>
+				</button>
+			</div>
+		</div>
+	</div>
 
 	<div id="af-lease-upload-modal" class="af-modal af-lease-upload-modal" hidden>
 		<div class="af-modal__backdrop" data-af-close-upload-modal></div>
@@ -401,5 +439,105 @@ $can_bill      = current_user_can( (string) apply_filters( 'af_billing_capabilit
 	var style = document.createElement( 'style' );
 	style.textContent = '.af-confirm-armed{background:#c62828!important;border-color:#b71c1c!important;color:#fff!important;}';
 	document.head.appendChild( style );
+
+	// ── Early termination modal ──────────────────────────────────────────────
+	(function () {
+		var modal      = document.getElementById( 'af-early-terminate-modal' );
+		var backdrop   = document.getElementById( 'af-early-terminate-backdrop' );
+		var reasonArea = document.getElementById( 'af-early-terminate-reason' );
+		var feedback   = document.getElementById( 'af-early-terminate-feedback' );
+		var btnCancel  = document.getElementById( 'af-early-terminate-cancel' );
+		var btnConfirm = document.getElementById( 'af-early-terminate-confirm' );
+		var ajaxUrl    = '<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>';
+
+		var activeLease = null; // { leaseId, nonce, row }
+
+		function openModal( leaseId, nonce, row ) {
+			activeLease = { leaseId: leaseId, nonce: nonce, row: row };
+			reasonArea.value = '';
+			feedback.textContent = '';
+			btnConfirm.disabled = false;
+			btnConfirm.textContent = '<?php echo esc_js( __( 'Confirmar terminacion', 'arriendo-facil' ) ); ?>';
+			modal.hidden = false;
+			reasonArea.focus();
+		}
+
+		function closeModal() {
+			modal.hidden = true;
+			activeLease = null;
+		}
+
+		backdrop.addEventListener( 'click', closeModal );
+		btnCancel.addEventListener( 'click', closeModal );
+
+		document.addEventListener( 'keydown', function ( e ) {
+			if ( ! modal.hidden && 'Escape' === e.key ) {
+				closeModal();
+			}
+		} );
+
+		// Open modal when "Terminar anticipadamente" is clicked.
+		document.addEventListener( 'click', function ( e ) {
+			var btn = e.target.closest( '.af-early-terminate-lease-btn' );
+			if ( ! btn ) return;
+			var leaseId = btn.dataset.leaseId;
+			var nonce   = btn.dataset.nonce;
+			var row     = btn.closest( 'tr' );
+			openModal( leaseId, nonce, row );
+		} );
+
+		btnConfirm.addEventListener( 'click', function () {
+			if ( ! activeLease ) return;
+
+			var reason = reasonArea.value.trim();
+			if ( '' === reason ) {
+				feedback.textContent = '<?php echo esc_js( __( 'Por favor, ingresa el motivo de terminacion.', 'arriendo-facil' ) ); ?>';
+				reasonArea.focus();
+				return;
+			}
+
+			feedback.textContent = '';
+			btnConfirm.disabled = true;
+			btnConfirm.textContent = '<?php echo esc_js( __( 'Procesando…', 'arriendo-facil' ) ); ?>';
+
+			var body = new FormData();
+			body.append( 'action',   'af_early_terminate_lease' );
+			body.append( 'nonce',    activeLease.nonce );
+			body.append( 'lease_id', activeLease.leaseId );
+			body.append( 'reason',   reason );
+
+			fetch( ajaxUrl, { method: 'POST', credentials: 'same-origin', body: body } )
+				.then( function ( r ) { return r.json(); } )
+				.then( function ( res ) {
+					if ( res && res.success ) {
+						// Update the status cell in the row.
+						if ( activeLease.row ) {
+							var cells = activeLease.row.querySelectorAll( 'td' );
+							// Status column is index 6 (0-based).
+							if ( cells[6] ) {
+								cells[6].innerHTML = '<strong style="color:#b91c1c;">terminated</strong>';
+							}
+							// Hide the terminate button.
+							var terminateBtn = activeLease.row.querySelector( '.af-early-terminate-lease-btn' );
+							if ( terminateBtn ) {
+								terminateBtn.remove();
+							}
+						}
+						closeModal();
+						alert( ( res.data && res.data.message ) ? res.data.message : '<?php echo esc_js( __( 'Contrato terminado.', 'arriendo-facil' ) ); ?>' );
+					} else {
+						var msg = ( res && res.data && res.data.message ) ? res.data.message : '<?php echo esc_js( __( 'No se pudo terminar el contrato.', 'arriendo-facil' ) ); ?>';
+						feedback.textContent = msg;
+						btnConfirm.disabled = false;
+						btnConfirm.textContent = '<?php echo esc_js( __( 'Confirmar terminacion', 'arriendo-facil' ) ); ?>';
+					}
+				} )
+				.catch( function () {
+					feedback.textContent = '<?php echo esc_js( __( 'Error de red. Intenta nuevamente.', 'arriendo-facil' ) ); ?>';
+					btnConfirm.disabled = false;
+					btnConfirm.textContent = '<?php echo esc_js( __( 'Confirmar terminacion', 'arriendo-facil' ) ); ?>';
+				} );
+		} );
+	}());
 }());
 </script>

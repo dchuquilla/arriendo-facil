@@ -37,6 +37,7 @@ class Arriendo_Facil_Rental_Workflow {
 		add_action( 'wp_ajax_af_finalize_lease_manual_release', array( $this, 'ajax_finalize_lease_manual_release' ) );
 		add_action( 'wp_ajax_af_renew_lease', array( $this, 'ajax_renew_lease' ) );
 		add_action( 'wp_ajax_af_execute_manual_release', array( $this, 'ajax_execute_manual_release' ) );
+		add_action( 'wp_ajax_af_early_terminate_lease', array( $this, 'ajax_early_terminate_lease' ) );
 		add_action( 'wp_ajax_af_get_accommodation_availability', array( $this, 'ajax_get_accommodation_availability' ) );
 		add_action( 'wp_ajax_nopriv_af_get_accommodation_availability', array( $this, 'ajax_get_accommodation_availability' ) );
 	}
@@ -897,6 +898,197 @@ class Arriendo_Facil_Rental_Workflow {
 		self::log_lease_event( $lease_id, (int) $lease->accommodation_id, 'lease_renewed', array( 'new_end_date' => $new_end_date, 'reason' => $reason ) );
 
 		wp_send_json_success( array( 'message' => __( 'Contrato renovado correctamente.', 'arriendo-facil' ) ) );
+	}
+
+	/**
+	 * AJAX: terminate active lease early (before the contractual end date).
+	 *
+	 * Accepts either `lease_id` (from the leases table view) or `accommodation_id`
+	 * (from the "Ocupada" toggle). A mandatory `reason` must be provided.
+	 * Uses nonce `af_lease_nonce`.
+	 */
+	public function ajax_early_terminate_lease() {
+		check_ajax_referer( 'af_lease_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$lease_id         = isset( $_POST['lease_id'] ) ? absint( wp_unslash( $_POST['lease_id'] ) ) : 0;
+		$accommodation_id = isset( $_POST['accommodation_id'] ) ? absint( wp_unslash( $_POST['accommodation_id'] ) ) : 0;
+		$reason           = isset( $_POST['reason'] ) ? sanitize_textarea_field( wp_unslash( $_POST['reason'] ) ) : '';
+
+		if ( '' === trim( $reason ) ) {
+			wp_send_json_error( array( 'message' => __( 'El motivo de terminacion anticipada es obligatorio.', 'arriendo-facil' ) ), 400 );
+		}
+
+		$lease_service = class_exists( 'Arriendo_Facil_Lease' ) ? new Arriendo_Facil_Lease() : null;
+
+		// Resolve lease from accommodation when only accommodation_id is provided.
+		if ( ! $lease_id && $accommodation_id ) {
+			global $wpdb;
+			$row = $wpdb->get_row(
+				$wpdb->prepare(
+					"SELECT id FROM {$wpdb->prefix}af_leases
+					 WHERE accommodation_id = %d
+					   AND status IN ('active','pending_release')
+					   AND deleted_at IS NULL
+					 ORDER BY start_date DESC LIMIT 1",
+					$accommodation_id
+				)
+			);
+			if ( $row ) {
+				$lease_id = (int) $row->id;
+			}
+		}
+
+		// Validate the lease if found.
+		if ( $lease_id ) {
+			$lease = $lease_service ? $lease_service->get_lease( $lease_id ) : null;
+			if ( ! $lease ) {
+				wp_send_json_error( array( 'message' => __( 'Contrato no encontrado.', 'arriendo-facil' ) ), 404 );
+			}
+			if ( ! $this->can_manage_accommodation( (int) $lease->accommodation_id ) ) {
+				wp_send_json_error( array( 'message' => __( 'Sin permisos para este contrato.', 'arriendo-facil' ) ), 403 );
+			}
+			$accommodation_id = (int) $lease->accommodation_id;
+		}
+
+		if ( ! $accommodation_id || ! $this->can_manage_accommodation( $accommodation_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'Inmueble invalido o sin permisos.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$this->terminate_lease_early( $lease_id, $accommodation_id, $reason );
+
+		wp_send_json_success( array(
+			'message'          => __( 'Contrato terminado anticipadamente. El inmueble vuelve a estar disponible.', 'arriendo-facil' ),
+			'accommodation_id' => $accommodation_id,
+		) );
+	}
+
+	/**
+	 * Terminates a lease before its contractual end date, releases the accommodation,
+	 * removes the "Ocupada" flag, cancels reservations, and notifies all parties.
+	 *
+	 * @param int    $lease_id         Lease ID (0 if not yet known).
+	 * @param int    $accommodation_id Accommodation ID.
+	 * @param string $reason           Human-readable termination reason.
+	 * @return void
+	 */
+	private function terminate_lease_early( int $lease_id, int $accommodation_id, string $reason ): void {
+		global $wpdb;
+
+		if ( $lease_id ) {
+			// Notify the tenant before changing the record.
+			$this->notify_guest_early_termination( $lease_id, $accommodation_id, $reason );
+
+			$wpdb->update(
+				$wpdb->prefix . 'af_leases',
+				array( 'status' => 'terminated' ),
+				array( 'id'     => $lease_id ),
+				array( '%s' ),
+				array( '%d' )
+			);
+		} else {
+			// Terminate any active/pending lease tied to this accommodation.
+			$wpdb->query(
+				$wpdb->prepare(
+					"UPDATE {$wpdb->prefix}af_leases
+					 SET status = 'terminated'
+					 WHERE accommodation_id = %d
+					   AND status IN ('active','pending_release')
+					   AND deleted_at IS NULL",
+					$accommodation_id
+				)
+			);
+		}
+
+		// Release any open reservation holds.
+		$wpdb->update(
+			$wpdb->prefix . 'af_reservations',
+			array(
+				'status'             => 'released',
+				'reservation_status' => 'released',
+				'release_reason'     => $reason,
+				'released_at'        => current_time( 'mysql' ),
+			),
+			array(
+				'accommodation_id' => $accommodation_id,
+				'status'           => 'reserved',
+			),
+			array( '%s', '%s', '%s', '%s' ),
+			array( '%d', '%s' )
+		);
+
+		// Free the accommodation and reset all blocking flags.
+		self::set_commercial_state( $accommodation_id, 'available', 'public' );
+		update_post_meta( $accommodation_id, '_af_status', 'available' );
+		delete_post_meta( $accommodation_id, '_af_release_date' );
+		delete_post_meta( $accommodation_id, '_af_release_reason' );
+		delete_post_meta( $accommodation_id, '_af_is_occupied' );
+
+		self::log_lease_event(
+			$lease_id,
+			$accommodation_id,
+			'lease_early_terminated',
+			array( 'reason' => $reason, 'terminated_by' => get_current_user_id() )
+		);
+
+		// Notify people waiting in the interest queue that the accommodation is free again.
+		$this->notify_interest_queue_release( $accommodation_id );
+	}
+
+	/**
+	 * Emails the tenant to inform them of an early lease termination.
+	 *
+	 * @param int    $lease_id         Lease ID.
+	 * @param int    $accommodation_id Accommodation ID.
+	 * @param string $reason           Termination reason.
+	 * @return void
+	 */
+	private function notify_guest_early_termination( int $lease_id, int $accommodation_id, string $reason ): void {
+		global $wpdb;
+
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT l.end_date, g.email AS guest_email, g.first_name, g.last_name
+				 FROM {$wpdb->prefix}af_leases l
+				 LEFT JOIN {$wpdb->prefix}af_guests g ON g.id = l.guest_id
+				 WHERE l.id = %d AND l.deleted_at IS NULL LIMIT 1",
+				$lease_id
+			)
+		);
+
+		if ( ! $row || empty( $row->guest_email ) || ! is_email( $row->guest_email ) ) {
+			return;
+		}
+
+		$acc_title  = get_the_title( $accommodation_id );
+		$guest_name = trim(
+			sanitize_text_field( (string) $row->first_name ) . ' ' .
+			sanitize_text_field( (string) $row->last_name )
+		);
+		if ( '' === $guest_name ) {
+			$guest_name = __( 'Arrendatario', 'arriendo-facil' );
+		}
+
+		$subject = sprintf(
+			/* translators: %s: accommodation title */
+			__( '[Arriendo Facil] Terminacion anticipada del contrato: %s', 'arriendo-facil' ),
+			$acc_title
+		);
+
+		$message = sprintf(
+			/* translators: 1: guest name, 2: accommodation title, 3: original end date, 4: reason */
+			__( "Estimado/a %1\$s,\n\nLe informamos que el contrato de arriendo de la propiedad \"%2\$s\" ha sido terminado anticipadamente (fecha de termino original: %3\$s).\n\nMotivo: %4\$s\n\nPor favor, coordine con el administrador los detalles del proceso de entrega de la propiedad.\n\nGracias por confiar en Arriendo Facil.", 'arriendo-facil' ),
+			$guest_name,
+			$acc_title,
+			sanitize_text_field( (string) $row->end_date ),
+			$reason
+		);
+
+		$sent = wp_mail( sanitize_email( (string) $row->guest_email ), $subject, $message );
+		$this->log_notification( $accommodation_id, 'lease_early_termination_guest', sanitize_email( (string) $row->guest_email ), $sent ? 'sent' : 'failed' );
 	}
 
 	/**

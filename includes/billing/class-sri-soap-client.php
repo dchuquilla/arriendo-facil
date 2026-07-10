@@ -131,10 +131,14 @@ class Arriendo_Facil_SRI_Soap_Client {
 			// En lugar de marcar la factura como error, la tratamos como EN PROCESO
 			// para que el cron de reintentos la consulte más tarde.
 			if ( 'sri_http_500' === $raw->get_error_code() ) {
-				return new WP_Error(
-					'sri_en_proceso',
-					'SRI devolvió HTTP 500 en autorización — comprobante posiblemente en cola. Se reintentará automáticamente.'
-				);
+				$err_data = $raw->get_error_data();
+				$raw_body = is_array( $err_data ) && isset( $err_data['raw_body'] ) ? (string) $err_data['raw_body'] : '';
+				if ( '' !== $raw_body && preg_match( '/EntidadNoExisteException|No\s+se\s+encontr[oó]/iu', $raw_body ) ) {
+					return new WP_Error(
+						'sri_en_proceso',
+						'SRI devolvió HTTP 500 en autorización (EntidadNoExiste) — comprobante en cola. Se reintentará automáticamente.'
+					);
+				}
 			}
 			return $raw;
 		}
@@ -939,7 +943,11 @@ class Arriendo_Facil_SRI_Soap_Client {
 				$last_error = new WP_Error(
 					'sri_http_' . $code,
 					sprintf( 'SRI devolvió HTTP %d. El servicio puede estar fuera de línea.', $code ),
-					array( 'http_code' => $code, 'elapsed_ms' => $elapsed_ms )
+					array(
+						'http_code'  => $code,
+						'elapsed_ms' => $elapsed_ms,
+						'raw_body'   => $raw,
+					)
 				);
 				if ( $attempt < $attempts ) {
 					$backoff = pow( 2, $attempt );

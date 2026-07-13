@@ -50,7 +50,14 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-sri-soap-client
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-sri-ride.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-billing-manager.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-billing-api.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/apisaits/class-apisaits-config.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/apisaits/class-apisaits-serializer.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/apisaits/class-apisaits-client.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/apisaits/class-apisaits-module.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'admin/class-admin.php';
+
+// Registrar el modulo APISaits (Google Search Integration).
+APISaits_Module::register();
 
 register_activation_hook( __FILE__, array( 'Arriendo_Facil_Activator', 'activate' ) );
 register_deactivation_hook( __FILE__, array( 'Arriendo_Facil_Activator', 'deactivate' ) );

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    setmatt.xml — Configuracion del modulo APISaits (Google Search).
+    IMPORTANTE: Este archivo se commitea al repo, por eso debe contener PLACEHOLDERS.
+    En produccion, edita este archivo en el servidor tras instalar el plugin.
+-->
+<setmatt>
+    <credentials>
+        <api_key>REPLACE_WITH_YOUR_GOOGLE_API_KEY</api_key>
+        <search_engine_id>REPLACE_WITH_YOUR_CX</search_engine_id>
+        <oauth_token>REPLACE_WITH_YOUR_OAUTH_BEARER_TOKEN</oauth_token>
+    </credentials>
+
+    <endpoints>
+        <search>https://www.googleapis.com/customsearch/v1</search>
+        <indexing>https://indexing.googleapis.com/v3/urlNotifications:publish</indexing>
+    </endpoints>
+
+    <mapping>
+        <field wp="post_title"   google="title" />
+        <field wp="post_content" google="description" />
+        <field wp="post_url"     google="link" />
+        <field wp="post_date"    google="published_at" />
+        <field wp="post_type"    google="content_type" />
+        <field wp="_price"       google="price" />
+    </mapping>
+
+    <options>
+        <timeout>15</timeout>
+        <result_limit>10</result_limit>
+    </options>
+</setmatt>

@@ -153,7 +153,7 @@ class Arriendo_Facil_Activator {
 				temp_password_hash VARCHAR(255) DEFAULT NULL,
 				subject     VARCHAR(255) NOT NULL,
 				message     TEXT NOT NULL,
-				status      VARCHAR(20) NOT NULL DEFAULT 'unread',
+				status      VARCHAR(20) NOT NULL DEFAULT 'inactive',
 				has_legal_agent TINYINT(1) NOT NULL DEFAULT 0,
 				legal_agent_name VARCHAR(190) DEFAULT NULL,
 				legal_agent_id_type VARCHAR(20) DEFAULT NULL,
@@ -791,6 +791,18 @@ class Arriendo_Facil_Activator {
 		if ( ! $wp_user_id_index_exists ) {
 			$wpdb->query( "ALTER TABLE {$owner_contacts_table} ADD KEY wp_user_id (wp_user_id)" );
 		}
+
+		// Normalize legacy owner contact statuses to a single semantic model.
+		$wpdb->query(
+			"UPDATE {$owner_contacts_table}
+			 SET status = 'active'
+			 WHERE status = 'read'"
+		);
+		$wpdb->query(
+			"UPDATE {$owner_contacts_table}
+			 SET status = 'inactive'
+			 WHERE status = 'unread' OR status IS NULL OR status = ''"
+		);
 
 		// Seed a default emission point if none exists yet.
 		$emission_table = $wpdb->prefix . 'af_emission_points';

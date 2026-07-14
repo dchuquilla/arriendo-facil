@@ -99,6 +99,7 @@ $current_user_id = (int) get_current_user_id();
             <input type="hidden" name="action" value="af_send_owner_contact" />
             <input type="hidden" name="nonce" value="<?php echo esc_attr( wp_create_nonce( 'af_owner_contact_nonce' ) ); ?>" />
 						<input type="hidden" name="redirect_to" value="<?php echo esc_url( admin_url( 'admin.php?page=af-owner-contacts&action=new' ) ); ?>" />
+						<input type="hidden" name="message" value="" />
 
             <table class="form-table" role="presentation">
 								<tr>
@@ -174,10 +175,6 @@ $current_user_id = (int) get_current_user_id();
                     <td><input type="text" required id="af_subject" name="subject" class="regular-text" /></td>
                 </tr>
                 <tr>
-                    <th scope="row"><label for="af_message"><?php esc_html_e( 'Observations*', 'arriendo-facil' ); ?></label></th>
-                    <td><textarea required id="af_message" name="message" rows="5" class="large-text"></textarea></td>
-                </tr>
-                <tr>
                     <th scope="row"><?php esc_html_e( 'Sensitive Documents (PDF)', 'arriendo-facil' ); ?></th>
                     <td>
                         <p>
@@ -233,7 +230,6 @@ $current_user_id = (int) get_current_user_id();
 				<th><?php esc_html_e( 'Document Type', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'ID del propietario', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Client Name', 'arriendo-facil' ); ?></th>
-                <th><?php esc_html_e( 'Observations', 'arriendo-facil' ); ?></th>
                 <th><?php esc_html_e( 'Legal Agent', 'arriendo-facil' ); ?></th>
                 <th><?php esc_html_e( 'Actions', 'arriendo-facil' ); ?></th>
 			</tr>
@@ -286,7 +282,6 @@ $current_user_id = (int) get_current_user_id();
 						<td><?php echo esc_html( $contact->owner_id_type ); ?></td>
 						<td><?php echo esc_html( $contact->owner_id ); ?></td>
 						<td><?php echo esc_html( $contact->subject ); ?></td>
-						<td><?php echo esc_html( wp_trim_words( $contact->message, 15 ) ); ?></td>
                         <td><?php echo ! empty( $contact->has_legal_agent ) ? esc_html__( 'Yes', 'arriendo-facil' ) : esc_html__( 'No', 'arriendo-facil' ); ?></td>
                         <td class="af-account-actions">
 							<span class="af-owner-status-badge <?php echo esc_attr( $status_class ); ?>" style="display:inline-block;margin-right:8px;padding:2px 8px;border-radius:999px;background:#f1f5f9;font-size:12px;font-weight:600;">
@@ -330,7 +325,7 @@ $current_user_id = (int) get_current_user_id();
 				<?php endforeach; ?>
 			<?php else : ?>
 				<tr>
-                    <td colspan="7"><?php esc_html_e( 'No se encontraron contactos.', 'arriendo-facil' ); ?></td>
+                    <td colspan="6"><?php esc_html_e( 'No se encontraron contactos.', 'arriendo-facil' ); ?></td>
 				</tr>
 			<?php endif; ?>
 		</tbody>

@@ -229,7 +229,7 @@ class Arriendo_Facil_Owner_Contact {
 		$subject = isset( $_POST['subject'] ) ? sanitize_text_field( wp_unslash( $_POST['subject'] ) ) : '';
 		$message = isset( $_POST['message'] ) ? sanitize_textarea_field( wp_unslash( $_POST['message'] ) ) : '';
 
-		if ( ! $this->is_valid_owner_document( $owner_id_type, $owner_id ) || ! is_email( $owner_email ) || ! $subject || ! $message ) {
+		if ( ! $this->is_valid_owner_document( $owner_id_type, $owner_id ) || ! is_email( $owner_email ) || ! $subject ) {
 			if ( $is_xhr ) {
 				wp_send_json_error( array( 'message' => __( 'Datos de registro del propietario invalidos.', 'arriendo-facil' ) ) );
 			}
@@ -358,7 +358,7 @@ class Arriendo_Facil_Owner_Contact {
 			'temp_password_hash' => wp_hash_password( $temp_password_plain ),
 			'subject'            => $subject,
 			'message'            => $message,
-			'status'             => 'unread',
+			'status'             => 'inactive',
 		);
 
 		$owner_formats = array( '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s' );
@@ -1144,7 +1144,7 @@ class Arriendo_Facil_Owner_Contact {
 				 SET status = %s,
 				     temp_password_hash = NULL
 				 WHERE wp_user_id = %d",
-				'read',
+				'active',
 				(int) $user->ID
 			)
 		);

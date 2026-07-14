@@ -32,7 +32,7 @@ if ( $is_owner ) {
 	$lease_count            = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_leases" );
 	$guest_count            = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_guests" );
 	$pending_cleaning       = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_cleaning_requests WHERE status = 'pending'" );
-	$active_contacts        = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_owner_contacts WHERE status IN ('active', 'read')" );
+	$active_contacts        = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_owner_contacts WHERE status = 'active'" );
 }
 ?>
 <div class="wrap af-dashboard">

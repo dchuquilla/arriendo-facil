@@ -354,9 +354,9 @@ class Arriendo_Facil_Accommodation {
 		}
 
 		$fields = array(
-			'_af_address'              => 'sanitize_text_field',
-			'_af_location_text'        => 'sanitize_text_field',
-			'_af_city'                 => 'sanitize_text_field',
+			'_af_address'              => array( 'AF_Text_Normalizer', 'proper_name' ),
+			'_af_location_text'        => array( 'AF_Text_Normalizer', 'proper_name' ),
+			'_af_city'                 => array( 'AF_Text_Normalizer', 'proper_name' ),
 			'_af_latitude'             => 'floatval',
 			'_af_longitude'            => 'floatval',
 			'_af_bedrooms'             => 'absint',

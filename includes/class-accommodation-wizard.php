@@ -138,6 +138,17 @@ class Arriendo_Facil_Accommodation_Wizard {
 			true
 		);
 
+		// Input normalizer: capitalise address/city on blur.
+		$normalizer_path = get_stylesheet_directory() . '/assets/js/input-normalizer.js';
+		$normalizer_url  = get_stylesheet_directory_uri() . '/assets/js/input-normalizer.js';
+		wp_enqueue_script(
+			'af-input-normalizer',
+			$normalizer_url,
+			array(),
+			file_exists( $normalizer_path ) ? (string) filemtime( $normalizer_path ) : ARRIENDO_FACIL_VERSION,
+			true
+		);
+
 		$post_id = isset( $_GET['id'] ) ? absint( wp_unslash( $_GET['id'] ) ) : 0;
 		wp_localize_script(
 			'af-admin-wizard',

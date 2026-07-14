@@ -55,9 +55,9 @@ class Arriendo_Facil_Owner_Register_API {
 
 		$owner_id_type   = sanitize_key( $request->get_param( 'id_type' ) );
 		$owner_id_raw    = sanitize_text_field( $request->get_param( 'id_number' ) );
-		$owner_id        = $this->normalize_document( $owner_id_type, $owner_id_raw );
-		$client_name     = sanitize_text_field( $request->get_param( 'client_name' ) );
-		$owner_email     = sanitize_email( $request->get_param( 'email' ) );
+		$owner_id        = AF_Text_Normalizer::document( $owner_id_type, $owner_id_raw );
+		$client_name     = AF_Text_Normalizer::proper_name( (string) $request->get_param( 'client_name' ) );
+		$owner_email     = AF_Text_Normalizer::email( (string) $request->get_param( 'email' ) );
 		$observations    = '';
 		$has_legal_agent = 'yes' === $request->get_param( 'has_legal_agent' ) ? 1 : 0;
 
@@ -96,12 +96,12 @@ class Arriendo_Facil_Owner_Register_API {
 		$legal_agent_email   = '';
 
 		if ( $has_legal_agent ) {
-			$legal_agent_name    = sanitize_text_field( $request->get_param( 'legal_agent_name' ) );
+			$legal_agent_name    = AF_Text_Normalizer::proper_name( (string) $request->get_param( 'legal_agent_name' ) );
 			$legal_agent_id_type = sanitize_key( $request->get_param( 'legal_agent_id_type' ) );
 			$legal_agent_id_raw  = sanitize_text_field( $request->get_param( 'legal_agent_id_number' ) );
-			$legal_agent_id      = $this->normalize_document( $legal_agent_id_type, $legal_agent_id_raw );
+			$legal_agent_id      = AF_Text_Normalizer::document( $legal_agent_id_type, $legal_agent_id_raw );
 			$legal_agent_phone   = preg_replace( '/\D+/', '', sanitize_text_field( $request->get_param( 'legal_agent_phone' ) ) );
-			$legal_agent_email   = sanitize_email( $request->get_param( 'legal_agent_email' ) );
+			$legal_agent_email   = AF_Text_Normalizer::email( (string) $request->get_param( 'legal_agent_email' ) );
 
 			if ( ! $legal_agent_name
 				|| ! in_array( $legal_agent_id_type, array( 'cedula', 'ruc', 'pasaporte' ), true )
@@ -399,11 +399,7 @@ class Arriendo_Facil_Owner_Register_API {
 	}
 
 	private function normalize_document( $type, $raw ) {
-		$raw = preg_replace( '/[\s\-]/', '', trim( $raw ) );
-		if ( 'ruc' === $type || 'cedula' === $type ) {
-			$raw = preg_replace( '/\D/', '', $raw );
-		}
-		return $raw;
+		return AF_Text_Normalizer::document( (string) $type, (string) $raw );
 	}
 
 	private function is_valid_document( $type, $value ) {

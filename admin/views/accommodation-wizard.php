@@ -178,15 +178,13 @@ $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data[
 						<label class="af-field__label" for="af_address"><?php esc_html_e( 'Dirección completa', 'arriendo-facil' ); ?> <span class="af-required">*</span></label>
 						<input type="text" id="af_address" name="af_address"
 							value="<?php echo esc_attr( $data['address'] ); ?>"
-							class="af-input af-input--full"
-							placeholder="<?php esc_attr_e( 'Ej: Av. Amazonas N34-451', 'arriendo-facil' ); ?>" />
+							class="af-input af-input--full"						data-normalize="address"							placeholder="<?php esc_attr_e( 'Ej: Av. Amazonas N34-451', 'arriendo-facil' ); ?>" />
 					</div>
 					<div class="af-field">
 						<label class="af-field__label" for="af_city"><?php esc_html_e( 'Ciudad', 'arriendo-facil' ); ?> <span class="af-required">*</span></label>
 						<input type="text" id="af_city" name="af_city"
 							value="<?php echo esc_attr( $data['city'] ); ?>"
-							class="af-input af-input--full"
-							placeholder="<?php esc_attr_e( 'Ej: Quito', 'arriendo-facil' ); ?>" />
+							class="af-input af-input--full"						data-normalize="address"							placeholder="<?php esc_attr_e( 'Ej: Quito', 'arriendo-facil' ); ?>" />
 					</div>
 				</div>
 
@@ -194,8 +192,7 @@ $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data[
 					<label class="af-field__label" for="af_location_text"><?php esc_html_e( 'Sector o barrio', 'arriendo-facil' ); ?></label>
 					<input type="text" id="af_location_text" name="af_location_text"
 						value="<?php echo esc_attr( $data['location_text'] ); ?>"
-						class="af-input af-input--full"
-						placeholder="<?php esc_attr_e( 'Ej: La Carolina', 'arriendo-facil' ); ?>" />
+						class="af-input af-input--full"					data-normalize="address"						placeholder="<?php esc_attr_e( 'Ej: La Carolina', 'arriendo-facil' ); ?>" />
 					<p class="af-field__hint"><?php esc_html_e( 'Se usa en las búsquedas del sitio.', 'arriendo-facil' ); ?></p>
 				</div>
 

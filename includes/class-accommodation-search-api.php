@@ -471,9 +471,13 @@ class Arriendo_Facil_Accommodation_Search_API {
 			return false;
 		}
 
-		// Location filter
-		if ( $location && stripos( $accommodation['location'], $location ) === false ) {
-			return false;
+		// Location filter — accent and case insensitive.
+		if ( $location ) {
+			$norm_query    = AF_Text_Normalizer::search_query( $location );
+			$norm_location = AF_Text_Normalizer::search_query( (string) ( $accommodation['location'] ?? '' ) );
+			if ( '' !== $norm_query && false === mb_strpos( $norm_location, $norm_query ) ) {
+				return false;
+			}
 		}
 
 		// Radius filter (haversine formula)

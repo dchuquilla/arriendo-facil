@@ -400,8 +400,8 @@ class Arriendo_Facil_Guest {
 		$rental_end_date = gmdate( 'Y-m-d', strtotime( '+' . $rental_years . ' years', strtotime( $rental_start_date ) ) );
 
 		$name_parts = preg_split( '/\s+/', trim( $name_input ) );
-		$first_name = ! empty( $name_parts[0] ) ? sanitize_text_field( (string) $name_parts[0] ) : '';
-		$last_name  = count( $name_parts ) > 1 ? sanitize_text_field( trim( implode( ' ', array_slice( $name_parts, 1 ) ) ) ) : '';
+		$first_name = ! empty( $name_parts[0] ) ? AF_Text_Normalizer::proper_name( (string) $name_parts[0] ) : '';
+		$last_name  = count( $name_parts ) > 1 ? AF_Text_Normalizer::proper_name( trim( implode( ' ', array_slice( $name_parts, 1 ) ) ) ) : '';
 
 		$updated = $wpdb->update(
 			$wpdb->prefix . 'af_guests',
@@ -734,8 +734,8 @@ class Arriendo_Facil_Guest {
 		global $wpdb;
 
 		$accommodation_id = absint( $accommodation_id );
-		$name             = sanitize_text_field( (string) $name );
-		$email            = sanitize_email( (string) $email );
+		$name             = AF_Text_Normalizer::proper_name( (string) $name );
+		$email            = AF_Text_Normalizer::email( (string) $email );
 		$phone            = sanitize_text_field( (string) $phone );
 		$preferred_date   = sanitize_text_field( (string) $preferred_date );
 		$preferred_time   = sanitize_text_field( (string) $preferred_time );

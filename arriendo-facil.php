@@ -23,6 +23,7 @@ if ( file_exists( $af_composer_autoload ) ) {
 }
 
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-activator.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-text-normalizer.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-idempotency.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-wizard.php';

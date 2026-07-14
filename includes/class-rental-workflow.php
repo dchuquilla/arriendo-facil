@@ -271,8 +271,8 @@ class Arriendo_Facil_Rental_Workflow {
 		$this->verify_frontend_nonce_required();
 
 		$slot_id           = isset( $_POST['slot_id'] ) ? absint( wp_unslash( $_POST['slot_id'] ) ) : 0;
-		$guest_name        = isset( $_POST['guest_name'] ) ? sanitize_text_field( wp_unslash( $_POST['guest_name'] ) ) : '';
-		$guest_email       = isset( $_POST['guest_email'] ) ? sanitize_email( wp_unslash( $_POST['guest_email'] ) ) : '';
+		$guest_name        = isset( $_POST['guest_name'] ) ? AF_Text_Normalizer::proper_name( wp_unslash( $_POST['guest_name'] ) ) : '';
+		$guest_email       = isset( $_POST['guest_email'] ) ? AF_Text_Normalizer::email( wp_unslash( $_POST['guest_email'] ) ) : '';
 		$guest_phone       = isset( $_POST['guest_phone'] ) ? sanitize_text_field( wp_unslash( $_POST['guest_phone'] ) ) : '';
 		$guest_id_number   = isset( $_POST['guest_id_number'] ) ? sanitize_text_field( wp_unslash( $_POST['guest_id_number'] ) ) : '';
 		$notes             = isset( $_POST['notes'] ) ? sanitize_textarea_field( wp_unslash( $_POST['notes'] ) ) : '';
@@ -346,8 +346,8 @@ class Arriendo_Facil_Rental_Workflow {
 
 		$accommodation_id = isset( $_POST['accommodation_id'] ) ? absint( wp_unslash( $_POST['accommodation_id'] ) ) : 0;
 		$slot_id          = isset( $_POST['slot_id'] ) ? absint( wp_unslash( $_POST['slot_id'] ) ) : 0;
-		$guest_name       = isset( $_POST['guest_name'] ) ? sanitize_text_field( wp_unslash( $_POST['guest_name'] ) ) : '';
-		$guest_email      = isset( $_POST['guest_email'] ) ? sanitize_email( wp_unslash( $_POST['guest_email'] ) ) : '';
+		$guest_name       = isset( $_POST['guest_name'] ) ? AF_Text_Normalizer::proper_name( wp_unslash( $_POST['guest_name'] ) ) : '';
+		$guest_email      = isset( $_POST['guest_email'] ) ? AF_Text_Normalizer::email( wp_unslash( $_POST['guest_email'] ) ) : '';
 		$guest_phone      = isset( $_POST['guest_phone'] ) ? sanitize_text_field( wp_unslash( $_POST['guest_phone'] ) ) : '';
 		$notes            = isset( $_POST['notes'] ) ? sanitize_textarea_field( wp_unslash( $_POST['notes'] ) ) : '';
 		$preferred_date   = isset( $_POST['preferred_date'] ) ? sanitize_text_field( wp_unslash( $_POST['preferred_date'] ) ) : '';
@@ -493,8 +493,8 @@ class Arriendo_Facil_Rental_Workflow {
 		$this->verify_frontend_nonce_required();
 
 		$accommodation_id = isset( $_POST['accommodation_id'] ) ? absint( wp_unslash( $_POST['accommodation_id'] ) ) : 0;
-		$name             = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
-		$email            = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
+		$name             = isset( $_POST['name'] ) ? AF_Text_Normalizer::proper_name( wp_unslash( $_POST['name'] ) ) : '';
+		$email            = isset( $_POST['email'] ) ? AF_Text_Normalizer::email( wp_unslash( $_POST['email'] ) ) : '';
 		$phone            = isset( $_POST['phone'] ) ? sanitize_text_field( wp_unslash( $_POST['phone'] ) ) : '';
 		$message          = isset( $_POST['message'] ) ? sanitize_textarea_field( wp_unslash( $_POST['message'] ) ) : '';
 

@@ -213,7 +213,7 @@ class Arriendo_Facil_Owner_Contact {
 		$owner_id_type = isset( $_POST['owner_id_type'] ) ? sanitize_key( wp_unslash( $_POST['owner_id_type'] ) ) : '';
 		$owner_id_raw  = isset( $_POST['owner_id'] ) ? sanitize_text_field( wp_unslash( $_POST['owner_id'] ) ) : '';
 		$owner_id      = $this->normalize_owner_document( $owner_id_type, $owner_id_raw );
-		$owner_email   = isset( $_POST['owner_email'] ) ? sanitize_email( wp_unslash( $_POST['owner_email'] ) ) : '';
+		$owner_email   = isset( $_POST['owner_email'] ) ? AF_Text_Normalizer::email( wp_unslash( $_POST['owner_email'] ) ) : '';
 		$has_legal_agent = isset( $_POST['has_legal_agent'] ) && '1' === wp_unslash( $_POST['has_legal_agent'] ) ? 1 : 0;
 
 		$legal_agent_name_raw    = isset( $_POST['legal_agent_name'] ) ? sanitize_text_field( wp_unslash( $_POST['legal_agent_name'] ) ) : '';
@@ -221,10 +221,10 @@ class Arriendo_Facil_Owner_Contact {
 		$legal_agent_id_raw      = isset( $_POST['legal_agent_id'] ) ? sanitize_text_field( wp_unslash( $_POST['legal_agent_id'] ) ) : '';
 		$legal_agent_phone_raw   = isset( $_POST['legal_agent_phone'] ) ? sanitize_text_field( wp_unslash( $_POST['legal_agent_phone'] ) ) : '';
 		$legal_agent_email_raw   = isset( $_POST['legal_agent_email'] ) ? sanitize_email( wp_unslash( $_POST['legal_agent_email'] ) ) : '';
-		$legal_agent_name        = trim( $legal_agent_name_raw );
+		$legal_agent_name        = AF_Text_Normalizer::proper_name( $legal_agent_name_raw );
 		$legal_agent_id          = $this->normalize_owner_document( $legal_agent_id_type, $legal_agent_id_raw );
 		$legal_agent_phone       = preg_replace( '/\D+/', '', trim( $legal_agent_phone_raw ) );
-		$legal_agent_email       = trim( $legal_agent_email_raw );
+		$legal_agent_email       = AF_Text_Normalizer::email( $legal_agent_email_raw );
 
 		$subject = isset( $_POST['subject'] ) ? sanitize_text_field( wp_unslash( $_POST['subject'] ) ) : '';
 		$message = isset( $_POST['message'] ) ? sanitize_textarea_field( wp_unslash( $_POST['message'] ) ) : '';
@@ -1301,17 +1301,7 @@ class Arriendo_Facil_Owner_Contact {
 	}
 
 	private function normalize_owner_document( $type, $value ) {
-		$value = trim( (string) $value );
-
-		if ( 'cedula' === $type || 'ruc' === $type ) {
-			return preg_replace( '/\D+/', '', $value );
-		}
-
-		if ( 'pasaporte' === $type ) {
-			return strtoupper( preg_replace( '/[^A-Za-z0-9]/', '', $value ) );
-		}
-
-		return $value;
+		return AF_Text_Normalizer::document( (string) $type, (string) $value );
 	}
 
 	private function generate_unique_login( $base_login, $owner_id ) {

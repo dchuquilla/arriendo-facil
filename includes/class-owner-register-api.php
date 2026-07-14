@@ -186,7 +186,7 @@ class Arriendo_Facil_Owner_Register_API {
 			'temp_password_hash'  => wp_hash_password( $temp_password ),
 			'subject'             => $client_name,
 			'message'             => $observations,
-			'status'              => 'unread',
+			'status'              => 'inactive',
 		);
 
 		$inserted = $wpdb->insert(

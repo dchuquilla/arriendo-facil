@@ -2,6 +2,10 @@
 
 A WordPress plugin that manages accommodations and provides a complete rental-management platform including:
 
+> 📚 **[Ver Documentación Completa →](docs/INDEX.md)** | Pagos | Facturación | OTA Integration | Templates
+
+---
+
 - **Accommodation management** – Custom Post Type with address, bedrooms, bathrooms, monthly rent, owner, and availability status.
 - **Cleaning services** – Define cleaning service types (standard, deep-clean, move-in/out) and track cleaning requests with statuses (*pending → in_progress → completed*).
 - **Lease management** – Create and manage rental contracts linked to accommodations and guests, with lifecycle statuses (*draft → active → expired/terminated*).
@@ -23,6 +27,22 @@ A WordPress plugin that manages accommodations and provides a complete rental-ma
 1. Upload the `arriendo-facil` folder to `/wp-content/plugins/`.
 2. Activate the plugin through the **Plugins** screen in WordPress.
 3. Navigate to **Arriendo Fácil → AI Settings** and configure the AI API URL and key.
+
+## 📚 Documentation
+
+All documentation is organized in the `/docs/` folder:
+
+| Tema | Descripción |
+|------|------------|
+| **[/docs/payments/](docs/payments/)** ⭐ **NUEVO** | 💳 Integración Deuna + Banco Pichincha - Comienza con [WORDPRESS_COMPATIBILITY_SUMMARY.md](docs/payments/WORDPRESS_COMPATIBILITY_SUMMARY.md) |
+| **[/docs/architecture/](docs/architecture/)** | Diseño técnico general, flujos, diagramas |
+| **[/docs/billing/](docs/billing/)** | Facturación SRI (Ecuador), certificados, firmas |
+| **[/docs/templates/](docs/templates/)** | Procesamiento de documentos DOCX |
+| **[/docs/ota/](docs/ota/)** | Integración Booking.com + Airbnb |
+| **[/docs/implementation/](docs/implementation/)** | Guías de implementación, checklists |
+| **[/docs/troubleshooting/](docs/troubleshooting/)** | Solución de problemas |
+
+👉 **Ver índice completo:** [docs/INDEX.md](docs/INDEX.md)
 
 ## Plugin Structure
 

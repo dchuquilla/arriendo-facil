@@ -269,6 +269,7 @@ class Arriendo_Facil_Rental_Workflow {
 	 */
 	public function ajax_book_visit_slot() {
 		$this->verify_frontend_nonce_required();
+		$this->check_frontend_rate_limit( 'book_visit', 5, 300 );
 
 		$slot_id           = isset( $_POST['slot_id'] ) ? absint( wp_unslash( $_POST['slot_id'] ) ) : 0;
 		$guest_name        = isset( $_POST['guest_name'] ) ? AF_Text_Normalizer::proper_name( wp_unslash( $_POST['guest_name'] ) ) : '';
@@ -343,6 +344,7 @@ class Arriendo_Facil_Rental_Workflow {
 	 */
 	public function ajax_create_reservation_intent() {
 		$this->verify_frontend_nonce_required();
+		$this->check_frontend_rate_limit( 'reservation_intent', 10, 300 );
 
 		$accommodation_id = isset( $_POST['accommodation_id'] ) ? absint( wp_unslash( $_POST['accommodation_id'] ) ) : 0;
 		$slot_id          = isset( $_POST['slot_id'] ) ? absint( wp_unslash( $_POST['slot_id'] ) ) : 0;
@@ -491,6 +493,7 @@ class Arriendo_Facil_Rental_Workflow {
 	 */
 	public function ajax_join_interest_queue() {
 		$this->verify_frontend_nonce_required();
+		$this->check_frontend_rate_limit( 'interest_queue', 5, 300 );
 
 		$accommodation_id = isset( $_POST['accommodation_id'] ) ? absint( wp_unslash( $_POST['accommodation_id'] ) ) : 0;
 		$name             = isset( $_POST['name'] ) ? AF_Text_Normalizer::proper_name( wp_unslash( $_POST['name'] ) ) : '';
@@ -1715,6 +1718,39 @@ class Arriendo_Facil_Rental_Workflow {
 	private function verify_frontend_nonce_required() {
 		if ( false === check_ajax_referer( 'af_guest_frontend_nonce', 'nonce', false ) ) {
 			wp_send_json_error( array( 'message' => __( 'La sesion expiro. Recarga la pagina e intenta nuevamente.', 'arriendo-facil' ) ), 403 );
+		}
+	}
+
+	/**
+	 * Enforces a simple IP-based rate limit for public (nopriv) endpoints.
+	 *
+	 * Uses a transient counter keyed by action + hashed IP. On the first request
+	 * within the window the transient is created with TTL = $window. Subsequent
+	 * requests increment the counter; once $limit is reached the request is
+	 * rejected with HTTP 429 before any business logic runs.
+	 *
+	 * @param string $action Short identifier for the action (e.g. 'book_visit').
+	 * @param int    $limit  Max allowed requests within the window. Default 10.
+	 * @param int    $window Time window in seconds. Default 300 (5 minutes).
+	 * @return void Sends JSON error and exits if the limit is exceeded.
+	 */
+	private function check_frontend_rate_limit( $action, $limit = 10, $window = 300 ) {
+		$ip  = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : 'unknown';
+		$key = 'af_rl_' . substr( md5( $action . $ip ), 0, 16 );
+
+		$count = (int) get_transient( $key );
+
+		if ( $count >= $limit ) {
+			wp_send_json_error(
+				array( 'message' => __( 'Demasiadas solicitudes. Por favor espera unos minutos e intenta nuevamente.', 'arriendo-facil' ) ),
+				429
+			);
+		}
+
+		if ( 0 === $count ) {
+			set_transient( $key, 1, $window );
+		} else {
+			set_transient( $key, $count + 1, $window );
 		}
 	}
 }

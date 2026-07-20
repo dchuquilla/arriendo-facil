@@ -65,13 +65,45 @@ register_deactivation_hook( __FILE__, array( 'Arriendo_Facil_Activator', 'deacti
 
 /**
  * Applies runtime PHP limits used by owner PDF uploads.
+ *
+ * Emits an admin notice when a directive cannot be raised so that hosting
+ * misconfigurations surface instead of silently being swallowed.
  */
 function arriendo_facil_apply_runtime_upload_limits() {
-	if ( function_exists( 'ini_set' ) ) {
-		@ini_set( 'upload_max_filesize', '12M' );
-		@ini_set( 'post_max_size', '36M' );
-		@ini_set( 'memory_limit', '256M' );
-		@ini_set( 'max_execution_time', '120' );
+	if ( ! function_exists( 'ini_set' ) ) {
+		return;
+	}
+
+	$failed = array();
+
+	if ( false === ini_set( 'upload_max_filesize', '12M' ) ) {
+		$failed[] = 'upload_max_filesize';
+	}
+	if ( false === ini_set( 'post_max_size', '36M' ) ) {
+		$failed[] = 'post_max_size';
+	}
+	if ( false === ini_set( 'memory_limit', '256M' ) ) {
+		$failed[] = 'memory_limit';
+	}
+	if ( false === ini_set( 'max_execution_time', '120' ) ) {
+		$failed[] = 'max_execution_time';
+	}
+
+	if ( ! empty( $failed ) && is_admin() ) {
+		add_action(
+			'admin_notices',
+			static function () use ( $failed ) {
+				echo '<div class="notice notice-warning is-dismissible"><p>' .
+					esc_html(
+						sprintf(
+							/* translators: %s: comma-separated list of PHP directives that could not be changed */
+							__( 'Arriendo Fácil: no se pudo elevar la configuración PHP para: %s. Verifica la configuración del hosting (php.ini o .htaccess).', 'arriendo-facil' ),
+							implode( ', ', $failed )
+						)
+					) .
+					'</p></div>';
+			}
+		);
 	}
 }
 add_action( 'init', 'arriendo_facil_apply_runtime_upload_limits', 1 );

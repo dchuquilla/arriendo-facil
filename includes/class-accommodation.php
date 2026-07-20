@@ -335,22 +335,24 @@ class Arriendo_Facil_Accommodation {
 			return;
 		}
 
+		// Nonce must be verified before writing any meta to prevent unauthorized
+		// save_post triggers (e.g., from other plugins) from silently mutating owner data.
+		if ( ! isset( $_POST['af_accommodation_nonce'] ) ) {
+			return;
+		}
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['af_accommodation_nonce'] ) ), 'af_save_accommodation_meta' ) ) {
+			return;
+		}
+
 		// Invalidate search cache
 		$this->invalidate_search_cache();
 
 		$current_user_id = get_current_user_id();
 		$is_owner_user   = self::user_is_owner( $current_user_id );
 
-		// Keep owner/accommodation link consistent even when nonce payload is missing.
+		// Keep owner/accommodation link consistent.
 		if ( $is_owner_user ) {
 			update_post_meta( $post_id, '_af_owner_id', $current_user_id );
-		}
-
-		if ( ! isset( $_POST['af_accommodation_nonce'] ) ) {
-			return;
-		}
-		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['af_accommodation_nonce'] ) ), 'af_save_accommodation_meta' ) ) {
-			return;
 		}
 
 		$fields = array(

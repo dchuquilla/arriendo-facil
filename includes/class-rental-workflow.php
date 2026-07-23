@@ -647,6 +647,14 @@ class Arriendo_Facil_Rental_Workflow {
 		$payment_reference = isset( $_POST['payment_reference'] ) ? sanitize_text_field( wp_unslash( $_POST['payment_reference'] ) ) : '';
 		$notes             = isset( $_POST['notes'] ) ? sanitize_textarea_field( wp_unslash( $_POST['notes'] ) ) : '';
 
+		// Regla comercial: solo el primer pago del huesped en el inmueble es 2x canon.
+		if ( $accommodation_id && $deposit_amount > 0 && $this->is_first_reservation_payment( $accommodation_id, $guest_id ) ) {
+			$monthly_rent = (float) get_post_meta( $accommodation_id, '_af_monthly_rent', true );
+			if ( $monthly_rent > 0 ) {
+				$deposit_amount = round( $monthly_rent * 2, 2 );
+			}
+		}
+
 		if ( ! $this->can_manage_accommodation( $accommodation_id ) ) {
 			wp_send_json_error( array( 'message' => __( 'No puedes gestionar este inmueble.', 'arriendo-facil' ) ), 403 );
 		}
@@ -1626,6 +1634,37 @@ class Arriendo_Facil_Rental_Workflow {
 				absint( $accommodation_id )
 			)
 		);
+	}
+
+	/**
+	 * Returns whether this is the first paid reservation for a guest in an accommodation.
+	 *
+	 * @param int $accommodation_id Accommodation ID.
+	 * @param int $guest_id Guest ID.
+	 * @return bool
+	 */
+	private function is_first_reservation_payment( $accommodation_id, $guest_id ) {
+		$accommodation_id = absint( $accommodation_id );
+		$guest_id         = absint( $guest_id );
+
+		if ( ! $accommodation_id || ! $guest_id ) {
+			return true;
+		}
+
+		global $wpdb;
+		$paid_count = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				 FROM {$wpdb->prefix}af_reservations
+				 WHERE accommodation_id = %d
+				   AND guest_id = %d
+				   AND deposit_amount > 0",
+				$accommodation_id,
+				$guest_id
+			)
+		);
+
+		return 0 === $paid_count;
 	}
 
 	/**

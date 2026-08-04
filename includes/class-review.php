@@ -29,6 +29,8 @@ class Arriendo_Facil_Review {
 		add_action( 'wp_ajax_nopriv_af_request_new_review_link', array( $this, 'ajax_request_new_review_link' ) );
 		add_shortcode( 'af_review_form', array( $this, 'render_review_form_shortcode' ) );
 		add_shortcode( 'af_review_stats', array( $this, 'render_review_stats_shortcode' ) );
+		add_filter( 'the_content', array( $this, 'append_public_stats_to_single_accommodation' ), 30 );
+		add_filter( 'elementor/frontend/the_content', array( $this, 'append_public_stats_to_single_accommodation' ), 30 );
 	}
 
 	/**
@@ -860,6 +862,40 @@ class Arriendo_Facil_Review {
 		<?php
 
 		return (string) ob_get_clean();
+	}
+
+	/**
+	 * Appends aggregate review stats to singular accommodation content.
+	 *
+	 * @param string $content Current post content.
+	 * @return string
+	 */
+	public function append_public_stats_to_single_accommodation( $content ) {
+		if ( is_admin() || ! is_singular( 'accommodation' ) || ! is_main_query() || ! in_the_loop() ) {
+			return $content;
+		}
+
+		$content = (string) $content;
+		if ( false !== strpos( $content, 'af-review-stats' ) || false !== strpos( $content, '[af_review_stats' ) ) {
+			return $content;
+		}
+
+		$stats_html = $this->render_review_stats_shortcode(
+			array(
+				'accommodation_id' => absint( get_the_ID() ),
+			)
+		);
+
+		if ( '' === trim( $stats_html ) ) {
+			return $content;
+		}
+
+		$section  = '<section class="af-review-summary" aria-label="' . esc_attr__( 'Valoración de la propiedad', 'arriendo-facil' ) . '">';
+		$section .= '<h3>' . esc_html__( 'Valoración general', 'arriendo-facil' ) . '</h3>';
+		$section .= $stats_html;
+		$section .= '</section>';
+
+		return $content . $section;
 	}
 
 	/**

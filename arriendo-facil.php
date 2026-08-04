@@ -37,6 +37,7 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-rental-workflow.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-owner-contact.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-owner-register-api.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-guest.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-review.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ai-service.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ical-parser.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ota-sync-manager.php';
@@ -178,6 +179,7 @@ function arriendo_facil_init() {
 		'Arriendo_Facil_Owner_Contact',
 		'Arriendo_Facil_Owner_Register_API',
 		'Arriendo_Facil_Guest',
+		'Arriendo_Facil_Review',
 		'Arriendo_Facil_Billing_API',
 		'Arriendo_Facil_OTA_Webhook_Handler',
 		'Arriendo_Facil_OTA_Notifications',
@@ -206,7 +208,7 @@ function arriendo_facil_maybe_upgrade_schema() {
 		return;
 	}
 
-	$target_schema_version = '2026-07-owner-sri-multi-tenant-v1';
+	$target_schema_version = '2026-08-review-foundation-v1';
 	$current_schema_version = (string) get_option( 'af_db_schema_version', '' );
 
 	if ( $current_schema_version === $target_schema_version ) {

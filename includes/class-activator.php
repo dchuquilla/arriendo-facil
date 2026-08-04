@@ -336,6 +336,74 @@ class Arriendo_Facil_Activator {
 				KEY status_expires (status, expires_at)
 			) $charset_collate;",
 
+			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_review_groups (
+				id                BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+				lease_id          BIGINT(20) UNSIGNED NOT NULL,
+				accommodation_id  BIGINT(20) UNSIGNED NOT NULL,
+				owner_user_id     BIGINT(20) UNSIGNED NOT NULL,
+				tenant_email      VARCHAR(190) NOT NULL,
+				reviewer_type     VARCHAR(20) NOT NULL COMMENT 'tenant or owner',
+				status            VARCHAR(20) NOT NULL DEFAULT 'pending',
+				due_at            DATETIME DEFAULT NULL,
+				sent_at           DATETIME DEFAULT NULL,
+				completed_at      DATETIME DEFAULT NULL,
+				created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				UNIQUE KEY uniq_lease_reviewer (lease_id, reviewer_type),
+				KEY lease_id (lease_id),
+				KEY accommodation_id (accommodation_id),
+				KEY owner_user_id (owner_user_id),
+				KEY tenant_email (tenant_email),
+				KEY status (status),
+				KEY reviewer_type (reviewer_type)
+			) $charset_collate;",
+
+			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_reviews (
+				id                BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+				review_group_id   BIGINT(20) UNSIGNED NOT NULL,
+				lease_id          BIGINT(20) UNSIGNED NOT NULL,
+				accommodation_id  BIGINT(20) UNSIGNED NOT NULL,
+				owner_user_id     BIGINT(20) UNSIGNED NOT NULL,
+				tenant_email      VARCHAR(190) NOT NULL,
+				review_direction  VARCHAR(30) NOT NULL,
+				stars             TINYINT(2) UNSIGNED NOT NULL DEFAULT 0,
+				status            VARCHAR(20) NOT NULL DEFAULT 'pending',
+				submitted_at      DATETIME DEFAULT NULL,
+				created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				UNIQUE KEY uniq_review_direction (lease_id, review_direction),
+				KEY review_group_id (review_group_id),
+				KEY lease_id (lease_id),
+				KEY accommodation_id (accommodation_id),
+				KEY owner_user_id (owner_user_id),
+				KEY tenant_email (tenant_email),
+				KEY review_direction (review_direction),
+				KEY status (status),
+				KEY stars (stars)
+			) $charset_collate;",
+
+			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_review_tokens (
+				id                BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+				review_group_id   BIGINT(20) UNSIGNED NOT NULL,
+				selector          VARCHAR(64) NOT NULL,
+				token_hash        VARCHAR(255) NOT NULL,
+				expires_at        DATETIME NOT NULL,
+				used_at           DATETIME DEFAULT NULL,
+				attempts          SMALLINT(5) UNSIGNED NOT NULL DEFAULT 0,
+				max_attempts      SMALLINT(5) UNSIGNED NOT NULL DEFAULT 5,
+				status            VARCHAR(20) NOT NULL DEFAULT 'active',
+				sent_at           DATETIME DEFAULT NULL,
+				created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				UNIQUE KEY selector (selector),
+				KEY review_group_id (review_group_id),
+				KEY status (status),
+				KEY expires_at (expires_at)
+			) $charset_collate;",
+
 			// ── Facturación Electrónica SRI ──────────────────────────────────
 
 			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_emission_points (

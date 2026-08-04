@@ -140,6 +140,11 @@ function arriendo_facil_register_cron_jobs() {
 	if ( ! wp_next_scheduled( 'af_idempotency_purge' ) ) {
 		wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', 'af_idempotency_purge' );
 	}
+
+	// Daily review dispatch for lease-based, tokenized ratings.
+	if ( ! wp_next_scheduled( 'af_review_dispatch_cron' ) ) {
+		wp_schedule_event( time() + 10 * MINUTE_IN_SECONDS, 'daily', 'af_review_dispatch_cron' );
+	}
 }
 
 /**

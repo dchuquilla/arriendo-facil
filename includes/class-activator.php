@@ -1014,6 +1014,7 @@ class Arriendo_Facil_Activator {
 		if ( function_exists( 'wp_clear_scheduled_hook' ) ) {
 			wp_clear_scheduled_hook( 'af_sri_retry_cron' );
 			wp_clear_scheduled_hook( 'af_process_ai_queue' );
+			wp_clear_scheduled_hook( 'af_review_dispatch_cron' );
 		}
 		flush_rewrite_rules();
 	}

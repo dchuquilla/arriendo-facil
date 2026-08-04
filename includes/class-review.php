@@ -20,6 +20,14 @@ class Arriendo_Facil_Review {
 	 */
 	public function __construct() {
 		add_action( 'af_lease_activated', array( $this, 'initialize_reviews_for_lease' ), 20, 1 );
+		add_action( 'af_review_dispatch_cron', array( $this, 'dispatch_pending_reviews' ) );
+		add_action( 'wp_ajax_af_validate_review_token', array( $this, 'ajax_validate_review_token' ) );
+		add_action( 'wp_ajax_nopriv_af_validate_review_token', array( $this, 'ajax_validate_review_token' ) );
+		add_action( 'wp_ajax_af_submit_review_by_token', array( $this, 'ajax_submit_review_by_token' ) );
+		add_action( 'wp_ajax_nopriv_af_submit_review_by_token', array( $this, 'ajax_submit_review_by_token' ) );
+		add_action( 'wp_ajax_af_request_new_review_link', array( $this, 'ajax_request_new_review_link' ) );
+		add_action( 'wp_ajax_nopriv_af_request_new_review_link', array( $this, 'ajax_request_new_review_link' ) );
+		add_shortcode( 'af_review_form', array( $this, 'render_review_form_shortcode' ) );
 	}
 
 	/**
@@ -362,6 +370,418 @@ class Arriendo_Facil_Review {
 	}
 
 	/**
+	 * Cron worker that sends review links for eligible lease groups.
+	 *
+	 * @return int Number of groups processed.
+	 */
+	public function dispatch_pending_reviews() {
+		global $wpdb;
+
+		$today    = current_time( 'Y-m-d' );
+		$min_date = gmdate( 'Y-m-d', strtotime( '-' . self::review_window_days() . ' days', strtotime( $today . ' 00:00:00' ) ) );
+
+		$groups = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT g.*
+				 FROM " . self::groups_table() . " g
+				 INNER JOIN {$wpdb->prefix}af_leases l ON l.id = g.lease_id
+				 WHERE g.status = %s
+				   AND l.end_date <= %s
+				   AND l.end_date >= %s
+				 ORDER BY g.id ASC
+				 LIMIT 100",
+				'pending',
+				$today,
+				$min_date
+			)
+		);
+
+		if ( empty( $groups ) ) {
+			return 0;
+		}
+
+		$processed = 0;
+		foreach ( $groups as $group ) {
+			$processed += $this->dispatch_single_group( $group ) ? 1 : 0;
+		}
+
+		return $processed;
+	}
+
+	/**
+	 * AJAX: validates a public review token and returns pending directions.
+	 *
+	 * @return void
+	 */
+	public function ajax_validate_review_token() {
+		$selector = isset( $_REQUEST['selector'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['selector'] ) ) : '';
+		$token    = isset( $_REQUEST['token'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['token'] ) ) : '';
+
+		$resolved = self::resolve_review_token( $selector, $token, false );
+		if ( is_wp_error( $resolved ) ) {
+			wp_send_json_error(
+				array(
+					'message' => $resolved->get_error_message(),
+					'code'    => $resolved->get_error_code(),
+				),
+				400
+			);
+		}
+
+		$group = $this->get_group_by_id( isset( $resolved['review_group_id'] ) ? absint( $resolved['review_group_id'] ) : 0 );
+		if ( ! $group ) {
+			wp_send_json_error( array( 'message' => __( 'No se encontro el grupo de reseña asociado al enlace.', 'arriendo-facil' ) ), 404 );
+		}
+
+		$pending = $this->get_pending_reviews_for_group( (int) $group->id );
+		if ( empty( $pending ) ) {
+			wp_send_json_error( array( 'message' => __( 'No hay reseñas pendientes para este enlace.', 'arriendo-facil' ) ), 400 );
+		}
+
+		wp_send_json_success(
+			array(
+				'group_id'       => (int) $group->id,
+				'reviewer_type'  => sanitize_key( (string) $group->reviewer_type ),
+				'accommodation_id'=> (int) $group->accommodation_id,
+				'lease_id'        => (int) $group->lease_id,
+				'expires_at'      => isset( $resolved['expires_at'] ) ? sanitize_text_field( (string) $resolved['expires_at'] ) : '',
+				'directions'      => $pending,
+			)
+		);
+	}
+
+	/**
+	 * AJAX: submits star reviews for a valid token and consumes it.
+	 *
+	 * @return void
+	 */
+	public function ajax_submit_review_by_token() {
+		$selector = isset( $_POST['selector'] ) ? sanitize_text_field( wp_unslash( $_POST['selector'] ) ) : '';
+		$token    = isset( $_POST['token'] ) ? sanitize_text_field( wp_unslash( $_POST['token'] ) ) : '';
+
+		$resolved = self::resolve_review_token( $selector, $token, true );
+		if ( is_wp_error( $resolved ) ) {
+			wp_send_json_error(
+				array(
+					'message' => $resolved->get_error_message(),
+					'code'    => $resolved->get_error_code(),
+				),
+				400
+			);
+		}
+
+		$group_id = isset( $resolved['review_group_id'] ) ? absint( $resolved['review_group_id'] ) : 0;
+		$group    = $this->get_group_by_id( $group_id );
+		if ( ! $group ) {
+			wp_send_json_error( array( 'message' => __( 'No se encontro el grupo de reseña asociado al token.', 'arriendo-facil' ) ), 404 );
+		}
+
+		$pending_reviews = $this->get_pending_reviews_for_group( $group_id );
+		if ( empty( $pending_reviews ) ) {
+			wp_send_json_error( array( 'message' => __( 'No hay reseñas pendientes para enviar en este enlace.', 'arriendo-facil' ) ), 400 );
+		}
+
+		$ratings_payload = isset( $_POST['ratings'] ) ? wp_unslash( $_POST['ratings'] ) : '';
+		$ratings         = $this->parse_ratings_payload( $ratings_payload );
+		if ( empty( $ratings ) ) {
+			wp_send_json_error( array( 'message' => __( 'No se recibieron calificaciones válidas.', 'arriendo-facil' ) ), 400 );
+		}
+
+		foreach ( $pending_reviews as $review_row ) {
+			$direction = sanitize_key( (string) $review_row['direction'] );
+			if ( ! isset( $ratings[ $direction ] ) ) {
+				wp_send_json_error( array( 'message' => sprintf( __( 'Falta la calificación para: %s', 'arriendo-facil' ), $direction ) ), 400 );
+			}
+
+			$stars = absint( $ratings[ $direction ] );
+			if ( $stars < 1 || $stars > 5 ) {
+				wp_send_json_error( array( 'message' => __( 'Cada calificación debe estar entre 1 y 5 estrellas.', 'arriendo-facil' ) ), 400 );
+			}
+		}
+
+		global $wpdb;
+		$now = gmdate( 'Y-m-d H:i:s' );
+		foreach ( $pending_reviews as $review_row ) {
+			$direction = sanitize_key( (string) $review_row['direction'] );
+			$stars     = absint( $ratings[ $direction ] );
+
+			$wpdb->update(
+				self::reviews_table(),
+				array(
+					'stars'        => $stars,
+					'status'       => 'completed',
+					'submitted_at' => $now,
+				),
+				array( 'id' => absint( $review_row['id'] ) ),
+				array( '%d', '%s', '%s' ),
+				array( '%d' )
+			);
+		}
+
+		$wpdb->update(
+			self::groups_table(),
+			array(
+				'status'       => 'completed',
+				'completed_at' => $now,
+			),
+			array( 'id' => $group_id ),
+			array( '%s', '%s' ),
+			array( '%d' )
+		);
+
+		self::consume_review_token( isset( $resolved['token_id'] ) ? absint( $resolved['token_id'] ) : 0 );
+
+		wp_send_json_success(
+			array(
+				'message' => __( 'Gracias. Tu calificación fue registrada correctamente.', 'arriendo-facil' ),
+				'group_id' => $group_id,
+			)
+		);
+	}
+
+	/**
+	 * AJAX: issues and sends a fresh token for an existing review group.
+	 *
+	 * @return void
+	 */
+	public function ajax_request_new_review_link() {
+		$selector = isset( $_POST['selector'] ) ? sanitize_text_field( wp_unslash( $_POST['selector'] ) ) : '';
+		if ( '' === $selector ) {
+			wp_send_json_error( array( 'message' => __( 'Debes indicar el selector del enlace anterior.', 'arriendo-facil' ) ), 400 );
+		}
+
+		$token_row = $this->get_token_by_selector( $selector );
+		if ( ! $token_row ) {
+			wp_send_json_error( array( 'message' => __( 'No se encontro el enlace para solicitar uno nuevo.', 'arriendo-facil' ) ), 404 );
+		}
+
+		$group = $this->get_group_by_id( isset( $token_row->review_group_id ) ? absint( $token_row->review_group_id ) : 0 );
+		if ( ! $group ) {
+			wp_send_json_error( array( 'message' => __( 'No se encontro el grupo de reseña para reenviar el enlace.', 'arriendo-facil' ) ), 404 );
+		}
+
+		$group_status = isset( $group->status ) ? sanitize_key( (string) $group->status ) : '';
+		if ( 'completed' === $group_status ) {
+			wp_send_json_error( array( 'message' => __( 'Este ciclo de reseñas ya se completó y no admite nuevo enlace.', 'arriendo-facil' ) ), 400 );
+		}
+
+		if ( ! empty( $group->due_at ) && strtotime( (string) $group->due_at ) < time() ) {
+			wp_send_json_error( array( 'message' => __( 'La ventana de reseña ya venció para este contrato.', 'arriendo-facil' ) ), 400 );
+		}
+
+		if ( ! empty( $group->sent_at ) && strtotime( (string) $group->sent_at ) > ( time() - 600 ) ) {
+			wp_send_json_error( array( 'message' => __( 'Espera unos minutos antes de solicitar otro enlace.', 'arriendo-facil' ) ), 429 );
+		}
+
+		$sent = $this->dispatch_single_group( $group );
+		if ( ! $sent ) {
+			wp_send_json_error( array( 'message' => __( 'No se pudo generar y enviar el nuevo enlace de reseña.', 'arriendo-facil' ) ), 500 );
+		}
+
+		wp_send_json_success( array( 'message' => __( 'Se envio un nuevo enlace de reseña al correo registrado.', 'arriendo-facil' ) ) );
+	}
+
+	/**
+	 * Renders the public token-based review form.
+	 *
+	 * Usage: [af_review_form]
+	 *
+	 * @return string
+	 */
+	public function render_review_form_shortcode() {
+		$ajax_url = esc_url( admin_url( 'admin-ajax.php' ) );
+		$title    = esc_html__( 'Calificar estancia', 'arriendo-facil' );
+
+		ob_start();
+		?>
+		<div id="af-review-form-app" style="max-width:760px;margin:20px auto;padding:24px;border:1px solid #e2e8f0;border-radius:12px;background:#fff;">
+			<h2 style="margin:0 0 14px;font-size:26px;line-height:1.2;color:#0f172a;"><?php echo $title; ?></h2>
+			<p style="margin:0 0 14px;color:#475569;line-height:1.6;"><?php echo esc_html__( 'Este enlace es seguro y de un solo uso. Completa las calificaciones pendientes para finalizar.', 'arriendo-facil' ); ?></p>
+
+			<div id="af-review-alert" style="display:none;padding:10px 12px;border-radius:8px;margin-bottom:14px;"></div>
+			<div id="af-review-loading" style="color:#334155;"><?php echo esc_html__( 'Validando enlace…', 'arriendo-facil' ); ?></div>
+
+			<form id="af-review-form" style="display:none;">
+				<div id="af-review-fields" style="display:grid;grid-template-columns:1fr;gap:14px;"></div>
+				<button type="submit" id="af-review-submit" style="margin-top:16px;padding:11px 16px;border:0;border-radius:8px;background:#1d4ed8;color:#fff;font-weight:600;cursor:pointer;">
+					<?php echo esc_html__( 'Enviar calificación', 'arriendo-facil' ); ?>
+				</button>
+			</form>
+
+			<button type="button" id="af-review-new-link" style="display:none;margin-top:12px;padding:9px 14px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#0f172a;cursor:pointer;">
+				<?php echo esc_html__( 'Solicitar nuevo enlace', 'arriendo-facil' ); ?>
+			</button>
+		</div>
+
+		<script>
+		(function(){
+			const app = document.getElementById('af-review-form-app');
+			if(!app){ return; }
+
+			const ajaxUrl = <?php echo wp_json_encode( $ajax_url ); ?>;
+			const alertBox = document.getElementById('af-review-alert');
+			const loading = document.getElementById('af-review-loading');
+			const form = document.getElementById('af-review-form');
+			const fieldsWrap = document.getElementById('af-review-fields');
+			const submitBtn = document.getElementById('af-review-submit');
+			const newLinkBtn = document.getElementById('af-review-new-link');
+
+			const labels = {
+				tenant_to_owner: <?php echo wp_json_encode( __( 'Califica al propietario', 'arriendo-facil' ) ); ?>,
+				tenant_to_property: <?php echo wp_json_encode( __( 'Califica la propiedad', 'arriendo-facil' ) ); ?>,
+				owner_to_tenant: <?php echo wp_json_encode( __( 'Califica al inquilino', 'arriendo-facil' ) ); ?>
+			};
+
+			const params = new URLSearchParams(window.location.search);
+			const selector = params.get('selector') || '';
+			const token = params.get('token') || '';
+
+			function showAlert(message, type){
+				alertBox.style.display = 'block';
+				alertBox.textContent = message || '';
+				if(type === 'success'){
+					alertBox.style.background = '#ecfdf5';
+					alertBox.style.border = '1px solid #86efac';
+					alertBox.style.color = '#166534';
+				} else {
+					alertBox.style.background = '#fef2f2';
+					alertBox.style.border = '1px solid #fca5a5';
+					alertBox.style.color = '#991b1b';
+				}
+			}
+
+			function toFormBody(obj){
+				const fd = new URLSearchParams();
+				Object.keys(obj).forEach((key) => fd.append(key, obj[key]));
+				return fd;
+			}
+
+			function renderDirectionFields(directions){
+				fieldsWrap.innerHTML = '';
+				directions.forEach((entry) => {
+					const key = entry.direction;
+					const label = labels[key] || key;
+					const block = document.createElement('div');
+					block.style.border = '1px solid #e2e8f0';
+					block.style.borderRadius = '10px';
+					block.style.padding = '12px';
+					block.innerHTML = `
+						<div style="font-weight:600;color:#0f172a;margin-bottom:8px;">${label}</div>
+						<div style="display:flex;gap:10px;flex-wrap:wrap;">
+							${[1,2,3,4,5].map((n) => `
+								<label style="display:flex;align-items:center;gap:6px;color:#334155;">
+									<input type="radio" name="rating_${key}" value="${n}" ${n===5?'checked':''}>
+									<span>${n}★</span>
+								</label>
+							`).join('')}
+						</div>
+					`;
+					fieldsWrap.appendChild(block);
+				});
+			}
+
+			async function validateToken(){
+				if(!selector || !token){
+					loading.style.display = 'none';
+					showAlert(<?php echo wp_json_encode( __( 'Enlace incompleto. Verifica que la URL tenga selector y token.', 'arriendo-facil' ) ); ?>, 'error');
+					return;
+				}
+
+				const response = await fetch(ajaxUrl, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+					body: toFormBody({
+						action: 'af_validate_review_token',
+						selector,
+						token
+					})
+				});
+
+				const json = await response.json();
+				loading.style.display = 'none';
+
+				if(!json || !json.success){
+					const message = json && json.data && json.data.message ? json.data.message : <?php echo wp_json_encode( __( 'No se pudo validar el enlace de reseña.', 'arriendo-facil' ) ); ?>;
+					showAlert(message, 'error');
+					newLinkBtn.style.display = 'inline-block';
+					return;
+				}
+
+				renderDirectionFields((json.data && json.data.directions) ? json.data.directions : []);
+				form.style.display = 'block';
+			}
+
+			form.addEventListener('submit', async function(e){
+				e.preventDefault();
+				submitBtn.disabled = true;
+
+				const ratings = {};
+				const radios = form.querySelectorAll('input[type="radio"]:checked');
+				radios.forEach((r) => {
+					const name = r.getAttribute('name') || '';
+					const direction = name.replace('rating_', '');
+					if(direction){ ratings[direction] = parseInt(r.value, 10); }
+				});
+
+				const response = await fetch(ajaxUrl, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+					body: toFormBody({
+						action: 'af_submit_review_by_token',
+						selector,
+						token,
+						ratings: JSON.stringify(ratings)
+					})
+				});
+
+				const json = await response.json();
+				submitBtn.disabled = false;
+
+				if(!json || !json.success){
+					const message = json && json.data && json.data.message ? json.data.message : <?php echo wp_json_encode( __( 'No se pudo enviar la calificación.', 'arriendo-facil' ) ); ?>;
+					showAlert(message, 'error');
+					if(message.toLowerCase().includes('expir') || message.toLowerCase().includes('bloque')){
+						newLinkBtn.style.display = 'inline-block';
+					}
+					return;
+				}
+
+				showAlert((json.data && json.data.message) ? json.data.message : <?php echo wp_json_encode( __( 'Calificación enviada correctamente.', 'arriendo-facil' ) ); ?>, 'success');
+				form.style.display = 'none';
+				newLinkBtn.style.display = 'none';
+			});
+
+			newLinkBtn.addEventListener('click', async function(){
+				newLinkBtn.disabled = true;
+				const response = await fetch(ajaxUrl, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+					body: toFormBody({
+						action: 'af_request_new_review_link',
+						selector
+					})
+				});
+
+				const json = await response.json();
+				newLinkBtn.disabled = false;
+				if(!json || !json.success){
+					const message = json && json.data && json.data.message ? json.data.message : <?php echo wp_json_encode( __( 'No se pudo solicitar un nuevo enlace.', 'arriendo-facil' ) ); ?>;
+					showAlert(message, 'error');
+					return;
+				}
+
+				showAlert((json.data && json.data.message) ? json.data.message : <?php echo wp_json_encode( __( 'Se enviará un nuevo enlace si la reseña aún está habilitada.', 'arriendo-facil' ) ); ?>, 'success');
+			});
+
+			validateToken();
+		})();
+		</script>
+		<?php
+
+		return (string) ob_get_clean();
+	}
+
+	/**
 	 * Initializes pending reviews for a lease right after activation.
 	 *
 	 * @param int $lease_id Lease ID.
@@ -562,5 +982,339 @@ class Arriendo_Facil_Review {
 		}
 
 		return $created_ids;
+	}
+
+	/**
+	 * Dispatches one review group by creating token and sending its email.
+	 *
+	 * @param object $group Review group row.
+	 * @return bool
+	 */
+	private function dispatch_single_group( $group ) {
+		if ( ! is_object( $group ) || ! isset( $group->id ) || ! isset( $group->reviewer_type ) ) {
+			return false;
+		}
+
+		$reviewer_type = sanitize_key( (string) $group->reviewer_type );
+		if ( ! array_key_exists( $reviewer_type, self::reviewer_types() ) ) {
+			return false;
+		}
+
+		$recipient_email = $this->resolve_group_recipient_email( $group );
+		if ( ! is_email( $recipient_email ) ) {
+			return false;
+		}
+
+		$pending_reviews = $this->get_pending_reviews_for_group( (int) $group->id );
+		if ( empty( $pending_reviews ) ) {
+			return false;
+		}
+
+		$this->revoke_active_tokens_for_group( (int) $group->id );
+		$token_data = self::create_review_token( (int) $group->id, self::default_token_attempts() );
+		if ( is_wp_error( $token_data ) ) {
+			return false;
+		}
+
+		$review_url = $this->build_review_link(
+			isset( $token_data['selector'] ) ? (string) $token_data['selector'] : '',
+			isset( $token_data['token'] ) ? (string) $token_data['token'] : ''
+		);
+		if ( '' === $review_url ) {
+			return false;
+		}
+
+		$sent = $this->send_review_link_email(
+			$recipient_email,
+			$reviewer_type,
+			(int) $group->accommodation_id,
+			$review_url,
+			isset( $token_data['expires_at'] ) ? (string) $token_data['expires_at'] : ''
+		);
+		if ( ! $sent ) {
+			return false;
+		}
+
+		global $wpdb;
+		$now = gmdate( 'Y-m-d H:i:s' );
+		$wpdb->update(
+			self::groups_table(),
+			array(
+				'status'  => 'sent',
+				'sent_at' => $now,
+			),
+			array( 'id' => (int) $group->id ),
+			array( '%s', '%s' ),
+			array( '%d' )
+		);
+
+		if ( isset( $token_data['token_id'] ) ) {
+			$wpdb->update(
+				self::tokens_table(),
+				array( 'sent_at' => $now ),
+				array( 'id' => absint( $token_data['token_id'] ) ),
+				array( '%s' ),
+				array( '%d' )
+			);
+		}
+
+		return true;
+	}
+
+	/**
+	 * Gets a review group by ID.
+	 *
+	 * @param int $group_id Review group ID.
+	 * @return object|null
+	 */
+	private function get_group_by_id( $group_id ) {
+		$group_id = absint( $group_id );
+		if ( ! $group_id ) {
+			return null;
+		}
+
+		global $wpdb;
+		return $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT * FROM " . self::groups_table() . " WHERE id = %d LIMIT 1",
+				$group_id
+			)
+		);
+	}
+
+	/**
+	 * Gets a token row by selector.
+	 *
+	 * @param string $selector Token selector.
+	 * @return object|null
+	 */
+	private function get_token_by_selector( $selector ) {
+		$selector = sanitize_text_field( (string) $selector );
+		if ( '' === $selector ) {
+			return null;
+		}
+
+		global $wpdb;
+		return $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT * FROM " . self::tokens_table() . " WHERE selector = %s LIMIT 1",
+				$selector
+			)
+		);
+	}
+
+	/**
+	 * Returns pending review rows for a group.
+	 *
+	 * @param int $group_id Review group ID.
+	 * @return array<int,array<string,mixed>>
+	 */
+	private function get_pending_reviews_for_group( $group_id ) {
+		$group_id = absint( $group_id );
+		if ( ! $group_id ) {
+			return array();
+		}
+
+		global $wpdb;
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT id, review_direction
+				 FROM " . self::reviews_table() . "
+				 WHERE review_group_id = %d
+				   AND status = %s
+				 ORDER BY id ASC",
+				$group_id,
+				'pending'
+			)
+		);
+
+		$pending = array();
+		foreach ( (array) $rows as $row ) {
+			$pending[] = array(
+				'id'        => isset( $row->id ) ? absint( $row->id ) : 0,
+				'direction' => isset( $row->review_direction ) ? sanitize_key( (string) $row->review_direction ) : '',
+			);
+		}
+
+		return array_values( array_filter( $pending, static function( $item ) {
+			return ! empty( $item['id'] ) && ! empty( $item['direction'] );
+		} ) );
+	}
+
+	/**
+	 * Revokes active tokens for a group before creating a new one.
+	 *
+	 * @param int $group_id Review group ID.
+	 * @return void
+	 */
+	private function revoke_active_tokens_for_group( $group_id ) {
+		$group_id = absint( $group_id );
+		if ( ! $group_id ) {
+			return;
+		}
+
+		global $wpdb;
+		$wpdb->update(
+			self::tokens_table(),
+			array( 'status' => 'revoked' ),
+			array(
+				'review_group_id' => $group_id,
+				'status'          => 'active',
+			),
+			array( '%s' ),
+			array( '%d', '%s' )
+		);
+	}
+
+	/**
+	 * Resolves which email receives the group review link.
+	 *
+	 * @param object $group Review group row.
+	 * @return string
+	 */
+	private function resolve_group_recipient_email( $group ) {
+		$reviewer_type = sanitize_key( (string) $group->reviewer_type );
+		if ( 'tenant' === $reviewer_type ) {
+			return sanitize_email( (string) $group->tenant_email );
+		}
+
+		$owner_user_id = isset( $group->owner_user_id ) ? absint( $group->owner_user_id ) : 0;
+		if ( ! $owner_user_id ) {
+			return '';
+		}
+
+		$user = get_userdata( $owner_user_id );
+		if ( ! $user instanceof WP_User ) {
+			return '';
+		}
+
+		return sanitize_email( (string) $user->user_email );
+	}
+
+	/**
+	 * Builds the public review form URL.
+	 *
+	 * @param string $selector Token selector.
+	 * @param string $token Plain token.
+	 * @return string
+	 */
+	private function build_review_link( $selector, $token ) {
+		$selector = sanitize_text_field( (string) $selector );
+		$token    = sanitize_text_field( (string) $token );
+
+		if ( '' === $selector || '' === $token ) {
+			return '';
+		}
+
+		$path = apply_filters( 'af_review_form_path', '/calificar-estancia/' );
+		$url  = home_url( '/' . ltrim( (string) $path, '/' ) );
+
+		return (string) add_query_arg(
+			array(
+				'selector' => rawurlencode( $selector ),
+				'token'    => rawurlencode( $token ),
+			),
+			$url
+		);
+	}
+
+	/**
+	 * Sends the review link email.
+	 *
+	 * @param string $recipient_email Recipient email.
+	 * @param string $reviewer_type Reviewer type.
+	 * @param int    $accommodation_id Accommodation ID.
+	 * @param string $review_url Review URL.
+	 * @param string $expires_at Expiration date/time.
+	 * @return bool
+	 */
+	private function send_review_link_email( $recipient_email, $reviewer_type, $accommodation_id, $review_url, $expires_at ) {
+		$recipient_email = sanitize_email( (string) $recipient_email );
+		$reviewer_type   = sanitize_key( (string) $reviewer_type );
+		$accommodation_id = absint( $accommodation_id );
+		$review_url      = esc_url_raw( (string) $review_url );
+
+		if ( ! is_email( $recipient_email ) || '' === $review_url ) {
+			return false;
+		}
+
+		$property_title = (string) get_the_title( $accommodation_id );
+		$subject        = 'tenant' === $reviewer_type
+			? sprintf( __( '[Arriendo Facil] Califica tu experiencia en %s', 'arriendo-facil' ), $property_title ? $property_title : __( 'tu arriendo', 'arriendo-facil' ) )
+			: sprintf( __( '[Arriendo Facil] Califica a tu inquilino de %s', 'arriendo-facil' ), $property_title ? $property_title : __( 'tu contrato', 'arriendo-facil' ) );
+
+		$title = 'tenant' === $reviewer_type
+			? __( 'Tu reseña ayuda a mejorar el ecosistema de arriendo', 'arriendo-facil' )
+			: __( 'Comparte tu reseña del inquilino', 'arriendo-facil' );
+
+		$description = 'tenant' === $reviewer_type
+			? __( 'Completa en un solo formulario la calificación del propietario y de la propiedad.', 'arriendo-facil' )
+			: __( 'Completa la calificación del inquilino para cerrar el ciclo del contrato.', 'arriendo-facil' );
+
+		$expires_line = '';
+		if ( '' !== trim( (string) $expires_at ) ) {
+			$expires_line = '<p style="margin:0 0 14px;color:#334155;line-height:1.6;">' . sprintf( esc_html__( 'Este enlace estara disponible hasta: %s', 'arriendo-facil' ), esc_html( $expires_at ) ) . '</p>';
+		}
+
+		$message = '<div style="margin:0;padding:24px;background:#f8fafc;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#0f172a;">';
+		$message .= '<div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">';
+		$message .= '<div style="padding:18px 22px;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#ffffff;">';
+		$message .= '<h2 style="margin:0;font-size:20px;line-height:1.3;">' . esc_html( $title ) . '</h2>';
+		$message .= '</div>';
+		$message .= '<div style="padding:22px;">';
+		$message .= '<p style="margin:0 0 12px;line-height:1.6;">' . esc_html( $description ) . '</p>';
+		$message .= '<p style="margin:0 0 18px;"><a href="' . esc_url( $review_url ) . '" style="display:inline-block;padding:12px 18px;border-radius:8px;background:#2563eb;color:#ffffff;text-decoration:none;font-weight:600;">' . esc_html__( 'Ir a calificar', 'arriendo-facil' ) . '</a></p>';
+		$message .= $expires_line;
+		$message .= '<p style="margin:0;line-height:1.6;color:#475569;">' . esc_html__( 'El enlace es de un solo uso y se invalida al enviar tu calificación.', 'arriendo-facil' ) . '</p>';
+		$message .= '</div></div>';
+		$message .= '<p style="max-width:640px;margin:12px auto 0;font-size:12px;color:#64748b;text-align:center;">Arriendo Facil</p>';
+		$message .= '</div>';
+
+		return (bool) wp_mail( $recipient_email, $subject, $message, array( 'Content-Type: text/html; charset=UTF-8' ) );
+	}
+
+	/**
+	 * Parses ratings payload from JSON or array format.
+	 *
+	 * @param mixed $ratings_payload Raw ratings payload.
+	 * @return array<string,int>
+	 */
+	private function parse_ratings_payload( $ratings_payload ) {
+		$ratings = array();
+
+		if ( is_array( $ratings_payload ) ) {
+			$raw = $ratings_payload;
+		} elseif ( is_string( $ratings_payload ) && '' !== trim( $ratings_payload ) ) {
+			$decoded = json_decode( (string) $ratings_payload, true );
+			$raw     = is_array( $decoded ) ? $decoded : array();
+		} else {
+			$raw = array();
+		}
+
+		$allowed = self::review_directions();
+		foreach ( $raw as $direction => $stars ) {
+			$direction = sanitize_key( (string) $direction );
+			if ( ! array_key_exists( $direction, $allowed ) ) {
+				continue;
+			}
+
+			$stars = absint( $stars );
+			if ( $stars < 1 || $stars > 5 ) {
+				continue;
+			}
+
+			$ratings[ $direction ] = $stars;
+		}
+
+		// Fallback for clients that submit a single pair: direction + stars.
+		if ( empty( $ratings ) ) {
+			$single_direction = isset( $_POST['review_direction'] ) ? sanitize_key( (string) wp_unslash( $_POST['review_direction'] ) ) : '';
+			$single_stars     = isset( $_POST['stars'] ) ? absint( wp_unslash( $_POST['stars'] ) ) : 0;
+			if ( '' !== $single_direction && $single_stars >= 1 && $single_stars <= 5 && array_key_exists( $single_direction, $allowed ) ) {
+				$ratings[ $single_direction ] = $single_stars;
+			}
+		}
+
+		return $ratings;
 	}
 }

@@ -94,6 +94,15 @@ class Arriendo_Facil_Admin {
 
 		add_submenu_page(
 			'arriendo-facil',
+			__( 'Valoraciones', 'arriendo-facil' ),
+			__( 'Valoraciones', 'arriendo-facil' ),
+			'edit_posts',
+			'af-reviews',
+			array( $this, 'render_reviews' )
+		);
+
+		add_submenu_page(
+			'arriendo-facil',
 			__( 'Ajustes de IA', 'arriendo-facil' ),
 			__( 'Ajustes de IA', 'arriendo-facil' ),
 			'manage_options',
@@ -377,6 +386,13 @@ class Arriendo_Facil_Admin {
 	 */
 	public function render_guests() {
 		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/guests.php';
+	}
+
+	/**
+	 * Renders the reviews admin page.
+	 */
+	public function render_reviews() {
+		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/reviews.php';
 	}
 
 	/**

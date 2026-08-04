@@ -1,0 +1,150 @@
+<?php
+/**
+ * Reviews admin page view.
+ *
+ * @package Arriendo_Facil
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+global $wpdb;
+
+$is_owner          = Arriendo_Facil_Accommodation::user_is_owner();
+$review_table      = $wpdb->prefix . 'af_reviews';
+$groups_table      = $wpdb->prefix . 'af_review_groups';
+$posts_table       = $wpdb->posts;
+$directions_map    = class_exists( 'Arriendo_Facil_Review' ) ? Arriendo_Facil_Review::review_directions() : array();
+$direction_filter  = isset( $_GET['direction'] ) ? sanitize_key( wp_unslash( $_GET['direction'] ) ) : '';
+
+$where_clauses = array( 'r.status = %s' );
+$where_args    = array( 'completed' );
+
+if ( $is_owner ) {
+	$owner_ids = Arriendo_Facil_Accommodation::get_owner_accommodation_ids( get_current_user_id() );
+	if ( empty( $owner_ids ) ) {
+		$owner_ids = array( 0 );
+	}
+	$ids_sql = implode( ',', array_map( 'intval', $owner_ids ) );
+	$where_clauses[] = "r.accommodation_id IN ({$ids_sql})";
+}
+
+if ( '' !== $direction_filter ) {
+	$where_clauses[] = 'r.review_direction = %s';
+	$where_args[]    = $direction_filter;
+}
+
+$where_sql = implode( ' AND ', $where_clauses );
+
+$summary_query = "
+	SELECT
+		COUNT(*) AS total_reviews,
+		AVG(r.stars) AS avg_stars,
+		SUM(CASE WHEN r.stars >= 4 THEN 1 ELSE 0 END) AS positive_reviews
+	FROM {$review_table} r
+	WHERE {$where_sql}
+";
+
+$summary = $wpdb->get_row( $wpdb->prepare( $summary_query, $where_args ) );
+$total_reviews    = isset( $summary->total_reviews ) ? (int) $summary->total_reviews : 0;
+$avg_stars        = isset( $summary->avg_stars ) ? (float) $summary->avg_stars : 0.0;
+$positive_reviews = isset( $summary->positive_reviews ) ? (int) $summary->positive_reviews : 0;
+$positive_rate    = $total_reviews > 0 ? ( $positive_reviews / $total_reviews ) * 100 : 0;
+
+$list_query = "
+	SELECT
+		r.id,
+		r.lease_id,
+		r.accommodation_id,
+		r.review_direction,
+		r.stars,
+		r.submitted_at,
+		r.tenant_email,
+		r.owner_user_id,
+		p.post_title AS accommodation_title,
+		g.reviewer_type
+	FROM {$review_table} r
+	LEFT JOIN {$posts_table} p ON p.ID = r.accommodation_id
+	LEFT JOIN {$groups_table} g ON g.id = r.review_group_id
+	WHERE {$where_sql}
+	ORDER BY r.submitted_at DESC
+	LIMIT 150
+";
+
+$rows = $wpdb->get_results( $wpdb->prepare( $list_query, $where_args ) );
+
+?>
+<div class="wrap">
+	<h1><?php esc_html_e( 'Valoraciones', 'arriendo-facil' ); ?></h1>
+
+	<form method="get" style="margin:0 0 16px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+		<input type="hidden" name="page" value="af-reviews" />
+		<label>
+			<?php esc_html_e( 'Direccion', 'arriendo-facil' ); ?>
+			<select name="direction">
+				<option value=""><?php esc_html_e( 'Todas', 'arriendo-facil' ); ?></option>
+				<?php foreach ( $directions_map as $key => $label ) : ?>
+					<option value="<?php echo esc_attr( $key ); ?>" <?php selected( $direction_filter, $key ); ?>><?php echo esc_html( $label ); ?></option>
+				<?php endforeach; ?>
+			</select>
+		</label>
+		<button type="submit" class="button button-primary"><?php esc_html_e( 'Filtrar', 'arriendo-facil' ); ?></button>
+		<a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=af-reviews' ) ); ?>"><?php esc_html_e( 'Limpiar', 'arriendo-facil' ); ?></a>
+	</form>
+
+	<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px;">
+		<div style="padding:12px;border:1px solid #dcdcde;border-radius:8px;background:#fff;">
+			<div style="font-size:22px;font-weight:700;"><?php echo esc_html( $total_reviews ); ?></div>
+			<div style="color:#555;"><?php esc_html_e( 'Reseñas completadas', 'arriendo-facil' ); ?></div>
+		</div>
+		<div style="padding:12px;border:1px solid #dcdcde;border-radius:8px;background:#fff;">
+			<div style="font-size:22px;font-weight:700;"><?php echo esc_html( number_format( $avg_stars, 2 ) ); ?></div>
+			<div style="color:#555;"><?php esc_html_e( 'Promedio general', 'arriendo-facil' ); ?></div>
+		</div>
+		<div style="padding:12px;border:1px solid #dcdcde;border-radius:8px;background:#fff;">
+			<div style="font-size:22px;font-weight:700;"><?php echo esc_html( $positive_reviews ); ?></div>
+			<div style="color:#555;"><?php esc_html_e( 'Reseñas positivas (>=4.0)', 'arriendo-facil' ); ?></div>
+		</div>
+		<div style="padding:12px;border:1px solid #dcdcde;border-radius:8px;background:#fff;">
+			<div style="font-size:22px;font-weight:700;"><?php echo esc_html( number_format( $positive_rate, 1 ) ); ?>%</div>
+			<div style="color:#555;"><?php esc_html_e( 'Tasa positiva', 'arriendo-facil' ); ?></div>
+		</div>
+	</div>
+
+	<table class="wp-list-table widefat fixed striped">
+		<thead>
+			<tr>
+				<th><?php esc_html_e( 'ID', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'Contrato', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'Propiedad', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'Direccion', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'Estrellas', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'Fecha', 'arriendo-facil' ); ?></th>
+			</tr>
+		</thead>
+		<tbody>
+			<?php if ( empty( $rows ) ) : ?>
+				<tr>
+					<td colspan="6"><?php esc_html_e( 'No hay reseñas completadas para los filtros actuales.', 'arriendo-facil' ); ?></td>
+				</tr>
+			<?php else : ?>
+				<?php foreach ( $rows as $row ) : ?>
+					<?php
+					$direction = isset( $row->review_direction ) ? sanitize_key( (string) $row->review_direction ) : '';
+					$label     = isset( $directions_map[ $direction ] ) ? $directions_map[ $direction ] : $direction;
+					$title     = isset( $row->accommodation_title ) && '' !== trim( (string) $row->accommodation_title ) ? (string) $row->accommodation_title : '#' . absint( $row->accommodation_id );
+					?>
+					<tr>
+						<td><?php echo esc_html( (int) $row->id ); ?></td>
+						<td><?php echo esc_html( (int) $row->lease_id ); ?></td>
+						<td><?php echo esc_html( $title ); ?></td>
+						<td><?php echo esc_html( $label ); ?></td>
+						<td><?php echo esc_html( number_format( (float) $row->stars, 1 ) ); ?></td>
+						<td><?php echo esc_html( isset( $row->submitted_at ) ? (string) $row->submitted_at : '' ); ?></td>
+					</tr>
+				<?php endforeach; ?>
+			<?php endif; ?>
+		</tbody>
+	</table>
+</div>

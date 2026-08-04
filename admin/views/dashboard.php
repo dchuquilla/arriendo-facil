@@ -22,8 +22,9 @@ if ( $is_owner ) {
 		$lease_count      = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_leases WHERE accommodation_id IN ($ids_sql)" );
 		$guest_count      = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_guests WHERE accommodation_id IN ($ids_sql)" );
 		$pending_cleaning = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_cleaning_requests WHERE accommodation_id IN ($ids_sql) AND status = 'pending'" );
+		$review_count     = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_reviews WHERE accommodation_id IN ($ids_sql) AND status = 'completed'" );
 	} else {
-		$lease_count = $guest_count = $pending_cleaning = 0;
+		$lease_count = $guest_count = $pending_cleaning = $review_count = 0;
 	}
 	$active_contacts = null;
 } else {
@@ -32,6 +33,7 @@ if ( $is_owner ) {
 	$lease_count            = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_leases" );
 	$guest_count            = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_guests" );
 	$pending_cleaning       = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_cleaning_requests WHERE status = 'pending'" );
+	$review_count           = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_reviews WHERE status = 'completed'" );
 	$active_contacts        = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_owner_contacts WHERE status = 'active'" );
 }
 ?>
@@ -70,6 +72,12 @@ if ( $is_owner ) {
 			<span class="af-stat-label"><?php esc_html_e( 'Huespedes', 'arriendo-facil' ); ?></span>
 			<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-guests' ) ); ?>"><?php esc_html_e( 'View all', 'arriendo-facil' ); ?></a>
 		</div>
+
+		<div class="af-stat-card">
+			<span class="af-stat-number"><?php echo esc_html( (int) $review_count ); ?></span>
+			<span class="af-stat-label"><?php esc_html_e( 'Valoraciones', 'arriendo-facil' ); ?></span>
+			<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-reviews' ) ); ?>"><?php esc_html_e( 'View all', 'arriendo-facil' ); ?></a>
+		</div>
 	</div>
 
 	<div class="af-quick-actions">
@@ -82,6 +90,9 @@ if ( $is_owner ) {
 		</a>
 		<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-cleaning-requests' ) ); ?>" class="button">
 			<?php esc_html_e( 'Solicitudes de limpieza', 'arriendo-facil' ); ?>
+		</a>
+		<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-reviews' ) ); ?>" class="button">
+			<?php esc_html_e( 'Ver Valoraciones', 'arriendo-facil' ); ?>
 		</a>
 		<?php if ( ! $is_owner ) : ?>
 		<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-ai-settings' ) ); ?>" class="button">

@@ -28,6 +28,7 @@ class Arriendo_Facil_Review {
 		add_action( 'wp_ajax_af_request_new_review_link', array( $this, 'ajax_request_new_review_link' ) );
 		add_action( 'wp_ajax_nopriv_af_request_new_review_link', array( $this, 'ajax_request_new_review_link' ) );
 		add_shortcode( 'af_review_form', array( $this, 'render_review_form_shortcode' ) );
+		add_shortcode( 'af_review_stats', array( $this, 'render_review_stats_shortcode' ) );
 	}
 
 	/**
@@ -776,6 +777,86 @@ class Arriendo_Facil_Review {
 			validateToken();
 		})();
 		</script>
+		<?php
+
+		return (string) ob_get_clean();
+	}
+
+	/**
+	 * Renders aggregate public review statistics for a property.
+	 *
+	 * Usage:
+	 * - [af_review_stats] (uses current post ID)
+	 * - [af_review_stats accommodation_id="123"]
+	 *
+	 * @param array<string,mixed> $atts Shortcode attributes.
+	 * @return string
+	 */
+	public function render_review_stats_shortcode( $atts ) {
+		$atts = shortcode_atts(
+			array(
+				'accommodation_id' => 0,
+			),
+			(array) $atts,
+			'af_review_stats'
+		);
+
+		$accommodation_id = absint( $atts['accommodation_id'] );
+		if ( ! $accommodation_id ) {
+			$accommodation_id = get_the_ID() ? absint( get_the_ID() ) : 0;
+		}
+
+		if ( ! $accommodation_id ) {
+			return '';
+		}
+
+		global $wpdb;
+		$summary = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT
+					COUNT(*) AS total_reviews,
+					AVG(stars) AS avg_stars,
+					SUM(CASE WHEN stars >= %f THEN 1 ELSE 0 END) AS positive_reviews
+				 FROM " . self::reviews_table() . "
+				 WHERE accommodation_id = %d
+				   AND review_direction = %s
+				   AND status = %s",
+				self::positive_threshold(),
+				$accommodation_id,
+				'tenant_to_property',
+				'completed'
+			)
+		);
+
+		$total_reviews    = isset( $summary->total_reviews ) ? (int) $summary->total_reviews : 0;
+		$avg_stars        = isset( $summary->avg_stars ) ? (float) $summary->avg_stars : 0.0;
+		$positive_reviews = isset( $summary->positive_reviews ) ? (int) $summary->positive_reviews : 0;
+		$positive_rate    = $total_reviews > 0 ? ( $positive_reviews / $total_reviews ) * 100 : 0;
+
+		if ( 0 === $total_reviews ) {
+			return '<div class="af-review-stats" style="padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;">' . esc_html__( 'Aún no hay valoraciones públicas para esta propiedad.', 'arriendo-facil' ) . '</div>';
+		}
+
+		ob_start();
+		?>
+		<div class="af-review-stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;padding:12px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;">
+			<div>
+				<div style="font-size:20px;font-weight:700;color:#0f172a;"><?php echo esc_html( number_format( $avg_stars, 2 ) ); ?></div>
+				<div style="color:#64748b;font-size:12px;"><?php esc_html_e( 'Promedio', 'arriendo-facil' ); ?></div>
+			</div>
+			<div>
+				<div style="font-size:20px;font-weight:700;color:#0f172a;"><?php echo esc_html( $total_reviews ); ?></div>
+				<div style="color:#64748b;font-size:12px;"><?php esc_html_e( 'Reseñas', 'arriendo-facil' ); ?></div>
+			</div>
+			<div>
+				<div style="font-size:20px;font-weight:700;color:#0f172a;"><?php echo esc_html( $positive_reviews ); ?></div>
+				<div style="color:#64748b;font-size:12px;"><?php esc_html_e( 'Positivas', 'arriendo-facil' ); ?></div>
+			</div>
+			<div>
+				<div style="font-size:20px;font-weight:700;color:#0f172a;"><?php echo esc_html( number_format( $positive_rate, 1 ) ); ?>%</div>
+				<div style="color:#64748b;font-size:12px;"><?php esc_html_e( 'Tasa positiva', 'arriendo-facil' ); ?></div>
+			</div>
+		</div>
 		<?php
 
 		return (string) ob_get_clean();

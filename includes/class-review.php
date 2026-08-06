@@ -487,6 +487,8 @@ class Arriendo_Facil_Review {
 
 		$ratings_payload = isset( $_POST['ratings'] ) ? wp_unslash( $_POST['ratings'] ) : '';
 		$ratings         = $this->parse_ratings_payload( $ratings_payload );
+		$comments_payload = isset( $_POST['comments'] ) ? wp_unslash( $_POST['comments'] ) : '';
+		$comments         = $this->parse_comments_payload( $comments_payload );
 		if ( empty( $ratings ) ) {
 			wp_send_json_error( array( 'message' => __( 'No se recibieron calificaciones válidas.', 'arriendo-facil' ) ), 400 );
 		}
@@ -505,19 +507,29 @@ class Arriendo_Facil_Review {
 
 		global $wpdb;
 		$now = gmdate( 'Y-m-d H:i:s' );
+		$has_comment_column = $this->reviews_comment_column_exists();
 		foreach ( $pending_reviews as $review_row ) {
 			$direction = sanitize_key( (string) $review_row['direction'] );
 			$stars     = absint( $ratings[ $direction ] );
+			$comment_text = isset( $comments[ $direction ] ) ? sanitize_textarea_field( (string) $comments[ $direction ] ) : '';
+
+			$update_data = array(
+				'stars'        => $stars,
+				'status'       => 'completed',
+				'submitted_at' => $now,
+			);
+			$update_format = array( '%d', '%s', '%s' );
+
+			if ( $has_comment_column ) {
+				$update_data['comment_text'] = $comment_text;
+				$update_format[]             = '%s';
+			}
 
 			$wpdb->update(
 				self::reviews_table(),
-				array(
-					'stars'        => $stars,
-					'status'       => 'completed',
-					'submitted_at' => $now,
-				),
+				$update_data,
 				array( 'id' => absint( $review_row['id'] ) ),
-				array( '%d', '%s', '%s' ),
+				$update_format,
 				array( '%d' )
 			);
 		}
@@ -591,7 +603,7 @@ class Arriendo_Facil_Review {
 	 * Expects:
 	 * - nonce: af_lease_nonce
 	 * - lease_id: lease ID
-	 * - reviewer_type: tenant|owner (optional, default tenant)
+	 * - reviewer_type: tenant|owner
 	 *
 	 * @return void
 	 */
@@ -603,13 +615,13 @@ class Arriendo_Facil_Review {
 		}
 
 		$lease_id      = isset( $_POST['lease_id'] ) ? absint( wp_unslash( $_POST['lease_id'] ) ) : 0;
-		$reviewer_type = isset( $_POST['reviewer_type'] ) ? sanitize_key( wp_unslash( $_POST['reviewer_type'] ) ) : 'tenant';
+		$reviewer_type = isset( $_POST['reviewer_type'] ) ? sanitize_key( wp_unslash( $_POST['reviewer_type'] ) ) : '';
 
 		if ( ! $lease_id ) {
 			wp_send_json_error( array( 'message' => __( 'Debes enviar un lease_id valido.', 'arriendo-facil' ) ), 400 );
 		}
 
-		if ( ! array_key_exists( $reviewer_type, self::reviewer_types() ) ) {
+		if ( '' === $reviewer_type || ! array_key_exists( $reviewer_type, self::reviewer_types() ) ) {
 			wp_send_json_error( array( 'message' => __( 'reviewer_type invalido. Usa tenant u owner.', 'arriendo-facil' ) ), 400 );
 		}
 
@@ -692,6 +704,7 @@ class Arriendo_Facil_Review {
 		<div id="af-review-form-app" style="max-width:760px;margin:20px auto;padding:24px;border:1px solid #e2e8f0;border-radius:12px;background:#fff;">
 			<h2 style="margin:0 0 14px;font-size:26px;line-height:1.2;color:#0f172a;"><?php echo $title; ?></h2>
 			<p style="margin:0 0 14px;color:#475569;line-height:1.6;"><?php echo esc_html__( 'Este enlace es seguro y de un solo uso. Completa las calificaciones pendientes para finalizar.', 'arriendo-facil' ); ?></p>
+			<p id="af-review-role-note" style="display:none;margin:0 0 14px;padding:10px 12px;border:1px solid #dbeafe;background:#eff6ff;border-radius:8px;color:#1e3a8a;"></p>
 
 			<div id="af-review-alert" style="display:none;padding:10px 12px;border-radius:8px;margin-bottom:14px;"></div>
 			<div id="af-review-loading" style="color:#334155;"><?php echo esc_html__( 'Validando enlace…', 'arriendo-facil' ); ?></div>
@@ -718,6 +731,7 @@ class Arriendo_Facil_Review {
 			const loading = document.getElementById('af-review-loading');
 			const form = document.getElementById('af-review-form');
 			const fieldsWrap = document.getElementById('af-review-fields');
+			const roleNote = document.getElementById('af-review-role-note');
 			const submitBtn = document.getElementById('af-review-submit');
 			const newLinkBtn = document.getElementById('af-review-new-link');
 
@@ -725,6 +739,10 @@ class Arriendo_Facil_Review {
 				tenant_to_owner: <?php echo wp_json_encode( __( 'Califica al propietario', 'arriendo-facil' ) ); ?>,
 				tenant_to_property: <?php echo wp_json_encode( __( 'Califica la propiedad', 'arriendo-facil' ) ); ?>,
 				owner_to_tenant: <?php echo wp_json_encode( __( 'Califica al inquilino', 'arriendo-facil' ) ); ?>
+			};
+			const reviewerLabels = {
+				tenant: <?php echo wp_json_encode( __( 'Estás calificando como inquilino. Verás: propietario y propiedad.', 'arriendo-facil' ) ); ?>,
+				owner: <?php echo wp_json_encode( __( 'Estás calificando como propietario. Verás solo la evaluación del inquilino.', 'arriendo-facil' ) ); ?>
 			};
 
 			const params = new URLSearchParams(window.location.search);
@@ -770,6 +788,10 @@ class Arriendo_Facil_Review {
 								</label>
 							`).join('')}
 						</div>
+						<div style="margin-top:10px;">
+							<label style="display:block;font-weight:600;color:#334155;margin-bottom:6px;"><?php echo esc_js( __( 'Comentario (opcional)', 'arriendo-facil' ) ); ?></label>
+							<textarea name="comment_${key}" rows="3" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;color:#0f172a;" placeholder="<?php echo esc_js( __( 'Escribe un detalle si deseas…', 'arriendo-facil' ) ); ?>"></textarea>
+						</div>
 					`;
 					fieldsWrap.appendChild(block);
 				});
@@ -803,6 +825,13 @@ class Arriendo_Facil_Review {
 				}
 
 				renderDirectionFields((json.data && json.data.directions) ? json.data.directions : []);
+				if ( roleNote ) {
+					const reviewerType = json.data && json.data.reviewer_type ? String(json.data.reviewer_type) : '';
+					if ( reviewerLabels[reviewerType] ) {
+						roleNote.textContent = reviewerLabels[reviewerType];
+						roleNote.style.display = 'block';
+					}
+				}
 				form.style.display = 'block';
 			}
 
@@ -811,11 +840,19 @@ class Arriendo_Facil_Review {
 				submitBtn.disabled = true;
 
 				const ratings = {};
+				const comments = {};
 				const radios = form.querySelectorAll('input[type="radio"]:checked');
 				radios.forEach((r) => {
 					const name = r.getAttribute('name') || '';
 					const direction = name.replace('rating_', '');
 					if(direction){ ratings[direction] = parseInt(r.value, 10); }
+				});
+
+				const textareas = form.querySelectorAll('textarea[name^="comment_"]');
+				textareas.forEach((t) => {
+					const name = t.getAttribute('name') || '';
+					const direction = name.replace('comment_', '');
+					if(direction){ comments[direction] = String(t.value || ''); }
 				});
 
 				const response = await fetch(ajaxUrl, {
@@ -825,7 +862,8 @@ class Arriendo_Facil_Review {
 						action: 'af_submit_review_by_token',
 						selector,
 						token,
-						ratings: JSON.stringify(ratings)
+						ratings: JSON.stringify(ratings),
+						comments: JSON.stringify(comments)
 					})
 				});
 
@@ -1551,5 +1589,60 @@ class Arriendo_Facil_Review {
 		}
 
 		return $ratings;
+	}
+
+	/**
+	 * Parses optional review comments payload from JSON or array format.
+	 *
+	 * @param mixed $comments_payload Raw comments payload.
+	 * @return array<string,string>
+	 */
+	private function parse_comments_payload( $comments_payload ) {
+		$comments = array();
+
+		if ( is_array( $comments_payload ) ) {
+			$raw = $comments_payload;
+		} elseif ( is_string( $comments_payload ) && '' !== trim( $comments_payload ) ) {
+			$decoded = json_decode( (string) $comments_payload, true );
+			$raw     = is_array( $decoded ) ? $decoded : array();
+		} else {
+			$raw = array();
+		}
+
+		$allowed = self::review_directions();
+		foreach ( $raw as $direction => $comment ) {
+			$direction = sanitize_key( (string) $direction );
+			if ( ! array_key_exists( $direction, $allowed ) ) {
+				continue;
+			}
+
+			$comment = sanitize_textarea_field( (string) $comment );
+			if ( '' === trim( $comment ) ) {
+				continue;
+			}
+
+			$comments[ $direction ] = $comment;
+		}
+
+		return $comments;
+	}
+
+	/**
+	 * Determines whether the optional review comment column exists.
+	 *
+	 * @return bool
+	 */
+	private function reviews_comment_column_exists() {
+		static $exists = null;
+
+		if ( null !== $exists ) {
+			return (bool) $exists;
+		}
+
+		global $wpdb;
+		$column = $wpdb->get_var( "SHOW COLUMNS FROM " . self::reviews_table() . " LIKE 'comment_text'" );
+		$exists = ! empty( $column );
+
+		return (bool) $exists;
 	}
 }

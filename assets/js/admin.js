@@ -301,12 +301,17 @@
 	$( document ).on( 'click', '.af-generate-review-test-link', function () {
 		var $btn = $( this );
 		var leaseId = parseInt( String( $btn.data( 'lease-id' ) || 0 ), 10 );
-		var reviewerType = String( $btn.data( 'reviewer-type' ) || 'tenant' );
+		var reviewerType = String( $btn.attr( 'data-reviewer-type' ) || '' );
 		var $output = $( '.af-review-test-link-output[data-lease-id="' + leaseId + '"]' );
 		var originalText = $btn.text();
 
 		if ( ! leaseId ) {
 			alert( 'Contrato invalido.' );
+			return;
+		}
+
+		if ( 'tenant' !== reviewerType && 'owner' !== reviewerType ) {
+			alert( 'Tipo de revisor invalido.' );
 			return;
 		}
 
@@ -321,6 +326,7 @@
 			.done( function ( response ) {
 				var link = response && response.success && response.data ? response.data.review_url : '';
 				var expiresAt = response && response.success && response.data ? ( response.data.expires_at || '' ) : '';
+				var reviewerLabel = 'tenant' === reviewerType ? 'Inquilino' : 'Propietario';
 
 				if ( ! response || ! response.success || ! link ) {
 					var errorMessage = response && response.data && response.data.message ? response.data.message : 'No se pudo generar el enlace de prueba.';
@@ -344,7 +350,7 @@
 						.show()
 						.css( { borderColor: '#86efac', background: '#f0fdf4', color: '#166534' } )
 						.html(
-							'<strong>Enlace generado y copiado:</strong><br>' +
+							'<strong>Enlace generado y copiado (' + reviewerLabel + '):</strong><br>' +
 							'<a href="' + encodeURI( link ) + '" target="_blank" rel="noopener noreferrer">Abrir reseña</a><br>' +
 							'<span style="word-break:break-all;">' + link + '</span>' +
 							( expiresAt ? '<br><small>Expira: ' + expiresAt + ' UTC</small>' : '' )

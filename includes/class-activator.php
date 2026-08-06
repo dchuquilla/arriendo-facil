@@ -368,6 +368,7 @@ class Arriendo_Facil_Activator {
 				tenant_email      VARCHAR(190) NOT NULL,
 				review_direction  VARCHAR(30) NOT NULL,
 				stars             TINYINT(2) UNSIGNED NOT NULL DEFAULT 0,
+				comment_text      TEXT DEFAULT NULL,
 				status            VARCHAR(20) NOT NULL DEFAULT 'pending',
 				submitted_at      DATETIME DEFAULT NULL,
 				created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

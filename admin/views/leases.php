@@ -276,6 +276,19 @@ $can_bill      = current_user_can( (string) apply_filters( 'af_billing_capabilit
 									<?php esc_html_e( 'Terminar anticipadamente', 'arriendo-facil' ); ?>
 								</button>
 							<?php endif; ?>
+							<button type="button"
+								class="button button-small af-generate-review-test-link"
+								data-lease-id="<?php echo esc_attr( $lease->id ); ?>"
+								data-reviewer-type="tenant">
+								<?php esc_html_e( 'Link reseña inquilino', 'arriendo-facil' ); ?>
+							</button>
+							<button type="button"
+								class="button button-small af-generate-review-test-link"
+								data-lease-id="<?php echo esc_attr( $lease->id ); ?>"
+								data-reviewer-type="owner">
+								<?php esc_html_e( 'Link reseña propietario', 'arriendo-facil' ); ?>
+							</button>
+							<div class="af-review-test-link-output" data-lease-id="<?php echo esc_attr( $lease->id ); ?>" style="display:none;margin-top:8px;padding:8px;border:1px solid #dbeafe;background:#eff6ff;border-radius:6px;font-size:12px;line-height:1.4;"></div>
 							</div>
 						</td>
 					</tr>

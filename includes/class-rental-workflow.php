@@ -988,6 +988,7 @@ class Arriendo_Facil_Rental_Workflow {
 	 */
 	private function terminate_lease_early( int $lease_id, int $accommodation_id, string $reason ): void {
 		global $wpdb;
+		$terminated_on = current_time( 'Y-m-d' );
 
 		if ( $lease_id ) {
 			// Notify the tenant before changing the record.
@@ -995,9 +996,12 @@ class Arriendo_Facil_Rental_Workflow {
 
 			$wpdb->update(
 				$wpdb->prefix . 'af_leases',
-				array( 'status' => 'terminated' ),
+				array(
+					'status'   => 'terminated',
+					'end_date' => $terminated_on,
+				),
 				array( 'id'     => $lease_id ),
-				array( '%s' ),
+				array( '%s', '%s' ),
 				array( '%d' )
 			);
 		} else {
@@ -1005,10 +1009,11 @@ class Arriendo_Facil_Rental_Workflow {
 			$wpdb->query(
 				$wpdb->prepare(
 					"UPDATE {$wpdb->prefix}af_leases
-					 SET status = 'terminated'
+					 SET status = 'terminated', end_date = %s
 					 WHERE accommodation_id = %d
 					   AND status IN ('active','pending_release')
 					   AND deleted_at IS NULL",
+					$terminated_on,
 					$accommodation_id
 				)
 			);
@@ -1135,6 +1140,7 @@ class Arriendo_Facil_Rental_Workflow {
 		if ( ! $accommodation_id ) {
 			return;
 		}
+		$terminated_on = current_time( 'Y-m-d' );
 
 		self::set_commercial_state( $accommodation_id, 'available', 'public' );
 		update_post_meta( $accommodation_id, '_af_status', 'available' );
@@ -1144,12 +1150,15 @@ class Arriendo_Facil_Rental_Workflow {
 		global $wpdb;
 		$wpdb->update(
 			$wpdb->prefix . 'af_leases',
-			array( 'status' => 'terminated' ),
+			array(
+				'status'   => 'terminated',
+				'end_date' => $terminated_on,
+			),
 			array(
 				'accommodation_id' => $accommodation_id,
 				'status'           => 'pending_release',
 			),
-			array( '%s' ),
+			array( '%s', '%s' ),
 			array( '%d', '%s' )
 		);
 

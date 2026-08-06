@@ -297,6 +297,73 @@
 			} );
 	} );
 
+	// ── Generate review test link (one click from leases table) ─────────────
+	$( document ).on( 'click', '.af-generate-review-test-link', function () {
+		var $btn = $( this );
+		var leaseId = parseInt( String( $btn.data( 'lease-id' ) || 0 ), 10 );
+		var reviewerType = String( $btn.data( 'reviewer-type' ) || 'tenant' );
+		var $output = $( '.af-review-test-link-output[data-lease-id="' + leaseId + '"]' );
+		var originalText = $btn.text();
+
+		if ( ! leaseId ) {
+			alert( 'Contrato invalido.' );
+			return;
+		}
+
+		$btn.prop( 'disabled', true ).text( 'Generando...' );
+
+		$.post( afAdmin.ajaxUrl, {
+			action: 'af_generate_review_test_link',
+			nonce: afAdmin.leaseNonce,
+			lease_id: leaseId,
+			reviewer_type: reviewerType,
+		} )
+			.done( function ( response ) {
+				var link = response && response.success && response.data ? response.data.review_url : '';
+				var expiresAt = response && response.success && response.data ? ( response.data.expires_at || '' ) : '';
+
+				if ( ! response || ! response.success || ! link ) {
+					var errorMessage = response && response.data && response.data.message ? response.data.message : 'No se pudo generar el enlace de prueba.';
+					if ( $output.length ) {
+						$output
+							.show()
+							.css( { borderColor: '#fecaca', background: '#fef2f2', color: '#991b1b' } )
+							.text( errorMessage );
+					}
+					return;
+				}
+
+				if ( navigator.clipboard && navigator.clipboard.writeText ) {
+					navigator.clipboard.writeText( link ).catch( function () {
+						// Clipboard may be blocked by browser permissions.
+					} );
+				}
+
+				if ( $output.length ) {
+					$output
+						.show()
+						.css( { borderColor: '#86efac', background: '#f0fdf4', color: '#166534' } )
+						.html(
+							'<strong>Enlace generado y copiado:</strong><br>' +
+							'<a href="' + encodeURI( link ) + '" target="_blank" rel="noopener noreferrer">Abrir reseña</a><br>' +
+							'<span style="word-break:break-all;">' + link + '</span>' +
+							( expiresAt ? '<br><small>Expira: ' + expiresAt + ' UTC</small>' : '' )
+						);
+				}
+			} )
+			.fail( function () {
+				if ( $output.length ) {
+					$output
+						.show()
+						.css( { borderColor: '#fecaca', background: '#fef2f2', color: '#991b1b' } )
+						.text( 'La solicitud fallo.' );
+				}
+			} )
+			.always( function () {
+				$btn.prop( 'disabled', false ).text( originalText );
+			} );
+	} );
+
 	// ── Update cleaning request status ──────────────────────────────────────
 	$( document ).on( 'click', '.af-update-cleaning', function () {
 		var $btn = $( this );

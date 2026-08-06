@@ -27,6 +27,7 @@ class Arriendo_Facil_Review {
 		add_action( 'wp_ajax_nopriv_af_submit_review_by_token', array( $this, 'ajax_submit_review_by_token' ) );
 		add_action( 'wp_ajax_af_request_new_review_link', array( $this, 'ajax_request_new_review_link' ) );
 		add_action( 'wp_ajax_nopriv_af_request_new_review_link', array( $this, 'ajax_request_new_review_link' ) );
+		add_action( 'wp_ajax_af_generate_review_test_link', array( $this, 'ajax_generate_review_test_link' ) );
 		add_shortcode( 'af_review_form', array( $this, 'render_review_form_shortcode' ) );
 		add_shortcode( 'af_review_stats', array( $this, 'render_review_stats_shortcode' ) );
 		add_filter( 'the_content', array( $this, 'append_public_stats_to_single_accommodation' ), 30 );
@@ -582,6 +583,97 @@ class Arriendo_Facil_Review {
 		}
 
 		wp_send_json_success( array( 'message' => __( 'Se envio un nuevo enlace de reseña al correo registrado.', 'arriendo-facil' ) ) );
+	}
+
+	/**
+	 * AJAX: generates a valid review link for testing (admin/owner only).
+	 *
+	 * Expects:
+	 * - nonce: af_lease_nonce
+	 * - lease_id: lease ID
+	 * - reviewer_type: tenant|owner (optional, default tenant)
+	 *
+	 * @return void
+	 */
+	public function ajax_generate_review_test_link() {
+		check_ajax_referer( 'af_lease_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$lease_id      = isset( $_POST['lease_id'] ) ? absint( wp_unslash( $_POST['lease_id'] ) ) : 0;
+		$reviewer_type = isset( $_POST['reviewer_type'] ) ? sanitize_key( wp_unslash( $_POST['reviewer_type'] ) ) : 'tenant';
+
+		if ( ! $lease_id ) {
+			wp_send_json_error( array( 'message' => __( 'Debes enviar un lease_id valido.', 'arriendo-facil' ) ), 400 );
+		}
+
+		if ( ! array_key_exists( $reviewer_type, self::reviewer_types() ) ) {
+			wp_send_json_error( array( 'message' => __( 'reviewer_type invalido. Usa tenant u owner.', 'arriendo-facil' ) ), 400 );
+		}
+
+		$context = $this->resolve_lease_review_context( $lease_id );
+		if ( is_wp_error( $context ) ) {
+			wp_send_json_error( array( 'message' => $context->get_error_message() ), 400 );
+		}
+
+		$group_id = $this->find_group_id_by_lease_and_reviewer( $lease_id, $reviewer_type );
+		if ( ! $group_id ) {
+			$due_at = gmdate( 'Y-m-d H:i:s', strtotime( '+' . self::review_window_days() . ' days' ) );
+			$group_id = self::create_review_group(
+				$lease_id,
+				$context['accommodation_id'],
+				$context['owner_user_id'],
+				$context['tenant_email'],
+				$reviewer_type,
+				$due_at
+			);
+			if ( is_wp_error( $group_id ) ) {
+				wp_send_json_error( array( 'message' => $group_id->get_error_message() ), 500 );
+			}
+
+			$directions = 'tenant' === $reviewer_type
+				? array( 'tenant_to_owner', 'tenant_to_property' )
+				: array( 'owner_to_tenant' );
+
+			$created = $this->create_reviews_for_group(
+				(int) $group_id,
+				$lease_id,
+				$context['accommodation_id'],
+				$context['owner_user_id'],
+				$context['tenant_email'],
+				$directions
+			);
+			if ( is_wp_error( $created ) ) {
+				wp_send_json_error( array( 'message' => $created->get_error_message() ), 500 );
+			}
+		}
+
+		$this->revoke_active_tokens_for_group( (int) $group_id );
+		$token_data = self::create_review_token( (int) $group_id, self::default_token_attempts() );
+		if ( is_wp_error( $token_data ) ) {
+			wp_send_json_error( array( 'message' => $token_data->get_error_message() ), 500 );
+		}
+
+		$review_url = $this->build_review_link(
+			isset( $token_data['selector'] ) ? (string) $token_data['selector'] : '',
+			isset( $token_data['token'] ) ? (string) $token_data['token'] : ''
+		);
+
+		if ( '' === $review_url ) {
+			wp_send_json_error( array( 'message' => __( 'No se pudo construir la URL de prueba.', 'arriendo-facil' ) ), 500 );
+		}
+
+		wp_send_json_success(
+			array(
+				'lease_id'      => $lease_id,
+				'reviewer_type' => $reviewer_type,
+				'group_id'      => (int) $group_id,
+				'review_url'    => $review_url,
+				'expires_at'    => isset( $token_data['expires_at'] ) ? (string) $token_data['expires_at'] : '',
+			)
+		);
 	}
 
 	/**
@@ -1197,6 +1289,32 @@ class Arriendo_Facil_Review {
 				$group_id
 			)
 		);
+	}
+
+	/**
+	 * Finds review group ID by lease and reviewer type.
+	 *
+	 * @param int    $lease_id Lease ID.
+	 * @param string $reviewer_type Reviewer type.
+	 * @return int
+	 */
+	private function find_group_id_by_lease_and_reviewer( $lease_id, $reviewer_type ) {
+		$lease_id      = absint( $lease_id );
+		$reviewer_type = sanitize_key( (string) $reviewer_type );
+		if ( ! $lease_id || ! array_key_exists( $reviewer_type, self::reviewer_types() ) ) {
+			return 0;
+		}
+
+		global $wpdb;
+		$group_id = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT id FROM " . self::groups_table() . " WHERE lease_id = %d AND reviewer_type = %s LIMIT 1",
+				$lease_id,
+				$reviewer_type
+			)
+		);
+
+		return $group_id ? (int) $group_id : 0;
 	}
 
 	/**

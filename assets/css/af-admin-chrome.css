@@ -260,57 +260,37 @@ body.wp-admin .wrap {
     -moz-osx-font-smoothing: grayscale;
 }
 
-/* ── Sidebar: espaciado + look de app ───────────────────────────────── */
-#adminmenu {
-    padding: 8px 6px !important;
-}
-
-#adminmenu li.menu-top {
-    margin: 2px 0;
-}
-
+/* ── Sidebar: sólo tipografía + peso del label activo ─────────────────
+   NOTA: el layout del sidebar WP depende de floats y anchos exactos
+   (wp-menu-image 36px, menu-top height, etc.). Cambiar padding/margin/width
+   rompe la alineación de iconos y labels. Aquí sólo tocamos tipografía,
+   color y sombra — nunca geometría. */
 #adminmenu a.menu-top,
 #adminmenu .wp-has-current-submenu a.wp-has-current-submenu {
-    border-radius: 10px !important;
     transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
     font-weight: 500;
     letter-spacing: 0.01em;
 }
 
-/* Píldora azul brand cuando está activo (en lugar de barra completa) */
+/* Item activo: glow azul brand adicional (no reemplaza el bg brand ya definido arriba) */
 #adminmenu li.wp-has-current-submenu a.wp-has-current-submenu,
 #adminmenu li.current a.menu-top,
 #adminmenu li.wp-has-current-submenu.wp-menu-open a.wp-has-current-submenu {
-    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.28) !important;
+    box-shadow: inset 3px 0 0 rgba(255, 255, 255, 0.35), 0 4px 12px rgba(37, 99, 235, 0.28) !important;
 }
 
-/* Item icons: alinear con label */
-#adminmenu .wp-menu-image {
-    padding: 8px 0 !important;
-    width: 36px !important;
-}
-
-/* Submenu: chip look */
-#adminmenu .wp-submenu {
-    padding: 4px 6px !important;
-    border-radius: 0 0 12px 12px;
-}
+/* Submenu: sólo tipografía + hover suave (sin tocar padding ni márgenes) */
 #adminmenu .wp-submenu a {
-    padding: 8px 10px !important;
-    border-radius: 8px !important;
-    margin: 1px 0;
     font-size: 13px;
     transition: background 140ms ease, color 140ms ease;
 }
-#adminmenu .wp-submenu a:hover {
-    background: rgba(255, 255, 255, 0.06) !important;
-}
-#adminmenu .wp-submenu li.current a {
-    background: rgba(37, 99, 235, 0.18) !important;
+#adminmenu .wp-submenu li.current a,
+#adminmenu .wp-submenu li.current a:hover,
+#adminmenu .wp-submenu li.current a:focus {
     color: #DBEAFE !important;
+    font-weight: 600;
 }
 #adminmenu .wp-submenu .wp-submenu-head {
-    padding: 8px 12px 4px !important;
     font-size: 11px !important;
     text-transform: uppercase;
     letter-spacing: 0.08em;
@@ -318,20 +298,9 @@ body.wp-admin .wrap {
     font-weight: 700 !important;
 }
 
-/* Separator sutil entre items */
-#adminmenu li.wp-menu-separator {
-    background: transparent !important;
-    height: 1px !important;
-    margin: 8px 12px !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
-    padding: 0 !important;
-}
-
-/* ── Collapse arrow — más discreto ──────────────────────────────────── */
+/* Collapse arrow — sólo color, sin tocar geometría */
 #collapse-menu {
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
     color: #7A7870 !important;
-    padding: 12px 14px !important;
     font-size: 12px;
 }
 #collapse-menu:hover { color: #DBEAFE !important; background: transparent !important; }

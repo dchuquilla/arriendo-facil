@@ -1066,3 +1066,244 @@
     .af-sri-flow__step + .af-sri-flow__step::before { display: none; }
     .af-sri-flow__list { gap: var(--af-space-3); }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   FASE 6 — Deleite (opcional)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Welcome banner (dashboard, owners sin propiedades) ------------------ */
+.af-welcome {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--af-space-5);
+    align-items: center;
+    padding: var(--af-space-6) var(--af-space-8);
+    margin-bottom: var(--af-space-6);
+    border-radius: var(--af-radius-lg);
+    background:
+        radial-gradient(120% 180% at 100% 0%, rgba(245, 56, 92, .12) 0%, transparent 55%),
+        linear-gradient(135deg, var(--af-primary-50, #EFF6FF) 0%, var(--af-gray-0, #fff) 60%);
+    border: 1px solid var(--af-gray-200);
+    box-shadow: var(--af-shadow-sm);
+    overflow: hidden;
+    animation: af-fade-up var(--af-motion-slow) both;
+}
+.af-welcome::after {
+    content: "";
+    position: absolute;
+    inset: auto -60px -80px auto;
+    width: 260px;
+    height: 260px;
+    background: radial-gradient(closest-side, rgba(37, 99, 235, .12), transparent 70%);
+    pointer-events: none;
+}
+.af-welcome__art {
+    width: 96px;
+    height: 96px;
+    display: grid;
+    place-items: center;
+    border-radius: var(--af-radius-lg);
+    background: rgba(37, 99, 235, .08);
+    color: var(--af-primary-600, #1D4ED8);
+}
+.af-welcome__art svg { width: 56px; height: 56px; }
+.af-welcome__body { position: relative; z-index: 1; }
+.af-welcome__eyebrow {
+    display: inline-block;
+    font-size: var(--af-text-xs);
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--af-accent-600, #D42548);
+    margin-bottom: var(--af-space-2);
+}
+.af-welcome__title {
+    font-size: var(--af-text-2xl);
+    font-weight: 700;
+    color: var(--af-gray-900);
+    margin: 0 0 var(--af-space-2);
+    line-height: var(--af-leading-tight);
+}
+.af-welcome__subtitle {
+    color: var(--af-gray-600);
+    font-size: var(--af-text-base);
+    line-height: var(--af-leading-relaxed);
+    margin: 0 0 var(--af-space-4);
+    max-width: 60ch;
+}
+.af-welcome__actions { display: flex; gap: var(--af-space-3); flex-wrap: wrap; }
+
+@media (max-width: 720px) {
+    .af-welcome {
+        grid-template-columns: 1fr;
+        padding: var(--af-space-5);
+        text-align: left;
+    }
+    .af-welcome__art { width: 64px; height: 64px; }
+    .af-welcome__art svg { width: 36px; height: 36px; }
+    .af-welcome__title { font-size: var(--af-text-xl); }
+}
+
+/* Micro-animaciones --------------------------------------------------- */
+@keyframes af-fade-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes af-shimmer {
+    from { background-position: -400px 0; }
+    to   { background-position: 400px 0; }
+}
+
+.af-kpi,
+.af-service-card,
+.af-integration-card,
+.af-section {
+    animation: af-fade-up var(--af-motion-slow) both;
+    transition:
+        transform var(--af-motion-base),
+        box-shadow var(--af-motion-base),
+        border-color var(--af-motion-base);
+}
+.af-kpi:hover,
+.af-service-card:hover,
+.af-integration-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--af-shadow-md);
+    border-color: var(--af-gray-300);
+}
+
+/* Entrance stagger para tarjetas de KPI */
+.af-kpi-grid > .af-kpi:nth-child(1) { animation-delay: 0ms; }
+.af-kpi-grid > .af-kpi:nth-child(2) { animation-delay: 40ms; }
+.af-kpi-grid > .af-kpi:nth-child(3) { animation-delay: 80ms; }
+.af-kpi-grid > .af-kpi:nth-child(4) { animation-delay: 120ms; }
+.af-kpi-grid > .af-kpi:nth-child(5) { animation-delay: 160ms; }
+.af-kpi-grid > .af-kpi:nth-child(6) { animation-delay: 200ms; }
+
+.af-service-health > .af-service-card:nth-child(1) { animation-delay: 0ms; }
+.af-service-health > .af-service-card:nth-child(2) { animation-delay: 60ms; }
+.af-service-health > .af-service-card:nth-child(3) { animation-delay: 120ms; }
+
+/* SRI flow step: pulso ligero al hover */
+.af-sri-flow__step {
+    transition: transform var(--af-motion-fast), color var(--af-motion-fast);
+    cursor: default;
+}
+.af-sri-flow__step:hover { transform: translateY(-1px); color: var(--af-gray-900); }
+.af-sri-flow__step:hover .af-sri-flow__num {
+    background: var(--af-primary-500);
+    color: #fff;
+}
+
+/* Focus ring más pulido para links dentro del shell */
+.af-shell a:focus-visible,
+.af-shell button:focus-visible,
+.af-shell .button:focus-visible {
+    outline: none;
+    box-shadow: var(--af-focus-ring);
+    border-radius: var(--af-radius-sm);
+    transition: box-shadow var(--af-motion-fast);
+}
+
+/* Skeleton shimmer utility (para uso futuro en loaders) */
+.af-skeleton {
+    background: linear-gradient(90deg, var(--af-gray-100) 0%, var(--af-gray-50) 40%, var(--af-gray-100) 80%);
+    background-size: 800px 100%;
+    animation: af-shimmer 1.4s ease-in-out infinite;
+    border-radius: var(--af-radius-sm);
+    color: transparent;
+}
+
+/* Reduced motion — desactiva animaciones no esenciales */
+@media (prefers-reduced-motion: reduce) {
+    .af-welcome,
+    .af-kpi,
+    .af-service-card,
+    .af-integration-card,
+    .af-section,
+    .af-skeleton {
+        animation: none !important;
+    }
+    .af-kpi:hover,
+    .af-service-card:hover,
+    .af-integration-card:hover,
+    .af-sri-flow__step:hover {
+        transform: none;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   FASE 6 — Dark mode (opt-in: [data-af-theme="dark"] on .af-shell)
+   ═══════════════════════════════════════════════════════════════════════ */
+.af-shell[data-af-theme="dark"] {
+    /* Superficies */
+    --af-gray-0:   #12141A;
+    --af-gray-50:  #181B22;
+    --af-gray-100: #22262E;
+    --af-gray-200: #2E323C;
+    --af-gray-300: #3F4453;
+    --af-gray-400: #6B7385;
+    --af-gray-500: #9199A8;
+    --af-gray-600: #B4BAC7;
+    --af-gray-700: #D0D5DE;
+    --af-gray-900: #F0F2F5;
+
+    /* Primary un poco más claro para contraste sobre superficie oscura */
+    --af-primary-50:  #1E2A44;
+    --af-primary-100: #24365A;
+    --af-primary-500: #3B82F6;
+    --af-primary-600: #60A5FA;
+    --af-primary-700: #93C5FD;
+
+    /* Accent legible en oscuro */
+    --af-accent-50:  #3A1A22;
+    --af-accent-100: #4A222E;
+    --af-accent-500: #FB7185;
+    --af-accent-600: #F5385C;
+
+    /* Semánticos: bajar saturación de -50/-100, subir el 500 */
+    --af-success-50:  #0F2B1F;
+    --af-success-100: #14382A;
+    --af-success-500: #34D399;
+    --af-success-700: #6EE7B7;
+
+    --af-warning-50:  #3A2A0F;
+    --af-warning-100: #4A3614;
+    --af-warning-500: #FBBF24;
+    --af-warning-700: #FCD34D;
+
+    --af-danger-50:  #3A1414;
+    --af-danger-100: #4A1B1B;
+    --af-danger-500: #F87171;
+    --af-danger-700: #FCA5A5;
+
+    --af-info-50:  #0E2C3A;
+    --af-info-100: #143848;
+    --af-info-500: #38BDF8;
+    --af-info-700: #7DD3FC;
+
+    /* Sombras más profundas y con negro */
+    --af-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.35);
+    --af-shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.40);
+    --af-shadow-md: 0 8px 20px rgba(0, 0, 0, 0.45);
+    --af-shadow-lg: 0 20px 40px rgba(0, 0, 0, 0.55);
+    --af-focus-ring: 0 0 0 3px rgba(96, 165, 250, 0.45);
+}
+
+/* Dark: ajustes puntuales donde había colores hard-coded ------------- */
+.af-shell[data-af-theme="dark"] { color: var(--af-gray-700); }
+.af-shell[data-af-theme="dark"] .af-integration-brand--neutral { background: var(--af-gray-200); color: var(--af-gray-700); }
+.af-shell[data-af-theme="dark"] .af-code-block code { background: var(--af-gray-100); color: var(--af-gray-700); }
+.af-shell[data-af-theme="dark"] .af-sri-flow { background: var(--af-gray-50); }
+.af-shell[data-af-theme="dark"] .af-sri-flow__num { background: var(--af-primary-100); color: var(--af-primary-700); }
+.af-shell[data-af-theme="dark"] .af-welcome {
+    background:
+        radial-gradient(120% 180% at 100% 0%, rgba(251, 113, 133, .10) 0%, transparent 55%),
+        linear-gradient(135deg, var(--af-primary-50) 0%, var(--af-gray-50) 60%);
+}
+.af-shell[data-af-theme="dark"] .af-welcome__art {
+    background: rgba(96, 165, 250, .12);
+    color: var(--af-primary-600);
+}
+.af-shell[data-af-theme="dark"] .af-welcome__title { color: var(--af-gray-900); }

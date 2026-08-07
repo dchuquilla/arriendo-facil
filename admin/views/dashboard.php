@@ -151,6 +151,34 @@ if ( $pending_queue > 0 ) {
 		</div>
 	</header>
 
+	<?php if ( $is_owner && 0 === $accommodation_count ) : ?>
+		<section class="af-welcome" aria-labelledby="af-welcome-title">
+			<div class="af-welcome__art" aria-hidden="true">
+				<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+					<path d="M8 30l24-20 24 20v22a4 4 0 01-4 4H40V38H24v18H12a4 4 0 01-4-4V30z" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/>
+					<circle cx="32" cy="24" r="3" fill="currentColor"/>
+				</svg>
+			</div>
+			<div class="af-welcome__body">
+				<span class="af-welcome__eyebrow"><?php esc_html_e( 'Bienvenido a Arriendo Fácil', 'arriendo-facil' ); ?></span>
+				<h2 id="af-welcome-title" class="af-welcome__title">
+					<?php esc_html_e( 'Publica tu primera propiedad en minutos', 'arriendo-facil' ); ?>
+				</h2>
+				<p class="af-welcome__subtitle">
+					<?php esc_html_e( 'Añade fotos, describe los amenities y define tu tarifa. Nosotros te ayudamos a que aparezca donde importa.', 'arriendo-facil' ); ?>
+				</p>
+				<div class="af-welcome__actions">
+					<a class="button af-btn af-btn--primary" href="<?php echo esc_url( admin_url( 'post-new.php?post_type=accommodation' ) ); ?>">
+						<?php esc_html_e( 'Publicar propiedad', 'arriendo-facil' ); ?>
+					</a>
+					<a class="button af-btn af-btn--ghost" href="<?php echo esc_url( admin_url( 'admin.php?page=af-guests' ) ); ?>">
+						<?php esc_html_e( 'Ver solicitudes de visita', 'arriendo-facil' ); ?>
+					</a>
+				</div>
+			</div>
+		</section>
+	<?php endif; ?>
+
 	<div class="af-kpi-grid" role="list">
 
 		<article class="af-kpi" role="listitem">

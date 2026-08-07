@@ -634,3 +634,58 @@
 		max-width: none;
 	}
 }
+
+/* ── OTA sync log & filter bar ────────────────────────────────────────── */
+
+.af-ota-filters .af-section__header { padding-bottom: var(--af-space-3); }
+
+.af-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--af-space-4);
+    padding: 0 var(--af-space-5) var(--af-space-5);
+}
+
+.af-filter-bar .af-form-field { flex: 1 1 200px; min-width: 180px; }
+
+.af-filter-bar__actions {
+    display: flex;
+    gap: var(--af-space-2);
+    margin-left: auto;
+}
+
+.af-ota-log { border-collapse: separate; border-spacing: 0; }
+.af-ota-log th { font-weight: 600; color: var(--af-gray-700); }
+.af-ota-log td { vertical-align: middle; }
+
+.af-ota-log__deleted {
+    color: var(--af-gray-500);
+    font-style: italic;
+}
+
+.af-ota-log__error {
+    margin-top: 4px;
+    font-size: var(--af-text-xs);
+    color: var(--af-danger-600, #DC2626);
+    line-height: 1.35;
+}
+
+.af-ota-log__timestamp {
+    color: var(--af-gray-500);
+    font-size: var(--af-text-xs);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+@media (max-width: 782px) {
+    .af-filter-bar { padding: 0 var(--af-space-4) var(--af-space-4); }
+    .af-filter-bar__actions { margin-left: 0; width: 100%; }
+    .af-filter-bar__actions .button { flex: 1; }
+}
+
+/* ── Owner contacts table ─────────────────────────────────────────────── */
+
+.af-account-actions .af-owner-status-badge { margin-right: var(--af-space-2); }
+.af-account-actions form { display: inline-block; margin-left: var(--af-space-2); }
+.af-account-actions .description { margin-left: var(--af-space-2); color: var(--af-gray-500); }

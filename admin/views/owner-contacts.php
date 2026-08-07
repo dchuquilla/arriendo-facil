@@ -67,13 +67,25 @@ $notice = isset( $_GET['af_notice'] ) ? sanitize_key( wp_unslash( $_GET['af_noti
 $message = isset( $_GET['af_message'] ) ? sanitize_text_field( wp_unslash( $_GET['af_message'] ) ) : '';
 $current_user_id = (int) get_current_user_id();
 ?>
-<div class="wrap">
-	<h1>
-		<?php esc_html_e( 'Contactos de propietarios', 'arriendo-facil' ); ?>
-		<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-owner-contacts&action=new' ) ); ?>" class="page-title-action">
-			<?php esc_html_e( '+ Nuevo contacto de propietario', 'arriendo-facil' ); ?>
-		</a>
-	</h1>
+<div class="wrap af-shell">
+
+	<?php
+	af_page_header(
+		array(
+			'eyebrow'  => __( 'Propietarios y accesos', 'arriendo-facil' ),
+			'title'    => __( 'Contactos de propietarios', 'arriendo-facil' ),
+			'subtitle' => __( 'Registra propietarios, gestiona sus accesos y consulta el detalle de cada cuenta.', 'arriendo-facil' ),
+			'actions'  => array(
+				array(
+					'label'   => __( 'Nuevo propietario', 'arriendo-facil' ),
+					'url'     => admin_url( 'admin.php?page=af-owner-contacts&action=new' ),
+					'variant' => 'primary',
+					'icon'    => '<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+				),
+			),
+		)
+	);
+	?>
 
     <?php if ( 'owner_disabled' === $notice ) : ?>
         <div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'Cuenta de propietario deshabilitada correctamente.', 'arriendo-facil' ); ?></p></div>
@@ -92,8 +104,13 @@ $current_user_id = (int) get_current_user_id();
     <?php endif; ?>
 
 	<?php if ( $is_new ) : ?>
-    <div class="card" style="max-width: 900px; margin: 16px 0; padding: 16px;">
-        <h2><?php esc_html_e( 'Nuevo contacto de propietario', 'arriendo-facil' ); ?></h2>
+	<section class="af-section">
+		<header class="af-section__header">
+			<div>
+				<h2 class="af-section__title"><?php esc_html_e( 'Nuevo contacto de propietario', 'arriendo-facil' ); ?></h2>
+				<p class="af-section__subtitle"><?php esc_html_e( 'Completa los datos del propietario, sube los documentos requeridos y, opcionalmente, la plantilla del contrato.', 'arriendo-facil' ); ?></p>
+			</div>
+		</header>
 
          <form id="af-owner-contact-form" method="post" action="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>" enctype="multipart/form-data">
             <input type="hidden" name="action" value="af_send_owner_contact" />
@@ -220,10 +237,18 @@ $current_user_id = (int) get_current_user_id();
                 <a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=af-owner-contacts' ) ); ?>"><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></a>
             </p>
         </form>
-    </div>
-<?php endif; ?>
+	</section>
+	<?php endif; ?>
 
-	<table class="wp-list-table widefat fixed striped">
+	<section class="af-section">
+		<header class="af-section__header">
+			<div>
+				<h2 class="af-section__title"><?php esc_html_e( 'Propietarios registrados', 'arriendo-facil' ); ?></h2>
+				<p class="af-section__subtitle"><?php esc_html_e( 'Últimos 100 contactos. Usa “Details” para ver el detalle y “Disable Account” para revocar el acceso.', 'arriendo-facil' ); ?></p>
+			</div>
+		</header>
+
+	<table class="wp-list-table widefat fixed striped af-owner-table">
 		<thead>
 			<tr>
 				<th><?php esc_html_e( 'ID', 'arriendo-facil' ); ?></th>
@@ -276,6 +301,15 @@ $current_user_id = (int) get_current_user_id();
 					if ( false === $accommodations_json ) {
 						$accommodations_json = '[]';
 					}
+
+					$pill_variant = 'neutral';
+					if ( 'is-active' === $status_class ) {
+						$pill_variant = 'success';
+					} elseif ( 'is-disabled' === $status_class ) {
+						$pill_variant = 'danger';
+					} elseif ( 'is-inactive' === $status_class ) {
+						$pill_variant = 'warning';
+					}
                     ?>
                     <tr class="af-owner-contact-row" data-contact-id="<?php echo esc_attr( (int) $contact->id ); ?>">
 						<td><?php echo esc_html( $contact->id ); ?></td>
@@ -284,7 +318,7 @@ $current_user_id = (int) get_current_user_id();
 						<td><?php echo esc_html( $contact->subject ); ?></td>
                         <td><?php echo ! empty( $contact->has_legal_agent ) ? esc_html__( 'Yes', 'arriendo-facil' ) : esc_html__( 'No', 'arriendo-facil' ); ?></td>
                         <td class="af-account-actions">
-							<span class="af-owner-status-badge <?php echo esc_attr( $status_class ); ?>" style="display:inline-block;margin-right:8px;padding:2px 8px;border-radius:999px;background:#f1f5f9;font-size:12px;font-weight:600;">
+							<span class="af-pill af-pill--<?php echo esc_attr( $pill_variant ); ?> af-owner-status-badge">
 								<?php echo esc_html( $status_label ); ?>
 							</span>
                             <button
@@ -325,11 +359,23 @@ $current_user_id = (int) get_current_user_id();
 				<?php endforeach; ?>
 			<?php else : ?>
 				<tr>
-                    <td colspan="6"><?php esc_html_e( 'No se encontraron contactos.', 'arriendo-facil' ); ?></td>
+                    <td colspan="6">
+                        <div class="af-empty">
+                            <div class="af-empty__icon" aria-hidden="true">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M22 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75M13 7a4 4 0 11-8 0 4 4 0 018 0z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            </div>
+                            <h3 class="af-empty__title"><?php esc_html_e( 'Aún no hay propietarios registrados', 'arriendo-facil' ); ?></h3>
+                            <p class="af-empty__text"><?php esc_html_e( 'Usa “Nuevo propietario” para registrar el primer contacto y enviarle el enlace de activación.', 'arriendo-facil' ); ?></p>
+                            <a href="<?php echo esc_url( admin_url( 'admin.php?page=af-owner-contacts&action=new' ) ); ?>" class="button af-btn af-btn--primary">
+                                <?php esc_html_e( 'Nuevo propietario', 'arriendo-facil' ); ?>
+                            </a>
+                        </div>
+                    </td>
 				</tr>
 			<?php endif; ?>
 		</tbody>
 	</table>
+	</section>
 
     <div id="af-legal-agent-modal" class="af-modal" hidden>
         <div class="af-modal__backdrop" data-af-close-modal="1"></div>

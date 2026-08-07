@@ -225,6 +225,83 @@ $any_storage_field_locked = $provider_locked || $access_key_locked || $secret_ke
 	);
 	?>
 
+	<?php
+	$ai_key_current   = af_settings_get_value( 'AF_AI_API_KEY', 'af_ai_api_key', '' );
+	$has_ai_key       = '' !== trim( $ai_key_current );
+	$ai_status_var    = $has_ai_key ? 'success' : 'danger';
+	$ai_status_text   = $has_ai_key
+		? ( $ai_key_locked ? __( 'API key definida en wp-config', 'arriendo-facil' ) : __( 'API key configurada', 'arriendo-facil' ) )
+		: __( 'Falta API key de Claude', 'arriendo-facil' );
+
+	$r2_status_var  = 'danger';
+	$r2_status_text = __( 'Sin conexión verificada', 'arriendo-facil' );
+	if ( $r2_connected ) {
+		$r2_status_var  = 'success';
+		$r2_status_text = $r2_last_check
+			? sprintf( /* translators: %s: date */ __( 'OK · verificado %s', 'arriendo-facil' ), $r2_last_check )
+			: __( 'Conectado', 'arriendo-facil' );
+	} elseif ( '' !== trim( $r2_access_key_id ) || $has_r2_secret_key ) {
+		$r2_status_var  = 'warning';
+		$r2_status_text = __( 'Credenciales sin verificar', 'arriendo-facil' );
+	}
+
+	$docx_status_var  = $pandoc_available ? 'success' : 'warning';
+	$docx_status_text = $pandoc_available
+		? __( 'Pandoc disponible', 'arriendo-facil' )
+		: __( 'Sin Pandoc · usando fallback nativo', 'arriendo-facil' );
+	?>
+
+	<div class="af-service-health" role="list" aria-label="<?php esc_attr_e( 'Estado de servicios', 'arriendo-facil' ); ?>">
+
+		<article class="af-service-card af-service-card--<?php echo esc_attr( $ai_status_var ); ?>" role="listitem">
+			<div class="af-service-card__icon" aria-hidden="true">
+				<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 3v3M12 18v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M3 12h3M18 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2"/></svg>
+			</div>
+			<div class="af-service-card__body">
+				<div class="af-service-card__label"><?php esc_html_e( 'Claude AI', 'arriendo-facil' ); ?></div>
+				<div class="af-service-card__status"><?php echo esc_html( $ai_status_text ); ?></div>
+			</div>
+			<span class="af-pill af-pill--<?php echo esc_attr( $ai_status_var ); ?> af-service-card__pill">
+				<?php echo esc_html( $has_ai_key ? __( 'Activo', 'arriendo-facil' ) : __( 'Pendiente', 'arriendo-facil' ) ); ?>
+			</span>
+		</article>
+
+		<article class="af-service-card af-service-card--<?php echo esc_attr( $r2_status_var ); ?>" role="listitem">
+			<div class="af-service-card__icon" aria-hidden="true">
+				<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M17.5 19a4.5 4.5 0 100-9 6 6 0 00-11.7 1.6A4 4 0 006 19h11.5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+			</div>
+			<div class="af-service-card__body">
+				<div class="af-service-card__label"><?php esc_html_e( 'Cloudflare R2', 'arriendo-facil' ); ?></div>
+				<div class="af-service-card__status"><?php echo esc_html( $r2_status_text ); ?></div>
+			</div>
+			<span class="af-pill af-pill--<?php echo esc_attr( $r2_status_var ); ?> af-service-card__pill">
+				<?php
+				$r2_pill_label = __( 'Sin conectar', 'arriendo-facil' );
+				if ( 'success' === $r2_status_var ) {
+					$r2_pill_label = __( 'Conectado', 'arriendo-facil' );
+				} elseif ( 'warning' === $r2_status_var ) {
+					$r2_pill_label = __( 'Revisar', 'arriendo-facil' );
+				}
+				echo esc_html( $r2_pill_label );
+				?>
+			</span>
+		</article>
+
+		<article class="af-service-card af-service-card--<?php echo esc_attr( $docx_status_var ); ?>" role="listitem">
+			<div class="af-service-card__icon" aria-hidden="true">
+				<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8l-5-5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M14 3v5h5M9 13l1.5 4L12 14l1.5 3L15 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+			</div>
+			<div class="af-service-card__body">
+				<div class="af-service-card__label"><?php esc_html_e( 'Procesador DOCX', 'arriendo-facil' ); ?></div>
+				<div class="af-service-card__status"><?php echo esc_html( $docx_status_text ); ?></div>
+			</div>
+			<span class="af-pill af-pill--<?php echo esc_attr( $docx_status_var ); ?> af-service-card__pill">
+				<?php echo esc_html( $pandoc_available ? __( 'Pandoc', 'arriendo-facil' ) : __( 'Fallback', 'arriendo-facil' ) ); ?>
+			</span>
+		</article>
+
+	</div>
+
 	<form method="post" action="" class="af-settings-form">
 		<?php wp_nonce_field( 'af_ai_settings_nonce' ); ?>
 

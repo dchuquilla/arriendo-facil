@@ -12,19 +12,37 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 ?>
 
-<div class="wrap">
-	<h1><?php esc_html_e( 'Integraciones OTA', 'arriendo-facil' ); ?></h1>
+<div class="wrap af-shell">
 
-	<div class="af-ota-info-box" style="background: #e7f3ff; border-left: 4px solid #0073aa; padding: 15px; margin: 20px 0; border-radius: 4px;">
-		<p style="margin: 0; color: #0073aa; font-size: 15px;">
-			<strong><?php esc_html_e( 'ℹ Nuevo método de sincronización:', 'arriendo-facil' ); ?></strong><br/>
-			<?php esc_html_e( 'ArriendoFácil ahora usa calendarios iCal públicos (estándar de la industria) en lugar de APIs. Esto es más simple, seguro y no requiere credenciales.', 'arriendo-facil' ); ?>
-		</p>
+	<?php
+	af_page_header(
+		array(
+			'eyebrow'  => __( 'Integraciones externas', 'arriendo-facil' ),
+			'title'    => __( 'Integraciones OTA', 'arriendo-facil' ),
+			'subtitle' => __( 'Cómo obtener y configurar las URL iCal de Booking y Airbnb en tus alojamientos.', 'arriendo-facil' ),
+		)
+	);
+	?>
+
+	<div class="af-info-banner">
+		<svg class="af-info-banner__icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+			<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.8"/>
+			<path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+		</svg>
+		<div class="af-info-banner__body">
+			<p class="af-info-banner__title"><?php esc_html_e( 'Nuevo método de sincronización', 'arriendo-facil' ); ?></p>
+			<p><?php esc_html_e( 'ArriendoFácil ahora usa calendarios iCal públicos (estándar de la industria) en lugar de APIs. Esto es más simple, seguro y no requiere credenciales.', 'arriendo-facil' ); ?></p>
+		</div>
 	</div>
 
 	<!-- BOOKING.COM -->
-	<div class="af-integration-card" style="background: white; border: 1px solid #ddd; padding: 20px; margin: 20px 0; border-radius: 4px;">
-		<h2 style="margin-top: 0;">📅 Booking.com</h2>
+	<section class="af-section af-integration-card">
+		<header class="af-section__header">
+			<div>
+				<h2 class="af-section__title">📅 Booking.com</h2>
+				<p class="af-section__subtitle"><?php esc_html_e( 'Sincroniza reservas y disponibilidad desde tu extranet de Booking.', 'arriendo-facil' ); ?></p>
+			</div>
+		</header>
 
 		<h3><?php esc_html_e( 'Paso 1: Obtén tu URL iCal de Booking', 'arriendo-facil' ); ?></h3>
 		<ol style="line-height: 2;">
@@ -52,15 +70,23 @@ if ( ! defined( 'ABSPATH' ) ) {
 			<li><?php esc_html_e( 'Haz click en el botón azul "Actualizar" o "Guardar" (lado derecho de la pantalla)', 'arriendo-facil' ); ?></li>
 		</ol>
 
-		<div style="background: #f0f6fc; border-left: 3px solid #0073aa; padding: 12px; margin: 15px 0;">
-			<strong><?php esc_html_e( 'Resultado:', 'arriendo-facil' ); ?></strong><br/>
-			<?php esc_html_e( 'Cada 30 minutos, ArriendoFácil descargará tu calendario de Booking y marcará automáticamente el inmueble como ocupado cuando haya reservas.', 'arriendo-facil' ); ?>
+		<div class="af-info-banner af-info-banner--success">
+			<svg class="af-info-banner__icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+			<div class="af-info-banner__body">
+				<p class="af-info-banner__title"><?php esc_html_e( 'Resultado', 'arriendo-facil' ); ?></p>
+				<p><?php esc_html_e( 'Cada 30 minutos, ArriendoFácil descargará tu calendario de Booking y marcará automáticamente el inmueble como ocupado cuando haya reservas.', 'arriendo-facil' ); ?></p>
+			</div>
 		</div>
-	</div>
+	</section>
 
 	<!-- AIRBNB -->
-	<div class="af-integration-card" style="background: white; border: 1px solid #ddd; padding: 20px; margin: 20px 0; border-radius: 4px;">
-		<h2 style="margin-top: 0;">🏠 Airbnb</h2>
+	<section class="af-section af-integration-card">
+		<header class="af-section__header">
+			<div>
+				<h2 class="af-section__title">🏠 Airbnb</h2>
+				<p class="af-section__subtitle"><?php esc_html_e( 'Sincroniza reservas y disponibilidad desde tu panel de host de Airbnb.', 'arriendo-facil' ); ?></p>
+			</div>
+		</header>
 
 		<h3><?php esc_html_e( 'Paso 1: Obtén tu URL iCal de Airbnb', 'arriendo-facil' ); ?></h3>
 		<ol style="line-height: 2;">
@@ -89,15 +115,22 @@ if ( ! defined( 'ABSPATH' ) ) {
 			<li><?php esc_html_e( 'Haz click en el botón azul "Actualizar" o "Guardar" (lado derecho de la pantalla)', 'arriendo-facil' ); ?></li>
 		</ol>
 
-		<div style="background: #f0f6fc; border-left: 3px solid #0073aa; padding: 12px; margin: 15px 0;">
-			<strong><?php esc_html_e( 'Resultado:', 'arriendo-facil' ); ?></strong><br/>
-			<?php esc_html_e( 'Cada 30 minutos, ArriendoFácil descargará tu calendario de Airbnb y marcará automáticamente el inmueble como ocupado cuando haya reservas.', 'arriendo-facil' ); ?>
+		<div class="af-info-banner af-info-banner--success">
+			<svg class="af-info-banner__icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+			<div class="af-info-banner__body">
+				<p class="af-info-banner__title"><?php esc_html_e( 'Resultado', 'arriendo-facil' ); ?></p>
+				<p><?php esc_html_e( 'Cada 30 minutos, ArriendoFácil descargará tu calendario de Airbnb y marcará automáticamente el inmueble como ocupado cuando haya reservas.', 'arriendo-facil' ); ?></p>
+			</div>
 		</div>
-	</div>
+	</section>
 
 	<!-- TROUBLESHOOTING -->
-	<div class="af-integration-card" style="background: #fff8e5; border: 1px solid #ffb81c; padding: 20px; margin: 20px 0; border-radius: 4px;">
-		<h2 style="margin-top: 0; color: #856404;">⚙️ <?php esc_html_e( 'Solución de problemas', 'arriendo-facil' ); ?></h2>
+	<section class="af-section af-integration-card">
+		<header class="af-section__header">
+			<div>
+				<h2 class="af-section__title">⚙️ <?php esc_html_e( 'Solución de problemas', 'arriendo-facil' ); ?></h2>
+			</div>
+		</header>
 
 		<h3><?php esc_html_e( '¿No veo la sección "Sincronización OTA (iCal)"?', 'arriendo-facil' ); ?></h3>
 		<ul style="line-height: 1.8;">
@@ -127,11 +160,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 			<li><?php esc_html_e( 'Ve a: Arriendo Fácil → Sincronización OTA (es un nuevo menú)', 'arriendo-facil' ); ?></li>
 			<li><?php esc_html_e( 'Allí verás todas las sincronizaciones, errores y estadísticas', 'arriendo-facil' ); ?></li>
 		</ul>
-	</div>
+	</section>
 
 	<!-- WEBHOOK INFO (Optional) -->
-	<div class="af-integration-card" style="background: white; border: 1px solid #ddd; padding: 20px; margin: 20px 0; border-radius: 4px;">
-		<h2 style="margin-top: 0;">🔔 <?php esc_html_e( 'Webhooks (Sincronización en Tiempo Real - Opcional)', 'arriendo-facil' ); ?></h2>
+	<section class="af-section af-integration-card">
+		<header class="af-section__header">
+			<div>
+				<h2 class="af-section__title">🔔 <?php esc_html_e( 'Webhooks (sincronización en tiempo real – opcional)', 'arriendo-facil' ); ?></h2>
+				<p class="af-section__subtitle"><?php esc_html_e( 'Para usuarios avanzados que necesiten propagación instantánea.', 'arriendo-facil' ); ?></p>
+			</div>
+		</header>
 
 		<p><?php esc_html_e( 'Si quieres que se sincronice en tiempo real (cuando cambias disponibilidad), puedes configurar webhooks en Booking.com y Airbnb.', 'arriendo-facil' ); ?></p>
 
@@ -147,10 +185,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 			<code><?php echo esc_html( rest_url( 'af/v1/ota/webhook/airbnb' ) ); ?></code>
 		</div>
 
-		<p style="color: #666; font-size: 13px;">
+		<p style="color: var(--af-gray-500); font-size: 13px;">
 			<?php esc_html_e( 'Nota: Por ahora, la sincronización automática cada 30 minutos es suficiente para la mayoría de casos. Los webhooks son opcionales para usuarios avanzados.', 'arriendo-facil' ); ?>
 		</p>
-	</div>
+	</section>
 </div>
 
 <style>

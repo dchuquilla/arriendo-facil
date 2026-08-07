@@ -213,13 +213,29 @@ $custom_domain_locked     = af_settings_is_locked( 'AF_R2_CUSTOM_DOMAIN' );
 $any_storage_field_locked = $provider_locked || $access_key_locked || $secret_key_locked || $endpoint_locked || $bucket_locked || $custom_domain_locked;
 ?>
 
-<div class="wrap">
-	<h1><?php esc_html_e( 'Ajustes', 'arriendo-facil' ); ?></h1>
-	<p><?php esc_html_e( 'Configure AI and cloud storage integrations for Arriendo Facil.', 'arriendo-facil' ); ?></p>
+<div class="wrap af-shell">
 
-	<form method="post" action="">
+	<?php
+	af_page_header(
+		array(
+			'eyebrow'  => __( 'Configuración', 'arriendo-facil' ),
+			'title'    => __( 'Ajustes de IA', 'arriendo-facil' ),
+			'subtitle' => __( 'Configura las integraciones de IA y almacenamiento en la nube para Arriendo Fácil.', 'arriendo-facil' ),
+		)
+	);
+	?>
+
+	<form method="post" action="" class="af-settings-form">
 		<?php wp_nonce_field( 'af_ai_settings_nonce' ); ?>
-		<h2><?php esc_html_e( 'AI Service', 'arriendo-facil' ); ?></h2>
+
+		<section class="af-section">
+			<header class="af-section__header">
+				<div>
+					<h2 class="af-section__title"><?php esc_html_e( 'Servicio de IA', 'arriendo-facil' ); ?></h2>
+					<p class="af-section__subtitle"><?php esc_html_e( 'Endpoint y credenciales de Claude para procesar contratos.', 'arriendo-facil' ); ?></p>
+				</div>
+			</header>
+
 		<table class="form-table">
 			<tr>
 				<th scope="row">
@@ -293,10 +309,15 @@ $any_storage_field_locked = $provider_locked || $access_key_locked || $secret_ke
 		<p class="description">
 			<?php esc_html_e( 'Esta prueba envia registros de propietarios a Claude y valida la conectividad con Anthropic. No esta relacionada con la configuracion del proveedor en la nube.', 'arriendo-facil' ); ?>
 		</p>
+		</section>
 
-		<hr />
-		<h2><?php esc_html_e( 'Cloud Provider', 'arriendo-facil' ); ?></h2>
-		<p><?php esc_html_e( 'Select a cloud storage provider and provide the necessary credentials.', 'arriendo-facil' ); ?></p>
+		<section class="af-section">
+			<header class="af-section__header">
+				<div>
+					<h2 class="af-section__title"><?php esc_html_e( 'Proveedor de nube', 'arriendo-facil' ); ?></h2>
+					<p class="af-section__subtitle"><?php esc_html_e( 'Selecciona el proveedor de almacenamiento en la nube y sus credenciales.', 'arriendo-facil' ); ?></p>
+				</div>
+			</header>
 		<p class="description">
 			<?php esc_html_e( 'Nota: Puedes configurar las credenciales aqui o definirlas en wp-config.php para mayor seguridad. Las constantes definidas en wp-config.php tendran prioridad y desactivaran estos campos.', 'arriendo-facil' ); ?>
 		</p>
@@ -375,13 +396,19 @@ $any_storage_field_locked = $provider_locked || $access_key_locked || $secret_ke
 		<?php if ( $any_storage_field_locked ) : ?>
 			<p class="description"><?php esc_html_e( 'One or more storage fields are locked by constants in wp-config.php.', 'arriendo-facil' ); ?></p>
 		<?php endif; ?>
+		</section>
 	</form>
 
-	<hr />
-	<form method="post" action="">
+	<form method="post" action="" class="af-settings-form">
 		<?php wp_nonce_field( 'af_ai_settings_nonce' ); ?>
-		<h2><?php esc_html_e( 'WhatsApp de contacto', 'arriendo-facil' ); ?></h2>
-		<p><?php esc_html_e( 'Número de WhatsApp de la empresa visible en el frontend para que los visitantes puedan contactarse.', 'arriendo-facil' ); ?></p>
+
+		<section class="af-section">
+			<header class="af-section__header">
+				<div>
+					<h2 class="af-section__title"><?php esc_html_e( 'WhatsApp de contacto', 'arriendo-facil' ); ?></h2>
+					<p class="af-section__subtitle"><?php esc_html_e( 'Número de WhatsApp visible en el frontend para contacto de visitantes.', 'arriendo-facil' ); ?></p>
+				</div>
+			</header>
 		<table class="form-table">
 			<tr>
 				<th scope="row"><label for="af_whatsapp_number"><?php esc_html_e( 'Número WhatsApp', 'arriendo-facil' ); ?></label></th>
@@ -397,5 +424,6 @@ $any_storage_field_locked = $provider_locked || $access_key_locked || $secret_ke
 			<input type="submit" name="af_save_whatsapp" class="button button-primary"
 				value="<?php esc_attr_e( 'Guardar número', 'arriendo-facil' ); ?>" />
 		</p>
+		</section>
 	</form>
 </div>

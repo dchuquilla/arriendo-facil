@@ -1,0 +1,494 @@
+/**
+ * Arriendo Facil — Forms polish layer.
+ *
+ * Aligns existing form structures with the brand tokens WITHOUT touching HTML:
+ *  - Native WP `.form-table` (used across settings pages).
+ *  - `.af-wizard` and its internals (defined in admin-wizard.css).
+ *  - `.af-accom-form` / `.af-accom-section` meta-box structures.
+ *  - Any input/select/textarea inside `.af-shell` (opt-in).
+ *
+ * Enqueued globally after af-shell so it can polish forms wherever they appear.
+ * Requires af-tokens.css and af-admin-chrome.css.
+ */
+
+/* ─────────────────────────────────────────────────────────────
+   1. Native WP `.form-table` (used in Settings API)
+   ───────────────────────────────────────────────────────────── */
+
+.af-shell .form-table {
+	border-collapse: separate;
+	border-spacing: 0;
+	margin-top: var(--af-space-4, 16px);
+	background: var(--af-gray-0, #fff);
+	border: 1px solid var(--af-gray-200, #E2E1DB);
+	border-radius: var(--af-radius-lg, 14px);
+	box-shadow: var(--af-shadow-xs, 0 1px 2px rgba(16, 24, 40, 0.05));
+	overflow: hidden;
+}
+
+.af-shell .form-table th,
+.af-shell .form-table td {
+	padding: var(--af-space-4, 16px) var(--af-space-5, 20px);
+	border-top: 1px solid var(--af-gray-100, #EEEDE8);
+	font-family: var(--af-font-family, "Inter", sans-serif);
+}
+
+.af-shell .form-table > tbody > tr:first-child > th,
+.af-shell .form-table > tbody > tr:first-child > td {
+	border-top: 0;
+}
+
+.af-shell .form-table th {
+	color: var(--af-gray-900, #1B1A16);
+	font-weight: 600;
+	font-size: var(--af-text-sm, 14px);
+	width: 220px;
+	vertical-align: top;
+	padding-top: calc(var(--af-space-4, 16px) + 6px);
+}
+
+.af-shell .form-table td p.description,
+.af-shell .form-table td .description {
+	color: var(--af-gray-500, #7A7870);
+	font-size: var(--af-text-xs, 12px);
+	margin-top: var(--af-space-2, 8px);
+	line-height: var(--af-leading-normal, 1.5);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   2. Input controls inside af-shell (opt-in)
+   ───────────────────────────────────────────────────────────── */
+
+.af-shell input[type="text"],
+.af-shell input[type="email"],
+.af-shell input[type="url"],
+.af-shell input[type="password"],
+.af-shell input[type="search"],
+.af-shell input[type="number"],
+.af-shell input[type="tel"],
+.af-shell input[type="date"],
+.af-shell input[type="time"],
+.af-shell input[type="datetime-local"],
+.af-shell select,
+.af-shell textarea {
+	background: var(--af-gray-0, #fff);
+	border: 1px solid var(--af-gray-300, #D3D1CB);
+	border-radius: var(--af-radius-md, 10px);
+	padding: 10px var(--af-space-3, 12px);
+	font-family: var(--af-font-family, "Inter", sans-serif);
+	font-size: var(--af-text-sm, 14px);
+	color: var(--af-gray-900, #1B1A16);
+	min-height: 40px;
+	box-shadow: none;
+	transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+	max-width: 100%;
+}
+
+.af-shell textarea {
+	min-height: 96px;
+	line-height: var(--af-leading-normal, 1.5);
+	padding-top: 10px;
+}
+
+.af-shell input[type="text"]:focus,
+.af-shell input[type="email"]:focus,
+.af-shell input[type="url"]:focus,
+.af-shell input[type="password"]:focus,
+.af-shell input[type="search"]:focus,
+.af-shell input[type="number"]:focus,
+.af-shell input[type="tel"]:focus,
+.af-shell input[type="date"]:focus,
+.af-shell input[type="time"]:focus,
+.af-shell input[type="datetime-local"]:focus,
+.af-shell select:focus,
+.af-shell textarea:focus {
+	border-color: var(--af-primary-500, #2563EB);
+	box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+	outline: none;
+}
+
+.af-shell input[type="text"][disabled],
+.af-shell input[type="email"][disabled],
+.af-shell input[type="url"][disabled],
+.af-shell input[type="password"][disabled],
+.af-shell input[type="number"][disabled],
+.af-shell select[disabled],
+.af-shell textarea[disabled] {
+	background: var(--af-gray-50, #F7F7F5);
+	color: var(--af-gray-500, #7A7870);
+	cursor: not-allowed;
+}
+
+.af-shell input[type="checkbox"],
+.af-shell input[type="radio"] {
+	accent-color: var(--af-primary-500, #2563EB);
+	width: 18px;
+	height: 18px;
+	margin-right: 6px;
+}
+
+.af-shell label {
+	color: var(--af-gray-700, #3F3E37);
+	font-size: var(--af-text-sm, 14px);
+	line-height: var(--af-leading-normal, 1.5);
+}
+
+/* Buttons inside af-shell — align WP defaults with brand */
+.af-shell .button,
+.af-shell button.button {
+	border-radius: var(--af-radius-md, 10px);
+	font-family: var(--af-font-family, "Inter", sans-serif);
+	font-weight: 600;
+	min-height: 38px;
+	padding: 0 var(--af-space-4, 16px);
+	transition: background 180ms ease, box-shadow 180ms ease, transform 120ms ease;
+}
+
+.af-shell .button.button-primary,
+.af-shell button.button.button-primary {
+	background: var(--af-primary-500, #2563EB);
+	border-color: var(--af-primary-500, #2563EB);
+	color: #fff;
+	box-shadow: var(--af-shadow-xs, 0 1px 2px rgba(16, 24, 40, 0.05));
+}
+
+.af-shell .button.button-primary:hover,
+.af-shell .button.button-primary:focus,
+.af-shell button.button.button-primary:hover,
+.af-shell button.button.button-primary:focus {
+	background: var(--af-primary-600, #1D4ED8);
+	border-color: var(--af-primary-600, #1D4ED8);
+	box-shadow: var(--af-shadow-sm, 0 2px 6px rgba(16, 24, 40, 0.06));
+}
+
+.af-shell .button-secondary,
+.af-shell button.button-secondary {
+	background: var(--af-gray-0, #fff);
+	border-color: var(--af-gray-300, #D3D1CB);
+	color: var(--af-gray-800, #2A2924);
+}
+
+.af-shell .button-secondary:hover,
+.af-shell button.button-secondary:hover {
+	background: var(--af-gray-50, #F7F7F5);
+	border-color: var(--af-gray-400, #B4B2A9);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   3. Reusable form primitives (opt-in)
+   ───────────────────────────────────────────────────────────── */
+
+.af-form-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: var(--af-space-4, 16px);
+}
+
+@media (max-width: 900px) {
+	.af-form-grid {
+		grid-template-columns: 1fr;
+	}
+}
+
+.af-form-field {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.af-form-field--full {
+	grid-column: 1 / -1;
+}
+
+.af-form-field__label {
+	font-weight: 600;
+	font-size: var(--af-text-sm, 14px);
+	color: var(--af-gray-900, #1B1A16);
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.af-form-field__label .af-required {
+	color: var(--af-danger-500, #DC2626);
+}
+
+.af-form-field__hint {
+	color: var(--af-gray-500, #7A7870);
+	font-size: var(--af-text-xs, 12px);
+	line-height: var(--af-leading-normal, 1.5);
+}
+
+.af-form-field__error {
+	color: var(--af-danger-500, #DC2626);
+	font-size: var(--af-text-xs, 12px);
+	font-weight: 600;
+}
+
+.af-fieldset {
+	border: 1px solid var(--af-gray-200, #E2E1DB);
+	border-radius: var(--af-radius-lg, 14px);
+	background: var(--af-gray-0, #fff);
+	padding: var(--af-space-5, 20px);
+	margin: 0 0 var(--af-space-4, 16px);
+	box-shadow: var(--af-shadow-xs, 0 1px 2px rgba(16, 24, 40, 0.05));
+}
+
+.af-fieldset__legend {
+	font-weight: 700;
+	font-size: var(--af-text-base, 16px);
+	color: var(--af-gray-900, #1B1A16);
+	margin: 0 0 var(--af-space-1, 4px);
+}
+
+.af-fieldset__hint {
+	color: var(--af-gray-500, #7A7870);
+	font-size: var(--af-text-xs, 12px);
+	margin: 0 0 var(--af-space-4, 16px);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   4. Info / tip banner (replaces ad-hoc inline blue boxes)
+   ───────────────────────────────────────────────────────────── */
+
+.af-info-banner {
+	display: flex;
+	gap: var(--af-space-3, 12px);
+	padding: var(--af-space-4, 16px) var(--af-space-5, 20px);
+	background: var(--af-primary-50, #EFF6FF);
+	border: 1px solid var(--af-primary-100, #DBEAFE);
+	border-left: 4px solid var(--af-primary-500, #2563EB);
+	border-radius: var(--af-radius-lg, 14px);
+	color: var(--af-primary-700, #1E40AF);
+	margin: 0 0 var(--af-space-4, 16px);
+}
+
+.af-info-banner__icon {
+	flex-shrink: 0;
+	width: 20px;
+	height: 20px;
+	color: var(--af-primary-500, #2563EB);
+}
+
+.af-info-banner__body {
+	flex: 1;
+	font-size: var(--af-text-sm, 14px);
+	line-height: var(--af-leading-normal, 1.5);
+}
+
+.af-info-banner__title {
+	font-weight: 700;
+	color: var(--af-primary-700, #1E40AF);
+	margin: 0 0 2px;
+}
+
+.af-info-banner--warning {
+	background: var(--af-warning-50, #FEF6E6);
+	border-color: var(--af-warning-100, #FBE6B8);
+	border-left-color: var(--af-warning-500, #F59E0B);
+	color: var(--af-warning-700, #A26708);
+}
+.af-info-banner--warning .af-info-banner__icon,
+.af-info-banner--warning .af-info-banner__title { color: var(--af-warning-700, #A26708); }
+
+.af-info-banner--success {
+	background: var(--af-success-50, #E6F4EA);
+	border-color: var(--af-success-100, #B7E1C1);
+	border-left-color: var(--af-success-500, #0F9D58);
+	color: var(--af-success-700, #0B7A44);
+}
+.af-info-banner--success .af-info-banner__icon,
+.af-info-banner--success .af-info-banner__title { color: var(--af-success-700, #0B7A44); }
+
+/* ─────────────────────────────────────────────────────────────
+   5. Accommodation wizard polish (no HTML changes)
+   ───────────────────────────────────────────────────────────── */
+
+.af-wizard {
+	background: var(--af-gray-50, #F7F7F5);
+	font-family: var(--af-font-family, "Inter", sans-serif);
+}
+
+.af-wizard__header {
+	background: var(--af-gray-0, #fff);
+	border-bottom: 1px solid var(--af-gray-200, #E2E1DB);
+	box-shadow: var(--af-shadow-xs, 0 1px 2px rgba(16, 24, 40, 0.05));
+}
+
+.af-wizard__title h1 {
+	font-family: var(--af-font-family, "Inter", sans-serif);
+	color: var(--af-gray-900, #1B1A16);
+	letter-spacing: -0.01em;
+}
+
+.af-wizard__back {
+	color: var(--af-primary-600, #1D4ED8);
+	font-weight: 500;
+	border-radius: var(--af-radius-md, 10px);
+	padding: 4px 8px;
+	transition: background 180ms ease;
+}
+.af-wizard__back:hover,
+.af-wizard__back:focus {
+	background: var(--af-primary-50, #EFF6FF);
+	color: var(--af-primary-700, #1E40AF);
+}
+
+.af-wizard__toast {
+	border-radius: var(--af-radius-lg, 14px);
+	box-shadow: var(--af-shadow-sm, 0 2px 6px rgba(16, 24, 40, 0.06));
+}
+.af-wizard__toast--success {
+	background: var(--af-success-50, #E6F4EA);
+	color: var(--af-success-700, #0B7A44);
+	border-color: var(--af-success-100, #B7E1C1);
+}
+.af-wizard__toast--info {
+	background: var(--af-primary-50, #EFF6FF);
+	color: var(--af-primary-700, #1E40AF);
+	border-color: var(--af-primary-100, #DBEAFE);
+}
+.af-wizard__toast--error {
+	background: var(--af-danger-50, #FEECEC);
+	color: var(--af-danger-700, #A31E1E);
+	border-color: var(--af-danger-100, #FBCACA);
+}
+
+/* Wizard side nav */
+.af-wizard__layout {
+	background: var(--af-gray-50, #F7F7F5);
+}
+
+.af-wizard__nav {
+	background: var(--af-gray-0, #fff);
+	border-radius: var(--af-radius-lg, 14px);
+	box-shadow: var(--af-shadow-xs, 0 1px 2px rgba(16, 24, 40, 0.05));
+	border: 1px solid var(--af-gray-200, #E2E1DB);
+	padding: var(--af-space-3, 12px);
+}
+
+.af-wizard__nav-item {
+	border-radius: var(--af-radius-md, 10px);
+	color: var(--af-gray-600, #5B594F);
+	font-weight: 500;
+	transition: background 180ms ease, color 180ms ease;
+}
+.af-wizard__nav-item:hover {
+	background: var(--af-gray-50, #F7F7F5);
+	color: var(--af-gray-900, #1B1A16);
+}
+.af-wizard__nav-item.is-active {
+	background: var(--af-primary-50, #EFF6FF);
+	color: var(--af-primary-700, #1E40AF);
+	font-weight: 600;
+}
+.af-wizard__nav-item.is-done {
+	color: var(--af-success-700, #0B7A44);
+}
+
+/* Wizard content card */
+.af-wizard__form,
+.af-wizard__panel {
+	background: var(--af-gray-0, #fff);
+	border-radius: var(--af-radius-lg, 14px);
+	box-shadow: var(--af-shadow-sm, 0 2px 6px rgba(16, 24, 40, 0.06));
+	border: 1px solid var(--af-gray-200, #E2E1DB);
+}
+
+/* Wizard footer bar with actions */
+.af-wizard__footer,
+.af-wizard__actions {
+	background: var(--af-gray-0, #fff);
+	border-top: 1px solid var(--af-gray-200, #E2E1DB);
+	box-shadow: var(--af-shadow-md, 0 6px 20px rgba(16, 24, 40, 0.08));
+}
+
+/* Chip selectors (property type / amenities) */
+.af-wizard .af-chip,
+.af-wizard label.af-chip,
+.af-wizard .af-chip-group label,
+.af-accom-form .af-chip,
+.af-accom-form label.af-chip {
+	border: 1px solid var(--af-gray-300, #D3D1CB);
+	border-radius: var(--af-radius-md, 10px);
+	background: var(--af-gray-0, #fff);
+	color: var(--af-gray-700, #3F3E37);
+	transition: border-color 180ms ease, background 180ms ease, color 180ms ease, transform 120ms ease;
+}
+.af-wizard .af-chip:hover,
+.af-accom-form .af-chip:hover {
+	border-color: var(--af-primary-300, #93C5FD);
+	background: var(--af-primary-50, #EFF6FF);
+	color: var(--af-primary-700, #1E40AF);
+	transform: translateY(-1px);
+}
+.af-wizard .af-chip.is-active,
+.af-wizard .af-chip--selected,
+.af-wizard input:checked + .af-chip,
+.af-accom-form .af-chip.is-active,
+.af-accom-form .af-chip--selected {
+	border-color: var(--af-primary-500, #2563EB);
+	background: var(--af-primary-500, #2563EB);
+	color: #fff;
+	box-shadow: var(--af-shadow-xs, 0 1px 2px rgba(16, 24, 40, 0.05));
+}
+
+/* ─────────────────────────────────────────────────────────────
+   6. Accommodation meta-box (post edit screen) polish
+   ───────────────────────────────────────────────────────────── */
+
+.af-accom-form {
+	font-family: var(--af-font-family, "Inter", sans-serif);
+}
+
+.af-accom-section {
+	background: var(--af-gray-0, #fff);
+	border: 1px solid var(--af-gray-200, #E2E1DB);
+	border-radius: var(--af-radius-lg, 14px);
+	box-shadow: var(--af-shadow-xs, 0 1px 2px rgba(16, 24, 40, 0.05));
+	padding: var(--af-space-5, 20px);
+	margin: 0 0 var(--af-space-4, 16px);
+	transition: box-shadow 180ms ease;
+}
+.af-accom-section:hover {
+	box-shadow: var(--af-shadow-sm, 0 2px 6px rgba(16, 24, 40, 0.06));
+}
+
+.af-accom-section__header {
+	display: flex;
+	align-items: center;
+	gap: var(--af-space-2, 8px);
+	margin: 0 0 var(--af-space-4, 16px);
+	padding-bottom: var(--af-space-3, 12px);
+	border-bottom: 1px solid var(--af-gray-100, #EEEDE8);
+}
+
+.af-accom-section__icon {
+	font-size: var(--af-text-lg, 18px);
+	line-height: 1;
+}
+
+.af-accom-section__title {
+	margin: 0;
+	font-size: var(--af-text-base, 16px);
+	font-weight: 700;
+	color: var(--af-gray-900, #1B1A16);
+}
+
+/* Inline OTA card polish inside meta boxes */
+.af-integration-card,
+.af-ota-info-box {
+	background: var(--af-gray-0, #fff);
+	border: 1px solid var(--af-gray-200, #E2E1DB);
+	border-radius: var(--af-radius-lg, 14px);
+	box-shadow: var(--af-shadow-xs, 0 1px 2px rgba(16, 24, 40, 0.05));
+	padding: var(--af-space-5, 20px);
+}
+
+.af-ota-info-box {
+	background: var(--af-primary-50, #EFF6FF);
+	border-color: var(--af-primary-100, #DBEAFE);
+	border-left: 4px solid var(--af-primary-500, #2563EB);
+	color: var(--af-primary-700, #1E40AF);
+}
+.af-ota-info-box p { color: inherit !important; }

@@ -149,7 +149,7 @@ $rows = $wpdb->get_results( $wpdb->prepare( $list_query, $where_args ) );
 			</div>
 		</header>
 
-	<table class="wp-list-table widefat fixed striped">
+	<table class="wp-list-table widefat fixed striped af-data-table">
 		<thead>
 			<tr>
 				<th><?php esc_html_e( 'ID', 'arriendo-facil' ); ?></th>
@@ -180,12 +180,12 @@ $rows = $wpdb->get_results( $wpdb->prepare( $list_query, $where_args ) );
 					}
 					?>
 					<tr>
-						<td><?php echo esc_html( (int) $row->id ); ?></td>
-						<td><?php echo esc_html( (int) $row->lease_id ); ?></td>
-						<td><?php echo esc_html( $title ); ?></td>
-						<td><span class="af-pill af-pill--neutral"><?php echo esc_html( $label ); ?></span></td>
-						<td><span class="af-pill <?php echo esc_attr( $star_pill ); ?>">★ <?php echo esc_html( number_format_i18n( $stars, 1 ) ); ?></span></td>
-						<td><?php echo esc_html( isset( $row->submitted_at ) ? (string) $row->submitted_at : '' ); ?></td>
+						<td data-label="<?php esc_attr_e( 'ID', 'arriendo-facil' ); ?>"><?php echo esc_html( (int) $row->id ); ?></td>
+						<td data-label="<?php esc_attr_e( 'Contrato', 'arriendo-facil' ); ?>"><?php echo esc_html( (int) $row->lease_id ); ?></td>
+						<td data-label="<?php esc_attr_e( 'Propiedad', 'arriendo-facil' ); ?>"><?php echo esc_html( $title ); ?></td>
+						<td data-label="<?php esc_attr_e( 'Dirección', 'arriendo-facil' ); ?>"><span class="af-pill af-pill--neutral"><?php echo esc_html( $label ); ?></span></td>
+						<td data-label="<?php esc_attr_e( 'Estrellas', 'arriendo-facil' ); ?>"><span class="af-pill <?php echo esc_attr( $star_pill ); ?>">★ <?php echo esc_html( number_format_i18n( $stars, 1 ) ); ?></span></td>
+						<td data-label="<?php esc_attr_e( 'Fecha', 'arriendo-facil' ); ?>"><?php echo esc_html( isset( $row->submitted_at ) ? (string) $row->submitted_at : '' ); ?></td>
 					</tr>
 				<?php endforeach; ?>
 			<?php endif; ?>

@@ -310,7 +310,7 @@ if ( $is_owner ) {
 	</div>
 
 	<h2 style="margin-top:20px;"><?php esc_html_e( 'Visit Requests Queue', 'arriendo-facil' ); ?></h2>
-	<table class="wp-list-table widefat fixed striped" style="margin-bottom:20px;">
+	<table class="wp-list-table widefat fixed striped af-data-table" style="margin-bottom:20px;">
 		<thead>
 			<tr>
 				<th><?php esc_html_e( 'Date', 'arriendo-facil' ); ?></th>
@@ -342,20 +342,20 @@ if ( $is_owner ) {
 					}
 					?>
 					<tr>
-						<td><?php echo isset( $request->created_at ) ? esc_html( (string) $request->created_at ) : '—'; ?></td>
-						<td>
+						<td data-label="<?php esc_attr_e( 'Date', 'arriendo-facil' ); ?>"><?php echo isset( $request->created_at ) ? esc_html( (string) $request->created_at ) : '—'; ?></td>
+						<td data-label="<?php esc_attr_e( 'Accommodation', 'arriendo-facil' ); ?>">
 							<strong><?php echo ! empty( $request->accommodation_title ) ? esc_html( (string) $request->accommodation_title ) : __( '(Sin titulo)', 'arriendo-facil' ); ?></strong>
 							<br />
 							<small><?php echo esc_html( '#' . absint( $request->accommodation_id ) ); ?></small>
 						</td>
-						<td><?php echo esc_html( isset( $request->name ) ? (string) $request->name : '—' ); ?></td>
-						<td>
+						<td data-label="<?php esc_attr_e( 'Interested Person', 'arriendo-facil' ); ?>"><?php echo esc_html( isset( $request->name ) ? (string) $request->name : '—' ); ?></td>
+						<td data-label="<?php esc_attr_e( 'Contact', 'arriendo-facil' ); ?>">
 							<div><strong><?php esc_html_e( 'Email:', 'arriendo-facil' ); ?></strong> <?php echo esc_html( isset( $request->email ) ? (string) $request->email : '—' ); ?></div>
 							<div><strong><?php esc_html_e( 'Phone:', 'arriendo-facil' ); ?></strong> <?php echo esc_html( isset( $request->phone ) ? (string) $request->phone : '—' ); ?></div>
 						</td>
-						<td><?php echo esc_html( (string) $status_label ); ?></td>
-						<td><?php echo ! empty( $request->message ) ? esc_html( (string) $request->message ) : '—'; ?></td>
-						<td>
+						<td data-label="<?php esc_attr_e( 'Status', 'arriendo-facil' ); ?>"><?php echo esc_html( (string) $status_label ); ?></td>
+						<td data-label="<?php esc_attr_e( 'Request Details', 'arriendo-facil' ); ?>"><?php echo ! empty( $request->message ) ? esc_html( (string) $request->message ) : '—'; ?></td>
+						<td class="af-td-actions" data-label="<?php esc_attr_e( 'Actions', 'arriendo-facil' ); ?>">
 							<?php if ( $is_actionable ) : ?>
 								<form method="post" style="display:inline-block;margin-right:4px;">
 									<input type="hidden" name="af_queue_action" value="approve" />
@@ -387,7 +387,7 @@ if ( $is_owner ) {
 		</tbody>
 	</table>
 
-	<table class="wp-list-table widefat fixed striped">
+	<table class="wp-list-table widefat fixed striped af-data-table">
 		<thead>
 			<tr>
 				<th><?php esc_html_e( 'ID (National ID or Passport)', 'arriendo-facil' ); ?></th>
@@ -403,15 +403,15 @@ if ( $is_owner ) {
 			<?php if ( $guests ) : ?>
 				<?php foreach ( $guests as $guest ) : ?>
 					<tr>
-						<td><?php echo esc_html( $guest->id_number ); ?></td>
-						<td><?php echo esc_html( $guest->first_name . ' ' . $guest->last_name ); ?></td>
-						<td><?php echo esc_html( $guest->email ); ?></td>
-						<td><?php echo esc_html( $guest->phone ); ?></td>
-						<td>—</td>
-						<td>
+						<td data-label="<?php esc_attr_e( 'ID (National ID or Passport)', 'arriendo-facil' ); ?>"><?php echo esc_html( $guest->id_number ); ?></td>
+						<td data-label="<?php esc_attr_e( 'Name', 'arriendo-facil' ); ?>"><?php echo esc_html( $guest->first_name . ' ' . $guest->last_name ); ?></td>
+						<td data-label="<?php esc_attr_e( 'Email', 'arriendo-facil' ); ?>"><?php echo esc_html( $guest->email ); ?></td>
+						<td data-label="<?php esc_attr_e( 'Phone', 'arriendo-facil' ); ?>"><?php echo esc_html( $guest->phone ); ?></td>
+						<td data-label="<?php esc_attr_e( 'ID Number', 'arriendo-facil' ); ?>">—</td>
+						<td data-label="<?php esc_attr_e( 'AI Score', 'arriendo-facil' ); ?>">
 							<?php echo $guest->ai_score ? esc_html( number_format( (float) $guest->ai_score, 2 ) ) : '—'; ?>
 						</td>
-						<td>
+						<td class="af-td-actions" data-label="<?php esc_attr_e( 'Actions', 'arriendo-facil' ); ?>">
 							<button type="button" class="button af-score-guest"
 								data-guest-id="<?php echo esc_attr( $guest->id ); ?>">
 								<?php esc_html_e( 'Score (AI)', 'arriendo-facil' ); ?>

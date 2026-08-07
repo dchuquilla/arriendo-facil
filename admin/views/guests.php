@@ -218,20 +218,29 @@ if ( $is_owner ) {
 	);
 }
 ?>
-<div class="wrap">
-	<h1><?php esc_html_e( 'Huespedes', 'arriendo-facil' ); ?></h1>
+<div class="wrap af-shell">
+
+	<?php
+	af_page_header(
+		array(
+			'eyebrow'  => __( 'Personas', 'arriendo-facil' ),
+			'title'    => __( 'Huéspedes', 'arriendo-facil' ),
+			'subtitle' => __( 'Interesados en cola, huéspedes activos y perfiles de scoring. Aprueba solicitudes y comparte formularios de perfil legal.', 'arriendo-facil' ),
+			'actions'  => array(
+				sprintf(
+					'<button type="button" class="button af-btn af-btn--primary" id="af-new-guest"><span class="af-btn__icon" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>%s</button>',
+					esc_html__( 'Nuevo huésped', 'arriendo-facil' )
+				),
+			),
+		)
+	);
+	?>
 
 	<?php if ( '' !== $action_notice ) : ?>
 		<div class="notice <?php echo esc_attr( $action_notice_class ); ?> is-dismissible">
 			<p><?php echo esc_html( $action_notice ); ?></p>
 		</div>
 	<?php endif; ?>
-
-	<div class="af-guest-actions" style="margin-bottom: 16px;">
-		<button type="button" class="button button-primary" id="af-new-guest">
-			<?php esc_html_e( '+ Nuevo huesped', 'arriendo-facil' ); ?>
-		</button>
-	</div>
 
 	<div id="af-guest-form-card" class="card" style="max-width: 900px; margin: 16px 0; padding: 16px; display: none;">
 		<h2><?php esc_html_e( 'Nuevo huesped', 'arriendo-facil' ); ?></h2>

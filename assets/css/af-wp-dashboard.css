@@ -1,0 +1,263 @@
+/**
+ * Arriendo Facil — WordPress native dashboard rebrand.
+ *
+ * Applies only to /wp-admin/index.php (body.index-php). Extends WP core widgets
+ * with our design tokens, and styles the custom AF summary widget added via
+ * wp_dashboard_setup. Requires af-tokens.css and af-admin-chrome.css (global
+ * body background is already handled there).
+ */
+
+body.index-php #dashboard-widgets-wrap {
+	padding-top: var(--af-space-2, 8px);
+}
+
+/* ── Screen title ─────────────────────────────────────────────────────── */
+
+body.index-php .wrap > h1 {
+	font-family: var(--af-font-family, "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+	font-size: var(--af-text-xl, 24px);
+	color: var(--af-gray-900, #1B1A16);
+	padding-top: var(--af-space-4, 16px);
+	margin-bottom: var(--af-space-2, 8px);
+}
+
+/* ── Welcome panel ────────────────────────────────────────────────────── */
+
+body.index-php #welcome-panel {
+	background: linear-gradient(135deg, #FFFFFF 0%, var(--af-primary-50, #EFF6FF) 100%);
+	border: 1px solid var(--af-primary-100, #DBEAFE);
+	border-radius: var(--af-radius-lg, 14px);
+	box-shadow: var(--af-shadow-sm, 0 2px 6px rgba(16, 24, 40, 0.06));
+	padding: var(--af-space-6, 24px) var(--af-space-8, 32px);
+	color: var(--af-gray-700, #3F3E37);
+}
+
+body.index-php #welcome-panel h2 {
+	font-family: var(--af-font-family, "Inter", sans-serif);
+	color: var(--af-gray-900, #1B1A16);
+	font-size: var(--af-text-xl, 24px);
+	font-weight: 700;
+}
+
+body.index-php #welcome-panel .welcome-panel-column-container {
+	color: var(--af-gray-600, #5B594F);
+}
+
+body.index-php #welcome-panel a.button.button-hero {
+	background: var(--af-primary-500, #2563EB);
+	border-color: var(--af-primary-500, #2563EB);
+	color: #fff;
+	border-radius: var(--af-radius-md, 10px);
+	font-weight: 600;
+	box-shadow: var(--af-shadow-xs, 0 1px 2px rgba(16, 24, 40, 0.05));
+	transition: background 180ms ease, box-shadow 180ms ease;
+}
+
+body.index-php #welcome-panel a.button.button-hero:hover,
+body.index-php #welcome-panel a.button.button-hero:focus {
+	background: var(--af-primary-600, #1D4ED8);
+	border-color: var(--af-primary-600, #1D4ED8);
+	color: #fff;
+	box-shadow: var(--af-shadow-sm, 0 2px 6px rgba(16, 24, 40, 0.06));
+}
+
+/* ── Dashboard widgets (postboxes) ────────────────────────────────────── */
+
+body.index-php #dashboard-widgets .postbox {
+	border: 1px solid var(--af-gray-200, #E2E1DB);
+	border-radius: var(--af-radius-lg, 14px);
+	box-shadow: var(--af-shadow-xs, 0 1px 2px rgba(16, 24, 40, 0.05));
+	background: var(--af-gray-0, #FFFFFF);
+	overflow: hidden;
+	transition: box-shadow 180ms ease, transform 180ms ease;
+}
+
+body.index-php #dashboard-widgets .postbox:hover {
+	box-shadow: var(--af-shadow-sm, 0 2px 6px rgba(16, 24, 40, 0.06));
+}
+
+body.index-php #dashboard-widgets .postbox .postbox-header {
+	background: var(--af-gray-50, #F7F7F5);
+	border-bottom: 1px solid var(--af-gray-200, #E2E1DB);
+	border-radius: var(--af-radius-lg, 14px) var(--af-radius-lg, 14px) 0 0;
+}
+
+body.index-php #dashboard-widgets .postbox .postbox-header .hndle,
+body.index-php #dashboard-widgets .postbox h2.hndle {
+	font-family: var(--af-font-family, "Inter", sans-serif);
+	font-size: var(--af-text-base, 16px);
+	font-weight: 700;
+	color: var(--af-gray-900, #1B1A16);
+	padding: var(--af-space-3, 12px) var(--af-space-4, 16px);
+	border-bottom: 0;
+}
+
+body.index-php #dashboard-widgets .postbox .inside {
+	padding: var(--af-space-4, 16px) var(--af-space-5, 20px) var(--af-space-5, 20px);
+	color: var(--af-gray-700, #3F3E37);
+	font-family: var(--af-font-family, "Inter", sans-serif);
+	font-size: var(--af-text-sm, 14px);
+	line-height: var(--af-leading-normal, 1.5);
+}
+
+body.index-php #dashboard-widgets .postbox .inside a {
+	color: var(--af-primary-600, #1D4ED8);
+	text-decoration: none;
+}
+
+body.index-php #dashboard-widgets .postbox .inside a:hover,
+body.index-php #dashboard-widgets .postbox .inside a:focus {
+	color: var(--af-primary-700, #1E40AF);
+	text-decoration: underline;
+}
+
+/* Toggle chevron */
+body.index-php #dashboard-widgets .postbox .handlediv {
+	color: var(--af-gray-500, #7A7870);
+}
+
+/* ── AF custom dashboard widget ───────────────────────────────────────── */
+
+.af-dash-widget {
+	display: flex;
+	flex-direction: column;
+	gap: var(--af-space-4, 16px);
+}
+
+.af-dash-widget__hero {
+	display: flex;
+	align-items: center;
+	gap: var(--af-space-3, 12px);
+	padding: var(--af-space-4, 16px);
+	background: linear-gradient(135deg, var(--af-primary-500, #2563EB) 0%, var(--af-primary-700, #1E40AF) 100%);
+	color: #fff;
+	border-radius: var(--af-radius-md, 10px);
+	box-shadow: var(--af-shadow-sm, 0 2px 6px rgba(16, 24, 40, 0.06));
+}
+
+.af-dash-widget__logo {
+	width: 40px;
+	height: 40px;
+	border-radius: var(--af-radius-md, 10px);
+	background: rgba(255, 255, 255, 0.18);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	color: #fff;
+}
+
+.af-dash-widget__hero-text h3 {
+	margin: 0 0 2px;
+	font-size: var(--af-text-base, 16px);
+	color: #fff;
+	font-weight: 700;
+	line-height: 1.2;
+}
+
+.af-dash-widget__hero-text p {
+	margin: 0;
+	font-size: var(--af-text-xs, 12px);
+	color: rgba(255, 255, 255, 0.85);
+}
+
+.af-dash-widget__stats {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: var(--af-space-2, 8px);
+}
+
+.af-dash-widget__stat {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: var(--af-space-3, 12px);
+	background: var(--af-gray-50, #F7F7F5);
+	border: 1px solid var(--af-gray-100, #EEEDE8);
+	border-radius: var(--af-radius-md, 10px);
+	text-decoration: none;
+	color: inherit;
+	transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+
+.af-dash-widget__stat:hover {
+	transform: translateY(-1px);
+	border-color: var(--af-primary-200, #BFDBFE);
+	background: var(--af-gray-0, #FFFFFF);
+	color: inherit;
+}
+
+.af-dash-widget__stat-label {
+	font-size: 11px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--af-gray-500, #7A7870);
+}
+
+.af-dash-widget__stat-value {
+	font-family: var(--af-font-numeric, "Inter", monospace);
+	font-variant-numeric: tabular-nums;
+	font-size: var(--af-text-xl, 24px);
+	font-weight: 700;
+	color: var(--af-gray-900, #1B1A16);
+	line-height: 1.1;
+}
+
+.af-dash-widget__stat--attention {
+	background: var(--af-warning-50, #FEF6E6);
+	border-color: var(--af-warning-100, #FBE6B8);
+}
+.af-dash-widget__stat--attention .af-dash-widget__stat-value {
+	color: var(--af-warning-700, #A26708);
+}
+
+.af-dash-widget__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--af-space-2, 8px);
+	margin-top: var(--af-space-1, 4px);
+}
+
+.af-dash-widget__actions .af-dash-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	height: 34px;
+	padding: 0 var(--af-space-3, 12px);
+	border-radius: var(--af-radius-md, 10px);
+	font-weight: 600;
+	font-size: var(--af-text-xs, 12px);
+	text-decoration: none;
+	line-height: 1;
+	transition: background 180ms ease, transform 180ms ease;
+}
+
+.af-dash-widget__actions .af-dash-btn--primary {
+	background: var(--af-primary-500, #2563EB);
+	color: #fff;
+}
+.af-dash-widget__actions .af-dash-btn--primary:hover {
+	background: var(--af-primary-600, #1D4ED8);
+	color: #fff;
+}
+
+.af-dash-widget__actions .af-dash-btn--ghost {
+	background: var(--af-gray-50, #F7F7F5);
+	color: var(--af-gray-700, #3F3E37);
+	border: 1px solid var(--af-gray-200, #E2E1DB);
+}
+.af-dash-widget__actions .af-dash-btn--ghost:hover {
+	background: var(--af-gray-100, #EEEDE8);
+	color: var(--af-gray-900, #1B1A16);
+}
+
+/* Responsive */
+@media (max-width: 782px) {
+	body.index-php #welcome-panel {
+		padding: var(--af-space-4, 16px);
+	}
+	.af-dash-widget__stats {
+		grid-template-columns: 1fr 1fr;
+	}
+}

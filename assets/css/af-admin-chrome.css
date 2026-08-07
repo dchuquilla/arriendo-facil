@@ -1,0 +1,243 @@
+/**
+ * Arriendo Facil — Global WP admin chrome rebrand.
+ *
+ * Enqueued on ALL admin pages. Applies brand palette to:
+ *  - Sidebar (#adminmenu): current item + hover in brand blue.
+ *  - Admin bar (#wpadminbar): warm dark + brand hover.
+ *  - Body content background: warm gray (--af-gray-50).
+ *  - Screen titles: Inter typography.
+ *  - Notices: rounded corners + brand info accent.
+ *  - Gutenberg / core theme color vars (buttons, focus rings).
+ *  - AF top-level menu icon: mask-image so it recolors on current/hover.
+ *
+ * Purely visual. No layout shifts, no JS, no logic changes.
+ * All !important usages are targeted overrides of WP core inline/hardcoded colors.
+ */
+
+/* ── Expose brand as WP core theme color (Gutenberg picks these up) ───── */
+
+body.wp-admin,
+body.wp-core-ui {
+	--wp-admin-theme-color: #2563EB;
+	--wp-admin-theme-color--rgb: 37, 99, 235;
+	--wp-admin-theme-color-darker-10: #1D4ED8;
+	--wp-admin-theme-color-darker-10--rgb: 29, 78, 216;
+	--wp-admin-theme-color-darker-20: #1E40AF;
+	--wp-admin-theme-color-darker-20--rgb: 30, 64, 175;
+	--wp-admin-border-width-focus: 2px;
+}
+
+/* ── Body / content surface ───────────────────────────────────────────── */
+
+body.wp-admin {
+	background: #F7F7F5;
+}
+
+body.wp-admin #wpbody-content {
+	background: transparent;
+}
+
+/* Slightly nicer screen title typography on every admin page */
+body.wp-admin .wrap > h1,
+body.wp-admin .wrap > h1.wp-heading-inline {
+	font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+	color: #1B1A16;
+	font-weight: 700;
+}
+
+/* ── Admin bar (topbar) ───────────────────────────────────────────────── */
+
+#wpadminbar {
+	background: #1B1A16;
+}
+
+#wpadminbar .ab-top-menu > li:hover > .ab-item,
+#wpadminbar .ab-top-menu > li.hover > .ab-item,
+#wpadminbar .ab-top-menu > li > .ab-item:focus,
+#wpadminbar.nojq .quicklinks .ab-top-menu > li > .ab-item:focus,
+#wpadminbar li:hover .ab-icon::before,
+#wpadminbar li:hover .ab-item::before {
+	background: #1D4ED8 !important;
+	color: #fff !important;
+}
+
+#wpadminbar #wp-admin-bar-my-account.with-avatar > .ab-item:hover,
+#wpadminbar #wp-admin-bar-my-account:hover > .ab-item {
+	background: #1D4ED8 !important;
+}
+
+#wpadminbar #wp-admin-bar-wp-logo > .ab-item .ab-icon::before {
+	color: #DBEAFE;
+}
+
+/* ── Sidebar (#adminmenu) ─────────────────────────────────────────────── */
+
+/* Base surface stays dark for familiarity, warmed a touch */
+#adminmenuback,
+#adminmenuwrap,
+#adminmenu {
+	background: #1B1A16;
+}
+
+/* Current top-level item + folded state */
+#adminmenu li.wp-has-current-submenu a.wp-has-current-submenu,
+#adminmenu li.current a.menu-top,
+#adminmenu li.wp-has-current-submenu.wp-menu-open a.wp-has-current-submenu,
+.folded #adminmenu li.current.menu-top,
+.folded #adminmenu li.wp-has-current-submenu {
+	background: #2563EB !important;
+	color: #fff !important;
+	box-shadow: inset 3px 0 0 rgba(255, 255, 255, 0.35);
+}
+
+#adminmenu li.wp-has-current-submenu .wp-menu-arrow,
+#adminmenu li.wp-has-current-submenu .wp-menu-arrow div,
+#adminmenu li.current .wp-menu-arrow,
+#adminmenu li.current .wp-menu-arrow div {
+	background: #2563EB !important;
+	border-color: #2563EB !important;
+}
+
+/* Hover / focus on any top-level menu item */
+#adminmenu a.menu-top:hover,
+#adminmenu li.menu-top > a:focus,
+#adminmenu li.opensub > a.menu-top,
+#adminmenu li > a.menu-top:focus {
+	background: #1E40AF !important;
+	color: #fff !important;
+}
+
+/* Dashicon color for current / hover (works for core menu items) */
+#adminmenu li.current .wp-menu-image::before,
+#adminmenu li.wp-has-current-submenu .wp-menu-image::before,
+#adminmenu li a:hover .wp-menu-image::before,
+#adminmenu li a:focus .wp-menu-image::before {
+	color: #fff !important;
+}
+
+/* ── Submenu panel ────────────────────────────────────────────────────── */
+
+#adminmenu .wp-submenu {
+	background: #141311;
+}
+
+#adminmenu .wp-submenu a {
+	color: #C4C2BC;
+}
+
+#adminmenu .wp-submenu a:hover,
+#adminmenu .wp-submenu a:focus,
+#adminmenu .wp-has-current-submenu .wp-submenu a:hover,
+#adminmenu .wp-has-current-submenu .wp-submenu a:focus {
+	color: #93C5FD !important; /* primary-300 */
+	background: transparent;
+}
+
+#adminmenu .wp-submenu li.current a,
+#adminmenu .wp-submenu li.current a:hover,
+#adminmenu .wp-submenu li.current a:focus,
+#adminmenu a.wp-has-current-submenu:focus + .wp-submenu li.current a,
+#adminmenu .wp-submenu .wp-submenu-head {
+	color: #fff !important;
+	font-weight: 600;
+}
+
+/* Folded sidebar: keep brand accent on the flyout panel */
+.folded #adminmenu .wp-submenu.sub-open,
+.folded #adminmenu .opensub .wp-submenu,
+.folded #adminmenu a.menu-top:focus + .wp-submenu {
+	border-left-color: #2563EB !important;
+}
+
+/* ── AF plugin menu icon: mask-image for recolor on state ─────────────── */
+
+#toplevel_page_arriendo-facil .wp-menu-image img {
+	display: none;
+}
+
+#toplevel_page_arriendo-facil .wp-menu-image {
+	position: relative;
+}
+
+#toplevel_page_arriendo-facil .wp-menu-image::before {
+	content: '';
+	display: block;
+	width: 20px;
+	height: 20px;
+	margin: 8px auto 0;
+	background-color: #A7AAAD;
+	-webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none'><path d='M3 11l9-8 9 8v10a1 1 0 01-1 1h-5v-6H10v6H4a1 1 0 01-1-1V11z' stroke='black' stroke-width='1.8' stroke-linejoin='round'/><circle cx='12' cy='14' r='1.6' fill='black' stroke='black' stroke-width='0.6'/></svg>");
+	mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none'><path d='M3 11l9-8 9 8v10a1 1 0 01-1 1h-5v-6H10v6H4a1 1 0 01-1-1V11z' stroke='black' stroke-width='1.8' stroke-linejoin='round'/><circle cx='12' cy='14' r='1.6' fill='black' stroke='black' stroke-width='0.6'/></svg>");
+	-webkit-mask-repeat: no-repeat;
+	mask-repeat: no-repeat;
+	-webkit-mask-position: center;
+	mask-position: center;
+	-webkit-mask-size: 20px 20px;
+	mask-size: 20px 20px;
+	transition: background-color 180ms ease;
+}
+
+#toplevel_page_arriendo-facil.current .wp-menu-image::before,
+#toplevel_page_arriendo-facil.wp-has-current-submenu .wp-menu-image::before,
+#toplevel_page_arriendo-facil a:hover .wp-menu-image::before,
+#toplevel_page_arriendo-facil a:focus .wp-menu-image::before {
+	background-color: #FFFFFF;
+}
+
+/* ── Notices ──────────────────────────────────────────────────────────── */
+
+body.wp-admin .notice,
+body.wp-admin div.error,
+body.wp-admin div.updated {
+	border-left-width: 4px;
+	border-radius: 8px;
+	box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+	padding: 12px 16px;
+}
+
+body.wp-admin .notice-info,
+body.wp-admin .notice.notice-info {
+	border-left-color: #2563EB;
+}
+
+body.wp-admin .notice-success,
+body.wp-admin .notice.notice-success,
+body.wp-admin div.updated {
+	border-left-color: #0F9D58;
+}
+
+body.wp-admin .notice-warning,
+body.wp-admin .notice.notice-warning {
+	border-left-color: #F59E0B;
+}
+
+body.wp-admin .notice-error,
+body.wp-admin .notice.notice-error,
+body.wp-admin div.error {
+	border-left-color: #DC2626;
+}
+
+/* ── Footer credit ────────────────────────────────────────────────────── */
+
+body.wp-admin #wpfooter {
+	color: #7A7870;
+}
+
+body.wp-admin #wpfooter a {
+	color: #1D4ED8;
+}
+
+/* ── Responsive: collapsed sidebar on <783px keeps rebrand ────────────── */
+
+@media screen and (max-width: 782px) {
+	#adminmenuback,
+	#adminmenuwrap,
+	#adminmenu {
+		background: #1B1A16;
+	}
+
+	#adminmenu li.wp-has-current-submenu a.wp-has-current-submenu,
+	#adminmenu li.current a.menu-top {
+		box-shadow: inset 4px 0 0 rgba(255, 255, 255, 0.35);
+	}
+}

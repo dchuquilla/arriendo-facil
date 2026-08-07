@@ -9,6 +9,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+require_once __DIR__ . '/af-view-helpers.php';
+
 /**
  * Class Arriendo_Facil_Admin
  *
@@ -25,6 +27,7 @@ class Arriendo_Facil_Admin {
 		add_filter( 'login_redirect', array( $this, 'redirect_owner_after_login' ), 10, 3 );
 		add_action( 'admin_init', array( $this, 'redirect_owner_from_wp_dashboard' ) );
 		add_action( 'wp_dashboard_setup', array( $this, 'remove_owner_dashboard_widgets' ), 999 );
+		add_action( 'wp_dashboard_setup', array( $this, 'register_native_dashboard_widget' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
 		add_action( 'wp_ajax_af_predict_cost', array( $this, 'ajax_predict_cost' ) );
 		add_action( 'wp_ajax_af_generate_document', array( $this, 'ajax_generate_document' ) );
@@ -237,20 +240,120 @@ class Arriendo_Facil_Admin {
 	}
 
 	/**
+	 * Registers the Arriendo Facil summary widget on the native WP dashboard,
+	 * pinned to the top of the main column so it is the first thing admins see.
+	 *
+	 * @return void
+	 */
+	public function register_native_dashboard_widget() {
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			return;
+		}
+
+		if ( Arriendo_Facil_Accommodation::user_is_owner() ) {
+			return;
+		}
+
+		global $wp_meta_boxes;
+
+		wp_add_dashboard_widget(
+			'af_dashboard_summary',
+			__( 'Arriendo Fácil — Resumen operativo', 'arriendo-facil' ),
+			array( $this, 'render_native_dashboard_widget' )
+		);
+
+		if ( isset( $wp_meta_boxes['dashboard']['normal']['core'] ) && is_array( $wp_meta_boxes['dashboard']['normal']['core'] ) ) {
+			$normal = $wp_meta_boxes['dashboard']['normal']['core'];
+			if ( isset( $normal['af_dashboard_summary'] ) ) {
+				$af_widget = array( 'af_dashboard_summary' => $normal['af_dashboard_summary'] );
+				unset( $normal['af_dashboard_summary'] );
+				$wp_meta_boxes['dashboard']['normal']['core'] = $af_widget + $normal;
+			}
+		}
+	}
+
+	/**
+	 * Renders the AF summary widget on the native WP dashboard.
+	 *
+	 * @return void
+	 */
+	public function render_native_dashboard_widget() {
+		global $wpdb;
+
+		$accommodation_count = (int) wp_count_posts( 'accommodation' )->publish;
+		$active_leases       = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_leases WHERE status = 'active' AND deleted_at IS NULL" );
+		$pending_cleaning    = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_cleaning_requests WHERE status = 'pending'" );
+		$pending_queue       = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_interest_queue WHERE status = 'pending'" );
+
+		$panel_url    = admin_url( 'admin.php?page=arriendo-facil' );
+		$leases_url   = admin_url( 'admin.php?page=af-leases' );
+		$cleaning_url = admin_url( 'admin.php?page=af-cleaning-requests' );
+		$guests_url   = admin_url( 'admin.php?page=af-guests' );
+		$new_url      = admin_url( 'post-new.php?post_type=accommodation' );
+		?>
+		<div class="af-dash-widget">
+
+			<div class="af-dash-widget__hero">
+				<span class="af-dash-widget__logo" aria-hidden="true">
+					<svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 11l9-8 9 8v10a1 1 0 01-1 1h-5v-6H10v6H4a1 1 0 01-1-1V11z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+				</span>
+				<div class="af-dash-widget__hero-text">
+					<h3><?php esc_html_e( 'Panel de operaciones', 'arriendo-facil' ); ?></h3>
+					<p><?php esc_html_e( 'El pulso de tu plataforma en un vistazo.', 'arriendo-facil' ); ?></p>
+				</div>
+			</div>
+
+			<div class="af-dash-widget__stats">
+				<a class="af-dash-widget__stat" href="<?php echo esc_url( admin_url( 'edit.php?post_type=accommodation' ) ); ?>">
+					<span class="af-dash-widget__stat-label"><?php esc_html_e( 'Alojamientos', 'arriendo-facil' ); ?></span>
+					<span class="af-dash-widget__stat-value"><?php echo esc_html( number_format_i18n( $accommodation_count ) ); ?></span>
+				</a>
+				<a class="af-dash-widget__stat" href="<?php echo esc_url( $leases_url ); ?>">
+					<span class="af-dash-widget__stat-label"><?php esc_html_e( 'Contratos activos', 'arriendo-facil' ); ?></span>
+					<span class="af-dash-widget__stat-value"><?php echo esc_html( number_format_i18n( $active_leases ) ); ?></span>
+				</a>
+				<a class="af-dash-widget__stat <?php echo $pending_cleaning > 0 ? 'af-dash-widget__stat--attention' : ''; ?>" href="<?php echo esc_url( $cleaning_url ); ?>">
+					<span class="af-dash-widget__stat-label"><?php esc_html_e( 'Limpiezas pendientes', 'arriendo-facil' ); ?></span>
+					<span class="af-dash-widget__stat-value"><?php echo esc_html( number_format_i18n( $pending_cleaning ) ); ?></span>
+				</a>
+				<a class="af-dash-widget__stat <?php echo $pending_queue > 0 ? 'af-dash-widget__stat--attention' : ''; ?>" href="<?php echo esc_url( $guests_url ); ?>">
+					<span class="af-dash-widget__stat-label"><?php esc_html_e( 'Huéspedes por aprobar', 'arriendo-facil' ); ?></span>
+					<span class="af-dash-widget__stat-value"><?php echo esc_html( number_format_i18n( $pending_queue ) ); ?></span>
+				</a>
+			</div>
+
+			<div class="af-dash-widget__actions">
+				<a class="af-dash-btn af-dash-btn--primary" href="<?php echo esc_url( $panel_url ); ?>">
+					<?php esc_html_e( 'Abrir panel completo', 'arriendo-facil' ); ?>
+				</a>
+				<a class="af-dash-btn af-dash-btn--ghost" href="<?php echo esc_url( $new_url ); ?>">
+					<?php esc_html_e( '+ Nuevo alojamiento', 'arriendo-facil' ); ?>
+				</a>
+			</div>
+
+		</div>
+		<?php
+	}
+
+	/**
 	 * Enqueues plugin admin CSS and JS.
 	 *
 	 * @param string $hook Current admin page hook.
 	 */
 	public function enqueue_assets( $hook ) {
-		$tokens_css_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-tokens.css';
-		$shell_css_path  = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-shell.css';
-		$admin_css_path  = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/admin.css';
-		$admin_js_path   = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/admin.js';
+		$tokens_css_path       = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-tokens.css';
+		$shell_css_path        = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-shell.css';
+		$chrome_css_path       = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-admin-chrome.css';
+		$wp_dashboard_css_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-wp-dashboard.css';
+		$admin_css_path        = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/admin.css';
+		$admin_js_path         = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/admin.js';
 
-		$tokens_css_version = file_exists( $tokens_css_path ) ? (string) filemtime( $tokens_css_path ) : ARRIENDO_FACIL_VERSION;
-		$shell_css_version  = file_exists( $shell_css_path ) ? (string) filemtime( $shell_css_path ) : ARRIENDO_FACIL_VERSION;
-		$admin_css_version  = file_exists( $admin_css_path ) ? (string) filemtime( $admin_css_path ) : ARRIENDO_FACIL_VERSION;
-		$admin_js_version   = file_exists( $admin_js_path ) ? (string) filemtime( $admin_js_path ) : ARRIENDO_FACIL_VERSION;
+		$tokens_css_version       = file_exists( $tokens_css_path ) ? (string) filemtime( $tokens_css_path ) : ARRIENDO_FACIL_VERSION;
+		$shell_css_version        = file_exists( $shell_css_path ) ? (string) filemtime( $shell_css_path ) : ARRIENDO_FACIL_VERSION;
+		$chrome_css_version       = file_exists( $chrome_css_path ) ? (string) filemtime( $chrome_css_path ) : ARRIENDO_FACIL_VERSION;
+		$wp_dashboard_css_version = file_exists( $wp_dashboard_css_path ) ? (string) filemtime( $wp_dashboard_css_path ) : ARRIENDO_FACIL_VERSION;
+		$admin_css_version        = file_exists( $admin_css_path ) ? (string) filemtime( $admin_css_path ) : ARRIENDO_FACIL_VERSION;
+		$admin_js_version         = file_exists( $admin_js_path ) ? (string) filemtime( $admin_js_path ) : ARRIENDO_FACIL_VERSION;
 
 		// Design tokens must load before any component styles.
 		wp_enqueue_style(
@@ -260,12 +363,30 @@ class Arriendo_Facil_Admin {
 			$tokens_css_version
 		);
 
+		// Global chrome rebrand (sidebar, adminbar, notices, body bg) on ALL admin pages.
+		wp_enqueue_style(
+			'af-admin-chrome',
+			ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/af-admin-chrome.css',
+			array( 'af-tokens' ),
+			$chrome_css_version
+		);
+
 		wp_enqueue_style(
 			'af-shell',
 			ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/af-shell.css',
 			array( 'af-tokens' ),
 			$shell_css_version
 		);
+
+		// Rebrand the WordPress native dashboard only on index.php.
+		if ( 'index.php' === $hook ) {
+			wp_enqueue_style(
+				'af-wp-dashboard',
+				ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/af-wp-dashboard.css',
+				array( 'af-tokens', 'af-admin-chrome' ),
+				$wp_dashboard_css_version
+			);
+		}
 
 		wp_enqueue_style(
 			'af-admin',

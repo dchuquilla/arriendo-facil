@@ -103,15 +103,44 @@ if ( ! empty( $leases ) ) {
 
 $billing_nonce = wp_create_nonce( 'af_billing_nonce' );
 $can_bill      = current_user_can( (string) apply_filters( 'af_billing_capability', 'manage_options' ) );
-?>
-<div class="wrap">
-	<h1><?php esc_html_e( 'Contratos', 'arriendo-facil' ); ?></h1>
 
-	<div class="af-lease-actions">
-		<button type="button" class="button button-primary" id="af-new-lease">
-			<?php esc_html_e( '+ New Lease', 'arriendo-facil' ); ?>
-		</button>
-	</div>
+$total_leases = is_array( $leases ) ? count( $leases ) : 0;
+?>
+<div class="wrap af-shell">
+
+	<?php
+	af_page_header(
+		array(
+			'eyebrow'  => __( 'Gestión de arrendamientos', 'arriendo-facil' ),
+			'title'    => __( 'Contratos', 'arriendo-facil' ),
+			'subtitle' => __( 'Todos los contratos vigentes, borradores y terminados. Actívalos, sube versiones y emite facturas del período.', 'arriendo-facil' ),
+			'actions'  => array(
+				sprintf(
+					'<button type="button" class="button af-btn af-btn--primary" id="af-new-lease"><span class="af-btn__icon" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>%s</button>',
+					esc_html__( 'Nuevo contrato', 'arriendo-facil' )
+				),
+			),
+		)
+	);
+	?>
+
+	<section class="af-section" aria-labelledby="af-leases-title">
+		<header class="af-section__header">
+			<div>
+				<h2 class="af-section__title" id="af-leases-title"><?php esc_html_e( 'Listado de contratos', 'arriendo-facil' ); ?></h2>
+				<p class="af-section__subtitle">
+					<?php
+					echo esc_html(
+						sprintf(
+							/* translators: %d: total leases shown */
+							_n( 'Mostrando %d contrato.', 'Mostrando %d contratos.', $total_leases, 'arriendo-facil' ),
+							$total_leases
+						)
+					);
+					?>
+				</p>
+			</div>
+		</header>
 
 	<table class="wp-list-table widefat fixed striped af-leases-table">
 		<thead>
@@ -181,7 +210,7 @@ $can_bill      = current_user_can( (string) apply_filters( 'af_billing_capabilit
 						<td><?php echo esc_html( $lease->start_date ); ?></td>
 						<td><?php echo esc_html( $lease->end_date ); ?></td>
 						<td><?php echo esc_html( number_format( (float) $lease->monthly_rent, 2 ) ); ?></td>
-						<td><?php echo esc_html( $lease->status ); ?></td>					<?php
+						<td><?php echo af_pill( (string) $lease->status ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></td>					<?php
 					$binfo  = isset( $billing_status_map[ (int) $lease->id ] ) ? $billing_status_map[ (int) $lease->id ] : null;
 					$estado_colores = array(
 						'autorizada'          => array( 'label' => 'Autorizada', 'color' => '#2e7d32' ),
@@ -300,6 +329,7 @@ $can_bill      = current_user_can( (string) apply_filters( 'af_billing_capabilit
 			<?php endif; ?>
 		</tbody>
 	</table>
+	</section>
 
 	<div id="af-early-terminate-modal" class="af-modal" style="display:none;position:fixed;inset:0;z-index:100000;align-items:center;justify-content:center;">
 		<div class="af-modal__backdrop" id="af-early-terminate-backdrop" style="position:absolute;inset:0;background:rgba(0,0,0,.55);"></div>

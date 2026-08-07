@@ -852,3 +852,217 @@
 @media (max-width: 420px) {
     .af-kpi-grid { grid-template-columns: 1fr; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   FASE 5 — Módulos especializados
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Service health cards (AI settings) ---------------------------------- */
+.af-service-health {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: var(--af-space-3);
+    margin-bottom: var(--af-space-5);
+}
+
+.af-service-card {
+    display: flex;
+    align-items: center;
+    gap: var(--af-space-3);
+    padding: var(--af-space-4);
+    background: var(--af-surface, #fff);
+    border: 1px solid var(--af-gray-200);
+    border-radius: var(--af-radius-md);
+    box-shadow: var(--af-shadow-sm);
+    position: relative;
+}
+.af-service-card__icon {
+    flex: 0 0 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    border-radius: 12px;
+    background: var(--af-gray-100);
+    color: var(--af-gray-700);
+}
+.af-service-card__body { flex: 1 1 auto; min-width: 0; }
+.af-service-card__label {
+    font-weight: 600;
+    color: var(--af-gray-900);
+    font-size: var(--af-text-sm);
+}
+.af-service-card__status {
+    color: var(--af-gray-500);
+    font-size: var(--af-text-xs);
+    margin-top: 2px;
+    line-height: 1.3;
+}
+.af-service-card__pill { align-self: flex-start; flex-shrink: 0; }
+
+.af-service-card--success .af-service-card__icon {
+    background: rgba(15, 157, 88, .12);
+    color: var(--af-success-700, #0F9D58);
+}
+.af-service-card--warning .af-service-card__icon {
+    background: rgba(245, 158, 11, .14);
+    color: var(--af-warning-700, #B45309);
+}
+.af-service-card--danger .af-service-card__icon {
+    background: rgba(220, 38, 38, .12);
+    color: var(--af-danger-700, #B91C1C);
+}
+
+/* Integration brand cards (OTA settings) ------------------------------ */
+.af-integration-card__head {
+    display: flex;
+    align-items: center;
+    gap: var(--af-space-3);
+    flex-wrap: wrap;
+}
+.af-integration-card__head > div:not(.af-integration-brand) { flex: 1 1 auto; min-width: 0; }
+.af-integration-card__tag { flex-shrink: 0; }
+
+.af-integration-brand {
+    flex: 0 0 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    border-radius: 12px;
+    color: #fff;
+    background: var(--af-primary-600, #2563EB);
+}
+.af-integration-brand--booking { background: #003580; }   /* Booking navy */
+.af-integration-brand--airbnb  { background: #FF385C; }   /* Airbnb coral */
+.af-integration-brand--neutral { background: var(--af-gray-700); }
+.af-integration-brand--accent  { background: var(--af-accent-500, #F5385C); }
+
+.af-integration-card h3 {
+    margin-top: var(--af-space-5);
+    margin-bottom: var(--af-space-2);
+    font-size: var(--af-text-md);
+    font-weight: 600;
+    color: var(--af-gray-900);
+    padding-left: var(--af-space-3);
+    border-left: 3px solid var(--af-primary-500, #2563EB);
+}
+
+.af-step-list {
+    line-height: 1.9;
+    padding-left: var(--af-space-5);
+    color: var(--af-gray-700);
+}
+.af-step-list li { padding-block: 2px; }
+.af-step-list a { color: var(--af-primary-600, #2563EB); text-decoration: none; }
+.af-step-list a:hover { text-decoration: underline; }
+
+.af-code-block {
+    padding: var(--af-space-3) var(--af-space-4);
+    background: var(--af-gray-50);
+    border: 1px solid var(--af-gray-200);
+    border-left: 3px solid var(--af-primary-500, #2563EB);
+    border-radius: var(--af-radius-sm);
+    margin: var(--af-space-3) 0;
+}
+.af-code-block__label {
+    font-size: var(--af-text-xs);
+    font-weight: 600;
+    color: var(--af-gray-600);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    margin-bottom: var(--af-space-1);
+}
+.af-code-block code {
+    display: block;
+    padding: var(--af-space-2);
+    background: #fff;
+    border: 1px solid var(--af-gray-200);
+    border-radius: var(--af-radius-xs);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: var(--af-text-xs);
+    word-break: break-all;
+    color: var(--af-gray-900);
+}
+.af-note {
+    color: var(--af-gray-500);
+    font-size: var(--af-text-xs);
+    margin-top: var(--af-space-3);
+}
+
+/* SRI Billing flow diagram -------------------------------------------- */
+.af-sri-flow {
+    padding: var(--af-space-4) var(--af-space-5);
+    background: var(--af-surface, #fff);
+    border: 1px solid var(--af-gray-200);
+    border-radius: var(--af-radius-md);
+    box-shadow: var(--af-shadow-sm);
+    margin-bottom: var(--af-space-4);
+}
+.af-sri-flow__list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    gap: var(--af-space-2);
+    flex-wrap: wrap;
+    align-items: center;
+    counter-reset: sri-step;
+}
+.af-sri-flow__step {
+    display: flex;
+    align-items: center;
+    gap: var(--af-space-2);
+    color: var(--af-gray-600);
+    font-size: var(--af-text-sm);
+    position: relative;
+}
+.af-sri-flow__step + .af-sri-flow__step::before {
+    content: "";
+    display: block;
+    width: 20px;
+    height: 2px;
+    background: var(--af-gray-200);
+    margin-right: var(--af-space-2);
+}
+.af-sri-flow__num {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    background: var(--af-primary-50, #EFF6FF);
+    color: var(--af-primary-700, #1D4ED8);
+    font-weight: 700;
+    font-size: var(--af-text-xs);
+}
+.af-sri-flow__label { font-weight: 500; color: var(--af-gray-700); }
+
+/* Wizard sticky enhancements ------------------------------------------ */
+@media (min-width: 900px) {
+    .af-wizard__nav {
+        position: sticky;
+        top: 44px;
+        align-self: start;
+        max-height: calc(100vh - 96px);
+        overflow-y: auto;
+    }
+}
+.af-wizard__actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 15;
+    background: rgba(255, 255, 255, 0.94);
+    backdrop-filter: saturate(140%) blur(10px);
+    -webkit-backdrop-filter: saturate(140%) blur(10px);
+    border-top: 1px solid var(--af-gray-200);
+    padding: var(--af-space-3) var(--af-space-4);
+    box-shadow: 0 -6px 18px rgba(15, 23, 42, .04);
+}
+
+/* Responsive Fase 5 ---------------------------------------------------- */
+@media (max-width: 640px) {
+    .af-service-health { grid-template-columns: 1fr; }
+    .af-integration-card__head { gap: var(--af-space-2); }
+    .af-integration-brand { flex-basis: 36px; height: 36px; border-radius: 10px; }
+    .af-sri-flow__step + .af-sri-flow__step::before { display: none; }
+    .af-sri-flow__list { gap: var(--af-space-3); }
+}

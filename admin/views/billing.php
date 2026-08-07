@@ -129,8 +129,44 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 	}
 }
 ?>
-<div class="wrap">
-	<h1><?php esc_html_e( 'Facturación Electrónica', 'arriendo-facil' ); ?></h1>
+<div class="wrap af-shell">
+
+	<?php
+	$env_variant = ( '2' === $cfg['ambiente'] ) ? 'danger' : 'info';
+	$env_label   = ( '2' === $cfg['ambiente'] )
+		? __( 'Ambiente: PRODUCCIÓN', 'arriendo-facil' )
+		: __( 'Ambiente: PRUEBAS (certificación SRI)', 'arriendo-facil' );
+
+	af_page_header(
+		array(
+			'eyebrow'  => __( 'SRI Ecuador', 'arriendo-facil' ),
+			'title'    => __( 'Facturación electrónica', 'arriendo-facil' ),
+			'subtitle' => __( 'Emisión, seguimiento y anulación de comprobantes autorizados por el SRI.', 'arriendo-facil' ),
+			'actions'  => array(
+				sprintf(
+					'<span class="af-pill af-pill--%s">%s</span>',
+					esc_attr( $env_variant ),
+					esc_html( $env_label )
+				),
+				sprintf(
+					'<a href="%s" class="button af-btn af-btn--ghost">%s</a>',
+					esc_url( admin_url( 'admin.php?page=af-billing-settings' ) ),
+					esc_html__( 'Configuración SRI', 'arriendo-facil' )
+				),
+			),
+		)
+	);
+	?>
+
+	<div class="af-sri-flow" aria-label="<?php esc_attr_e( 'Ciclo del comprobante SRI', 'arriendo-facil' ); ?>">
+		<ol class="af-sri-flow__list">
+			<li class="af-sri-flow__step"><span class="af-sri-flow__num">1</span><span class="af-sri-flow__label"><?php esc_html_e( 'Generada', 'arriendo-facil' ); ?></span></li>
+			<li class="af-sri-flow__step"><span class="af-sri-flow__num">2</span><span class="af-sri-flow__label"><?php esc_html_e( 'Firmada', 'arriendo-facil' ); ?></span></li>
+			<li class="af-sri-flow__step"><span class="af-sri-flow__num">3</span><span class="af-sri-flow__label"><?php esc_html_e( 'Enviada al SRI', 'arriendo-facil' ); ?></span></li>
+			<li class="af-sri-flow__step"><span class="af-sri-flow__num">4</span><span class="af-sri-flow__label"><?php esc_html_e( 'Autorizada', 'arriendo-facil' ); ?></span></li>
+			<li class="af-sri-flow__step"><span class="af-sri-flow__num">5</span><span class="af-sri-flow__label"><?php esc_html_e( 'RIDE + XML entregados', 'arriendo-facil' ); ?></span></li>
+		</ol>
+	</div>
 
 	<?php if ( '' !== $last_action_message ) : ?>
 		<div class="notice notice-info is-dismissible" style="margin-top:12px;">
@@ -145,16 +181,6 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 		<?php endif; ?>
 	<?php endif; ?>
 
-	<?php if ( '2' === $cfg['ambiente'] ) : ?>
-		<div class="notice notice-warning inline" style="margin-bottom:16px;">
-			<p><strong><?php esc_html_e( '⚠ Ambiente: PRODUCCIÓN', 'arriendo-facil' ); ?></strong></p>
-		</div>
-	<?php else : ?>
-		<div class="notice notice-info inline" style="margin-bottom:16px;">
-			<p><?php esc_html_e( 'Ambiente: PRUEBAS (certificación SRI)', 'arriendo-facil' ); ?></p>
-		</div>
-	<?php endif; ?>
-
 	<?php if ( empty( $cfg['ruc'] ) || empty( $cfg['cert_filename'] ) ) : ?>
 		<div class="notice notice-error">
 			<p>
@@ -166,8 +192,13 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 		</div>
 	<?php endif; ?>
 
-	<div style="margin: 16px 0 18px; padding: 14px 16px; background: #fff; border: 1px solid #dcdcde; border-radius: 4px;">
-		<h2 style="margin-top:0;"><?php esc_html_e( 'Emisión Manual de Comprobante', 'arriendo-facil' ); ?></h2>
+	<section class="af-section">
+		<header class="af-section__header">
+			<div>
+				<h2 class="af-section__title"><?php esc_html_e( 'Emisión manual de comprobante', 'arriendo-facil' ); ?></h2>
+				<p class="af-section__subtitle"><?php esc_html_e( 'Busca el contrato por cédula, RUC, pasaporte o nombre e inicia la emisión.', 'arriendo-facil' ); ?></p>
+			</div>
+		</header>
 
 		<div style="margin-bottom:12px;">
 			<label for="af-lease-search-input" style="display:block; font-weight:600; margin-bottom:4px;">
@@ -194,7 +225,7 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 				</button>
 			</noscript>
 		</form>
-	</div>
+	</section>
 
 	<div id="af-billing-preview-modal" class="af-modal" hidden>
 		<div class="af-modal__backdrop" data-af-close-billing-preview></div>

@@ -88,14 +88,23 @@ $cleaning_services = $wpdb->get_results(
 	 ORDER BY COALESCE(pm_name.meta_value, p.post_title) ASC"
 );
 ?>
-<div class="wrap">
-	<h1><?php esc_html_e( 'Solicitudes de limpieza', 'arriendo-facil' ); ?></h1>
+<div class="wrap af-shell">
 
-	<div class="af-cleaning-actions" style="margin-bottom: 16px;">
-		<button type="button" class="button button-primary" id="af-new-cleaning-request">
-			<?php esc_html_e( '+ Nueva solicitud de limpieza', 'arriendo-facil' ); ?>
-		</button>
-	</div>
+	<?php
+	af_page_header(
+		array(
+			'eyebrow'  => __( 'Operaciones', 'arriendo-facil' ),
+			'title'    => __( 'Solicitudes de limpieza', 'arriendo-facil' ),
+			'subtitle' => __( 'Programa, asigna y da seguimiento a cada solicitud. Genera contratos para el proveedor con un clic.', 'arriendo-facil' ),
+			'actions'  => array(
+				sprintf(
+					'<button type="button" class="button af-btn af-btn--primary" id="af-new-cleaning-request"><span class="af-btn__icon" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>%s</button>',
+					esc_html__( 'Nueva solicitud', 'arriendo-facil' )
+				),
+			),
+		)
+	);
+	?>
 
 	<div id="af-cleaning-request-form-card" class="card" style="max-width: 1000px; margin: 16px 0; padding: 16px; display: none;">
 		<h2><?php esc_html_e( 'Nueva solicitud de limpieza', 'arriendo-facil' ); ?></h2>
@@ -187,6 +196,14 @@ $cleaning_services = $wpdb->get_results(
 		</form>
 	</div>
 
+	<section class="af-section">
+		<header class="af-section__header">
+			<div>
+				<h2 class="af-section__title"><?php esc_html_e( 'Listado de solicitudes', 'arriendo-facil' ); ?></h2>
+				<p class="af-section__subtitle"><?php esc_html_e( 'Las más recientes aparecen primero.', 'arriendo-facil' ); ?></p>
+			</div>
+		</header>
+
 	<table class="wp-list-table widefat fixed striped">
 		<thead>
 			<tr>
@@ -217,7 +234,7 @@ $cleaning_services = $wpdb->get_results(
 						<td><?php echo esc_html( $request->accommodation_title ?: $request->accommodation_id ); ?></td>
 						<td><?php echo esc_html( $request->requested_date ); ?></td>
 						<td><?php echo esc_html( $request->completed_date ?: '—' ); ?></td>
-						<td><?php echo esc_html( $request->status ); ?></td>
+						<td><?php echo af_pill( (string) $request->status ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></td>
 						<td><?php echo esc_html( $request->notes ); ?></td>
 						<td>
 							<a class="button button-secondary" href="<?php echo esc_url( $contract_url ); ?>" target="_blank" rel="noopener">
@@ -240,4 +257,5 @@ $cleaning_services = $wpdb->get_results(
 			<?php endif; ?>
 		</tbody>
 	</table>
+	</section>
 </div>

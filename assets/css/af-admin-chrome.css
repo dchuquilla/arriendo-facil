@@ -241,3 +241,281 @@ body.wp-admin #wpfooter a {
 		box-shadow: inset 4px 0 0 rgba(255, 255, 255, 0.35);
 	}
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SaaS polish — que no parezca WordPress
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Tipografía Inter en TODO el chrome ─────────────────────────────── */
+#adminmenu,
+#adminmenu .wp-submenu,
+#adminmenu a,
+#wpadminbar,
+#wpadminbar .ab-item,
+#wpadminbar .ab-label,
+body.wp-admin,
+body.wp-admin .wrap {
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Sidebar: espaciado + look de app ───────────────────────────────── */
+#adminmenu {
+    padding: 8px 6px !important;
+}
+
+#adminmenu li.menu-top {
+    margin: 2px 0;
+}
+
+#adminmenu a.menu-top,
+#adminmenu .wp-has-current-submenu a.wp-has-current-submenu {
+    border-radius: 10px !important;
+    transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+}
+
+/* Píldora azul brand cuando está activo (en lugar de barra completa) */
+#adminmenu li.wp-has-current-submenu a.wp-has-current-submenu,
+#adminmenu li.current a.menu-top,
+#adminmenu li.wp-has-current-submenu.wp-menu-open a.wp-has-current-submenu {
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.28) !important;
+}
+
+/* Item icons: alinear con label */
+#adminmenu .wp-menu-image {
+    padding: 8px 0 !important;
+    width: 36px !important;
+}
+
+/* Submenu: chip look */
+#adminmenu .wp-submenu {
+    padding: 4px 6px !important;
+    border-radius: 0 0 12px 12px;
+}
+#adminmenu .wp-submenu a {
+    padding: 8px 10px !important;
+    border-radius: 8px !important;
+    margin: 1px 0;
+    font-size: 13px;
+    transition: background 140ms ease, color 140ms ease;
+}
+#adminmenu .wp-submenu a:hover {
+    background: rgba(255, 255, 255, 0.06) !important;
+}
+#adminmenu .wp-submenu li.current a {
+    background: rgba(37, 99, 235, 0.18) !important;
+    color: #DBEAFE !important;
+}
+#adminmenu .wp-submenu .wp-submenu-head {
+    padding: 8px 12px 4px !important;
+    font-size: 11px !important;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #7A7870 !important;
+    font-weight: 700 !important;
+}
+
+/* Separator sutil entre items */
+#adminmenu li.wp-menu-separator {
+    background: transparent !important;
+    height: 1px !important;
+    margin: 8px 12px !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 0 !important;
+}
+
+/* ── Collapse arrow — más discreto ──────────────────────────────────── */
+#collapse-menu {
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    color: #7A7870 !important;
+    padding: 12px 14px !important;
+    font-size: 12px;
+}
+#collapse-menu:hover { color: #DBEAFE !important; background: transparent !important; }
+
+/* ── Adminbar: más airy, más SaaS ───────────────────────────────────── */
+#wpadminbar {
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
+    font-size: 13px;
+}
+#wpadminbar .ab-item {
+    padding: 0 12px !important;
+}
+#wpadminbar .quicklinks .ab-icon::before,
+#wpadminbar .quicklinks .ab-item::before {
+    color: #A8A69E !important;
+    transition: color 120ms ease;
+}
+#wpadminbar li:hover .ab-icon::before,
+#wpadminbar li:hover .ab-item::before {
+    color: #fff !important;
+}
+
+/* Ocultar "howdy" verboso en pantallas medianas */
+@media (max-width: 1200px) {
+    #wp-admin-bar-my-account > .ab-item .display-name { display: none; }
+}
+
+/* ── Content wrapper: más espacio + card feel ───────────────────────── */
+body.wp-admin #wpcontent {
+    padding-left: 28px !important;
+}
+@media (max-width: 782px) {
+    body.wp-admin #wpcontent { padding-left: 10px !important; }
+}
+
+body.wp-admin .wrap {
+    max-width: 1440px;
+    margin-top: 8px;
+}
+
+/* Screen titles: más peso visual */
+body.wp-admin .wrap > h1,
+body.wp-admin .wrap > h1.wp-heading-inline {
+    font-size: 24px;
+    letter-spacing: -0.01em;
+    margin-bottom: 12px;
+}
+
+/* Add New button en listas nativas (edit.php, users.php, etc.) */
+body.wp-admin .wrap > .page-title-action,
+body.wp-admin .wrap > h1 + .page-title-action {
+    background: #2563EB;
+    color: #fff;
+    border-color: #1D4ED8;
+    border-radius: 8px;
+    padding: 6px 16px;
+    font-weight: 500;
+    box-shadow: 0 1px 2px rgba(37, 99, 235, 0.3);
+    transition: background 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+body.wp-admin .wrap > .page-title-action:hover {
+    background: #1D4ED8;
+    box-shadow: 0 4px 10px rgba(37, 99, 235, 0.35);
+    transform: translateY(-1px);
+    color: #fff;
+}
+
+/* ── Postboxes (widgets del dashboard nativo y meta boxes) ──────────── */
+body.wp-admin .postbox {
+    border: 1px solid #E2E1DB;
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+    background: #fff;
+    overflow: hidden;
+}
+body.wp-admin .postbox > .postbox-header,
+body.wp-admin .postbox > h2,
+body.wp-admin .postbox > h3 {
+    background: #FAFAF7;
+    border-bottom: 1px solid #EEEDE8;
+    padding: 12px 16px !important;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1B1A16;
+}
+body.wp-admin .postbox .inside {
+    padding: 16px !important;
+}
+
+/* Aplacar visualmente widgets de OTROS plugins en index.php (los de AF
+   se destacan por venir con clase específica af-dashboard-widget) */
+body.index-php .postbox:not([id*="af_"]):not([id*="arriendo"]) {
+    opacity: 0.92;
+}
+body.index-php .postbox:not([id*="af_"]):not([id*="arriendo"]):hover {
+    opacity: 1;
+}
+
+/* Welcome panel nativo: más discreto */
+body.index-php #welcome-panel {
+    border-radius: 12px;
+    border: 1px solid #E2E1DB;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+}
+body.index-php #welcome-panel h2 {
+    font-family: "Inter", sans-serif;
+    font-weight: 700;
+}
+
+/* ── Botones nativos (button, button-secondary) ─────────────────────── */
+body.wp-admin .button,
+body.wp-admin .button-secondary {
+    border-radius: 8px;
+    border-color: #CFCEC6;
+    color: #3F3E37;
+    background: #fff;
+    box-shadow: 0 1px 1px rgba(16, 24, 40, 0.04);
+    transition: background 140ms ease, border-color 140ms ease, transform 120ms ease;
+}
+body.wp-admin .button:hover,
+body.wp-admin .button-secondary:hover {
+    background: #F7F7F5;
+    border-color: #A8A69E;
+    color: #1B1A16;
+}
+body.wp-admin .button-primary {
+    border-radius: 8px;
+    background: #2563EB;
+    border-color: #1D4ED8;
+    box-shadow: 0 1px 2px rgba(37, 99, 235, 0.28);
+    text-shadow: none;
+}
+body.wp-admin .button-primary:hover,
+body.wp-admin .button-primary:focus {
+    background: #1D4ED8;
+    border-color: #1E40AF;
+    box-shadow: 0 4px 10px rgba(37, 99, 235, 0.32);
+}
+
+/* ── Tablas nativas (wp-list-table): rounded + no striped agresivo ──── */
+body.wp-admin .wp-list-table {
+    border: 1px solid #E2E1DB;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+}
+body.wp-admin .wp-list-table thead th,
+body.wp-admin .wp-list-table tfoot th {
+    background: #FAFAF7;
+    color: #5B594F;
+    font-weight: 600;
+    border-bottom: 1px solid #EEEDE8;
+}
+body.wp-admin .wp-list-table.striped > tbody > :nth-child(odd) {
+    background: #FCFCFB;
+}
+
+/* ── Inputs nativos (text, search) más consistentes ─────────────────── */
+body.wp-admin input[type="text"],
+body.wp-admin input[type="search"],
+body.wp-admin input[type="email"],
+body.wp-admin input[type="url"],
+body.wp-admin input[type="password"],
+body.wp-admin input[type="number"],
+body.wp-admin select,
+body.wp-admin textarea {
+    border-radius: 8px;
+    border-color: #CFCEC6;
+    padding: 6px 10px;
+    transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+body.wp-admin input[type="text"]:focus,
+body.wp-admin input[type="search"]:focus,
+body.wp-admin input[type="email"]:focus,
+body.wp-admin select:focus,
+body.wp-admin textarea:focus {
+    border-color: #2563EB;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    outline: none;
+}
+
+/* ── Ocultar footer version note (más SaaS) ─────────────────────────── */
+body.wp-admin #wp-version-message,
+body.wp-admin #footer-upgrade { opacity: 0.55; font-size: 11px; }
+

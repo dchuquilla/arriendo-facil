@@ -309,121 +309,222 @@ if ( $is_owner ) {
 		</form>
 	</div>
 
-	<h2 style="margin-top:20px;"><?php esc_html_e( 'Visit Requests Queue', 'arriendo-facil' ); ?></h2>
-	<table class="wp-list-table widefat fixed striped af-data-table" style="margin-bottom:20px;">
-		<thead>
-			<tr>
-				<th><?php esc_html_e( 'Date', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Accommodation', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Interested Person', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Contact', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Status', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Request Details', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Actions', 'arriendo-facil' ); ?></th>
-			</tr>
-		</thead>
-		<tbody>
-			<?php if ( ! empty( $visit_requests ) ) : ?>
-				<?php foreach ( $visit_requests as $request ) : ?>
-					<?php
-					$status = isset( $request->status ) ? sanitize_key( (string) $request->status ) : 'queued';
-					$is_actionable = in_array( $status, array( 'queued', 'notified', 'visit_requested' ), true );
-					$status_label = $status;
-					if ( 'visit_requested' === $status ) {
-						$status_label = __( 'Visit Requested', 'arriendo-facil' );
-					} elseif ( 'queued' === $status ) {
-						$status_label = __( 'Queued', 'arriendo-facil' );
-					} elseif ( 'notified' === $status ) {
-						$status_label = __( 'Notified', 'arriendo-facil' );
-					} elseif ( 'approved' === $status ) {
-						$status_label = __( 'Approved', 'arriendo-facil' );
-					} elseif ( 'rejected' === $status ) {
-						$status_label = __( 'Rejected', 'arriendo-facil' );
-					}
-					?>
-					<tr>
-						<td data-label="<?php esc_attr_e( 'Date', 'arriendo-facil' ); ?>"><?php echo isset( $request->created_at ) ? esc_html( (string) $request->created_at ) : '—'; ?></td>
-						<td data-label="<?php esc_attr_e( 'Accommodation', 'arriendo-facil' ); ?>">
-							<strong><?php echo ! empty( $request->accommodation_title ) ? esc_html( (string) $request->accommodation_title ) : __( '(Sin titulo)', 'arriendo-facil' ); ?></strong>
-							<br />
-							<small><?php echo esc_html( '#' . absint( $request->accommodation_id ) ); ?></small>
-						</td>
-						<td data-label="<?php esc_attr_e( 'Interested Person', 'arriendo-facil' ); ?>"><?php echo esc_html( isset( $request->name ) ? (string) $request->name : '—' ); ?></td>
-						<td data-label="<?php esc_attr_e( 'Contact', 'arriendo-facil' ); ?>">
-							<div><strong><?php esc_html_e( 'Email:', 'arriendo-facil' ); ?></strong> <?php echo esc_html( isset( $request->email ) ? (string) $request->email : '—' ); ?></div>
-							<div><strong><?php esc_html_e( 'Phone:', 'arriendo-facil' ); ?></strong> <?php echo esc_html( isset( $request->phone ) ? (string) $request->phone : '—' ); ?></div>
-						</td>
-						<td data-label="<?php esc_attr_e( 'Status', 'arriendo-facil' ); ?>"><?php echo esc_html( (string) $status_label ); ?></td>
-						<td data-label="<?php esc_attr_e( 'Request Details', 'arriendo-facil' ); ?>"><?php echo ! empty( $request->message ) ? esc_html( (string) $request->message ) : '—'; ?></td>
-						<td class="af-td-actions" data-label="<?php esc_attr_e( 'Actions', 'arriendo-facil' ); ?>">
-							<?php if ( $is_actionable ) : ?>
-								<form method="post" style="display:inline-block;margin-right:4px;">
-									<input type="hidden" name="af_queue_action" value="approve" />
-									<input type="hidden" name="af_queue_request_id" value="<?php echo esc_attr( (string) absint( $request->id ) ); ?>" />
-									<input type="hidden" name="af_queue_nonce" value="<?php echo esc_attr( wp_create_nonce( 'af_queue_action' ) ); ?>" />
-									<button type="submit" class="button button-primary" onclick="return confirm('<?php echo esc_js( __( 'Al aprobar esta solicitud, las otras solicitudes activas para la misma acomodacion se rechazaran automaticamente. Continuar?', 'arriendo-facil' ) ); ?>');">
-										<?php esc_html_e( 'Approve', 'arriendo-facil' ); ?>
-									</button>
-								</form>
-								<form method="post" style="display:inline-block;">
-									<input type="hidden" name="af_queue_action" value="reject" />
-									<input type="hidden" name="af_queue_request_id" value="<?php echo esc_attr( (string) absint( $request->id ) ); ?>" />
-									<input type="hidden" name="af_queue_nonce" value="<?php echo esc_attr( wp_create_nonce( 'af_queue_action' ) ); ?>" />
-									<button type="submit" class="button" onclick="return confirm('<?php echo esc_js( __( 'Confirmas rechazar esta solicitud?', 'arriendo-facil' ) ); ?>');">
-										<?php esc_html_e( 'Reject', 'arriendo-facil' ); ?>
-									</button>
-								</form>
-							<?php else : ?>
-								—
-							<?php endif; ?>
-						</td>
-					</tr>
-				<?php endforeach; ?>
-			<?php else : ?>
-				<tr>
-					<td colspan="7"><?php esc_html_e( 'No se encontraron solicitudes de visita.', 'arriendo-facil' ); ?></td>
-				</tr>
-			<?php endif; ?>
-		</tbody>
-	</table>
+	<?php
+	$visit_count      = is_array( $visit_requests ) ? count( $visit_requests ) : 0;
+	$guest_count_page = is_array( $guests ) ? count( $guests ) : 0;
+	$pending_visits   = 0;
+	if ( $visit_count > 0 ) {
+		foreach ( $visit_requests as $r ) {
+			$s = isset( $r->status ) ? sanitize_key( (string) $r->status ) : 'queued';
+			if ( in_array( $s, array( 'queued', 'notified', 'visit_requested' ), true ) ) {
+				$pending_visits++;
+			}
+		}
+	}
+	?>
 
-	<table class="wp-list-table widefat fixed striped af-data-table">
-		<thead>
-			<tr>
-				<th><?php esc_html_e( 'ID (National ID or Passport)', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Name', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Email', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Phone', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'ID Number', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'AI Score', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Actions', 'arriendo-facil' ); ?></th>
-			</tr>
-		</thead>
-		<tbody>
-			<?php if ( $guests ) : ?>
-				<?php foreach ( $guests as $guest ) : ?>
-					<tr>
-						<td data-label="<?php esc_attr_e( 'ID (National ID or Passport)', 'arriendo-facil' ); ?>"><?php echo esc_html( $guest->id_number ); ?></td>
-						<td data-label="<?php esc_attr_e( 'Name', 'arriendo-facil' ); ?>"><?php echo esc_html( $guest->first_name . ' ' . $guest->last_name ); ?></td>
-						<td data-label="<?php esc_attr_e( 'Email', 'arriendo-facil' ); ?>"><?php echo esc_html( $guest->email ); ?></td>
-						<td data-label="<?php esc_attr_e( 'Phone', 'arriendo-facil' ); ?>"><?php echo esc_html( $guest->phone ); ?></td>
-						<td data-label="<?php esc_attr_e( 'ID Number', 'arriendo-facil' ); ?>">—</td>
-						<td data-label="<?php esc_attr_e( 'AI Score', 'arriendo-facil' ); ?>">
-							<?php echo $guest->ai_score ? esc_html( number_format( (float) $guest->ai_score, 2 ) ) : '—'; ?>
-						</td>
-						<td class="af-td-actions" data-label="<?php esc_attr_e( 'Actions', 'arriendo-facil' ); ?>">
-							<button type="button" class="button af-score-guest"
-								data-guest-id="<?php echo esc_attr( $guest->id ); ?>">
-								<?php esc_html_e( 'Score (AI)', 'arriendo-facil' ); ?>
-							</button>
-						</td>
-					</tr>
-				<?php endforeach; ?>
-			<?php else : ?>
-				<tr>
-					<td colspan="7"><?php esc_html_e( 'No se encontraron huespedes.', 'arriendo-facil' ); ?></td>
-				</tr>
-			<?php endif; ?>
-		</tbody>
-	</table>
+	<div class="af-tabs af-guest-tabs">
+		<input type="radio" name="af-guest-tab" id="af-tab-visits" class="af-tabs__radio" <?php echo ( $pending_visits > 0 || 0 === $guest_count_page ) ? 'checked' : ''; ?> />
+		<input type="radio" name="af-guest-tab" id="af-tab-guests" class="af-tabs__radio" <?php echo ( 0 === $pending_visits && $guest_count_page > 0 ) ? 'checked' : ''; ?> />
+
+		<div class="af-tabs__nav" role="tablist" aria-label="<?php esc_attr_e( 'Vista de huéspedes', 'arriendo-facil' ); ?>">
+			<label for="af-tab-visits" class="af-tabs__tab af-tabs__tab--visits" role="tab">
+				<span class="af-tabs__icon" aria-hidden="true">
+					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v4M16 2v4M3 10h18M5 6h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+				</span>
+				<span class="af-tabs__label"><?php esc_html_e( 'Solicitudes de visita', 'arriendo-facil' ); ?></span>
+				<?php if ( $pending_visits > 0 ) : ?>
+					<span class="af-tabs__badge af-tabs__badge--attention"><?php echo esc_html( number_format_i18n( $pending_visits ) ); ?></span>
+				<?php elseif ( $visit_count > 0 ) : ?>
+					<span class="af-tabs__badge"><?php echo esc_html( number_format_i18n( $visit_count ) ); ?></span>
+				<?php endif; ?>
+			</label>
+
+			<label for="af-tab-guests" class="af-tabs__tab af-tabs__tab--guests" role="tab">
+				<span class="af-tabs__icon" aria-hidden="true">
+					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+				</span>
+				<span class="af-tabs__label"><?php esc_html_e( 'Huéspedes registrados', 'arriendo-facil' ); ?></span>
+				<?php if ( $guest_count_page > 0 ) : ?>
+					<span class="af-tabs__badge"><?php echo esc_html( number_format_i18n( $guest_count_page ) ); ?></span>
+				<?php endif; ?>
+			</label>
+		</div>
+
+		<div class="af-tabs__panels">
+
+			<section class="af-tabs__panel af-tabs__panel--visits" role="tabpanel" aria-labelledby="af-tab-visits">
+				<div class="af-section af-section--visits">
+					<header class="af-section__head">
+						<div>
+							<h2 class="af-section__title"><?php esc_html_e( 'Cola de solicitudes de visita', 'arriendo-facil' ); ?></h2>
+							<p class="af-section__subtitle"><?php esc_html_e( 'Interesados que solicitaron ver la propiedad. Aprueba o rechaza; al aprobar una solicitud las demás activas para la misma propiedad se rechazan automáticamente.', 'arriendo-facil' ); ?></p>
+						</div>
+						<?php if ( $pending_visits > 0 ) : ?>
+							<span class="af-pill af-pill--warning"><?php echo esc_html( sprintf( _n( '%s pendiente', '%s pendientes', $pending_visits, 'arriendo-facil' ), number_format_i18n( $pending_visits ) ) ); ?></span>
+						<?php endif; ?>
+					</header>
+
+					<?php if ( ! empty( $visit_requests ) ) : ?>
+					<table class="wp-list-table widefat af-data-table af-data-table--visits">
+						<thead>
+							<tr>
+								<th><?php esc_html_e( 'Fecha', 'arriendo-facil' ); ?></th>
+								<th><?php esc_html_e( 'Alojamiento', 'arriendo-facil' ); ?></th>
+								<th><?php esc_html_e( 'Interesado', 'arriendo-facil' ); ?></th>
+								<th><?php esc_html_e( 'Contacto', 'arriendo-facil' ); ?></th>
+								<th><?php esc_html_e( 'Estado', 'arriendo-facil' ); ?></th>
+								<th><?php esc_html_e( 'Mensaje', 'arriendo-facil' ); ?></th>
+								<th><?php esc_html_e( 'Acciones', 'arriendo-facil' ); ?></th>
+							</tr>
+						</thead>
+						<tbody>
+							<?php foreach ( $visit_requests as $request ) : ?>
+								<?php
+								$status         = isset( $request->status ) ? sanitize_key( (string) $request->status ) : 'queued';
+								$is_actionable  = in_array( $status, array( 'queued', 'notified', 'visit_requested' ), true );
+								$status_label   = $status;
+								$status_variant = 'default';
+								if ( 'visit_requested' === $status ) {
+									$status_label   = __( 'Visita solicitada', 'arriendo-facil' );
+									$status_variant = 'info';
+								} elseif ( 'queued' === $status ) {
+									$status_label   = __( 'En cola', 'arriendo-facil' );
+									$status_variant = 'warning';
+								} elseif ( 'notified' === $status ) {
+									$status_label   = __( 'Notificado', 'arriendo-facil' );
+									$status_variant = 'info';
+								} elseif ( 'approved' === $status ) {
+									$status_label   = __( 'Aprobado', 'arriendo-facil' );
+									$status_variant = 'success';
+								} elseif ( 'rejected' === $status ) {
+									$status_label   = __( 'Rechazado', 'arriendo-facil' );
+									$status_variant = 'danger';
+								}
+								?>
+								<tr>
+									<td data-label="<?php esc_attr_e( 'Fecha', 'arriendo-facil' ); ?>"><?php echo isset( $request->created_at ) ? esc_html( (string) $request->created_at ) : '—'; ?></td>
+									<td data-label="<?php esc_attr_e( 'Alojamiento', 'arriendo-facil' ); ?>">
+										<strong><?php echo ! empty( $request->accommodation_title ) ? esc_html( (string) $request->accommodation_title ) : esc_html__( '(Sin título)', 'arriendo-facil' ); ?></strong>
+										<div class="af-td-meta">#<?php echo esc_html( (string) absint( $request->accommodation_id ) ); ?></div>
+									</td>
+									<td data-label="<?php esc_attr_e( 'Interesado', 'arriendo-facil' ); ?>"><?php echo esc_html( isset( $request->name ) ? (string) $request->name : '—' ); ?></td>
+									<td data-label="<?php esc_attr_e( 'Contacto', 'arriendo-facil' ); ?>">
+										<div class="af-td-meta"><?php echo esc_html( isset( $request->email ) ? (string) $request->email : '' ); ?></div>
+										<div class="af-td-meta"><?php echo esc_html( isset( $request->phone ) ? (string) $request->phone : '' ); ?></div>
+									</td>
+									<td data-label="<?php esc_attr_e( 'Estado', 'arriendo-facil' ); ?>">
+										<span class="af-pill af-pill--<?php echo esc_attr( $status_variant ); ?>"><?php echo esc_html( (string) $status_label ); ?></span>
+									</td>
+									<td data-label="<?php esc_attr_e( 'Mensaje', 'arriendo-facil' ); ?>" class="af-td-truncate"><?php echo ! empty( $request->message ) ? esc_html( (string) $request->message ) : '—'; ?></td>
+									<td class="af-td-actions" data-label="<?php esc_attr_e( 'Acciones', 'arriendo-facil' ); ?>">
+										<?php if ( $is_actionable ) : ?>
+											<form method="post" class="af-inline-form">
+												<input type="hidden" name="af_queue_action" value="approve" />
+												<input type="hidden" name="af_queue_request_id" value="<?php echo esc_attr( (string) absint( $request->id ) ); ?>" />
+												<input type="hidden" name="af_queue_nonce" value="<?php echo esc_attr( wp_create_nonce( 'af_queue_action' ) ); ?>" />
+												<button type="submit" class="button af-btn af-btn--primary af-btn--sm" onclick="return confirm('<?php echo esc_js( __( 'Al aprobar esta solicitud, las otras solicitudes activas para la misma acomodacion se rechazaran automaticamente. Continuar?', 'arriendo-facil' ) ); ?>');">
+													<?php esc_html_e( 'Aprobar', 'arriendo-facil' ); ?>
+												</button>
+											</form>
+											<form method="post" class="af-inline-form">
+												<input type="hidden" name="af_queue_action" value="reject" />
+												<input type="hidden" name="af_queue_request_id" value="<?php echo esc_attr( (string) absint( $request->id ) ); ?>" />
+												<input type="hidden" name="af_queue_nonce" value="<?php echo esc_attr( wp_create_nonce( 'af_queue_action' ) ); ?>" />
+												<button type="submit" class="button af-btn af-btn--ghost af-btn--sm" onclick="return confirm('<?php echo esc_js( __( 'Confirmas rechazar esta solicitud?', 'arriendo-facil' ) ); ?>');">
+													<?php esc_html_e( 'Rechazar', 'arriendo-facil' ); ?>
+												</button>
+											</form>
+										<?php else : ?>
+											<span class="af-td-meta">—</span>
+										<?php endif; ?>
+									</td>
+								</tr>
+							<?php endforeach; ?>
+						</tbody>
+					</table>
+					<?php else : ?>
+						<div class="af-empty">
+							<div class="af-empty__icon" aria-hidden="true">
+								<svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v4M16 2v4M3 10h18M5 6h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+							</div>
+							<h3><?php esc_html_e( 'No hay solicitudes de visita', 'arriendo-facil' ); ?></h3>
+							<p><?php esc_html_e( 'Cuando alguien pida ver una de tus propiedades desde la web pública, aparecerá aquí para que la apruebes.', 'arriendo-facil' ); ?></p>
+						</div>
+					<?php endif; ?>
+				</div>
+			</section>
+
+			<section class="af-tabs__panel af-tabs__panel--guests" role="tabpanel" aria-labelledby="af-tab-guests">
+				<div class="af-section af-section--guests">
+					<header class="af-section__head">
+						<div>
+							<h2 class="af-section__title"><?php esc_html_e( 'Huéspedes registrados', 'arriendo-facil' ); ?></h2>
+							<p class="af-section__subtitle"><?php esc_html_e( 'Perfiles verificados de personas que ya alquilaron o están en proceso. Ejecuta el scoring con IA para evaluar riesgo.', 'arriendo-facil' ); ?></p>
+						</div>
+						<?php if ( $guest_count_page > 0 ) : ?>
+							<span class="af-pill af-pill--info"><?php echo esc_html( sprintf( _n( '%s huésped', '%s huéspedes', $guest_count_page, 'arriendo-facil' ), number_format_i18n( $guest_count_page ) ) ); ?></span>
+						<?php endif; ?>
+					</header>
+
+					<?php if ( $guests ) : ?>
+					<table class="wp-list-table widefat af-data-table af-data-table--guests">
+						<thead>
+							<tr>
+								<th><?php esc_html_e( 'Identificación', 'arriendo-facil' ); ?></th>
+								<th><?php esc_html_e( 'Nombre', 'arriendo-facil' ); ?></th>
+								<th><?php esc_html_e( 'Email', 'arriendo-facil' ); ?></th>
+								<th><?php esc_html_e( 'Teléfono', 'arriendo-facil' ); ?></th>
+								<th><?php esc_html_e( 'AI Score', 'arriendo-facil' ); ?></th>
+								<th><?php esc_html_e( 'Acciones', 'arriendo-facil' ); ?></th>
+							</tr>
+						</thead>
+						<tbody>
+							<?php foreach ( $guests as $guest ) :
+								$score = $guest->ai_score ? (float) $guest->ai_score : null;
+								$score_variant = 'default';
+								if ( null !== $score ) {
+									if ( $score >= 0.75 ) { $score_variant = 'success'; }
+									elseif ( $score >= 0.5 ) { $score_variant = 'warning'; }
+									else { $score_variant = 'danger'; }
+								}
+							?>
+								<tr>
+									<td data-label="<?php esc_attr_e( 'Identificación', 'arriendo-facil' ); ?>"><?php echo esc_html( $guest->id_number ); ?></td>
+									<td data-label="<?php esc_attr_e( 'Nombre', 'arriendo-facil' ); ?>">
+										<strong><?php echo esc_html( $guest->first_name . ' ' . $guest->last_name ); ?></strong>
+									</td>
+									<td data-label="<?php esc_attr_e( 'Email', 'arriendo-facil' ); ?>"><?php echo esc_html( $guest->email ); ?></td>
+									<td data-label="<?php esc_attr_e( 'Teléfono', 'arriendo-facil' ); ?>"><?php echo esc_html( $guest->phone ); ?></td>
+									<td data-label="<?php esc_attr_e( 'AI Score', 'arriendo-facil' ); ?>">
+										<?php if ( null !== $score ) : ?>
+											<span class="af-pill af-pill--<?php echo esc_attr( $score_variant ); ?>"><?php echo esc_html( number_format( $score, 2 ) ); ?></span>
+										<?php else : ?>
+											<span class="af-td-meta">—</span>
+										<?php endif; ?>
+									</td>
+									<td class="af-td-actions" data-label="<?php esc_attr_e( 'Acciones', 'arriendo-facil' ); ?>">
+										<button type="button" class="button af-btn af-btn--ghost af-btn--sm af-score-guest"
+											data-guest-id="<?php echo esc_attr( $guest->id ); ?>">
+											<?php esc_html_e( 'Score (IA)', 'arriendo-facil' ); ?>
+										</button>
+									</td>
+								</tr>
+							<?php endforeach; ?>
+						</tbody>
+					</table>
+					<?php else : ?>
+						<div class="af-empty">
+							<div class="af-empty__icon" aria-hidden="true">
+								<svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+							</div>
+							<h3><?php esc_html_e( 'Sin huéspedes registrados aún', 'arriendo-facil' ); ?></h3>
+							<p><?php esc_html_e( 'Usa el botón "Nuevo huésped" para registrar el primer perfil verificado.', 'arriendo-facil' ); ?></p>
+						</div>
+					<?php endif; ?>
+				</div>
+			</section>
+
+		</div>
+	</div>
 </div>

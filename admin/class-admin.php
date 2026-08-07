@@ -37,13 +37,20 @@ class Arriendo_Facil_Admin {
 	 * Registers the plugin's top-level menu and sub-pages.
 	 */
 	public function add_menu() {
+		$menu_icon_svg = 'data:image/svg+xml;base64,' . base64_encode(
+			'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">'
+			. '<path d="M3 11l9-8 9 8v10a1 1 0 01-1 1h-5v-6H10v6H4a1 1 0 01-1-1V11z" stroke="#a7aaad" stroke-width="1.8" stroke-linejoin="round"/>'
+			. '<circle cx="12" cy="14" r="1.6" fill="#a7aaad"/>'
+			. '</svg>'
+		);
+
 		add_menu_page(
 			__( 'Arriendo Fácil', 'arriendo-facil' ),
 			__( 'Arriendo Fácil', 'arriendo-facil' ),
 			'edit_posts',
 			'arriendo-facil',
 			array( $this, 'render_dashboard' ),
-			'dashicons-building',
+			$menu_icon_svg,
 			30
 		);
 
@@ -235,16 +242,35 @@ class Arriendo_Facil_Admin {
 	 * @param string $hook Current admin page hook.
 	 */
 	public function enqueue_assets( $hook ) {
-		$admin_css_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/admin.css';
-		$admin_js_path  = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/admin.js';
+		$tokens_css_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-tokens.css';
+		$shell_css_path  = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-shell.css';
+		$admin_css_path  = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/admin.css';
+		$admin_js_path   = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/admin.js';
 
-		$admin_css_version = file_exists( $admin_css_path ) ? (string) filemtime( $admin_css_path ) : ARRIENDO_FACIL_VERSION;
-		$admin_js_version  = file_exists( $admin_js_path ) ? (string) filemtime( $admin_js_path ) : ARRIENDO_FACIL_VERSION;
+		$tokens_css_version = file_exists( $tokens_css_path ) ? (string) filemtime( $tokens_css_path ) : ARRIENDO_FACIL_VERSION;
+		$shell_css_version  = file_exists( $shell_css_path ) ? (string) filemtime( $shell_css_path ) : ARRIENDO_FACIL_VERSION;
+		$admin_css_version  = file_exists( $admin_css_path ) ? (string) filemtime( $admin_css_path ) : ARRIENDO_FACIL_VERSION;
+		$admin_js_version   = file_exists( $admin_js_path ) ? (string) filemtime( $admin_js_path ) : ARRIENDO_FACIL_VERSION;
+
+		// Design tokens must load before any component styles.
+		wp_enqueue_style(
+			'af-tokens',
+			ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/af-tokens.css',
+			array(),
+			$tokens_css_version
+		);
+
+		wp_enqueue_style(
+			'af-shell',
+			ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/af-shell.css',
+			array( 'af-tokens' ),
+			$shell_css_version
+		);
 
 		wp_enqueue_style(
 			'af-admin',
 			ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/admin.css',
-			array(),
+			array( 'af-shell' ),
 			$admin_css_version
 		);
 

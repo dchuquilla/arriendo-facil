@@ -1,0 +1,122 @@
+/**
+ * Arriendo Facil — Design Tokens
+ *
+ * Scoped to .af-shell so tokens never leak to WordPress core, other plugins,
+ * or existing plugin CSS that still uses hard-coded hex values.
+ *
+ * Add class="wrap af-shell" (or wrap it) on any admin view to opt-in.
+ */
+
+.af-shell {
+	/* ── Primary — Azul Arriendo (confianza) ─────────────────────────────── */
+	--af-primary-50:  #EFF6FF;
+	--af-primary-100: #DBEAFE;
+	--af-primary-200: #BFDBFE;
+	--af-primary-400: #60A5FA;
+	--af-primary-500: #2563EB;
+	--af-primary-600: #1D4ED8;
+	--af-primary-700: #1E40AF;
+	--af-primary-900: #0B2A5B;
+
+	/* ── Accent — Coral Hogar (calidez) ──────────────────────────────────── */
+	--af-accent-50:  #FFF1F0;
+	--af-accent-100: #FFE0DE;
+	--af-accent-500: #F5385C;
+	--af-accent-600: #D42548;
+
+	/* ── Neutrales — grises tierra ───────────────────────────────────────── */
+	--af-gray-0:   #FFFFFF;
+	--af-gray-50:  #F7F7F5;
+	--af-gray-100: #EEEDE8;
+	--af-gray-200: #E2E1DB;
+	--af-gray-300: #CFCEC6;
+	--af-gray-400: #A8A69E;
+	--af-gray-500: #7A7870;
+	--af-gray-600: #5B594F;
+	--af-gray-700: #3F3E37;
+	--af-gray-900: #1B1A16;
+
+	/* ── Semánticos ──────────────────────────────────────────────────────── */
+	--af-success-50:  #E6F7EE;
+	--af-success-100: #C6ECD6;
+	--af-success-500: #0F9D58;
+	--af-success-700: #0A6B3C;
+
+	--af-warning-50:  #FEF6E6;
+	--af-warning-100: #FBE6B8;
+	--af-warning-500: #F59E0B;
+	--af-warning-700: #A26708;
+
+	--af-danger-50:  #FEECEC;
+	--af-danger-100: #FBD1D1;
+	--af-danger-500: #DC2626;
+	--af-danger-700: #971818;
+
+	--af-info-50:  #E6F6FE;
+	--af-info-100: #BEE7FB;
+	--af-info-500: #0EA5E9;
+	--af-info-700: #0369A1;
+
+	/* ── Typography ──────────────────────────────────────────────────────── */
+	--af-font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+	--af-font-numeric: "Inter", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+	--af-text-xs:   0.75rem;    /* 12 */
+	--af-text-sm:   0.875rem;   /* 14 */
+	--af-text-base: 1rem;       /* 16 */
+	--af-text-lg:   1.125rem;   /* 18 */
+	--af-text-xl:   1.5rem;     /* 24 */
+	--af-text-2xl:  2rem;       /* 32 */
+	--af-text-3xl:  2.5rem;     /* 40 */
+
+	--af-leading-tight:  1.2;
+	--af-leading-snug:   1.35;
+	--af-leading-normal: 1.5;
+	--af-leading-relaxed: 1.65;
+
+	/* ── Spacing ─────────────────────────────────────────────────────────── */
+	--af-space-1:  4px;
+	--af-space-2:  8px;
+	--af-space-3:  12px;
+	--af-space-4:  16px;
+	--af-space-5:  20px;
+	--af-space-6:  24px;
+	--af-space-8:  32px;
+	--af-space-10: 40px;
+	--af-space-12: 48px;
+	--af-space-16: 64px;
+
+	/* ── Radii ───────────────────────────────────────────────────────────── */
+	--af-radius-sm:   6px;
+	--af-radius-md:   10px;
+	--af-radius-lg:   14px;
+	--af-radius-xl:   20px;
+	--af-radius-full: 999px;
+
+	/* ── Shadows ─────────────────────────────────────────────────────────── */
+	--af-shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.05);
+	--af-shadow-sm: 0 2px 6px rgba(16, 24, 40, 0.06);
+	--af-shadow-md: 0 8px 20px rgba(16, 24, 40, 0.08);
+	--af-shadow-lg: 0 20px 40px rgba(16, 24, 40, 0.10);
+	--af-focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.35);
+
+	/* ── Motion ──────────────────────────────────────────────────────────── */
+	--af-motion-fast: 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
+	--af-motion-base: 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+	--af-motion-slow: 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+
+	/* ── Layout ──────────────────────────────────────────────────────────── */
+	--af-page-max: 1440px;
+	--af-page-gutter: var(--af-space-6);
+	--af-z-drawer: 100000;
+	--af-z-modal:  100010;
+	--af-z-toast:  100020;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.af-shell {
+		--af-motion-fast: 0ms linear;
+		--af-motion-base: 0ms linear;
+		--af-motion-slow: 0ms linear;
+	}
+}

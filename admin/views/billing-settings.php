@@ -460,8 +460,17 @@ $af_cert_ready       = ( $cert_has_pwd && $cert_has_pems );
 $af_points_ready     = ! empty( $emission_points );
 
 ?>
-<div class="wrap">
-	<h1><?php esc_html_e( 'Configuración SRI – Facturación Electrónica', 'arriendo-facil' ); ?></h1>
+<div class="wrap af-shell">
+
+	<?php
+	af_page_header(
+		array(
+			'eyebrow'  => __( 'Facturación electrónica', 'arriendo-facil' ),
+			'title'    => __( 'Configuración SRI', 'arriendo-facil' ),
+			'subtitle' => __( 'Datos del emisor, certificado digital y puntos de emisión para facturación electrónica en Ecuador.', 'arriendo-facil' ),
+		)
+	);
+	?>
 
 	<div class="af-sri-hero">
 		<div class="af-sri-hero__content">

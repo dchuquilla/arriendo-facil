@@ -344,6 +344,7 @@ class Arriendo_Facil_Admin {
 		$tokens_css_path       = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-tokens.css';
 		$shell_css_path        = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-shell.css';
 		$chrome_css_path       = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-admin-chrome.css';
+		$forms_css_path        = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-forms.css';
 		$wp_dashboard_css_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-wp-dashboard.css';
 		$admin_css_path        = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/admin.css';
 		$admin_js_path         = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/admin.js';
@@ -351,6 +352,7 @@ class Arriendo_Facil_Admin {
 		$tokens_css_version       = file_exists( $tokens_css_path ) ? (string) filemtime( $tokens_css_path ) : ARRIENDO_FACIL_VERSION;
 		$shell_css_version        = file_exists( $shell_css_path ) ? (string) filemtime( $shell_css_path ) : ARRIENDO_FACIL_VERSION;
 		$chrome_css_version       = file_exists( $chrome_css_path ) ? (string) filemtime( $chrome_css_path ) : ARRIENDO_FACIL_VERSION;
+		$forms_css_version        = file_exists( $forms_css_path ) ? (string) filemtime( $forms_css_path ) : ARRIENDO_FACIL_VERSION;
 		$wp_dashboard_css_version = file_exists( $wp_dashboard_css_path ) ? (string) filemtime( $wp_dashboard_css_path ) : ARRIENDO_FACIL_VERSION;
 		$admin_css_version        = file_exists( $admin_css_path ) ? (string) filemtime( $admin_css_path ) : ARRIENDO_FACIL_VERSION;
 		$admin_js_version         = file_exists( $admin_js_path ) ? (string) filemtime( $admin_js_path ) : ARRIENDO_FACIL_VERSION;
@@ -376,6 +378,14 @@ class Arriendo_Facil_Admin {
 			ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/af-shell.css',
 			array( 'af-tokens' ),
 			$shell_css_version
+		);
+
+		// Forms polish: applies globally so meta-boxes and wizard also benefit.
+		wp_enqueue_style(
+			'af-forms',
+			ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/af-forms.css',
+			array( 'af-shell' ),
+			$forms_css_version
 		);
 
 		// Rebrand the WordPress native dashboard only on index.php.

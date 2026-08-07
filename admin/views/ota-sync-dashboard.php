@@ -192,7 +192,7 @@ $success_rate = ( $success_count + $error_count ) > 0 ? round( ( $success_count 
 			</div>
 		</header>
 
-	<table class="widefat striped af-ota-log">
+	<table class="widefat striped af-ota-log af-data-table">
 		<thead>
 			<tr>
 				<th><?php esc_html_e( 'Alojamiento', 'arriendo-facil' ); ?></th>
@@ -224,27 +224,27 @@ $success_rate = ( $success_count + $error_count ) > 0 ? round( ( $success_count 
 					$status_text = $is_success ? __( 'Exitoso', 'arriendo-facil' ) : __( 'Error', 'arriendo-facil' );
 					?>
 					<tr>
-						<td>
+						<td data-label="<?php esc_attr_e( 'Alojamiento', 'arriendo-facil' ); ?>">
 							<?php if ( $accommodation ) : ?>
 								<a href="<?php echo esc_url( $accom_edit_url ); ?>"><?php echo esc_html( $accom_title ); ?></a>
 							<?php else : ?>
 								<span class="af-ota-log__deleted"><?php echo esc_html( $accom_title ); ?></span>
 							<?php endif; ?>
 						</td>
-						<td><strong><?php echo esc_html( $platform_label ); ?></strong></td>
-						<td>
+						<td data-label="<?php esc_attr_e( 'Plataforma', 'arriendo-facil' ); ?>"><strong><?php echo esc_html( $platform_label ); ?></strong></td>
+						<td data-label="<?php esc_attr_e( 'Estado local', 'arriendo-facil' ); ?>">
 							<span class="af-pill af-pill--<?php echo esc_attr( $local_variant ); ?>"><?php echo esc_html( $local_text ); ?></span>
 						</td>
-						<td>
+						<td data-label="<?php esc_attr_e( 'Estado remoto', 'arriendo-facil' ); ?>">
 							<span class="af-pill af-pill--<?php echo esc_attr( $remote_variant ); ?>"><?php echo esc_html( $remote_text ); ?></span>
 						</td>
-						<td>
+						<td data-label="<?php esc_attr_e( 'Resultado', 'arriendo-facil' ); ?>">
 							<span class="af-pill af-pill--<?php echo $is_success ? 'success' : 'danger'; ?>"><?php echo esc_html( $status_text ); ?></span>
 							<?php if ( ! empty( $log->error_message ) ) : ?>
 								<div class="af-ota-log__error"><?php echo esc_html( $log->error_message ); ?></div>
 							<?php endif; ?>
 						</td>
-						<td class="af-ota-log__timestamp">
+						<td class="af-ota-log__timestamp" data-label="<?php esc_attr_e( 'Fecha / hora', 'arriendo-facil' ); ?>">
 							<?php
 							echo esc_html(
 								wp_date(

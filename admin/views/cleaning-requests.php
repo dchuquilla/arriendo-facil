@@ -204,7 +204,7 @@ $cleaning_services = $wpdb->get_results(
 			</div>
 		</header>
 
-	<table class="wp-list-table widefat fixed striped">
+	<table class="wp-list-table widefat fixed striped af-data-table">
 		<thead>
 			<tr>
 				<th><?php esc_html_e( 'ID', 'arriendo-facil' ); ?></th>
@@ -230,13 +230,13 @@ $cleaning_services = $wpdb->get_results(
 					);
 					?>
 					<tr>
-						<td><?php echo esc_html( $request->id ); ?></td>
-						<td><?php echo esc_html( $request->accommodation_title ?: $request->accommodation_id ); ?></td>
-						<td><?php echo esc_html( $request->requested_date ); ?></td>
-						<td><?php echo esc_html( $request->completed_date ?: '—' ); ?></td>
-						<td><?php echo af_pill( (string) $request->status ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></td>
-						<td><?php echo esc_html( $request->notes ); ?></td>
-						<td>
+						<td data-label="<?php esc_attr_e( 'ID', 'arriendo-facil' ); ?>"><?php echo esc_html( $request->id ); ?></td>
+						<td data-label="<?php esc_attr_e( 'Accommodation', 'arriendo-facil' ); ?>"><?php echo esc_html( $request->accommodation_title ?: $request->accommodation_id ); ?></td>
+						<td data-label="<?php esc_attr_e( 'Requested Date', 'arriendo-facil' ); ?>"><?php echo esc_html( $request->requested_date ); ?></td>
+						<td data-label="<?php esc_attr_e( 'Completed Date', 'arriendo-facil' ); ?>"><?php echo esc_html( $request->completed_date ?: '—' ); ?></td>
+						<td data-label="<?php esc_attr_e( 'Status', 'arriendo-facil' ); ?>"><?php echo af_pill( (string) $request->status ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></td>
+						<td data-label="<?php esc_attr_e( 'Notas', 'arriendo-facil' ); ?>"><?php echo esc_html( $request->notes ); ?></td>
+						<td class="af-td-actions" data-label="<?php esc_attr_e( 'Actions', 'arriendo-facil' ); ?>">
 							<a class="button button-secondary" href="<?php echo esc_url( $contract_url ); ?>" target="_blank" rel="noopener">
 								<?php esc_html_e( 'Generar contrato', 'arriendo-facil' ); ?>
 							</a>

@@ -248,7 +248,7 @@ $current_user_id = (int) get_current_user_id();
 			</div>
 		</header>
 
-	<table class="wp-list-table widefat fixed striped af-owner-table">
+	<table class="wp-list-table widefat fixed striped af-owner-table af-data-table">
 		<thead>
 			<tr>
 				<th><?php esc_html_e( 'ID', 'arriendo-facil' ); ?></th>
@@ -312,12 +312,12 @@ $current_user_id = (int) get_current_user_id();
 					}
                     ?>
                     <tr class="af-owner-contact-row" data-contact-id="<?php echo esc_attr( (int) $contact->id ); ?>">
-						<td><?php echo esc_html( $contact->id ); ?></td>
-						<td><?php echo esc_html( $contact->owner_id_type ); ?></td>
-						<td><?php echo esc_html( $contact->owner_id ); ?></td>
-						<td><?php echo esc_html( $contact->subject ); ?></td>
-                        <td><?php echo ! empty( $contact->has_legal_agent ) ? esc_html__( 'Yes', 'arriendo-facil' ) : esc_html__( 'No', 'arriendo-facil' ); ?></td>
-                        <td class="af-account-actions">
+						<td data-label="<?php esc_attr_e( 'ID', 'arriendo-facil' ); ?>"><?php echo esc_html( $contact->id ); ?></td>
+						<td data-label="<?php esc_attr_e( 'Document Type', 'arriendo-facil' ); ?>"><?php echo esc_html( $contact->owner_id_type ); ?></td>
+						<td data-label="<?php esc_attr_e( 'ID del propietario', 'arriendo-facil' ); ?>"><?php echo esc_html( $contact->owner_id ); ?></td>
+						<td data-label="<?php esc_attr_e( 'Client Name', 'arriendo-facil' ); ?>"><?php echo esc_html( $contact->subject ); ?></td>
+                        <td data-label="<?php esc_attr_e( 'Legal Agent', 'arriendo-facil' ); ?>"><?php echo ! empty( $contact->has_legal_agent ) ? esc_html__( 'Yes', 'arriendo-facil' ) : esc_html__( 'No', 'arriendo-facil' ); ?></td>
+                        <td class="af-account-actions" data-label="<?php esc_attr_e( 'Actions', 'arriendo-facil' ); ?>">
 							<span class="af-pill af-pill--<?php echo esc_attr( $pill_variant ); ?> af-owner-status-badge">
 								<?php echo esc_html( $status_label ); ?>
 							</span>

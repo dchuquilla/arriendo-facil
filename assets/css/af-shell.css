@@ -689,3 +689,166 @@
 .af-account-actions .af-owner-status-badge { margin-right: var(--af-space-2); }
 .af-account-actions form { display: inline-block; margin-left: var(--af-space-2); }
 .af-account-actions .description { margin-left: var(--af-space-2); color: var(--af-gray-500); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   FASE 4 — Responsive real (< 900px collapse-to-cards, bottom sheets)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Horizontal scroll shim: baseline para tablas sin data-label ---------- */
+.af-shell .af-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+}
+
+/* Collapse-to-cards: opt-in via .af-data-table + data-label en <td> ---- */
+@media (max-width: 900px) {
+    .af-shell .af-data-table {
+        background: transparent;
+        border: 0;
+        box-shadow: none;
+    }
+    .af-shell .af-data-table thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
+    .af-shell .af-data-table tbody tr {
+        display: block;
+        background: var(--af-surface, #fff);
+        border: 1px solid var(--af-gray-200);
+        border-radius: var(--af-radius-md);
+        padding: var(--af-space-3) var(--af-space-4);
+        margin-bottom: var(--af-space-3);
+        box-shadow: var(--af-shadow-sm);
+    }
+    .af-shell .af-data-table tbody td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: var(--af-space-3);
+        padding: var(--af-space-2) 0;
+        border: 0;
+        text-align: right;
+        min-height: 32px;
+    }
+    .af-shell .af-data-table tbody td + td {
+        border-top: 1px dashed var(--af-gray-100);
+    }
+    .af-shell .af-data-table tbody td::before {
+        content: attr(data-label);
+        flex: 0 0 42%;
+        font-size: var(--af-text-xs);
+        font-weight: 600;
+        color: var(--af-gray-600);
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        text-align: left;
+    }
+    .af-shell .af-data-table tbody td:not([data-label])::before { content: none; }
+    .af-shell .af-data-table tbody td.af-account-actions,
+    .af-shell .af-data-table tbody td.af-td-actions {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--af-space-2);
+        text-align: left;
+        padding-top: var(--af-space-3);
+    }
+    .af-shell .af-data-table tbody td.af-account-actions::before,
+    .af-shell .af-data-table tbody td.af-td-actions::before { flex-basis: auto; }
+    .af-shell .af-data-table tbody td.af-account-actions form,
+    .af-shell .af-data-table tbody td.af-td-actions form { margin-left: 0; display: block; }
+    .af-shell .af-data-table tbody td.af-account-actions .button,
+    .af-shell .af-data-table tbody td.af-td-actions .button { width: 100%; text-align: center; }
+}
+
+/* Bottom sheet: modales existentes en móvil ---------------------------- */
+@media (max-width: 640px) {
+    .af-modal .af-modal__dialog,
+    .af-shell .af-modal__dialog {
+        position: fixed;
+        inset: auto 0 0 0;
+        max-width: none;
+        width: 100%;
+        max-height: 92vh;
+        margin: 0;
+        border-radius: var(--af-radius-lg) var(--af-radius-lg) 0 0;
+        animation: af-sheet-in .28s cubic-bezier(.2, .9, .3, 1);
+        overflow-y: auto;
+    }
+    .af-modal .af-modal__dialog::before {
+        content: "";
+        position: sticky;
+        top: var(--af-space-2);
+        display: block;
+        width: 40px;
+        height: 4px;
+        margin: 0 auto var(--af-space-2);
+        border-radius: 999px;
+        background: var(--af-gray-300);
+    }
+    .af-modal .af-modal__footer {
+        position: sticky;
+        bottom: 0;
+        background: var(--af-surface, #fff);
+        border-top: 1px solid var(--af-gray-200);
+        padding: var(--af-space-3);
+    }
+}
+
+@keyframes af-sheet-in {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .af-modal .af-modal__dialog { animation: none; }
+}
+
+/* Sticky action bar: opt-in para forms largos -------------------------- */
+.af-sticky-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--af-space-3);
+    padding: var(--af-space-3) var(--af-space-5);
+    background: rgba(255, 255, 255, 0.94);
+    backdrop-filter: saturate(140%) blur(10px);
+    -webkit-backdrop-filter: saturate(140%) blur(10px);
+    border-top: 1px solid var(--af-gray-200);
+    margin: var(--af-space-4) calc(-1 * var(--af-space-5)) calc(-1 * var(--af-space-5));
+}
+
+@media (max-width: 640px) {
+    .af-sticky-actions {
+        position: fixed;
+        inset: auto 0 0 0;
+        margin: 0;
+        padding: var(--af-space-3);
+        box-shadow: 0 -8px 24px rgba(15, 23, 42, .08);
+        z-index: 9999;
+    }
+    .af-sticky-actions > .button,
+    .af-sticky-actions > .af-btn { flex: 1 1 auto; text-align: center; }
+    .af-shell .af-has-sticky-actions { padding-bottom: 96px; }
+}
+
+/* Page-header responsive: acciones full-width en móvil ---------------- */
+@media (max-width: 640px) {
+    .af-page-header__actions { width: 100%; }
+    .af-page-header__actions .af-btn,
+    .af-page-header__actions .button { flex: 1 1 auto; text-align: center; }
+    .af-kpi-grid { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 420px) {
+    .af-kpi-grid { grid-template-columns: 1fr; }
+}

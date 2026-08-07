@@ -1307,3 +1307,183 @@
     color: var(--af-primary-600);
 }
 .af-shell[data-af-theme="dark"] .af-welcome__title { color: var(--af-gray-900); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   TABS (CSS-only radio switcher) + EMPTY STATE + BTN SM
+   Usado principalmente en guests.php (Solicitudes vs Huéspedes)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.af-tabs { margin-top: var(--af-space-4); }
+.af-tabs__radio {
+    position: absolute;
+    width: 1px; height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.af-tabs__nav {
+    display: inline-flex;
+    gap: 4px;
+    padding: 4px;
+    background: var(--af-gray-100);
+    border: 1px solid var(--af-gray-200);
+    border-radius: var(--af-radius-lg);
+    margin-bottom: var(--af-space-5);
+    flex-wrap: wrap;
+}
+.af-tabs__tab {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--af-space-2);
+    padding: 10px 18px;
+    border-radius: var(--af-radius-md);
+    font-size: var(--af-text-sm);
+    font-weight: 600;
+    color: var(--af-gray-600);
+    cursor: pointer;
+    user-select: none;
+    transition: color var(--af-motion-fast), background var(--af-motion-fast), box-shadow var(--af-motion-fast);
+    position: relative;
+}
+.af-tabs__tab:hover { color: var(--af-gray-900); }
+.af-tabs__icon { display: inline-flex; }
+.af-tabs__label { white-space: nowrap; }
+.af-tabs__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: var(--af-gray-200);
+    color: var(--af-gray-700);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+}
+.af-tabs__badge--attention {
+    background: var(--af-accent-500);
+    color: #fff;
+    box-shadow: 0 0 0 3px rgba(245, 56, 92, .15);
+}
+
+.af-tabs__panels > .af-tabs__panel {
+    display: none;
+    animation: af-fade-up var(--af-motion-slow) both;
+}
+
+#af-tab-visits:checked ~ .af-tabs__nav > label[for="af-tab-visits"],
+#af-tab-guests:checked ~ .af-tabs__nav > label[for="af-tab-guests"] {
+    background: var(--af-gray-0, #fff);
+    color: var(--af-gray-900);
+    box-shadow: var(--af-shadow-sm);
+}
+#af-tab-visits:checked ~ .af-tabs__panels > .af-tabs__panel--visits,
+#af-tab-guests:checked ~ .af-tabs__panels > .af-tabs__panel--guests {
+    display: block;
+}
+
+/* Foco accesible (radio invisible, focus lo pintamos en el label activo) */
+.af-tabs__radio:focus-visible + .af-tabs__radio + .af-tabs__nav > label[for="af-tab-visits"],
+.af-tabs__radio + .af-tabs__radio:focus-visible + .af-tabs__nav > label[for="af-tab-guests"] {
+    box-shadow: var(--af-focus-ring);
+}
+
+/* Section head con título + badge al lado */
+.af-section__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--af-space-4);
+    margin-bottom: var(--af-space-4);
+    flex-wrap: wrap;
+}
+.af-section__title {
+    margin: 0 0 4px;
+    font-size: var(--af-text-lg);
+    font-weight: 700;
+    color: var(--af-gray-900);
+}
+.af-section__subtitle {
+    margin: 0;
+    color: var(--af-gray-600);
+    font-size: var(--af-text-sm);
+    line-height: var(--af-leading-relaxed);
+    max-width: 68ch;
+}
+
+/* Border-left accent por tipo de sección */
+.af-section--visits { border-left: 3px solid var(--af-warning-500); padding-left: var(--af-space-4); }
+.af-section--guests { border-left: 3px solid var(--af-success-500); padding-left: var(--af-space-4); }
+
+/* Table variants — subtle color hint en header row */
+.af-data-table--visits thead th { color: var(--af-warning-700); background: var(--af-warning-50); }
+.af-data-table--guests thead th { color: var(--af-success-700); background: var(--af-success-50); }
+
+/* Meta secundario dentro de td */
+.af-td-meta {
+    display: block;
+    color: var(--af-gray-500);
+    font-size: var(--af-text-xs);
+    line-height: 1.4;
+}
+.af-td-truncate {
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.af-inline-form { display: inline-block; margin: 0 4px 4px 0; }
+
+/* Button size sm */
+.af-btn--sm {
+    padding: 4px 12px !important;
+    font-size: var(--af-text-xs) !important;
+    min-height: 30px !important;
+    line-height: 1.4 !important;
+}
+
+/* Empty state cálido -------------------------------------------------- */
+.af-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: var(--af-space-8) var(--af-space-6);
+    background: var(--af-gray-50);
+    border: 1px dashed var(--af-gray-300);
+    border-radius: var(--af-radius-lg);
+}
+.af-empty__icon {
+    width: 64px;
+    height: 64px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--af-gray-0, #fff);
+    color: var(--af-gray-400);
+    margin-bottom: var(--af-space-3);
+    box-shadow: var(--af-shadow-xs);
+}
+.af-empty h3 {
+    margin: 0 0 var(--af-space-2);
+    font-size: var(--af-text-lg);
+    font-weight: 600;
+    color: var(--af-gray-900);
+}
+.af-empty p {
+    margin: 0;
+    color: var(--af-gray-600);
+    font-size: var(--af-text-sm);
+    max-width: 46ch;
+    line-height: var(--af-leading-relaxed);
+}
+
+/* Responsive — tabs en móvil ocupan ancho completo */
+@media (max-width: 640px) {
+    .af-tabs__nav { display: flex; width: 100%; }
+    .af-tabs__tab { flex: 1 1 auto; justify-content: center; padding: 10px 12px; }
+    .af-tabs__label { font-size: var(--af-text-xs); }
+    .af-section__head { flex-direction: column; align-items: stretch; }
+}

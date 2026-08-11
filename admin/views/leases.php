@@ -142,6 +142,7 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 			</div>
 		</header>
 
+	<div class="af-table-scroll">
 	<table class="wp-list-table widefat fixed striped af-leases-table af-data-table">
 		<thead>
 			<tr>
@@ -329,6 +330,7 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 			<?php endif; ?>
 		</tbody>
 	</table>
+	</div>
 	</section>
 
 	<div id="af-early-terminate-modal" class="af-modal" style="display:none;position:fixed;inset:0;z-index:100000;align-items:center;justify-content:center;">

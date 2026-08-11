@@ -24,6 +24,8 @@ class Arriendo_Facil_Accommodation_Wizard {
 		add_action( 'admin_menu', array( $this, 'register_page' ), 11 );
 		add_action( 'admin_init', array( $this, 'maybe_redirect' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
+		add_filter( 'parent_file', array( $this, 'keep_parent_menu_open' ) );
+		add_filter( 'submenu_file', array( $this, 'keep_submenu_selected' ) );
 		add_action( 'admin_post_' . self::SUBMIT_ACTION, array( $this, 'handle_submit' ) );
 		add_action( 'admin_notices', array( $this, 'render_post_publish_notice' ) );
 	}
@@ -67,6 +69,36 @@ class Arriendo_Facil_Accommodation_Wizard {
 				exit;
 			}
 		}
+	}
+
+	/**
+	 * Keep Arriendo Facil parent menu expanded on the wizard screen.
+	 *
+	 * @param string $parent_file Current parent menu slug.
+	 * @return string
+	 */
+	public function keep_parent_menu_open( $parent_file ) {
+		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
+		if ( self::PAGE_SLUG !== $page ) {
+			return $parent_file;
+		}
+
+		return 'arriendo-facil';
+	}
+
+	/**
+	 * Keep a stable submenu highlight while browsing the wizard.
+	 *
+	 * @param string $submenu_file Current submenu slug.
+	 * @return string
+	 */
+	public function keep_submenu_selected( $submenu_file ) {
+		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
+		if ( self::PAGE_SLUG !== $page ) {
+			return $submenu_file;
+		}
+
+		return 'arriendo-facil';
 	}
 
 	/**

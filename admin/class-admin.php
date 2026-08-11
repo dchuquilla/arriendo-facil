@@ -33,6 +33,7 @@ class Arriendo_Facil_Admin {
 		add_filter( 'admin_footer_text', array( $this, 'owner_admin_footer_text' ), 999 );
 		add_filter( 'update_footer', array( $this, 'owner_admin_footer_text' ), 999 );
 		add_filter( 'screen_options_show_screen', array( $this, 'owner_hide_screen_options' ), 999 );
+		add_filter( 'admin_body_class', array( $this, 'tag_native_pages_body_class' ) );
 		add_action( 'wp_dashboard_setup', array( $this, 'remove_owner_dashboard_widgets' ), 999 );
 		add_action( 'wp_dashboard_setup', array( $this, 'register_native_dashboard_widget' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
@@ -297,6 +298,36 @@ class Arriendo_Facil_Admin {
 			return $show;
 		}
 		return false;
+	}
+
+	/**
+	 * Adds contextual body classes so CSS can restyle native WP pages
+	 * (accommodation list, profile edit) without touching their HTML.
+	 *
+	 * @param string $classes Existing space-separated body classes.
+	 * @return string
+	 */
+	public function tag_native_pages_body_class( $classes ) {
+		global $pagenow, $typenow;
+
+		$extra = array();
+
+		if ( 'edit.php' === $pagenow && 'accommodation' === $typenow ) {
+			$extra[] = 'af-native-inmuebles';
+		}
+
+		if ( 'profile.php' === $pagenow || 'user-edit.php' === $pagenow ) {
+			$extra[] = 'af-native-profile';
+			if ( $this->is_restricted_owner() ) {
+				$extra[] = 'af-owner-view';
+			}
+		}
+
+		if ( ! empty( $extra ) ) {
+			$classes .= ' ' . implode( ' ', $extra );
+		}
+
+		return $classes;
 	}
 
 	/**

@@ -488,3 +488,466 @@ body.wp-admin textarea:focus {
 body.wp-admin #wp-version-message,
 body.wp-admin #footer-upgrade { opacity: 0.55; font-size: 11px; }
 
+
+/* ═══════════════════════════════════════════════════════════════════════
+   NATIVE PAGES POLISH — Inmuebles + Profile
+   Scoped por body class inyectada desde tag_native_pages_body_class().
+   No toca HTML; sólo estilos.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ───────────────────────────────────────────────────────────────────────
+   1) INMUEBLES — edit.php?post_type=accommodation
+   ─────────────────────────────────────────────────────────────────────── */
+
+body.af-native-inmuebles #wpbody-content { padding-bottom: 40px; }
+
+body.af-native-inmuebles .wrap {
+    max-width: 1440px;
+    padding: 8px 4px 0;
+}
+
+/* Título + Add New: hero row */
+body.af-native-inmuebles .wrap > h1.wp-heading-inline {
+    font-size: 32px !important;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 8px 12px 4px 0 !important;
+}
+body.af-native-inmuebles .wrap > h1.wp-heading-inline + a.page-title-action {
+    background: #2563EB;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.28);
+    transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+    vertical-align: middle;
+}
+body.af-native-inmuebles .wrap > h1.wp-heading-inline + a.page-title-action::before {
+    content: "+ ";
+    font-weight: 700;
+    margin-right: 2px;
+}
+body.af-native-inmuebles .wrap > h1.wp-heading-inline + a.page-title-action:hover {
+    background: #1D4ED8;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+}
+
+/* Subline con conteo */
+body.af-native-inmuebles .subtitle {
+    color: #5B594F;
+    font-size: 14px;
+    margin: 4px 0 12px !important;
+}
+
+/* Bar de "views" (All | Published | Draft...) */
+body.af-native-inmuebles .subsubsub {
+    display: inline-flex;
+    gap: 2px;
+    background: #EEEDE8;
+    padding: 4px;
+    border-radius: 10px;
+    margin: 16px 0 8px !important;
+    font-size: 13px;
+}
+body.af-native-inmuebles .subsubsub li {
+    margin: 0 !important;
+    display: inline-flex;
+}
+body.af-native-inmuebles .subsubsub li::after { content: none !important; }
+body.af-native-inmuebles .subsubsub a {
+    padding: 6px 14px;
+    border-radius: 7px;
+    color: #5B594F;
+    text-decoration: none;
+    font-weight: 500;
+    transition: background 140ms ease, color 140ms ease;
+}
+body.af-native-inmuebles .subsubsub a:hover { color: #1B1A16; }
+body.af-native-inmuebles .subsubsub a.current {
+    background: #fff;
+    color: #1B1A16;
+    box-shadow: 0 1px 3px rgba(16, 24, 40, 0.08);
+    font-weight: 600;
+}
+
+/* Filter/search bar */
+body.af-native-inmuebles .tablenav.top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #fff;
+    padding: 12px 16px;
+    border: 1px solid #E2E1DB;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+    flex-wrap: wrap;
+}
+body.af-native-inmuebles .tablenav .actions,
+body.af-native-inmuebles .tablenav .alignleft.actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    float: none;
+}
+body.af-native-inmuebles .tablenav .search-box {
+    display: inline-flex;
+    gap: 8px;
+    float: none !important;
+    margin: 0 !important;
+}
+body.af-native-inmuebles .tablenav .search-box input[type="search"] {
+    min-width: 220px;
+    border-radius: 8px !important;
+}
+body.af-native-inmuebles .tablenav .tablenav-pages { margin-left: auto; }
+
+/* Wrap la tabla en card grande */
+body.af-native-inmuebles .wp-list-table {
+    border: 1px solid #E2E1DB !important;
+    border-radius: 14px !important;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 2px 10px rgba(16, 24, 40, 0.05);
+}
+body.af-native-inmuebles .wp-list-table thead th,
+body.af-native-inmuebles .wp-list-table tfoot th {
+    background: #FAFAF7;
+    color: #3F3E37;
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-bottom: 1px solid #EEEDE8;
+    padding: 14px 12px;
+}
+
+/* Rows: separación por bottom border, hover elevate */
+body.af-native-inmuebles .wp-list-table tbody tr {
+    background: #fff;
+    transition: background 140ms ease, box-shadow 140ms ease;
+}
+body.af-native-inmuebles .wp-list-table tbody tr td {
+    border-bottom: 1px solid #F0EFEA;
+    padding: 16px 12px !important;
+    vertical-align: middle;
+}
+body.af-native-inmuebles .wp-list-table tbody tr:hover td {
+    background: #FAFAF7;
+}
+body.af-native-inmuebles .wp-list-table tbody tr:last-child td { border-bottom: none; }
+body.af-native-inmuebles .wp-list-table.striped > tbody > :nth-child(odd) { background: transparent !important; }
+
+/* Title cell: título como link grande + row actions más discretas */
+body.af-native-inmuebles .wp-list-table .column-title a.row-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #1B1A16;
+    text-decoration: none;
+}
+body.af-native-inmuebles .wp-list-table .column-title a.row-title:hover { color: #1D4ED8; }
+body.af-native-inmuebles .wp-list-table .row-actions {
+    color: #A8A69E;
+    font-size: 12px;
+    padding-top: 4px;
+}
+body.af-native-inmuebles .wp-list-table .row-actions a {
+    color: #5B594F;
+    padding: 2px 6px;
+    border-radius: 5px;
+    transition: background 120ms ease, color 120ms ease;
+}
+body.af-native-inmuebles .wp-list-table .row-actions a:hover {
+    background: #EEEDE8;
+    color: #1B1A16;
+}
+body.af-native-inmuebles .wp-list-table .row-actions .trash a { color: #DC2626; }
+body.af-native-inmuebles .wp-list-table .row-actions .trash a:hover { background: #FEECEC; }
+
+/* Featured image (thumbnail) */
+body.af-native-inmuebles .wp-list-table td.column-thumbnail,
+body.af-native-inmuebles .wp-list-table td[class*="column-featured"] {
+    width: 84px;
+    padding: 8px !important;
+}
+body.af-native-inmuebles .wp-list-table td.column-thumbnail img,
+body.af-native-inmuebles .wp-list-table td[class*="column-featured"] img {
+    width: 72px !important;
+    height: 72px !important;
+    object-fit: cover;
+    border-radius: 10px;
+    box-shadow: 0 2px 6px rgba(16, 24, 40, 0.08);
+}
+
+/* Bulk actions dropdown look */
+body.af-native-inmuebles .tablenav select {
+    border-radius: 8px !important;
+    padding: 6px 10px !important;
+    min-height: 36px;
+}
+body.af-native-inmuebles .tablenav .button {
+    border-radius: 8px;
+    min-height: 36px;
+    padding: 6px 14px;
+}
+
+/* Pagination */
+body.af-native-inmuebles .tablenav-pages .pagination-links a,
+body.af-native-inmuebles .tablenav-pages .pagination-links span.current {
+    border-radius: 8px;
+    padding: 4px 10px;
+    min-width: 32px;
+    text-align: center;
+    display: inline-block;
+    background: #fff;
+    border: 1px solid #E2E1DB;
+    color: #3F3E37;
+    text-decoration: none;
+    transition: background 140ms ease, border-color 140ms ease;
+}
+body.af-native-inmuebles .tablenav-pages .pagination-links a:hover {
+    background: #F7F7F5;
+    border-color: #A8A69E;
+}
+body.af-native-inmuebles .tablenav-pages .pagination-links span.current {
+    background: #2563EB;
+    border-color: #2563EB;
+    color: #fff;
+    font-weight: 600;
+}
+
+/* Responsive — colapso a cards */
+@media (max-width: 900px) {
+    body.af-native-inmuebles .tablenav.top {
+        padding: 10px 12px;
+    }
+    body.af-native-inmuebles .tablenav .search-box input[type="search"] {
+        min-width: 0;
+        width: 100%;
+    }
+    body.af-native-inmuebles .wp-list-table thead { display: none; }
+    body.af-native-inmuebles .wp-list-table,
+    body.af-native-inmuebles .wp-list-table tbody,
+    body.af-native-inmuebles .wp-list-table tr {
+        display: block;
+        width: 100%;
+    }
+    body.af-native-inmuebles .wp-list-table tbody tr {
+        border: 1px solid #E2E1DB;
+        border-radius: 12px;
+        margin-bottom: 12px;
+        padding: 12px;
+        box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+    }
+    body.af-native-inmuebles .wp-list-table tbody tr td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 4px !important;
+        border-bottom: 1px dashed #F0EFEA;
+    }
+    body.af-native-inmuebles .wp-list-table tbody tr td::before {
+        content: attr(data-colname);
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #7A7870;
+        min-width: 100px;
+    }
+    body.af-native-inmuebles .wp-list-table td.check-column {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        padding: 0 !important;
+    }
+    body.af-native-inmuebles .wp-list-table td.check-column::before { display: none; }
+    body.af-native-inmuebles .wp-list-table tbody tr td:last-child { border-bottom: none; }
+}
+
+@media (max-width: 640px) {
+    body.af-native-inmuebles .wrap > h1.wp-heading-inline { font-size: 24px !important; }
+    body.af-native-inmuebles .wrap > h1.wp-heading-inline + a.page-title-action {
+        display: block;
+        margin: 8px 0 !important;
+        text-align: center;
+    }
+    body.af-native-inmuebles .tablenav.top { flex-direction: column; align-items: stretch; }
+    body.af-native-inmuebles .tablenav .tablenav-pages { margin-left: 0; }
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+   2) PROFILE — profile.php / user-edit.php
+   ─────────────────────────────────────────────────────────────────────── */
+
+body.af-native-profile #wpbody-content { padding-bottom: 40px; }
+
+body.af-native-profile .wrap {
+    max-width: 900px;
+    margin: 8px auto 0 !important;
+    padding: 0 4px;
+}
+
+body.af-native-profile .wrap > h1 {
+    font-size: 28px !important;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 4px 0 20px !important;
+}
+
+/* Cada bloque de h2 + form-table se convierte en una "card" visual */
+body.af-native-profile .wrap > h2 {
+    font-size: 16px !important;
+    font-weight: 700;
+    color: #1B1A16;
+    margin: 24px 0 4px !important;
+    padding: 20px 20px 12px;
+    background: #fff;
+    border: 1px solid #E2E1DB;
+    border-bottom: none;
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+}
+body.af-native-profile .wrap > h2 + h3 {
+    margin-top: 0 !important;
+    padding: 0 20px;
+    background: #fff;
+    border-left: 1px solid #E2E1DB;
+    border-right: 1px solid #E2E1DB;
+    font-size: 13px;
+    color: #7A7870;
+    font-weight: 500;
+}
+
+body.af-native-profile .wrap > .form-table {
+    background: #fff;
+    border: 1px solid #E2E1DB;
+    border-top: none;
+    border-radius: 0 0 14px 14px;
+    box-shadow: 0 2px 10px rgba(16, 24, 40, 0.05);
+    padding: 8px 20px 16px;
+    margin-top: 0 !important;
+    margin-bottom: 20px !important;
+    border-collapse: separate !important;
+}
+body.af-native-profile .wrap > .form-table tr { display: block; padding: 10px 0; border-bottom: 1px solid #F5F4F0; }
+body.af-native-profile .wrap > .form-table tr:last-child { border-bottom: none; }
+body.af-native-profile .wrap > .form-table th {
+    display: block;
+    width: 100%;
+    padding: 4px 0 !important;
+    font-size: 13px;
+    font-weight: 600;
+    color: #3F3E37;
+}
+body.af-native-profile .wrap > .form-table td {
+    display: block;
+    width: 100%;
+    padding: 4px 0 !important;
+}
+body.af-native-profile .wrap > .form-table td input[type="text"],
+body.af-native-profile .wrap > .form-table td input[type="email"],
+body.af-native-profile .wrap > .form-table td input[type="url"],
+body.af-native-profile .wrap > .form-table td input[type="password"],
+body.af-native-profile .wrap > .form-table td select,
+body.af-native-profile .wrap > .form-table td textarea {
+    max-width: 100%;
+    width: 100%;
+    border-radius: 8px;
+    border: 1px solid #CFCEC6;
+    padding: 8px 12px;
+    font-size: 14px;
+    transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+body.af-native-profile .wrap > .form-table td input:focus,
+body.af-native-profile .wrap > .form-table td select:focus,
+body.af-native-profile .wrap > .form-table td textarea:focus {
+    border-color: #2563EB;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+    outline: none;
+}
+body.af-native-profile .wrap > .form-table td p.description {
+    color: #7A7870;
+    font-size: 12px;
+    margin-top: 4px;
+    font-style: normal;
+}
+
+/* Password strength wrapper */
+body.af-native-profile .user-pass1-wrap .button.wp-generate-pw,
+body.af-native-profile .wp-pwd .button {
+    border-radius: 8px !important;
+    padding: 6px 14px !important;
+    background: #2563EB;
+    color: #fff;
+    border-color: #1D4ED8;
+    box-shadow: 0 1px 2px rgba(37, 99, 235, 0.28);
+}
+body.af-native-profile .wp-pwd .button:hover {
+    background: #1D4ED8;
+}
+body.af-native-profile #pass-strength-result {
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-weight: 600;
+    border-width: 0;
+    box-shadow: inset 0 0 0 2px currentColor;
+}
+body.af-native-profile #pass-strength-result.strong { color: #0F9D58; background: #E6F7EE; }
+body.af-native-profile #pass-strength-result.good   { color: #F59E0B; background: #FEF6E6; }
+body.af-native-profile #pass-strength-result.bad,
+body.af-native-profile #pass-strength-result.short  { color: #DC2626; background: #FEECEC; }
+
+/* Submit button prominente */
+body.af-native-profile .wrap > p.submit {
+    position: sticky;
+    bottom: 0;
+    background: linear-gradient(180deg, rgba(247, 247, 245, 0) 0%, #F7F7F5 40%);
+    padding: 16px 0 !important;
+    margin: 0 !important;
+    text-align: right;
+    z-index: 5;
+}
+body.af-native-profile .wrap > p.submit .button.button-primary {
+    background: #2563EB;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 28px !important;
+    font-size: 14px;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    min-height: 44px;
+    transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+body.af-native-profile .wrap > p.submit .button.button-primary:hover {
+    background: #1D4ED8;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 20px rgba(37, 99, 235, 0.35);
+}
+
+/* Ocultar bloque "Personal Options" (Admin color scheme, etc.) para owners
+   — puramente estético, no bloquea funcionalidad. */
+body.af-native-profile.af-owner-view h2:first-of-type,
+body.af-native-profile.af-owner-view .user-rich-editing-wrap,
+body.af-native-profile.af-owner-view .user-syntax-highlighting-wrap,
+body.af-native-profile.af-owner-view .user-admin-color-wrap,
+body.af-native-profile.af-owner-view .user-comment-shortcuts-wrap,
+body.af-native-profile.af-owner-view .show-admin-bar {
+    display: none;
+}
+
+/* Responsive */
+@media (max-width: 782px) {
+    body.af-native-profile .wrap { padding: 0 8px; }
+    body.af-native-profile .wrap > h2,
+    body.af-native-profile .wrap > .form-table { padding-left: 16px; padding-right: 16px; }
+    body.af-native-profile .wrap > p.submit { text-align: center; }
+    body.af-native-profile .wrap > p.submit .button.button-primary { width: 100%; }
+}

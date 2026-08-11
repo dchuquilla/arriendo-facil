@@ -26,6 +26,10 @@ class Arriendo_Facil_Admin {
 		add_action( 'admin_menu', array( $this, 'remove_menus_for_owner' ), 999 );
 		add_filter( 'login_redirect', array( $this, 'redirect_owner_after_login' ), 10, 3 );
 		add_action( 'admin_init', array( $this, 'redirect_owner_from_wp_dashboard' ) );
+		add_action( 'admin_init', array( $this, 'suppress_owner_update_nag' ) );
+		add_action( 'admin_bar_menu', array( $this, 'harden_admin_bar_for_owner' ), 999 );
+		add_action( 'admin_head', array( $this, 'owner_hardening_css' ) );
+		add_action( 'wp_head', array( $this, 'owner_hardening_css' ) );
 		add_action( 'wp_dashboard_setup', array( $this, 'remove_owner_dashboard_widgets' ), 999 );
 		add_action( 'wp_dashboard_setup', array( $this, 'register_native_dashboard_widget' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
@@ -174,6 +178,89 @@ class Arriendo_Facil_Admin {
 
 		// Hide Cleaning Services CPT (admin-managed, not for owners).
 		remove_submenu_page( 'arriendo-facil', 'edit.php?post_type=cleaning_service' );
+	}
+
+	/**
+	 * Returns true when the current user should see the owner-restricted UI
+	 * (owner role and NOT admin).
+	 */
+	private function is_restricted_owner() {
+		return Arriendo_Facil_Accommodation::user_is_owner() && ! current_user_can( 'manage_options' );
+	}
+
+	/**
+	 * Removes noisy WP-core nodes from the admin bar for owners.
+	 * Keeps: site-name (link a home), user account, notifications.
+	 *
+	 * @param WP_Admin_Bar $wp_admin_bar
+	 */
+	public function harden_admin_bar_for_owner( $wp_admin_bar ) {
+		if ( ! $this->is_restricted_owner() ) {
+			return;
+		}
+
+		$noisy_nodes = array(
+			'wp-logo',
+			'wp-logo-external',
+			'about',
+			'contribute',
+			'wporg',
+			'documentation',
+			'support-forums',
+			'feedback',
+			'view-site',
+			'dashboard',
+			'themes',
+			'menus',
+			'widgets',
+			'background',
+			'header',
+			'customize',
+			'search',
+			'comments',
+			'new-content',
+			'updates',
+			'edit',
+		);
+
+		foreach ( $noisy_nodes as $node ) {
+			$wp_admin_bar->remove_node( $node );
+		}
+	}
+
+	/**
+	 * Suppresses the "WordPress X.Y is available" nag for owners.
+	 */
+	public function suppress_owner_update_nag() {
+		if ( ! $this->is_restricted_owner() ) {
+			return;
+		}
+
+		remove_action( 'admin_notices', 'update_nag', 3 );
+		remove_action( 'network_admin_notices', 'update_nag', 3 );
+		remove_action( 'admin_notices', 'maintenance_nag', 10 );
+	}
+
+	/**
+	 * CSS fallback that hides residual WP-core UI for owners
+	 * (some nodes reappear via JS or are injected late).
+	 */
+	public function owner_hardening_css() {
+		if ( ! $this->is_restricted_owner() ) {
+			return;
+		}
+
+		echo '<style id="af-owner-hardening">'
+			. '#update-nag, .update-nag, .php-update-nag, .plugin-update-tr,'
+			. '#wp-admin-bar-wp-logo, #wp-admin-bar-updates, #wp-admin-bar-comments,'
+			. '#wp-admin-bar-new-content, #wp-admin-bar-customize, #wp-admin-bar-search,'
+			. '#wp-admin-bar-themes, #wp-admin-bar-menus, #wp-admin-bar-widgets,'
+			. '#wp-admin-bar-about, #wp-admin-bar-wporg, #wp-admin-bar-documentation,'
+			. '#wp-admin-bar-support-forums, #wp-admin-bar-feedback, #wp-admin-bar-contribute,'
+			. '#footer-upgrade, #wp-version-message,'
+			. 'body.wp-admin .notice.notice-warning.update-message'
+			. '{ display: none !important; }'
+			. '</style>';
 	}
 
 	/**

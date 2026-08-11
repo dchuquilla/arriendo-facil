@@ -94,6 +94,9 @@ function arriendo_facil_apply_runtime_upload_limits() {
 		add_action(
 			'admin_notices',
 			static function () use ( $failed ) {
+				if ( ! current_user_can( 'manage_options' ) ) {
+					return;
+				}
 				echo '<div class="notice notice-warning is-dismissible"><p>' .
 					esc_html(
 						sprintf(

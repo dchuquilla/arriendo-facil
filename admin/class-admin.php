@@ -30,6 +30,9 @@ class Arriendo_Facil_Admin {
 		add_action( 'admin_bar_menu', array( $this, 'harden_admin_bar_for_owner' ), 999 );
 		add_action( 'admin_head', array( $this, 'owner_hardening_css' ) );
 		add_action( 'wp_head', array( $this, 'owner_hardening_css' ) );
+		add_filter( 'admin_footer_text', array( $this, 'owner_admin_footer_text' ), 999 );
+		add_filter( 'update_footer', array( $this, 'owner_admin_footer_text' ), 999 );
+		add_filter( 'screen_options_show_screen', array( $this, 'owner_hide_screen_options' ), 999 );
 		add_action( 'wp_dashboard_setup', array( $this, 'remove_owner_dashboard_widgets' ), 999 );
 		add_action( 'wp_dashboard_setup', array( $this, 'register_native_dashboard_widget' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
@@ -221,6 +224,9 @@ class Arriendo_Facil_Admin {
 			'new-content',
 			'updates',
 			'edit',
+			'view',
+			'view-store',
+			'archive',
 		);
 
 		foreach ( $noisy_nodes as $node ) {
@@ -257,10 +263,40 @@ class Arriendo_Facil_Admin {
 			. '#wp-admin-bar-themes, #wp-admin-bar-menus, #wp-admin-bar-widgets,'
 			. '#wp-admin-bar-about, #wp-admin-bar-wporg, #wp-admin-bar-documentation,'
 			. '#wp-admin-bar-support-forums, #wp-admin-bar-feedback, #wp-admin-bar-contribute,'
-			. '#footer-upgrade, #wp-version-message,'
+			. '#wp-admin-bar-view, #wp-admin-bar-view-store, #wp-admin-bar-archive,'
+			. '#screen-options-link-wrap, #contextual-help-link-wrap,'
+			. '#screen-meta, #screen-meta-links,'
+			. '#wpfooter, #footer-upgrade, #footer-thankyou, #wp-version-message,'
 			. 'body.wp-admin .notice.notice-warning.update-message'
 			. '{ display: none !important; }'
 			. '</style>';
+	}
+
+	/**
+	 * Empties the admin footer text (left "Thank you for creating with WordPress"
+	 * and right version string) for owners.
+	 *
+	 * @param string $text Original footer text.
+	 * @return string
+	 */
+	public function owner_admin_footer_text( $text ) {
+		if ( ! $this->is_restricted_owner() ) {
+			return $text;
+		}
+		return '';
+	}
+
+	/**
+	 * Hides the "Screen Options" and "Help" tabs for owners.
+	 *
+	 * @param bool $show Whether to show screen options.
+	 * @return bool
+	 */
+	public function owner_hide_screen_options( $show ) {
+		if ( ! $this->is_restricted_owner() ) {
+			return $show;
+		}
+		return false;
 	}
 
 	/**

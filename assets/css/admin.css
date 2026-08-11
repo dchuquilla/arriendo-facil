@@ -311,8 +311,28 @@ body.post-type-cleaning_service .page-title-action:focus {
 .af-leases-table {
 	table-layout: auto !important;
 	width: 100%;
-	min-width: 1360px;
 }
+
+.af-leases-table th:nth-child(1),
+.af-leases-table td:nth-child(1) { width: 4%; }
+.af-leases-table th:nth-child(2),
+.af-leases-table td:nth-child(2) { width: 10%; }
+.af-leases-table th:nth-child(3),
+.af-leases-table td:nth-child(3) { width: 7%; }
+.af-leases-table th:nth-child(4),
+.af-leases-table td:nth-child(4),
+.af-leases-table th:nth-child(5),
+.af-leases-table td:nth-child(5) { width: 8%; }
+.af-leases-table th:nth-child(6),
+.af-leases-table td:nth-child(6) { width: 7%; }
+.af-leases-table th:nth-child(7),
+.af-leases-table td:nth-child(7) { width: 9%; }
+.af-leases-table th:nth-child(8),
+.af-leases-table td:nth-child(8) { width: 10%; }
+.af-leases-table th:nth-child(9),
+.af-leases-table td:nth-child(9) { width: 15%; }
+.af-leases-table th:nth-child(10),
+.af-leases-table td:nth-child(10) { width: 22%; }
 
 .af-leases-table th:nth-child(1),
 .af-leases-table th:nth-child(3),
@@ -330,8 +350,8 @@ body.post-type-cleaning_service .page-title-action:focus {
 }
 
 .af-lease-document-cell {
-	min-width: 250px;
-	max-width: 320px;
+	min-width: 0;
+	max-width: none;
 	line-height: 1.5;
 }
 
@@ -356,12 +376,12 @@ body.post-type-cleaning_service .page-title-action:focus {
 }
 
 .af-lease-actions-cell {
-	min-width: 360px;
+	min-width: 0;
 }
 
 .af-lease-actions-stack {
 	display: grid;
-	grid-template-columns: repeat(2, minmax(155px, 1fr));
+	grid-template-columns: repeat(2, minmax(0, 1fr));
 	align-items: stretch;
 	gap: 8px;
 }
@@ -369,10 +389,11 @@ body.post-type-cleaning_service .page-title-action:focus {
 .af-lease-actions-stack .button {
 	width: 100%;
 	justify-content: center;
-	white-space: nowrap;
+	white-space: normal;
 	min-height: 34px;
 	font-size: 12px;
 	padding: 4px 10px;
+	line-height: 1.2;
 }
 
 .af-lease-actions-stack .af-early-terminate-lease-btn,
@@ -387,10 +408,6 @@ body.post-type-cleaning_service .page-title-action:focus {
 }
 
 @media (max-width: 1400px) {
-	.af-leases-table {
-		min-width: 0;
-	}
-
 	.af-leases-table th:nth-child(1),
 	.af-leases-table th:nth-child(3),
 	.af-leases-table th:nth-child(4),
@@ -404,14 +421,6 @@ body.post-type-cleaning_service .page-title-action:focus {
 	.af-leases-table td:nth-child(6),
 	.af-leases-table td:nth-child(7) {
 		white-space: normal;
-	}
-
-	.af-lease-actions-cell {
-		min-width: 0;
-	}
-
-	.af-lease-actions-stack {
-		grid-template-columns: 1fr;
 	}
 }
 

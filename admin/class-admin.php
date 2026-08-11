@@ -34,6 +34,8 @@ class Arriendo_Facil_Admin {
 		add_filter( 'update_footer', array( $this, 'owner_admin_footer_text' ), 999 );
 		add_filter( 'screen_options_show_screen', array( $this, 'owner_hide_screen_options' ), 999 );
 		add_filter( 'admin_body_class', array( $this, 'tag_native_pages_body_class' ) );
+		add_action( 'pre_get_posts', array( $this, 'restrict_accommodation_list_to_owner' ) );
+		add_filter( 'views_edit-accommodation', array( $this, 'filter_accommodation_status_views_for_owner' ) );
 		add_action( 'wp_dashboard_setup', array( $this, 'remove_owner_dashboard_widgets' ), 999 );
 		add_action( 'wp_dashboard_setup', array( $this, 'register_native_dashboard_widget' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
@@ -328,6 +330,110 @@ class Arriendo_Facil_Admin {
 		}
 
 		return $classes;
+	}
+
+	/**
+	 * Restricts the accommodation admin list to posts authored by the owner.
+	 *
+	 * @param WP_Query $query
+	 * @return void
+	 */
+	public function restrict_accommodation_list_to_owner( $query ) {
+		if ( ! is_admin() || ! $query->is_main_query() ) {
+			return;
+		}
+		global $pagenow, $typenow;
+		if ( 'edit.php' !== $pagenow || 'accommodation' !== $typenow ) {
+			return;
+		}
+		if ( ! $this->is_restricted_owner() ) {
+			return;
+		}
+		$query->set( 'author', get_current_user_id() );
+	}
+
+	/**
+	 * Rewrites the status tab counts (All / Published / Draft…) so owners
+	 * only see totals for their own accommodations.
+	 *
+	 * @param array $views
+	 * @return array
+	 */
+	public function filter_accommodation_status_views_for_owner( $views ) {
+		if ( ! $this->is_restricted_owner() ) {
+			return $views;
+		}
+
+		$user_id = get_current_user_id();
+		$counts  = wp_count_posts( 'accommodation', 'readable' );
+
+		// Recount per status scoped to this author.
+		$statuses = array( 'publish', 'future', 'draft', 'pending', 'private', 'trash' );
+		$scoped   = array_fill_keys( $statuses, 0 );
+		$total    = 0;
+
+		foreach ( $statuses as $status ) {
+			$q = new WP_Query( array(
+				'post_type'      => 'accommodation',
+				'post_status'    => $status,
+				'author'         => $user_id,
+				'fields'         => 'ids',
+				'posts_per_page' => 1,
+				'no_found_rows'  => false,
+			) );
+			$scoped[ $status ] = (int) $q->found_posts;
+			if ( 'trash' !== $status ) {
+				$total += $scoped[ $status ];
+			}
+		}
+
+		$base_url = admin_url( 'edit.php?post_type=accommodation' );
+		$current  = isset( $_GET['post_status'] ) ? sanitize_key( wp_unslash( $_GET['post_status'] ) ) : '';
+
+		$out = array();
+
+		// "All" view.
+		if ( isset( $views['all'] ) ) {
+			$class      = ( '' === $current || 'all' === $current ) ? 'current' : '';
+			$out['all'] = sprintf(
+				'<a href="%s" class="%s">%s <span class="count">(%d)</span></a>',
+				esc_url( $base_url ),
+				esc_attr( $class ),
+				esc_html__( 'Todos', 'arriendo-facil' ),
+				$total
+			);
+		}
+
+		$labels = array(
+			'publish' => __( 'Publicados', 'arriendo-facil' ),
+			'future'  => __( 'Programados', 'arriendo-facil' ),
+			'draft'   => __( 'Borradores', 'arriendo-facil' ),
+			'pending' => __( 'Pendientes', 'arriendo-facil' ),
+			'private' => __( 'Privados', 'arriendo-facil' ),
+			'trash'   => __( 'Papelera', 'arriendo-facil' ),
+		);
+
+		foreach ( $labels as $status => $label ) {
+			if ( ! isset( $views[ $status ] ) ) {
+				continue;
+			}
+			if ( 0 === $scoped[ $status ] ) {
+				continue;
+			}
+			$class = ( $current === $status ) ? 'current' : '';
+			$url   = add_query_arg( 'post_status', $status, $base_url );
+			$out[ $status ] = sprintf(
+				'<a href="%s" class="%s">%s <span class="count">(%d)</span></a>',
+				esc_url( $url ),
+				esc_attr( $class ),
+				esc_html( $label ),
+				$scoped[ $status ]
+			);
+		}
+
+		unset( $counts );
+
+		return $out;
 	}
 
 	/**

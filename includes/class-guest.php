@@ -59,21 +59,29 @@ class Arriendo_Facil_Guest {
 
 		ob_start();
 		?>
+		<style>
+			#<?php echo esc_html( $instance_id ); ?> .af-tenant-signup-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+			#<?php echo esc_html( $instance_id ); ?> .af-tenant-signup-full{grid-column:1 / -1;}
+			#<?php echo esc_html( $instance_id ); ?> .af-tenant-signup-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;}
+			#<?php echo esc_html( $instance_id ); ?> .af-tenant-signup-title{margin:0 0 8px;color:#0f172a;font-size:26px;line-height:1.2;}
+			@media (max-width: 760px){
+				#<?php echo esc_html( $instance_id ); ?>{padding:16px !important;margin:14px auto !important;}
+				#<?php echo esc_html( $instance_id ); ?> .af-tenant-signup-grid{grid-template-columns:1fr;gap:10px;}
+				#<?php echo esc_html( $instance_id ); ?> .af-tenant-signup-title{font-size:22px;}
+				#<?php echo esc_html( $instance_id ); ?> .af-tenant-signup-actions{flex-direction:column;align-items:stretch;}
+				#<?php echo esc_html( $instance_id ); ?> .af-tenant-signup-actions .af-tenant-signup-link{text-align:center;}
+			}
+		</style>
 		<div id="<?php echo esc_attr( $instance_id ); ?>" style="max-width:760px;margin:24px auto;padding:22px;border:1px solid #dbe3ef;border-radius:14px;background:#ffffff;box-shadow:0 8px 22px rgba(15,23,42,.06);">
-			<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-				<div>
-					<h3 style="margin:0 0 8px;color:#0f172a;font-size:26px;line-height:1.2;"><?php echo esc_html__( 'Crea tu cuenta como inquilino', 'arriendo-facil' ); ?></h3>
-					<p style="margin:0;color:#475569;line-height:1.6;"><?php echo esc_html__( 'Registra tus datos, define tu clave y gestiona tus visitas, contratos y reservas en un solo lugar.', 'arriendo-facil' ); ?></p>
-				</div>
-				<button type="button" data-af-open-signup style="padding:11px 16px;border:0;border-radius:10px;background:#0f766e;color:#fff;font-weight:700;cursor:pointer;">
-					<?php echo esc_html__( 'Crea tu cuenta como inquilino', 'arriendo-facil' ); ?>
-				</button>
+			<div>
+				<h3 class="af-tenant-signup-title"><?php echo esc_html__( 'Crea tu cuenta como inquilino', 'arriendo-facil' ); ?></h3>
+				<p style="margin:0;color:#475569;line-height:1.6;"><?php echo esc_html__( 'Registra tus datos, define tu clave y gestiona tus visitas, contratos y reservas en un solo lugar.', 'arriendo-facil' ); ?></p>
 			</div>
 
 			<div data-af-signup-alert style="display:none;margin-top:16px;padding:10px 12px;border-radius:10px;"></div>
 
-			<form data-af-signup-form style="display:none;margin-top:16px;">
-				<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+			<form data-af-signup-form style="display:block;margin-top:16px;">
+				<div class="af-tenant-signup-grid">
 					<label style="display:flex;flex-direction:column;gap:6px;">
 						<span style="font-weight:600;color:#0f172a;"><?php echo esc_html__( 'Nombres', 'arriendo-facil' ); ?></span>
 						<input type="text" name="first_name" required maxlength="100" style="padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;" />
@@ -82,7 +90,7 @@ class Arriendo_Facil_Guest {
 						<span style="font-weight:600;color:#0f172a;"><?php echo esc_html__( 'Apellidos', 'arriendo-facil' ); ?></span>
 						<input type="text" name="last_name" required maxlength="100" style="padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;" />
 					</label>
-					<label style="display:flex;flex-direction:column;gap:6px;grid-column:1 / -1;">
+					<label class="af-tenant-signup-full" style="display:flex;flex-direction:column;gap:6px;">
 						<span style="font-weight:600;color:#0f172a;"><?php echo esc_html__( 'Correo electronico', 'arriendo-facil' ); ?></span>
 						<input type="email" name="email" required maxlength="190" style="padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;" />
 					</label>
@@ -109,12 +117,12 @@ class Arriendo_Facil_Guest {
 					<span><?php echo esc_html__( 'Acepto el tratamiento de mis datos para el proceso de arriendo.', 'arriendo-facil' ); ?></span>
 				</label>
 
-				<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;">
+				<div class="af-tenant-signup-actions">
 					<button type="submit" data-af-submit-signup style="padding:11px 16px;border:0;border-radius:10px;background:#1d4ed8;color:#fff;font-weight:700;cursor:pointer;">
 						<?php echo esc_html__( 'Crear cuenta', 'arriendo-facil' ); ?>
 					</button>
-					<a href="<?php echo esc_url( $login_url ); ?>" style="color:#1d4ed8;text-decoration:underline;"><?php echo esc_html__( 'Ya tengo cuenta, iniciar sesion', 'arriendo-facil' ); ?></a>
-					<a href="<?php echo esc_url( $recover_url ); ?>" style="color:#475569;text-decoration:underline;"><?php echo esc_html__( 'Recuperar contrasena', 'arriendo-facil' ); ?></a>
+					<a class="af-tenant-signup-link" href="<?php echo esc_url( $login_url ); ?>" style="color:#1d4ed8;text-decoration:underline;"><?php echo esc_html__( 'Ya tengo cuenta, iniciar sesion', 'arriendo-facil' ); ?></a>
+					<a class="af-tenant-signup-link" href="<?php echo esc_url( $recover_url ); ?>" style="color:#475569;text-decoration:underline;"><?php echo esc_html__( 'Recuperar contrasena', 'arriendo-facil' ); ?></a>
 				</div>
 			</form>
 		</div>
@@ -126,7 +134,6 @@ class Arriendo_Facil_Guest {
 
 			const ajaxUrl = <?php echo wp_json_encode( $ajax_url ); ?>;
 			const nonce = <?php echo wp_json_encode( $nonce ); ?>;
-			const openBtn = app.querySelector('[data-af-open-signup]');
 			const form = app.querySelector('[data-af-signup-form]');
 			const submitBtn = app.querySelector('[data-af-submit-signup]');
 			const alertBox = app.querySelector('[data-af-signup-alert]');
@@ -145,12 +152,8 @@ class Arriendo_Facil_Guest {
 				}
 			}
 
-			openBtn.addEventListener('click', function(){
-				form.style.display = 'block';
-				openBtn.style.display = 'none';
-				const firstInput = form.querySelector('input[name="first_name"]');
-				if(firstInput){ firstInput.focus(); }
-			});
+			const firstInput = form.querySelector('input[name="first_name"]');
+			if(firstInput){ firstInput.focus(); }
 
 			form.addEventListener('submit', async function(e){
 				e.preventDefault();
@@ -185,6 +188,9 @@ class Arriendo_Facil_Guest {
 
 				showAlert((json.data && json.data.message) ? json.data.message : <?php echo wp_json_encode( __( 'Cuenta creada correctamente.', 'arriendo-facil' ) ); ?>, 'success');
 				form.reset();
+				if(json.data && json.data.login_url){
+					setTimeout(function(){ window.location.href = String(json.data.login_url); }, 900);
+				}
 			});
 		})();
 		</script>
@@ -292,11 +298,13 @@ class Arriendo_Facil_Guest {
 
 		$this->upsert_guest_row_for_tenant( $user_id, $first_name, $last_name, $email, $phone, $id_number );
 		$this->send_tenant_account_created_email( $user_id );
+		$tenant_dashboard_url = admin_url();
 
 		wp_send_json_success(
 			array(
-				'user_id'  => (int) $user_id,
-				'message'  => __( 'Tu cuenta de inquilino fue creada correctamente. Te enviamos un correo de confirmacion.', 'arriendo-facil' ),
+				'user_id'   => (int) $user_id,
+				'login_url' => wp_login_url( $tenant_dashboard_url ),
+				'message'   => __( 'Tu cuenta de inquilino fue creada correctamente. Te enviamos un correo de confirmacion.', 'arriendo-facil' ),
 			)
 		);
 	}

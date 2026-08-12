@@ -437,7 +437,7 @@ class Arriendo_Facil_Admin {
 	}
 
 	/**
-	 * Redirects owner users to Arriendo Facil dashboard right after login.
+	 * Redirects owner/tenant users to their dashboard right after login.
 	 *
 	 * @param string           $redirect_to           Requested redirect destination.
 	 * @param string           $requested_redirect_to Redirect destination passed to login form.
@@ -450,6 +450,11 @@ class Arriendo_Facil_Admin {
 		}
 
 		$roles = isset( $user->roles ) && is_array( $user->roles ) ? $user->roles : array();
+
+		if ( in_array( 'af_tenant', $roles, true ) && ! in_array( 'administrator', $roles, true ) ) {
+			return $this->get_tenant_dashboard_url();
+		}
+
 		if ( in_array( 'af_owner', $roles, true ) && ! in_array( 'administrator', $roles, true ) ) {
 			return admin_url( 'admin.php?page=arriendo-facil' );
 		}
@@ -458,12 +463,35 @@ class Arriendo_Facil_Admin {
 	}
 
 	/**
+	 * Resolves tenant dashboard URL.
+	 *
+	 * @return string
+	 */
+	private function get_tenant_dashboard_url() {
+		return admin_url();
+	}
+
+	/**
 	 * Prevents owner users from landing on WordPress native dashboard.
 	 *
 	 * @return void
 	 */
 	public function redirect_owner_from_wp_dashboard() {
-		if ( ! is_admin() || wp_doing_ajax() || ! Arriendo_Facil_Accommodation::user_is_owner() || current_user_can( 'manage_options' ) ) {
+		if ( ! is_admin() || wp_doing_ajax() || current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		$user = wp_get_current_user();
+		if ( ! ( $user instanceof WP_User ) ) {
+			return;
+		}
+
+		$roles = isset( $user->roles ) && is_array( $user->roles ) ? $user->roles : array();
+		if ( in_array( 'af_tenant', $roles, true ) ) {
+			return;
+		}
+
+		if ( ! Arriendo_Facil_Accommodation::user_is_owner() ) {
 			return;
 		}
 

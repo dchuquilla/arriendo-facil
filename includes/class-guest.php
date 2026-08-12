@@ -24,6 +24,11 @@ class Arriendo_Facil_Guest {
 		add_action( 'wp_ajax_af_create_guest', array( $this, 'ajax_create_guest' ) );
 		add_action( 'wp_ajax_af_register_tenant_account', array( $this, 'ajax_register_tenant_account' ) );
 		add_action( 'wp_ajax_nopriv_af_register_tenant_account', array( $this, 'ajax_register_tenant_account' ) );
+		add_action( 'wp_ajax_af_resend_tenant_verification_email', array( $this, 'ajax_resend_tenant_verification_email' ) );
+		add_action( 'wp_ajax_nopriv_af_resend_tenant_verification_email', array( $this, 'ajax_resend_tenant_verification_email' ) );
+		add_action( 'login_init', array( $this, 'handle_tenant_email_verification_request' ) );
+		add_filter( 'authenticate', array( $this, 'enforce_tenant_email_verification_on_login' ), 30, 3 );
+		add_filter( 'login_message', array( $this, 'render_tenant_email_verification_login_notice' ) );
 		add_action( 'wp_ajax_af_process_guest_post_submit_now', array( $this, 'ajax_process_guest_post_submit_now' ) );
 		add_action( 'wp_ajax_nopriv_af_process_guest_post_submit_now', array( $this, 'ajax_process_guest_post_submit_now' ) );
 		add_action( 'wp_ajax_af_send_guest_profile_link', array( $this, 'ajax_send_guest_profile_link' ) );
@@ -56,6 +61,8 @@ class Arriendo_Facil_Guest {
 		$login_url    = wp_login_url( home_url( '/' ) );
 		$recover_url  = wp_lostpassword_url();
 		$instance_id  = 'af-tenant-signup-' . wp_rand( 1000, 999999 );
+		$form_ts      = time();
+		$form_sig     = hash_hmac( 'sha256', (string) $form_ts, wp_salt( 'nonce' ) . 'af_tenant_signup_form_v1' );
 		$terms_page   = get_page_by_path( 'terminos-y-condiciones' );
 		$terms_url    = $terms_page instanceof WP_Post ? get_permalink( $terms_page ) : home_url( '/terminos-y-condiciones/' );
 		$privacy_url  = function_exists( 'get_privacy_policy_url' ) ? get_privacy_policy_url() : home_url( '/politica-de-privacidad/' );
@@ -115,6 +122,8 @@ class Arriendo_Facil_Guest {
 				</div>
 
 				<input type="text" name="website" value="" tabindex="-1" autocomplete="off" aria-hidden="true" class="af-tenant-signup__honeypot" />
+				<input type="hidden" name="form_ts" value="<?php echo esc_attr( (string) $form_ts ); ?>" />
+				<input type="hidden" name="form_sig" value="<?php echo esc_attr( (string) $form_sig ); ?>" />
 
 				<label class="af-tenant-signup__legal">
 					<input type="checkbox" name="accept_terms" value="1" required class="af-tenant-signup__checkbox" />
@@ -135,6 +144,7 @@ class Arriendo_Facil_Guest {
 					<button type="submit" data-af-submit-signup class="af-tenant-signup__submit">
 						<?php echo esc_html__( 'Crear cuenta', 'arriendo-facil' ); ?>
 					</button>
+					<a class="af-tenant-signup__link af-tenant-signup__link--secondary" href="#" data-af-resend-verification><?php echo esc_html__( 'Reenviar correo de verificacion', 'arriendo-facil' ); ?></a>
 					<a class="af-tenant-signup__link af-tenant-signup__link--primary" href="<?php echo esc_url( $login_url ); ?>"><?php echo esc_html__( 'Ya tengo cuenta, iniciar sesion', 'arriendo-facil' ); ?></a>
 					<a class="af-tenant-signup__link af-tenant-signup__link--secondary" href="<?php echo esc_url( $recover_url ); ?>"><?php echo esc_html__( 'Recuperar contrasena', 'arriendo-facil' ); ?></a>
 				</div>
@@ -150,9 +160,11 @@ class Arriendo_Facil_Guest {
 			const nonce = <?php echo wp_json_encode( $nonce ); ?>;
 			const form = app.querySelector('[data-af-signup-form]');
 			const submitBtn = app.querySelector('[data-af-submit-signup]');
+			const resendLink = app.querySelector('[data-af-resend-verification]');
 			const alertBox = app.querySelector('[data-af-signup-alert]');
 			const passwordInput = form.querySelector('input[name="password"]');
 			const passwordConfirmInput = form.querySelector('input[name="password_confirm"]');
+			const emailInput = form.querySelector('input[name="email"]');
 
 			function showAlert(message, type){
 				alertBox.style.display = 'block';
@@ -226,10 +238,61 @@ class Arriendo_Facil_Guest {
 
 				showAlert((json.data && json.data.message) ? json.data.message : <?php echo wp_json_encode( __( 'Cuenta creada correctamente.', 'arriendo-facil' ) ); ?>, 'success');
 				form.reset();
-				if(json.data && json.data.login_url){
+				if(json.data && json.data.should_redirect && json.data.login_url){
 					setTimeout(function(){ window.location.href = String(json.data.login_url); }, 900);
 				}
 			});
+
+			if(resendLink){
+				resendLink.addEventListener('click', async function(e){
+					e.preventDefault();
+
+					const emailValue = String(emailInput && emailInput.value ? emailInput.value : '').trim();
+					if(!emailValue || !/^\S+@\S+\.\S+$/.test(emailValue)){
+						showAlert(<?php echo wp_json_encode( __( 'Ingresa un correo valido para reenviar la verificacion.', 'arriendo-facil' ) ); ?>, 'error');
+						return;
+					}
+
+					resendLink.setAttribute('aria-disabled', 'true');
+					resendLink.style.pointerEvents = 'none';
+					resendLink.style.opacity = '0.6';
+
+					const data = new URLSearchParams();
+					data.set('action', 'af_resend_tenant_verification_email');
+					data.set('nonce', nonce);
+					data.set('email', emailValue);
+
+					let json;
+					try {
+						const response = await fetch(ajaxUrl, {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+							body: data.toString()
+						});
+						json = await response.json();
+					} catch (err) {
+						resendLink.removeAttribute('aria-disabled');
+						resendLink.style.pointerEvents = '';
+						resendLink.style.opacity = '';
+						showAlert(<?php echo wp_json_encode( __( 'No se pudo reenviar el correo en este momento. Intenta nuevamente.', 'arriendo-facil' ) ); ?>, 'error');
+						return;
+					}
+
+					setTimeout(function(){
+						resendLink.removeAttribute('aria-disabled');
+						resendLink.style.pointerEvents = '';
+						resendLink.style.opacity = '';
+					}, 1200);
+
+					if(!json || !json.success){
+						const message = json && json.data && json.data.message ? json.data.message : <?php echo wp_json_encode( __( 'No se pudo procesar el reenvio.', 'arriendo-facil' ) ); ?>;
+						showAlert(message, 'error');
+						return;
+					}
+
+					showAlert((json.data && json.data.message) ? json.data.message : <?php echo wp_json_encode( __( 'Si tu cuenta esta pendiente, te enviaremos un nuevo correo.', 'arriendo-facil' ) ); ?>, 'success');
+				});
+			}
 		})();
 		</script>
 		<?php
@@ -247,10 +310,6 @@ class Arriendo_Facil_Guest {
 			wp_send_json_error( array( 'message' => __( 'La sesion expiro. Recarga la pagina e intenta nuevamente.', 'arriendo-facil' ) ), 403 );
 		}
 
-		if ( ! $this->tenant_signup_within_rate_limit() ) {
-			wp_send_json_error( array( 'message' => __( 'Demasiados intentos. Espera unos minutos e intenta nuevamente.', 'arriendo-facil' ) ), 429 );
-		}
-
 		$first_name       = isset( $_POST['first_name'] ) ? AF_Text_Normalizer::proper_name( wp_unslash( $_POST['first_name'] ) ) : '';
 		$last_name        = isset( $_POST['last_name'] ) ? AF_Text_Normalizer::proper_name( wp_unslash( $_POST['last_name'] ) ) : '';
 		$email            = isset( $_POST['email'] ) ? AF_Text_Normalizer::email( wp_unslash( $_POST['email'] ) ) : '';
@@ -260,6 +319,8 @@ class Arriendo_Facil_Guest {
 		$password_confirm = isset( $_POST['password_confirm'] ) ? (string) wp_unslash( $_POST['password_confirm'] ) : '';
 		$accept_terms     = isset( $_POST['accept_terms'] ) ? absint( wp_unslash( $_POST['accept_terms'] ) ) : 0;
 		$website_honeypot = isset( $_POST['website'] ) ? sanitize_text_field( wp_unslash( $_POST['website'] ) ) : '';
+		$form_ts          = isset( $_POST['form_ts'] ) ? absint( wp_unslash( $_POST['form_ts'] ) ) : 0;
+		$form_sig         = isset( $_POST['form_sig'] ) ? sanitize_text_field( wp_unslash( $_POST['form_sig'] ) ) : '';
 
 		if ( '' === $first_name || '' === $last_name || '' === $email || '' === $phone || '' === $id_number || '' === $password || '' === $password_confirm ) {
 			wp_send_json_error( array( 'message' => __( 'Completa todos los campos obligatorios.', 'arriendo-facil' ) ), 400 );
@@ -270,8 +331,17 @@ class Arriendo_Facil_Guest {
 			wp_send_json_error( array( 'message' => __( 'No se pudo procesar la solicitud.', 'arriendo-facil' ) ), 400 );
 		}
 
+		if ( ! $this->validate_tenant_signup_form_proof( $form_ts, $form_sig ) ) {
+			$this->log_tenant_signup_security_event( 'invalid_form_proof', $email );
+			wp_send_json_error( array( 'message' => __( 'No se pudo validar la solicitud. Recarga la pagina e intenta nuevamente.', 'arriendo-facil' ) ), 400 );
+		}
+
 		if ( ! is_email( $email ) ) {
 			wp_send_json_error( array( 'message' => __( 'Correo electronico invalido.', 'arriendo-facil' ) ), 400 );
+		}
+
+		if ( ! $this->tenant_signup_within_rate_limit( $email ) ) {
+			wp_send_json_error( array( 'message' => __( 'Demasiados intentos. Espera unos minutos e intenta nuevamente.', 'arriendo-facil' ) ), 429 );
 		}
 
 		if ( 1 !== $accept_terms ) {
@@ -299,6 +369,22 @@ class Arriendo_Facil_Guest {
 				array(
 					'code'    => 'email_exists',
 					'message' => __( 'Ese correo ya tiene una cuenta. Inicia sesion o recupera tu contrasena.', 'arriendo-facil' ),
+				),
+				409
+			);
+		}
+
+		$id_fingerprint = $this->build_tenant_identity_fingerprint( $id_number );
+		if ( '' === $id_fingerprint ) {
+			wp_send_json_error( array( 'message' => __( 'No se pudo validar tu identificacion. Intenta nuevamente.', 'arriendo-facil' ) ), 400 );
+		}
+
+		if ( $this->tenant_identity_fingerprint_exists( $id_fingerprint ) ) {
+			$this->log_tenant_signup_security_event( 'duplicate_identity_fingerprint', $email );
+			wp_send_json_error(
+				array(
+					'code'    => 'identity_exists',
+					'message' => __( 'La identificacion ya esta asociada a una cuenta. Si necesitas ayuda, contacta soporte.', 'arriendo-facil' ),
 				),
 				409
 			);
@@ -338,6 +424,8 @@ class Arriendo_Facil_Guest {
 
 		update_user_meta( $user_id, 'af_tenant_phone_enc', $encrypted_phone );
 		update_user_meta( $user_id, 'af_tenant_id_number_enc', $encrypted_id );
+		update_user_meta( $user_id, 'af_tenant_id_fingerprint', $id_fingerprint );
+		update_user_meta( $user_id, 'af_tenant_email_verified', 0 );
 		update_user_meta( $user_id, 'af_tenant_terms_accepted_at', current_time( 'mysql' ) );
 		update_user_meta( $user_id, 'af_tenant_terms_version', '2026-08-owasp-hardened' );
 
@@ -347,15 +435,88 @@ class Arriendo_Facil_Guest {
 		}
 
 		$this->upsert_guest_row_for_tenant( $user_id, $first_name, $last_name, $email, $phone, $id_number, $encrypted_phone, $encrypted_id );
-		$this->send_tenant_account_created_email( $user_id );
+
+		$verification_token = $this->create_tenant_email_verification_token( $user_id );
+		if ( is_wp_error( $verification_token ) ) {
+			$this->log_tenant_signup_security_event( 'verification_token_generation_failed', $email );
+			$this->delete_tenant_user_safely( $user_id );
+			wp_send_json_error( array( 'message' => __( 'No se pudo finalizar el registro seguro. Intenta nuevamente.', 'arriendo-facil' ) ), 500 );
+		}
+
+		if ( ! $this->send_tenant_email_verification_email( $user_id, (string) $verification_token ) ) {
+			$this->log_tenant_signup_security_event( 'verification_email_failed', $email );
+			$this->delete_tenant_user_safely( $user_id );
+			wp_send_json_error( array( 'message' => __( 'No se pudo enviar el correo de verificacion. Intenta nuevamente en unos minutos.', 'arriendo-facil' ) ), 500 );
+		}
+
 		$tenant_dashboard_url = admin_url();
-		$this->log_tenant_signup_security_event( 'signup_success', $email );
+		$this->log_tenant_signup_security_event( 'signup_pending_verification', $email );
 
 		wp_send_json_success(
 			array(
-				'user_id'   => (int) $user_id,
-				'login_url' => wp_login_url( $tenant_dashboard_url ),
-				'message'   => __( 'Tu cuenta de inquilino fue creada correctamente. Te enviamos un correo de confirmacion.', 'arriendo-facil' ),
+				'user_id'                => (int) $user_id,
+				'login_url'              => wp_login_url( $tenant_dashboard_url ),
+				'should_redirect'        => false,
+				'requires_verification'  => true,
+				'message'                => __( 'Te enviamos un correo para verificar tu cuenta. Debes confirmar ese enlace antes de iniciar sesion.', 'arriendo-facil' ),
+			)
+		);
+	}
+
+	/**
+	 * AJAX: resends tenant verification email.
+	 *
+	 * @return void
+	 */
+	public function ajax_resend_tenant_verification_email() {
+		if ( false === check_ajax_referer( 'af_guest_frontend_nonce', 'nonce', false ) ) {
+			wp_send_json_error( array( 'message' => __( 'La sesion expiro. Recarga la pagina e intenta nuevamente.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$email = isset( $_POST['email'] ) ? AF_Text_Normalizer::email( wp_unslash( $_POST['email'] ) ) : '';
+		if ( ! is_email( $email ) ) {
+			wp_send_json_error( array( 'message' => __( 'Ingresa un correo valido para reenviar la verificacion.', 'arriendo-facil' ) ), 400 );
+		}
+
+		if ( ! $this->tenant_resend_verification_within_rate_limit( $email ) ) {
+			wp_send_json_error( array( 'message' => __( 'Espera unos minutos antes de volver a solicitar el reenvio.', 'arriendo-facil' ) ), 429 );
+		}
+
+		$user = get_user_by( 'email', $email );
+		if ( ! ( $user instanceof WP_User ) || ! in_array( 'af_tenant', (array) $user->roles, true ) ) {
+			$this->log_tenant_signup_security_event( 'resend_verification_email_unknown_account', $email );
+			wp_send_json_success(
+				array(
+					'message' => __( 'Si tu cuenta esta pendiente de verificacion, te enviaremos un nuevo correo.', 'arriendo-facil' ),
+				)
+			);
+		}
+
+		$is_verified = (int) get_user_meta( (int) $user->ID, 'af_tenant_email_verified', true );
+		if ( 1 === $is_verified ) {
+			wp_send_json_success(
+				array(
+					'message' => __( 'Si tu cuenta esta pendiente de verificacion, te enviaremos un nuevo correo.', 'arriendo-facil' ),
+				)
+			);
+		}
+
+		$token = $this->create_tenant_email_verification_token( (int) $user->ID );
+		if ( is_wp_error( $token ) ) {
+			$this->log_tenant_signup_security_event( 'resend_verification_token_generation_failed', $email );
+			wp_send_json_error( array( 'message' => __( 'No se pudo procesar el reenvio en este momento. Intenta nuevamente.', 'arriendo-facil' ) ), 500 );
+		}
+
+		if ( ! $this->send_tenant_email_verification_email( (int) $user->ID, (string) $token ) ) {
+			$this->log_tenant_signup_security_event( 'resend_verification_email_failed', $email );
+			wp_send_json_error( array( 'message' => __( 'No se pudo enviar el correo ahora. Intenta nuevamente en unos minutos.', 'arriendo-facil' ) ), 500 );
+		}
+
+		$this->log_tenant_signup_security_event( 'resend_verification_email_success', $email );
+
+		wp_send_json_success(
+			array(
+				'message' => __( 'Si tu cuenta esta pendiente de verificacion, te enviaremos un nuevo correo.', 'arriendo-facil' ),
 			)
 		);
 	}
@@ -365,9 +526,10 @@ class Arriendo_Facil_Guest {
 	 *
 	 * @return bool
 	 */
-	private function tenant_signup_within_rate_limit() {
+	private function tenant_signup_within_rate_limit( $email = '' ) {
 		$ip  = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : 'unknown';
-		$key = 'af_tenant_signup_rl_' . substr( md5( (string) $ip ), 0, 16 );
+		$ua  = isset( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) : 'unknown';
+		$key = 'af_tenant_signup_rl_' . substr( md5( (string) $ip . '|' . (string) $ua ), 0, 16 );
 
 		$count = (int) get_transient( $key );
 		if ( $count >= 6 ) {
@@ -381,7 +543,128 @@ class Arriendo_Facil_Guest {
 			set_transient( $key, $count + 1, 10 * MINUTE_IN_SECONDS );
 		}
 
+		$email = sanitize_email( (string) $email );
+		if ( '' !== $email ) {
+			$email_key   = 'af_tenant_signup_email_rl_' . substr( md5( strtolower( $email ) ), 0, 16 );
+			$email_count = (int) get_transient( $email_key );
+			if ( $email_count >= 4 ) {
+				$this->log_tenant_signup_security_event( 'email_rate_limit_exceeded', $email );
+				return false;
+			}
+
+			if ( 0 === $email_count ) {
+				set_transient( $email_key, 1, 20 * MINUTE_IN_SECONDS );
+			} else {
+				set_transient( $email_key, $email_count + 1, 20 * MINUTE_IN_SECONDS );
+			}
+		}
+
 		return true;
+	}
+
+	/**
+	 * Enforces anti-abuse rate limits for verification email resend endpoint.
+	 *
+	 * @param string $email Candidate email.
+	 * @return bool
+	 */
+	private function tenant_resend_verification_within_rate_limit( $email ) {
+		$email = sanitize_email( (string) $email );
+		$ip    = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : 'unknown';
+		$ua    = isset( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) : 'unknown';
+
+		$ip_key   = 'af_tenant_resend_rl_' . substr( md5( (string) $ip . '|' . (string) $ua ), 0, 16 );
+		$ip_count = (int) get_transient( $ip_key );
+		if ( $ip_count >= 6 ) {
+			$this->log_tenant_signup_security_event( 'resend_rate_limit_ip', $email );
+			return false;
+		}
+
+		set_transient( $ip_key, $ip_count + 1, 15 * MINUTE_IN_SECONDS );
+
+		if ( '' !== $email ) {
+			$email_key   = 'af_tenant_resend_email_rl_' . substr( md5( strtolower( $email ) ), 0, 16 );
+			$email_count = (int) get_transient( $email_key );
+			if ( $email_count >= 3 ) {
+				$this->log_tenant_signup_security_event( 'resend_rate_limit_email', $email );
+				return false;
+			}
+
+			set_transient( $email_key, $email_count + 1, 30 * MINUTE_IN_SECONDS );
+		}
+
+		return true;
+	}
+
+	/**
+	 * Validates signed anti-bot form proof emitted by the rendered signup form.
+	 *
+	 * @param int    $form_ts Form unix timestamp.
+	 * @param string $form_sig HMAC signature.
+	 * @return bool
+	 */
+	private function validate_tenant_signup_form_proof( $form_ts, $form_sig ) {
+		$form_ts  = absint( $form_ts );
+		$form_sig = (string) $form_sig;
+
+		if ( ! $form_ts || '' === $form_sig ) {
+			return false;
+		}
+
+		$expected_sig = hash_hmac( 'sha256', (string) $form_ts, wp_salt( 'nonce' ) . 'af_tenant_signup_form_v1' );
+		if ( ! hash_equals( (string) $expected_sig, $form_sig ) ) {
+			return false;
+		}
+
+		$age = time() - $form_ts;
+		if ( $age < 2 ) {
+			return false;
+		}
+
+		if ( $age > 2 * HOUR_IN_SECONDS ) {
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Builds deterministic fingerprint for tenant identity document.
+	 *
+	 * @param string $id_number Identity value.
+	 * @return string
+	 */
+	private function build_tenant_identity_fingerprint( $id_number ) {
+		$normalized = strtoupper( preg_replace( '/[^A-Za-z0-9]/', '', (string) $id_number ) );
+		if ( '' === $normalized ) {
+			return '';
+		}
+
+		return hash_hmac( 'sha256', $normalized, wp_salt( 'secure_auth' ) . 'af_tenant_id_fp_v1' );
+	}
+
+	/**
+	 * Checks whether tenant identity fingerprint is already in use.
+	 *
+	 * @param string $fingerprint Fingerprint hash.
+	 * @return bool
+	 */
+	private function tenant_identity_fingerprint_exists( $fingerprint ) {
+		$fingerprint = sanitize_text_field( (string) $fingerprint );
+		if ( '' === $fingerprint ) {
+			return false;
+		}
+
+		$users = get_users(
+			array(
+				'number'     => 1,
+				'fields'     => 'ids',
+				'meta_key'   => 'af_tenant_id_fingerprint',
+				'meta_value' => $fingerprint,
+			)
+		);
+
+		return ! empty( $users );
 	}
 
 	/**
@@ -598,6 +881,236 @@ class Arriendo_Facil_Guest {
 		$message .= '</div>';
 
 		wp_mail( $recipient, $subject, $message, array( 'Content-Type: text/html; charset=UTF-8' ) );
+	}
+
+	/**
+	 * Deletes user safely in contexts where wp_delete_user may not be loaded yet.
+	 *
+	 * @param int $user_id User ID.
+	 * @return void
+	 */
+	private function delete_tenant_user_safely( $user_id ) {
+		$user_id = absint( $user_id );
+		if ( ! $user_id ) {
+			return;
+		}
+
+		if ( ! function_exists( 'wp_delete_user' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/user.php';
+		}
+
+		if ( function_exists( 'wp_delete_user' ) ) {
+			wp_delete_user( $user_id );
+		}
+	}
+
+	/**
+	 * Generates and stores an email verification token for a tenant user.
+	 *
+	 * @param int $user_id Tenant user ID.
+	 * @return string|WP_Error
+	 */
+	private function create_tenant_email_verification_token( $user_id ) {
+		$user_id = absint( $user_id );
+		if ( ! $user_id ) {
+			return new WP_Error( 'af_invalid_user', __( 'Usuario invalido para verificacion.', 'arriendo-facil' ) );
+		}
+
+		try {
+			$token = bin2hex( random_bytes( 32 ) );
+		} catch ( Exception $exception ) {
+			return new WP_Error( 'af_token_entropy_failed', __( 'No se pudo generar un token seguro.', 'arriendo-facil' ) );
+		}
+
+		$token_hash = hash_hmac( 'sha256', $token, wp_salt( 'auth' ) . 'af_tenant_email_verify_v1' );
+		$expires_at = time() + ( 24 * HOUR_IN_SECONDS );
+
+		update_user_meta( $user_id, 'af_tenant_email_verify_hash', $token_hash );
+		update_user_meta( $user_id, 'af_tenant_email_verify_expires', (int) $expires_at );
+		update_user_meta( $user_id, 'af_tenant_email_verify_requested_at', current_time( 'mysql' ) );
+
+		return $token;
+	}
+
+	/**
+	 * Sends tenant email verification message.
+	 *
+	 * @param int    $user_id Tenant user ID.
+	 * @param string $token Raw verification token.
+	 * @return bool
+	 */
+	private function send_tenant_email_verification_email( $user_id, $token ) {
+		$user_id = absint( $user_id );
+		$token   = (string) $token;
+
+		if ( ! $user_id || '' === $token ) {
+			return false;
+		}
+
+		$user = get_user_by( 'id', $user_id );
+		if ( ! $user || empty( $user->user_email ) || ! is_email( (string) $user->user_email ) ) {
+			return false;
+		}
+
+		$recipient = sanitize_email( (string) $user->user_email );
+		$display   = sanitize_text_field( (string) $user->display_name );
+		$verify_url = add_query_arg(
+			array(
+				'action' => 'af_verify_tenant_email',
+				'uid'    => (int) $user_id,
+				'token'  => rawurlencode( $token ),
+			),
+			wp_login_url( admin_url() )
+		);
+
+		$subject = __( '[Arriendo Facil] Verifica tu correo para activar tu cuenta', 'arriendo-facil' );
+
+		$message = '<div style="margin:0;padding:24px;background:#f8fafc;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#0f172a;">';
+		$message .= '<div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">';
+		$message .= '<div style="padding:18px 22px;background:linear-gradient(135deg,#1d4ed8,#0ea5e9);color:#ffffff;">';
+		$message .= '<h2 style="margin:0;font-size:20px;line-height:1.3;">' . esc_html__( 'Verifica tu correo para activar tu cuenta', 'arriendo-facil' ) . '</h2>';
+		$message .= '</div>';
+		$message .= '<div style="padding:22px;">';
+		$message .= '<p style="margin:0 0 12px;line-height:1.6;">' . sprintf( esc_html__( 'Hola %s, recibimos tu solicitud de registro como inquilino.', 'arriendo-facil' ), esc_html( '' !== $display ? $display : __( 'inquilino', 'arriendo-facil' ) ) ) . '</p>';
+		$message .= '<p style="margin:0 0 16px;line-height:1.6;color:#334155;">' . esc_html__( 'Por seguridad, confirma que este correo te pertenece para activar la cuenta y poder iniciar sesion.', 'arriendo-facil' ) . '</p>';
+		$message .= '<p style="margin:0 0 16px;">';
+		$message .= '<a href="' . esc_url( $verify_url ) . '" style="display:inline-block;padding:11px 16px;background:#1d4ed8;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;">' . esc_html__( 'Verificar mi correo', 'arriendo-facil' ) . '</a>';
+		$message .= '</p>';
+		$message .= '<p style="margin:0;color:#475569;line-height:1.6;">' . esc_html__( 'Este enlace vence en 24 horas. Si no solicitaste esta cuenta, ignora este mensaje.', 'arriendo-facil' ) . '</p>';
+		$message .= '</div>';
+		$message .= '</div>';
+		$message .= '<p style="max-width:640px;margin:12px auto 0;font-size:12px;color:#64748b;text-align:center;">Arriendo Facil</p>';
+		$message .= '</div>';
+
+		return (bool) wp_mail( $recipient, $subject, $message, array( 'Content-Type: text/html; charset=UTF-8' ) );
+	}
+
+	/**
+	 * Handles tenant email verification callback from login endpoint.
+	 *
+	 * @return void
+	 */
+	public function handle_tenant_email_verification_request() {
+		$action = isset( $_GET['action'] ) ? sanitize_key( wp_unslash( $_GET['action'] ) ) : '';
+		if ( 'af_verify_tenant_email' !== $action ) {
+			return;
+		}
+
+		$user_id = isset( $_GET['uid'] ) ? absint( wp_unslash( $_GET['uid'] ) ) : 0;
+		$token   = isset( $_GET['token'] ) ? sanitize_text_field( wp_unslash( $_GET['token'] ) ) : '';
+
+		$status = 'invalid';
+		if ( $user_id && '' !== $token ) {
+			$result = $this->verify_tenant_email_token( $user_id, $token );
+			$status = is_wp_error( $result ) ? 'failed' : 'ok';
+		}
+
+		wp_safe_redirect( add_query_arg( 'af_verify', $status, wp_login_url( admin_url() ) ) );
+		exit;
+	}
+
+	/**
+	 * Marks tenant email as verified when token is valid.
+	 *
+	 * @param int    $user_id Tenant user ID.
+	 * @param string $token Raw verification token.
+	 * @return true|WP_Error
+	 */
+	private function verify_tenant_email_token( $user_id, $token ) {
+		$user_id = absint( $user_id );
+		$token   = (string) $token;
+
+		if ( ! $user_id || '' === $token ) {
+			return new WP_Error( 'af_invalid_verification_request', __( 'Solicitud de verificacion invalida.', 'arriendo-facil' ) );
+		}
+
+		$user = get_user_by( 'id', $user_id );
+		if ( ! $user ) {
+			return new WP_Error( 'af_verification_user_not_found', __( 'No se encontro el usuario a verificar.', 'arriendo-facil' ) );
+		}
+
+		$stored_hash = (string) get_user_meta( $user_id, 'af_tenant_email_verify_hash', true );
+		$expires_at  = (int) get_user_meta( $user_id, 'af_tenant_email_verify_expires', true );
+		if ( '' === $stored_hash || ! $expires_at ) {
+			return new WP_Error( 'af_verification_not_found', __( 'No existe una verificacion pendiente para esta cuenta.', 'arriendo-facil' ) );
+		}
+
+		if ( time() > $expires_at ) {
+			$this->log_tenant_signup_security_event( 'verification_token_expired', (string) $user->user_email );
+			return new WP_Error( 'af_verification_expired', __( 'El enlace de verificacion ya expiro.', 'arriendo-facil' ) );
+		}
+
+		$provided_hash = hash_hmac( 'sha256', $token, wp_salt( 'auth' ) . 'af_tenant_email_verify_v1' );
+		if ( ! hash_equals( $stored_hash, $provided_hash ) ) {
+			$this->log_tenant_signup_security_event( 'verification_token_mismatch', (string) $user->user_email );
+			return new WP_Error( 'af_verification_mismatch', __( 'No pudimos validar el enlace de verificacion.', 'arriendo-facil' ) );
+		}
+
+		update_user_meta( $user_id, 'af_tenant_email_verified', 1 );
+		update_user_meta( $user_id, 'af_tenant_email_verified_at', current_time( 'mysql' ) );
+		delete_user_meta( $user_id, 'af_tenant_email_verify_hash' );
+		delete_user_meta( $user_id, 'af_tenant_email_verify_expires' );
+		delete_user_meta( $user_id, 'af_tenant_email_verify_requested_at' );
+		$this->log_tenant_signup_security_event( 'verification_success', (string) $user->user_email );
+		$this->send_tenant_account_created_email( $user_id );
+
+		return true;
+	}
+
+	/**
+	 * Blocks tenant login until email verification is completed.
+	 *
+	 * @param WP_User|WP_Error|null $user Authenticated user object.
+	 * @param string                $username Submitted username.
+	 * @param string                $password Submitted password.
+	 * @return WP_User|WP_Error|null
+	 */
+	public function enforce_tenant_email_verification_on_login( $user, $username, $password ) {
+		if ( ! ( $user instanceof WP_User ) ) {
+			return $user;
+		}
+
+		if ( ! in_array( 'af_tenant', (array) $user->roles, true ) ) {
+			return $user;
+		}
+
+		$is_verified = (int) get_user_meta( (int) $user->ID, 'af_tenant_email_verified', true );
+		if ( 1 === $is_verified ) {
+			return $user;
+		}
+
+		$pending_hash    = (string) get_user_meta( (int) $user->ID, 'af_tenant_email_verify_hash', true );
+		$pending_expires = (int) get_user_meta( (int) $user->ID, 'af_tenant_email_verify_expires', true );
+
+		// Keep rollout safe: only block tenant logins when verification is explicitly pending.
+		if ( '' === $pending_hash || $pending_expires <= 0 ) {
+			return $user;
+		}
+
+		$this->log_tenant_signup_security_event( 'blocked_unverified_login', (string) $user->user_email );
+
+		return new WP_Error(
+			'af_tenant_email_unverified',
+			__( 'Debes verificar tu correo antes de iniciar sesion. Revisa la bandeja de entrada del email registrado.', 'arriendo-facil' )
+		);
+	}
+
+	/**
+	 * Renders login notices after tenant email verification attempts.
+	 *
+	 * @param string $message Existing login message.
+	 * @return string
+	 */
+	public function render_tenant_email_verification_login_notice( $message ) {
+		$status = isset( $_GET['af_verify'] ) ? sanitize_key( wp_unslash( $_GET['af_verify'] ) ) : '';
+
+		if ( 'ok' === $status ) {
+			$message .= '<p class="message" style="border-left-color:#16a34a;">' . esc_html__( 'Tu correo fue verificado correctamente. Ya puedes iniciar sesion.', 'arriendo-facil' ) . '</p>';
+		} elseif ( 'failed' === $status || 'invalid' === $status ) {
+			$message .= '<p class="message" style="border-left-color:#dc2626;">' . esc_html__( 'No se pudo verificar el enlace. Solicita un nuevo registro o contacta soporte.', 'arriendo-facil' ) . '</p>';
+		}
+
+		return $message;
 	}
 
 	/**

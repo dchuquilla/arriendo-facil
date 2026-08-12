@@ -168,6 +168,7 @@ add_filter( 'cron_schedules', 'arriendo_facil_add_cron_intervals' );
  */
 function arriendo_facil_init() {
 	load_plugin_textdomain( 'arriendo-facil', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
+	Arriendo_Facil_Activator::ensure_tenant_role();
 	Arriendo_Facil_Activator::ensure_owner_role();
 
 	// Register cron jobs

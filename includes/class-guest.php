@@ -56,73 +56,87 @@ class Arriendo_Facil_Guest {
 		$login_url    = wp_login_url( home_url( '/' ) );
 		$recover_url  = wp_lostpassword_url();
 		$instance_id  = 'af-tenant-signup-' . wp_rand( 1000, 999999 );
+		$terms_page   = get_page_by_path( 'terminos-y-condiciones' );
+		$terms_url    = $terms_page instanceof WP_Post ? get_permalink( $terms_page ) : home_url( '/terminos-y-condiciones/' );
+		$privacy_url  = function_exists( 'get_privacy_policy_url' ) ? get_privacy_policy_url() : home_url( '/politica-de-privacidad/' );
+
+		wp_enqueue_style(
+			'af-tenant-signup',
+			ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/af-tenant-signup.css',
+			array(),
+			ARRIENDO_FACIL_VERSION
+		);
 
 		ob_start();
 		?>
-		<style>
-			#<?php echo esc_html( $instance_id ); ?> .af-tenant-signup-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-			#<?php echo esc_html( $instance_id ); ?> .af-tenant-signup-full{grid-column:1 / -1;}
-			#<?php echo esc_html( $instance_id ); ?> .af-tenant-signup-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;}
-			#<?php echo esc_html( $instance_id ); ?> .af-tenant-signup-title{margin:0 0 8px;color:#0f172a;font-size:26px;line-height:1.2;}
-			@media (max-width: 760px){
-				#<?php echo esc_html( $instance_id ); ?>{padding:16px !important;margin:14px auto !important;}
-				#<?php echo esc_html( $instance_id ); ?> .af-tenant-signup-grid{grid-template-columns:1fr;gap:10px;}
-				#<?php echo esc_html( $instance_id ); ?> .af-tenant-signup-title{font-size:22px;}
-				#<?php echo esc_html( $instance_id ); ?> .af-tenant-signup-actions{flex-direction:column;align-items:stretch;}
-				#<?php echo esc_html( $instance_id ); ?> .af-tenant-signup-actions .af-tenant-signup-link{text-align:center;}
-			}
-		</style>
-		<div id="<?php echo esc_attr( $instance_id ); ?>" style="max-width:760px;margin:24px auto;padding:22px;border:1px solid #dbe3ef;border-radius:14px;background:#ffffff;box-shadow:0 8px 22px rgba(15,23,42,.06);">
+		<div id="<?php echo esc_attr( $instance_id ); ?>" class="af-tenant-signup">
 			<div>
-				<h3 class="af-tenant-signup-title"><?php echo esc_html__( 'Crea tu cuenta como inquilino', 'arriendo-facil' ); ?></h3>
-				<p style="margin:0;color:#475569;line-height:1.6;"><?php echo esc_html__( 'Registra tus datos, define tu clave y gestiona tus visitas, contratos y reservas en un solo lugar.', 'arriendo-facil' ); ?></p>
+				<h3 class="af-tenant-signup__title"><?php echo esc_html__( 'Crea tu cuenta como inquilino', 'arriendo-facil' ); ?></h3>
+				<p class="af-tenant-signup__subtitle"><?php echo esc_html__( 'Registra tus datos, define tu clave y gestiona tus visitas, contratos y reservas en un solo lugar.', 'arriendo-facil' ); ?></p>
 			</div>
 
-			<div data-af-signup-alert style="display:none;margin-top:16px;padding:10px 12px;border-radius:10px;"></div>
+			<div data-af-signup-alert class="af-tenant-signup__alert"></div>
 
-			<form data-af-signup-form style="display:block;margin-top:16px;">
-				<div class="af-tenant-signup-grid">
-					<label style="display:flex;flex-direction:column;gap:6px;">
-						<span style="font-weight:600;color:#0f172a;"><?php echo esc_html__( 'Nombres', 'arriendo-facil' ); ?></span>
-						<input type="text" name="first_name" required maxlength="100" style="padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;" />
+			<form data-af-signup-form class="af-tenant-signup__form">
+				<div class="af-tenant-signup__grid">
+					<label class="af-tenant-signup__field">
+						<span class="af-tenant-signup__label"><?php echo esc_html__( 'Nombres', 'arriendo-facil' ); ?></span>
+						<input type="text" name="first_name" required maxlength="100" class="af-tenant-signup__input" />
 					</label>
-					<label style="display:flex;flex-direction:column;gap:6px;">
-						<span style="font-weight:600;color:#0f172a;"><?php echo esc_html__( 'Apellidos', 'arriendo-facil' ); ?></span>
-						<input type="text" name="last_name" required maxlength="100" style="padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;" />
+					<label class="af-tenant-signup__field">
+						<span class="af-tenant-signup__label"><?php echo esc_html__( 'Apellidos', 'arriendo-facil' ); ?></span>
+						<input type="text" name="last_name" required maxlength="100" class="af-tenant-signup__input" />
 					</label>
-					<label class="af-tenant-signup-full" style="display:flex;flex-direction:column;gap:6px;">
-						<span style="font-weight:600;color:#0f172a;"><?php echo esc_html__( 'Correo electronico', 'arriendo-facil' ); ?></span>
-						<input type="email" name="email" required maxlength="190" style="padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;" />
+					<label class="af-tenant-signup__field af-tenant-signup__full">
+						<span class="af-tenant-signup__label"><?php echo esc_html__( 'Correo electronico', 'arriendo-facil' ); ?></span>
+						<input type="email" name="email" required maxlength="190" class="af-tenant-signup__input" />
 					</label>
-					<label style="display:flex;flex-direction:column;gap:6px;">
-						<span style="font-weight:600;color:#0f172a;"><?php echo esc_html__( 'Telefono', 'arriendo-facil' ); ?></span>
-						<input type="text" name="phone" required maxlength="20" pattern="[0-9+\s-]{7,20}" style="padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;" />
+					<label class="af-tenant-signup__field">
+						<span class="af-tenant-signup__label"><?php echo esc_html__( 'Telefono', 'arriendo-facil' ); ?></span>
+						<input type="text" name="phone" required maxlength="20" pattern="[0-9+\s-]{7,20}" class="af-tenant-signup__input" />
 					</label>
-					<label style="display:flex;flex-direction:column;gap:6px;">
-						<span style="font-weight:600;color:#0f172a;"><?php echo esc_html__( 'Cedula o identificacion', 'arriendo-facil' ); ?></span>
-						<input type="text" name="id_number" required maxlength="20" pattern="[A-Za-z0-9-]{5,20}" style="padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;" />
+					<label class="af-tenant-signup__field">
+						<span class="af-tenant-signup__label"><?php echo esc_html__( 'Cedula o identificacion', 'arriendo-facil' ); ?></span>
+						<input type="text" name="id_number" required maxlength="20" pattern="[A-Za-z0-9-]{5,20}" class="af-tenant-signup__input" />
 					</label>
-					<label style="display:flex;flex-direction:column;gap:6px;">
-						<span style="font-weight:600;color:#0f172a;"><?php echo esc_html__( 'Contrasena', 'arriendo-facil' ); ?></span>
-						<input type="password" name="password" required minlength="8" maxlength="72" autocomplete="new-password" style="padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;" />
+					<label class="af-tenant-signup__field">
+						<span class="af-tenant-signup__label"><?php echo esc_html__( 'Contrasena', 'arriendo-facil' ); ?></span>
+						<input type="password" name="password" required minlength="10" maxlength="72" autocomplete="new-password" class="af-tenant-signup__input" />
 					</label>
-					<label style="display:flex;flex-direction:column;gap:6px;">
-						<span style="font-weight:600;color:#0f172a;"><?php echo esc_html__( 'Confirmar contrasena', 'arriendo-facil' ); ?></span>
-						<input type="password" name="password_confirm" required minlength="8" maxlength="72" autocomplete="new-password" style="padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;" />
+					<label class="af-tenant-signup__field">
+						<span class="af-tenant-signup__label"><?php echo esc_html__( 'Confirmar contrasena', 'arriendo-facil' ); ?></span>
+						<input type="password" name="password_confirm" required minlength="10" maxlength="72" autocomplete="new-password" class="af-tenant-signup__input" />
 					</label>
 				</div>
 
-				<label style="display:flex;align-items:flex-start;gap:8px;margin-top:12px;color:#334155;line-height:1.5;">
-					<input type="checkbox" name="accept_terms" value="1" required style="margin-top:2px;" />
-					<span><?php echo esc_html__( 'Acepto el tratamiento de mis datos para el proceso de arriendo.', 'arriendo-facil' ); ?></span>
+				<div class="af-tenant-signup__password-hint">
+					<strong><?php echo esc_html__( 'Requisitos de contrasena:', 'arriendo-facil' ); ?></strong>
+					<?php echo esc_html__( 'minimo 10 caracteres, al menos 1 mayuscula, 1 minuscula, 1 numero y 1 simbolo (ej: !@#$%).', 'arriendo-facil' ); ?>
+				</div>
+
+				<input type="text" name="website" value="" tabindex="-1" autocomplete="off" aria-hidden="true" class="af-tenant-signup__honeypot" />
+
+				<label class="af-tenant-signup__legal">
+					<input type="checkbox" name="accept_terms" value="1" required class="af-tenant-signup__checkbox" />
+					<span>
+						<?php
+						echo wp_kses_post(
+							sprintf(
+								__( 'Acepto los <a href="%1$s" target="_blank" rel="noopener noreferrer">Terminos y Condiciones</a> y la <a href="%2$s" target="_blank" rel="noopener noreferrer">Politica de Privacidad</a> para el tratamiento de mis datos.', 'arriendo-facil' ),
+								esc_url( $terms_url ),
+								esc_url( $privacy_url )
+							)
+						);
+						?>
+					</span>
 				</label>
 
-				<div class="af-tenant-signup-actions">
-					<button type="submit" data-af-submit-signup style="padding:11px 16px;border:0;border-radius:10px;background:#1d4ed8;color:#fff;font-weight:700;cursor:pointer;">
+				<div class="af-tenant-signup__actions">
+					<button type="submit" data-af-submit-signup class="af-tenant-signup__submit">
 						<?php echo esc_html__( 'Crear cuenta', 'arriendo-facil' ); ?>
 					</button>
-					<a class="af-tenant-signup-link" href="<?php echo esc_url( $login_url ); ?>" style="color:#1d4ed8;text-decoration:underline;"><?php echo esc_html__( 'Ya tengo cuenta, iniciar sesion', 'arriendo-facil' ); ?></a>
-					<a class="af-tenant-signup-link" href="<?php echo esc_url( $recover_url ); ?>" style="color:#475569;text-decoration:underline;"><?php echo esc_html__( 'Recuperar contrasena', 'arriendo-facil' ); ?></a>
+					<a class="af-tenant-signup__link af-tenant-signup__link--primary" href="<?php echo esc_url( $login_url ); ?>"><?php echo esc_html__( 'Ya tengo cuenta, iniciar sesion', 'arriendo-facil' ); ?></a>
+					<a class="af-tenant-signup__link af-tenant-signup__link--secondary" href="<?php echo esc_url( $recover_url ); ?>"><?php echo esc_html__( 'Recuperar contrasena', 'arriendo-facil' ); ?></a>
 				</div>
 			</form>
 		</div>
@@ -137,6 +151,8 @@ class Arriendo_Facil_Guest {
 			const form = app.querySelector('[data-af-signup-form]');
 			const submitBtn = app.querySelector('[data-af-submit-signup]');
 			const alertBox = app.querySelector('[data-af-signup-alert]');
+			const passwordInput = form.querySelector('input[name="password"]');
+			const passwordConfirmInput = form.querySelector('input[name="password_confirm"]');
 
 			function showAlert(message, type){
 				alertBox.style.display = 'block';
@@ -152,11 +168,33 @@ class Arriendo_Facil_Guest {
 				}
 			}
 
+			function validatePasswordClientSide(password){
+				const checks = [
+					password.length >= 10,
+					/[A-Z]/.test(password),
+					/[a-z]/.test(password),
+					/[0-9]/.test(password),
+					/[^A-Za-z0-9]/.test(password)
+				];
+				return checks.every(Boolean);
+			}
+
 			const firstInput = form.querySelector('input[name="first_name"]');
 			if(firstInput){ firstInput.focus(); }
 
 			form.addEventListener('submit', async function(e){
 				e.preventDefault();
+
+				if(!validatePasswordClientSide(String(passwordInput && passwordInput.value ? passwordInput.value : ''))){
+					showAlert(<?php echo wp_json_encode( __( 'La contrasena no cumple los requisitos: minimo 10 caracteres, mayuscula, minuscula, numero y simbolo.', 'arriendo-facil' ) ); ?>, 'error');
+					return;
+				}
+
+				if(String(passwordInput.value || '') !== String(passwordConfirmInput.value || '')){
+					showAlert(<?php echo wp_json_encode( __( 'Las contrasenas no coinciden.', 'arriendo-facil' ) ); ?>, 'error');
+					return;
+				}
+
 				submitBtn.disabled = true;
 				alertBox.style.display = 'none';
 
@@ -221,9 +259,15 @@ class Arriendo_Facil_Guest {
 		$password         = isset( $_POST['password'] ) ? (string) wp_unslash( $_POST['password'] ) : '';
 		$password_confirm = isset( $_POST['password_confirm'] ) ? (string) wp_unslash( $_POST['password_confirm'] ) : '';
 		$accept_terms     = isset( $_POST['accept_terms'] ) ? absint( wp_unslash( $_POST['accept_terms'] ) ) : 0;
+		$website_honeypot = isset( $_POST['website'] ) ? sanitize_text_field( wp_unslash( $_POST['website'] ) ) : '';
 
 		if ( '' === $first_name || '' === $last_name || '' === $email || '' === $phone || '' === $id_number || '' === $password || '' === $password_confirm ) {
 			wp_send_json_error( array( 'message' => __( 'Completa todos los campos obligatorios.', 'arriendo-facil' ) ), 400 );
+		}
+
+		if ( '' !== trim( $website_honeypot ) ) {
+			$this->log_tenant_signup_security_event( 'honeypot_triggered', $email );
+			wp_send_json_error( array( 'message' => __( 'No se pudo procesar la solicitud.', 'arriendo-facil' ) ), 400 );
 		}
 
 		if ( ! is_email( $email ) ) {
@@ -238,12 +282,16 @@ class Arriendo_Facil_Guest {
 			wp_send_json_error( array( 'message' => __( 'Las contrasenas no coinciden.', 'arriendo-facil' ) ), 400 );
 		}
 
-		if ( strlen( $password ) < 8 ) {
-			wp_send_json_error( array( 'message' => __( 'La contrasena debe tener al menos 8 caracteres.', 'arriendo-facil' ) ), 400 );
+		$password_policy_errors = $this->validate_tenant_password_policy( $password );
+		if ( ! empty( $password_policy_errors ) ) {
+			wp_send_json_error( array( 'message' => implode( ' ', $password_policy_errors ) ), 400 );
 		}
 
-		if ( ! preg_match( '/[A-Za-z]/', $password ) || ! preg_match( '/[0-9]/', $password ) ) {
-			wp_send_json_error( array( 'message' => __( 'La contrasena debe incluir al menos una letra y un numero.', 'arriendo-facil' ) ), 400 );
+		$encrypted_phone = $this->encrypt_sensitive_tenant_value( $phone );
+		$encrypted_id    = $this->encrypt_sensitive_tenant_value( $id_number );
+		if ( '' === $encrypted_phone || '' === $encrypted_id ) {
+			$this->log_tenant_signup_security_event( 'encryption_failed', $email );
+			wp_send_json_error( array( 'message' => __( 'No se pudo proteger la informacion sensible. Intenta nuevamente.', 'arriendo-facil' ) ), 500 );
 		}
 
 		if ( email_exists( $email ) ) {
@@ -288,17 +336,20 @@ class Arriendo_Facil_Guest {
 			wp_send_json_error( array( 'message' => $user_id->get_error_message() ), 500 );
 		}
 
-		update_user_meta( $user_id, 'af_tenant_phone', $phone );
-		update_user_meta( $user_id, 'af_tenant_id_number', $id_number );
+		update_user_meta( $user_id, 'af_tenant_phone_enc', $encrypted_phone );
+		update_user_meta( $user_id, 'af_tenant_id_number_enc', $encrypted_id );
+		update_user_meta( $user_id, 'af_tenant_terms_accepted_at', current_time( 'mysql' ) );
+		update_user_meta( $user_id, 'af_tenant_terms_version', '2026-08-owasp-hardened' );
 
 		$schema_result = $this->ensure_guest_extra_columns();
 		if ( is_wp_error( $schema_result ) ) {
 			wp_send_json_error( array( 'message' => $schema_result->get_error_message() ), 500 );
 		}
 
-		$this->upsert_guest_row_for_tenant( $user_id, $first_name, $last_name, $email, $phone, $id_number );
+		$this->upsert_guest_row_for_tenant( $user_id, $first_name, $last_name, $email, $phone, $id_number, $encrypted_phone, $encrypted_id );
 		$this->send_tenant_account_created_email( $user_id );
 		$tenant_dashboard_url = admin_url();
+		$this->log_tenant_signup_security_event( 'signup_success', $email );
 
 		wp_send_json_success(
 			array(
@@ -320,6 +371,7 @@ class Arriendo_Facil_Guest {
 
 		$count = (int) get_transient( $key );
 		if ( $count >= 6 ) {
+			$this->log_tenant_signup_security_event( 'rate_limit_exceeded', '' );
 			return false;
 		}
 
@@ -341,10 +393,15 @@ class Arriendo_Facil_Guest {
 	 * @param string $email Email.
 	 * @param string $phone Phone.
 	 * @param string $id_number ID number.
+	 * @param string $encrypted_phone Encrypted phone.
+	 * @param string $encrypted_id Encrypted ID number.
 	 * @return void
 	 */
-	private function upsert_guest_row_for_tenant( $user_id, $first_name, $last_name, $email, $phone, $id_number ) {
+	private function upsert_guest_row_for_tenant( $user_id, $first_name, $last_name, $email, $phone, $id_number, $encrypted_phone = '', $encrypted_id = '' ) {
 		global $wpdb;
+
+		$masked_phone = $this->mask_sensitive_phone( $phone );
+		$masked_id    = $this->mask_sensitive_id_number( $id_number );
 
 		$existing_guest_id = (int) $wpdb->get_var(
 			$wpdb->prepare(
@@ -357,14 +414,16 @@ class Arriendo_Facil_Guest {
 			$wpdb->update(
 				$wpdb->prefix . 'af_guests',
 				array(
-					'user_id'    => (int) $user_id,
-					'first_name' => $first_name,
-					'last_name'  => $last_name,
-					'phone'      => $phone,
-					'id_number'  => $id_number,
+					'user_id'             => (int) $user_id,
+					'first_name'          => $first_name,
+					'last_name'           => $last_name,
+					'phone'               => $masked_phone,
+					'id_number'           => $masked_id,
+					'phone_encrypted'     => $encrypted_phone,
+					'id_number_encrypted' => $encrypted_id,
 				),
 				array( 'id' => $existing_guest_id ),
-				array( '%d', '%s', '%s', '%s', '%s' ),
+				array( '%d', '%s', '%s', '%s', '%s', '%s', '%s' ),
 				array( '%d' )
 			);
 			return;
@@ -373,15 +432,128 @@ class Arriendo_Facil_Guest {
 		$wpdb->insert(
 			$wpdb->prefix . 'af_guests',
 			array(
-				'user_id'    => (int) $user_id,
-				'first_name' => $first_name,
-				'last_name'  => $last_name,
-				'email'      => $email,
-				'phone'      => $phone,
-				'id_number'  => $id_number,
+				'user_id'             => (int) $user_id,
+				'first_name'          => $first_name,
+				'last_name'           => $last_name,
+				'email'               => $email,
+				'phone'               => $masked_phone,
+				'id_number'           => $masked_id,
+				'phone_encrypted'     => $encrypted_phone,
+				'id_number_encrypted' => $encrypted_id,
 			),
-			array( '%d', '%s', '%s', '%s', '%s', '%s' )
+			array( '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
 		);
+	}
+
+	/**
+	 * Validates password against tenant policy.
+	 *
+	 * @param string $password Plain password.
+	 * @return string[]
+	 */
+	private function validate_tenant_password_policy( $password ) {
+		$password = (string) $password;
+		$errors   = array();
+
+		if ( strlen( $password ) < 10 ) {
+			$errors[] = __( 'La contrasena debe tener minimo 10 caracteres.', 'arriendo-facil' );
+		}
+
+		if ( ! preg_match( '/[A-Z]/', $password ) ) {
+			$errors[] = __( 'Incluye al menos una letra mayuscula.', 'arriendo-facil' );
+		}
+
+		if ( ! preg_match( '/[a-z]/', $password ) ) {
+			$errors[] = __( 'Incluye al menos una letra minuscula.', 'arriendo-facil' );
+		}
+
+		if ( ! preg_match( '/[0-9]/', $password ) ) {
+			$errors[] = __( 'Incluye al menos un numero.', 'arriendo-facil' );
+		}
+
+		if ( ! preg_match( '/[^A-Za-z0-9]/', $password ) ) {
+			$errors[] = __( 'Incluye al menos un simbolo especial (ej: !@#$%).', 'arriendo-facil' );
+		}
+
+		return $errors;
+	}
+
+	/**
+	 * Encrypts sensitive tenant data using libsodium secretbox.
+	 *
+	 * @param string $value Sensitive value.
+	 * @return string
+	 */
+	private function encrypt_sensitive_tenant_value( $value ) {
+		$value = (string) $value;
+		if ( '' === trim( $value ) ) {
+			return '';
+		}
+
+		if ( ! function_exists( 'sodium_crypto_secretbox' ) || ! function_exists( 'random_bytes' ) ) {
+			return '';
+		}
+
+		try {
+			$key_material = hash( 'sha256', wp_salt( 'auth' ) . wp_salt( 'secure_auth' ) . 'af_tenant_sensitive_v1', true );
+			if ( ! is_string( $key_material ) || 32 !== strlen( $key_material ) ) {
+				return '';
+			}
+
+			$nonce = random_bytes( SODIUM_CRYPTO_SECRETBOX_NONCEBYTES );
+			$ciphertext = sodium_crypto_secretbox( $value, $nonce, $key_material );
+
+			return 'v1:' . base64_encode( $nonce . $ciphertext );
+		} catch ( Exception $exception ) {
+			error_log( '[AF Security] tenant sensitive encryption failure: ' . $exception->getMessage() );
+			return '';
+		}
+	}
+
+	/**
+	 * Masks sensitive phone value for non-sensitive display storage.
+	 *
+	 * @param string $phone Raw phone.
+	 * @return string
+	 */
+	private function mask_sensitive_phone( $phone ) {
+		$digits = preg_replace( '/\D+/', '', (string) $phone );
+		if ( ! is_string( $digits ) || '' === $digits ) {
+			return '';
+		}
+
+		$tail = strlen( $digits ) > 4 ? substr( $digits, -4 ) : $digits;
+		return '***' . $tail;
+	}
+
+	/**
+	 * Masks sensitive ID value for non-sensitive display storage.
+	 *
+	 * @param string $id_number Raw ID number.
+	 * @return string
+	 */
+	private function mask_sensitive_id_number( $id_number ) {
+		$clean = preg_replace( '/\s+/', '', (string) $id_number );
+		if ( ! is_string( $clean ) || '' === $clean ) {
+			return '';
+		}
+
+		$tail = strlen( $clean ) > 4 ? substr( $clean, -4 ) : $clean;
+		return '***' . $tail;
+	}
+
+	/**
+	 * Logs security-significant tenant signup events.
+	 *
+	 * @param string $event Event key.
+	 * @param string $email Optional email.
+	 * @return void
+	 */
+	private function log_tenant_signup_security_event( $event, $email = '' ) {
+		$ip          = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : 'unknown';
+		$email       = sanitize_email( (string) $email );
+		$email_fprint = '' !== $email ? hash( 'sha256', strtolower( $email ) ) : '';
+		error_log( sprintf( '[AF Security] tenant_signup event=%s ip=%s email_fingerprint=%s', sanitize_key( $event ), $ip, $email_fprint ) );
 	}
 
 	/**
@@ -403,7 +575,7 @@ class Arriendo_Facil_Guest {
 
 		$recipient   = sanitize_email( (string) $user->user_email );
 		$display     = sanitize_text_field( (string) $user->display_name );
-		$login_url   = wp_login_url( home_url( '/' ) );
+		$login_url   = wp_login_url( admin_url() );
 		$recover_url = wp_lostpassword_url();
 
 		$subject = __( '[Arriendo Facil] Tu cuenta de inquilino fue creada', 'arriendo-facil' );
@@ -1616,6 +1788,8 @@ class Arriendo_Facil_Guest {
 			'referencia_personal_1'=> 'ALTER TABLE ' . $table . ' ADD COLUMN referencia_personal_1 VARCHAR(255) DEFAULT NULL',
 			'referencia_personal_2'=> 'ALTER TABLE ' . $table . ' ADD COLUMN referencia_personal_2 VARCHAR(255) DEFAULT NULL',
 			'personas_viviran'     => 'ALTER TABLE ' . $table . ' ADD COLUMN personas_viviran TINYINT UNSIGNED DEFAULT NULL',
+			'phone_encrypted'      => 'ALTER TABLE ' . $table . ' ADD COLUMN phone_encrypted LONGTEXT DEFAULT NULL',
+			'id_number_encrypted'  => 'ALTER TABLE ' . $table . ' ADD COLUMN id_number_encrypted LONGTEXT DEFAULT NULL',
 		);
 
 		foreach ( $columns as $column_name => $sql ) {

@@ -1,0 +1,161 @@
+.af-tenant-signup {
+  max-width: 760px;
+  margin: 24px auto;
+  padding: 22px;
+  border: 1px solid #dbe3ef;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+}
+
+.af-tenant-signup__title {
+  margin: 0 0 8px;
+  color: #0f172a;
+  font-size: 26px;
+  line-height: 1.2;
+}
+
+.af-tenant-signup__subtitle {
+  margin: 0;
+  color: #475569;
+  line-height: 1.6;
+}
+
+.af-tenant-signup__alert {
+  display: none;
+  margin-top: 16px;
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+
+.af-tenant-signup__form {
+  display: block;
+  margin-top: 16px;
+}
+
+.af-tenant-signup__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.af-tenant-signup__full {
+  grid-column: 1 / -1;
+}
+
+.af-tenant-signup__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.af-tenant-signup__label {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.af-tenant-signup__input {
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.af-tenant-signup__input:focus {
+  outline: none;
+  border-color: #7dbe52;
+  box-shadow: 0 0 0 3px rgba(125, 190, 82, 0.15);
+}
+
+.af-tenant-signup__password-hint {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.af-tenant-signup__honeypot {
+  position: absolute;
+  left: -9999px;
+  opacity: 0;
+  height: 0;
+  width: 0;
+  pointer-events: none;
+}
+
+.af-tenant-signup__legal {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+  color: #334155;
+  line-height: 1.5;
+}
+
+.af-tenant-signup__legal a {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+
+.af-tenant-signup__checkbox {
+  margin-top: 2px;
+}
+
+.af-tenant-signup__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.af-tenant-signup__submit {
+  padding: 11px 16px;
+  border: 0;
+  border-radius: 10px;
+  background: #1d4ed8;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.af-tenant-signup__link {
+  text-decoration: underline;
+}
+
+.af-tenant-signup__link--primary {
+  color: #1d4ed8;
+}
+
+.af-tenant-signup__link--secondary {
+  color: #475569;
+}
+
+@media (max-width: 760px) {
+  .af-tenant-signup {
+    padding: 16px;
+    margin: 14px auto;
+  }
+
+  .af-tenant-signup__grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .af-tenant-signup__title {
+    font-size: 22px;
+  }
+
+  .af-tenant-signup__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .af-tenant-signup__link {
+    text-align: center;
+  }
+}

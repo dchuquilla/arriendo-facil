@@ -17,6 +17,42 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Arriendo_Facil_Activator {
 
 	/**
+	 * Ensures the tenant role exists with least-privilege capabilities.
+	 *
+	 * @return void
+	 */
+	public static function ensure_tenant_role() {
+		$role = get_role( 'af_tenant' );
+
+		if ( ! $role ) {
+			$role = add_role(
+				'af_tenant',
+				__( 'Inquilino', 'arriendo-facil' ),
+				array(
+					'read' => true,
+				)
+			);
+		}
+
+		if ( $role instanceof WP_Role ) {
+			$required_caps = array(
+				'read',
+				'af_tenant_portal',
+				'af_tenant_manage_profile',
+				'af_tenant_view_own_leases',
+				'af_tenant_view_own_reservations',
+				'af_tenant_submit_reviews',
+			);
+
+			foreach ( $required_caps as $cap ) {
+				if ( ! $role->has_cap( $cap ) ) {
+					$role->add_cap( $cap );
+				}
+			}
+		}
+	}
+
+	/**
 	 * Ensures the owner role exists with required capabilities.
 	 *
 	 * @return void
@@ -108,6 +144,7 @@ class Arriendo_Facil_Activator {
 	 * owner contacts and AI logs.
 	 */
 	public static function activate() {
+		self::ensure_tenant_role();
 		self::ensure_owner_role();
 
 		global $wpdb;

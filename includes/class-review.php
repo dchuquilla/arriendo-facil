@@ -164,15 +164,17 @@ class Arriendo_Facil_Review {
 	 * @param int    $lease_id Lease ID.
 	 * @param int    $accommodation_id Accommodation ID.
 	 * @param int    $owner_user_id Owner user ID.
+	 * @param int    $tenant_user_id Tenant user ID (optional for legacy rows).
 	 * @param string $tenant_email Tenant email.
 	 * @param string $reviewer_type Reviewer type (tenant or owner).
 	 * @param string $due_at Optional due date in Y-m-d H:i:s.
 	 * @return int|WP_Error
 	 */
-	public static function create_review_group( $lease_id, $accommodation_id, $owner_user_id, $tenant_email, $reviewer_type, $due_at = '' ) {
+	public static function create_review_group( $lease_id, $accommodation_id, $owner_user_id, $tenant_user_id, $tenant_email, $reviewer_type, $due_at = '' ) {
 		$lease_id         = absint( $lease_id );
 		$accommodation_id = absint( $accommodation_id );
 		$owner_user_id    = absint( $owner_user_id );
+		$tenant_user_id   = absint( $tenant_user_id );
 		$tenant_email     = sanitize_email( (string) $tenant_email );
 		$reviewer_type    = sanitize_key( (string) $reviewer_type );
 		$due_at           = sanitize_text_field( (string) $due_at );
@@ -193,19 +195,23 @@ class Arriendo_Facil_Review {
 			return (int) $existing_group_id;
 		}
 
-		$inserted = $wpdb->insert(
-			self::groups_table(),
-			array(
-				'lease_id'         => $lease_id,
-				'accommodation_id' => $accommodation_id,
-				'owner_user_id'    => $owner_user_id,
-				'tenant_email'     => $tenant_email,
-				'reviewer_type'    => $reviewer_type,
-				'status'           => 'pending',
-				'due_at'           => '' !== $due_at ? $due_at : null,
-			),
-			array( '%d', '%d', '%d', '%s', '%s', '%s', '%s' )
+		$insert_data = array(
+			'lease_id'         => $lease_id,
+			'accommodation_id' => $accommodation_id,
+			'owner_user_id'    => $owner_user_id,
+			'tenant_email'     => $tenant_email,
+			'reviewer_type'    => $reviewer_type,
+			'status'           => 'pending',
+			'due_at'           => '' !== $due_at ? $due_at : null,
 		);
+		$insert_format = array( '%d', '%d', '%d', '%s', '%s', '%s', '%s' );
+
+		if ( self::groups_tenant_user_column_exists() ) {
+			$insert_data['tenant_user_id'] = $tenant_user_id > 0 ? $tenant_user_id : null;
+			$insert_format[]               = '%d';
+		}
+
+		$inserted = $wpdb->insert( self::groups_table(), $insert_data, $insert_format );
 
 		if ( ! $inserted ) {
 			return new WP_Error( 'af_review_group_insert_failed', __( 'No se pudo crear el grupo de reseña.', 'arriendo-facil' ) );
@@ -621,6 +627,7 @@ class Arriendo_Facil_Review {
 		}
 
 		$tenant_email = sanitize_email( (string) $user->user_email );
+		$tenant_user_id = absint( $user->ID );
 		if ( ! is_email( $tenant_email ) ) {
 			wp_send_json_error( array( 'message' => __( 'Tu cuenta no tiene un correo valido para reseñas.', 'arriendo-facil' ) ), 400 );
 		}
@@ -629,24 +636,72 @@ class Arriendo_Facil_Review {
 		$groups_table = self::groups_table();
 		$now_gmt      = gmdate( 'Y-m-d H:i:s' );
 
-		$group_id = (int) $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT id
-				 FROM {$groups_table}
-				 WHERE tenant_email = %s
-				   AND reviewer_type = %s
-				   AND status IN ('pending','sent')
-				   AND (due_at IS NULL OR due_at >= %s)
-				 ORDER BY COALESCE(due_at, '9999-12-31 23:59:59') ASC, id DESC
-				 LIMIT 1",
-				$tenant_email,
-				'tenant',
-				$now_gmt
-			)
-		);
+		if ( self::groups_tenant_user_column_exists() ) {
+			$group_id = (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT id
+					 FROM {$groups_table}
+					 WHERE reviewer_type = %s
+					   AND status IN ('pending','sent')
+					   AND (due_at IS NULL OR due_at >= %s)
+					   AND (
+						 tenant_user_id = %d
+						 OR ((tenant_user_id IS NULL OR tenant_user_id = 0) AND tenant_email = %s)
+					   )
+					 ORDER BY COALESCE(due_at, '9999-12-31 23:59:59') ASC, id DESC
+					 LIMIT 1",
+					'tenant',
+					$now_gmt,
+					$tenant_user_id,
+					$tenant_email
+				)
+			);
+		} else {
+			$group_id = (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT id
+					 FROM {$groups_table}
+					 WHERE tenant_email = %s
+					   AND reviewer_type = %s
+					   AND status IN ('pending','sent')
+					   AND (due_at IS NULL OR due_at >= %s)
+					 ORDER BY COALESCE(due_at, '9999-12-31 23:59:59') ASC, id DESC
+					 LIMIT 1",
+					$tenant_email,
+					'tenant',
+					$now_gmt
+				)
+			);
+		}
 
 		if ( ! $group_id ) {
 			wp_send_json_error( array( 'message' => __( 'No tienes reseñas pendientes por calificar en este momento.', 'arriendo-facil' ) ), 404 );
+		}
+
+		if ( self::groups_tenant_user_column_exists() && $tenant_user_id > 0 ) {
+			$wpdb->query(
+				$wpdb->prepare(
+					"UPDATE {$groups_table}
+					 SET tenant_user_id = %d
+					 WHERE id = %d
+					   AND (tenant_user_id IS NULL OR tenant_user_id = 0)",
+					$tenant_user_id,
+					$group_id
+				)
+			);
+
+			if ( self::reviews_tenant_user_column_exists() ) {
+				$wpdb->query(
+					$wpdb->prepare(
+						"UPDATE " . self::reviews_table() . "
+						 SET tenant_user_id = %d
+						 WHERE review_group_id = %d
+						   AND (tenant_user_id IS NULL OR tenant_user_id = 0)",
+						$tenant_user_id,
+						$group_id
+					)
+				);
+			}
 		}
 
 		$this->revoke_active_tokens_for_group( $group_id );
@@ -711,6 +766,7 @@ class Arriendo_Facil_Review {
 				$lease_id,
 				$context['accommodation_id'],
 				$context['owner_user_id'],
+				$context['tenant_user_id'],
 				$context['tenant_email'],
 				$reviewer_type,
 				$due_at
@@ -728,6 +784,7 @@ class Arriendo_Facil_Review {
 				$lease_id,
 				$context['accommodation_id'],
 				$context['owner_user_id'],
+				$context['tenant_user_id'],
 				$context['tenant_email'],
 				$directions
 			);
@@ -1129,6 +1186,7 @@ class Arriendo_Facil_Review {
 			$lease_id,
 			$context['accommodation_id'],
 			$context['owner_user_id'],
+			$context['tenant_user_id'],
 			$context['tenant_email'],
 			'tenant',
 			$due_at
@@ -1141,6 +1199,7 @@ class Arriendo_Facil_Review {
 			$lease_id,
 			$context['accommodation_id'],
 			$context['owner_user_id'],
+			$context['tenant_user_id'],
 			$context['tenant_email'],
 			'owner',
 			$due_at
@@ -1159,6 +1218,7 @@ class Arriendo_Facil_Review {
 			$lease_id,
 			$context['accommodation_id'],
 			$context['owner_user_id'],
+			$context['tenant_user_id'],
 			$context['tenant_email'],
 			array( 'tenant_to_owner', 'tenant_to_property' )
 		);
@@ -1171,6 +1231,7 @@ class Arriendo_Facil_Review {
 			$lease_id,
 			$context['accommodation_id'],
 			$context['owner_user_id'],
+			$context['tenant_user_id'],
 			$context['tenant_email'],
 			array( 'owner_to_tenant' )
 		);
@@ -1215,7 +1276,15 @@ class Arriendo_Facil_Review {
 
 		global $wpdb;
 		$tenant_email = '';
+		$tenant_user_id = 0;
 		if ( isset( $lease->guest_id ) ) {
+			$tenant_user_id = (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT user_id FROM {$wpdb->prefix}af_guests WHERE id = %d LIMIT 1",
+					absint( $lease->guest_id )
+				)
+			);
+
 			$tenant_email = (string) $wpdb->get_var(
 				$wpdb->prepare(
 					"SELECT email FROM {$wpdb->prefix}af_guests WHERE id = %d LIMIT 1",
@@ -1229,10 +1298,15 @@ class Arriendo_Facil_Review {
 			return new WP_Error( 'af_review_tenant_missing', __( 'No se encontro el correo del inquilino para crear reseñas.', 'arriendo-facil' ) );
 		}
 
+		if ( $tenant_user_id <= 0 ) {
+			$tenant_user_id = $this->resolve_tenant_user_id_from_email( $tenant_email );
+		}
+
 		return array(
 			'lease'           => $lease,
 			'accommodation_id' => $accommodation_id,
 			'owner_user_id'    => $owner_user_id,
+			'tenant_user_id'   => $tenant_user_id,
 			'tenant_email'     => $tenant_email,
 		);
 	}
@@ -1244,15 +1318,17 @@ class Arriendo_Facil_Review {
 	 * @param int   $lease_id Lease ID.
 	 * @param int   $accommodation_id Accommodation ID.
 	 * @param int   $owner_user_id Owner user ID.
+	 * @param int    $tenant_user_id Tenant user ID.
 	 * @param string $tenant_email Tenant email.
 	 * @param array  $directions Review directions to create.
 	 * @return array|WP_Error
 	 */
-	private function create_reviews_for_group( $review_group_id, $lease_id, $accommodation_id, $owner_user_id, $tenant_email, array $directions ) {
+	private function create_reviews_for_group( $review_group_id, $lease_id, $accommodation_id, $owner_user_id, $tenant_user_id, $tenant_email, array $directions ) {
 		$review_group_id  = absint( $review_group_id );
 		$lease_id         = absint( $lease_id );
 		$accommodation_id = absint( $accommodation_id );
 		$owner_user_id    = absint( $owner_user_id );
+		$tenant_user_id   = absint( $tenant_user_id );
 		$tenant_email     = sanitize_email( (string) $tenant_email );
 
 		if ( ! $review_group_id || ! $lease_id || ! $accommodation_id || ! $owner_user_id || ! is_email( $tenant_email ) || empty( $directions ) ) {
@@ -1280,20 +1356,24 @@ class Arriendo_Facil_Review {
 				continue;
 			}
 
-			$inserted = $wpdb->insert(
-				self::reviews_table(),
-				array(
-					'review_group_id' => $review_group_id,
-					'lease_id'        => $lease_id,
-					'accommodation_id'=> $accommodation_id,
-					'owner_user_id'   => $owner_user_id,
-					'tenant_email'    => $tenant_email,
-					'review_direction'=> $direction,
-					'stars'           => 0,
-					'status'          => 'pending',
-				),
-				array( '%d', '%d', '%d', '%d', '%s', '%s', '%d', '%s' )
+			$insert_data = array(
+				'review_group_id' => $review_group_id,
+				'lease_id'        => $lease_id,
+				'accommodation_id'=> $accommodation_id,
+				'owner_user_id'   => $owner_user_id,
+				'tenant_email'    => $tenant_email,
+				'review_direction'=> $direction,
+				'stars'           => 0,
+				'status'          => 'pending',
 			);
+			$insert_format = array( '%d', '%d', '%d', '%d', '%s', '%s', '%d', '%s' );
+
+			if ( self::reviews_tenant_user_column_exists() ) {
+				$insert_data['tenant_user_id'] = $tenant_user_id > 0 ? $tenant_user_id : null;
+				$insert_format[]               = '%d';
+			}
+
+			$inserted = $wpdb->insert( self::reviews_table(), $insert_data, $insert_format );
 
 			if ( ! $inserted ) {
 				return new WP_Error( 'af_review_row_insert_failed', __( 'No se pudo crear una reseña pendiente.', 'arriendo-facil' ) );
@@ -1522,6 +1602,14 @@ class Arriendo_Facil_Review {
 	private function resolve_group_recipient_email( $group ) {
 		$reviewer_type = sanitize_key( (string) $group->reviewer_type );
 		if ( 'tenant' === $reviewer_type ) {
+			$tenant_user_id = isset( $group->tenant_user_id ) ? absint( $group->tenant_user_id ) : 0;
+			if ( $tenant_user_id > 0 ) {
+				$tenant_user = get_userdata( $tenant_user_id );
+				if ( $tenant_user instanceof WP_User && is_email( $tenant_user->user_email ) ) {
+					return sanitize_email( (string) $tenant_user->user_email );
+				}
+			}
+
 			return sanitize_email( (string) $group->tenant_email );
 		}
 
@@ -1699,6 +1787,64 @@ class Arriendo_Facil_Review {
 		}
 
 		return $comments;
+	}
+
+	/**
+	 * Resolves tenant user ID from a valid tenant email when possible.
+	 *
+	 * @param string $tenant_email Tenant email.
+	 * @return int
+	 */
+	private function resolve_tenant_user_id_from_email( $tenant_email ) {
+		$tenant_email = sanitize_email( (string) $tenant_email );
+		if ( ! is_email( $tenant_email ) ) {
+			return 0;
+		}
+
+		$user = get_user_by( 'email', $tenant_email );
+		if ( ! $user instanceof WP_User ) {
+			return 0;
+		}
+
+		return (int) $user->ID;
+	}
+
+	/**
+	 * Determines whether af_review_groups has tenant_user_id.
+	 *
+	 * @return bool
+	 */
+	public static function groups_tenant_user_column_exists() {
+		static $exists = null;
+
+		if ( null !== $exists ) {
+			return (bool) $exists;
+		}
+
+		global $wpdb;
+		$column = $wpdb->get_var( "SHOW COLUMNS FROM " . self::groups_table() . " LIKE 'tenant_user_id'" );
+		$exists = ! empty( $column );
+
+		return (bool) $exists;
+	}
+
+	/**
+	 * Determines whether af_reviews has tenant_user_id.
+	 *
+	 * @return bool
+	 */
+	public static function reviews_tenant_user_column_exists() {
+		static $exists = null;
+
+		if ( null !== $exists ) {
+			return (bool) $exists;
+		}
+
+		global $wpdb;
+		$column = $wpdb->get_var( "SHOW COLUMNS FROM " . self::reviews_table() . " LIKE 'tenant_user_id'" );
+		$exists = ! empty( $column );
+
+		return (bool) $exists;
 	}
 
 	/**

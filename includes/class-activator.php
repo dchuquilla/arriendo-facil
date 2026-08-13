@@ -378,6 +378,7 @@ class Arriendo_Facil_Activator {
 				lease_id          BIGINT(20) UNSIGNED NOT NULL,
 				accommodation_id  BIGINT(20) UNSIGNED NOT NULL,
 				owner_user_id     BIGINT(20) UNSIGNED NOT NULL,
+				tenant_user_id    BIGINT(20) UNSIGNED DEFAULT NULL,
 				tenant_email      VARCHAR(190) NOT NULL,
 				reviewer_type     VARCHAR(20) NOT NULL COMMENT 'tenant or owner',
 				status            VARCHAR(20) NOT NULL DEFAULT 'pending',
@@ -391,6 +392,7 @@ class Arriendo_Facil_Activator {
 				KEY lease_id (lease_id),
 				KEY accommodation_id (accommodation_id),
 				KEY owner_user_id (owner_user_id),
+				KEY tenant_user_id (tenant_user_id),
 				KEY tenant_email (tenant_email),
 				KEY status (status),
 				KEY reviewer_type (reviewer_type)
@@ -402,6 +404,7 @@ class Arriendo_Facil_Activator {
 				lease_id          BIGINT(20) UNSIGNED NOT NULL,
 				accommodation_id  BIGINT(20) UNSIGNED NOT NULL,
 				owner_user_id     BIGINT(20) UNSIGNED NOT NULL,
+				tenant_user_id    BIGINT(20) UNSIGNED DEFAULT NULL,
 				tenant_email      VARCHAR(190) NOT NULL,
 				review_direction  VARCHAR(30) NOT NULL,
 				stars             TINYINT(2) UNSIGNED NOT NULL DEFAULT 0,
@@ -416,6 +419,7 @@ class Arriendo_Facil_Activator {
 				KEY lease_id (lease_id),
 				KEY accommodation_id (accommodation_id),
 				KEY owner_user_id (owner_user_id),
+				KEY tenant_user_id (tenant_user_id),
 				KEY tenant_email (tenant_email),
 				KEY review_direction (review_direction),
 				KEY status (status),
@@ -569,6 +573,91 @@ class Arriendo_Facil_Activator {
 		foreach ( $tables as $sql ) {
 			dbDelta( $sql );
 		}
+
+		$review_groups_table = $wpdb->prefix . 'af_review_groups';
+		$review_rows_table   = $wpdb->prefix . 'af_reviews';
+
+		$review_groups_tenant_user_col = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				 FROM INFORMATION_SCHEMA.COLUMNS
+				 WHERE TABLE_SCHEMA = %s
+				   AND TABLE_NAME = %s
+				   AND COLUMN_NAME = %s",
+				DB_NAME,
+				$review_groups_table,
+				'tenant_user_id'
+			)
+		);
+		if ( ! (int) $review_groups_tenant_user_col ) {
+			$wpdb->query( "ALTER TABLE {$review_groups_table} ADD COLUMN tenant_user_id BIGINT(20) UNSIGNED DEFAULT NULL AFTER owner_user_id" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		}
+
+		$review_groups_tenant_user_idx = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				 FROM INFORMATION_SCHEMA.STATISTICS
+				 WHERE TABLE_SCHEMA = %s
+				   AND TABLE_NAME = %s
+				   AND INDEX_NAME = %s",
+				DB_NAME,
+				$review_groups_table,
+				'tenant_user_id'
+			)
+		);
+		if ( ! (int) $review_groups_tenant_user_idx ) {
+			$wpdb->query( "ALTER TABLE {$review_groups_table} ADD KEY tenant_user_id (tenant_user_id)" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		}
+
+		$review_rows_tenant_user_col = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				 FROM INFORMATION_SCHEMA.COLUMNS
+				 WHERE TABLE_SCHEMA = %s
+				   AND TABLE_NAME = %s
+				   AND COLUMN_NAME = %s",
+				DB_NAME,
+				$review_rows_table,
+				'tenant_user_id'
+			)
+		);
+		if ( ! (int) $review_rows_tenant_user_col ) {
+			$wpdb->query( "ALTER TABLE {$review_rows_table} ADD COLUMN tenant_user_id BIGINT(20) UNSIGNED DEFAULT NULL AFTER owner_user_id" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		}
+
+		$review_rows_tenant_user_idx = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				 FROM INFORMATION_SCHEMA.STATISTICS
+				 WHERE TABLE_SCHEMA = %s
+				   AND TABLE_NAME = %s
+				   AND INDEX_NAME = %s",
+				DB_NAME,
+				$review_rows_table,
+				'tenant_user_id'
+			)
+		);
+		if ( ! (int) $review_rows_tenant_user_idx ) {
+			$wpdb->query( "ALTER TABLE {$review_rows_table} ADD KEY tenant_user_id (tenant_user_id)" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		}
+
+		$wpdb->query(
+			"UPDATE {$review_groups_table} g
+			 LEFT JOIN {$wpdb->prefix}af_guests gu ON gu.email = g.tenant_email
+			 SET g.tenant_user_id = gu.user_id
+			 WHERE (g.tenant_user_id IS NULL OR g.tenant_user_id = 0)
+			   AND gu.user_id IS NOT NULL
+			   AND gu.user_id > 0"
+		); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+
+		$wpdb->query(
+			"UPDATE {$review_rows_table} r
+			 LEFT JOIN {$wpdb->prefix}af_guests gu ON gu.email = r.tenant_email
+			 SET r.tenant_user_id = gu.user_id
+			 WHERE (r.tenant_user_id IS NULL OR r.tenant_user_id = 0)
+			   AND gu.user_id IS NOT NULL
+			   AND gu.user_id > 0"
+		); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 
 		$reservations_table = $wpdb->prefix . 'af_reservations';
 		$reservation_status_exists = $wpdb->get_var(

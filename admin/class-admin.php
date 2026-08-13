@@ -1170,18 +1170,43 @@ class Arriendo_Facil_Admin {
 			)
 		) : 0;
 
-		$reviews_pending = is_email( $email ) ? (int) $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT COUNT(*) FROM {$wpdb->prefix}af_review_groups
-				 WHERE tenant_email = %s
-				   AND reviewer_type = %s
-				   AND status IN ('pending','sent')
-				   AND (due_at IS NULL OR due_at >= %s)",
-				$email,
-				'tenant',
-				gmdate( 'Y-m-d H:i:s' )
-			)
-		) : 0;
+		$reviews_pending = 0;
+		if ( is_email( $email ) ) {
+			$review_now = gmdate( 'Y-m-d H:i:s' );
+			$user_id    = (int) $user->ID;
+
+			if ( class_exists( 'Arriendo_Facil_Review' ) && Arriendo_Facil_Review::groups_tenant_user_column_exists() ) {
+				$reviews_pending = (int) $wpdb->get_var(
+					$wpdb->prepare(
+						"SELECT COUNT(*) FROM {$wpdb->prefix}af_review_groups
+						 WHERE reviewer_type = %s
+						   AND status IN ('pending','sent')
+						   AND (due_at IS NULL OR due_at >= %s)
+						   AND (
+							 tenant_user_id = %d
+							 OR ((tenant_user_id IS NULL OR tenant_user_id = 0) AND tenant_email = %s)
+						   )",
+						'tenant',
+						$review_now,
+						$user_id,
+						$email
+					)
+				);
+			} else {
+				$reviews_pending = (int) $wpdb->get_var(
+					$wpdb->prepare(
+						"SELECT COUNT(*) FROM {$wpdb->prefix}af_review_groups
+						 WHERE tenant_email = %s
+						   AND reviewer_type = %s
+						   AND status IN ('pending','sent')
+						   AND (due_at IS NULL OR due_at >= %s)",
+						$email,
+						'tenant',
+						$review_now
+					)
+				);
+			}
+		}
 
 		return array(
 			'user'     => $user,
@@ -1262,6 +1287,7 @@ class Arriendo_Facil_Admin {
 	private function get_tenant_reviews_summary() {
 		$context = $this->get_tenant_portal_context();
 		$email   = isset( $context['email'] ) ? sanitize_email( (string) $context['email'] ) : '';
+		$user_id = isset( $context['user'] ) && $context['user'] instanceof WP_User ? (int) $context['user']->ID : 0;
 
 		if ( ! is_email( $email ) ) {
 			return array(
@@ -1273,38 +1299,92 @@ class Arriendo_Facil_Admin {
 
 		global $wpdb;
 
-		$completed = (int) $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT COUNT(*) FROM {$wpdb->prefix}af_reviews
-				 WHERE tenant_email = %s
-				   AND review_direction IN ('tenant_to_owner','tenant_to_property')
-				   AND status = 'completed'",
-				$email
-			)
-		);
+		$use_user_link_groups  = class_exists( 'Arriendo_Facil_Review' ) && Arriendo_Facil_Review::groups_tenant_user_column_exists();
+		$use_user_link_reviews = class_exists( 'Arriendo_Facil_Review' ) && Arriendo_Facil_Review::reviews_tenant_user_column_exists();
 
-		$pending = (int) $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT COUNT(*) FROM {$wpdb->prefix}af_review_groups
-				 WHERE tenant_email = %s
-				   AND reviewer_type = %s
-				   AND status IN ('pending','sent')
-				   AND (due_at IS NULL OR due_at >= %s)",
-				$email,
-				'tenant',
-				gmdate( 'Y-m-d H:i:s' )
-			)
-		);
+		if ( $use_user_link_reviews ) {
+			$completed = (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*) FROM {$wpdb->prefix}af_reviews
+					 WHERE review_direction IN ('tenant_to_owner','tenant_to_property')
+					   AND status = 'completed'
+					   AND (
+						 tenant_user_id = %d
+						 OR ((tenant_user_id IS NULL OR tenant_user_id = 0) AND tenant_email = %s)
+					   )",
+					$user_id,
+					$email
+				)
+			);
+		} else {
+			$completed = (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*) FROM {$wpdb->prefix}af_reviews
+					 WHERE tenant_email = %s
+					   AND review_direction IN ('tenant_to_owner','tenant_to_property')
+					   AND status = 'completed'",
+					$email
+				)
+			);
+		}
 
-		$avg_stars = (float) $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT AVG(stars) FROM {$wpdb->prefix}af_reviews
-				 WHERE tenant_email = %s
-				   AND review_direction IN ('tenant_to_owner','tenant_to_property')
-				   AND status = 'completed'",
-				$email
-			)
-		);
+		if ( $use_user_link_groups ) {
+			$pending = (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*) FROM {$wpdb->prefix}af_review_groups
+					 WHERE reviewer_type = %s
+					   AND status IN ('pending','sent')
+					   AND (due_at IS NULL OR due_at >= %s)
+					   AND (
+						 tenant_user_id = %d
+						 OR ((tenant_user_id IS NULL OR tenant_user_id = 0) AND tenant_email = %s)
+					   )",
+					'tenant',
+					gmdate( 'Y-m-d H:i:s' ),
+					$user_id,
+					$email
+				)
+			);
+		} else {
+			$pending = (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*) FROM {$wpdb->prefix}af_review_groups
+					 WHERE tenant_email = %s
+					   AND reviewer_type = %s
+					   AND status IN ('pending','sent')
+					   AND (due_at IS NULL OR due_at >= %s)",
+					$email,
+					'tenant',
+					gmdate( 'Y-m-d H:i:s' )
+				)
+			);
+		}
+
+		if ( $use_user_link_reviews ) {
+			$avg_stars = (float) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT AVG(stars) FROM {$wpdb->prefix}af_reviews
+					 WHERE review_direction IN ('tenant_to_owner','tenant_to_property')
+					   AND status = 'completed'
+					   AND (
+						 tenant_user_id = %d
+						 OR ((tenant_user_id IS NULL OR tenant_user_id = 0) AND tenant_email = %s)
+					   )",
+					$user_id,
+					$email
+				)
+			);
+		} else {
+			$avg_stars = (float) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT AVG(stars) FROM {$wpdb->prefix}af_reviews
+					 WHERE tenant_email = %s
+					   AND review_direction IN ('tenant_to_owner','tenant_to_property')
+					   AND status = 'completed'",
+					$email
+				)
+			);
+		}
 
 		return array(
 			'completed' => $completed,

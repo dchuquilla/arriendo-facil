@@ -27,6 +27,7 @@ class Arriendo_Facil_Review {
 		add_action( 'wp_ajax_nopriv_af_submit_review_by_token', array( $this, 'ajax_submit_review_by_token' ) );
 		add_action( 'wp_ajax_af_request_new_review_link', array( $this, 'ajax_request_new_review_link' ) );
 		add_action( 'wp_ajax_nopriv_af_request_new_review_link', array( $this, 'ajax_request_new_review_link' ) );
+		add_action( 'wp_ajax_af_tenant_request_review_link', array( $this, 'ajax_tenant_request_review_link' ) );
 		add_action( 'wp_ajax_af_generate_review_test_link', array( $this, 'ajax_generate_review_test_link' ) );
 		add_shortcode( 'af_review_form', array( $this, 'render_review_form_shortcode' ) );
 		add_shortcode( 'af_review_stats', array( $this, 'render_review_stats_shortcode' ) );
@@ -595,6 +596,79 @@ class Arriendo_Facil_Review {
 		}
 
 		wp_send_json_success( array( 'message' => __( 'Se envio un nuevo enlace de reseña al correo registrado.', 'arriendo-facil' ) ) );
+	}
+
+	/**
+	 * AJAX: requests a fresh review link for the logged-in tenant.
+	 *
+	 * @return void
+	 */
+	public function ajax_tenant_request_review_link() {
+		check_ajax_referer( 'af_guest_nonce', 'nonce' );
+
+		if ( ! is_user_logged_in() ) {
+			wp_send_json_error( array( 'message' => __( 'Debes iniciar sesion para solicitar tu enlace de reseña.', 'arriendo-facil' ) ), 401 );
+		}
+
+		$user = wp_get_current_user();
+		if ( ! ( $user instanceof WP_User ) ) {
+			wp_send_json_error( array( 'message' => __( 'No se pudo validar tu sesión.', 'arriendo-facil' ) ), 401 );
+		}
+
+		$roles = isset( $user->roles ) && is_array( $user->roles ) ? $user->roles : array();
+		if ( ! in_array( 'af_tenant', $roles, true ) && ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado para solicitar enlace de reseña.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$tenant_email = sanitize_email( (string) $user->user_email );
+		if ( ! is_email( $tenant_email ) ) {
+			wp_send_json_error( array( 'message' => __( 'Tu cuenta no tiene un correo valido para reseñas.', 'arriendo-facil' ) ), 400 );
+		}
+
+		global $wpdb;
+		$groups_table = self::groups_table();
+		$now_gmt      = gmdate( 'Y-m-d H:i:s' );
+
+		$group_id = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT id
+				 FROM {$groups_table}
+				 WHERE tenant_email = %s
+				   AND reviewer_type = %s
+				   AND status IN ('pending','sent')
+				   AND (due_at IS NULL OR due_at >= %s)
+				 ORDER BY COALESCE(due_at, '9999-12-31 23:59:59') ASC, id DESC
+				 LIMIT 1",
+				$tenant_email,
+				'tenant',
+				$now_gmt
+			)
+		);
+
+		if ( ! $group_id ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes reseñas pendientes por calificar en este momento.', 'arriendo-facil' ) ), 404 );
+		}
+
+		$this->revoke_active_tokens_for_group( $group_id );
+		$token_data = self::create_review_token( $group_id, self::default_token_attempts() );
+		if ( is_wp_error( $token_data ) ) {
+			wp_send_json_error( array( 'message' => $token_data->get_error_message() ), 500 );
+		}
+
+		$selector   = isset( $token_data['selector'] ) ? (string) $token_data['selector'] : '';
+		$token      = isset( $token_data['token'] ) ? (string) $token_data['token'] : '';
+		$review_url = $this->build_review_link( $selector, $token );
+
+		if ( '' === $review_url ) {
+			wp_send_json_error( array( 'message' => __( 'No se pudo construir tu enlace de reseña.', 'arriendo-facil' ) ), 500 );
+		}
+
+		wp_send_json_success(
+			array(
+				'message'    => __( 'Tu enlace de reseña está listo. Ábrelo para calificar tu estancia.', 'arriendo-facil' ),
+				'review_url' => $review_url,
+			)
+		);
 	}
 
 	/**

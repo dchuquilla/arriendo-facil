@@ -8,6 +8,38 @@ body.index-php .af-tenant-dash-widget .af-dash-widget__hero {
 	background: linear-gradient(135deg, #0f766e 0%, #0f766e 20%, #0f172a 100%);
 }
 
+.af-tenant-dashboard #dashboard-widgets-wrap {
+	max-width: 1240px;
+	margin: 0 auto;
+}
+
+.af-tenant-dashboard #dashboard-widgets .postbox-container,
+.af-tenant-dashboard #wpbody-content .metabox-holder.columns-2 #postbox-container-1,
+.af-tenant-dashboard #wpbody-content .metabox-holder.columns-2 #postbox-container-2 {
+	width: 100% !important;
+	max-width: 100% !important;
+	float: none;
+}
+
+.af-tenant-dashboard #postbox-container-2,
+.af-tenant-dashboard #postbox-container-3,
+.af-tenant-dashboard #postbox-container-4 {
+	display: none;
+}
+
+.af-tenant-dashboard .metabox-holder {
+	margin-top: 8px;
+}
+
+.af-tenant-dashboard #dashboard-widgets .postbox#af_tenant_dashboard_summary .inside {
+	padding: 20px;
+}
+
+.af-tenant-dashboard .wrap > h1 {
+	font-size: 30px;
+	margin-bottom: 12px;
+}
+
 .af-tenant-portal {
 	max-width: 1280px;
 	margin: 0 auto;
@@ -69,6 +101,61 @@ body.index-php .af-tenant-dash-widget .af-dash-widget__hero {
 	color: #0f766e;
 }
 
+.af-tenant-dash-widget {
+	gap: 18px;
+}
+
+.af-tenant-dash-widget .af-dash-widget__hero {
+	min-height: 96px;
+	border-radius: 14px;
+	padding: 16px 18px;
+	box-shadow: 0 14px 30px rgba(15, 23, 42, 0.2);
+}
+
+.af-tenant-dash-widget .af-dash-widget__hero-text h3 {
+	font-size: 20px;
+	margin-bottom: 4px;
+}
+
+.af-tenant-dash-widget .af-dash-widget__hero-text p {
+	font-size: 14px;
+	opacity: 0.95;
+}
+
+.af-tenant-dash-widget .af-dash-widget__stats {
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 10px;
+}
+
+.af-tenant-dash-widget .af-dash-widget__stat {
+	padding: 14px;
+	min-height: 96px;
+	justify-content: center;
+}
+
+.af-tenant-dash-widget .af-dash-widget__stat-label {
+	font-size: 10px;
+	letter-spacing: 0.07em;
+}
+
+.af-tenant-dash-widget .af-dash-widget__stat-value {
+	font-size: clamp(28px, 3vw, 36px);
+	line-height: 1;
+}
+
+.af-tenant-dash-widget .af-dash-widget__actions {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 10px;
+}
+
+.af-tenant-dash-widget .af-dash-widget__actions .af-dash-btn {
+	height: 42px;
+	justify-content: center;
+	font-size: 13px;
+	border-radius: 10px;
+}
+
 #af-tenant-review-feedback {
 	margin-top: 10px;
 	min-height: 20px;
@@ -77,6 +164,14 @@ body.index-php .af-tenant-dash-widget .af-dash-widget__hero {
 
 @media (max-width: 1100px) {
 	.af-tenant-portal .af-split {
+		grid-template-columns: 1fr;
+	}
+
+	.af-tenant-dash-widget .af-dash-widget__stats {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.af-tenant-dash-widget .af-dash-widget__actions {
 		grid-template-columns: 1fr;
 	}
 }
@@ -93,5 +188,17 @@ body.index-php .af-tenant-dash-widget .af-dash-widget__hero {
 	.af-tenant-portal .af-page-header__actions .af-btn {
 		width: 100%;
 		justify-content: center;
+	}
+
+	.af-tenant-dashboard #dashboard-widgets .postbox#af_tenant_dashboard_summary .inside {
+		padding: 14px;
+	}
+
+	.af-tenant-dash-widget .af-dash-widget__hero {
+		min-height: auto;
+	}
+
+	.af-tenant-dash-widget .af-dash-widget__stats {
+		grid-template-columns: 1fr;
 	}
 }

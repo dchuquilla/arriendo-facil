@@ -27,6 +27,7 @@ class Arriendo_Facil_Admin {
 		add_action( 'admin_menu', array( $this, 'remove_menus_for_owner' ), 999 );
 		add_action( 'admin_menu', array( $this, 'remove_menus_for_tenant' ), 999 );
 		add_action( 'admin_menu', array( $this, 'register_tenant_dashboard_pages' ), 50 );
+		add_filter( 'get_user_option_screen_layout_dashboard', array( $this, 'force_tenant_dashboard_single_column' ), 10, 3 );
 		add_filter( 'login_redirect', array( $this, 'redirect_owner_after_login' ), 10, 3 );
 		add_action( 'admin_init', array( $this, 'redirect_owner_from_wp_dashboard' ) );
 		add_action( 'admin_init', array( $this, 'suppress_owner_update_nag' ) );
@@ -403,11 +404,37 @@ class Arriendo_Facil_Admin {
 			}
 		}
 
+		if ( 'index.php' === $pagenow && $this->is_restricted_tenant() ) {
+			$extra[] = 'af-tenant-dashboard';
+		}
+
 		if ( ! empty( $extra ) ) {
 			$classes .= ' ' . implode( ' ', $extra );
 		}
 
 		return $classes;
+	}
+
+	/**
+	 * Forces the native dashboard to one column for tenant users so the
+	 * tenant widget uses full available space.
+	 *
+	 * @param mixed  $result Existing option value.
+	 * @param string $option Option key.
+	 * @param WP_User $user  User object.
+	 * @return mixed
+	 */
+	public function force_tenant_dashboard_single_column( $result, $option, $user ) {
+		if ( ! ( $user instanceof WP_User ) ) {
+			return $result;
+		}
+
+		$roles = isset( $user->roles ) && is_array( $user->roles ) ? $user->roles : array();
+		if ( in_array( 'af_tenant', $roles, true ) && ! in_array( 'administrator', $roles, true ) ) {
+			return 1;
+		}
+
+		return $result;
 	}
 
 	/**

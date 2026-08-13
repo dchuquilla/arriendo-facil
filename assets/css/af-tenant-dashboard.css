@@ -35,6 +35,16 @@ body.index-php .af-tenant-dash-widget .af-dash-widget__hero {
 	padding: 20px;
 }
 
+.af-tenant-dashboard #dashboard-widgets .postbox#af_tenant_dashboard_summary .postbox-header .handle-actions,
+.af-tenant-dashboard #dashboard-widgets .postbox#af_tenant_dashboard_summary .postbox-header .handlediv {
+	display: none !important;
+}
+
+.af-tenant-dashboard #dashboard-widgets .postbox#af_tenant_dashboard_summary .postbox-header .hndle {
+	pointer-events: none;
+	cursor: default;
+}
+
 .af-tenant-dashboard .wrap > h1 {
 	font-size: 30px;
 	margin-bottom: 12px;
@@ -154,6 +164,13 @@ body.index-php .af-tenant-dash-widget .af-dash-widget__hero {
 	justify-content: center;
 	font-size: 13px;
 	border-radius: 10px;
+}
+
+.af-tenant-dash-widget .af-dash-widget__actions .af-dash-btn--primary,
+.af-tenant-dash-widget .af-dash-widget__actions .af-dash-btn--primary:visited,
+.af-tenant-dash-widget .af-dash-widget__actions .af-dash-btn--primary:hover,
+.af-tenant-dash-widget .af-dash-widget__actions .af-dash-btn--primary:focus {
+	color: #ffffff !important;
 }
 
 #af-tenant-review-feedback {

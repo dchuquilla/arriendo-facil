@@ -23,6 +23,7 @@ class Arriendo_Facil_Admin {
 	 */
 	public function __construct() {
 		add_action( 'admin_menu', array( $this, 'add_menu' ) );
+		add_action( 'admin_menu', array( $this, 'rename_wp_dashboard_menu_for_portal_users' ), 1000 );
 		add_action( 'admin_menu', array( $this, 'remove_menus_for_owner' ), 999 );
 		add_action( 'admin_menu', array( $this, 'remove_menus_for_tenant' ), 999 );
 		add_action( 'admin_menu', array( $this, 'register_tenant_dashboard_pages' ), 50 );
@@ -213,6 +214,27 @@ class Arriendo_Facil_Admin {
 	}
 
 	/**
+	 * Renames native WordPress Dashboard label for tenant users.
+	 *
+	 * @return void
+	 */
+	public function rename_wp_dashboard_menu_for_portal_users() {
+		if ( ! $this->is_restricted_tenant() ) {
+			return;
+		}
+
+		global $menu, $submenu;
+
+		if ( isset( $menu[2][0] ) ) {
+			$menu[2][0] = __( 'Arriendo Fácil', 'arriendo-facil' );
+		}
+
+		if ( isset( $submenu['index.php'][0][0] ) ) {
+			$submenu['index.php'][0][0] = __( 'Arriendo Fácil', 'arriendo-facil' );
+		}
+	}
+
+	/**
 	 * Returns true when the current user should see the owner-restricted UI
 	 * (owner role and NOT admin).
 	 */
@@ -240,13 +262,22 @@ class Arriendo_Facil_Admin {
 	}
 
 	/**
-	 * Removes noisy WP-core nodes from the admin bar for owners.
+	 * Returns true for restricted role-based dashboards (owner or tenant).
+	 *
+	 * @return bool
+	 */
+	private function is_restricted_portal_user() {
+		return $this->is_restricted_owner() || $this->is_restricted_tenant();
+	}
+
+	/**
+	 * Removes noisy WP-core nodes from the admin bar for restricted users.
 	 * Keeps: site-name (link a home), user account, notifications.
 	 *
 	 * @param WP_Admin_Bar $wp_admin_bar
 	 */
 	public function harden_admin_bar_for_owner( $wp_admin_bar ) {
-		if ( ! $this->is_restricted_owner() ) {
+		if ( ! $this->is_restricted_owner() && ! $this->is_restricted_tenant() ) {
 			return;
 		}
 
@@ -283,10 +314,10 @@ class Arriendo_Facil_Admin {
 	}
 
 	/**
-	 * Suppresses the "WordPress X.Y is available" nag for owners.
+	 * Suppresses the "WordPress X.Y is available" nag for restricted users.
 	 */
 	public function suppress_owner_update_nag() {
-		if ( ! $this->is_restricted_owner() ) {
+		if ( ! $this->is_restricted_portal_user() ) {
 			return;
 		}
 
@@ -296,11 +327,11 @@ class Arriendo_Facil_Admin {
 	}
 
 	/**
-	 * CSS fallback that hides residual WP-core UI for owners
+	 * CSS fallback that hides residual WP-core UI for restricted users
 	 * (some nodes reappear via JS or are injected late).
 	 */
 	public function owner_hardening_css() {
-		if ( ! $this->is_restricted_owner() ) {
+		if ( ! $this->is_restricted_portal_user() ) {
 			return;
 		}
 
@@ -322,26 +353,26 @@ class Arriendo_Facil_Admin {
 
 	/**
 	 * Empties the admin footer text (left "Thank you for creating with WordPress"
-	 * and right version string) for owners.
+	 * and right version string) for restricted users.
 	 *
 	 * @param string $text Original footer text.
 	 * @return string
 	 */
 	public function owner_admin_footer_text( $text ) {
-		if ( ! $this->is_restricted_owner() ) {
+		if ( ! $this->is_restricted_portal_user() ) {
 			return $text;
 		}
 		return '';
 	}
 
 	/**
-	 * Hides the "Screen Options" and "Help" tabs for owners.
+	 * Hides the "Screen Options" and "Help" tabs for restricted users.
 	 *
 	 * @param bool $show Whether to show screen options.
 	 * @return bool
 	 */
 	public function owner_hide_screen_options( $show ) {
-		if ( ! $this->is_restricted_owner() ) {
+		if ( ! $this->is_restricted_portal_user() ) {
 			return $show;
 		}
 		return false;
@@ -803,10 +834,16 @@ class Arriendo_Facil_Admin {
 			</div>
 
 			<section class="af-section">
+				<div class="af-section__header">
+					<div>
+						<h2 class="af-section__title"><?php esc_html_e( 'Estancias registradas', 'arriendo-facil' ); ?></h2>
+						<p class="af-section__subtitle"><?php esc_html_e( 'Histórico de arriendos con fechas y estado de cada contrato.', 'arriendo-facil' ); ?></p>
+					</div>
+				</div>
 				<?php if ( empty( $leases ) ) : ?>
 					<p><?php esc_html_e( 'Aún no tienes arriendos registrados.', 'arriendo-facil' ); ?></p>
 				<?php else : ?>
-					<table class="widefat striped">
+					<table class="widefat striped af-data-table af-data-table--tenant">
 						<thead>
 							<tr>
 								<th><?php esc_html_e( 'Alojamiento', 'arriendo-facil' ); ?></th>
@@ -819,11 +856,11 @@ class Arriendo_Facil_Admin {
 						<tbody>
 							<?php foreach ( $leases as $lease ) : ?>
 								<tr>
-									<td><?php echo esc_html( isset( $lease['accommodation_title'] ) ? (string) $lease['accommodation_title'] : __( 'Alojamiento', 'arriendo-facil' ) ); ?></td>
-									<td><?php echo esc_html( isset( $lease['start_date'] ) ? (string) wp_date( 'd/m/Y', strtotime( (string) $lease['start_date'] ) ) : '-' ); ?></td>
-									<td><?php echo esc_html( isset( $lease['end_date'] ) ? (string) wp_date( 'd/m/Y', strtotime( (string) $lease['end_date'] ) ) : '-' ); ?></td>
-									<td><?php echo esc_html( isset( $lease['monthly_rent'] ) ? '$' . number_format_i18n( (float) $lease['monthly_rent'], 2 ) : '-' ); ?></td>
-									<td><?php echo esc_html( isset( $lease['status_label'] ) ? (string) $lease['status_label'] : '' ); ?></td>
+									<td data-label="<?php esc_attr_e( 'Alojamiento', 'arriendo-facil' ); ?>"><?php echo esc_html( isset( $lease['accommodation_title'] ) ? (string) $lease['accommodation_title'] : __( 'Alojamiento', 'arriendo-facil' ) ); ?></td>
+									<td data-label="<?php esc_attr_e( 'Inicio', 'arriendo-facil' ); ?>"><?php echo esc_html( isset( $lease['start_date'] ) ? (string) wp_date( 'd/m/Y', strtotime( (string) $lease['start_date'] ) ) : '-' ); ?></td>
+									<td data-label="<?php esc_attr_e( 'Fin', 'arriendo-facil' ); ?>"><?php echo esc_html( isset( $lease['end_date'] ) ? (string) wp_date( 'd/m/Y', strtotime( (string) $lease['end_date'] ) ) : '-' ); ?></td>
+									<td data-label="<?php esc_attr_e( 'Valor mensual', 'arriendo-facil' ); ?>"><?php echo esc_html( isset( $lease['monthly_rent'] ) ? '$' . number_format_i18n( (float) $lease['monthly_rent'], 2 ) : '-' ); ?></td>
+									<td data-label="<?php esc_attr_e( 'Estado', 'arriendo-facil' ); ?>"><?php echo esc_html( isset( $lease['status_label'] ) ? (string) $lease['status_label'] : '' ); ?></td>
 								</tr>
 							<?php endforeach; ?>
 						</tbody>
@@ -841,7 +878,7 @@ class Arriendo_Facil_Admin {
 				<?php if ( empty( $visits ) ) : ?>
 					<p><?php esc_html_e( 'Aún no tienes visitas o reservas registradas.', 'arriendo-facil' ); ?></p>
 				<?php else : ?>
-					<table class="widefat striped">
+					<table class="widefat striped af-data-table af-data-table--tenant">
 						<thead>
 							<tr>
 								<th><?php esc_html_e( 'Alojamiento', 'arriendo-facil' ); ?></th>
@@ -853,10 +890,10 @@ class Arriendo_Facil_Admin {
 						<tbody>
 							<?php foreach ( $visits as $visit ) : ?>
 								<tr>
-									<td><?php echo esc_html( isset( $visit['accommodation_title'] ) ? (string) $visit['accommodation_title'] : __( 'Alojamiento', 'arriendo-facil' ) ); ?></td>
-									<td><?php echo esc_html( isset( $visit['visit_date'] ) ? (string) wp_date( 'd/m/Y', strtotime( (string) $visit['visit_date'] ) ) : '-' ); ?></td>
-									<td><?php echo esc_html( isset( $visit['start_time'] ) ? (string) substr( (string) $visit['start_time'], 0, 5 ) : '--:--' ); ?></td>
-									<td><?php echo esc_html( isset( $visit['status_label'] ) ? (string) $visit['status_label'] : '' ); ?></td>
+									<td data-label="<?php esc_attr_e( 'Alojamiento', 'arriendo-facil' ); ?>"><?php echo esc_html( isset( $visit['accommodation_title'] ) ? (string) $visit['accommodation_title'] : __( 'Alojamiento', 'arriendo-facil' ) ); ?></td>
+									<td data-label="<?php esc_attr_e( 'Fecha', 'arriendo-facil' ); ?>"><?php echo esc_html( isset( $visit['visit_date'] ) ? (string) wp_date( 'd/m/Y', strtotime( (string) $visit['visit_date'] ) ) : '-' ); ?></td>
+									<td data-label="<?php esc_attr_e( 'Hora', 'arriendo-facil' ); ?>"><?php echo esc_html( isset( $visit['start_time'] ) ? (string) substr( (string) $visit['start_time'], 0, 5 ) : '--:--' ); ?></td>
+									<td data-label="<?php esc_attr_e( 'Estado', 'arriendo-facil' ); ?>"><?php echo esc_html( isset( $visit['status_label'] ) ? (string) $visit['status_label'] : '' ); ?></td>
 								</tr>
 							<?php endforeach; ?>
 						</tbody>
@@ -992,10 +1029,16 @@ class Arriendo_Facil_Admin {
 			</div>
 
 			<section class="af-section">
+				<div class="af-section__header">
+					<div>
+						<h2 class="af-section__title"><?php esc_html_e( 'Eventos próximos', 'arriendo-facil' ); ?></h2>
+						<p class="af-section__subtitle"><?php esc_html_e( 'Línea de tiempo de estancias y visitas confirmadas.', 'arriendo-facil' ); ?></p>
+					</div>
+				</div>
 				<?php if ( empty( $events ) ) : ?>
 					<p><?php esc_html_e( 'No tienes eventos próximos en el calendario.', 'arriendo-facil' ); ?></p>
 				<?php else : ?>
-					<table class="widefat striped">
+					<table class="widefat striped af-data-table af-data-table--tenant">
 						<thead>
 							<tr>
 								<th><?php esc_html_e( 'Fecha', 'arriendo-facil' ); ?></th>
@@ -1006,9 +1049,9 @@ class Arriendo_Facil_Admin {
 						<tbody>
 							<?php foreach ( $events as $event ) : ?>
 								<tr>
-									<td><?php echo esc_html( isset( $event['date'] ) ? wp_date( 'd/m/Y', strtotime( (string) $event['date'] ) ) : '-' ); ?></td>
-									<td><?php echo esc_html( isset( $event['type_label'] ) ? (string) $event['type_label'] : '' ); ?></td>
-									<td><?php echo esc_html( isset( $event['detail'] ) ? (string) $event['detail'] : '' ); ?></td>
+									<td data-label="<?php esc_attr_e( 'Fecha', 'arriendo-facil' ); ?>"><?php echo esc_html( isset( $event['date'] ) ? wp_date( 'd/m/Y', strtotime( (string) $event['date'] ) ) : '-' ); ?></td>
+									<td data-label="<?php esc_attr_e( 'Tipo', 'arriendo-facil' ); ?>"><?php echo esc_html( isset( $event['type_label'] ) ? (string) $event['type_label'] : '' ); ?></td>
+									<td data-label="<?php esc_attr_e( 'Detalle', 'arriendo-facil' ); ?>"><?php echo esc_html( isset( $event['detail'] ) ? (string) $event['detail'] : '' ); ?></td>
 								</tr>
 							<?php endforeach; ?>
 						</tbody>

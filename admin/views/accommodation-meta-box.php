@@ -18,6 +18,15 @@
  * @var string  $status           Current accommodation status meta value.
  * @var array   $owner_options    Available owner options.
  * @var bool    $is_owner_user    Whether current editor is an owner role.
+ * @var int     $year_built       Current year built meta value.
+ * @var int     $floor_number     Current floor number meta value.
+ * @var int     $total_floors     Current building total floors meta value.
+ * @var int     $parking_spots    Current parking spots meta value.
+ * @var string  $furnished        Current furnished state meta value.
+ * @var string  $condition        Current condition meta value.
+ * @var float   $hoa_fee          Current HOA/maintenance fee meta value.
+ * @var array   $utilities_included Current utilities included meta value (array).
+ * @var array   $inventory        Current inventory items (array of assoc arrays).
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -48,6 +57,32 @@ $amenities_options = array(
 	'kitchen'      => array( 'label' => __( 'Cocina', 'arriendo-facil' ), 'icon' => '&#x1F373;' ),
 	'balcony'      => array( 'label' => __( 'Balc&oacute;n', 'arriendo-facil' ), 'icon' => '&#x1F305;' ),
 	'ac'           => array( 'label' => __( 'Aire Acond.', 'arriendo-facil' ), 'icon' => '&#x2744;' ),
+);
+
+$furnished_options = array(
+	'unfurnished' => __( 'Sin amoblar', 'arriendo-facil' ),
+	'semi'        => __( 'Semi-amoblado', 'arriendo-facil' ),
+	'furnished'   => __( 'Amoblado', 'arriendo-facil' ),
+);
+
+$condition_options = array(
+	'new'          => __( 'Nuevo', 'arriendo-facil' ),
+	'very_good'    => __( 'Muy bueno', 'arriendo-facil' ),
+	'good'         => __( 'Bueno', 'arriendo-facil' ),
+	'needs_repair' => __( 'A remodelar', 'arriendo-facil' ),
+);
+
+$utilities_options = array(
+	'water'    => __( 'Agua', 'arriendo-facil' ),
+	'electric' => __( 'Luz', 'arriendo-facil' ),
+	'internet' => __( 'Internet', 'arriendo-facil' ),
+	'gas'      => __( 'Gas', 'arriendo-facil' ),
+);
+
+$inventory_categories = array(
+	'electrodomestico' => __( 'Electrodoméstico', 'arriendo-facil' ),
+	'mobiliario'       => __( 'Mobiliario', 'arriendo-facil' ),
+	'otro'             => __( 'Otro', 'arriendo-facil' ),
 );
 ?>
 <div class="af-accom-form">
@@ -229,13 +264,137 @@ $amenities_options = array(
 							class="af-input af-input--rent"
 							placeholder="0.00" />
 					</div>
-					<button type="button" class="button af-predict-cost af-predict-btn"
-						data-id="<?php echo esc_attr( $post->ID ); ?>">
-						&#x2728; <?php esc_html_e( 'Sugerir precio (IA)', 'arriendo-facil' ); ?>
-					</button>
+					<?php if ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) : ?>
+						<button type="button" class="button af-predict-cost af-predict-btn"
+							data-id="<?php echo esc_attr( $post->ID ); ?>">
+							&#x2728; <?php esc_html_e( 'Sugerir precio (IA)', 'arriendo-facil' ); ?>
+						</button>
+					<?php endif; ?>
 				</div>
 				<span class="af-predict-result"></span>
 			</div>
+		</div>
+	</div>
+
+	<!-- SECCION 4B: Detalles adicionales -->
+	<div class="af-accom-section">
+		<div class="af-accom-section__header">
+			<span class="af-accom-section__icon">&#x1F4CB;</span>
+			<h3 class="af-accom-section__title"><?php esc_html_e( 'Detalles adicionales', 'arriendo-facil' ); ?></h3>
+		</div>
+		<div class="af-accom-section__body">
+			<div class="af-field-group af-field-group--three-col">
+				<div class="af-field">
+					<label class="af-field__label" for="af_year_built"><?php esc_html_e( 'Año de construcción', 'arriendo-facil' ); ?></label>
+					<input type="number" id="af_year_built" name="af_year_built" min="1900" max="<?php echo esc_attr( gmdate( 'Y' ) + 1 ); ?>"
+						value="<?php echo esc_attr( $year_built ); ?>" class="af-input af-input--full" placeholder="<?php echo esc_attr( gmdate( 'Y' ) ); ?>" />
+				</div>
+				<div class="af-field">
+					<label class="af-field__label" for="af_floor_number"><?php esc_html_e( 'Piso', 'arriendo-facil' ); ?></label>
+					<input type="number" id="af_floor_number" name="af_floor_number" min="0" max="200"
+						value="<?php echo esc_attr( $floor_number ); ?>" class="af-input af-input--full" placeholder="0" />
+				</div>
+				<div class="af-field">
+					<label class="af-field__label" for="af_total_floors"><?php esc_html_e( 'Total de pisos del edificio', 'arriendo-facil' ); ?></label>
+					<input type="number" id="af_total_floors" name="af_total_floors" min="0" max="200"
+						value="<?php echo esc_attr( $total_floors ); ?>" class="af-input af-input--full" placeholder="0" />
+				</div>
+				<div class="af-field">
+					<label class="af-field__label" for="af_parking_spots"><?php esc_html_e( 'Parqueaderos', 'arriendo-facil' ); ?></label>
+					<input type="number" id="af_parking_spots" name="af_parking_spots" min="0" max="20"
+						value="<?php echo esc_attr( $parking_spots ); ?>" class="af-input af-input--full" placeholder="0" />
+				</div>
+				<div class="af-field">
+					<label class="af-field__label" for="af_furnished"><?php esc_html_e( 'Estado de amoblado', 'arriendo-facil' ); ?></label>
+					<select id="af_furnished" name="af_furnished" class="af-input af-input--select">
+						<?php foreach ( $furnished_options as $f_value => $f_label ) : ?>
+							<option value="<?php echo esc_attr( $f_value ); ?>" <?php selected( $furnished, $f_value ); ?>><?php echo esc_html( $f_label ); ?></option>
+						<?php endforeach; ?>
+					</select>
+				</div>
+				<div class="af-field">
+					<label class="af-field__label" for="af_condition"><?php esc_html_e( 'Estado general', 'arriendo-facil' ); ?></label>
+					<select id="af_condition" name="af_condition" class="af-input af-input--select">
+						<?php foreach ( $condition_options as $c_value => $c_label ) : ?>
+							<option value="<?php echo esc_attr( $c_value ); ?>" <?php selected( $condition, $c_value ); ?>><?php echo esc_html( $c_label ); ?></option>
+						<?php endforeach; ?>
+					</select>
+				</div>
+				<div class="af-field">
+					<label class="af-field__label" for="af_hoa_fee"><?php esc_html_e( 'Alícuota / mantenimiento mensual (USD)', 'arriendo-facil' ); ?></label>
+					<input type="number" id="af_hoa_fee" name="af_hoa_fee" step="0.01" min="0"
+						value="<?php echo esc_attr( $hoa_fee ); ?>" class="af-input af-input--full" placeholder="0.00" />
+				</div>
+			</div>
+
+			<div class="af-field" style="margin-top: 20px;">
+				<label class="af-field__label"><?php esc_html_e( 'Servicios incluidos en el arriendo', 'arriendo-facil' ); ?></label>
+				<div class="af-amenities-grid">
+					<?php foreach ( $utilities_options as $u_value => $u_label ) :
+						$u_checked = in_array( $u_value, $utilities_included, true );
+					?>
+						<label class="af-amenity-chip <?php echo $u_checked ? 'is-selected' : ''; ?>">
+							<input type="checkbox" name="af_utilities_included[]"
+								value="<?php echo esc_attr( $u_value ); ?>" <?php checked( $u_checked ); ?> />
+							<span class="af-amenity-chip__label"><?php echo esc_html( $u_label ); ?></span>
+						</label>
+					<?php endforeach; ?>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- SECCION 4C: Inventario -->
+	<div class="af-accom-section">
+		<div class="af-accom-section__header">
+			<span class="af-accom-section__icon">&#x1F4E6;</span>
+			<h3 class="af-accom-section__title"><?php esc_html_e( 'Inventario del inmueble', 'arriendo-facil' ); ?></h3>
+		</div>
+		<div class="af-accom-section__body">
+			<p class="af-field__hint">
+				<?php esc_html_e( 'Mobiliario y electrodomésticos que se entregan con la propiedad. Se usa para el checklist de entrega/devolución.', 'arriendo-facil' ); ?>
+			</p>
+
+			<table class="af-inventory-table" id="af-inventory-table">
+				<thead>
+					<tr>
+						<th><?php esc_html_e( 'Ítem', 'arriendo-facil' ); ?></th>
+						<th><?php esc_html_e( 'Categoría', 'arriendo-facil' ); ?></th>
+						<th><?php esc_html_e( 'Estado', 'arriendo-facil' ); ?></th>
+						<th><?php esc_html_e( 'Cant.', 'arriendo-facil' ); ?></th>
+						<th></th>
+					</tr>
+				</thead>
+				<tbody id="af-inventory-rows">
+					<?php foreach ( $inventory as $inv_index => $inv_item ) : ?>
+						<tr class="af-inventory-row">
+							<td><input type="text" class="af-input af-inv-item" value="<?php echo esc_attr( $inv_item['item'] ); ?>" placeholder="<?php esc_attr_e( 'Ej: Refrigeradora', 'arriendo-facil' ); ?>" /></td>
+							<td>
+								<select class="af-input af-inv-category">
+									<?php foreach ( $inventory_categories as $cat_value => $cat_label ) : ?>
+										<option value="<?php echo esc_attr( $cat_value ); ?>" <?php selected( $inv_item['category'], $cat_value ); ?>><?php echo esc_html( $cat_label ); ?></option>
+									<?php endforeach; ?>
+								</select>
+							</td>
+							<td>
+								<select class="af-input af-inv-condition">
+									<?php foreach ( $condition_options as $c_value => $c_label ) : ?>
+										<option value="<?php echo esc_attr( $c_value ); ?>" <?php selected( $inv_item['condition'], $c_value ); ?>><?php echo esc_html( $c_label ); ?></option>
+									<?php endforeach; ?>
+								</select>
+							</td>
+							<td><input type="number" class="af-input af-inv-quantity" min="1" max="99" value="<?php echo esc_attr( $inv_item['quantity'] ); ?>" /></td>
+							<td><button type="button" class="button af-inventory-remove-row" aria-label="<?php esc_attr_e( 'Eliminar ítem', 'arriendo-facil' ); ?>">&#x2715;</button></td>
+						</tr>
+					<?php endforeach; ?>
+				</tbody>
+			</table>
+
+			<button type="button" id="af-inventory-add-row" class="button button-secondary" style="margin-top:12px;">
+				&#x2795; <?php esc_html_e( 'Agregar ítem', 'arriendo-facil' ); ?>
+			</button>
+
+			<input type="hidden" id="af_inventory" name="af_inventory" value="" />
 		</div>
 	</div>
 
@@ -324,5 +483,66 @@ $amenities_options = array(
 			this.closest('.af-amenity-chip').classList.toggle('is-selected', this.checked);
 		});
 	});
+
+	// Inventory: dynamic rows
+	var inventoryBody   = document.getElementById('af-inventory-rows');
+	var inventoryHidden = document.getElementById('af_inventory');
+	var inventoryTemplate =
+		'<tr class="af-inventory-row">' +
+		'<td><input type="text" class="af-input af-inv-item" placeholder="<?php echo esc_js( __( 'Ej: Refrigeradora', 'arriendo-facil' ) ); ?>" /></td>' +
+		'<td><select class="af-input af-inv-category">' +
+		<?php foreach ( $inventory_categories as $cat_value => $cat_label ) : ?>
+		'<option value="<?php echo esc_js( $cat_value ); ?>"><?php echo esc_js( $cat_label ); ?></option>' +
+		<?php endforeach; ?>
+		'</select></td>' +
+		'<td><select class="af-input af-inv-condition">' +
+		<?php foreach ( $condition_options as $c_value => $c_label ) : ?>
+		'<option value="<?php echo esc_js( $c_value ); ?>"><?php echo esc_js( $c_label ); ?></option>' +
+		<?php endforeach; ?>
+		'</select></td>' +
+		'<td><input type="number" class="af-input af-inv-quantity" min="1" max="99" value="1" /></td>' +
+		'<td><button type="button" class="button af-inventory-remove-row">&#x2715;</button></td>' +
+		'</tr>';
+
+	function bindInventoryRemove(row) {
+		row.querySelector('.af-inventory-remove-row').addEventListener('click', function () {
+			row.remove();
+		});
+	}
+
+	if (inventoryBody) {
+		inventoryBody.querySelectorAll('.af-inventory-row').forEach(bindInventoryRemove);
+	}
+
+	var addInventoryBtn = document.getElementById('af-inventory-add-row');
+	if (addInventoryBtn) {
+		addInventoryBtn.addEventListener('click', function () {
+			var wrapper = document.createElement('tbody');
+			wrapper.innerHTML = inventoryTemplate;
+			var newRow = wrapper.firstElementChild;
+			inventoryBody.appendChild(newRow);
+			bindInventoryRemove(newRow);
+		});
+	}
+
+	var accommodationForm = document.getElementById('post');
+	if (accommodationForm && inventoryHidden) {
+		accommodationForm.addEventListener('submit', function () {
+			var items = [];
+			inventoryBody.querySelectorAll('.af-inventory-row').forEach(function (row) {
+				var item = row.querySelector('.af-inv-item').value.trim();
+				if ('' === item) {
+					return;
+				}
+				items.push({
+					item: item,
+					category: row.querySelector('.af-inv-category').value,
+					condition: row.querySelector('.af-inv-condition').value,
+					quantity: parseInt(row.querySelector('.af-inv-quantity').value, 10) || 1
+				});
+			});
+			inventoryHidden.value = JSON.stringify(items);
+		});
+	}
 }());
 </script>

@@ -45,8 +45,10 @@ class Arriendo_Facil_Admin {
 		add_action( 'wp_dashboard_setup', array( $this, 'register_native_dashboard_widget' ) );
 		add_action( 'wp_dashboard_setup', array( $this, 'register_tenant_dashboard_widget' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
-		add_action( 'wp_ajax_af_predict_cost', array( $this, 'ajax_predict_cost' ) );
-		add_action( 'wp_ajax_af_generate_document', array( $this, 'ajax_generate_document' ) );
+		if ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) {
+			add_action( 'wp_ajax_af_predict_cost', array( $this, 'ajax_predict_cost' ) );
+			add_action( 'wp_ajax_af_generate_document', array( $this, 'ajax_generate_document' ) );
+		}
 		add_action( 'wp_ajax_af_resolve_short_url', array( $this, 'ajax_resolve_short_url' ) );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
 		add_action( 'admin_notices', array( $this, 'pandoc_notice' ) );
@@ -100,19 +102,21 @@ class Arriendo_Facil_Admin {
 			array( $this, 'render_cleaning_requests' )
 		);
 
-		add_submenu_page(
-			'arriendo-facil',
-			__( 'Contactos de propietarios', 'arriendo-facil' ),
-			__( 'Contactos de propietarios', 'arriendo-facil' ),
-			'manage_options',
-			'af-owner-contacts',
-			array( $this, 'render_owner_contacts' )
-		);
+		if ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) {
+			add_submenu_page(
+				'arriendo-facil',
+				__( 'Contactos de propietarios', 'arriendo-facil' ),
+				__( 'Contactos de propietarios', 'arriendo-facil' ),
+				'manage_options',
+				'af-owner-contacts',
+				array( $this, 'render_owner_contacts' )
+			);
+		}
 
 		add_submenu_page(
 			'arriendo-facil',
-			__( 'Huespedes', 'arriendo-facil' ),
-			__( 'Huespedes', 'arriendo-facil' ),
+			__( 'Inquilinos', 'arriendo-facil' ),
+			__( 'Inquilinos', 'arriendo-facil' ),
 			'edit_posts',
 			'af-guests',
 			array( $this, 'render_guests' )
@@ -120,21 +124,23 @@ class Arriendo_Facil_Admin {
 
 		add_submenu_page(
 			'arriendo-facil',
-			__( 'Valoraciones', 'arriendo-facil' ),
-			__( 'Valoraciones', 'arriendo-facil' ),
+			__( 'Calificación de Inquilinos', 'arriendo-facil' ),
+			__( 'Calificaciones', 'arriendo-facil' ),
 			'edit_posts',
 			'af-reviews',
 			array( $this, 'render_reviews' )
 		);
 
-		add_submenu_page(
-			'arriendo-facil',
-			__( 'Ajustes de IA', 'arriendo-facil' ),
-			__( 'Ajustes de IA', 'arriendo-facil' ),
-			'manage_options',
-			'af-ai-settings',
-			array( $this, 'render_ai_settings' )
-		);
+		if ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) {
+			add_submenu_page(
+				'arriendo-facil',
+				__( 'Ajustes de IA', 'arriendo-facil' ),
+				__( 'Ajustes de IA', 'arriendo-facil' ),
+				'manage_options',
+				'af-ai-settings',
+				array( $this, 'render_ai_settings' )
+			);
+		}
 
 		add_submenu_page(
 			'arriendo-facil',
@@ -154,23 +160,25 @@ class Arriendo_Facil_Admin {
 			array( $this, 'render_billing_settings' )
 		);
 
-		add_submenu_page(
-			'arriendo-facil',
-			__( 'Integraciones OTA', 'arriendo-facil' ),
-			__( 'Integraciones OTA', 'arriendo-facil' ),
-			'edit_posts',
-			'af-ota-integrations',
-			array( $this, 'render_ota_integrations' )
-		);
+		if ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) {
+			add_submenu_page(
+				'arriendo-facil',
+				__( 'Integraciones OTA', 'arriendo-facil' ),
+				__( 'Integraciones OTA', 'arriendo-facil' ),
+				'edit_posts',
+				'af-ota-integrations',
+				array( $this, 'render_ota_integrations' )
+			);
 
-		add_submenu_page(
-			'arriendo-facil',
-			__( 'Panel de Sincronización OTA', 'arriendo-facil' ),
-			__( 'Sincronización OTA', 'arriendo-facil' ),
-			'manage_options',
-			'af-ota-sync-dashboard',
-			array( $this, 'render_ota_sync_dashboard' )
-		);
+			add_submenu_page(
+				'arriendo-facil',
+				__( 'Panel de Sincronización OTA', 'arriendo-facil' ),
+				__( 'Sincronización OTA', 'arriendo-facil' ),
+				'manage_options',
+				'af-ota-sync-dashboard',
+				array( $this, 'render_ota_sync_dashboard' )
+			);
+		}
 	}
 
 	/**
@@ -188,8 +196,12 @@ class Arriendo_Facil_Admin {
 		remove_menu_page( 'tools.php' );
 		remove_menu_page( 'edit.php?post_type=residencia' );
 
-		// Hide Cleaning Services CPT (admin-managed, not for owners).
+		// Ocultar subpáginas que el propietario no necesita ver.
 		remove_submenu_page( 'arriendo-facil', 'edit.php?post_type=cleaning_service' );
+		remove_submenu_page( 'arriendo-facil', 'af-owner-contacts' );
+		remove_submenu_page( 'arriendo-facil', 'af-ai-settings' );
+		remove_submenu_page( 'arriendo-facil', 'af-ota-integrations' );
+		remove_submenu_page( 'arriendo-facil', 'af-ota-sync-dashboard' );
 	}
 
 	/**

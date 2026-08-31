@@ -1281,6 +1281,65 @@ body.post-type-cleaning_service .page-title-action:focus {
 }
 
 /* =============================================================
+   Inventory Table (Accommodation meta box)
+   ============================================================= */
+
+.af-inventory-table {
+	width: 100%;
+	border-collapse: collapse;
+	margin-top: 12px;
+}
+
+.af-inventory-table th {
+	text-align: left;
+	font-size: 12px;
+	font-weight: 600;
+	color: #6b7280;
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+	padding: 6px 8px;
+	border-bottom: 1px solid #e5e7eb;
+}
+
+.af-inventory-table td {
+	padding: 6px 8px;
+	vertical-align: middle;
+	border-bottom: 1px solid #f2f2f2;
+}
+
+.af-inventory-table .af-inv-quantity {
+	width: 64px;
+}
+
+.af-inventory-remove-row {
+	color: #b32d2e;
+	line-height: 1;
+	padding: 4px 8px;
+}
+
+@media (max-width: 782px) {
+	.af-inventory-table,
+	.af-inventory-table thead,
+	.af-inventory-table tbody,
+	.af-inventory-table th,
+	.af-inventory-table td,
+	.af-inventory-table tr {
+		display: block;
+	}
+
+	.af-inventory-table thead tr {
+		display: none;
+	}
+
+	.af-inventory-row {
+		border: 1px solid #e5e7eb;
+		border-radius: 8px;
+		padding: 8px;
+		margin-bottom: 10px;
+	}
+}
+
+/* =============================================================
    Accommodation Edit Screen – Title, Editor & Gallery
    ============================================================= */
 

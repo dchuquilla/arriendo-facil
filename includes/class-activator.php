@@ -659,6 +659,22 @@ class Arriendo_Facil_Activator {
 			   AND gu.user_id > 0"
 		); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 
+		$review_rows_criteria_col = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				 FROM INFORMATION_SCHEMA.COLUMNS
+				 WHERE TABLE_SCHEMA = %s
+				   AND TABLE_NAME = %s
+				   AND COLUMN_NAME = %s",
+				DB_NAME,
+				$review_rows_table,
+				'criteria_scores'
+			)
+		);
+		if ( ! (int) $review_rows_criteria_col ) {
+			$wpdb->query( "ALTER TABLE {$review_rows_table} ADD COLUMN criteria_scores TEXT DEFAULT NULL AFTER comment_text" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		}
+
 		$reservations_table = $wpdb->prefix . 'af_reservations';
 		$reservation_status_exists = $wpdb->get_var(
 			$wpdb->prepare(

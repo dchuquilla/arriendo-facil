@@ -17,6 +17,11 @@ define( 'ARRIENDO_FACIL_VERSION', '1.0.0' );
 define( 'ARRIENDO_FACIL_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ARRIENDO_FACIL_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
+// Módulos heredados — cambiar a true para reactivarlos durante análisis independiente.
+if ( ! defined( 'AF_LEGACY_MODULES' ) ) {
+	define( 'AF_LEGACY_MODULES', false );
+}
+
 $af_composer_autoload = ARRIENDO_FACIL_PLUGIN_DIR . 'vendor/autoload.php';
 if ( file_exists( $af_composer_autoload ) ) {
 	require_once $af_composer_autoload;
@@ -30,6 +35,7 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-wizard.ph
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-featured-admin.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-occupied-admin.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-search-api.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-matching-engine.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-cleaning-service.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-docx-template-processor.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-lease.php';

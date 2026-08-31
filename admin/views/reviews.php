@@ -59,6 +59,7 @@ $list_query = "
 		r.accommodation_id,
 		r.review_direction,
 		r.stars,
+		r.criteria_scores,
 		r.submitted_at,
 		r.tenant_email,
 		r.owner_user_id,
@@ -157,13 +158,14 @@ $rows = $wpdb->get_results( $wpdb->prepare( $list_query, $where_args ) );
 				<th><?php esc_html_e( 'Propiedad', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Dirección', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Estrellas', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'Detalle', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Fecha', 'arriendo-facil' ); ?></th>
 			</tr>
 		</thead>
 		<tbody>
 			<?php if ( empty( $rows ) ) : ?>
 				<tr>
-					<td colspan="6"><?php esc_html_e( 'No hay reseñas completadas para los filtros actuales.', 'arriendo-facil' ); ?></td>
+					<td colspan="7"><?php esc_html_e( 'No hay reseñas completadas para los filtros actuales.', 'arriendo-facil' ); ?></td>
 				</tr>
 			<?php else : ?>
 				<?php foreach ( $rows as $row ) : ?>
@@ -178,6 +180,8 @@ $rows = $wpdb->get_results( $wpdb->prepare( $list_query, $where_args ) );
 					} elseif ( $stars >= 3 ) {
 						$star_pill = 'af-pill--warning';
 					}
+					$criteria_labels = Arriendo_Facil_Review::owner_to_tenant_criteria();
+					$criteria_scores = 'owner_to_tenant' === $direction && ! empty( $row->criteria_scores ) ? json_decode( (string) $row->criteria_scores, true ) : null;
 					?>
 					<tr>
 						<td data-label="<?php esc_attr_e( 'ID', 'arriendo-facil' ); ?>"><?php echo esc_html( (int) $row->id ); ?></td>
@@ -185,6 +189,19 @@ $rows = $wpdb->get_results( $wpdb->prepare( $list_query, $where_args ) );
 						<td data-label="<?php esc_attr_e( 'Propiedad', 'arriendo-facil' ); ?>"><?php echo esc_html( $title ); ?></td>
 						<td data-label="<?php esc_attr_e( 'Dirección', 'arriendo-facil' ); ?>"><span class="af-pill af-pill--neutral"><?php echo esc_html( $label ); ?></span></td>
 						<td data-label="<?php esc_attr_e( 'Estrellas', 'arriendo-facil' ); ?>"><span class="af-pill <?php echo esc_attr( $star_pill ); ?>">★ <?php echo esc_html( number_format_i18n( $stars, 1 ) ); ?></span></td>
+						<td data-label="<?php esc_attr_e( 'Detalle', 'arriendo-facil' ); ?>">
+							<?php if ( is_array( $criteria_scores ) ) : ?>
+								<ul style="margin:0;padding-left:16px;">
+									<?php foreach ( $criteria_labels as $crit_key => $crit_label ) : ?>
+										<?php if ( isset( $criteria_scores[ $crit_key ] ) ) : ?>
+											<li><?php echo esc_html( $crit_label ); ?>: <?php echo esc_html( (int) $criteria_scores[ $crit_key ] ); ?>/5</li>
+										<?php endif; ?>
+									<?php endforeach; ?>
+								</ul>
+							<?php else : ?>
+								&mdash;
+							<?php endif; ?>
+						</td>
 						<td data-label="<?php esc_attr_e( 'Fecha', 'arriendo-facil' ); ?>"><?php echo esc_html( isset( $row->submitted_at ) ? (string) $row->submitted_at : '' ); ?></td>
 					</tr>
 				<?php endforeach; ?>

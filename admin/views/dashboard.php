@@ -309,7 +309,7 @@ if ( $pending_queue > 0 ) {
 			</div>
 		</article>
 
-		<?php if ( ! $is_owner && null !== $active_contacts ) : ?>
+		<?php if ( ! $is_owner && null !== $active_contacts && defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) : ?>
 			<article class="af-kpi" role="listitem">
 				<div class="af-kpi__head">
 					<span class="af-kpi__label"><?php esc_html_e( 'Propietarios', 'arriendo-facil' ); ?></span>
@@ -328,7 +328,7 @@ if ( $pending_queue > 0 ) {
 
 		<article class="af-kpi" role="listitem">
 			<div class="af-kpi__head">
-				<span class="af-kpi__label"><?php esc_html_e( 'Huéspedes', 'arriendo-facil' ); ?></span>
+				<span class="af-kpi__label"><?php esc_html_e( 'Inquilinos', 'arriendo-facil' ); ?></span>
 				<span class="af-kpi__icon" aria-hidden="true">
 					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M17 21v-2a4 4 0 00-4-4H7a4 4 0 00-4 4v2M21 21v-2a4 4 0 00-3-3.87M9 11a4 4 0 100-8 4 4 0 000 8zM17 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
 				</span>

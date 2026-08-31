@@ -158,10 +158,20 @@ class Arriendo_Facil_Accommodation_Search_API {
 			);
 		}
 
+		$review_averages = $this->fetch_review_averages_map();
+
 		$filtered_accommodations = array();
 
 		foreach ( $raw_rows as $row ) {
 			$accommodation = $this->build_accommodation_from_row( $row );
+
+			if ( isset( $review_averages[ $accommodation['id'] ] ) ) {
+				$accommodation['review_avg']   = $review_averages[ $accommodation['id'] ]['avg_stars'];
+				$accommodation['review_count'] = $review_averages[ $accommodation['id'] ]['review_count'];
+			} else {
+				$accommodation['review_avg']   = 0.0;
+				$accommodation['review_count'] = 0;
+			}
 
 			if ( ! $this->matches_filters(
 				$accommodation,
@@ -178,7 +188,10 @@ class Arriendo_Facil_Accommodation_Search_API {
 			$filtered_accommodations,
 			$sort,
 			$latitude,
-			$longitude
+			$longitude,
+			$radius_km,
+			$price_min,
+			$price_max
 		);
 
 		// Pagination
@@ -302,6 +315,45 @@ class Arriendo_Facil_Accommodation_Search_API {
 		}
 
 		return $rows;
+	}
+
+	/**
+	 * Builds a map of accommodation_id => { avg_stars, review_count } from
+	 * completed tenant_to_property reviews, in a single aggregate query.
+	 *
+	 * @return array<int,array{avg_stars:float,review_count:int}>
+	 */
+	private function fetch_review_averages_map() {
+		global $wpdb;
+
+		if ( ! class_exists( 'Arriendo_Facil_Review' ) ) {
+			return array();
+		}
+
+		$reviews_table = Arriendo_Facil_Review::reviews_table();
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT accommodation_id, AVG(stars) AS avg_stars, COUNT(*) AS review_count
+				 FROM {$reviews_table}
+				 WHERE review_direction = %s AND status = %s
+				 GROUP BY accommodation_id",
+				'tenant_to_property',
+				'completed'
+			)
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery
+
+		$map = array();
+		foreach ( (array) $rows as $row ) {
+			$map[ (int) $row->accommodation_id ] = array(
+				'avg_stars'     => round( (float) $row->avg_stars, 2 ),
+				'review_count'  => (int) $row->review_count,
+			);
+		}
+
+		return $map;
 	}
 
 	/**
@@ -532,9 +584,12 @@ class Arriendo_Facil_Accommodation_Search_API {
 	 * @param string $sort_by Sort criteria (relevance, price, newest).
 	 * @param float  $latitude Current latitude for distance calculation.
 	 * @param float  $longitude Current longitude for distance calculation.
+	 * @param float  $radius_km Search radius used to normalize the distance score.
+	 * @param float  $price_min Requested budget lower bound.
+	 * @param float  $price_max Requested budget upper bound.
 	 * @return array
 	 */
-	private function sort_accommodations( $accommodations, $sort_by, $latitude = null, $longitude = null ) {
+	private function sort_accommodations( $accommodations, $sort_by, $latitude = null, $longitude = null, $radius_km = 25, $price_min = 0, $price_max = 0 ) {
 		if ( 'price' === $sort_by ) {
 			usort( $accommodations, function( $a, $b ) {
 				return floatval( $a['price'] ) <=> floatval( $b['price'] );
@@ -544,15 +599,24 @@ class Arriendo_Facil_Accommodation_Search_API {
 			usort( $accommodations, function( $a, $b ) {
 				return $b['id'] <=> $a['id'];
 			} );
-		} else {
-			// Relevance: sort by distance if coordinates available
-			if ( is_numeric( $latitude ) && is_numeric( $longitude ) ) {
-				usort( $accommodations, function( $a, $b ) use ( $latitude, $longitude ) {
-					$dist_a = $this->haversine_distance( $latitude, $longitude, $a['latitude'], $a['longitude'] );
-					$dist_b = $this->haversine_distance( $latitude, $longitude, $b['latitude'], $b['longitude'] );
-					return $dist_a <=> $dist_b;
-				} );
-			}
+		} elseif ( class_exists( 'Arriendo_Facil_Matching_Engine' ) ) {
+			// Relevance: rank by combined distance + price fit + reputation score.
+			$accommodations = Arriendo_Facil_Matching_Engine::rank(
+				$accommodations,
+				array(
+					'latitude'  => $latitude,
+					'longitude' => $longitude,
+					'radius_km' => $radius_km,
+					'price_min' => $price_min,
+					'price_max' => $price_max,
+				)
+			);
+		} elseif ( is_numeric( $latitude ) && is_numeric( $longitude ) ) {
+			usort( $accommodations, function( $a, $b ) use ( $latitude, $longitude ) {
+				$dist_a = $this->haversine_distance( $latitude, $longitude, $a['latitude'], $a['longitude'] );
+				$dist_b = $this->haversine_distance( $latitude, $longitude, $b['latitude'], $b['longitude'] );
+				return $dist_a <=> $dist_b;
+			} );
 		}
 
 		return $accommodations;

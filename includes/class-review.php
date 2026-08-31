@@ -93,6 +93,21 @@ class Arriendo_Facil_Review {
 	}
 
 	/**
+	 * Returns the structured criteria used for the owner_to_tenant direction.
+	 * Other directions keep the single 1-5 star rating.
+	 *
+	 * @return array<string,string>
+	 */
+	public static function owner_to_tenant_criteria() {
+		return array(
+			'puntualidad_pago' => __( 'Puntualidad de pago', 'arriendo-facil' ),
+			'cuidado_inmueble' => __( 'Cuidado del inmueble', 'arriendo-facil' ),
+			'convivencia'      => __( 'Convivencia / comportamiento', 'arriendo-facil' ),
+			'comunicacion'     => __( 'Comunicación', 'arriendo-facil' ),
+		);
+	}
+
+	/**
 	 * Returns the supported review statuses.
 	 *
 	 * @return array<string,string>
@@ -496,6 +511,16 @@ class Arriendo_Facil_Review {
 		$ratings         = $this->parse_ratings_payload( $ratings_payload );
 		$comments_payload = isset( $_POST['comments'] ) ? wp_unslash( $_POST['comments'] ) : '';
 		$comments         = $this->parse_comments_payload( $comments_payload );
+		$criteria_payload = isset( $_POST['criteria'] ) ? wp_unslash( $_POST['criteria'] ) : '';
+		$criteria_scores  = $this->parse_criteria_payload( $criteria_payload );
+
+		// owner_to_tenant may arrive as structured criteria instead of a single star rating;
+		// derive the aggregate star value from the criteria average when present.
+		if ( isset( $criteria_scores['owner_to_tenant'] ) && ! empty( $criteria_scores['owner_to_tenant'] ) ) {
+			$values = array_values( $criteria_scores['owner_to_tenant'] );
+			$ratings['owner_to_tenant'] = (int) round( array_sum( $values ) / count( $values ) );
+		}
+
 		if ( empty( $ratings ) ) {
 			wp_send_json_error( array( 'message' => __( 'No se recibieron calificaciones válidas.', 'arriendo-facil' ) ), 400 );
 		}
@@ -514,7 +539,8 @@ class Arriendo_Facil_Review {
 
 		global $wpdb;
 		$now = gmdate( 'Y-m-d H:i:s' );
-		$has_comment_column = $this->reviews_comment_column_exists();
+		$has_comment_column  = $this->reviews_comment_column_exists();
+		$has_criteria_column = $this->reviews_criteria_column_exists();
 		foreach ( $pending_reviews as $review_row ) {
 			$direction = sanitize_key( (string) $review_row['direction'] );
 			$stars     = absint( $ratings[ $direction ] );
@@ -530,6 +556,11 @@ class Arriendo_Facil_Review {
 			if ( $has_comment_column ) {
 				$update_data['comment_text'] = $comment_text;
 				$update_format[]             = '%s';
+			}
+
+			if ( $has_criteria_column && isset( $criteria_scores[ $direction ] ) && ! empty( $criteria_scores[ $direction ] ) ) {
+				$update_data['criteria_scores'] = wp_json_encode( $criteria_scores[ $direction ] );
+				$update_format[]                = '%s';
 			}
 
 			$wpdb->update(
@@ -871,6 +902,7 @@ class Arriendo_Facil_Review {
 				tenant_to_property: <?php echo wp_json_encode( __( 'Califica la propiedad', 'arriendo-facil' ) ); ?>,
 				owner_to_tenant: <?php echo wp_json_encode( __( 'Califica al inquilino', 'arriendo-facil' ) ); ?>
 			};
+			const ownerToTenantCriteria = <?php echo wp_json_encode( self::owner_to_tenant_criteria() ); ?>;
 			const reviewerLabels = {
 				tenant: <?php echo wp_json_encode( __( 'Estás calificando como inquilino. Verás: propietario y propiedad.', 'arriendo-facil' ) ); ?>,
 				owner: <?php echo wp_json_encode( __( 'Estás calificando como propietario. Verás solo la evaluación del inquilino.', 'arriendo-facil' ) ); ?>
@@ -909,6 +941,33 @@ class Arriendo_Facil_Review {
 					block.style.border = '1px solid #e2e8f0';
 					block.style.borderRadius = '10px';
 					block.style.padding = '12px';
+
+					if (key === 'owner_to_tenant') {
+						const criteriaRows = Object.keys(ownerToTenantCriteria).map((critKey) => `
+							<div style="margin-bottom:10px;">
+								<div style="color:#334155;margin-bottom:4px;">${ownerToTenantCriteria[critKey]}</div>
+								<div style="display:flex;gap:10px;flex-wrap:wrap;">
+									${[1,2,3,4,5].map((n) => `
+										<label style="display:flex;align-items:center;gap:6px;color:#334155;">
+											<input type="radio" name="criteria_${key}_${critKey}" value="${n}" ${n===5?'checked':''}>
+											<span>${n}★</span>
+										</label>
+									`).join('')}
+								</div>
+							</div>
+						`).join('');
+						block.innerHTML = `
+							<div style="font-weight:600;color:#0f172a;margin-bottom:8px;">${label}</div>
+							${criteriaRows}
+							<div style="margin-top:10px;">
+								<label style="display:block;font-weight:600;color:#334155;margin-bottom:6px;"><?php echo esc_js( __( 'Comentario (opcional)', 'arriendo-facil' ) ); ?></label>
+								<textarea name="comment_${key}" rows="3" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;color:#0f172a;" placeholder="<?php echo esc_js( __( 'Escribe un detalle si deseas…', 'arriendo-facil' ) ); ?>"></textarea>
+							</div>
+						`;
+						fieldsWrap.appendChild(block);
+						return;
+					}
+
 					block.innerHTML = `
 						<div style="font-weight:600;color:#0f172a;margin-bottom:8px;">${label}</div>
 						<div style="display:flex;gap:10px;flex-wrap:wrap;">
@@ -972,11 +1031,24 @@ class Arriendo_Facil_Review {
 
 				const ratings = {};
 				const comments = {};
-				const radios = form.querySelectorAll('input[type="radio"]:checked');
+				const criteria = {};
+				const radios = form.querySelectorAll('input[type="radio"][name^="rating_"]:checked');
 				radios.forEach((r) => {
 					const name = r.getAttribute('name') || '';
 					const direction = name.replace('rating_', '');
 					if(direction){ ratings[direction] = parseInt(r.value, 10); }
+				});
+
+				const criteriaRadios = form.querySelectorAll('input[type="radio"][name^="criteria_"]:checked');
+				criteriaRadios.forEach((r) => {
+					const name = r.getAttribute('name') || '';
+					const parts = name.replace('criteria_', '').split('_');
+					const direction = parts.shift();
+					const critKey = parts.join('_');
+					if(direction && critKey){
+						criteria[direction] = criteria[direction] || {};
+						criteria[direction][critKey] = parseInt(r.value, 10);
+					}
 				});
 
 				const textareas = form.querySelectorAll('textarea[name^="comment_"]');
@@ -994,7 +1066,8 @@ class Arriendo_Facil_Review {
 						selector,
 						token,
 						ratings: JSON.stringify(ratings),
-						comments: JSON.stringify(comments)
+						comments: JSON.stringify(comments),
+						criteria: JSON.stringify(criteria)
 					})
 				});
 
@@ -1787,6 +1860,71 @@ class Arriendo_Facil_Review {
 		}
 
 		return $comments;
+	}
+
+	/**
+	 * Parses the structured owner_to_tenant criteria payload (JSON or array).
+	 * Only the owner_to_tenant direction supports criteria; other directions are ignored.
+	 *
+	 * @param mixed $criteria_payload Raw criteria payload.
+	 * @return array<string,array<string,int>>
+	 */
+	private function parse_criteria_payload( $criteria_payload ) {
+		$parsed = array();
+
+		if ( is_array( $criteria_payload ) ) {
+			$raw = $criteria_payload;
+		} elseif ( is_string( $criteria_payload ) && '' !== trim( $criteria_payload ) ) {
+			$decoded = json_decode( (string) $criteria_payload, true );
+			$raw     = is_array( $decoded ) ? $decoded : array();
+		} else {
+			$raw = array();
+		}
+
+		if ( ! isset( $raw['owner_to_tenant'] ) || ! is_array( $raw['owner_to_tenant'] ) ) {
+			return $parsed;
+		}
+
+		$allowed_criteria = self::owner_to_tenant_criteria();
+		$scores           = array();
+		foreach ( $raw['owner_to_tenant'] as $criterion => $score ) {
+			$criterion = sanitize_key( (string) $criterion );
+			if ( ! array_key_exists( $criterion, $allowed_criteria ) ) {
+				continue;
+			}
+
+			$score = absint( $score );
+			if ( $score < 1 || $score > 5 ) {
+				continue;
+			}
+
+			$scores[ $criterion ] = $score;
+		}
+
+		if ( count( $scores ) === count( $allowed_criteria ) ) {
+			$parsed['owner_to_tenant'] = $scores;
+		}
+
+		return $parsed;
+	}
+
+	/**
+	 * Determines whether the optional criteria_scores column exists.
+	 *
+	 * @return bool
+	 */
+	private function reviews_criteria_column_exists() {
+		static $exists = null;
+
+		if ( null !== $exists ) {
+			return (bool) $exists;
+		}
+
+		global $wpdb;
+		$column = $wpdb->get_var( "SHOW COLUMNS FROM " . self::reviews_table() . " LIKE 'criteria_scores'" );
+		$exists = ! empty( $column );
+
+		return (bool) $exists;
 	}
 
 	/**

@@ -220,6 +220,22 @@ class Arriendo_Facil_Accommodation {
 		$owner_options = $this->get_owner_user_options();
 		$is_owner_user = self::user_is_owner( get_current_user_id() );
 
+		$year_built    = get_post_meta( $post->ID, '_af_year_built', true );
+		$floor_number  = get_post_meta( $post->ID, '_af_floor_number', true );
+		$total_floors  = get_post_meta( $post->ID, '_af_total_floors', true );
+		$parking_spots = get_post_meta( $post->ID, '_af_parking_spots', true );
+		$furnished     = get_post_meta( $post->ID, '_af_furnished', true );
+		$condition     = get_post_meta( $post->ID, '_af_condition', true );
+		$hoa_fee       = get_post_meta( $post->ID, '_af_hoa_fee', true );
+		$utilities_included = get_post_meta( $post->ID, '_af_utilities_included', true );
+		if ( ! is_array( $utilities_included ) ) {
+			$utilities_included = array();
+		}
+		$inventory = get_post_meta( $post->ID, '_af_inventory', true );
+		if ( ! is_array( $inventory ) ) {
+			$inventory = array();
+		}
+
 		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/accommodation-meta-box.php';
 	}
 
@@ -372,6 +388,13 @@ class Arriendo_Facil_Accommodation {
 			'_af_airbnb_listing_id'    => 'sanitize_text_field',
 			'_af_airbnb_ical_url'      => 'esc_url_raw',
 			'_af_sync_enabled'         => 'absint',
+			'_af_year_built'           => 'absint',
+			'_af_floor_number'         => 'absint',
+			'_af_total_floors'         => 'absint',
+			'_af_parking_spots'        => 'absint',
+			'_af_furnished'            => 'sanitize_text_field',
+			'_af_condition'            => 'sanitize_text_field',
+			'_af_hoa_fee'              => 'floatval',
 		);
 
 		foreach ( $fields as $key => $sanitize_cb ) {
@@ -379,6 +402,30 @@ class Arriendo_Facil_Accommodation {
 			if ( isset( $_POST[ $form_key ] ) ) {
 				update_post_meta( $post_id, $key, call_user_func( $sanitize_cb, wp_unslash( $_POST[ $form_key ] ) ) );
 			}
+		}
+
+		if ( isset( $_POST['af_furnished'] ) ) {
+			$allowed_furnished = array( 'unfurnished', 'semi', 'furnished' );
+			$furnished_value   = sanitize_text_field( wp_unslash( $_POST['af_furnished'] ) );
+			update_post_meta( $post_id, '_af_furnished', in_array( $furnished_value, $allowed_furnished, true ) ? $furnished_value : 'unfurnished' );
+		}
+
+		if ( isset( $_POST['af_condition'] ) ) {
+			$allowed_conditions = array( 'new', 'very_good', 'good', 'needs_repair' );
+			$condition_value    = sanitize_text_field( wp_unslash( $_POST['af_condition'] ) );
+			update_post_meta( $post_id, '_af_condition', in_array( $condition_value, $allowed_conditions, true ) ? $condition_value : 'good' );
+		}
+
+		if ( isset( $_POST['af_utilities_included'] ) && is_array( $_POST['af_utilities_included'] ) ) {
+			$allowed_utilities  = array( 'water', 'electric', 'internet', 'gas' );
+			$utilities_included = array_values( array_intersect( $allowed_utilities, array_map( 'sanitize_text_field', wp_unslash( $_POST['af_utilities_included'] ) ) ) );
+			update_post_meta( $post_id, '_af_utilities_included', $utilities_included );
+		} else {
+			update_post_meta( $post_id, '_af_utilities_included', array() );
+		}
+
+		if ( isset( $_POST['af_inventory'] ) ) {
+			update_post_meta( $post_id, '_af_inventory', $this->sanitize_inventory_json( wp_unslash( $_POST['af_inventory'] ) ) );
 		}
 
 		if ( isset( $_POST['af_amenities'] ) && is_array( $_POST['af_amenities'] ) ) {
@@ -398,6 +445,41 @@ class Arriendo_Facil_Accommodation {
 		if ( ! $is_owner_user && isset( $_POST['af_owner_id'] ) ) {
 			update_post_meta( $post_id, '_af_owner_id', absint( wp_unslash( $_POST['af_owner_id'] ) ) );
 		}
+	}
+
+	/**
+	 * Validates and sanitizes the raw inventory JSON payload submitted from the meta box.
+	 *
+	 * @param string $raw_json Raw JSON string from the hidden af_inventory field.
+	 * @return array<int,array{item:string,category:string,condition:string,quantity:int}>
+	 */
+	private function sanitize_inventory_json( $raw_json ) {
+		$decoded = json_decode( (string) $raw_json, true );
+		if ( ! is_array( $decoded ) ) {
+			return array();
+		}
+
+		$allowed_categories  = array( 'electrodomestico', 'mobiliario', 'otro' );
+		$allowed_conditions  = array( 'new', 'very_good', 'good', 'needs_repair' );
+		$sanitized_inventory = array();
+
+		foreach ( $decoded as $entry ) {
+			if ( ! is_array( $entry ) || empty( $entry['item'] ) ) {
+				continue;
+			}
+
+			$category  = isset( $entry['category'] ) ? sanitize_text_field( $entry['category'] ) : 'otro';
+			$condition = isset( $entry['condition'] ) ? sanitize_text_field( $entry['condition'] ) : 'good';
+
+			$sanitized_inventory[] = array(
+				'item'      => sanitize_text_field( $entry['item'] ),
+				'category'  => in_array( $category, $allowed_categories, true ) ? $category : 'otro',
+				'condition' => in_array( $condition, $allowed_conditions, true ) ? $condition : 'good',
+				'quantity'  => isset( $entry['quantity'] ) ? max( 1, absint( $entry['quantity'] ) ) : 1,
+			);
+		}
+
+		return $sanitized_inventory;
 	}
 
 	/**

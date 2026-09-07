@@ -151,6 +151,99 @@ class Arriendo_Facil_Activator {
 		$charset_collate = $wpdb->get_charset_collate();
 
 		$tables = array(
+			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_buildings (
+				id                     BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+				name                   VARCHAR(190) NOT NULL,
+				address                VARCHAR(255) DEFAULT NULL,
+				city                   VARCHAR(120) DEFAULT NULL,
+				owner_id               BIGINT(20) UNSIGNED DEFAULT NULL,
+				monthly_hoa_total      DECIMAL(12,2) NOT NULL DEFAULT 0.00 COMMENT 'Alicuota total mensual del edificio a prorratear',
+				status                 VARCHAR(20) NOT NULL DEFAULT 'active',
+				notes                  TEXT DEFAULT NULL,
+				created_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				KEY owner_id (owner_id),
+				KEY status (status)
+			) $charset_collate;",
+
+			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_units (
+				id                     BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+				building_id            BIGINT(20) UNSIGNED NOT NULL,
+				accommodation_id       BIGINT(20) UNSIGNED DEFAULT NULL COMMENT 'Post ID del CPT accommodation, si existe ficha',
+				unit_code              VARCHAR(50) NOT NULL COMMENT 'Ej: A-101',
+				hoa_coefficient        DECIMAL(7,4) NOT NULL DEFAULT 0.0000 COMMENT 'Porcentaje de prorrateo de alicuota',
+				area_m2                DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+				status                 VARCHAR(20) NOT NULL DEFAULT 'active',
+				created_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				UNIQUE KEY uniq_building_unit (building_id, unit_code),
+				KEY building_id (building_id),
+				KEY accommodation_id (accommodation_id),
+				KEY status (status)
+			) $charset_collate;",
+
+			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_charges (
+				id                     BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+				lease_id               BIGINT(20) UNSIGNED DEFAULT NULL,
+				unit_id                BIGINT(20) UNSIGNED DEFAULT NULL,
+				guest_id               BIGINT(20) UNSIGNED DEFAULT NULL,
+				charge_type            VARCHAR(30) NOT NULL COMMENT 'canon, alicuota, agua, luz, gas, internet, multa, otro',
+				period                 CHAR(7) NOT NULL COMMENT 'YYYY-MM',
+				description            VARCHAR(255) DEFAULT NULL,
+				amount                 DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+				amount_paid            DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+				due_date               DATE NOT NULL,
+				status                 VARCHAR(20) NOT NULL DEFAULT 'pending' COMMENT 'pending, partial, paid, overdue, void',
+				created_by             BIGINT(20) UNSIGNED DEFAULT NULL,
+				created_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				UNIQUE KEY uniq_charge_period (lease_id, charge_type, period),
+				KEY lease_id (lease_id),
+				KEY unit_id (unit_id),
+				KEY guest_id (guest_id),
+				KEY charge_type (charge_type),
+				KEY period (period),
+				KEY status_due (status, due_date)
+			) $charset_collate;",
+
+			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_payments (
+				id                     BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+				charge_id              BIGINT(20) UNSIGNED NOT NULL,
+				amount                 DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+				payment_date           DATE NOT NULL,
+				method                 VARCHAR(30) NOT NULL DEFAULT 'transferencia' COMMENT 'transferencia, efectivo, deposito, cheque, otro',
+				reference              VARCHAR(190) DEFAULT NULL COMMENT 'Numero de comprobante o referencia bancaria',
+				receipt_url            VARCHAR(500) DEFAULT NULL,
+				notes                  TEXT DEFAULT NULL,
+				recorded_by            BIGINT(20) UNSIGNED DEFAULT NULL,
+				created_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				KEY charge_id (charge_id),
+				KEY payment_date (payment_date),
+				KEY method (method)
+			) $charset_collate;",
+
+			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_meter_readings (
+				id                     BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+				unit_id                BIGINT(20) UNSIGNED NOT NULL,
+				service                VARCHAR(30) NOT NULL COMMENT 'agua, luz, gas',
+				period                 CHAR(7) NOT NULL COMMENT 'YYYY-MM',
+				previous_reading       DECIMAL(12,3) NOT NULL DEFAULT 0.000,
+				current_reading        DECIMAL(12,3) NOT NULL DEFAULT 0.000,
+				consumption            DECIMAL(12,3) NOT NULL DEFAULT 0.000,
+				unit_rate              DECIMAL(10,4) NOT NULL DEFAULT 0.0000,
+				calculated_amount      DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+				recorded_by            BIGINT(20) UNSIGNED DEFAULT NULL,
+				created_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				UNIQUE KEY uniq_unit_service_period (unit_id, service, period),
+				KEY unit_id (unit_id),
+				KEY period (period)
+			) $charset_collate;",
+
 			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_leases (
 				id            BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
 				accommodation_id BIGINT(20) UNSIGNED NOT NULL,
@@ -673,6 +766,33 @@ class Arriendo_Facil_Activator {
 		);
 		if ( ! (int) $review_rows_criteria_col ) {
 			$wpdb->query( "ALTER TABLE {$review_rows_table} ADD COLUMN criteria_scores TEXT DEFAULT NULL AFTER comment_text" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		}
+
+		// Estado de verificacion documental del inquilino.
+		$guests_table = $wpdb->prefix . 'af_guests';
+		$guest_doc_columns = array(
+			'doc_status'      => "ALTER TABLE {$guests_table} ADD COLUMN doc_status VARCHAR(20) NOT NULL DEFAULT 'pendiente'",
+			'doc_verified_by' => "ALTER TABLE {$guests_table} ADD COLUMN doc_verified_by BIGINT(20) UNSIGNED DEFAULT NULL",
+			'doc_verified_at' => "ALTER TABLE {$guests_table} ADD COLUMN doc_verified_at DATETIME DEFAULT NULL",
+			'doc_notes'       => "ALTER TABLE {$guests_table} ADD COLUMN doc_notes TEXT DEFAULT NULL",
+		);
+
+		foreach ( $guest_doc_columns as $column_name => $alter_sql ) {
+			$column_exists = $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*)
+					 FROM INFORMATION_SCHEMA.COLUMNS
+					 WHERE TABLE_SCHEMA = %s
+					   AND TABLE_NAME = %s
+					   AND COLUMN_NAME = %s",
+					DB_NAME,
+					$guests_table,
+					$column_name
+				)
+			);
+			if ( ! (int) $column_exists ) {
+				$wpdb->query( $alter_sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			}
 		}
 
 		$reservations_table = $wpdb->prefix . 'af_reservations';

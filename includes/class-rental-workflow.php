@@ -21,6 +21,17 @@ class Arriendo_Facil_Rental_Workflow {
 	 * Constructor.
 	 */
 	public function __construct() {
+		// Administración de contratos vigentes: siempre activo.
+		add_action( 'wp_ajax_af_finalize_lease_manual_release', array( $this, 'ajax_finalize_lease_manual_release' ) );
+		add_action( 'wp_ajax_af_renew_lease', array( $this, 'ajax_renew_lease' ) );
+		add_action( 'wp_ajax_af_execute_manual_release', array( $this, 'ajax_execute_manual_release' ) );
+		add_action( 'wp_ajax_af_early_terminate_lease', array( $this, 'ajax_early_terminate_lease' ) );
+
+		// Captación de inquilinos (visitas, reservas, cola de interés): fuera del modelo de administración.
+		if ( ! ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) ) {
+			return;
+		}
+
 		add_action( 'wp_ajax_af_create_visit_slot', array( $this, 'ajax_create_visit_slot' ) );
 		add_action( 'wp_ajax_af_get_visit_slots', array( $this, 'ajax_get_visit_slots' ) );
 		add_action( 'wp_ajax_nopriv_af_get_visit_slots', array( $this, 'ajax_get_visit_slots' ) );
@@ -34,10 +45,6 @@ class Arriendo_Facil_Rental_Workflow {
 		add_action( 'wp_ajax_af_get_interest_queue', array( $this, 'ajax_get_interest_queue' ) );
 		add_action( 'wp_ajax_af_create_reservation_hold', array( $this, 'ajax_create_reservation_hold' ) );
 		add_action( 'wp_ajax_af_release_reservation_hold', array( $this, 'ajax_release_reservation_hold' ) );
-		add_action( 'wp_ajax_af_finalize_lease_manual_release', array( $this, 'ajax_finalize_lease_manual_release' ) );
-		add_action( 'wp_ajax_af_renew_lease', array( $this, 'ajax_renew_lease' ) );
-		add_action( 'wp_ajax_af_execute_manual_release', array( $this, 'ajax_execute_manual_release' ) );
-		add_action( 'wp_ajax_af_early_terminate_lease', array( $this, 'ajax_early_terminate_lease' ) );
 		add_action( 'wp_ajax_af_get_accommodation_availability', array( $this, 'ajax_get_accommodation_availability' ) );
 		add_action( 'wp_ajax_nopriv_af_get_accommodation_availability', array( $this, 'ajax_get_accommodation_availability' ) );
 	}

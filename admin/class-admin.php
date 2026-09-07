@@ -95,6 +95,24 @@ class Arriendo_Facil_Admin {
 
 		add_submenu_page(
 			'arriendo-facil',
+			__( 'Edificios y unidades', 'arriendo-facil' ),
+			__( 'Edificios y unidades', 'arriendo-facil' ),
+			'manage_options',
+			'af-buildings',
+			array( $this, 'render_buildings' )
+		);
+
+		add_submenu_page(
+			'arriendo-facil',
+			__( 'Control de pagos', 'arriendo-facil' ),
+			__( 'Control de pagos', 'arriendo-facil' ),
+			'edit_posts',
+			'af-collections',
+			array( $this, 'render_collections' )
+		);
+
+		add_submenu_page(
+			'arriendo-facil',
 			__( 'Solicitudes de limpieza', 'arriendo-facil' ),
 			__( 'Solicitudes de limpieza', 'arriendo-facil' ),
 			'edit_posts',
@@ -1851,6 +1869,20 @@ class Arriendo_Facil_Admin {
 	 */
 	public function render_leases() {
 		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/leases.php';
+	}
+
+	/**
+	 * Renders the collections (cobranza) admin page.
+	 */
+	public function render_collections() {
+		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/collections.php';
+	}
+
+	/**
+	 * Renders the buildings and units admin page.
+	 */
+	public function render_buildings() {
+		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/buildings.php';
 	}
 
 	/**

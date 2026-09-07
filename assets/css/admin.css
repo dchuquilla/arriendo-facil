@@ -1283,7 +1283,6 @@ body.post-type-cleaning_service .page-title-action:focus {
 /* =============================================================
    Inventory Table (Accommodation meta box)
    ============================================================= */
-
 .af-inventory-table {
 	width: 100%;
 	border-collapse: collapse;
@@ -1537,4 +1536,187 @@ body.post-type-accommodation #titlediv {
 #af-gallery-count-num {
 	font-weight: 700;
 	color: #1d2327;
+}
+
+/* =============================================================
+   Modal (reusable — verificación de documentos, envío de formulario)
+   ============================================================= */
+
+.af-modal {
+	position: fixed;
+	inset: 0;
+	z-index: 100000;
+	display: none;
+	align-items: center;
+	justify-content: center;
+	padding: 20px;
+}
+
+.af-modal.is-open {
+	display: flex;
+}
+
+.af-modal__backdrop {
+	position: absolute;
+	inset: 0;
+	background: rgba(15, 23, 42, 0.55);
+	backdrop-filter: blur(2px);
+}
+
+.af-modal__dialog {
+	position: relative;
+	background: #fff;
+	border-radius: 12px;
+	box-shadow: 0 20px 60px rgba(15, 23, 42, 0.25);
+	width: min(520px, 100%);
+	max-height: 90vh;
+	overflow-y: auto;
+	animation: af-modal-in 0.16s ease-out;
+}
+
+@keyframes af-modal-in {
+	from { opacity: 0; transform: translateY(8px) scale(0.98); }
+	to   { opacity: 1; transform: none; }
+}
+
+.af-modal__header {
+	padding: 20px 24px 12px;
+	border-bottom: 1px solid #f0f0f1;
+}
+
+.af-modal__title {
+	margin: 0 0 4px;
+	font-size: 17px;
+	font-weight: 600;
+	color: #1d2327;
+}
+
+.af-modal__subtitle {
+	margin: 0;
+	font-size: 13px;
+	color: #646970;
+	line-height: 1.5;
+}
+
+.af-modal__body {
+	padding: 20px 24px;
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.af-modal__footer {
+	padding: 14px 24px 20px;
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+}
+
+.af-modal__close {
+	position: absolute;
+	top: 14px;
+	right: 14px;
+	width: 30px;
+	height: 30px;
+	border: 0;
+	border-radius: 6px;
+	background: transparent;
+	color: #646970;
+	font-size: 18px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.af-modal__close:hover {
+	background: #f0f0f1;
+	color: #1d2327;
+}
+
+.af-modal__field label {
+	display: block;
+	font-weight: 600;
+	font-size: 13px;
+	color: #1d2327;
+	margin-bottom: 6px;
+}
+
+.af-modal__field input[type="text"],
+.af-modal__field input[type="number"],
+.af-modal__field select,
+.af-modal__field textarea {
+	width: 100%;
+	box-sizing: border-box;
+}
+
+.af-modal__hint {
+	margin: 6px 0 0;
+	font-size: 12px;
+	color: #646970;
+}
+
+/* Radio cards para estados de verificación */
+.af-choice-group {
+	display: grid;
+	gap: 8px;
+}
+
+.af-choice {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	padding: 12px 14px;
+	border: 1.5px solid #dcdcde;
+	border-radius: 8px;
+	cursor: pointer;
+	transition: border-color 0.15s, background 0.15s;
+}
+
+.af-choice:hover {
+	border-color: #c3c4c7;
+	background: #fafafa;
+}
+
+.af-choice.is-selected {
+	border-color: #2271b1;
+	background: #f0f6fc;
+}
+
+.af-choice input[type="radio"] {
+	margin: 2px 0 0;
+}
+
+.af-choice__label {
+	font-weight: 600;
+	font-size: 13px;
+	color: #1d2327;
+	display: block;
+}
+
+.af-choice__desc {
+	font-size: 12px;
+	color: #646970;
+	display: block;
+	margin-top: 2px;
+}
+
+.af-modal__status {
+	margin: 0;
+	padding: 10px 12px;
+	border-radius: 6px;
+	font-size: 13px;
+	display: none;
+}
+
+.af-modal__status.is-error {
+	display: block;
+	background: #fcf0f1;
+	border-left: 3px solid #d63638;
+	color: #8a2424;
+}
+
+.af-modal__status.is-success {
+	display: block;
+	background: #edfaef;
+	border-left: 3px solid #00a32a;
+	color: #135e28;
 }

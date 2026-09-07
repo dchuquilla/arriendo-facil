@@ -29,17 +29,22 @@ class Arriendo_Facil_Accommodation {
 		add_filter( 'admin_post_thumbnail_html', array( $this, 'customize_thumbnail_label' ), 10, 3 );
 		add_action( 'pre_get_posts', array( $this, 'force_home_queries_to_accommodations' ) );
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_frontend_styles' ) );
-		add_shortcode( 'af_propiedad_destacada', array( $this, 'render_featured_accommodation_shortcode' ) );
-		add_shortcode( 'propiedad_destacada', array( $this, 'render_featured_accommodation_shortcode' ) );
-		add_shortcode( 'af_acomodaciones_ocupadas', array( $this, 'render_occupied_accommodations_shortcode' ) );
-		add_shortcode( 'acomodaciones_ocupadas', array( $this, 'render_occupied_accommodations_shortcode' ) );
-		add_shortcode( 'af_propiedades_gestion', array( $this, 'render_managed_accommodations_shortcode' ) );
-		add_shortcode( 'propiedades_bajo_gestion', array( $this, 'render_managed_accommodations_shortcode' ) );
-		add_shortcode( 'accommodations', array( $this, 'render_managed_accommodations_shortcode' ) );
-		add_filter( 'the_content', array( $this, 'append_single_accommodation_details' ), 20 );
-		add_filter( 'elementor/frontend/the_content', array( $this, 'append_single_accommodation_details' ), 20 );
-		add_filter( 'the_content', array( $this, 'inject_managed_accommodations_in_content' ), 999 );
-		add_filter( 'elementor/frontend/the_content', array( $this, 'inject_managed_accommodations_in_content' ), 999 );
+		add_action( 'pre_get_posts', array( $this, 'force_home_queries_to_accommodations' ) );
+
+		// Catalogo publico: solo aplica al modelo marketplace, no a la administracion interna.
+		if ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) {
+			add_shortcode( 'af_propiedad_destacada', array( $this, 'render_featured_accommodation_shortcode' ) );
+			add_shortcode( 'propiedad_destacada', array( $this, 'render_featured_accommodation_shortcode' ) );
+			add_shortcode( 'af_acomodaciones_ocupadas', array( $this, 'render_occupied_accommodations_shortcode' ) );
+			add_shortcode( 'acomodaciones_ocupadas', array( $this, 'render_occupied_accommodations_shortcode' ) );
+			add_shortcode( 'af_propiedades_gestion', array( $this, 'render_managed_accommodations_shortcode' ) );
+			add_shortcode( 'propiedades_bajo_gestion', array( $this, 'render_managed_accommodations_shortcode' ) );
+			add_shortcode( 'accommodations', array( $this, 'render_managed_accommodations_shortcode' ) );
+			add_filter( 'the_content', array( $this, 'append_single_accommodation_details' ), 20 );
+			add_filter( 'elementor/frontend/the_content', array( $this, 'append_single_accommodation_details' ), 20 );
+			add_filter( 'the_content', array( $this, 'inject_managed_accommodations_in_content' ), 999 );
+			add_filter( 'elementor/frontend/the_content', array( $this, 'inject_managed_accommodations_in_content' ), 999 );
+		}
 	}
 
 	/**
@@ -55,6 +60,11 @@ class Arriendo_Facil_Accommodation {
 
 		if ( is_admin() ) {
 			$this->restrict_admin_accommodation_queries_to_owner( $query );
+			return;
+		}
+
+		// Sin catalogo publico no se reescribe la home.
+		if ( ! ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) ) {
 			return;
 		}
 

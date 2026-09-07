@@ -31,6 +31,9 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-activator.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-text-normalizer.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-idempotency.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-property-structure.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-billing-ledger.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-document-verification.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-wizard.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-featured-admin.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-occupied-admin.php';
@@ -154,6 +157,11 @@ function arriendo_facil_register_cron_jobs() {
 	if ( ! wp_next_scheduled( 'af_review_dispatch_cron' ) ) {
 		wp_schedule_event( time() + 10 * MINUTE_IN_SECONDS, 'daily', 'af_review_dispatch_cron' );
 	}
+
+	// Daily overdue flagging for outstanding charges.
+	if ( ! wp_next_scheduled( 'af_flag_overdue_charges' ) ) {
+		wp_schedule_event( time() + 20 * MINUTE_IN_SECONDS, 'daily', 'af_flag_overdue_charges' );
+	}
 }
 
 /**
@@ -184,23 +192,30 @@ function arriendo_facil_init() {
 	// not tumble the entire site with a fatal error during plugin_loaded.
 	$components = array(
 		'Arriendo_Facil_Accommodation',
+		'Arriendo_Facil_Property_Structure',
 		'Arriendo_Facil_Accommodation_Wizard',
 		'Arriendo_Facil_Accommodation_Featured_Admin',
 		'Arriendo_Facil_Accommodation_Occupied_Admin',
-		'Arriendo_Facil_Accommodation_Search_API',
 		'Arriendo_Facil_Cleaning_Service',
 		'Arriendo_Facil_Lease',
+		'Arriendo_Facil_Billing_Ledger',
 		'Arriendo_Facil_Rental_Workflow',
 		'Arriendo_Facil_Owner_Contact',
-		'Arriendo_Facil_Owner_Register_API',
 		'Arriendo_Facil_Guest',
+		'Arriendo_Facil_Document_Verification',
 		'Arriendo_Facil_Review',
 		'Arriendo_Facil_Billing_API',
-		'Arriendo_Facil_OTA_Webhook_Handler',
-		'Arriendo_Facil_OTA_Notifications',
-		'Arriendo_Facil_OTA_AJAX_Handlers',
 		'Arriendo_Facil_Admin',
 	);
+
+	// Captación/marketplace: sin catálogo público ni OTAs en el modelo de administración.
+	if ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) {
+		$components[] = 'Arriendo_Facil_Accommodation_Search_API';
+		$components[] = 'Arriendo_Facil_Owner_Register_API';
+		$components[] = 'Arriendo_Facil_OTA_Webhook_Handler';
+		$components[] = 'Arriendo_Facil_OTA_Notifications';
+		$components[] = 'Arriendo_Facil_OTA_AJAX_Handlers';
+	}
 
 	foreach ( $components as $component_class ) {
 		if ( class_exists( $component_class ) ) {

@@ -30,9 +30,13 @@ class Arriendo_Facil_Review {
 		add_action( 'wp_ajax_af_tenant_request_review_link', array( $this, 'ajax_tenant_request_review_link' ) );
 		add_action( 'wp_ajax_af_generate_review_test_link', array( $this, 'ajax_generate_review_test_link' ) );
 		add_shortcode( 'af_review_form', array( $this, 'render_review_form_shortcode' ) );
-		add_shortcode( 'af_review_stats', array( $this, 'render_review_stats_shortcode' ) );
-		add_filter( 'the_content', array( $this, 'append_public_stats_to_single_accommodation' ), 30 );
-		add_filter( 'elementor/frontend/the_content', array( $this, 'append_public_stats_to_single_accommodation' ), 30 );
+
+		// Estadisticas publicas de la propiedad: solo aplican al catalogo del marketplace.
+		if ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) {
+			add_shortcode( 'af_review_stats', array( $this, 'render_review_stats_shortcode' ) );
+			add_filter( 'the_content', array( $this, 'append_public_stats_to_single_accommodation' ), 30 );
+			add_filter( 'elementor/frontend/the_content', array( $this, 'append_public_stats_to_single_accommodation' ), 30 );
+		}
 	}
 
 	/**
@@ -1255,17 +1259,41 @@ class Arriendo_Facil_Review {
 		}
 
 		$due_at = gmdate( 'Y-m-d H:i:s', strtotime( '+' . self::review_window_days() . ' days', $end_date_ts ) );
-		$tenant_group_id = self::create_review_group(
-			$lease_id,
-			$context['accommodation_id'],
-			$context['owner_user_id'],
-			$context['tenant_user_id'],
-			$context['tenant_email'],
-			'tenant',
-			$due_at
-		);
-		if ( is_wp_error( $tenant_group_id ) ) {
-			return $tenant_group_id;
+
+		// En el modelo de administracion solo aplica la valoracion admin -> inquilino.
+		// Las direcciones inquilino -> propietario/propiedad eran senal de marketplace.
+		$tenant_directions_enabled = defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES;
+
+		$created = array();
+
+		if ( $tenant_directions_enabled ) {
+			$tenant_group_id = self::create_review_group(
+				$lease_id,
+				$context['accommodation_id'],
+				$context['owner_user_id'],
+				$context['tenant_user_id'],
+				$context['tenant_email'],
+				'tenant',
+				$due_at
+			);
+			if ( is_wp_error( $tenant_group_id ) ) {
+				return $tenant_group_id;
+			}
+
+			$created['tenant_group_id'] = (int) $tenant_group_id;
+
+			$tenant_review_ids = $this->create_reviews_for_group(
+				(int) $tenant_group_id,
+				$lease_id,
+				$context['accommodation_id'],
+				$context['owner_user_id'],
+				$context['tenant_user_id'],
+				$context['tenant_email'],
+				array( 'tenant_to_owner', 'tenant_to_property' )
+			);
+			if ( is_wp_error( $tenant_review_ids ) ) {
+				return $tenant_review_ids;
+			}
 		}
 
 		$owner_group_id = self::create_review_group(
@@ -1281,23 +1309,7 @@ class Arriendo_Facil_Review {
 			return $owner_group_id;
 		}
 
-		$created = array(
-			'tenant_group_id' => (int) $tenant_group_id,
-			'owner_group_id'  => (int) $owner_group_id,
-		);
-
-		$tenant_review_ids = $this->create_reviews_for_group(
-			(int) $tenant_group_id,
-			$lease_id,
-			$context['accommodation_id'],
-			$context['owner_user_id'],
-			$context['tenant_user_id'],
-			$context['tenant_email'],
-			array( 'tenant_to_owner', 'tenant_to_property' )
-		);
-		if ( is_wp_error( $tenant_review_ids ) ) {
-			return $tenant_review_ids;
-		}
+		$created['owner_group_id'] = (int) $owner_group_id;
 
 		$owner_review_ids = $this->create_reviews_for_group(
 			(int) $owner_group_id,

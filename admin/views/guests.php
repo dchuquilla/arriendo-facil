@@ -459,11 +459,11 @@ if ( $is_owner ) {
 				<div class="af-section af-section--guests">
 					<header class="af-section__head">
 						<div>
-							<h2 class="af-section__title"><?php esc_html_e( 'Huéspedes registrados', 'arriendo-facil' ); ?></h2>
-							<p class="af-section__subtitle"><?php esc_html_e( 'Perfiles verificados de personas que ya alquilaron o están en proceso. Ejecuta el scoring con IA para evaluar riesgo.', 'arriendo-facil' ); ?></p>
+							<h2 class="af-section__title"><?php esc_html_e( 'Inquilinos registrados', 'arriendo-facil' ); ?></h2>
+							<p class="af-section__subtitle"><?php esc_html_e( 'Perfiles de inquilinos bajo administración. Verifica los documentos de identidad antes de operar el contrato.', 'arriendo-facil' ); ?></p>
 						</div>
 						<?php if ( $guest_count_page > 0 ) : ?>
-							<span class="af-pill af-pill--info"><?php echo esc_html( sprintf( _n( '%s huésped', '%s huéspedes', $guest_count_page, 'arriendo-facil' ), number_format_i18n( $guest_count_page ) ) ); ?></span>
+							<span class="af-pill af-pill--info"><?php echo esc_html( sprintf( _n( '%s inquilino', '%s inquilinos', $guest_count_page, 'arriendo-facil' ), number_format_i18n( $guest_count_page ) ) ); ?></span>
 						<?php endif; ?>
 					</header>
 
@@ -475,18 +475,33 @@ if ( $is_owner ) {
 								<th><?php esc_html_e( 'Nombre', 'arriendo-facil' ); ?></th>
 								<th><?php esc_html_e( 'Email', 'arriendo-facil' ); ?></th>
 								<th><?php esc_html_e( 'Teléfono', 'arriendo-facil' ); ?></th>
-								<th><?php esc_html_e( 'AI Score', 'arriendo-facil' ); ?></th>
+								<th><?php esc_html_e( 'Documentos', 'arriendo-facil' ); ?></th>
+								<?php if ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) : ?>
+									<th><?php esc_html_e( 'AI Score', 'arriendo-facil' ); ?></th>
+								<?php endif; ?>
 								<th><?php esc_html_e( 'Acciones', 'arriendo-facil' ); ?></th>
 							</tr>
 						</thead>
 						<tbody>
-							<?php foreach ( $guests as $guest ) :
+							<?php
+							$doc_statuses = class_exists( 'Arriendo_Facil_Document_Verification' )
+								? Arriendo_Facil_Document_Verification::statuses()
+								: array();
+							foreach ( $guests as $guest ) :
 								$score = $guest->ai_score ? (float) $guest->ai_score : null;
 								$score_variant = 'default';
 								if ( null !== $score ) {
 									if ( $score >= 0.75 ) { $score_variant = 'success'; }
 									elseif ( $score >= 0.5 ) { $score_variant = 'warning'; }
 									else { $score_variant = 'danger'; }
+								}
+
+								$doc_status = isset( $guest->doc_status ) && $guest->doc_status ? (string) $guest->doc_status : 'pendiente';
+								$doc_variant = 'warning';
+								if ( 'verificado' === $doc_status ) {
+									$doc_variant = 'success';
+								} elseif ( 'rechazado' === $doc_status ) {
+									$doc_variant = 'danger';
 								}
 							?>
 								<tr>
@@ -496,18 +511,39 @@ if ( $is_owner ) {
 									</td>
 									<td data-label="<?php esc_attr_e( 'Email', 'arriendo-facil' ); ?>"><?php echo esc_html( $guest->email ); ?></td>
 									<td data-label="<?php esc_attr_e( 'Teléfono', 'arriendo-facil' ); ?>"><?php echo esc_html( $guest->phone ); ?></td>
-									<td data-label="<?php esc_attr_e( 'AI Score', 'arriendo-facil' ); ?>">
-										<?php if ( null !== $score ) : ?>
-											<span class="af-pill af-pill--<?php echo esc_attr( $score_variant ); ?>"><?php echo esc_html( number_format( $score, 2 ) ); ?></span>
-										<?php else : ?>
-											<span class="af-td-meta">—</span>
-										<?php endif; ?>
+									<td data-label="<?php esc_attr_e( 'Documentos', 'arriendo-facil' ); ?>">
+										<span class="af-pill af-pill--<?php echo esc_attr( $doc_variant ); ?>">
+											<?php echo esc_html( $doc_statuses[ $doc_status ] ?? $doc_status ); ?>
+										</span>
 									</td>
+									<?php if ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) : ?>
+										<td data-label="<?php esc_attr_e( 'AI Score', 'arriendo-facil' ); ?>">
+											<?php if ( null !== $score ) : ?>
+												<span class="af-pill af-pill--<?php echo esc_attr( $score_variant ); ?>"><?php echo esc_html( number_format( $score, 2 ) ); ?></span>
+											<?php else : ?>
+												<span class="af-td-meta">—</span>
+											<?php endif; ?>
+										</td>
+									<?php endif; ?>
 									<td class="af-td-actions" data-label="<?php esc_attr_e( 'Acciones', 'arriendo-facil' ); ?>">
-										<button type="button" class="button af-btn af-btn--ghost af-btn--sm af-score-guest"
-											data-guest-id="<?php echo esc_attr( $guest->id ); ?>">
-											<?php esc_html_e( 'Score (IA)', 'arriendo-facil' ); ?>
+										<button type="button" class="button af-btn af-btn--primary af-btn--sm af-send-form"
+											data-guest-id="<?php echo esc_attr( $guest->id ); ?>"
+											data-guest-name="<?php echo esc_attr( trim( $guest->first_name . ' ' . $guest->last_name ) ); ?>"
+											data-guest-email="<?php echo esc_attr( $guest->email ); ?>">
+											<?php esc_html_e( 'Enviar formulario', 'arriendo-facil' ); ?>
 										</button>
+										<button type="button" class="button af-btn af-btn--ghost af-btn--sm af-verify-docs"
+											data-guest-id="<?php echo esc_attr( $guest->id ); ?>"
+											data-guest-name="<?php echo esc_attr( trim( $guest->first_name . ' ' . $guest->last_name ) ); ?>"
+											data-current="<?php echo esc_attr( $doc_status ); ?>">
+											<?php esc_html_e( 'Verificar documentos', 'arriendo-facil' ); ?>
+										</button>
+										<?php if ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) : ?>
+											<button type="button" class="button af-btn af-btn--ghost af-btn--sm af-score-guest"
+												data-guest-id="<?php echo esc_attr( $guest->id ); ?>">
+												<?php esc_html_e( 'Score (IA)', 'arriendo-facil' ); ?>
+											</button>
+										<?php endif; ?>
 									</td>
 								</tr>
 							<?php endforeach; ?>
@@ -518,8 +554,8 @@ if ( $is_owner ) {
 							<div class="af-empty__icon" aria-hidden="true">
 								<svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
 							</div>
-							<h3><?php esc_html_e( 'Sin huéspedes registrados aún', 'arriendo-facil' ); ?></h3>
-							<p><?php esc_html_e( 'Usa el botón "Nuevo huésped" para registrar el primer perfil verificado.', 'arriendo-facil' ); ?></p>
+							<h3><?php esc_html_e( 'Sin inquilinos registrados aún', 'arriendo-facil' ); ?></h3>
+							<p><?php esc_html_e( 'Usa el botón de alta para registrar el primer inquilino bajo administración.', 'arriendo-facil' ); ?></p>
 						</div>
 					<?php endif; ?>
 				</div>
@@ -528,3 +564,229 @@ if ( $is_owner ) {
 		</div>
 	</div>
 </div>
+
+<!-- Modal: enviar formulario de perfil legal -->
+<div class="af-modal" id="af-modal-send-form" role="dialog" aria-modal="true" aria-labelledby="af-modal-send-form-title">
+	<div class="af-modal__backdrop" data-af-modal-close></div>
+	<div class="af-modal__dialog">
+		<button type="button" class="af-modal__close" data-af-modal-close aria-label="<?php esc_attr_e( 'Cerrar', 'arriendo-facil' ); ?>">&times;</button>
+		<div class="af-modal__header">
+			<h2 class="af-modal__title" id="af-modal-send-form-title"><?php esc_html_e( 'Enviar formulario de datos', 'arriendo-facil' ); ?></h2>
+			<p class="af-modal__subtitle"><?php esc_html_e( 'Se enviará un enlace seguro y de un solo uso para que complete sus datos y suba los documentos de identidad.', 'arriendo-facil' ); ?></p>
+		</div>
+		<div class="af-modal__body">
+			<p class="af-modal__status" id="af-send-form-status"></p>
+			<div class="af-modal__field">
+				<label><?php esc_html_e( 'Destinatario', 'arriendo-facil' ); ?></label>
+				<p class="af-modal__hint" id="af-send-form-recipient" style="margin:0;font-size:13px;color:#1d2327;"></p>
+			</div>
+			<div class="af-modal__field">
+				<label for="af-send-form-expires"><?php esc_html_e( 'Vigencia del enlace', 'arriendo-facil' ); ?></label>
+				<select id="af-send-form-expires">
+					<option value="24"><?php esc_html_e( '24 horas', 'arriendo-facil' ); ?></option>
+					<option value="72" selected><?php esc_html_e( '3 días (recomendado)', 'arriendo-facil' ); ?></option>
+					<option value="168"><?php esc_html_e( '7 días', 'arriendo-facil' ); ?></option>
+				</select>
+				<p class="af-modal__hint"><?php esc_html_e( 'Pasado este tiempo el enlace caduca y habrá que reenviarlo.', 'arriendo-facil' ); ?></p>
+			</div>
+		</div>
+		<div class="af-modal__footer">
+			<button type="button" class="button" data-af-modal-close><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
+			<button type="button" class="button button-primary" id="af-send-form-confirm"><?php esc_html_e( 'Enviar enlace', 'arriendo-facil' ); ?></button>
+		</div>
+	</div>
+</div>
+
+<!-- Modal: verificación de documentos -->
+<div class="af-modal" id="af-modal-verify" role="dialog" aria-modal="true" aria-labelledby="af-modal-verify-title">
+	<div class="af-modal__backdrop" data-af-modal-close></div>
+	<div class="af-modal__dialog">
+		<button type="button" class="af-modal__close" data-af-modal-close aria-label="<?php esc_attr_e( 'Cerrar', 'arriendo-facil' ); ?>">&times;</button>
+		<div class="af-modal__header">
+			<h2 class="af-modal__title" id="af-modal-verify-title"><?php esc_html_e( 'Verificar documentos', 'arriendo-facil' ); ?></h2>
+			<p class="af-modal__subtitle" id="af-verify-subtitle"></p>
+		</div>
+		<div class="af-modal__body">
+			<p class="af-modal__status" id="af-verify-status"></p>
+			<div class="af-modal__field">
+				<label><?php esc_html_e( 'Resultado de la revisión', 'arriendo-facil' ); ?></label>
+				<div class="af-choice-group">
+					<label class="af-choice" data-value="pendiente">
+						<input type="radio" name="af_doc_status" value="pendiente" />
+						<span>
+							<span class="af-choice__label"><?php esc_html_e( 'Pendiente', 'arriendo-facil' ); ?></span>
+							<span class="af-choice__desc"><?php esc_html_e( 'Aún no se revisan los documentos.', 'arriendo-facil' ); ?></span>
+						</span>
+					</label>
+					<label class="af-choice" data-value="verificado">
+						<input type="radio" name="af_doc_status" value="verificado" />
+						<span>
+							<span class="af-choice__label"><?php esc_html_e( 'Verificado', 'arriendo-facil' ); ?></span>
+							<span class="af-choice__desc"><?php esc_html_e( 'Identidad confirmada. Puede operarse el contrato.', 'arriendo-facil' ); ?></span>
+						</span>
+					</label>
+					<label class="af-choice" data-value="rechazado">
+						<input type="radio" name="af_doc_status" value="rechazado" />
+						<span>
+							<span class="af-choice__label"><?php esc_html_e( 'Rechazado', 'arriendo-facil' ); ?></span>
+							<span class="af-choice__desc"><?php esc_html_e( 'Documentos ilegibles, incompletos o inconsistentes.', 'arriendo-facil' ); ?></span>
+						</span>
+					</label>
+				</div>
+			</div>
+			<div class="af-modal__field">
+				<label for="af-verify-notes"><?php esc_html_e( 'Notas de revisión', 'arriendo-facil' ); ?></label>
+				<textarea id="af-verify-notes" rows="3" placeholder="<?php esc_attr_e( 'Ej: cédula legible, certificado bancario vigente.', 'arriendo-facil' ); ?>"></textarea>
+				<p class="af-modal__hint"><?php esc_html_e( 'Queda registrado junto con tu usuario y la fecha.', 'arriendo-facil' ); ?></p>
+			</div>
+		</div>
+		<div class="af-modal__footer">
+			<button type="button" class="button" data-af-modal-close><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
+			<button type="button" class="button button-primary" id="af-verify-confirm"><?php esc_html_e( 'Guardar', 'arriendo-facil' ); ?></button>
+		</div>
+	</div>
+</div>
+
+<script>
+(function () {
+	const ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
+	const docNonce = <?php echo wp_json_encode( wp_create_nonce( 'af_document_nonce' ) ); ?>;
+	const linkNonce = <?php echo wp_json_encode( wp_create_nonce( 'af_owner_contact_nonce' ) ); ?>;
+
+	function post(payload) {
+		const body = new URLSearchParams();
+		Object.keys(payload).forEach((k) => body.append(k, payload[k]));
+		return fetch(ajaxUrl, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+			body: body
+		}).then((r) => r.json());
+	}
+
+	function setStatus(el, message, type) {
+		el.textContent = message;
+		el.className = 'af-modal__status is-' + type;
+	}
+
+	function clearStatus(el) {
+		el.textContent = '';
+		el.className = 'af-modal__status';
+	}
+
+	function openModal(modal) {
+		modal.classList.add('is-open');
+		const focusable = modal.querySelector('select, textarea, input, button.button-primary');
+		if (focusable) { focusable.focus(); }
+	}
+
+	function closeModal(modal) {
+		modal.classList.remove('is-open');
+	}
+
+	document.querySelectorAll('.af-modal').forEach(function (modal) {
+		modal.querySelectorAll('[data-af-modal-close]').forEach(function (btn) {
+			btn.addEventListener('click', function () { closeModal(modal); });
+		});
+	});
+
+	document.addEventListener('keydown', function (e) {
+		if (e.key !== 'Escape') { return; }
+		document.querySelectorAll('.af-modal.is-open').forEach(closeModal);
+	});
+
+	// ---- Enviar formulario de perfil legal ----
+	const sendModal = document.getElementById('af-modal-send-form');
+	const sendStatus = document.getElementById('af-send-form-status');
+	const sendRecipient = document.getElementById('af-send-form-recipient');
+	const sendExpires = document.getElementById('af-send-form-expires');
+	const sendConfirm = document.getElementById('af-send-form-confirm');
+	let sendGuestId = 0;
+
+	document.querySelectorAll('.af-send-form').forEach(function (btn) {
+		btn.addEventListener('click', function () {
+			sendGuestId = btn.getAttribute('data-guest-id');
+			sendRecipient.textContent = btn.getAttribute('data-guest-name') + ' — ' + btn.getAttribute('data-guest-email');
+			clearStatus(sendStatus);
+			openModal(sendModal);
+		});
+	});
+
+	sendConfirm.addEventListener('click', function () {
+		sendConfirm.disabled = true;
+		clearStatus(sendStatus);
+
+		post({
+			action: 'af_send_guest_profile_link',
+			nonce: linkNonce,
+			guest_id: sendGuestId,
+			expires_hours: sendExpires.value
+		}).then(function (json) {
+			sendConfirm.disabled = false;
+			if (!json || !json.success) {
+				setStatus(sendStatus, (json && json.data && json.data.message) || 'No se pudo enviar el enlace.', 'error');
+				return;
+			}
+			setStatus(sendStatus, json.data.message, 'success');
+			setTimeout(function () { closeModal(sendModal); }, 1400);
+		});
+	});
+
+	// ---- Verificación de documentos ----
+	const verifyModal = document.getElementById('af-modal-verify');
+	const verifyStatus = document.getElementById('af-verify-status');
+	const verifySubtitle = document.getElementById('af-verify-subtitle');
+	const verifyNotes = document.getElementById('af-verify-notes');
+	const verifyConfirm = document.getElementById('af-verify-confirm');
+	let verifyGuestId = 0;
+
+	function selectChoice(value) {
+		verifyModal.querySelectorAll('.af-choice').forEach(function (choice) {
+			const isMatch = choice.getAttribute('data-value') === value;
+			choice.classList.toggle('is-selected', isMatch);
+			choice.querySelector('input[type="radio"]').checked = isMatch;
+		});
+	}
+
+	verifyModal.querySelectorAll('.af-choice input[type="radio"]').forEach(function (radio) {
+		radio.addEventListener('change', function () { selectChoice(radio.value); });
+	});
+
+	document.querySelectorAll('.af-verify-docs').forEach(function (btn) {
+		btn.addEventListener('click', function () {
+			verifyGuestId = btn.getAttribute('data-guest-id');
+			verifySubtitle.textContent = btn.getAttribute('data-guest-name');
+			verifyNotes.value = '';
+			clearStatus(verifyStatus);
+			selectChoice(btn.getAttribute('data-current') || 'pendiente');
+			openModal(verifyModal);
+		});
+	});
+
+	verifyConfirm.addEventListener('click', function () {
+		const selected = verifyModal.querySelector('.af-choice input[type="radio"]:checked');
+		if (!selected) {
+			setStatus(verifyStatus, <?php echo wp_json_encode( __( 'Selecciona un resultado de revisión.', 'arriendo-facil' ) ); ?>, 'error');
+			return;
+		}
+
+		verifyConfirm.disabled = true;
+		clearStatus(verifyStatus);
+
+		post({
+			action: 'af_set_document_status',
+			nonce: docNonce,
+			guest_id: verifyGuestId,
+			doc_status: selected.value,
+			notes: verifyNotes.value
+		}).then(function (json) {
+			verifyConfirm.disabled = false;
+			if (!json || !json.success) {
+				setStatus(verifyStatus, (json && json.data && json.data.message) || 'Error', 'error');
+				return;
+			}
+			setStatus(verifyStatus, json.data.message, 'success');
+			setTimeout(function () { window.location.reload(); }, 900);
+		});
+	});
+}());
+</script>

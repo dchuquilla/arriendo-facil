@@ -113,12 +113,41 @@ class Arriendo_Facil_Admin {
 
 		add_submenu_page(
 			'arriendo-facil',
-			__( 'Solicitudes de limpieza', 'arriendo-facil' ),
-			__( 'Solicitudes de limpieza', 'arriendo-facil' ),
+			__( 'Lecturas de medidor', 'arriendo-facil' ),
+			__( 'Lecturas', 'arriendo-facil' ),
 			'edit_posts',
-			'af-cleaning-requests',
-			array( $this, 'render_cleaning_requests' )
+			'af-meter-readings',
+			array( $this, 'render_meter_readings' )
 		);
+
+		add_submenu_page(
+			'arriendo-facil',
+			__( 'Liquidación al propietario', 'arriendo-facil' ),
+			__( 'Liquidaciones', 'arriendo-facil' ),
+			'manage_options',
+			'af-owner-settlements',
+			array( $this, 'render_owner_settlements' )
+		);
+
+		add_submenu_page(
+			'arriendo-facil',
+			__( 'Mantenimiento e incidencias', 'arriendo-facil' ),
+			__( 'Mantenimiento', 'arriendo-facil' ),
+			'edit_posts',
+			'af-maintenance',
+			array( $this, 'render_maintenance' )
+		);
+
+		if ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) {
+			add_submenu_page(
+				'arriendo-facil',
+				__( 'Solicitudes de limpieza', 'arriendo-facil' ),
+				__( 'Solicitudes de limpieza', 'arriendo-facil' ),
+				'edit_posts',
+				'af-cleaning-requests',
+				array( $this, 'render_cleaning_requests' )
+			);
+		}
 
 		if ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) {
 			add_submenu_page(
@@ -1883,6 +1912,27 @@ class Arriendo_Facil_Admin {
 	 */
 	public function render_buildings() {
 		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/buildings.php';
+	}
+
+	/**
+	 * Renders the meter readings admin page.
+	 */
+	public function render_meter_readings() {
+		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/meter-readings.php';
+	}
+
+	/**
+	 * Renders the owner settlements admin page.
+	 */
+	public function render_owner_settlements() {
+		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/owner-settlements.php';
+	}
+
+	/**
+	 * Renders the maintenance and incidents admin page.
+	 */
+	public function render_maintenance() {
+		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/maintenance.php';
 	}
 
 	/**

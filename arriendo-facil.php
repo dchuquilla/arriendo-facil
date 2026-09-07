@@ -34,6 +34,8 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-property-structure.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-billing-ledger.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-document-verification.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-maintenance.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-owner-settlement.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-wizard.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-featured-admin.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-occupied-admin.php';
@@ -197,6 +199,7 @@ function arriendo_facil_init() {
 		'Arriendo_Facil_Accommodation_Featured_Admin',
 		'Arriendo_Facil_Accommodation_Occupied_Admin',
 		'Arriendo_Facil_Cleaning_Service',
+		'Arriendo_Facil_Maintenance',
 		'Arriendo_Facil_Lease',
 		'Arriendo_Facil_Billing_Ledger',
 		'Arriendo_Facil_Rental_Workflow',

@@ -69,7 +69,135 @@ $rows = $wpdb->get_results(
 );
 
 $aging = Arriendo_Facil_Billing_Ledger::get_aging_report();
+
+// Estado de cuenta de un contrato concreto.
+$statement_lease_id = isset( $_GET['statement_lease'] ) ? absint( wp_unslash( $_GET['statement_lease'] ) ) : 0;
+$statement          = $statement_lease_id ? Arriendo_Facil_Billing_Ledger::get_statement_by_lease( $statement_lease_id ) : null;
+$statement_context  = null;
+
+if ( $statement_lease_id ) {
+	$statement_context = $wpdb->get_row(
+		$wpdb->prepare(
+			"SELECT l.id, l.start_date, l.end_date, l.monthly_rent,
+			        p.post_title AS accommodation_title,
+			        CONCAT(g.first_name, ' ', g.last_name) AS guest_name,
+			        g.email AS guest_email
+			 FROM {$leases_table} l
+			 LEFT JOIN {$wpdb->posts} p ON p.ID = l.accommodation_id
+			 LEFT JOIN {$guests_table} g ON g.id = l.guest_id
+			 WHERE l.id = %d",
+			$statement_lease_id
+		)
+	);
+}
 ?>
+<?php if ( $statement && $statement_context ) : ?>
+<div class="wrap af-shell">
+	<?php
+	af_page_header(
+		array(
+			'eyebrow'  => __( 'Cobranza', 'arriendo-facil' ),
+			'title'    => __( 'Estado de cuenta', 'arriendo-facil' ),
+			'subtitle' => sprintf(
+				/* translators: 1: property title, 2: tenant name */
+				__( '%1$s · %2$s', 'arriendo-facil' ),
+				$statement_context->accommodation_title,
+				$statement_context->guest_name
+			),
+			'actions'  => array(
+				sprintf(
+					'<a href="%s" class="button af-btn af-btn--ghost">%s</a>',
+					esc_url( admin_url( 'admin.php?page=af-collections' ) ),
+					esc_html__( '← Volver', 'arriendo-facil' )
+				),
+				sprintf(
+					'<button type="button" class="button af-btn af-btn--primary" onclick="window.print()">%s</button>',
+					esc_html__( 'Imprimir', 'arriendo-facil' )
+				),
+			),
+		)
+	);
+	?>
+
+	<div class="af-kpi-grid">
+		<article class="af-kpi">
+			<div class="af-kpi__head"><span class="af-kpi__label"><?php esc_html_e( 'Total facturado', 'arriendo-facil' ); ?></span></div>
+			<div class="af-kpi__value">$<?php echo esc_html( number_format_i18n( $statement['total_charged'], 2 ) ); ?></div>
+		</article>
+		<article class="af-kpi af-kpi--success">
+			<div class="af-kpi__head"><span class="af-kpi__label"><?php esc_html_e( 'Total pagado', 'arriendo-facil' ); ?></span></div>
+			<div class="af-kpi__value">$<?php echo esc_html( number_format_i18n( $statement['total_paid'], 2 ) ); ?></div>
+		</article>
+		<article class="af-kpi <?php echo $statement['balance'] > 0 ? 'af-kpi--attention' : 'af-kpi--success'; ?>">
+			<div class="af-kpi__head"><span class="af-kpi__label"><?php esc_html_e( 'Saldo', 'arriendo-facil' ); ?></span></div>
+			<div class="af-kpi__value">$<?php echo esc_html( number_format_i18n( $statement['balance'], 2 ) ); ?></div>
+		</article>
+	</div>
+
+	<section class="af-section">
+		<header class="af-section__header">
+			<div>
+				<h2 class="af-section__title"><?php esc_html_e( 'Movimientos', 'arriendo-facil' ); ?></h2>
+				<p class="af-section__subtitle">
+					<?php
+					echo esc_html(
+						sprintf(
+							/* translators: 1: start date, 2: end date */
+							__( 'Contrato del %1$s al %2$s', 'arriendo-facil' ),
+							$statement_context->start_date,
+							$statement_context->end_date
+						)
+					);
+					?>
+				</p>
+			</div>
+		</header>
+
+		<table class="wp-list-table widefat fixed striped af-data-table">
+			<thead>
+				<tr>
+					<th><?php esc_html_e( 'Periodo', 'arriendo-facil' ); ?></th>
+					<th><?php esc_html_e( 'Concepto', 'arriendo-facil' ); ?></th>
+					<th><?php esc_html_e( 'Vence', 'arriendo-facil' ); ?></th>
+					<th><?php esc_html_e( 'Monto', 'arriendo-facil' ); ?></th>
+					<th><?php esc_html_e( 'Pagado', 'arriendo-facil' ); ?></th>
+					<th><?php esc_html_e( 'Saldo', 'arriendo-facil' ); ?></th>
+					<th><?php esc_html_e( 'Estado', 'arriendo-facil' ); ?></th>
+				</tr>
+			</thead>
+			<tbody>
+				<?php if ( empty( $statement['charges'] ) ) : ?>
+					<tr><td colspan="7"><?php esc_html_e( 'Sin movimientos registrados.', 'arriendo-facil' ); ?></td></tr>
+				<?php else : ?>
+					<?php foreach ( $statement['charges'] as $movement ) : ?>
+						<?php
+						$movement_balance = round( (float) $movement->amount - (float) $movement->amount_paid, 2 );
+						$movement_pill    = 'af-pill--neutral';
+						if ( 'paid' === $movement->status ) {
+							$movement_pill = 'af-pill--success';
+						} elseif ( 'overdue' === $movement->status ) {
+							$movement_pill = 'af-pill--danger';
+						} elseif ( 'partial' === $movement->status ) {
+							$movement_pill = 'af-pill--warning';
+						}
+						?>
+						<tr>
+							<td data-label="<?php esc_attr_e( 'Periodo', 'arriendo-facil' ); ?>"><?php echo esc_html( $movement->period ); ?></td>
+							<td data-label="<?php esc_attr_e( 'Concepto', 'arriendo-facil' ); ?>"><?php echo esc_html( $charge_types[ $movement->charge_type ] ?? $movement->charge_type ); ?></td>
+							<td data-label="<?php esc_attr_e( 'Vence', 'arriendo-facil' ); ?>"><?php echo esc_html( (string) $movement->due_date ); ?></td>
+							<td data-label="<?php esc_attr_e( 'Monto', 'arriendo-facil' ); ?>">$<?php echo esc_html( number_format_i18n( (float) $movement->amount, 2 ) ); ?></td>
+							<td data-label="<?php esc_attr_e( 'Pagado', 'arriendo-facil' ); ?>">$<?php echo esc_html( number_format_i18n( (float) $movement->amount_paid, 2 ) ); ?></td>
+							<td data-label="<?php esc_attr_e( 'Saldo', 'arriendo-facil' ); ?>"><strong>$<?php echo esc_html( number_format_i18n( $movement_balance, 2 ) ); ?></strong></td>
+							<td data-label="<?php esc_attr_e( 'Estado', 'arriendo-facil' ); ?>"><span class="af-pill <?php echo esc_attr( $movement_pill ); ?>"><?php echo esc_html( $movement->status ); ?></span></td>
+						</tr>
+					<?php endforeach; ?>
+				<?php endif; ?>
+			</tbody>
+		</table>
+	</section>
+</div>
+<?php return; endif; ?>
+
 <div class="wrap af-shell">
 
 	<?php
@@ -197,8 +325,11 @@ $aging = Arriendo_Facil_Billing_Ledger::get_aging_report();
 										data-tenant="<?php echo esc_attr( trim( (string) $row->guest_name ) ? $row->guest_name : __( 'Sin inquilino', 'arriendo-facil' ) ); ?>">
 										<?php esc_html_e( 'Registrar pago', 'arriendo-facil' ); ?>
 									</button>
-								<?php else : ?>
-									&mdash;
+								<?php endif; ?>
+								<?php if ( ! empty( $row->lease_id ) ) : ?>
+									<a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=af-collections&statement_lease=' . (int) $row->lease_id ) ); ?>">
+										<?php esc_html_e( 'Estado de cuenta', 'arriendo-facil' ); ?>
+									</a>
 								<?php endif; ?>
 							</td>
 						</tr>

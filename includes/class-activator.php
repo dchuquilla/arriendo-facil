@@ -795,6 +795,34 @@ class Arriendo_Facil_Activator {
 			}
 		}
 
+		// Mantenimiento e incidencias: extiende las solicitudes de limpieza.
+		$cleaning_table   = $wpdb->prefix . 'af_cleaning_requests';
+		$cleaning_columns = array(
+			'request_type' => "ALTER TABLE {$cleaning_table} ADD COLUMN request_type VARCHAR(30) NOT NULL DEFAULT 'limpieza'",
+			'priority'     => "ALTER TABLE {$cleaning_table} ADD COLUMN priority VARCHAR(20) NOT NULL DEFAULT 'media'",
+			'cost'         => "ALTER TABLE {$cleaning_table} ADD COLUMN cost DECIMAL(12,2) NOT NULL DEFAULT 0.00",
+			'lease_id'     => "ALTER TABLE {$cleaning_table} ADD COLUMN lease_id BIGINT(20) UNSIGNED DEFAULT NULL",
+			'reported_by'  => "ALTER TABLE {$cleaning_table} ADD COLUMN reported_by VARCHAR(30) NOT NULL DEFAULT 'operador'",
+		);
+
+		foreach ( $cleaning_columns as $column_name => $alter_sql ) {
+			$column_exists = $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*)
+					 FROM INFORMATION_SCHEMA.COLUMNS
+					 WHERE TABLE_SCHEMA = %s
+					   AND TABLE_NAME = %s
+					   AND COLUMN_NAME = %s",
+					DB_NAME,
+					$cleaning_table,
+					$column_name
+				)
+			);
+			if ( ! (int) $column_exists ) {
+				$wpdb->query( $alter_sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			}
+		}
+
 		$reservations_table = $wpdb->prefix . 'af_reservations';
 		$reservation_status_exists = $wpdb->get_var(
 			$wpdb->prepare(

@@ -276,6 +276,14 @@ class Arriendo_Facil_Accommodation_Wizard {
 			'gallery_ids'   => array(),
 			'post_title'    => '',
 			'post_content'  => '',
+			'year_built'        => '',
+			'floor_number'      => '',
+			'total_floors'      => '',
+			'parking_spots'     => '',
+			'furnished'         => 'unfurnished',
+			'condition'         => 'good',
+			'hoa_fee'           => '',
+			'utilities_included' => array(),
 		);
 
 		$data = $defaults;
@@ -300,6 +308,21 @@ class Arriendo_Facil_Accommodation_Wizard {
 			$data['featured_id']   = (int) get_post_thumbnail_id( $post_id );
 			$gallery               = get_post_meta( $post_id, '_af_gallery', true );
 			$data['gallery_ids']   = is_array( $gallery ) ? array_values( array_filter( array_map( 'absint', $gallery ) ) ) : array();
+
+			$data['year_built']    = get_post_meta( $post_id, '_af_year_built', true );
+			$data['floor_number']  = get_post_meta( $post_id, '_af_floor_number', true );
+			$data['total_floors']  = get_post_meta( $post_id, '_af_total_floors', true );
+			$data['parking_spots'] = get_post_meta( $post_id, '_af_parking_spots', true );
+			$data['hoa_fee']       = get_post_meta( $post_id, '_af_hoa_fee', true );
+
+			$furnished             = get_post_meta( $post_id, '_af_furnished', true );
+			$data['furnished']     = $furnished ? $furnished : 'unfurnished';
+
+			$condition             = get_post_meta( $post_id, '_af_condition', true );
+			$data['condition']     = $condition ? $condition : 'good';
+
+			$utilities                    = get_post_meta( $post_id, '_af_utilities_included', true );
+			$data['utilities_included']   = is_array( $utilities ) ? $utilities : array();
 		}
 
 		$owner_options = $this->get_owner_user_options();
@@ -308,10 +331,46 @@ class Arriendo_Facil_Accommodation_Wizard {
 	}
 
 	/**
+	 * Points the selected unit at this accommodation and clears any previous link.
+	 * A unit holds at most one accommodation, so the old row must be released first.
+	 *
+	 * @param int $post_id Accommodation post ID.
+	 * @return void
+	 */
+	private function sync_unit_link( $post_id ) {
+		if ( ! isset( $_POST['af_unit_id'] ) || ! class_exists( 'Arriendo_Facil_Property_Structure' ) ) {
+			return;
+		}
+
+		global $wpdb;
+
+		$post_id = absint( $post_id );
+		$unit_id = absint( wp_unslash( $_POST['af_unit_id'] ) );
+		$table   = Arriendo_Facil_Property_Structure::units_table();
+
+		$wpdb->update(
+			$table,
+			array( 'accommodation_id' => null ),
+			array( 'accommodation_id' => $post_id ),
+			array( '%d' ),
+			array( '%d' )
+		);
+
+		if ( $unit_id ) {
+			$wpdb->update(
+				$table,
+				array( 'accommodation_id' => $post_id ),
+				array( 'id' => $unit_id ),
+				array( '%d' ),
+				array( '%d' )
+			);
+		}
+	}
+
+	/**
 	 * Handles wizard submissions through admin-post.php.
 	 */
-	public function handle_submit() {
-		if ( ! current_user_can( 'edit_posts' ) ) {
+	public function handle_submit() {		if ( ! current_user_can( 'edit_posts' ) ) {
 			wp_die( esc_html__( 'No tienes permisos.', 'arriendo-facil' ), 403 );
 		}
 		check_admin_referer( self::NONCE_ACTION, self::NONCE_NAME );
@@ -400,6 +459,8 @@ class Arriendo_Facil_Accommodation_Wizard {
 		} else {
 			delete_post_thumbnail( $post_id );
 		}
+
+		$this->sync_unit_link( $post_id );
 
 		$is_first_publish = ! $post_id_was_existing && 'draft' !== $form_action;
 

@@ -1720,3 +1720,71 @@ body.post-type-accommodation #titlediv {
 	border-left: 3px solid #00a32a;
 	color: #135e28;
 }
+
+/* =============================================================
+   Property documents meta box
+   ============================================================= */
+
+.af-documents-list {
+	list-style: none;
+	margin: 0 0 12px;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.af-documents-item {
+	position: relative;
+	padding: 10px 30px 10px 12px;
+	border: 1px solid #e5e7eb;
+	border-radius: 8px;
+	background: #fafafa;
+	font-size: 13px;
+	line-height: 1.4;
+}
+
+.af-documents-item__type {
+	display: block;
+	font-size: 11px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+	color: #646970;
+	margin-bottom: 2px;
+}
+
+.af-documents-item__expires {
+	display: block;
+	font-size: 11px;
+	color: #b32d2e;
+	margin-top: 2px;
+}
+
+.af-documents-item__remove {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	width: 20px;
+	height: 20px;
+	border: 0;
+	border-radius: 4px;
+	background: transparent;
+	color: #b32d2e;
+	cursor: pointer;
+	line-height: 1;
+}
+
+.af-documents-item__remove:hover {
+	background: #fcf0f1;
+}
+
+.af-documents-add {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.af-documents-add .af-input {
+	width: 100%;
+}

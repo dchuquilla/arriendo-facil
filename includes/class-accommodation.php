@@ -24,6 +24,7 @@ class Arriendo_Facil_Accommodation {
 		add_action( 'add_meta_boxes', array( $this, 'add_meta_boxes' ) );
 		add_action( 'save_post_accommodation', array( $this, 'save_meta' ) );
 		add_action( 'save_post_accommodation', array( $this, 'save_gallery_meta' ) );
+		add_action( 'save_post_accommodation', array( $this, 'save_documents_meta' ) );
 		add_filter( 'enter_title_here', array( $this, 'customize_title_placeholder' ), 10, 2 );
 		add_action( 'edit_form_after_title', array( $this, 'render_editor_intro' ) );
 		add_filter( 'admin_post_thumbnail_html', array( $this, 'customize_thumbnail_label' ), 10, 3 );
@@ -201,6 +202,93 @@ class Arriendo_Facil_Accommodation {
 			'normal',
 			'high'
 		);
+
+		add_meta_box(
+			'af_accommodation_documents',
+			__( 'Documentos del inmueble', 'arriendo-facil' ),
+			array( $this, 'render_documents_meta_box' ),
+			'accommodation',
+			'side',
+			'default'
+		);
+	}
+
+	/**
+	 * Legal and administrative document slots tracked per property.
+	 *
+	 * @return array<string,string>
+	 */
+	public static function document_types() {
+		return array(
+			'escritura'      => __( 'Escritura', 'arriendo-facil' ),
+			'predial'        => __( 'Impuesto predial', 'arriendo-facil' ),
+			'poliza'         => __( 'Póliza de seguro', 'arriendo-facil' ),
+			'reglamento'     => __( 'Reglamento interno', 'arriendo-facil' ),
+			'certificado'    => __( 'Certificado de gravamen', 'arriendo-facil' ),
+			'otro'           => __( 'Otro', 'arriendo-facil' ),
+		);
+	}
+
+	/**
+	 * Renders the property documents meta box.
+	 *
+	 * @param WP_Post $post Current post object.
+	 */
+	public function render_documents_meta_box( $post ) {
+		wp_nonce_field( 'af_save_accommodation_documents', 'af_documents_nonce' );
+
+		$documents = get_post_meta( $post->ID, '_af_documents', true );
+		if ( ! is_array( $documents ) ) {
+			$documents = array();
+		}
+
+		$document_types = self::document_types();
+
+		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/accommodation-documents.php';
+	}
+
+	/**
+	 * Saves the property documents meta.
+	 *
+	 * @param int $post_id Post ID.
+	 */
+	public function save_documents_meta( $post_id ) {
+		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+			return;
+		}
+		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+			return;
+		}
+		if ( ! isset( $_POST['af_documents_nonce'] ) ) {
+			return;
+		}
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['af_documents_nonce'] ) ), 'af_save_accommodation_documents' ) ) {
+			return;
+		}
+
+		$raw       = isset( $_POST['af_documents'] ) ? wp_unslash( $_POST['af_documents'] ) : '';
+		$decoded   = json_decode( (string) $raw, true );
+		$allowed   = array_keys( self::document_types() );
+		$sanitized = array();
+
+		if ( is_array( $decoded ) ) {
+			foreach ( $decoded as $entry ) {
+				if ( ! is_array( $entry ) || empty( $entry['attachment_id'] ) ) {
+					continue;
+				}
+
+				$type = isset( $entry['type'] ) ? sanitize_key( $entry['type'] ) : 'otro';
+
+				$sanitized[] = array(
+					'type'          => in_array( $type, $allowed, true ) ? $type : 'otro',
+					'attachment_id' => absint( $entry['attachment_id'] ),
+					'label'         => isset( $entry['label'] ) ? sanitize_text_field( $entry['label'] ) : '',
+					'expires_at'    => isset( $entry['expires_at'] ) ? sanitize_text_field( $entry['expires_at'] ) : '',
+				);
+			}
+		}
+
+		update_post_meta( $post_id, '_af_documents', $sanitized );
 	}
 
 	/**

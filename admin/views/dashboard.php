@@ -57,6 +57,63 @@ if ( $is_owner ) {
 
 $positive_rate = $review_count > 0 ? (int) round( $positive_reviews / $review_count * 100 ) : 0;
 
+// ── KPIs de administración (cobranza, mora, vencimientos, documentos) ─────
+$is_management_model = ! ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES );
+$current_period      = gmdate( 'Y-m' );
+$charges_table       = $wpdb->prefix . 'af_charges';
+$has_ledger          = class_exists( 'Arriendo_Facil_Billing_Ledger' );
+
+$period_charged = 0.0;
+$period_paid    = 0.0;
+$overdue_count  = 0;
+$overdue_amount = 0.0;
+$expiring_count = 0;
+$docs_pending   = 0;
+
+if ( $has_ledger ) {
+	$period_totals = $wpdb->get_row(
+		$wpdb->prepare(
+			"SELECT COALESCE(SUM(amount), 0) AS charged, COALESCE(SUM(amount_paid), 0) AS paid
+			 FROM {$charges_table}
+			 WHERE period = %s AND status != 'void'",
+			$current_period
+		)
+	);
+	$period_charged = isset( $period_totals->charged ) ? (float) $period_totals->charged : 0.0;
+	$period_paid    = isset( $period_totals->paid ) ? (float) $period_totals->paid : 0.0;
+
+	$overdue = $wpdb->get_row(
+		$wpdb->prepare(
+			"SELECT COUNT(*) AS total, COALESCE(SUM(amount - amount_paid), 0) AS balance
+			 FROM {$charges_table}
+			 WHERE status IN ('pending', 'partial', 'overdue') AND due_date < %s",
+			gmdate( 'Y-m-d' )
+		)
+	);
+	$overdue_count  = isset( $overdue->total ) ? (int) $overdue->total : 0;
+	$overdue_amount = isset( $overdue->balance ) ? (float) $overdue->balance : 0.0;
+}
+
+// Contratos que vencen en los próximos 60 días.
+$expiring_count = (int) $wpdb->get_var(
+	$wpdb->prepare(
+		"SELECT COUNT(*) FROM {$wpdb->prefix}af_leases
+		 WHERE status = 'active' AND deleted_at IS NULL
+		   AND end_date BETWEEN %s AND %s",
+		gmdate( 'Y-m-d' ),
+		gmdate( 'Y-m-d', strtotime( '+60 days' ) )
+	)
+);
+
+if ( class_exists( 'Arriendo_Facil_Document_Verification' ) ) {
+	$docs_pending = (int) $wpdb->get_var(
+		"SELECT COUNT(*) FROM {$wpdb->prefix}af_guests WHERE doc_status IS NULL OR doc_status = 'pendiente'"
+	);
+}
+
+$period_balance   = round( $period_charged - $period_paid, 2 );
+$collection_rate  = $period_charged > 0 ? (int) round( $period_paid / $period_charged * 100 ) : 0;
+
 // ── Owner property preview (top 6) ────────────────────────────────────────
 $owner_properties = array();
 if ( $is_owner && '' !== $ids_sql ) {
@@ -88,6 +145,31 @@ $today_str  = wp_date( 'l, j \d\e F' );
 
 // ── Tasks list ────────────────────────────────────────────────────────────
 $tasks = array();
+
+if ( $is_management_model ) {
+	if ( $overdue_count > 0 ) {
+		$tasks[] = array(
+			'label' => _n( 'cargo vencido por cobrar', 'cargos vencidos por cobrar', $overdue_count, 'arriendo-facil' ),
+			'count' => $overdue_count,
+			'url'   => admin_url( 'admin.php?page=af-collections&charge_status=overdue' ),
+		);
+	}
+	if ( $docs_pending > 0 ) {
+		$tasks[] = array(
+			'label' => _n( 'inquilino con documentos por verificar', 'inquilinos con documentos por verificar', $docs_pending, 'arriendo-facil' ),
+			'count' => $docs_pending,
+			'url'   => admin_url( 'admin.php?page=af-guests' ),
+		);
+	}
+	if ( $expiring_count > 0 ) {
+		$tasks[] = array(
+			'label' => _n( 'contrato por vencer en 60 días', 'contratos por vencer en 60 días', $expiring_count, 'arriendo-facil' ),
+			'count' => $expiring_count,
+			'url'   => admin_url( 'admin.php?page=af-leases' ),
+		);
+	}
+}
+
 if ( $draft_leases > 0 ) {
 	$tasks[] = array(
 		'label' => _n( 'contrato en borrador por revisar', 'contratos en borrador por revisar', $draft_leases, 'arriendo-facil' ),
@@ -102,7 +184,7 @@ if ( $pending_cleaning > 0 ) {
 		'url'   => admin_url( 'admin.php?page=af-cleaning-requests' ),
 	);
 }
-if ( $pending_queue > 0 ) {
+if ( $pending_queue > 0 && ! $is_management_model ) {
 	$tasks[] = array(
 		'label' => _n( 'huésped interesado por aprobar', 'huéspedes interesados por aprobar', $pending_queue, 'arriendo-facil' ),
 		'count' => $pending_queue,
@@ -132,7 +214,9 @@ if ( $pending_queue > 0 ) {
 				echo esc_html(
 					$is_owner
 						? __( 'Un resumen rápido de tus propiedades y todo lo que necesita tu atención.', 'arriendo-facil' )
-						: __( 'Panel de operaciones — el pulso de Arriendo Fácil en un vistazo.', 'arriendo-facil' )
+						: ( $is_management_model
+							? __( 'Cobranza, mora y vencimientos de la operación en un vistazo.', 'arriendo-facil' )
+							: __( 'Panel de operaciones — el pulso de Arriendo Fácil en un vistazo.', 'arriendo-facil' ) )
 				);
 				?>
 			</p>
@@ -180,6 +264,73 @@ if ( $pending_queue > 0 ) {
 	<?php endif; ?>
 
 	<div class="af-kpi-grid" role="list">
+
+		<?php if ( $is_management_model ) : ?>
+			<article class="af-kpi af-kpi--success" role="listitem">
+				<div class="af-kpi__head">
+					<span class="af-kpi__label"><?php esc_html_e( 'Cobrado este mes', 'arriendo-facil' ); ?></span>
+				</div>
+				<div class="af-kpi__value">$<?php echo esc_html( number_format_i18n( $period_paid, 2 ) ); ?></div>
+				<div class="af-kpi__hint">
+					<?php
+					echo esc_html(
+						sprintf(
+							/* translators: %s: total charged for the period */
+							__( 'de $%s facturados', 'arriendo-facil' ),
+							number_format_i18n( $period_charged, 2 )
+						)
+					);
+					?>
+				</div>
+				<div class="af-kpi__footer">
+					<span class="af-pill <?php echo $collection_rate >= 80 ? 'af-pill--success' : 'af-pill--warning'; ?>"><?php echo esc_html( $collection_rate ); ?>%</span>
+					<a class="af-kpi__link" href="<?php echo esc_url( admin_url( 'admin.php?page=af-collections' ) ); ?>"><?php esc_html_e( 'Ver cobranza', 'arriendo-facil' ); ?></a>
+				</div>
+			</article>
+
+			<article class="af-kpi <?php echo $period_balance > 0 ? 'af-kpi--attention' : ''; ?>" role="listitem">
+				<div class="af-kpi__head">
+					<span class="af-kpi__label"><?php esc_html_e( 'Por cobrar', 'arriendo-facil' ); ?></span>
+				</div>
+				<div class="af-kpi__value">$<?php echo esc_html( number_format_i18n( $period_balance, 2 ) ); ?></div>
+				<div class="af-kpi__hint"><?php esc_html_e( 'Saldo del periodo actual', 'arriendo-facil' ); ?></div>
+				<div class="af-kpi__footer">
+					<span class="af-pill af-pill--info"><?php echo esc_html( $current_period ); ?></span>
+				</div>
+			</article>
+
+			<article class="af-kpi <?php echo $overdue_count > 0 ? 'af-kpi--attention' : 'af-kpi--success'; ?>" role="listitem">
+				<div class="af-kpi__head">
+					<span class="af-kpi__label"><?php esc_html_e( 'En mora', 'arriendo-facil' ); ?></span>
+				</div>
+				<div class="af-kpi__value">$<?php echo esc_html( number_format_i18n( $overdue_amount, 2 ) ); ?></div>
+				<div class="af-kpi__hint">
+					<?php
+					echo esc_html(
+						sprintf(
+							/* translators: %d: overdue charges count */
+							_n( '%d cargo vencido', '%d cargos vencidos', $overdue_count, 'arriendo-facil' ),
+							$overdue_count
+						)
+					);
+					?>
+				</div>
+				<div class="af-kpi__footer">
+					<a class="af-kpi__link" href="<?php echo esc_url( admin_url( 'admin.php?page=af-collections&charge_status=overdue' ) ); ?>"><?php esc_html_e( 'Gestionar', 'arriendo-facil' ); ?></a>
+				</div>
+			</article>
+
+			<article class="af-kpi <?php echo $expiring_count > 0 ? 'af-kpi--attention' : ''; ?>" role="listitem">
+				<div class="af-kpi__head">
+					<span class="af-kpi__label"><?php esc_html_e( 'Contratos por vencer', 'arriendo-facil' ); ?></span>
+				</div>
+				<div class="af-kpi__value"><?php echo esc_html( number_format_i18n( $expiring_count ) ); ?></div>
+				<div class="af-kpi__hint"><?php esc_html_e( 'En los próximos 60 días', 'arriendo-facil' ); ?></div>
+				<div class="af-kpi__footer">
+					<a class="af-kpi__link" href="<?php echo esc_url( admin_url( 'admin.php?page=af-leases' ) ); ?>"><?php esc_html_e( 'Ver contratos', 'arriendo-facil' ); ?></a>
+				</div>
+			</article>
+		<?php endif; ?>
 
 		<article class="af-kpi" role="listitem">
 			<div class="af-kpi__head">
@@ -336,13 +487,23 @@ if ( $pending_queue > 0 ) {
 			<div class="af-kpi__value"><?php echo esc_html( number_format_i18n( $guest_count ) ); ?></div>
 			<div class="af-kpi__hint">
 				<?php
-				echo esc_html(
-					sprintf(
-						/* translators: %d: pending queue */
-						_n( '%d en cola', '%d en cola', $pending_queue, 'arriendo-facil' ),
-						$pending_queue
-					)
-				);
+				if ( $is_management_model ) {
+					echo esc_html(
+						sprintf(
+							/* translators: %d: tenants with pending documents */
+							_n( '%d con documentos pendientes', '%d con documentos pendientes', $docs_pending, 'arriendo-facil' ),
+							$docs_pending
+						)
+					);
+				} else {
+					echo esc_html(
+						sprintf(
+							/* translators: %d: pending queue */
+							_n( '%d en cola', '%d en cola', $pending_queue, 'arriendo-facil' ),
+							$pending_queue
+						)
+					);
+				}
 				?>
 			</div>
 			<div class="af-kpi__footer">

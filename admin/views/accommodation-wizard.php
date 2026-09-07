@@ -51,8 +51,11 @@ $steps = array(
 	4 => array( 'title' => __( 'Fotos', 'arriendo-facil' ),            'icon' => '&#x1F4F7;' ),
 	5 => array( 'title' => __( 'Precio y propietario', 'arriendo-facil' ), 'icon' => '&#x1F4B0;' ),
 	6 => array( 'title' => __( 'Resumen y publicar', 'arriendo-facil' ),   'icon' => '&#x1F4DD;' ),
-	7 => array( 'title' => __( 'Sincronización OTA', 'arriendo-facil' ),   'icon' => '&#x1F4F1;' ),
 );
+
+if ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) {
+	$steps[7] = array( 'title' => __( 'Sincronización OTA', 'arriendo-facil' ), 'icon' => '&#x1F4F1;' );
+}
 
 $wizard_class = 'af-wizard af-wizard--' . esc_attr( $mode );
 $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data['featured_id'], 'medium' ) : '';
@@ -287,6 +290,88 @@ $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data[
 						placeholder="<?php esc_attr_e( 'Describe el inmueble: ambiente, entorno, qué lo hace especial...', 'arriendo-facil' ); ?>"><?php echo esc_textarea( $data['post_content'] ); ?></textarea>
 					<p class="af-field__hint"><?php esc_html_e( 'Esta descripción se mostrará en la publicación del inmueble.', 'arriendo-facil' ); ?></p>
 				</div>
+
+				<div class="af-field-group af-field-group--three-col" style="margin-top:20px;">
+					<div class="af-field">
+						<label class="af-field__label" for="af_year_built"><?php esc_html_e( 'Año de construcción', 'arriendo-facil' ); ?></label>
+						<input type="number" id="af_year_built" name="af_year_built" min="1900" max="<?php echo esc_attr( gmdate( 'Y' ) + 1 ); ?>"
+							value="<?php echo esc_attr( (string) ( $data['year_built'] ?? '' ) ); ?>" class="af-input af-input--full" />
+					</div>
+					<div class="af-field">
+						<label class="af-field__label" for="af_floor_number"><?php esc_html_e( 'Piso', 'arriendo-facil' ); ?></label>
+						<input type="number" id="af_floor_number" name="af_floor_number" min="0" max="200"
+							value="<?php echo esc_attr( (string) ( $data['floor_number'] ?? '' ) ); ?>" class="af-input af-input--full" />
+					</div>
+					<div class="af-field">
+						<label class="af-field__label" for="af_total_floors"><?php esc_html_e( 'Pisos del edificio', 'arriendo-facil' ); ?></label>
+						<input type="number" id="af_total_floors" name="af_total_floors" min="0" max="200"
+							value="<?php echo esc_attr( (string) ( $data['total_floors'] ?? '' ) ); ?>" class="af-input af-input--full" />
+					</div>
+					<div class="af-field">
+						<label class="af-field__label" for="af_parking_spots"><?php esc_html_e( 'Parqueaderos', 'arriendo-facil' ); ?></label>
+						<input type="number" id="af_parking_spots" name="af_parking_spots" min="0" max="20"
+							value="<?php echo esc_attr( (string) ( $data['parking_spots'] ?? '' ) ); ?>" class="af-input af-input--full" />
+					</div>
+					<div class="af-field">
+						<label class="af-field__label" for="af_furnished"><?php esc_html_e( 'Amoblado', 'arriendo-facil' ); ?></label>
+						<select id="af_furnished" name="af_furnished" class="af-input af-input--select">
+							<?php
+							$furnished_options = array(
+								'unfurnished' => __( 'Sin amoblar', 'arriendo-facil' ),
+								'semi'        => __( 'Semi-amoblado', 'arriendo-facil' ),
+								'furnished'   => __( 'Amoblado', 'arriendo-facil' ),
+							);
+							foreach ( $furnished_options as $f_value => $f_label ) :
+								?>
+								<option value="<?php echo esc_attr( $f_value ); ?>" <?php selected( $data['furnished'] ?? '', $f_value ); ?>><?php echo esc_html( $f_label ); ?></option>
+							<?php endforeach; ?>
+						</select>
+					</div>
+					<div class="af-field">
+						<label class="af-field__label" for="af_condition"><?php esc_html_e( 'Estado general', 'arriendo-facil' ); ?></label>
+						<select id="af_condition" name="af_condition" class="af-input af-input--select">
+							<?php
+							$condition_options = array(
+								'new'          => __( 'Nuevo', 'arriendo-facil' ),
+								'very_good'    => __( 'Muy bueno', 'arriendo-facil' ),
+								'good'         => __( 'Bueno', 'arriendo-facil' ),
+								'needs_repair' => __( 'A remodelar', 'arriendo-facil' ),
+							);
+							foreach ( $condition_options as $c_value => $c_label ) :
+								?>
+								<option value="<?php echo esc_attr( $c_value ); ?>" <?php selected( $data['condition'] ?? '', $c_value ); ?>><?php echo esc_html( $c_label ); ?></option>
+							<?php endforeach; ?>
+						</select>
+					</div>
+					<div class="af-field">
+						<label class="af-field__label" for="af_hoa_fee"><?php esc_html_e( 'Alícuota mensual (USD)', 'arriendo-facil' ); ?></label>
+						<input type="number" id="af_hoa_fee" name="af_hoa_fee" step="0.01" min="0"
+							value="<?php echo esc_attr( (string) ( $data['hoa_fee'] ?? '' ) ); ?>" class="af-input af-input--full" placeholder="0.00" />
+					</div>
+				</div>
+
+				<div class="af-field" style="margin-top:16px;">
+					<label class="af-field__label"><?php esc_html_e( 'Servicios incluidos en el arriendo', 'arriendo-facil' ); ?></label>
+					<div class="af-amenities-grid">
+						<?php
+						$utilities_options  = array(
+							'water'    => __( 'Agua', 'arriendo-facil' ),
+							'electric' => __( 'Luz', 'arriendo-facil' ),
+							'internet' => __( 'Internet', 'arriendo-facil' ),
+							'gas'      => __( 'Gas', 'arriendo-facil' ),
+						);
+						$utilities_selected = isset( $data['utilities_included'] ) && is_array( $data['utilities_included'] ) ? $data['utilities_included'] : array();
+						foreach ( $utilities_options as $u_value => $u_label ) :
+							$u_checked = in_array( $u_value, $utilities_selected, true );
+							?>
+							<label class="af-amenity-chip <?php echo $u_checked ? 'is-selected' : ''; ?>">
+								<input type="checkbox" name="af_utilities_included[]" value="<?php echo esc_attr( $u_value ); ?>" <?php checked( $u_checked ); ?> />
+								<span class="af-amenity-chip__label"><?php echo esc_html( $u_label ); ?></span>
+							</label>
+						<?php endforeach; ?>
+					</div>
+					<p class="af-field__hint"><?php esc_html_e( 'Lo que no marques se cobrará aparte al inquilino.', 'arriendo-facil' ); ?></p>
+				</div>
 			</section>
 
 			<!-- ============ PASO 4: FOTOS ============ -->
@@ -414,6 +499,46 @@ $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data[
 						</select>
 					<?php endif; ?>
 				</div>
+
+				<?php
+				// Vinculo con la unidad: necesario para prorratear alicuotas y generar cargos.
+				if ( class_exists( 'Arriendo_Facil_Property_Structure' ) && ! $is_owner_user ) :
+					global $wpdb;
+					$wizard_buildings = (array) $wpdb->get_results(
+						'SELECT id, name FROM ' . Arriendo_Facil_Property_Structure::buildings_table() . " WHERE status = 'active' ORDER BY name ASC"
+					);
+					$linked_unit      = $post_id ? Arriendo_Facil_Property_Structure::get_unit_by_accommodation( $post_id ) : null;
+					?>
+					<div class="af-field">
+						<label class="af-field__label" for="af_unit_id"><?php esc_html_e( 'Unidad del edificio', 'arriendo-facil' ); ?></label>
+						<?php if ( empty( $wizard_buildings ) ) : ?>
+							<p class="af-field__hint">
+								<?php
+								printf(
+									/* translators: %s: link to the buildings admin page */
+									esc_html__( 'Aún no hay edificios registrados. %s para poder prorratear alícuotas.', 'arriendo-facil' ),
+									'<a href="' . esc_url( admin_url( 'admin.php?page=af-buildings' ) ) . '">' . esc_html__( 'Crea uno primero', 'arriendo-facil' ) . '</a>'
+								);
+								?>
+							</p>
+						<?php else : ?>
+							<select id="af_unit_id" name="af_unit_id" class="af-input af-input--select">
+								<option value="0"><?php esc_html_e( '— Sin unidad asignada —', 'arriendo-facil' ); ?></option>
+								<?php foreach ( $wizard_buildings as $wizard_building ) : ?>
+									<optgroup label="<?php echo esc_attr( $wizard_building->name ); ?>">
+										<?php foreach ( Arriendo_Facil_Property_Structure::get_units_by_building( (int) $wizard_building->id ) as $wizard_unit ) : ?>
+											<option value="<?php echo esc_attr( (int) $wizard_unit->id ); ?>" <?php selected( $linked_unit && (int) $linked_unit->id === (int) $wizard_unit->id ); ?>>
+												<?php echo esc_html( $wizard_unit->unit_code ); ?>
+												(<?php echo esc_html( number_format_i18n( (float) $wizard_unit->hoa_coefficient, 2 ) ); ?>%)
+											</option>
+										<?php endforeach; ?>
+									</optgroup>
+								<?php endforeach; ?>
+							</select>
+							<p class="af-field__hint"><?php esc_html_e( 'Sin unidad asignada no se generará la alícuota mensual de este inmueble.', 'arriendo-facil' ); ?></p>
+						<?php endif; ?>
+					</div>
+				<?php endif; ?>
 			</section>
 
 			<!-- ============ PASO 6: RESUMEN ============ -->
@@ -504,6 +629,7 @@ $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data[
 			</section>
 
 			<!-- PASO 7: SINCRONIZACIÓN OTA -->
+			<?php if ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) : ?>
 			<section class="af-wizard__step" data-step="7">
 				<h2 class="af-wizard__step-title">
 					<span class="af-wizard__step-icon" aria-hidden="true">&#x1F4F1;</span>
@@ -624,8 +750,7 @@ $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data[
 						</p>
 					</div>
 				</div>
-			</section>
-
+			</section>			<?php endif; ?>
 			<!-- Sticky action bar -->
 			<div class="af-wizard__actions">
 				<div class="af-wizard__actions-left">

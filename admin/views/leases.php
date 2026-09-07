@@ -124,6 +124,142 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 	);
 	?>
 
+	<?php
+	$lease_accommodations = get_posts(
+		array(
+			'post_type'      => 'accommodation',
+			'post_status'    => array( 'publish', 'draft', 'private' ),
+			'posts_per_page' => 200,
+			'orderby'        => 'title',
+			'order'          => 'ASC',
+		)
+	);
+	$lease_guests = $wpdb->get_results(
+		"SELECT id, first_name, last_name, email FROM {$wpdb->prefix}af_guests ORDER BY first_name ASC LIMIT 300"
+	);
+	?>
+
+	<div id="af-lease-form-card" class="af-section" style="padding: var(--af-space-5); margin-bottom: var(--af-space-4); display:none;">
+		<h2 class="af-section__title" style="margin-top:0;"><?php esc_html_e( 'Nuevo contrato', 'arriendo-facil' ); ?></h2>
+		<p class="af-modal__hint" style="margin:0 0 16px;">
+			<?php esc_html_e( 'Registra un contrato ya acordado. El canon y la alícuota se generarán automáticamente cada mes en Control de pagos.', 'arriendo-facil' ); ?>
+		</p>
+		<p class="af-modal__status" id="af-lease-status"></p>
+
+		<form id="af-lease-form" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:14px; align-items:end;">
+			<label>
+				<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Inmueble', 'arriendo-facil' ); ?> *</span>
+				<select name="accommodation_id" required style="width:100%;">
+					<option value=""><?php esc_html_e( '— Seleccionar —', 'arriendo-facil' ); ?></option>
+					<?php foreach ( $lease_accommodations as $lease_accommodation ) : ?>
+						<option value="<?php echo esc_attr( (int) $lease_accommodation->ID ); ?>"
+							data-rent="<?php echo esc_attr( (string) get_post_meta( $lease_accommodation->ID, '_af_monthly_rent', true ) ); ?>">
+							<?php echo esc_html( $lease_accommodation->post_title ); ?>
+						</option>
+					<?php endforeach; ?>
+				</select>
+			</label>
+
+			<label>
+				<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Inquilino', 'arriendo-facil' ); ?> *</span>
+				<select name="guest_id" required style="width:100%;">
+					<option value=""><?php esc_html_e( '— Seleccionar —', 'arriendo-facil' ); ?></option>
+					<?php foreach ( (array) $lease_guests as $lease_guest ) : ?>
+						<option value="<?php echo esc_attr( (int) $lease_guest->id ); ?>">
+							<?php echo esc_html( trim( $lease_guest->first_name . ' ' . $lease_guest->last_name ) ); ?>
+						</option>
+					<?php endforeach; ?>
+				</select>
+				<span class="af-modal__hint" style="display:block;">
+					<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-guests' ) ); ?>"><?php esc_html_e( 'Registrar inquilino', 'arriendo-facil' ); ?></a>
+				</span>
+			</label>
+
+			<label>
+				<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Inicio', 'arriendo-facil' ); ?> *</span>
+				<input type="date" name="start_date" required style="width:100%;" />
+			</label>
+
+			<label>
+				<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Fin', 'arriendo-facil' ); ?> *</span>
+				<input type="date" name="end_date" required style="width:100%;" />
+			</label>
+
+			<label>
+				<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Canon mensual (USD)', 'arriendo-facil' ); ?> *</span>
+				<input type="number" name="monthly_rent" step="0.01" min="0" required style="width:100%;" placeholder="0.00" />
+			</label>
+
+			<div style="display:flex; gap:8px;">
+				<button type="submit" class="button button-primary"><?php esc_html_e( 'Crear contrato', 'arriendo-facil' ); ?></button>
+				<button type="button" class="button" id="af-lease-cancel"><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
+			</div>
+		</form>
+	</div>
+
+	<script>
+	(function () {
+		const card = document.getElementById('af-lease-form-card');
+		const form = document.getElementById('af-lease-form');
+		const status = document.getElementById('af-lease-status');
+		const openBtn = document.getElementById('af-new-lease');
+		const cancelBtn = document.getElementById('af-lease-cancel');
+		if (!card || !form || !openBtn) { return; }
+
+		const ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
+		const nonce = <?php echo wp_json_encode( wp_create_nonce( 'af_lease_nonce' ) ); ?>;
+
+		openBtn.addEventListener('click', function () {
+			card.style.display = card.style.display === 'none' ? 'block' : 'none';
+			if (card.style.display === 'block') { card.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+		});
+
+		cancelBtn.addEventListener('click', function () { card.style.display = 'none'; });
+
+		// Prefill rent from the selected property so the operator doesn't retype it.
+		form.accommodation_id.addEventListener('change', function () {
+			const opt = this.options[this.selectedIndex];
+			const rent = opt ? opt.getAttribute('data-rent') : '';
+			if (rent && !form.monthly_rent.value) { form.monthly_rent.value = parseFloat(rent).toFixed(2); }
+		});
+
+		form.addEventListener('submit', function (e) {
+			e.preventDefault();
+
+			if (form.end_date.value <= form.start_date.value) {
+				status.textContent = <?php echo wp_json_encode( __( 'La fecha de fin debe ser posterior al inicio.', 'arriendo-facil' ) ); ?>;
+				status.className = 'af-modal__status is-error';
+				return;
+			}
+
+			const btn = form.querySelector('button[type="submit"]');
+			btn.disabled = true;
+			status.textContent = '';
+			status.className = 'af-modal__status';
+
+			const body = new URLSearchParams(new FormData(form));
+			body.append('action', 'af_create_lease');
+			body.append('nonce', nonce);
+
+			fetch(ajaxUrl, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+				body: body
+			}).then((r) => r.json()).then(function (json) {
+				btn.disabled = false;
+				if (!json || !json.success) {
+					status.textContent = (json && json.data && json.data.message) || 'Error';
+					status.className = 'af-modal__status is-error';
+					return;
+				}
+				status.textContent = <?php echo wp_json_encode( __( 'Contrato creado correctamente.', 'arriendo-facil' ) ); ?>;
+				status.className = 'af-modal__status is-success';
+				setTimeout(function () { window.location.reload(); }, 800);
+			});
+		});
+	}());
+	</script>
+
 	<section class="af-section" aria-labelledby="af-leases-title">
 		<header class="af-section__header">
 			<div>

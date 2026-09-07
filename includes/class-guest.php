@@ -2206,28 +2206,31 @@ class Arriendo_Facil_Guest {
 			wp_send_json_error( array( 'message' => __( 'ID de alojamiento invalido.', 'arriendo-facil' ) ) );
 		}
 
-		if ( ! $referencia_personal_1 || ! $referencia_personal_2 ) {
-			wp_send_json_error( array( 'message' => __( 'Please provide at least two personal references.', 'arriendo-facil' ) ) );
-		}
-
 		if ( ! is_email( $email ) ) {
 			wp_send_json_error( array( 'message' => __( 'Correo electronico invalido.', 'arriendo-facil' ) ) );
 		}
 
 		if ( 1 !== preg_match( '/^[0-9]{1,10}$/', $phone ) ) {
-			wp_send_json_error( array( 'message' => __( 'Phone must contain only numbers with a maximum of 10 digits.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'El telefono debe contener solo numeros, maximo 10 digitos.', 'arriendo-facil' ) ) );
 		}
 
-		if ( 1 !== preg_match( '/^[0-9]{1,10}$/', $id_number ) ) {
-			wp_send_json_error( array( 'message' => __( 'ID (National ID or Passport) must contain only numbers with a maximum of 10 digits.', 'arriendo-facil' ) ) );
+		if ( 1 !== preg_match( '/^[0-9]{10,13}$/', $id_number ) ) {
+			wp_send_json_error( array( 'message' => __( 'La cedula debe tener 10 digitos y el RUC 13.', 'arriendo-facil' ) ) );
 		}
 
-		if ( $mascotas < 1 || $mascotas > 10 ) {
-			wp_send_json_error( array( 'message' => __( 'Pets must be between 1 and 10.', 'arriendo-facil' ) ) );
-		}
+		// El perfil extendido lo completa el inquilino por enlace con token, no el operador.
+		if ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) {
+			if ( ! $referencia_personal_1 || ! $referencia_personal_2 ) {
+				wp_send_json_error( array( 'message' => __( 'Indica al menos dos referencias personales.', 'arriendo-facil' ) ) );
+			}
 
-		if ( $personas_viviran < 1 || $personas_viviran > 10 ) {
-			wp_send_json_error( array( 'message' => __( 'How many people will live in or enter the property? must be between 1 and 10.', 'arriendo-facil' ) ) );
+			if ( $mascotas < 1 || $mascotas > 10 ) {
+				wp_send_json_error( array( 'message' => __( 'Mascotas debe estar entre 1 y 10.', 'arriendo-facil' ) ) );
+			}
+
+			if ( $personas_viviran < 1 || $personas_viviran > 10 ) {
+				wp_send_json_error( array( 'message' => __( 'El numero de personas debe estar entre 1 y 10.', 'arriendo-facil' ) ) );
+			}
 		}
 
 		$schema_result = $this->ensure_guest_extra_columns();

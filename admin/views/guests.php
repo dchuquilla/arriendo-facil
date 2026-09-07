@@ -224,12 +224,12 @@ if ( $is_owner ) {
 	af_page_header(
 		array(
 			'eyebrow'  => __( 'Personas', 'arriendo-facil' ),
-			'title'    => __( 'Huéspedes', 'arriendo-facil' ),
-			'subtitle' => __( 'Interesados en cola, huéspedes activos y perfiles de scoring. Aprueba solicitudes y comparte formularios de perfil legal.', 'arriendo-facil' ),
+			'title'    => __( 'Inquilinos', 'arriendo-facil' ),
+			'subtitle' => __( 'Inquilinos bajo administración. Regístralos, envíales el formulario para que completen su perfil y verifica sus documentos.', 'arriendo-facil' ),
 			'actions'  => array(
 				sprintf(
 					'<button type="button" class="button af-btn af-btn--primary" id="af-new-guest"><span class="af-btn__icon" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>%s</button>',
-					esc_html__( 'Nuevo huésped', 'arriendo-facil' )
+					esc_html__( 'Nuevo inquilino', 'arriendo-facil' )
 				),
 			),
 		)
@@ -243,67 +243,86 @@ if ( $is_owner ) {
 	<?php endif; ?>
 
 	<div id="af-guest-form-card" class="card" style="max-width: 900px; margin: 16px 0; padding: 16px; display: none;">
-		<h2><?php esc_html_e( 'Nuevo huesped', 'arriendo-facil' ); ?></h2>
+		<h2><?php esc_html_e( 'Nuevo inquilino', 'arriendo-facil' ); ?></h2>
+		<p class="af-modal__hint" style="margin:0 0 16px;">
+			<?php esc_html_e( 'Registra solo los datos de contacto. El resto de la información y los documentos los completa el inquilino desde el enlace seguro que le enviarás después.', 'arriendo-facil' ); ?>
+		</p>
 		<form id="af-guest-form" method="post" action="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>" enctype="multipart/form-data">
 			<input type="hidden" name="action" value="af_create_guest" />
 			<input type="hidden" name="nonce" value="<?php echo esc_attr( wp_create_nonce( 'af_guest_nonce' ) ); ?>" />
 
 			<table class="form-table" role="presentation">
 				<tr>
-					<th scope="row"><label for="af_guest_id_number"><?php esc_html_e( 'ID (National ID or Passport)*', 'arriendo-facil' ); ?></label></th>
-					<td><input type="text" required id="af_guest_id_number" name="id_number" class="regular-text" inputmode="numeric" pattern="^[0-9]{1,10}$" maxlength="10" title="Use only numbers (max 10)" /></td>
-				</tr>
-				<tr>
-					<th scope="row"><label for="af_guest_name"><?php esc_html_e( 'Name*', 'arriendo-facil' ); ?></label></th>
-					<td><input type="text" required id="af_guest_name" name="name" class="regular-text" /></td>
-				</tr>
-				<tr>
-					<th scope="row"><label for="af_guest_email"><?php esc_html_e( 'Email*', 'arriendo-facil' ); ?></label></th>
-					<td><input type="email" required id="af_guest_email" name="email" class="regular-text" /></td>
-				</tr>
-				<tr>
-					<th scope="row"><label for="af_guest_phone"><?php esc_html_e( 'Contact*', 'arriendo-facil' ); ?></label></th>
-					<td><input type="text" required id="af_guest_phone" name="phone" class="regular-text" inputmode="numeric" pattern="^[0-9]{1,10}$" maxlength="10" title="Use only numbers (max 10)" /></td>
-				</tr>
-				<tr>
-					<th scope="row"><label for="af_guest_mascotas"><?php esc_html_e( 'Pets (1 to 10)*', 'arriendo-facil' ); ?></label></th>
-					<td><input type="number" required id="af_guest_mascotas" name="mascotas" class="small-text" min="1" max="10" step="1" /></td>
-				</tr>
-				<tr>
-					<th scope="row"><label for="af_guest_referencia_1"><?php esc_html_e( 'Personal References (min 2)*', 'arriendo-facil' ); ?></label></th>
+					<th scope="row"><label for="af_guest_name"><?php esc_html_e( 'Nombre completo', 'arriendo-facil' ); ?> *</label></th>
 					<td>
-						<input type="text" required id="af_guest_referencia_1" name="referencia_personal_1" class="regular-text" placeholder="Personal reference 1" style="margin-bottom:8px;" />
-						<br />
-						<input type="text" required id="af_guest_referencia_2" name="referencia_personal_2" class="regular-text" placeholder="Personal reference 2" />
+						<input type="text" required id="af_guest_name" name="name" class="regular-text" placeholder="<?php esc_attr_e( 'Nombres y apellidos', 'arriendo-facil' ); ?>" />
 					</td>
 				</tr>
 				<tr>
-					<th scope="row"><label for="af_guest_personas_viviran"><?php esc_html_e( 'How many people will live in or enter the property?*', 'arriendo-facil' ); ?></label></th>
+					<th scope="row"><label for="af_guest_id_number"><?php esc_html_e( 'Cédula / RUC', 'arriendo-facil' ); ?> *</label></th>
 					<td>
-						<select id="af_guest_personas_viviran" name="personas_viviran" required>
-							<option value="">--</option>
-							<?php for ( $i = 1; $i <= 10; $i++ ) : ?>
-								<option value="<?php echo esc_attr( (string) $i ); ?>"><?php echo esc_html( (string) $i ); ?></option>
-							<?php endfor; ?>
-						</select>
+						<input type="text" required id="af_guest_id_number" name="id_number" class="regular-text" inputmode="numeric" pattern="^[0-9]{10,13}$" maxlength="13" title="<?php esc_attr_e( 'Solo números (10 dígitos para cédula, 13 para RUC)', 'arriendo-facil' ); ?>" />
+						<p class="description"><?php esc_html_e( 'Se valida contra el documento que suba el inquilino.', 'arriendo-facil' ); ?></p>
 					</td>
 				</tr>
 				<tr>
-					<th scope="row"><label for="af_guest_garantia_alicuota_pdf"><?php esc_html_e( 'Guarantee and HOA Fee (PDF)', 'arriendo-facil' ); ?></label></th>
-					<td><input type="file" id="af_guest_garantia_alicuota_pdf" name="guest_garantia_alicuota_pdf" class="regular-text" accept="application/pdf,.pdf" /></td>
+					<th scope="row"><label for="af_guest_email"><?php esc_html_e( 'Email', 'arriendo-facil' ); ?> *</label></th>
+					<td>
+						<input type="email" required id="af_guest_email" name="email" class="regular-text" />
+						<p class="description"><?php esc_html_e( 'A este correo se enviará el enlace para completar el perfil.', 'arriendo-facil' ); ?></p>
+					</td>
 				</tr>
 				<tr>
-					<th scope="row"><label for="af_guest_cedula_papeleta_pdf"><?php esc_html_e( 'National ID and Voting Certificate (PDF)', 'arriendo-facil' ); ?></label></th>
-					<td><input type="file" id="af_guest_cedula_papeleta_pdf" name="guest_cedula_papeleta_pdf" class="regular-text" accept="application/pdf,.pdf" /></td>
-				</tr>
-				<tr>
-					<th scope="row"><label for="af_guest_certificado_bancario_pdf"><?php esc_html_e( 'Bank Certificate (PDF)', 'arriendo-facil' ); ?></label></th>
-					<td><input type="file" id="af_guest_certificado_bancario_pdf" name="guest_certificado_bancario_pdf" class="regular-text" accept="application/pdf,.pdf" /></td>
+					<th scope="row"><label for="af_guest_phone"><?php esc_html_e( 'Teléfono', 'arriendo-facil' ); ?> *</label></th>
+					<td>
+						<input type="text" required id="af_guest_phone" name="phone" class="regular-text" inputmode="numeric" pattern="^[0-9]{10}$" maxlength="10" title="<?php esc_attr_e( 'Solo números (10 dígitos)', 'arriendo-facil' ); ?>" />
+					</td>
 				</tr>
 			</table>
 
+			<?php if ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) : ?>
+				<!-- Campos extendidos del modelo anterior: hoy los completa el inquilino por token. -->
+				<table class="form-table" role="presentation">
+					<tr>
+						<th scope="row"><label for="af_guest_mascotas"><?php esc_html_e( 'Mascotas (1 a 10)', 'arriendo-facil' ); ?></label></th>
+						<td><input type="number" id="af_guest_mascotas" name="mascotas" class="small-text" min="1" max="10" step="1" /></td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="af_guest_referencia_1"><?php esc_html_e( 'Referencias personales', 'arriendo-facil' ); ?></label></th>
+						<td>
+							<input type="text" id="af_guest_referencia_1" name="referencia_personal_1" class="regular-text" placeholder="<?php esc_attr_e( 'Referencia 1', 'arriendo-facil' ); ?>" style="margin-bottom:8px;" />
+							<br />
+							<input type="text" id="af_guest_referencia_2" name="referencia_personal_2" class="regular-text" placeholder="<?php esc_attr_e( 'Referencia 2', 'arriendo-facil' ); ?>" />
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="af_guest_personas_viviran"><?php esc_html_e( 'Personas que vivirán en el inmueble', 'arriendo-facil' ); ?></label></th>
+						<td>
+							<select id="af_guest_personas_viviran" name="personas_viviran">
+								<option value="">--</option>
+								<?php for ( $i = 1; $i <= 10; $i++ ) : ?>
+									<option value="<?php echo esc_attr( (string) $i ); ?>"><?php echo esc_html( (string) $i ); ?></option>
+								<?php endfor; ?>
+							</select>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="af_guest_garantia_alicuota_pdf"><?php esc_html_e( 'Garantía y alícuota (PDF)', 'arriendo-facil' ); ?></label></th>
+						<td><input type="file" id="af_guest_garantia_alicuota_pdf" name="guest_garantia_alicuota_pdf" class="regular-text" accept="application/pdf,.pdf" /></td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="af_guest_cedula_papeleta_pdf"><?php esc_html_e( 'Cédula y papeleta (PDF)', 'arriendo-facil' ); ?></label></th>
+						<td><input type="file" id="af_guest_cedula_papeleta_pdf" name="guest_cedula_papeleta_pdf" class="regular-text" accept="application/pdf,.pdf" /></td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="af_guest_certificado_bancario_pdf"><?php esc_html_e( 'Certificado bancario (PDF)', 'arriendo-facil' ); ?></label></th>
+						<td><input type="file" id="af_guest_certificado_bancario_pdf" name="guest_certificado_bancario_pdf" class="regular-text" accept="application/pdf,.pdf" /></td>
+					</tr>
+				</table>
+			<?php endif; ?>
+
 			<p class="submit">
-				<button type="submit" class="button button-primary"><?php esc_html_e( 'Guardar huesped', 'arriendo-facil' ); ?></button>
+				<button type="submit" class="button button-primary"><?php esc_html_e( 'Guardar y continuar', 'arriendo-facil' ); ?></button>
 				<button type="button" class="button" id="af-cancel-new-guest"><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
 			</p>
 		</form>
@@ -324,27 +343,32 @@ if ( $is_owner ) {
 	?>
 
 	<div class="af-tabs af-guest-tabs">
-		<input type="radio" name="af-guest-tab" id="af-tab-visits" class="af-tabs__radio" <?php echo ( $pending_visits > 0 || 0 === $guest_count_page ) ? 'checked' : ''; ?> />
-		<input type="radio" name="af-guest-tab" id="af-tab-guests" class="af-tabs__radio" <?php echo ( 0 === $pending_visits && $guest_count_page > 0 ) ? 'checked' : ''; ?> />
+		<?php $show_visits_tab = defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES; ?>
+		<?php if ( $show_visits_tab ) : ?>
+			<input type="radio" name="af-guest-tab" id="af-tab-visits" class="af-tabs__radio" <?php echo ( $pending_visits > 0 || 0 === $guest_count_page ) ? 'checked' : ''; ?> />
+		<?php endif; ?>
+		<input type="radio" name="af-guest-tab" id="af-tab-guests" class="af-tabs__radio" <?php echo ( ! $show_visits_tab || ( 0 === $pending_visits && $guest_count_page > 0 ) ) ? 'checked' : ''; ?> />
 
-		<div class="af-tabs__nav" role="tablist" aria-label="<?php esc_attr_e( 'Vista de huéspedes', 'arriendo-facil' ); ?>">
-			<label for="af-tab-visits" class="af-tabs__tab af-tabs__tab--visits" role="tab">
-				<span class="af-tabs__icon" aria-hidden="true">
-					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v4M16 2v4M3 10h18M5 6h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-				</span>
-				<span class="af-tabs__label"><?php esc_html_e( 'Solicitudes de visita', 'arriendo-facil' ); ?></span>
-				<?php if ( $pending_visits > 0 ) : ?>
-					<span class="af-tabs__badge af-tabs__badge--attention"><?php echo esc_html( number_format_i18n( $pending_visits ) ); ?></span>
-				<?php elseif ( $visit_count > 0 ) : ?>
-					<span class="af-tabs__badge"><?php echo esc_html( number_format_i18n( $visit_count ) ); ?></span>
-				<?php endif; ?>
-			</label>
+		<div class="af-tabs__nav" role="tablist" aria-label="<?php esc_attr_e( 'Vista de inquilinos', 'arriendo-facil' ); ?>">
+			<?php if ( $show_visits_tab ) : ?>
+				<label for="af-tab-visits" class="af-tabs__tab af-tabs__tab--visits" role="tab">
+					<span class="af-tabs__icon" aria-hidden="true">
+						<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v4M16 2v4M3 10h18M5 6h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+					</span>
+					<span class="af-tabs__label"><?php esc_html_e( 'Solicitudes de visita', 'arriendo-facil' ); ?></span>
+					<?php if ( $pending_visits > 0 ) : ?>
+						<span class="af-tabs__badge af-tabs__badge--attention"><?php echo esc_html( number_format_i18n( $pending_visits ) ); ?></span>
+					<?php elseif ( $visit_count > 0 ) : ?>
+						<span class="af-tabs__badge"><?php echo esc_html( number_format_i18n( $visit_count ) ); ?></span>
+					<?php endif; ?>
+				</label>
+			<?php endif; ?>
 
 			<label for="af-tab-guests" class="af-tabs__tab af-tabs__tab--guests" role="tab">
 				<span class="af-tabs__icon" aria-hidden="true">
 					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
 				</span>
-				<span class="af-tabs__label"><?php esc_html_e( 'Huéspedes registrados', 'arriendo-facil' ); ?></span>
+				<span class="af-tabs__label"><?php esc_html_e( 'Inquilinos registrados', 'arriendo-facil' ); ?></span>
 				<?php if ( $guest_count_page > 0 ) : ?>
 					<span class="af-tabs__badge"><?php echo esc_html( number_format_i18n( $guest_count_page ) ); ?></span>
 				<?php endif; ?>
@@ -353,6 +377,7 @@ if ( $is_owner ) {
 
 		<div class="af-tabs__panels">
 
+			<?php if ( $show_visits_tab ) : ?>
 			<section class="af-tabs__panel af-tabs__panel--visits" role="tabpanel" aria-labelledby="af-tab-visits">
 				<div class="af-section af-section--visits">
 					<header class="af-section__head">
@@ -454,6 +479,7 @@ if ( $is_owner ) {
 					<?php endif; ?>
 				</div>
 			</section>
+			<?php endif; ?>
 
 			<section class="af-tabs__panel af-tabs__panel--guests" role="tabpanel" aria-labelledby="af-tab-guests">
 				<div class="af-section af-section--guests">

@@ -75,6 +75,30 @@ $list_query = "
 
 $rows = $wpdb->get_results( $wpdb->prepare( $list_query, $where_args ) );
 
+$is_management_model = ! ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES );
+$criteria_labels     = Arriendo_Facil_Review::owner_to_tenant_criteria();
+
+// Contratos vigentes o terminados que aún no tienen calificación del administrador.
+$pending_leases = array();
+if ( $is_management_model ) {
+	$pending_leases = (array) $wpdb->get_results(
+		"SELECT l.id, l.start_date, l.end_date, l.status,
+		        p.post_title AS accommodation_title,
+		        CONCAT(g.first_name, ' ', g.last_name) AS guest_name
+		 FROM {$wpdb->prefix}af_leases l
+		 LEFT JOIN {$wpdb->posts} p ON p.ID = l.accommodation_id
+		 LEFT JOIN {$wpdb->prefix}af_guests g ON g.id = l.guest_id
+		 LEFT JOIN {$review_table} r
+		        ON r.lease_id = l.id
+		       AND r.review_direction = 'owner_to_tenant'
+		       AND r.status = 'completed'
+		 WHERE l.deleted_at IS NULL
+		   AND l.status IN ('active', 'terminated')
+		   AND r.id IS NULL
+		 ORDER BY l.end_date ASC
+		 LIMIT 100"
+	);
+}
 ?>
 <div class="wrap af-shell">
 
@@ -82,12 +106,74 @@ $rows = $wpdb->get_results( $wpdb->prepare( $list_query, $where_args ) );
 	af_page_header(
 		array(
 			'eyebrow'  => __( 'Reputación', 'arriendo-facil' ),
-			'title'    => __( 'Valoraciones', 'arriendo-facil' ),
-			'subtitle' => __( 'Resumen de reseñas de huéspedes y propietarios. Filtra por dirección para analizar tendencias.', 'arriendo-facil' ),
+			'title'    => __( 'Calificación de inquilinos', 'arriendo-facil' ),
+			'subtitle' => __( 'Evalúa el comportamiento de cada inquilino: pago, cuidado del inmueble, convivencia y comunicación.', 'arriendo-facil' ),
 		)
 	);
 	?>
 
+	<?php if ( $is_management_model && ! empty( $pending_leases ) ) : ?>
+		<section class="af-section" style="margin-bottom: var(--af-space-4);">
+			<header class="af-section__header">
+				<div>
+					<h2 class="af-section__title"><?php esc_html_e( 'Pendientes de calificar', 'arriendo-facil' ); ?></h2>
+					<p class="af-section__subtitle"><?php esc_html_e( 'La puntualidad de pago se sugiere automáticamente desde el historial de cobranza.', 'arriendo-facil' ); ?></p>
+				</div>
+			</header>
+
+			<table class="wp-list-table widefat fixed striped af-data-table">
+				<thead>
+					<tr>
+						<th><?php esc_html_e( 'Inmueble', 'arriendo-facil' ); ?></th>
+						<th><?php esc_html_e( 'Inquilino', 'arriendo-facil' ); ?></th>
+						<th><?php esc_html_e( 'Vigencia', 'arriendo-facil' ); ?></th>
+						<th><?php esc_html_e( 'Historial de pago', 'arriendo-facil' ); ?></th>
+						<th><?php esc_html_e( 'Acción', 'arriendo-facil' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+					<?php foreach ( $pending_leases as $pending_lease ) : ?>
+						<?php $payment_hint = Arriendo_Facil_Review::suggest_payment_score( (int) $pending_lease->id ); ?>
+						<tr>
+							<td data-label="<?php esc_attr_e( 'Inmueble', 'arriendo-facil' ); ?>"><?php echo esc_html( $pending_lease->accommodation_title ? $pending_lease->accommodation_title : '—' ); ?></td>
+							<td data-label="<?php esc_attr_e( 'Inquilino', 'arriendo-facil' ); ?>"><strong><?php echo esc_html( trim( (string) $pending_lease->guest_name ) ); ?></strong></td>
+							<td data-label="<?php esc_attr_e( 'Vigencia', 'arriendo-facil' ); ?>">
+								<?php echo esc_html( $pending_lease->start_date . ' → ' . $pending_lease->end_date ); ?>
+							</td>
+							<td data-label="<?php esc_attr_e( 'Historial de pago', 'arriendo-facil' ); ?>">
+								<?php if ( $payment_hint ) : ?>
+									<span class="af-pill <?php echo $payment_hint['score'] >= 4 ? 'af-pill--success' : ( $payment_hint['score'] >= 3 ? 'af-pill--warning' : 'af-pill--danger' ); ?>">
+										<?php
+										echo esc_html(
+											sprintf(
+												/* translators: 1: on-time payments, 2: total charges */
+												__( '%1$d de %2$d a tiempo', 'arriendo-facil' ),
+												$payment_hint['on_time'],
+												$payment_hint['total']
+											)
+										);
+										?>
+									</span>
+								<?php else : ?>
+									<span class="af-td-meta"><?php esc_html_e( 'Sin historial suficiente', 'arriendo-facil' ); ?></span>
+								<?php endif; ?>
+							</td>
+							<td data-label="<?php esc_attr_e( 'Acción', 'arriendo-facil' ); ?>">
+								<button type="button" class="button button-primary af-rate-tenant"
+									data-lease="<?php echo esc_attr( (int) $pending_lease->id ); ?>"
+									data-tenant="<?php echo esc_attr( trim( (string) $pending_lease->guest_name ) ); ?>"
+									data-suggested="<?php echo esc_attr( $payment_hint ? $payment_hint['score'] : 0 ); ?>">
+									<?php esc_html_e( 'Calificar', 'arriendo-facil' ); ?>
+								</button>
+							</td>
+						</tr>
+					<?php endforeach; ?>
+				</tbody>
+			</table>
+		</section>
+	<?php endif; ?>
+
+	<?php if ( ! $is_management_model ) : ?>
 	<form method="get" class="af-section" style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; padding: var(--af-space-4) var(--af-space-5); margin-bottom: var(--af-space-4);">
 		<input type="hidden" name="page" value="af-reviews" />
 		<label style="display:flex; align-items:center; gap:8px; font-weight:600; color: var(--af-gray-700);">
@@ -102,6 +188,7 @@ $rows = $wpdb->get_results( $wpdb->prepare( $list_query, $where_args ) );
 		<button type="submit" class="button af-btn af-btn--primary"><?php esc_html_e( 'Filtrar', 'arriendo-facil' ); ?></button>
 		<a class="button af-btn af-btn--ghost" href="<?php echo esc_url( admin_url( 'admin.php?page=af-reviews' ) ); ?>"><?php esc_html_e( 'Limpiar', 'arriendo-facil' ); ?></a>
 	</form>
+	<?php endif; ?>
 
 	<div class="af-kpi-grid">
 
@@ -210,3 +297,129 @@ $rows = $wpdb->get_results( $wpdb->prepare( $list_query, $where_args ) );
 	</table>
 	</section>
 </div>
+
+<?php if ( $is_management_model ) : ?>
+<div class="af-modal" id="af-modal-rate" role="dialog" aria-modal="true" aria-labelledby="af-modal-rate-title">
+	<div class="af-modal__backdrop" data-af-modal-close></div>
+	<div class="af-modal__dialog">
+		<button type="button" class="af-modal__close" data-af-modal-close aria-label="<?php esc_attr_e( 'Cerrar', 'arriendo-facil' ); ?>">&times;</button>
+		<div class="af-modal__header">
+			<h2 class="af-modal__title" id="af-modal-rate-title"><?php esc_html_e( 'Calificar inquilino', 'arriendo-facil' ); ?></h2>
+			<p class="af-modal__subtitle" id="af-rate-subtitle"></p>
+		</div>
+		<div class="af-modal__body">
+			<p class="af-modal__status" id="af-rate-status"></p>
+
+			<?php foreach ( $criteria_labels as $criterion_key => $criterion_label ) : ?>
+				<div class="af-modal__field">
+					<label>
+						<?php echo esc_html( $criterion_label ); ?>
+						<?php if ( 'puntualidad_pago' === $criterion_key ) : ?>
+							<span class="af-modal__hint" id="af-rate-suggested" style="display:none;"></span>
+						<?php endif; ?>
+					</label>
+					<div style="display:flex; gap:12px; flex-wrap:wrap;">
+						<?php for ( $star = 1; $star <= 5; $star++ ) : ?>
+							<label style="display:flex; align-items:center; gap:5px;">
+								<input type="radio" name="af_rate_<?php echo esc_attr( $criterion_key ); ?>" value="<?php echo esc_attr( $star ); ?>" <?php checked( 5 === $star ); ?> />
+								<span><?php echo esc_html( $star ); ?>★</span>
+							</label>
+						<?php endfor; ?>
+					</div>
+				</div>
+			<?php endforeach; ?>
+
+			<div class="af-modal__field">
+				<label for="af-rate-comment"><?php esc_html_e( 'Observaciones', 'arriendo-facil' ); ?></label>
+				<textarea id="af-rate-comment" rows="3" placeholder="<?php esc_attr_e( 'Ej: pagó puntual todo el contrato, entregó el inmueble en buen estado.', 'arriendo-facil' ); ?>"></textarea>
+			</div>
+		</div>
+		<div class="af-modal__footer">
+			<button type="button" class="button" data-af-modal-close><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
+			<button type="button" class="button button-primary" id="af-rate-confirm"><?php esc_html_e( 'Guardar calificación', 'arriendo-facil' ); ?></button>
+		</div>
+	</div>
+</div>
+
+<script>
+(function () {
+	const modal = document.getElementById('af-modal-rate');
+	if (!modal) { return; }
+
+	const ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
+	const nonce = <?php echo wp_json_encode( wp_create_nonce( 'af_rate_tenant_nonce' ) ); ?>;
+	const criteria = <?php echo wp_json_encode( array_keys( $criteria_labels ) ); ?>;
+
+	const status = document.getElementById('af-rate-status');
+	const subtitle = document.getElementById('af-rate-subtitle');
+	const suggested = document.getElementById('af-rate-suggested');
+	const comment = document.getElementById('af-rate-comment');
+	const confirm = document.getElementById('af-rate-confirm');
+	let leaseId = 0;
+
+	modal.querySelectorAll('[data-af-modal-close]').forEach(function (btn) {
+		btn.addEventListener('click', function () { modal.classList.remove('is-open'); });
+	});
+
+	document.addEventListener('keydown', function (e) {
+		if (e.key === 'Escape') { modal.classList.remove('is-open'); }
+	});
+
+	document.querySelectorAll('.af-rate-tenant').forEach(function (btn) {
+		btn.addEventListener('click', function () {
+			leaseId = btn.getAttribute('data-lease');
+			subtitle.textContent = btn.getAttribute('data-tenant');
+			comment.value = '';
+			status.textContent = '';
+			status.className = 'af-modal__status';
+
+			// Preselect the punctuality score derived from the ledger.
+			const score = parseInt(btn.getAttribute('data-suggested'), 10);
+			if (score >= 1 && score <= 5) {
+				const input = modal.querySelector('input[name="af_rate_puntualidad_pago"][value="' + score + '"]');
+				if (input) { input.checked = true; }
+				suggested.textContent = <?php echo wp_json_encode( __( '— sugerido desde el historial de cobranza', 'arriendo-facil' ) ); ?>;
+				suggested.style.display = 'inline';
+			} else {
+				suggested.style.display = 'none';
+			}
+
+			modal.classList.add('is-open');
+		});
+	});
+
+	confirm.addEventListener('click', function () {
+		confirm.disabled = true;
+		status.textContent = '';
+		status.className = 'af-modal__status';
+
+		const body = new URLSearchParams();
+		body.append('action', 'af_rate_tenant');
+		body.append('nonce', nonce);
+		body.append('lease_id', leaseId);
+		body.append('comment', comment.value);
+
+		criteria.forEach(function (key) {
+			const checked = modal.querySelector('input[name="af_rate_' + key + '"]:checked');
+			body.append(key, checked ? checked.value : '0');
+		});
+
+		fetch(ajaxUrl, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+			body: body
+		}).then((r) => r.json()).then(function (json) {
+			confirm.disabled = false;
+			if (!json || !json.success) {
+				status.textContent = (json && json.data && json.data.message) || 'Error';
+				status.className = 'af-modal__status is-error';
+				return;
+			}
+			status.textContent = json.data.message;
+			status.className = 'af-modal__status is-success';
+			setTimeout(function () { window.location.reload(); }, 800);
+		});
+	});
+}());
+</script>
+<?php endif; ?>

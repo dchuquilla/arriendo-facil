@@ -29,6 +29,7 @@ class Arriendo_Facil_Review {
 		add_action( 'wp_ajax_nopriv_af_request_new_review_link', array( $this, 'ajax_request_new_review_link' ) );
 		add_action( 'wp_ajax_af_tenant_request_review_link', array( $this, 'ajax_tenant_request_review_link' ) );
 		add_action( 'wp_ajax_af_generate_review_test_link', array( $this, 'ajax_generate_review_test_link' ) );
+		add_action( 'wp_ajax_af_rate_tenant', array( $this, 'ajax_rate_tenant' ) );
 		add_shortcode( 'af_review_form', array( $this, 'render_review_form_shortcode' ) );
 
 		// Estadisticas publicas de la propiedad: solo aplican al catalogo del marketplace.
@@ -37,6 +38,35 @@ class Arriendo_Facil_Review {
 			add_filter( 'the_content', array( $this, 'append_public_stats_to_single_accommodation' ), 30 );
 			add_filter( 'elementor/frontend/the_content', array( $this, 'append_public_stats_to_single_accommodation' ), 30 );
 		}
+	}
+
+	/**
+	 * AJAX: records the administrator's evaluation of a tenant from the panel.
+	 *
+	 * @return void
+	 */
+	public function ajax_rate_tenant() {
+		check_ajax_referer( 'af_rate_tenant_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$lease_id = isset( $_POST['lease_id'] ) ? absint( wp_unslash( $_POST['lease_id'] ) ) : 0;
+		$comment  = isset( $_POST['comment'] ) ? sanitize_textarea_field( wp_unslash( $_POST['comment'] ) ) : '';
+
+		$scores = array();
+		foreach ( array_keys( self::owner_to_tenant_criteria() ) as $criterion ) {
+			$scores[ $criterion ] = isset( $_POST[ $criterion ] ) ? absint( wp_unslash( $_POST[ $criterion ] ) ) : 0;
+		}
+
+		$result = self::rate_tenant_directly( $lease_id, $scores, $comment );
+
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ), 400 );
+		}
+
+		wp_send_json_success( array( 'message' => __( 'Calificación registrada.', 'arriendo-facil' ) ) );
 	}
 
 	/**
@@ -109,6 +139,199 @@ class Arriendo_Facil_Review {
 			'convivencia'      => __( 'Convivencia / comportamiento', 'arriendo-facil' ),
 			'comunicacion'     => __( 'Comunicación', 'arriendo-facil' ),
 		);
+	}
+
+	/**
+	 * Derives a 1-5 payment punctuality score from the lease ledger.
+	 * Returns null when there is not enough history to judge.
+	 *
+	 * @param int $lease_id Lease ID.
+	 * @return array{score:int,on_time:int,late:int,total:int}|null
+	 */
+	public static function suggest_payment_score( $lease_id ) {
+		global $wpdb;
+
+		$lease_id = absint( $lease_id );
+		if ( ! $lease_id || ! class_exists( 'Arriendo_Facil_Billing_Ledger' ) ) {
+			return null;
+		}
+
+		$charges_table = Arriendo_Facil_Billing_Ledger::charges_table();
+		$payments_table = Arriendo_Facil_Billing_Ledger::payments_table();
+
+		// A charge counts as on time when its last payment landed on or before the due date.
+		$rows = (array) $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT c.id, c.due_date, c.status, MAX(p.payment_date) AS last_payment
+				 FROM {$charges_table} c
+				 LEFT JOIN {$payments_table} p ON p.charge_id = c.id
+				 WHERE c.lease_id = %d AND c.status != 'void'
+				 GROUP BY c.id, c.due_date, c.status",
+				$lease_id
+			)
+		);
+
+		if ( count( $rows ) < 2 ) {
+			return null;
+		}
+
+		$on_time = 0;
+		$late    = 0;
+
+		foreach ( $rows as $row ) {
+			if ( 'paid' !== $row->status ) {
+				$late++;
+				continue;
+			}
+
+			if ( $row->last_payment && strtotime( $row->last_payment ) <= strtotime( $row->due_date ) ) {
+				$on_time++;
+			} else {
+				$late++;
+			}
+		}
+
+		$total = $on_time + $late;
+		if ( ! $total ) {
+			return null;
+		}
+
+		$ratio = $on_time / $total;
+
+		if ( $ratio >= 0.95 ) {
+			$score = 5;
+		} elseif ( $ratio >= 0.85 ) {
+			$score = 4;
+		} elseif ( $ratio >= 0.70 ) {
+			$score = 3;
+		} elseif ( $ratio >= 0.50 ) {
+			$score = 2;
+		} else {
+			$score = 1;
+		}
+
+		return array(
+			'score'   => $score,
+			'on_time' => $on_time,
+			'late'    => $late,
+			'total'   => $total,
+		);
+	}
+
+	/**
+	 * Records the administrator's evaluation of a tenant without the tokenized
+	 * email flow. In the management model the operator rates from the panel.
+	 *
+	 * @param int    $lease_id        Lease ID.
+	 * @param array  $criteria_scores Map of criterion => 1-5 score.
+	 * @param string $comment         Optional comment.
+	 * @return int|WP_Error Review ID.
+	 */
+	public static function rate_tenant_directly( $lease_id, array $criteria_scores, $comment = '' ) {
+		global $wpdb;
+
+		$lease_id = absint( $lease_id );
+		if ( ! $lease_id ) {
+			return new WP_Error( 'af_review_lease_invalid', __( 'Contrato invalido.', 'arriendo-facil' ) );
+		}
+
+		$allowed = self::owner_to_tenant_criteria();
+		$scores  = array();
+
+		foreach ( $allowed as $criterion => $label ) {
+			$value = isset( $criteria_scores[ $criterion ] ) ? absint( $criteria_scores[ $criterion ] ) : 0;
+			if ( $value < 1 || $value > 5 ) {
+				return new WP_Error(
+					'af_review_criteria_incomplete',
+					sprintf(
+						/* translators: %s: criterion label */
+						__( 'Falta calificar: %s', 'arriendo-facil' ),
+						$label
+					)
+				);
+			}
+			$scores[ $criterion ] = $value;
+		}
+
+		$instance = new self();
+		$context  = $instance->resolve_lease_review_context( $lease_id );
+		if ( is_wp_error( $context ) ) {
+			return $context;
+		}
+
+		$group_id = $instance->find_group_id_by_lease_and_reviewer( $lease_id, 'owner' );
+		if ( ! $group_id ) {
+			$group_id = self::create_review_group(
+				$lease_id,
+				$context['accommodation_id'],
+				$context['owner_user_id'],
+				$context['tenant_user_id'],
+				$context['tenant_email'],
+				'owner',
+				gmdate( 'Y-m-d H:i:s' )
+			);
+
+			if ( is_wp_error( $group_id ) ) {
+				return $group_id;
+			}
+
+			$instance->create_reviews_for_group(
+				(int) $group_id,
+				$lease_id,
+				$context['accommodation_id'],
+				$context['owner_user_id'],
+				$context['tenant_user_id'],
+				$context['tenant_email'],
+				array( 'owner_to_tenant' )
+			);
+		}
+
+		$review_id = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				'SELECT id FROM ' . self::reviews_table() . ' WHERE lease_id = %d AND review_direction = %s LIMIT 1',
+				$lease_id,
+				'owner_to_tenant'
+			)
+		);
+
+		if ( ! $review_id ) {
+			return new WP_Error( 'af_review_row_missing', __( 'No se encontro la fila de calificacion.', 'arriendo-facil' ) );
+		}
+
+		$stars = (int) round( array_sum( $scores ) / count( $scores ) );
+		$now   = current_time( 'mysql', true );
+
+		$data   = array(
+			'stars'        => $stars,
+			'status'       => 'completed',
+			'submitted_at' => $now,
+		);
+		$format = array( '%d', '%s', '%s' );
+
+		if ( $instance->reviews_comment_column_exists() ) {
+			$data['comment_text'] = sanitize_textarea_field( (string) $comment );
+			$format[]             = '%s';
+		}
+
+		if ( $instance->reviews_criteria_column_exists() ) {
+			$data['criteria_scores'] = wp_json_encode( $scores );
+			$format[]                = '%s';
+		}
+
+		$wpdb->update( self::reviews_table(), $data, array( 'id' => $review_id ), $format, array( '%d' ) );
+
+		$wpdb->update(
+			self::groups_table(),
+			array(
+				'status'       => 'completed',
+				'completed_at' => $now,
+			),
+			array( 'id' => (int) $group_id ),
+			array( '%s', '%s' ),
+			array( '%d' )
+		);
+
+		return $review_id;
 	}
 
 	/**
@@ -432,6 +655,13 @@ class Arriendo_Facil_Review {
 
 		$processed = 0;
 		foreach ( $groups as $group ) {
+			// En el modelo de administracion el operador califica desde el panel,
+			// no por enlace enviado al propietario.
+			if ( 'owner' === sanitize_key( (string) $group->reviewer_type )
+				&& ! ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) ) {
+				continue;
+			}
+
 			$processed += $this->dispatch_single_group( $group ) ? 1 : 0;
 		}
 

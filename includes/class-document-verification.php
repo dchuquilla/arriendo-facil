@@ -23,6 +23,72 @@ class Arriendo_Facil_Document_Verification {
 	 */
 	public function __construct() {
 		add_action( 'wp_ajax_af_set_document_status', array( $this, 'ajax_set_document_status' ) );
+		add_action( 'wp_ajax_af_download_guest_document', array( $this, 'ajax_download_guest_document' ) );
+	}
+
+	/**
+	 * Lists uploaded document rows for a guest (no sensitive data, just metadata).
+	 *
+	 * @param int $guest_id Guest ID.
+	 * @return array<int,object>
+	 */
+	public static function get_guest_documents( $guest_id ) {
+		global $wpdb;
+
+		$guest_id = absint( $guest_id );
+		if ( ! $guest_id ) {
+			return array();
+		}
+
+		return (array) $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT id, doc_type, storage, mime_type, file_size, created_at
+				 FROM {$wpdb->prefix}af_guest_documents
+				 WHERE guest_id = %d
+				 ORDER BY created_at DESC",
+				$guest_id
+			)
+		);
+	}
+
+	/**
+	 * AJAX: issues a short-lived download link for a guest document.
+	 * Requires manage_options — identity documents are never publicly linkable.
+	 *
+	 * @return void
+	 */
+	public function ajax_download_guest_document() {
+		check_ajax_referer( 'af_document_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		global $wpdb;
+		$document_id = isset( $_POST['document_id'] ) ? absint( wp_unslash( $_POST['document_id'] ) ) : 0;
+
+		$document = $document_id ? $wpdb->get_row(
+			$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}af_guest_documents WHERE id = %d", $document_id )
+		) : null;
+
+		if ( ! $document ) {
+			wp_send_json_error( array( 'message' => __( 'Documento no encontrado.', 'arriendo-facil' ) ), 404 );
+		}
+
+		if ( 'r2' === $document->storage ) {
+			$url = Arriendo_Facil_Private_Storage::presigned_get_url( $document->object_key, 300 );
+			if ( is_wp_error( $url ) ) {
+				wp_send_json_error( array( 'message' => $url->get_error_message() ), 500 );
+			}
+			wp_send_json_success( array( 'url' => $url, 'expires_in' => 300 ) );
+		}
+
+		// Fallback local: el archivo vive en la libreria de medios publica de WP.
+		$url = wp_get_attachment_url( absint( $document->object_key ) );
+		if ( ! $url ) {
+			wp_send_json_error( array( 'message' => __( 'No se pudo resolver el archivo.', 'arriendo-facil' ) ), 404 );
+		}
+		wp_send_json_success( array( 'url' => $url, 'expires_in' => 0 ) );
 	}
 
 	/**

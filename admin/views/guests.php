@@ -549,6 +549,18 @@ if ( $is_owner ) {
 										<?php elseif ( 'no_match' === $identity_status ) : ?>
 											<span class="af-td-meta" style="color:#b32d2e;" title="<?php esc_attr_e( 'La cédula declarada NO aparece en el texto del documento subido. Revisa manualmente antes de aprobar.', 'arriendo-facil' ); ?>">⚠ <?php esc_html_e( 'no coincide, revisar', 'arriendo-facil' ); ?></span>
 										<?php endif; ?>
+										<?php if ( current_user_can( 'manage_options' ) && class_exists( 'Arriendo_Facil_Document_Verification' ) ) : ?>
+											<?php $guest_docs = Arriendo_Facil_Document_Verification::get_guest_documents( $guest->id ); ?>
+											<?php if ( ! empty( $guest_docs ) ) : ?>
+												<div class="af-guest-docs">
+													<?php foreach ( $guest_docs as $guest_doc ) : ?>
+														<button type="button" class="af-guest-doc-view" data-document="<?php echo esc_attr( (int) $guest_doc->id ); ?>">
+															<?php echo esc_html( ucfirst( str_replace( '_', ' ', $guest_doc->doc_type ) ) ); ?>
+														</button>
+													<?php endforeach; ?>
+												</div>
+											<?php endif; ?>
+										<?php endif; ?>
 									</td>
 									<?php if ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) : ?>
 										<td data-label="<?php esc_attr_e( 'AI Score', 'arriendo-facil' ); ?>">
@@ -824,6 +836,25 @@ if ( $is_owner ) {
 			}
 			setStatus(verifyStatus, json.data.message, 'success');
 			setTimeout(function () { window.location.reload(); }, 900);
+		});
+	});
+
+	// ---- Ver documento (URL firmada de corta duración, nunca pública) ----
+	document.querySelectorAll('.af-guest-doc-view').forEach(function (btn) {
+		btn.addEventListener('click', function () {
+			btn.disabled = true;
+			post({
+				action: 'af_download_guest_document',
+				nonce: docNonce,
+				document_id: btn.getAttribute('data-document')
+			}).then(function (json) {
+				btn.disabled = false;
+				if (!json || !json.success || !json.data || !json.data.url) {
+					window.alert((json && json.data && json.data.message) || 'No se pudo abrir el documento.');
+					return;
+				}
+				window.open(json.data.url, '_blank', 'noopener,noreferrer');
+			});
 		});
 	});
 }());

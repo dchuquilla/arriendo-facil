@@ -106,7 +106,7 @@ class Arriendo_Facil_Admin {
 			'arriendo-facil',
 			__( 'Control de pagos', 'arriendo-facil' ),
 			__( 'Control de pagos', 'arriendo-facil' ),
-			'edit_posts',
+			'manage_options',
 			'af-collections',
 			array( $this, 'render_collections' )
 		);
@@ -115,7 +115,7 @@ class Arriendo_Facil_Admin {
 			'arriendo-facil',
 			__( 'Lecturas de medidor', 'arriendo-facil' ),
 			__( 'Lecturas', 'arriendo-facil' ),
-			'edit_posts',
+			'manage_options',
 			'af-meter-readings',
 			array( $this, 'render_meter_readings' )
 		);
@@ -133,7 +133,7 @@ class Arriendo_Facil_Admin {
 			'arriendo-facil',
 			__( 'Mantenimiento e incidencias', 'arriendo-facil' ),
 			__( 'Mantenimiento', 'arriendo-facil' ),
-			'edit_posts',
+			'manage_options',
 			'af-maintenance',
 			array( $this, 'render_maintenance' )
 		);

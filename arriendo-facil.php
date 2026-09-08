@@ -29,6 +29,7 @@ if ( file_exists( $af_composer_autoload ) ) {
 
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-activator.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-text-normalizer.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-identity-validator.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-idempotency.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-property-structure.php';
@@ -163,6 +164,14 @@ function arriendo_facil_register_cron_jobs() {
 	// Daily overdue flagging for outstanding charges.
 	if ( ! wp_next_scheduled( 'af_flag_overdue_charges' ) ) {
 		wp_schedule_event( time() + 20 * MINUTE_IN_SECONDS, 'daily', 'af_flag_overdue_charges' );
+	}
+
+	// Automatic monthly billing: canon + alícuota + servicios ya cargados por lectura.
+	// Se ejecuta a diario porque generate_monthly_charges() es idempotente (clave única
+	// lease+tipo+periodo), así que basta con que corra una vez al mes real sin lógica de fechas.
+	add_action( 'af_generate_monthly_charges_cron', array( 'Arriendo_Facil_Billing_Ledger', 'generate_monthly_charges' ) );
+	if ( ! wp_next_scheduled( 'af_generate_monthly_charges_cron' ) ) {
+		wp_schedule_event( time() + 30 * MINUTE_IN_SECONDS, 'daily', 'af_generate_monthly_charges_cron' );
 	}
 }
 

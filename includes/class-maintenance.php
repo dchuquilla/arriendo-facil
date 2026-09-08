@@ -182,7 +182,7 @@ class Arriendo_Facil_Maintenance {
 	public function ajax_create_maintenance() {
 		check_ajax_referer( 'af_maintenance_nonce', 'nonce' );
 
-		if ( ! current_user_can( 'edit_posts' ) ) {
+		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
@@ -218,7 +218,7 @@ class Arriendo_Facil_Maintenance {
 	public function ajax_update_status() {
 		check_ajax_referer( 'af_maintenance_nonce', 'nonce' );
 
-		if ( ! current_user_can( 'edit_posts' ) ) {
+		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 

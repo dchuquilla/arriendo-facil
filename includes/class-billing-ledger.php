@@ -186,7 +186,7 @@ class Arriendo_Facil_Billing_Ledger {
 	public function ajax_record_meter_reading() {
 		check_ajax_referer( 'af_ledger_nonce', 'nonce' );
 
-		if ( ! current_user_can( 'edit_posts' ) ) {
+		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
@@ -655,7 +655,9 @@ class Arriendo_Facil_Billing_Ledger {
 	public function ajax_record_payment() {
 		check_ajax_referer( 'af_ledger_nonce', 'nonce' );
 
-		if ( ! current_user_can( 'edit_posts' ) ) {
+		// manage_options: af_owner tiene edit_posts y podria operar cargos de
+		// propiedades ajenas si se permitiera aqui (control de acceso roto/IDOR).
+		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
@@ -690,7 +692,7 @@ class Arriendo_Facil_Billing_Ledger {
 	public function ajax_create_charge() {
 		check_ajax_referer( 'af_ledger_nonce', 'nonce' );
 
-		if ( ! current_user_can( 'edit_posts' ) ) {
+		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
@@ -727,7 +729,7 @@ class Arriendo_Facil_Billing_Ledger {
 	public function ajax_generate_period_charges() {
 		check_ajax_referer( 'af_ledger_nonce', 'nonce' );
 
-		if ( ! current_user_can( 'edit_posts' ) ) {
+		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 

@@ -159,12 +159,16 @@ if ( $is_management_model ) {
 								<?php endif; ?>
 							</td>
 							<td data-label="<?php esc_attr_e( 'Acción', 'arriendo-facil' ); ?>">
-								<button type="button" class="button button-primary af-rate-tenant"
-									data-lease="<?php echo esc_attr( (int) $pending_lease->id ); ?>"
-									data-tenant="<?php echo esc_attr( trim( (string) $pending_lease->guest_name ) ); ?>"
-									data-suggested="<?php echo esc_attr( $payment_hint ? $payment_hint['score'] : 0 ); ?>">
-									<?php esc_html_e( 'Calificar', 'arriendo-facil' ); ?>
-								</button>
+								<?php if ( current_user_can( 'manage_options' ) ) : ?>
+									<button type="button" class="button button-primary af-rate-tenant"
+										data-lease="<?php echo esc_attr( (int) $pending_lease->id ); ?>"
+										data-tenant="<?php echo esc_attr( trim( (string) $pending_lease->guest_name ) ); ?>"
+										data-suggested="<?php echo esc_attr( $payment_hint ? $payment_hint['score'] : 0 ); ?>">
+										<?php esc_html_e( 'Calificar', 'arriendo-facil' ); ?>
+									</button>
+								<?php else : ?>
+									<span class="af-td-meta">—</span>
+								<?php endif; ?>
 							</td>
 						</tr>
 					<?php endforeach; ?>

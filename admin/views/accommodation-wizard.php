@@ -468,17 +468,71 @@ $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data[
 								class="af-input af-input--rent"
 								placeholder="0.00" />
 						</div>
-						<?php // Sugerir precio (IA) — temporalmente oculto. Mantener marcado para reactivar más adelante. ?>
-						<span class="af-predict-cost-wrapper" style="display:none;">
-							<button type="button" class="button af-predict-cost af-predict-btn"
-								data-id="<?php echo esc_attr( (string) $post_id ); ?>"
-								<?php echo $post_id ? '' : 'disabled'; ?>>
-								&#x2728; <?php esc_html_e( 'Sugerir precio (IA)', 'arriendo-facil' ); ?>
-							</button>
-						</span>
 					</div>
-					<span class="af-predict-result" style="display:none;"></span>
+					<p id="af-rent-estimate" class="af-field__hint" style="display:none;"></p>
 				</div>
+				<script>
+				(function () {
+					var rentInput   = document.getElementById('af_monthly_rent');
+					var cityInput   = document.getElementById('af_city');
+					var bedInput    = document.getElementById('af_bedrooms');
+					var typeRadios  = document.querySelectorAll('input[name="af_property_type"]');
+					var estimateBox = document.getElementById('af-rent-estimate');
+					if (!rentInput || !estimateBox) { return; }
+
+					var ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
+					var nonce   = <?php echo wp_json_encode( wp_create_nonce( 'af_save_accommodation_meta' ) ); ?>;
+					var postId  = <?php echo (int) $post_id; ?>;
+					var timer   = null;
+
+					function getPropertyType() {
+						var checked = document.querySelector('input[name="af_property_type"]:checked');
+						return checked ? checked.value : '';
+					}
+
+					function fetchEstimate() {
+						var city = cityInput ? cityInput.value.trim() : '';
+						var type = getPropertyType();
+						if (!city || !type) { estimateBox.style.display = 'none'; return; }
+
+						var body = new URLSearchParams();
+						body.append('action', 'af_estimate_rent');
+						body.append('nonce', nonce);
+						body.append('city', city);
+						body.append('property_type', type);
+						body.append('bedrooms', bedInput ? bedInput.value : 0);
+						body.append('post_id', postId);
+
+						fetch(ajaxUrl, {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+							body: body
+						}).then(function (r) { return r.json(); }).then(function (json) {
+							if (!json || !json.success || !json.data || !json.data.sample_size) {
+								estimateBox.style.display = 'none';
+								return;
+							}
+							estimateBox.style.display = 'block';
+							estimateBox.textContent = <?php echo wp_json_encode( __( 'Estimado automático según propiedades similares: $', 'arriendo-facil' ) ); ?> +
+								json.data.average.toFixed(2) +
+								<?php echo wp_json_encode( __( ' (rango $', 'arriendo-facil' ) ); ?> +
+								json.data.min.toFixed(2) + ' - $' + json.data.max.toFixed(2) + ', ' +
+								json.data.sample_size + <?php echo wp_json_encode( __( ' propiedades comparadas)', 'arriendo-facil' ) ); ?>;
+						}).catch(function () { estimateBox.style.display = 'none'; });
+					}
+
+					function scheduleEstimate() {
+						if (timer) { clearTimeout(timer); }
+						timer = setTimeout(fetchEstimate, 400);
+					}
+
+					if (cityInput) { cityInput.addEventListener('input', scheduleEstimate); }
+					if (bedInput) { bedInput.addEventListener('change', scheduleEstimate); }
+					typeRadios.forEach(function (radio) { radio.addEventListener('change', scheduleEstimate); });
+
+					scheduleEstimate();
+				}());
+				</script>
 
 				<div class="af-field">
 					<label class="af-field__label"><?php esc_html_e( 'Propietario', 'arriendo-facil' ); ?></label>

@@ -30,7 +30,7 @@ class Arriendo_Facil_Accommodation {
 		add_filter( 'admin_post_thumbnail_html', array( $this, 'customize_thumbnail_label' ), 10, 3 );
 		add_action( 'pre_get_posts', array( $this, 'force_home_queries_to_accommodations' ) );
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_frontend_styles' ) );
-		add_action( 'pre_get_posts', array( $this, 'force_home_queries_to_accommodations' ) );
+		add_action( 'wp_ajax_af_estimate_rent', array( $this, 'ajax_estimate_rent' ) );
 
 		// Catalogo publico: solo aplica al modelo marketplace, no a la administracion interna.
 		if ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) {
@@ -46,6 +46,28 @@ class Arriendo_Facil_Accommodation {
 			add_filter( 'the_content', array( $this, 'inject_managed_accommodations_in_content' ), 999 );
 			add_filter( 'elementor/frontend/the_content', array( $this, 'inject_managed_accommodations_in_content' ), 999 );
 		}
+	}
+
+	/**
+	 * AJAX: returns the automatic statistical rent estimate for comparable properties.
+	 *
+	 * @return void
+	 */
+	public function ajax_estimate_rent() {
+		check_ajax_referer( 'af_save_accommodation_meta', 'nonce' );
+
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$estimate = self::estimate_monthly_rent(
+			isset( $_POST['city'] ) ? sanitize_text_field( wp_unslash( $_POST['city'] ) ) : '',
+			isset( $_POST['property_type'] ) ? sanitize_text_field( wp_unslash( $_POST['property_type'] ) ) : '',
+			isset( $_POST['bedrooms'] ) ? absint( wp_unslash( $_POST['bedrooms'] ) ) : 0,
+			isset( $_POST['post_id'] ) ? absint( wp_unslash( $_POST['post_id'] ) ) : 0
+		);
+
+		wp_send_json_success( $estimate );
 	}
 
 	/**
@@ -1106,6 +1128,69 @@ class Arriendo_Facil_Accommodation {
 				array( 'key' => '_af_owner_id', 'value' => absint( $user_id ) ),
 			),
 		) );
+	}
+
+	/**
+	 * Estimates a monthly rent automatically from comparable properties already
+	 * in the system (same city and property type, similar bedroom count).
+	 * Purely statistical — no external API, no manual trigger required.
+	 *
+	 * @param string $city          City to compare against.
+	 * @param string $property_type Property type to compare against.
+	 * @param int    $bedrooms      Bedroom count to compare against.
+	 * @param int    $exclude_id    Post ID to exclude (the property being edited).
+	 * @return array{average:float,min:float,max:float,sample_size:int}
+	 */
+	public static function estimate_monthly_rent( $city, $property_type, $bedrooms, $exclude_id = 0 ) {
+		global $wpdb;
+
+		$city          = sanitize_text_field( (string) $city );
+		$property_type = sanitize_text_field( (string) $property_type );
+		$bedrooms      = absint( $bedrooms );
+		$exclude_id    = absint( $exclude_id );
+
+		$empty = array(
+			'average'     => 0.0,
+			'min'         => 0.0,
+			'max'         => 0.0,
+			'sample_size' => 0,
+		);
+
+		if ( '' === $city || '' === $property_type ) {
+			return $empty;
+		}
+
+		$query = "SELECT pm_rent.meta_value AS rent
+			FROM {$wpdb->posts} p
+			INNER JOIN {$wpdb->postmeta} pm_city ON pm_city.post_id = p.ID AND pm_city.meta_key = '_af_city'
+			INNER JOIN {$wpdb->postmeta} pm_type ON pm_type.post_id = p.ID AND pm_type.meta_key = '_af_property_type'
+			INNER JOIN {$wpdb->postmeta} pm_rent ON pm_rent.post_id = p.ID AND pm_rent.meta_key = '_af_monthly_rent'
+			LEFT JOIN {$wpdb->postmeta} pm_bed  ON pm_bed.post_id = p.ID AND pm_bed.meta_key = '_af_bedrooms'
+			WHERE p.post_type = 'accommodation'
+			  AND p.post_status IN ('publish','private','draft')
+			  AND pm_city.meta_value = %s
+			  AND pm_type.meta_value = %s
+			  AND pm_rent.meta_value > 0
+			  AND ( pm_bed.meta_value IS NULL OR ABS(CAST(pm_bed.meta_value AS SIGNED) - %d) <= 1 )
+			  AND p.ID != %d
+			LIMIT 200";
+
+		$rents = $wpdb->get_col( $wpdb->prepare( $query, $city, $property_type, $bedrooms, $exclude_id ) );
+		$rents = array_map( 'floatval', (array) $rents );
+		$rents = array_values( array_filter( $rents, static function ( $rent ) {
+			return $rent > 0;
+		} ) );
+
+		if ( empty( $rents ) ) {
+			return $empty;
+		}
+
+		return array(
+			'average'     => round( array_sum( $rents ) / count( $rents ), 2 ),
+			'min'         => round( min( $rents ), 2 ),
+			'max'         => round( max( $rents ), 2 ),
+			'sample_size' => count( $rents ),
+		);
 	}
 
 	/**

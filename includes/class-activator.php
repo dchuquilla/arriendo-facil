@@ -775,6 +775,7 @@ class Arriendo_Facil_Activator {
 			'doc_verified_by' => "ALTER TABLE {$guests_table} ADD COLUMN doc_verified_by BIGINT(20) UNSIGNED DEFAULT NULL",
 			'doc_verified_at' => "ALTER TABLE {$guests_table} ADD COLUMN doc_verified_at DATETIME DEFAULT NULL",
 			'doc_notes'       => "ALTER TABLE {$guests_table} ADD COLUMN doc_notes TEXT DEFAULT NULL",
+			'identity_match_status' => "ALTER TABLE {$guests_table} ADD COLUMN identity_match_status VARCHAR(20) NOT NULL DEFAULT 'not_checked'",
 		);
 
 		foreach ( $guest_doc_columns as $column_name => $alter_sql ) {

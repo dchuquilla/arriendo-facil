@@ -20,9 +20,11 @@ if ( $is_owner ) {
 	if ( ! empty( $owner_ids ) ) {
 		$ids_sql = implode( ',', array_map( 'intval', $owner_ids ) );
 		$leases = $wpdb->get_results(
-			"SELECT l.*, p.post_title AS accommodation_title
+			"SELECT l.*, p.post_title AS accommodation_title,
+			        CONCAT(g.first_name, ' ', g.last_name) AS guest_name
 			 FROM {$wpdb->prefix}af_leases l
 			 LEFT JOIN {$wpdb->posts} p ON p.ID = l.accommodation_id
+			 LEFT JOIN {$wpdb->prefix}af_guests g ON g.id = l.guest_id
 			 WHERE l.accommodation_id IN ($ids_sql) AND l.deleted_at IS NULL
 			 ORDER BY l.created_at DESC
 			 LIMIT 100"
@@ -32,14 +34,45 @@ if ( $is_owner ) {
 	}
 } else {
 	$leases = $wpdb->get_results(
-		"SELECT l.*, p.post_title AS accommodation_title
+		"SELECT l.*, p.post_title AS accommodation_title,
+		        CONCAT(g.first_name, ' ', g.last_name) AS guest_name
 		 FROM {$wpdb->prefix}af_leases l
 		 LEFT JOIN {$wpdb->posts} p ON p.ID = l.accommodation_id
+		 LEFT JOIN {$wpdb->prefix}af_guests g ON g.id = l.guest_id
 		 WHERE l.deleted_at IS NULL
 		 ORDER BY l.created_at DESC
 		 LIMIT 100"
 	);
 }
+
+// Unidad vinculada y saldo pendiente por contrato (batch, sin N+1).
+$lease_unit_map    = array();
+$lease_balance_map = array();
+if ( ! empty( $leases ) ) {
+	$lease_ids_sql = implode( ',', array_map( static function ( $l ) { return (int) $l->id; }, $leases ) );
+
+	if ( class_exists( 'Arriendo_Facil_Property_Structure' ) ) {
+		$unit_rows = $wpdb->get_results(
+			'SELECT u.accommodation_id, u.unit_code FROM ' . Arriendo_Facil_Property_Structure::units_table() . '
+			 WHERE accommodation_id IN (' . implode( ',', array_map( static function ( $l ) { return (int) $l->accommodation_id; }, $leases ) ) . ')'
+		);
+		foreach ( (array) $unit_rows as $unit_row ) {
+			$lease_unit_map[ (int) $unit_row->accommodation_id ] = $unit_row->unit_code;
+		}
+	}
+
+	if ( class_exists( 'Arriendo_Facil_Billing_Ledger' ) ) {
+		$balance_rows = $wpdb->get_results(
+			'SELECT lease_id, SUM(amount - amount_paid) AS balance FROM ' . Arriendo_Facil_Billing_Ledger::charges_table() . "
+			 WHERE lease_id IN ({$lease_ids_sql}) AND status != 'void'
+			 GROUP BY lease_id"
+		);
+		foreach ( (array) $balance_rows as $balance_row ) {
+			$lease_balance_map[ (int) $balance_row->lease_id ] = round( (float) $balance_row->balance, 2 );
+		}
+	}
+}
+
 
 // ── Batch-fetch billing state for the CURRENT period per visible lease ──────
 $billing_status_map    = array();
@@ -283,15 +316,17 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 		<thead>
 			<tr>
 				<th><?php esc_html_e( 'ID', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Accommodation', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'ID de huesped', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Start Date', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'End Date', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Monthly Rent', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Status', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'Inmueble', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'Unidad', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'Inquilino', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'Inicio', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'Fin', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'Canon mensual', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'Saldo', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'Estado', 'arriendo-facil' ); ?></th>
 			<th><?php esc_html_e( 'Factura', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Document', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Actions', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'Documento', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'Acciones', 'arriendo-facil' ); ?></th>
 			</tr>
 		</thead>
 		<tbody>
@@ -342,12 +377,22 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 					?>
 					<tr class="af-lease-row">
 						<td data-label="<?php esc_attr_e( 'ID', 'arriendo-facil' ); ?>"><?php echo esc_html( $lease->id ); ?></td>
-							<td data-label="<?php esc_attr_e( 'Accommodation', 'arriendo-facil' ); ?>"><?php echo esc_html( ( isset( $lease->accommodation_title ) ? $lease->accommodation_title : null ) ?: ( isset( $lease->accommodation_id ) ? get_the_title( (int) $lease->accommodation_id ) : '' ) ?: $lease->accommodation_id ); ?></td>
-						<td data-label="<?php esc_attr_e( 'ID de huesped', 'arriendo-facil' ); ?>"><?php echo esc_html( $lease->guest_id ); ?></td>
-						<td data-label="<?php esc_attr_e( 'Start Date', 'arriendo-facil' ); ?>"><?php echo esc_html( $lease->start_date ); ?></td>
-						<td data-label="<?php esc_attr_e( 'End Date', 'arriendo-facil' ); ?>"><?php echo esc_html( $lease->end_date ); ?></td>
-						<td data-label="<?php esc_attr_e( 'Monthly Rent', 'arriendo-facil' ); ?>"><?php echo esc_html( number_format( (float) $lease->monthly_rent, 2 ) ); ?></td>
-						<td data-label="<?php esc_attr_e( 'Status', 'arriendo-facil' ); ?>"><?php echo af_pill( (string) $lease->status ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></td>					<?php
+							<td data-label="<?php esc_attr_e( 'Inmueble', 'arriendo-facil' ); ?>"><?php echo esc_html( ( isset( $lease->accommodation_title ) ? $lease->accommodation_title : null ) ?: ( isset( $lease->accommodation_id ) ? get_the_title( (int) $lease->accommodation_id ) : '' ) ?: $lease->accommodation_id ); ?></td>
+						<td data-label="<?php esc_attr_e( 'Unidad', 'arriendo-facil' ); ?>">
+							<?php echo esc_html( $lease_unit_map[ (int) $lease->accommodation_id ] ?? '—' ); ?>
+						</td>
+						<td data-label="<?php esc_attr_e( 'Inquilino', 'arriendo-facil' ); ?>"><?php echo esc_html( trim( (string) ( $lease->guest_name ?? '' ) ) ?: '#' . (int) $lease->guest_id ); ?></td>
+						<td data-label="<?php esc_attr_e( 'Inicio', 'arriendo-facil' ); ?>"><?php echo esc_html( $lease->start_date ); ?></td>
+						<td data-label="<?php esc_attr_e( 'Fin', 'arriendo-facil' ); ?>"><?php echo esc_html( $lease->end_date ); ?></td>
+						<td data-label="<?php esc_attr_e( 'Canon mensual', 'arriendo-facil' ); ?>">$<?php echo esc_html( number_format( (float) $lease->monthly_rent, 2 ) ); ?></td>
+						<td data-label="<?php esc_attr_e( 'Saldo', 'arriendo-facil' ); ?>">
+							<?php $lease_balance = $lease_balance_map[ (int) $lease->id ] ?? 0.0; ?>
+							<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-collections&statement_lease=' . (int) $lease->id ) ); ?>"
+								class="af-pill <?php echo $lease_balance > 0 ? 'af-pill--attention' : 'af-pill--success'; ?>">
+								$<?php echo esc_html( number_format_i18n( $lease_balance, 2 ) ); ?>
+							</a>
+						</td>
+						<td data-label="<?php esc_attr_e( 'Estado', 'arriendo-facil' ); ?>"><?php echo af_pill( (string) $lease->status ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></td>					<?php
 					$binfo  = isset( $billing_status_map[ (int) $lease->id ] ) ? $billing_status_map[ (int) $lease->id ] : null;
 					$estado_colores = array(
 						'autorizada'          => array( 'label' => 'Autorizada', 'color' => '#2e7d32' ),
@@ -394,7 +439,7 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 						<?php elseif ( ! $binfo && ! $can_bill ) : ?>
 							<span style="color:#aaa; font-size:12px;">&mdash;</span>
 						<?php endif; ?>
-					</td>					<td class="af-lease-document-cell" data-label="<?php esc_attr_e( 'Document', 'arriendo-facil' ); ?>">
+					</td>					<td class="af-lease-document-cell" data-label="<?php esc_attr_e( 'Documento', 'arriendo-facil' ); ?>">
 							<?php if ( $versions_count > 0 || $lease->document_url ) : ?>
 								<a class="af-lease-view-link" href="<?php echo esc_url( $download_active ); ?>" target="_blank">
 									<?php esc_html_e( 'Ver', 'arriendo-facil' ); ?>
@@ -413,7 +458,7 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 								<span class="af-lease-empty-document"><?php esc_html_e( 'Aun no hay contrato. Se genera desde el flujo del chatbot.', 'arriendo-facil' ); ?></span>
 							<?php endif; ?>
 						</td>
-						<td class="af-lease-actions-cell af-td-actions" data-label="<?php esc_attr_e( 'Actions', 'arriendo-facil' ); ?>">
+						<td class="af-lease-actions-cell af-td-actions" data-label="<?php esc_attr_e( 'Acciones', 'arriendo-facil' ); ?>">
 							<div class="af-lease-actions-stack">
 								<button type="button" class="button button-secondary af-open-upload-version-modal"
 									data-lease-id="<?php echo esc_attr( $lease->id ); ?>"

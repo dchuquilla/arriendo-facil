@@ -1446,6 +1446,12 @@ class Arriendo_Facil_Guest {
 			wp_send_json_error( array( 'message' => __( 'Cedula invalida. Debe tener exactamente 10 digitos.', 'arriendo-facil' ) ), 400 );
 		}
 
+		// Verifica el digito verificador real, no solo el formato, para evitar
+		// que se registre una identificacion inventada o mal transcrita.
+		if ( ! Arriendo_Facil_Identity_Validator::validate_cedula( $id_number ) ) {
+			wp_send_json_error( array( 'message' => __( 'El numero de cedula no es valido (digito verificador incorrecto). Verificalo e intenta nuevamente.', 'arriendo-facil' ) ), 400 );
+		}
+
 		if ( 1 !== preg_match( '/^\d{4}-\d{2}-\d{2}$/', (string) $rental_start_date ) ) {
 			wp_send_json_error( array( 'message' => __( 'La fecha de inicio debe tener formato YYYY-MM-DD.', 'arriendo-facil' ) ), 400 );
 		}
@@ -1509,6 +1515,27 @@ class Arriendo_Facil_Guest {
 		if ( is_wp_error( $upload_result ) ) {
 			wp_send_json_error( array( 'message' => $upload_result->get_error_message() ), 400 );
 		}
+
+		// Cotejo automatico best-effort: busca el numero declarado dentro del texto
+		// del documento subido. Solo es una senal de apoyo para el revisor humano;
+		// nunca aprueba ni rechaza la identidad por si solo (ver Document_Verification).
+		$identity_match_status = 'not_checked';
+		if ( ! empty( $upload_result['cedula_papeleta'] ) ) {
+			$cedula_file = get_attached_file( (int) $upload_result['cedula_papeleta'] );
+			if ( $cedula_file && file_exists( $cedula_file ) ) {
+				$identity_match_status = Arriendo_Facil_Identity_Validator::cross_check_document(
+					$id_number,
+					(string) file_get_contents( $cedula_file )
+				);
+			}
+		}
+		$wpdb->update(
+			$wpdb->prefix . 'af_guests',
+			array( 'identity_match_status' => $identity_match_status ),
+			array( 'id' => $guest_id ),
+			array( '%s' ),
+			array( '%d' )
+		);
 
 		$lease_payload = array(
 			'accommodation_id'  => $accommodation_id,
@@ -2216,6 +2243,13 @@ class Arriendo_Facil_Guest {
 
 		if ( 1 !== preg_match( '/^[0-9]{10,13}$/', $id_number ) ) {
 			wp_send_json_error( array( 'message' => __( 'La cedula debe tener 10 digitos y el RUC 13.', 'arriendo-facil' ) ) );
+		}
+
+		// Verifica el digito verificador real (algoritmo modulo 10/11 de Ecuador),
+		// no solo el largo del numero, para bloquear identificaciones inventadas.
+		$id_doc_type = 13 === strlen( $id_number ) ? 'ruc' : 'cedula';
+		if ( ! Arriendo_Facil_Identity_Validator::validate( $id_doc_type, $id_number ) ) {
+			wp_send_json_error( array( 'message' => __( 'El numero de cedula o RUC no es valido (digito verificador incorrecto).', 'arriendo-facil' ) ) );
 		}
 
 		// El perfil extendido lo completa el inquilino por enlace con token, no el operador.

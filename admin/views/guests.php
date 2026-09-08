@@ -227,10 +227,10 @@ if ( $is_owner ) {
 			'title'    => __( 'Inquilinos', 'arriendo-facil' ),
 			'subtitle' => __( 'Inquilinos bajo administración. Regístralos, envíales el formulario para que completen su perfil y verifica sus documentos.', 'arriendo-facil' ),
 			'actions'  => array(
-				sprintf(
+				current_user_can( 'manage_options' ) ? sprintf(
 					'<button type="button" class="button af-btn af-btn--primary" id="af-new-guest"><span class="af-btn__icon" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>%s</button>',
 					esc_html__( 'Nuevo inquilino', 'arriendo-facil' )
-				),
+				) : '',
 			),
 		)
 	);
@@ -541,6 +541,14 @@ if ( $is_owner ) {
 										<span class="af-pill af-pill--<?php echo esc_attr( $doc_variant ); ?>">
 											<?php echo esc_html( $doc_statuses[ $doc_status ] ?? $doc_status ); ?>
 										</span>
+										<?php
+										$identity_status = isset( $guest->identity_match_status ) ? (string) $guest->identity_match_status : 'not_checked';
+										if ( 'match' === $identity_status ) :
+											?>
+											<span class="af-td-meta" title="<?php esc_attr_e( 'La cédula declarada aparece en el texto del documento subido. Señal automática de apoyo, no reemplaza la revisión humana.', 'arriendo-facil' ); ?>">✓ <?php esc_html_e( 'coincide con el documento', 'arriendo-facil' ); ?></span>
+										<?php elseif ( 'no_match' === $identity_status ) : ?>
+											<span class="af-td-meta" style="color:#b32d2e;" title="<?php esc_attr_e( 'La cédula declarada NO aparece en el texto del documento subido. Revisa manualmente antes de aprobar.', 'arriendo-facil' ); ?>">⚠ <?php esc_html_e( 'no coincide, revisar', 'arriendo-facil' ); ?></span>
+										<?php endif; ?>
 									</td>
 									<?php if ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) : ?>
 										<td data-label="<?php esc_attr_e( 'AI Score', 'arriendo-facil' ); ?>">
@@ -552,18 +560,22 @@ if ( $is_owner ) {
 										</td>
 									<?php endif; ?>
 									<td class="af-td-actions" data-label="<?php esc_attr_e( 'Acciones', 'arriendo-facil' ); ?>">
-										<button type="button" class="button af-btn af-btn--primary af-btn--sm af-send-form"
-											data-guest-id="<?php echo esc_attr( $guest->id ); ?>"
-											data-guest-name="<?php echo esc_attr( trim( $guest->first_name . ' ' . $guest->last_name ) ); ?>"
-											data-guest-email="<?php echo esc_attr( $guest->email ); ?>">
-											<?php esc_html_e( 'Enviar formulario', 'arriendo-facil' ); ?>
-										</button>
-										<button type="button" class="button af-btn af-btn--ghost af-btn--sm af-verify-docs"
-											data-guest-id="<?php echo esc_attr( $guest->id ); ?>"
-											data-guest-name="<?php echo esc_attr( trim( $guest->first_name . ' ' . $guest->last_name ) ); ?>"
-											data-current="<?php echo esc_attr( $doc_status ); ?>">
-											<?php esc_html_e( 'Verificar documentos', 'arriendo-facil' ); ?>
-										</button>
+										<?php if ( current_user_can( 'manage_options' ) ) : ?>
+											<button type="button" class="button af-btn af-btn--primary af-btn--sm af-send-form"
+												data-guest-id="<?php echo esc_attr( $guest->id ); ?>"
+												data-guest-name="<?php echo esc_attr( trim( $guest->first_name . ' ' . $guest->last_name ) ); ?>"
+												data-guest-email="<?php echo esc_attr( $guest->email ); ?>">
+												<?php esc_html_e( 'Enviar formulario', 'arriendo-facil' ); ?>
+											</button>
+											<button type="button" class="button af-btn af-btn--ghost af-btn--sm af-verify-docs"
+												data-guest-id="<?php echo esc_attr( $guest->id ); ?>"
+												data-guest-name="<?php echo esc_attr( trim( $guest->first_name . ' ' . $guest->last_name ) ); ?>"
+												data-current="<?php echo esc_attr( $doc_status ); ?>">
+												<?php esc_html_e( 'Verificar documentos', 'arriendo-facil' ); ?>
+											</button>
+										<?php else : ?>
+											<span class="af-td-meta">—</span>
+										<?php endif; ?>
 										<?php if ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) : ?>
 											<button type="button" class="button af-btn af-btn--ghost af-btn--sm af-score-guest"
 												data-guest-id="<?php echo esc_attr( $guest->id ); ?>">

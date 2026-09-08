@@ -244,6 +244,22 @@ class Arriendo_Facil_Activator {
 				KEY period (period)
 			) $charset_collate;",
 
+			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_guest_documents (
+				id                BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+				guest_id          BIGINT(20) UNSIGNED NOT NULL,
+				doc_type          VARCHAR(40) NOT NULL COMMENT 'garantia_alicuota, cedula_papeleta, certificado_bancario',
+				storage           VARCHAR(10) NOT NULL DEFAULT 'local' COMMENT 'r2 (privado) o local (fallback publico WP)',
+				object_key        VARCHAR(255) NOT NULL COMMENT 'clave R2 o attachment_id (fallback local)',
+				mime_type         VARCHAR(100) NOT NULL DEFAULT 'application/pdf',
+				file_size         INT UNSIGNED NOT NULL DEFAULT 0,
+				checksum_sha256   CHAR(64) DEFAULT NULL,
+				uploaded_by       BIGINT(20) UNSIGNED DEFAULT NULL,
+				created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				KEY guest_id (guest_id),
+				KEY doc_type (doc_type)
+			) $charset_collate;",
+
 			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_leases (
 				id            BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
 				accommodation_id BIGINT(20) UNSIGNED NOT NULL,

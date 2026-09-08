@@ -1511,7 +1511,7 @@ class Arriendo_Facil_Guest {
 			wp_send_json_error( array( 'message' => __( 'No se pudo actualizar el perfil legal del arrendatario.', 'arriendo-facil' ) ), 500 );
 		}
 
-		$upload_result = $this->upload_guest_documents( $guest_id );
+		$upload_result = $this->upload_guest_documents( $guest_id, $raw_documents );
 		if ( is_wp_error( $upload_result ) ) {
 			wp_send_json_error( array( 'message' => $upload_result->get_error_message() ), 400 );
 		}
@@ -1520,14 +1520,11 @@ class Arriendo_Facil_Guest {
 		// del documento subido. Solo es una senal de apoyo para el revisor humano;
 		// nunca aprueba ni rechaza la identidad por si solo (ver Document_Verification).
 		$identity_match_status = 'not_checked';
-		if ( ! empty( $upload_result['cedula_papeleta'] ) ) {
-			$cedula_file = get_attached_file( (int) $upload_result['cedula_papeleta'] );
-			if ( $cedula_file && file_exists( $cedula_file ) ) {
-				$identity_match_status = Arriendo_Facil_Identity_Validator::cross_check_document(
-					$id_number,
-					(string) file_get_contents( $cedula_file )
-				);
-			}
+		if ( ! empty( $raw_documents['cedula_papeleta'] ) ) {
+			$identity_match_status = Arriendo_Facil_Identity_Validator::cross_check_document(
+				$id_number,
+				(string) $raw_documents['cedula_papeleta']
+			);
 		}
 		$wpdb->update(
 			$wpdb->prefix . 'af_guests',
@@ -5440,7 +5437,21 @@ class Arriendo_Facil_Guest {
 	 * @param int $guest_id Guest ID.
 	 * @return array|WP_Error
 	 */
-	private function upload_guest_documents( $guest_id ) {
+	/**
+	 * Uploads the guest's identity/support PDFs to private storage when
+	 * configured (Cloudflare R2, never publicly reachable), falling back to
+	 * the local WordPress media library only if no private storage is set up
+	 * so document capture never breaks on a site without R2 credentials.
+	 *
+	 * @param int        $guest_id      Guest ID.
+	 * @param array|null $raw_bytes_out Optional. Filled with doc_type => raw file
+	 *                                  contents for callers that need to run a
+	 *                                  best-effort check (e.g. identity cross-check)
+	 *                                  without re-reading from storage. Never
+	 *                                  returned to the client.
+	 * @return array|WP_Error Map of doc_type => af_guest_documents row ID.
+	 */
+	private function upload_guest_documents( $guest_id, &$raw_bytes_out = array() ) {
 		$fields = array(
 			'guest_garantia_alicuota_pdf'   => 'garantia_alicuota',
 			'guest_cedula_papeleta_pdf'     => 'cedula_papeleta',
@@ -5451,7 +5462,9 @@ class Arriendo_Facil_Guest {
 		require_once ABSPATH . 'wp-admin/includes/image.php';
 		require_once ABSPATH . 'wp-admin/includes/media.php';
 
-		$uploaded = array();
+		global $wpdb;
+		$uploaded       = array();
+		$raw_bytes_out  = array();
 
 		foreach ( $fields as $field_name => $doc_type ) {
 			if ( ! isset( $_FILES[ $field_name ] ) || ! is_array( $_FILES[ $field_name ] ) ) {
@@ -5478,24 +5491,64 @@ class Arriendo_Facil_Guest {
 				return new WP_Error( 'af_guest_pdf_invalid_type', __( 'Solo se permiten archivos PDF para documentos del huesped.', 'arriendo-facil' ) );
 			}
 
-			$attachment_id = media_handle_upload(
-				$field_name,
-				0,
-				array( 'post_title' => sprintf( 'guest-%d-%s', (int) $guest_id, $doc_type ) ),
-				array(
-					'test_form' => false,
-					'mimes'     => array( 'pdf' => 'application/pdf' ),
-				)
-			);
-
-			if ( is_wp_error( $attachment_id ) ) {
-				return new WP_Error( 'af_guest_pdf_save_failed', __( 'No se pudo guardar uno de los documentos PDF del huesped.', 'arriendo-facil' ) );
+			$contents = file_get_contents( $file_data['tmp_name'] ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+			if ( false === $contents || '' === $contents ) {
+				return new WP_Error( 'af_guest_pdf_read_failed', __( 'No se pudo leer uno de los documentos PDF del huesped.', 'arriendo-facil' ) );
 			}
 
-			update_post_meta( (int) $attachment_id, '_af_guest_id', (int) $guest_id );
-			update_post_meta( (int) $attachment_id, '_af_guest_doc_type', $doc_type );
+			$raw_bytes_out[ $doc_type ] = $contents;
+			$checksum                  = hash( 'sha256', $contents );
+			$storage                   = 'local';
+			$object_key                = '';
 
-			$uploaded[ $doc_type ] = (int) $attachment_id;
+			if ( Arriendo_Facil_Private_Storage::is_configured() ) {
+				$object_key = 'guest-documents/' . (int) $guest_id . '/' . $doc_type . '-' . wp_generate_password( 12, false, false ) . '.pdf';
+				$put_result = Arriendo_Facil_Private_Storage::upload( $contents, $object_key, 'application/pdf' );
+
+				if ( is_wp_error( $put_result ) ) {
+					return new WP_Error( 'af_guest_pdf_save_failed', __( 'No se pudo guardar uno de los documentos PDF del huesped en el almacenamiento privado.', 'arriendo-facil' ) );
+				}
+
+				$storage = 'r2';
+			} else {
+				// Fallback: sin credenciales de almacenamiento privado configuradas.
+				// El archivo queda en la libreria de medios publica de WordPress —
+				// menos seguro, pero evita que la captura de documentos se rompa.
+				$attachment_id = media_handle_upload(
+					$field_name,
+					0,
+					array( 'post_title' => sprintf( 'guest-%d-%s', (int) $guest_id, $doc_type ) ),
+					array(
+						'test_form' => false,
+						'mimes'     => array( 'pdf' => 'application/pdf' ),
+					)
+				);
+
+				if ( is_wp_error( $attachment_id ) ) {
+					return new WP_Error( 'af_guest_pdf_save_failed', __( 'No se pudo guardar uno de los documentos PDF del huesped.', 'arriendo-facil' ) );
+				}
+
+				update_post_meta( (int) $attachment_id, '_af_guest_id', (int) $guest_id );
+				update_post_meta( (int) $attachment_id, '_af_guest_doc_type', $doc_type );
+				$object_key = (string) $attachment_id;
+			}
+
+			$wpdb->insert(
+				$wpdb->prefix . 'af_guest_documents',
+				array(
+					'guest_id'        => (int) $guest_id,
+					'doc_type'        => $doc_type,
+					'storage'         => $storage,
+					'object_key'      => $object_key,
+					'mime_type'       => 'application/pdf',
+					'file_size'       => strlen( $contents ),
+					'checksum_sha256' => $checksum,
+					'uploaded_by'     => get_current_user_id(),
+				),
+				array( '%d', '%s', '%s', '%s', '%s', '%d', '%s', '%d' )
+			);
+
+			$uploaded[ $doc_type ] = (int) $wpdb->insert_id;
 		}
 
 		return $uploaded;

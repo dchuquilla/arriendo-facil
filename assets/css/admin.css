@@ -1788,3 +1788,25 @@ body.post-type-accommodation #titlediv {
 .af-documents-add .af-input {
 	width: 100%;
 }
+
+.af-guest-docs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin-top: 4px;
+}
+
+.af-guest-doc-view {
+	font-size: 11px;
+	padding: 2px 8px;
+	border: 1px solid #dcdcde;
+	border-radius: 12px;
+	background: #fff;
+	color: #2271b1;
+	cursor: pointer;
+}
+
+.af-guest-doc-view:hover {
+	background: #f0f6fc;
+	border-color: #2271b1;
+}

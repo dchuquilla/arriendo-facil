@@ -271,6 +271,7 @@ class Arriendo_Facil_Lease {
 		$start_date       = isset( $_POST['start_date'] ) ? sanitize_text_field( wp_unslash( $_POST['start_date'] ) ) : '';
 		$end_date         = isset( $_POST['end_date'] ) ? sanitize_text_field( wp_unslash( $_POST['end_date'] ) ) : '';
 		$monthly_rent     = isset( $_POST['monthly_rent'] ) ? floatval( wp_unslash( $_POST['monthly_rent'] ) ) : 0.0;
+		$deposit_amount   = isset( $_POST['deposit_amount'] ) ? max( 0, floatval( wp_unslash( $_POST['deposit_amount'] ) ) ) : 0.0;
 
 		if ( ! $accommodation_id || ! $guest_id || ! $start_date || ! $end_date ) {
 			wp_send_json_error( array( 'message' => __( 'Faltan campos obligatorios.', 'arriendo-facil' ) ) );
@@ -287,14 +288,15 @@ class Arriendo_Facil_Lease {
 					'start_date'       => $start_date,
 					'end_date'         => $end_date,
 					'monthly_rent'     => $monthly_rent,
+					'deposit_amount'   => $deposit_amount,
 				)
 			);
 			$idem_response = Arriendo_Facil_Idempotency::remember(
 				$scope,
 				$idempotency_key,
 				DAY_IN_SECONDS,
-				function () use ( $accommodation_id, $guest_id, $start_date, $end_date, $monthly_rent ) {
-					return $this->insert_lease_record( $accommodation_id, $guest_id, $start_date, $end_date, $monthly_rent );
+				function () use ( $accommodation_id, $guest_id, $start_date, $end_date, $monthly_rent, $deposit_amount ) {
+					return $this->insert_lease_record( $accommodation_id, $guest_id, $start_date, $end_date, $monthly_rent, $deposit_amount );
 				},
 				$fingerprint
 			);
@@ -318,7 +320,7 @@ class Arriendo_Facil_Lease {
 			wp_send_json_error( array( 'message' => __( 'No se pudo crear el contrato.', 'arriendo-facil' ) ) );
 		}
 
-		$result = $this->insert_lease_record( $accommodation_id, $guest_id, $start_date, $end_date, $monthly_rent );
+		$result = $this->insert_lease_record( $accommodation_id, $guest_id, $start_date, $end_date, $monthly_rent, $deposit_amount );
 		if ( is_array( $result ) && ! empty( $result['id'] ) ) {
 			wp_send_json_success( array( 'id' => (int) $result['id'] ) );
 		}
@@ -333,9 +335,10 @@ class Arriendo_Facil_Lease {
 	 * @param string $start_date       Start date (Y-m-d).
 	 * @param string $end_date         End date (Y-m-d).
 	 * @param float  $monthly_rent     Monthly rent.
+	 * @param float  $deposit_amount   Refundable deposit received.
 	 * @return array
 	 */
-	private function insert_lease_record( int $accommodation_id, int $guest_id, string $start_date, string $end_date, float $monthly_rent ): array {
+	private function insert_lease_record( int $accommodation_id, int $guest_id, string $start_date, string $end_date, float $monthly_rent, float $deposit_amount = 0.0 ): array {
 		global $wpdb;
 		$inserted = $wpdb->insert(
 			$wpdb->prefix . 'af_leases',
@@ -345,9 +348,10 @@ class Arriendo_Facil_Lease {
 				'start_date'       => $start_date,
 				'end_date'         => $end_date,
 				'monthly_rent'     => $monthly_rent,
+				'deposit_amount'   => $deposit_amount,
 				'status'           => 'draft',
 			),
-			array( '%d', '%d', '%s', '%s', '%f', '%s' )
+			array( '%d', '%d', '%s', '%s', '%f', '%f', '%s' )
 		);
 
 		if ( ! $inserted ) {

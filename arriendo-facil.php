@@ -46,6 +46,7 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-matching-engine.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-cleaning-service.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-docx-template-processor.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-lease.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-lease-operations.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-rental-workflow.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-owner-contact.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-owner-register-api.php';
@@ -142,13 +143,16 @@ add_filter( 'wp_max_upload_size', 'arriendo_facil_max_upload_size' );
  * Registers OTA sync cron jobs.
  */
 function arriendo_facil_register_cron_jobs() {
-	// Register WP-Cron action for OTA sync
-	add_action( 'af_sync_ota_availability', array( 'Arriendo_Facil_OTA_Sync_Manager', 'process_scheduled_sync' ) );
-	add_action( 'af_retry_ota_sync', array( 'Arriendo_Facil_OTA_Sync_Manager', 'process_retry_sync' ), 10, 2 );
-
-	// Schedule main sync if not already scheduled
-	if ( ! wp_next_scheduled( 'af_sync_ota_availability' ) ) {
-		wp_schedule_event( time(), 'every_30_minutes', 'af_sync_ota_availability' );
+	// OTA synchronization belongs only to the retired marketplace model.
+	if ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) {
+		add_action( 'af_sync_ota_availability', array( 'Arriendo_Facil_OTA_Sync_Manager', 'process_scheduled_sync' ) );
+		add_action( 'af_retry_ota_sync', array( 'Arriendo_Facil_OTA_Sync_Manager', 'process_retry_sync' ), 10, 2 );
+		if ( ! wp_next_scheduled( 'af_sync_ota_availability' ) ) {
+			wp_schedule_event( time(), 'every_30_minutes', 'af_sync_ota_availability' );
+		}
+	} else {
+		wp_clear_scheduled_hook( 'af_sync_ota_availability' );
+		wp_clear_scheduled_hook( 'af_retry_ota_sync' );
 	}
 
 	// Daily purge of expired idempotency keys.
@@ -211,6 +215,7 @@ function arriendo_facil_init() {
 		'Arriendo_Facil_Cleaning_Service',
 		'Arriendo_Facil_Maintenance',
 		'Arriendo_Facil_Lease',
+		'Arriendo_Facil_Lease_Operations',
 		'Arriendo_Facil_Billing_Ledger',
 		'Arriendo_Facil_Rental_Workflow',
 		'Arriendo_Facil_Owner_Contact',
@@ -251,7 +256,7 @@ function arriendo_facil_maybe_upgrade_schema() {
 		return;
 	}
 
-	$target_schema_version = '2026-08-review-tenant-link-v1';
+	$target_schema_version = '2026-09-pms-operations-v1';
 	$current_schema_version = (string) get_option( 'af_db_schema_version', '' );
 
 	if ( $current_schema_version === $target_schema_version ) {
@@ -339,5 +344,3 @@ add_action(
 		);
 	}
 );
-
-

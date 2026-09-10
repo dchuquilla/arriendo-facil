@@ -268,6 +268,16 @@ class Arriendo_Facil_Activator {
 				end_date      DATE NOT NULL,
 				monthly_rent  DECIMAL(10,2) NOT NULL DEFAULT 0.00,
 				status        VARCHAR(20) NOT NULL DEFAULT 'draft',
+				deposit_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+				deposit_damage_deduction DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+				deposit_service_deduction DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+				deposit_refund_amount DECIMAL(10,2) DEFAULT NULL,
+				deposit_settlement_status VARCHAR(20) NOT NULL DEFAULT 'pendiente',
+				deposit_settlement_notes TEXT DEFAULT NULL,
+				deposit_settled_at DATETIME DEFAULT NULL,
+				legal_status VARCHAR(30) NOT NULL DEFAULT 'pendiente',
+				legal_notes TEXT DEFAULT NULL,
+				legal_updated_at DATETIME DEFAULT NULL,
 				document_url  VARCHAR(255) DEFAULT NULL,
 				deleted_at    DATETIME DEFAULT NULL,
 				created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -835,6 +845,27 @@ class Arriendo_Facil_Activator {
 					$column_name
 				)
 			);
+			if ( ! (int) $column_exists ) {
+				$wpdb->query( $alter_sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			}
+		}
+
+		// PMS legal and deposit operations added without changing the lease lifecycle.
+		$leases_table = $wpdb->prefix . 'af_leases';
+		$lease_operation_columns = array(
+			'deposit_amount'             => "ALTER TABLE {$leases_table} ADD COLUMN deposit_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00",
+			'deposit_damage_deduction'   => "ALTER TABLE {$leases_table} ADD COLUMN deposit_damage_deduction DECIMAL(10,2) NOT NULL DEFAULT 0.00",
+			'deposit_service_deduction'  => "ALTER TABLE {$leases_table} ADD COLUMN deposit_service_deduction DECIMAL(10,2) NOT NULL DEFAULT 0.00",
+			'deposit_refund_amount'      => "ALTER TABLE {$leases_table} ADD COLUMN deposit_refund_amount DECIMAL(10,2) DEFAULT NULL",
+			'deposit_settlement_status'  => "ALTER TABLE {$leases_table} ADD COLUMN deposit_settlement_status VARCHAR(20) NOT NULL DEFAULT 'pendiente'",
+			'deposit_settlement_notes'   => "ALTER TABLE {$leases_table} ADD COLUMN deposit_settlement_notes TEXT DEFAULT NULL",
+			'deposit_settled_at'         => "ALTER TABLE {$leases_table} ADD COLUMN deposit_settled_at DATETIME DEFAULT NULL",
+			'legal_status'               => "ALTER TABLE {$leases_table} ADD COLUMN legal_status VARCHAR(30) NOT NULL DEFAULT 'pendiente'",
+			'legal_notes'                => "ALTER TABLE {$leases_table} ADD COLUMN legal_notes TEXT DEFAULT NULL",
+			'legal_updated_at'           => "ALTER TABLE {$leases_table} ADD COLUMN legal_updated_at DATETIME DEFAULT NULL",
+		);
+		foreach ( $lease_operation_columns as $column_name => $alter_sql ) {
+			$column_exists = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = %s", DB_NAME, $leases_table, $column_name ) );
 			if ( ! (int) $column_exists ) {
 				$wpdb->query( $alter_sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			}

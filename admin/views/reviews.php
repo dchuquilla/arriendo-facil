@@ -146,10 +146,10 @@ if ( $is_management_model ) {
 										<?php
 										echo esc_html(
 											sprintf(
-												/* translators: 1: on-time payments, 2: total charges */
-												__( '%1$d de %2$d a tiempo', 'arriendo-facil' ),
-												$payment_hint['on_time'],
-												$payment_hint['total']
+											/* translators: 1: average days late, 2: total charges */
+											__( '%1$s días promedio de atraso (%2$d cobros)', 'arriendo-facil' ),
+											number_format_i18n( $payment_hint['average_days_late'], 1 ),
+											$payment_hint['total']
 											)
 										);
 										?>

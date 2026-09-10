@@ -95,6 +95,15 @@ class Arriendo_Facil_Admin {
 
 		add_submenu_page(
 			'arriendo-facil',
+			__( 'Próximas salidas', 'arriendo-facil' ),
+			__( 'Próximas salidas', 'arriendo-facil' ),
+			'manage_options',
+			'af-upcoming-exits',
+			array( $this, 'render_upcoming_exits' )
+		);
+
+		add_submenu_page(
+			'arriendo-facil',
 			__( 'Edificios y unidades', 'arriendo-facil' ),
 			__( 'Edificios y unidades', 'arriendo-facil' ),
 			'manage_options',
@@ -1905,6 +1914,13 @@ class Arriendo_Facil_Admin {
 	 */
 	public function render_collections() {
 		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/collections.php';
+	}
+
+	/**
+	 * Renders contract expirations, renewal context and deposit settlement.
+	 */
+	public function render_upcoming_exits() {
+		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/upcoming-exits.php';
 	}
 
 	/**

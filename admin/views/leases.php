@@ -223,6 +223,11 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 				<input type="number" name="monthly_rent" step="0.01" min="0" required style="width:100%;" placeholder="0.00" />
 			</label>
 
+			<label>
+				<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Garantía recibida (USD)', 'arriendo-facil' ); ?></span>
+				<input type="number" name="deposit_amount" step="0.01" min="0" style="width:100%;" placeholder="0.00" />
+			</label>
+
 			<div style="display:flex; gap:8px;">
 				<button type="submit" class="button button-primary"><?php esc_html_e( 'Crear contrato', 'arriendo-facil' ); ?></button>
 				<button type="button" class="button" id="af-lease-cancel"><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>

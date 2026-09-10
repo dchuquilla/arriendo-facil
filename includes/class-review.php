@@ -142,11 +142,11 @@ class Arriendo_Facil_Review {
 	}
 
 	/**
-	 * Derives a 1-5 payment punctuality score from the lease ledger.
+	 * Derives a 1-5 payment punctuality score from the tenant's full ledger history.
 	 * Returns null when there is not enough history to judge.
 	 *
-	 * @param int $lease_id Lease ID.
-	 * @return array{score:int,on_time:int,late:int,total:int}|null
+	 * @param int $lease_id A lease belonging to the tenant to evaluate.
+	 * @return array{score:int,on_time:int,late:int,total:int,average_days_late:float}|null
 	 */
 	public static function suggest_payment_score( $lease_id ) {
 		global $wpdb;
@@ -158,6 +158,11 @@ class Arriendo_Facil_Review {
 
 		$charges_table = Arriendo_Facil_Billing_Ledger::charges_table();
 		$payments_table = Arriendo_Facil_Billing_Ledger::payments_table();
+		$leases_table   = $wpdb->prefix . 'af_leases';
+		$guest_id       = (int) $wpdb->get_var( $wpdb->prepare( "SELECT guest_id FROM {$leases_table} WHERE id = %d", $lease_id ) );
+		if ( ! $guest_id ) {
+			return null;
+		}
 
 		// A charge counts as on time when its last payment landed on or before the due date.
 		$rows = (array) $wpdb->get_results(
@@ -165,9 +170,10 @@ class Arriendo_Facil_Review {
 				"SELECT c.id, c.due_date, c.status, MAX(p.payment_date) AS last_payment
 				 FROM {$charges_table} c
 				 LEFT JOIN {$payments_table} p ON p.charge_id = c.id
-				 WHERE c.lease_id = %d AND c.status != 'void'
+				 INNER JOIN {$leases_table} l ON l.id = c.lease_id
+				 WHERE l.guest_id = %d AND c.status != 'void'
 				 GROUP BY c.id, c.due_date, c.status",
-				$lease_id
+				$guest_id
 			)
 		);
 
@@ -177,18 +183,18 @@ class Arriendo_Facil_Review {
 
 		$on_time = 0;
 		$late    = 0;
+		$total_days_late = 0;
 
 		foreach ( $rows as $row ) {
-			if ( 'paid' !== $row->status ) {
+			$reference_date = 'paid' === $row->status && $row->last_payment ? (string) $row->last_payment : gmdate( 'Y-m-d' );
+			$days_late      = max( 0, (int) floor( ( strtotime( $reference_date ) - strtotime( $row->due_date ) ) / DAY_IN_SECONDS ) );
+			$total_days_late += $days_late;
+
+			if ( $days_late > 0 || 'paid' !== $row->status ) {
 				$late++;
 				continue;
 			}
-
-			if ( $row->last_payment && strtotime( $row->last_payment ) <= strtotime( $row->due_date ) ) {
-				$on_time++;
-			} else {
-				$late++;
-			}
+			$on_time++;
 		}
 
 		$total = $on_time + $late;
@@ -196,15 +202,14 @@ class Arriendo_Facil_Review {
 			return null;
 		}
 
-		$ratio = $on_time / $total;
-
-		if ( $ratio >= 0.95 ) {
+		$average_days_late = round( $total_days_late / $total, 1 );
+		if ( 0.0 === $average_days_late ) {
 			$score = 5;
-		} elseif ( $ratio >= 0.85 ) {
+		} elseif ( $average_days_late <= 3 ) {
 			$score = 4;
-		} elseif ( $ratio >= 0.70 ) {
+		} elseif ( $average_days_late <= 10 ) {
 			$score = 3;
-		} elseif ( $ratio >= 0.50 ) {
+		} elseif ( $average_days_late <= 20 ) {
 			$score = 2;
 		} else {
 			$score = 1;
@@ -215,6 +220,7 @@ class Arriendo_Facil_Review {
 			'on_time' => $on_time,
 			'late'    => $late,
 			'total'   => $total,
+			'average_days_late' => $average_days_late,
 		);
 	}
 

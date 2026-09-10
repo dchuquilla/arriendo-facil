@@ -244,6 +244,14 @@
 .af-kpi--info::before    { background: var(--af-info-500); opacity: 1; }
 .af-kpi--accent::before  { background: var(--af-accent-500); opacity: 1; }
 
+/* Compact action forms keep operational tables legible without hiding controls. */
+.af-inline-operation { display: flex; flex-wrap: wrap; gap: var(--af-space-2); margin-top: var(--af-space-2); align-items: end; }
+.af-inline-operation input, .af-inline-operation select { min-height: 34px; max-width: 175px; }
+.af-inline-operation label { display: grid; gap: 3px; font-size: var(--af-text-xs); font-weight: 600; }
+.af-deposit-details summary { color: var(--af-primary-700); cursor: pointer; font-weight: 700; }
+.af-deposit-details p { margin: var(--af-space-2) 0; color: var(--af-gray-500); font-size: var(--af-text-xs); }
+@media (max-width: 782px) { .af-inline-operation input, .af-inline-operation select { max-width: none; width: 100%; } .af-inline-operation { display: grid; } }
+
 .af-kpi__head {
 	display: flex;
 	align-items: center;

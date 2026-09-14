@@ -32,6 +32,7 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-text-normalizer.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-identity-validator.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-private-storage.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-idempotency.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-tenancy.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-property-structure.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-billing-ledger.php';

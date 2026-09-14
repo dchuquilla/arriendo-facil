@@ -1095,7 +1095,7 @@ class Arriendo_Facil_Accommodation {
 	}
 
 	/**
-	 * Returns whether a user has the af_owner role.
+	 * Returns whether a user has the af_property_admin (subadmin) role.
 	 *
 	 * @param int $user_id User ID. Defaults to current user.
 	 * @return bool
@@ -1109,7 +1109,7 @@ class Arriendo_Facil_Accommodation {
 			return false;
 		}
 		$roles = isset( $user->roles ) && is_array( $user->roles ) ? $user->roles : array();
-		return in_array( 'af_owner', $roles, true );
+		return in_array( 'af_property_admin', $roles, true );
 	}
 
 	/**
@@ -1222,7 +1222,7 @@ class Arriendo_Facil_Accommodation {
 
 		$role_owner_users = get_users(
 			array(
-				'role'   => 'af_owner',
+				'role'   => 'af_property_admin',
 				'fields' => 'ID',
 			)
 		);

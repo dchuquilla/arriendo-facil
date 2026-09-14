@@ -69,13 +69,16 @@ $overdue_count  = 0;
 $overdue_amount = 0.0;
 $expiring_count = 0;
 $docs_pending   = 0;
+$scope_ids      = Arriendo_Facil_Tenancy::accessible_accommodation_ids();
 
 if ( $has_ledger ) {
+	$scope_clause = null === $scope_ids ? '' : ' AND lease_id IN (SELECT id FROM ' . $wpdb->prefix . 'af_leases WHERE accommodation_id IN (' . Arriendo_Facil_Tenancy::ids_in_clause( $scope_ids ) . '))';
+
 	$period_totals = $wpdb->get_row(
 		$wpdb->prepare(
 			"SELECT COALESCE(SUM(amount), 0) AS charged, COALESCE(SUM(amount_paid), 0) AS paid
 			 FROM {$charges_table}
-			 WHERE period = %s AND status != 'void'",
+			 WHERE period = %s AND status != 'void'{$scope_clause}", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			$current_period
 		)
 	);
@@ -86,7 +89,7 @@ if ( $has_ledger ) {
 		$wpdb->prepare(
 			"SELECT COUNT(*) AS total, COALESCE(SUM(amount - amount_paid), 0) AS balance
 			 FROM {$charges_table}
-			 WHERE status IN ('pending', 'partial', 'overdue') AND due_date < %s",
+			 WHERE status IN ('pending', 'partial', 'overdue') AND due_date < %s{$scope_clause}", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			gmdate( 'Y-m-d' )
 		)
 	);
@@ -95,24 +98,75 @@ if ( $has_ledger ) {
 }
 
 // Contratos que vencen en los próximos 60 días.
+$expiring_where = "status = 'active' AND deleted_at IS NULL AND end_date BETWEEN %s AND %s";
+$expiring_args  = array( gmdate( 'Y-m-d' ), gmdate( 'Y-m-d', strtotime( '+60 days' ) ) );
+if ( null !== $scope_ids ) {
+	$expiring_where .= ' AND accommodation_id IN (' . Arriendo_Facil_Tenancy::ids_in_clause( $scope_ids ) . ')';
+}
+
 $expiring_count = (int) $wpdb->get_var(
 	$wpdb->prepare(
-		"SELECT COUNT(*) FROM {$wpdb->prefix}af_leases
-		 WHERE status = 'active' AND deleted_at IS NULL
-		   AND end_date BETWEEN %s AND %s",
-		gmdate( 'Y-m-d' ),
-		gmdate( 'Y-m-d', strtotime( '+60 days' ) )
+		"SELECT COUNT(*) FROM {$wpdb->prefix}af_leases WHERE {$expiring_where}", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$expiring_args
 	)
 );
 
 if ( class_exists( 'Arriendo_Facil_Document_Verification' ) ) {
-	$docs_pending = (int) $wpdb->get_var(
-		"SELECT COUNT(*) FROM {$wpdb->prefix}af_guests WHERE doc_status IS NULL OR doc_status = 'pendiente'"
-	);
+	$docs_where = "doc_status IS NULL OR doc_status = 'pendiente'";
+	if ( isset( $scope_ids ) && null !== $scope_ids ) {
+		$docs_where = '(' . $docs_where . ') AND accommodation_id IN (' . Arriendo_Facil_Tenancy::ids_in_clause( $scope_ids ) . ')';
+	}
+	$docs_pending = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_guests WHERE {$docs_where}" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 }
 
 $period_balance   = round( $period_charged - $period_paid, 2 );
 $collection_rate  = $period_charged > 0 ? (int) round( $period_paid / $period_charged * 100 ) : 0;
+
+// ── Semáforo de cobros: cobrado / pendiente / atrasado + top mora ────────
+$semaforo = array(
+	'cobrado'   => array( 'count' => 0, 'amount' => 0.0 ),
+	'pendiente' => array( 'count' => 0, 'amount' => 0.0 ),
+	'atrasado'  => array( 'count' => $overdue_count, 'amount' => $overdue_amount ),
+);
+$top_mora = array();
+
+if ( $is_management_model && $has_ledger ) {
+	$semaforo_scope = null === $scope_ids ? '' : ' AND c.lease_id IN (SELECT id FROM ' . $wpdb->prefix . 'af_leases WHERE accommodation_id IN (' . Arriendo_Facil_Tenancy::ids_in_clause( $scope_ids ) . '))';
+
+	$status_totals = $wpdb->get_results(
+		$wpdb->prepare(
+			"SELECT c.status, COUNT(*) AS total, COALESCE(SUM(c.amount), 0) AS amount
+			 FROM {$charges_table} c
+			 WHERE c.period = %s AND c.status != 'void'{$semaforo_scope}
+			 GROUP BY c.status", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$current_period
+		)
+	);
+
+	foreach ( (array) $status_totals as $row ) {
+		if ( 'paid' === $row->status ) {
+			$semaforo['cobrado']['count']  += (int) $row->total;
+			$semaforo['cobrado']['amount'] += (float) $row->amount;
+		} elseif ( in_array( $row->status, array( 'pending', 'partial' ), true ) ) {
+			$semaforo['pendiente']['count']  += (int) $row->total;
+			$semaforo['pendiente']['amount'] += (float) $row->amount;
+		}
+	}
+
+	$top_mora = (array) $wpdb->get_results(
+		"SELECT c.id, c.amount, c.amount_paid, c.due_date, DATEDIFF(CURDATE(), c.due_date) AS days_overdue,
+		        p.post_title AS accommodation_title,
+		        CONCAT(g.first_name, ' ', g.last_name) AS guest_name,
+		        l.id AS lease_id
+		 FROM {$charges_table} c
+		 LEFT JOIN {$wpdb->prefix}af_leases l ON l.id = c.lease_id
+		 LEFT JOIN {$wpdb->posts} p ON p.ID = l.accommodation_id
+		 LEFT JOIN {$wpdb->prefix}af_guests g ON g.id = c.guest_id
+		 WHERE c.status IN ('pending', 'partial', 'overdue') AND c.due_date < CURDATE(){$semaforo_scope}
+		 ORDER BY days_overdue DESC
+		 LIMIT 6" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	);
+}
 
 // ── Owner property preview (top 6) ────────────────────────────────────────
 $owner_properties = array();
@@ -142,6 +196,25 @@ if ( $hour < 12 ) {
 
 $first_name = $current_user->first_name ? $current_user->first_name : $current_user->display_name;
 $today_str  = wp_date( 'l, j \d\e F' );
+
+// ── Video de marca en el hero (opcional, configurable por el super admin) ─
+$hero_video_url    = (string) get_option( 'af_dashboard_hero_video_url', '' );
+$hero_video_embed  = '';
+$hero_video_direct = false;
+
+if ( '' !== $hero_video_url ) {
+	if ( preg_match( '/\.(mp4|webm|ogg)(\?.*)?$/i', $hero_video_url ) ) {
+		$hero_video_direct = true;
+	} else {
+		$oembed_cache_key = 'af_hero_oembed_' . md5( $hero_video_url );
+		$hero_video_embed  = get_transient( $oembed_cache_key );
+
+		if ( false === $hero_video_embed ) {
+			$hero_video_embed = (string) wp_oembed_get( $hero_video_url, array( 'width' => 640 ) );
+			set_transient( $oembed_cache_key, $hero_video_embed, DAY_IN_SECONDS );
+		}
+	}
+}
 
 // ── Tasks list ────────────────────────────────────────────────────────────
 $tasks = array();
@@ -234,6 +307,51 @@ if ( $pending_queue > 0 && ! $is_management_model ) {
 			</a>
 		</div>
 	</header>
+
+	<?php if ( '' !== $hero_video_url ) : ?>
+		<section class="af-hero-media" aria-label="<?php esc_attr_e( 'Video de bienvenida', 'arriendo-facil' ); ?>">
+			<div class="af-hero-media__frame">
+				<?php if ( $hero_video_direct ) : ?>
+					<video class="af-hero-media__video" src="<?php echo esc_url( $hero_video_url ); ?>" autoplay muted loop playsinline></video>
+				<?php elseif ( '' !== $hero_video_embed ) : ?>
+					<div class="af-hero-media__embed"><?php echo $hero_video_embed; /* phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- wp_oembed_get() sanitizes provider markup. */ ?></div>
+				<?php endif; ?>
+			</div>
+			<?php if ( current_user_can( 'manage_options' ) ) : ?>
+				<button type="button" class="af-hero-media__edit" id="af-hero-video-edit"><?php esc_html_e( 'Cambiar video', 'arriendo-facil' ); ?></button>
+			<?php endif; ?>
+		</section>
+	<?php elseif ( current_user_can( 'manage_options' ) ) : ?>
+		<section class="af-hero-media af-hero-media--empty">
+			<p><?php esc_html_e( 'Añade un video corto de bienvenida (mp4/webm o enlace de YouTube/Vimeo) para que el panel se sienta 100% Arriendo Fácil.', 'arriendo-facil' ); ?></p>
+			<button type="button" class="button af-btn af-btn--ghost" id="af-hero-video-edit"><?php esc_html_e( 'Añadir video', 'arriendo-facil' ); ?></button>
+		</section>
+	<?php endif; ?>
+
+	<?php if ( current_user_can( 'manage_options' ) ) : ?>
+		<div class="af-modal" id="af-hero-video-modal" role="dialog" aria-modal="true" aria-labelledby="af-hero-video-modal-title">
+			<div class="af-modal__backdrop" data-af-modal-close></div>
+			<div class="af-modal__dialog">
+				<button type="button" class="af-modal__close" data-af-modal-close aria-label="<?php esc_attr_e( 'Cerrar', 'arriendo-facil' ); ?>">&times;</button>
+				<div class="af-modal__header">
+					<h2 class="af-modal__title" id="af-hero-video-modal-title"><?php esc_html_e( 'Video de bienvenida', 'arriendo-facil' ); ?></h2>
+					<p class="af-modal__subtitle"><?php esc_html_e( 'Un video corto (mp4/webm o YouTube/Vimeo) que aparecerá arriba del panel para todos los usuarios.', 'arriendo-facil' ); ?></p>
+				</div>
+				<div class="af-modal__body">
+					<p class="af-modal__status" id="af-hero-video-status"></p>
+					<div class="af-modal__field">
+						<label for="af-hero-video-url"><?php esc_html_e( 'URL del video', 'arriendo-facil' ); ?></label>
+						<input type="url" id="af-hero-video-url" class="regular-text" style="width:100%;" value="<?php echo esc_attr( $hero_video_url ); ?>" placeholder="https://..." />
+					</div>
+				</div>
+				<div class="af-modal__footer">
+					<button type="button" class="button" id="af-hero-video-clear"><?php esc_html_e( 'Quitar video', 'arriendo-facil' ); ?></button>
+					<button type="button" class="button" data-af-modal-close><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
+					<button type="button" class="button button-primary" id="af-hero-video-save"><?php esc_html_e( 'Guardar', 'arriendo-facil' ); ?></button>
+				</div>
+			</div>
+		</div>
+	<?php endif; ?>
 
 	<?php if ( $is_owner && 0 === $accommodation_count ) : ?>
 		<section class="af-welcome" aria-labelledby="af-welcome-title">
@@ -516,6 +634,69 @@ if ( $pending_queue > 0 && ! $is_management_model ) {
 
 	</div>
 
+	<?php if ( $is_management_model && $has_ledger ) : ?>
+	<section class="af-section af-semaforo" aria-labelledby="af-semaforo-title">
+		<header class="af-section__header">
+			<div>
+				<h2 class="af-section__title" id="af-semaforo-title"><?php esc_html_e( 'Semáforo de cobros', 'arriendo-facil' ); ?></h2>
+				<p class="af-section__subtitle"><?php echo esc_html( sprintf( /* translators: %s: period */ __( 'Estado de los cargos de %s en tiempo real.', 'arriendo-facil' ), $current_period ) ); ?></p>
+			</div>
+			<a class="af-kpi__link" href="<?php echo esc_url( admin_url( 'admin.php?page=af-collections' ) ); ?>"><?php esc_html_e( 'Ver control de pagos →', 'arriendo-facil' ); ?></a>
+		</header>
+
+		<div class="af-semaforo__lights" role="list">
+			<article class="af-semaforo__light af-semaforo__light--success" role="listitem">
+				<span class="af-semaforo__dot" aria-hidden="true"></span>
+				<div>
+					<span class="af-semaforo__label"><?php esc_html_e( 'Cobrado', 'arriendo-facil' ); ?></span>
+					<span class="af-semaforo__value">$<?php echo esc_html( number_format_i18n( $semaforo['cobrado']['amount'], 2 ) ); ?></span>
+					<span class="af-semaforo__meta"><?php echo esc_html( sprintf( /* translators: %d: charge count */ _n( '%d cargo', '%d cargos', $semaforo['cobrado']['count'], 'arriendo-facil' ), $semaforo['cobrado']['count'] ) ); ?></span>
+				</div>
+			</article>
+			<article class="af-semaforo__light af-semaforo__light--warning" role="listitem">
+				<span class="af-semaforo__dot" aria-hidden="true"></span>
+				<div>
+					<span class="af-semaforo__label"><?php esc_html_e( 'Pendiente', 'arriendo-facil' ); ?></span>
+					<span class="af-semaforo__value">$<?php echo esc_html( number_format_i18n( $semaforo['pendiente']['amount'], 2 ) ); ?></span>
+					<span class="af-semaforo__meta"><?php echo esc_html( sprintf( /* translators: %d: charge count */ _n( '%d cargo', '%d cargos', $semaforo['pendiente']['count'], 'arriendo-facil' ), $semaforo['pendiente']['count'] ) ); ?></span>
+				</div>
+			</article>
+			<article class="af-semaforo__light af-semaforo__light--danger<?php echo $semaforo['atrasado']['count'] > 0 ? ' is-pulsing' : ''; ?>" role="listitem">
+				<span class="af-semaforo__dot" aria-hidden="true"></span>
+				<div>
+					<span class="af-semaforo__label"><?php esc_html_e( 'Atrasado', 'arriendo-facil' ); ?></span>
+					<span class="af-semaforo__value">$<?php echo esc_html( number_format_i18n( $semaforo['atrasado']['amount'], 2 ) ); ?></span>
+					<span class="af-semaforo__meta"><?php echo esc_html( sprintf( /* translators: %d: charge count */ _n( '%d cargo', '%d cargos', $semaforo['atrasado']['count'], 'arriendo-facil' ), $semaforo['atrasado']['count'] ) ); ?></span>
+				</div>
+			</article>
+		</div>
+
+		<?php if ( ! empty( $top_mora ) ) : ?>
+			<div class="af-semaforo__table" role="table" aria-label="<?php esc_attr_e( 'Inquilinos con mayor mora', 'arriendo-facil' ); ?>">
+				<?php foreach ( $top_mora as $mora_row ) : ?>
+					<?php
+					$days = (int) $mora_row->days_overdue;
+					$tier = $days > 60 ? 'danger' : ( $days > 30 ? 'warning' : 'neutral' );
+					$due  = (float) $mora_row->amount - (float) $mora_row->amount_paid;
+					?>
+					<a class="af-semaforo__row" href="<?php echo esc_url( admin_url( 'admin.php?page=af-collections&statement_lease=' . (int) $mora_row->lease_id ) ); ?>">
+						<span class="af-semaforo__tenant">
+							<strong><?php echo esc_html( trim( (string) $mora_row->guest_name ) ? trim( (string) $mora_row->guest_name ) : __( 'Inquilino', 'arriendo-facil' ) ); ?></strong>
+							<small><?php echo esc_html( $mora_row->accommodation_title ? $mora_row->accommodation_title : '—' ); ?></small>
+						</span>
+						<span class="af-pill af-pill--<?php echo esc_attr( $tier ); ?>">
+							<?php echo esc_html( sprintf( /* translators: %d: days overdue */ _n( '%d día de mora', '%d días de mora', $days, 'arriendo-facil' ), $days ) ); ?>
+						</span>
+						<span class="af-semaforo__amount">$<?php echo esc_html( number_format_i18n( $due, 2 ) ); ?></span>
+					</a>
+				<?php endforeach; ?>
+			</div>
+		<?php else : ?>
+			<p class="af-semaforo__empty"><?php esc_html_e( 'Ningún inquilino en mora. Excelente gestión de cobranza.', 'arriendo-facil' ); ?></p>
+		<?php endif; ?>
+	</section>
+	<?php endif; ?>
+
 	<div class="af-split">
 
 		<section class="af-section" aria-labelledby="af-dashboard-focus">
@@ -675,3 +856,78 @@ if ( $pending_queue > 0 && ! $is_management_model ) {
 	</div>
 
 </div>
+
+<?php if ( current_user_can( 'manage_options' ) ) : ?>
+<script>
+(function () {
+	const ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
+	const nonce = <?php echo wp_json_encode( wp_create_nonce( 'af_dashboard_hero_video_nonce' ) ); ?>;
+
+	function post(payload) {
+		const body = new URLSearchParams();
+		Object.keys(payload).forEach((k) => body.append(k, payload[k]));
+		body.append('action', 'af_save_dashboard_hero_video');
+		body.append('nonce', nonce);
+		return fetch(ajaxUrl, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+			body: body
+		}).then((r) => r.json());
+	}
+
+	function openModal(modal) {
+		modal.classList.add('is-open');
+		const focusable = modal.querySelector('input, button.button-primary');
+		if (focusable) { focusable.focus(); }
+	}
+
+	function closeModal(modal) {
+		modal.classList.remove('is-open');
+	}
+
+	const modal = document.getElementById('af-hero-video-modal');
+	if (!modal) { return; }
+
+	modal.querySelectorAll('[data-af-modal-close]').forEach(function (btn) {
+		btn.addEventListener('click', function () { closeModal(modal); });
+	});
+	document.addEventListener('keydown', function (e) {
+		if (e.key === 'Escape') { closeModal(modal); }
+	});
+
+	document.querySelectorAll('#af-hero-video-edit').forEach(function (btn) {
+		btn.addEventListener('click', function () { openModal(modal); });
+	});
+
+	const status = document.getElementById('af-hero-video-status');
+	const input  = document.getElementById('af-hero-video-url');
+
+	function setStatus(message, type) {
+		status.textContent = message;
+		status.className = 'af-modal__status is-' + type;
+	}
+
+	document.getElementById('af-hero-video-save').addEventListener('click', function () {
+		post({ video_url: input.value.trim() }).then((res) => {
+			if (res && res.success) {
+				window.location.reload();
+			} else {
+				setStatus((res && res.data && res.data.message) ? res.data.message : 'Error', 'error');
+			}
+		});
+	});
+
+	document.getElementById('af-hero-video-clear').addEventListener('click', function () {
+		input.value = '';
+		post({ video_url: '' }).then((res) => {
+			if (res && res.success) {
+				window.location.reload();
+			} else {
+				setStatus((res && res.data && res.data.message) ? res.data.message : 'Error', 'error');
+			}
+		});
+	});
+})();
+</script>
+<?php endif; ?>
+

@@ -260,8 +260,16 @@ class Arriendo_Facil_Property_Structure {
 	public function ajax_create_building() {
 		check_ajax_referer( 'af_structure_nonce', 'nonce' );
 
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$can_manage_all = Arriendo_Facil_Tenancy::can_manage_all();
+		$owner_id       = get_current_user_id();
+
+		// Only a super admin may assign a building to a different property admin.
+		if ( $can_manage_all && ! empty( $_POST['assigned_admin_id'] ) ) {
+			$owner_id = absint( wp_unslash( $_POST['assigned_admin_id'] ) );
 		}
 
 		$result = self::create_building(
@@ -270,6 +278,7 @@ class Arriendo_Facil_Property_Structure {
 				'address'           => isset( $_POST['address'] ) ? sanitize_text_field( wp_unslash( $_POST['address'] ) ) : '',
 				'city'              => isset( $_POST['city'] ) ? sanitize_text_field( wp_unslash( $_POST['city'] ) ) : '',
 				'monthly_hoa_total' => isset( $_POST['monthly_hoa_total'] ) ? (float) wp_unslash( $_POST['monthly_hoa_total'] ) : 0,
+				'owner_id'          => $owner_id,
 			)
 		);
 
@@ -293,13 +302,19 @@ class Arriendo_Facil_Property_Structure {
 	public function ajax_create_unit() {
 		check_ajax_referer( 'af_structure_nonce', 'nonce' );
 
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$building_id = isset( $_POST['building_id'] ) ? absint( wp_unslash( $_POST['building_id'] ) ) : 0;
+
+		if ( ! Arriendo_Facil_Tenancy::can_access_building( $building_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes acceso a este edificio.', 'arriendo-facil' ) ), 403 );
 		}
 
 		$result = self::create_unit(
 			array(
-				'building_id'      => isset( $_POST['building_id'] ) ? absint( wp_unslash( $_POST['building_id'] ) ) : 0,
+				'building_id'      => $building_id,
 				'unit_code'        => isset( $_POST['unit_code'] ) ? sanitize_text_field( wp_unslash( $_POST['unit_code'] ) ) : '',
 				'hoa_coefficient'  => isset( $_POST['hoa_coefficient'] ) ? (float) wp_unslash( $_POST['hoa_coefficient'] ) : 0,
 				'area_m2'          => isset( $_POST['area_m2'] ) ? (float) wp_unslash( $_POST['area_m2'] ) : 0,

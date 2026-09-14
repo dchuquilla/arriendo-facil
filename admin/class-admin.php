@@ -50,6 +50,10 @@ class Arriendo_Facil_Admin {
 			add_action( 'wp_ajax_af_generate_document', array( $this, 'ajax_generate_document' ) );
 		}
 		add_action( 'wp_ajax_af_resolve_short_url', array( $this, 'ajax_resolve_short_url' ) );
+		add_action( 'wp_ajax_af_create_property_admin', array( $this, 'ajax_create_property_admin' ) );
+		add_action( 'wp_ajax_af_set_property_admin_status', array( $this, 'ajax_set_property_admin_status' ) );
+		add_action( 'wp_ajax_af_save_dashboard_hero_video', array( $this, 'ajax_save_dashboard_hero_video' ) );
+		add_filter( 'wp_authenticate_user', array( $this, 'block_suspended_property_admin_login' ), 10, 2 );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
 		add_action( 'admin_notices', array( $this, 'pandoc_notice' ) );
 	}
@@ -95,9 +99,18 @@ class Arriendo_Facil_Admin {
 
 		add_submenu_page(
 			'arriendo-facil',
-			__( 'Próximas salidas', 'arriendo-facil' ),
-			__( 'Próximas salidas', 'arriendo-facil' ),
+			__( 'Administradores de Propiedades', 'arriendo-facil' ),
+			__( 'Administradores', 'arriendo-facil' ),
 			'manage_options',
+			'af-property-admins',
+			array( $this, 'render_property_admins' )
+		);
+
+		add_submenu_page(
+			'arriendo-facil',
+			__( 'Próximas salidas', 'arriendo-facil' ),
+			__( 'Próximas salidas', 'arriendo-facil' ),
+			Arriendo_Facil_Tenancy::CAP,
 			'af-upcoming-exits',
 			array( $this, 'render_upcoming_exits' )
 		);
@@ -106,7 +119,7 @@ class Arriendo_Facil_Admin {
 			'arriendo-facil',
 			__( 'Edificios y unidades', 'arriendo-facil' ),
 			__( 'Edificios y unidades', 'arriendo-facil' ),
-			'manage_options',
+			Arriendo_Facil_Tenancy::CAP,
 			'af-buildings',
 			array( $this, 'render_buildings' )
 		);
@@ -115,7 +128,7 @@ class Arriendo_Facil_Admin {
 			'arriendo-facil',
 			__( 'Control de pagos', 'arriendo-facil' ),
 			__( 'Control de pagos', 'arriendo-facil' ),
-			'manage_options',
+			Arriendo_Facil_Tenancy::CAP,
 			'af-collections',
 			array( $this, 'render_collections' )
 		);
@@ -124,7 +137,7 @@ class Arriendo_Facil_Admin {
 			'arriendo-facil',
 			__( 'Lecturas de medidor', 'arriendo-facil' ),
 			__( 'Lecturas', 'arriendo-facil' ),
-			'manage_options',
+			Arriendo_Facil_Tenancy::CAP,
 			'af-meter-readings',
 			array( $this, 'render_meter_readings' )
 		);
@@ -133,7 +146,7 @@ class Arriendo_Facil_Admin {
 			'arriendo-facil',
 			__( 'Liquidación al propietario', 'arriendo-facil' ),
 			__( 'Liquidaciones', 'arriendo-facil' ),
-			'manage_options',
+			Arriendo_Facil_Tenancy::CAP,
 			'af-owner-settlements',
 			array( $this, 'render_owner_settlements' )
 		);
@@ -142,7 +155,7 @@ class Arriendo_Facil_Admin {
 			'arriendo-facil',
 			__( 'Mantenimiento e incidencias', 'arriendo-facil' ),
 			__( 'Mantenimiento', 'arriendo-facil' ),
-			'manage_options',
+			Arriendo_Facil_Tenancy::CAP,
 			'af-maintenance',
 			array( $this, 'render_maintenance' )
 		);
@@ -628,11 +641,36 @@ class Arriendo_Facil_Admin {
 			return $this->get_tenant_dashboard_url();
 		}
 
-		if ( in_array( 'af_owner', $roles, true ) && ! in_array( 'administrator', $roles, true ) ) {
+		if ( in_array( 'af_property_admin', $roles, true ) && ! in_array( 'administrator', $roles, true ) ) {
 			return admin_url( 'admin.php?page=arriendo-facil' );
 		}
 
 		return $redirect_to;
+	}
+
+	/**
+	 * Blocks login for property-admin (subadmin) licenses marked as
+	 * suspended. Administrators are never affected.
+	 *
+	 * @param WP_User|WP_Error $user     Authenticated user or error.
+	 * @param string            $password Raw password (unused).
+	 * @return WP_User|WP_Error
+	 */
+	public function block_suspended_property_admin_login( $user, $password ) {
+		if ( ! ( $user instanceof WP_User ) ) {
+			return $user;
+		}
+
+		$roles = isset( $user->roles ) && is_array( $user->roles ) ? $user->roles : array();
+		if ( ! in_array( 'af_property_admin', $roles, true ) || in_array( 'administrator', $roles, true ) ) {
+			return $user;
+		}
+
+		if ( 'suspended' === get_user_meta( $user->ID, 'af_license_status', true ) ) {
+			return new WP_Error( 'af_license_suspended', __( '<strong>Error:</strong> tu licencia está suspendida. Contacta al administrador de la plataforma.', 'arriendo-facil' ) );
+		}
+
+		return $user;
 	}
 
 	/**
@@ -1910,6 +1948,14 @@ class Arriendo_Facil_Admin {
 	}
 
 	/**
+	 * Renders the super-admin master panel: property-admin accounts
+	 * (licenses) and their aggregated metrics.
+	 */
+	public function render_property_admins() {
+		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/property-admins.php';
+	}
+
+	/**
 	 * Renders the collections (cobranza) admin page.
 	 */
 	public function render_collections() {
@@ -1966,9 +2012,14 @@ class Arriendo_Facil_Admin {
 	}
 
 	/**
-	 * Renders the guests admin page.
+	 * Renders the guests admin page (or the consolidated tenant profile
+	 * when a guest_id + view=profile is requested).
 	 */
 	public function render_guests() {
+		if ( isset( $_GET['view'], $_GET['guest_id'] ) && 'profile' === sanitize_key( wp_unslash( $_GET['view'] ) ) ) {
+			include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/guest-profile.php';
+			return;
+		}
 		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/guests.php';
 	}
 
@@ -2087,6 +2138,43 @@ class Arriendo_Facil_Admin {
 	}
 
 	/**
+	 * AJAX: sets (or clears) the branded intro video shown on the dashboard
+	 * hero. Accepts a direct video file URL (mp4/webm/ogg) or a link from a
+	 * supported oEmbed provider (YouTube, Vimeo).
+	 *
+	 * @return void
+	 */
+	public function ajax_save_dashboard_hero_video() {
+		check_ajax_referer( 'af_dashboard_hero_video_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$url = isset( $_POST['video_url'] ) ? esc_url_raw( wp_unslash( $_POST['video_url'] ) ) : '';
+
+		if ( '' === $url ) {
+			delete_option( 'af_dashboard_hero_video_url' );
+			wp_send_json_success( array( 'message' => __( 'Video removido.', 'arriendo-facil' ) ) );
+		}
+
+		$is_direct_file = (bool) preg_match( '/\.(mp4|webm|ogg)(\?.*)?$/i', $url );
+		$is_oembed       = false;
+
+		if ( ! $is_direct_file ) {
+			$is_oembed = false !== wp_oembed_get( $url, array( 'width' => 640 ) );
+		}
+
+		if ( ! $is_direct_file && ! $is_oembed ) {
+			wp_send_json_error( array( 'message' => __( 'URL no soportada. Usa un archivo .mp4/.webm o un enlace de YouTube/Vimeo.', 'arriendo-facil' ) ), 400 );
+		}
+
+		update_option( 'af_dashboard_hero_video_url', $url );
+
+		wp_send_json_success( array( 'message' => __( 'Video guardado.', 'arriendo-facil' ) ) );
+	}
+
+	/**
 	 * Filter helper: cap redirects at 3 for the short-url resolver.
 	 *
 	 * @param int $count Redirection count.
@@ -2094,6 +2182,121 @@ class Arriendo_Facil_Admin {
 	 */
 	public function cap_short_resolve_redirects( $count ) {
 		return min( (int) $count, 3 );
+	}
+
+	/**
+	 * AJAX: creates a property-admin (subadmin) account — a license sold to
+	 * a property-management company. No email is sent; the temporary
+	 * password is returned once in the response for the super admin to hand
+	 * over manually (WhatsApp, in person, etc.).
+	 *
+	 * @return void
+	 */
+	public function ajax_create_property_admin() {
+		check_ajax_referer( 'af_property_admin_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$company_name = isset( $_POST['company_name'] ) ? sanitize_text_field( wp_unslash( $_POST['company_name'] ) ) : '';
+		$contact_name = isset( $_POST['contact_name'] ) ? sanitize_text_field( wp_unslash( $_POST['contact_name'] ) ) : '';
+		$email        = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
+		$phone        = isset( $_POST['phone'] ) ? sanitize_text_field( wp_unslash( $_POST['phone'] ) ) : '';
+
+		if ( '' === $contact_name || ! is_email( $email ) ) {
+			wp_send_json_error( array( 'message' => __( 'Nombre y correo válido son obligatorios.', 'arriendo-facil' ) ), 400 );
+		}
+
+		if ( email_exists( $email ) ) {
+			wp_send_json_error( array( 'message' => __( 'Ya existe una cuenta con ese correo.', 'arriendo-facil' ) ), 400 );
+		}
+
+		if ( ! get_role( 'af_property_admin' ) && class_exists( 'Arriendo_Facil_Activator' ) ) {
+			Arriendo_Facil_Activator::ensure_owner_role();
+		}
+
+		$temp_password = wp_generate_password( 14, true, true );
+		$base_login    = sanitize_user( current( explode( '@', $email ) ), true );
+		$user_login    = $this->generate_unique_login( $base_login ? $base_login : 'admin', 0 );
+
+		$user_id = wp_insert_user(
+			array(
+				'user_login'   => $user_login,
+				'user_pass'    => $temp_password,
+				'user_email'   => $email,
+				'display_name' => '' !== $company_name ? $company_name : $contact_name,
+				'role'         => 'af_property_admin',
+			)
+		);
+
+		if ( is_wp_error( $user_id ) ) {
+			wp_send_json_error( array( 'message' => $user_id->get_error_message() ), 400 );
+		}
+
+		update_user_meta( $user_id, 'af_company_name', $company_name );
+		update_user_meta( $user_id, 'af_contact_name', $contact_name );
+		update_user_meta( $user_id, 'af_contact_phone', $phone );
+		update_user_meta( $user_id, 'af_license_status', 'active' );
+
+		wp_send_json_success(
+			array(
+				'message'  => __( 'Administrador de propiedades creado. Comparte estas credenciales por un canal seguro (no se envía correo).', 'arriendo-facil' ),
+				'user_id'  => $user_id,
+				'username' => $user_login,
+				'password' => $temp_password,
+			)
+		);
+	}
+
+	/**
+	 * AJAX: activates or suspends a property-admin license.
+	 *
+	 * @return void
+	 */
+	public function ajax_set_property_admin_status() {
+		check_ajax_referer( 'af_property_admin_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$user_id = isset( $_POST['user_id'] ) ? absint( wp_unslash( $_POST['user_id'] ) ) : 0;
+		$status  = isset( $_POST['status'] ) ? sanitize_key( wp_unslash( $_POST['status'] ) ) : '';
+
+		if ( ! $user_id || ! in_array( $status, array( 'active', 'suspended' ), true ) ) {
+			wp_send_json_error( array( 'message' => __( 'Datos inválidos.', 'arriendo-facil' ) ), 400 );
+		}
+
+		$user = get_userdata( $user_id );
+		if ( ! $user || ! in_array( 'af_property_admin', (array) $user->roles, true ) ) {
+			wp_send_json_error( array( 'message' => __( 'Administrador no encontrado.', 'arriendo-facil' ) ), 404 );
+		}
+
+		update_user_meta( $user_id, 'af_license_status', $status );
+
+		wp_send_json_success( array( 'message' => __( 'Estado de licencia actualizado.', 'arriendo-facil' ) ) );
+	}
+
+	/**
+	 * Generates a unique username from a base slug, appending a numeric
+	 * suffix (or the user ID) when the base login is already taken.
+	 *
+	 * @param string $base_login Suggested login (already sanitized).
+	 * @param int    $seed       Fallback seed appended when needed.
+	 * @return string
+	 */
+	private function generate_unique_login( $base_login, $seed = 0 ) {
+		$base_login = $base_login ? $base_login : 'user';
+		$login      = $base_login;
+		$suffix     = 0;
+
+		while ( username_exists( $login ) ) {
+			++$suffix;
+			$login = $base_login . $suffix;
+		}
+
+		return $login;
 	}
 
 	/**
@@ -3994,7 +4197,7 @@ class Arriendo_Facil_Admin {
 			$post_author_id = absint( $post->post_author );
 			if ( $post_author_id > 0 ) {
 				$author = get_user_by( 'id', $post_author_id );
-				if ( $author && in_array( 'af_owner', (array) $author->roles, true ) ) {
+				if ( $author && in_array( 'af_property_admin', (array) $author->roles, true ) ) {
 					return $post_author_id;
 				}
 			}

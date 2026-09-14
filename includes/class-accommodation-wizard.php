@@ -532,7 +532,7 @@ class Arriendo_Facil_Accommodation_Wizard {
 			"SELECT DISTINCT wp_user_id FROM {$wpdb->prefix}af_owner_contacts WHERE wp_user_id IS NOT NULL AND wp_user_id > 0"
 		);
 
-		$role_owner_users = get_users( array( 'role' => 'af_owner', 'fields' => 'ID' ) );
+		$role_owner_users = get_users( array( 'role' => 'af_property_admin', 'fields' => 'ID' ) );
 		if ( is_array( $role_owner_users ) ) {
 			$owner_user_ids = array_merge( is_array( $owner_user_ids ) ? $owner_user_ids : array(), $role_owner_users );
 		}

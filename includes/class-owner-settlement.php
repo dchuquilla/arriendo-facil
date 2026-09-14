@@ -50,10 +50,19 @@ class Arriendo_Facil_Owner_Settlement {
 	/**
 	 * Lists the owners that currently have at least one property assigned.
 	 *
+	 * @param int[]|null $accommodation_ids Restrict to these accommodations
+	 *                                       (property-admin scope). Null = all.
 	 * @return array<int,array{id:int,name:string,property_count:int}>
 	 */
-	public static function get_active_owners() {
+	public static function get_active_owners( $accommodation_ids = null ) {
 		global $wpdb;
+
+		$scope_clause = '';
+		if ( is_array( $accommodation_ids ) ) {
+			$scope_clause = empty( $accommodation_ids )
+				? ' AND 1 = 0'
+				: ' AND p.ID IN (' . implode( ',', array_map( 'absint', $accommodation_ids ) ) . ')';
+		}
 
 		$rows = (array) $wpdb->get_results(
 			"SELECT pm.meta_value AS owner_id, COUNT(*) AS property_count
@@ -61,8 +70,8 @@ class Arriendo_Facil_Owner_Settlement {
 			 INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id
 			 WHERE pm.meta_key = '_af_owner_id'
 			   AND pm.meta_value > 0
-			   AND p.post_type = 'accommodation'
-			 GROUP BY pm.meta_value"
+			   AND p.post_type = 'accommodation'{$scope_clause}
+			 GROUP BY pm.meta_value" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		);
 
 		$owners = array();

@@ -60,7 +60,7 @@ class Arriendo_Facil_Maintenance {
 		return array(
 			'baja'  => __( 'Baja', 'arriendo-facil' ),
 			'media' => __( 'Media', 'arriendo-facil' ),
-			'alta'  => __( 'Alta', 'arriendo-facil' ),
+			'alta'  => __( 'Crítica', 'arriendo-facil' ),
 		);
 	}
 
@@ -182,13 +182,18 @@ class Arriendo_Facil_Maintenance {
 	public function ajax_create_maintenance() {
 		check_ajax_referer( 'af_maintenance_nonce', 'nonce' );
 
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$accommodation_id = isset( $_POST['accommodation_id'] ) ? absint( wp_unslash( $_POST['accommodation_id'] ) ) : 0;
+		if ( ! Arriendo_Facil_Tenancy::can_access_accommodation( $accommodation_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes acceso a este inmueble.', 'arriendo-facil' ) ), 403 );
 		}
 
 		$result = self::create(
 			array(
-				'accommodation_id' => isset( $_POST['accommodation_id'] ) ? absint( wp_unslash( $_POST['accommodation_id'] ) ) : 0,
+				'accommodation_id' => $accommodation_id,
 				'request_type'     => isset( $_POST['request_type'] ) ? sanitize_key( wp_unslash( $_POST['request_type'] ) ) : '',
 				'priority'         => isset( $_POST['priority'] ) ? sanitize_key( wp_unslash( $_POST['priority'] ) ) : '',
 				'reported_by'      => isset( $_POST['reported_by'] ) ? sanitize_key( wp_unslash( $_POST['reported_by'] ) ) : '',
@@ -218,13 +223,18 @@ class Arriendo_Facil_Maintenance {
 	public function ajax_update_status() {
 		check_ajax_referer( 'af_maintenance_nonce', 'nonce' );
 
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$request_id = isset( $_POST['request_id'] ) ? absint( wp_unslash( $_POST['request_id'] ) ) : 0;
+		if ( ! Arriendo_Facil_Tenancy::can_access_maintenance( $request_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes acceso a esta incidencia.', 'arriendo-facil' ) ), 403 );
 		}
 
 		$cost   = isset( $_POST['cost'] ) && '' !== $_POST['cost'] ? (float) wp_unslash( $_POST['cost'] ) : null;
 		$result = self::update_status(
-			isset( $_POST['request_id'] ) ? absint( wp_unslash( $_POST['request_id'] ) ) : 0,
+			$request_id,
 			isset( $_POST['status'] ) ? sanitize_key( wp_unslash( $_POST['status'] ) ) : '',
 			$cost
 		);

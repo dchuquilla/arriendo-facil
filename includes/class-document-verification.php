@@ -60,7 +60,7 @@ class Arriendo_Facil_Document_Verification {
 	public function ajax_download_guest_document() {
 		check_ajax_referer( 'af_document_nonce', 'nonce' );
 
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
@@ -73,6 +73,10 @@ class Arriendo_Facil_Document_Verification {
 
 		if ( ! $document ) {
 			wp_send_json_error( array( 'message' => __( 'Documento no encontrado.', 'arriendo-facil' ) ), 404 );
+		}
+
+		if ( ! Arriendo_Facil_Tenancy::can_access_guest( (int) $document->guest_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes acceso a este documento.', 'arriendo-facil' ) ), 403 );
 		}
 
 		if ( 'r2' === $document->storage ) {
@@ -185,12 +189,17 @@ class Arriendo_Facil_Document_Verification {
 	public function ajax_set_document_status() {
 		check_ajax_referer( 'af_document_nonce', 'nonce' );
 
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
+		$guest_id = isset( $_POST['guest_id'] ) ? absint( wp_unslash( $_POST['guest_id'] ) ) : 0;
+		if ( ! Arriendo_Facil_Tenancy::can_access_guest( $guest_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes acceso a este inquilino.', 'arriendo-facil' ) ), 403 );
+		}
+
 		$result = self::set_status(
-			isset( $_POST['guest_id'] ) ? absint( wp_unslash( $_POST['guest_id'] ) ) : 0,
+			$guest_id,
 			isset( $_POST['doc_status'] ) ? sanitize_key( wp_unslash( $_POST['doc_status'] ) ) : '',
 			isset( $_POST['notes'] ) ? sanitize_textarea_field( wp_unslash( $_POST['notes'] ) ) : ''
 		);

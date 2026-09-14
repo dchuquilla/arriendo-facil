@@ -48,11 +48,16 @@ class Arriendo_Facil_Review {
 	public function ajax_rate_tenant() {
 		check_ajax_referer( 'af_rate_tenant_nonce', 'nonce' );
 
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
 		$lease_id = isset( $_POST['lease_id'] ) ? absint( wp_unslash( $_POST['lease_id'] ) ) : 0;
+
+		if ( ! Arriendo_Facil_Tenancy::can_access_lease( $lease_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes acceso a este contrato.', 'arriendo-facil' ) ), 403 );
+		}
+
 		$comment  = isset( $_POST['comment'] ) ? sanitize_textarea_field( wp_unslash( $_POST['comment'] ) ) : '';
 
 		$scores = array();

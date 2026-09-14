@@ -19,9 +19,14 @@ if ( ! preg_match( '/^\d{4}-\d{2}$/', $period_filter ) ) {
 	$period_filter = gmdate( 'Y-m' );
 }
 
+$accessible_building_ids = Arriendo_Facil_Tenancy::accessible_building_ids();
+$building_scope_clause   = null === $accessible_building_ids ? '' : ' AND id IN (' . Arriendo_Facil_Tenancy::ids_in_clause( $accessible_building_ids ) . ')';
+
 $buildings = (array) $wpdb->get_results(
-	'SELECT id, name FROM ' . Arriendo_Facil_Property_Structure::buildings_table() . " WHERE status = 'active' ORDER BY name ASC"
+	'SELECT id, name FROM ' . Arriendo_Facil_Property_Structure::buildings_table() . " WHERE status = 'active'{$building_scope_clause} ORDER BY name ASC" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 );
+
+$reading_scope_clause = null === $accessible_building_ids ? '' : ' AND b.id IN (' . Arriendo_Facil_Tenancy::ids_in_clause( $accessible_building_ids ) . ')';
 
 $readings = $wpdb->get_results(
 	$wpdb->prepare(
@@ -29,8 +34,8 @@ $readings = $wpdb->get_results(
 		 FROM {$readings_table} r
 		 LEFT JOIN " . Arriendo_Facil_Property_Structure::units_table() . ' u ON u.id = r.unit_id
 		 LEFT JOIN ' . Arriendo_Facil_Property_Structure::buildings_table() . " b ON b.id = u.building_id
-		 WHERE r.period = %s
-		 ORDER BY b.name ASC, u.unit_code ASC, r.service ASC",
+		 WHERE r.period = %s{$reading_scope_clause}
+		 ORDER BY b.name ASC, u.unit_code ASC, r.service ASC", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		$period_filter
 	)
 );

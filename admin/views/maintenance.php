@@ -56,15 +56,20 @@ $month_cost      = (float) $wpdb->get_var(
 	)
 );
 
-$maintenance_properties = get_posts(
-	array(
-		'post_type'      => 'accommodation',
-		'post_status'    => array( 'publish', 'draft', 'private' ),
-		'posts_per_page' => 200,
-		'orderby'        => 'title',
-		'order'          => 'ASC',
-	)
+$maintenance_property_args = array(
+	'post_type'      => 'accommodation',
+	'post_status'    => array( 'publish', 'draft', 'private' ),
+	'posts_per_page' => 200,
+	'orderby'        => 'title',
+	'order'          => 'ASC',
 );
+
+$accessible_accommodation_ids_for_dropdown = Arriendo_Facil_Tenancy::accessible_accommodation_ids();
+if ( null !== $accessible_accommodation_ids_for_dropdown ) {
+	$maintenance_property_args['post__in'] = ! empty( $accessible_accommodation_ids_for_dropdown ) ? $accessible_accommodation_ids_for_dropdown : array( 0 );
+}
+
+$maintenance_properties = get_posts( $maintenance_property_args );
 ?>
 <div class="wrap af-shell">
 
@@ -189,70 +194,73 @@ $maintenance_properties = get_posts(
 			</div>
 		</header>
 
-		<table class="wp-list-table widefat fixed striped af-data-table">
-			<thead>
-				<tr>
-					<th><?php esc_html_e( 'Inmueble', 'arriendo-facil' ); ?></th>
-					<th><?php esc_html_e( 'Tipo', 'arriendo-facil' ); ?></th>
-					<th><?php esc_html_e( 'Prioridad', 'arriendo-facil' ); ?></th>
-					<th><?php esc_html_e( 'Reportó', 'arriendo-facil' ); ?></th>
-					<th><?php esc_html_e( 'Fecha', 'arriendo-facil' ); ?></th>
-					<th><?php esc_html_e( 'Costo', 'arriendo-facil' ); ?></th>
-					<th><?php esc_html_e( 'Estado', 'arriendo-facil' ); ?></th>
-					<th><?php esc_html_e( 'Acción', 'arriendo-facil' ); ?></th>
-				</tr>
-			</thead>
-			<tbody>
-				<?php if ( empty( $requests ) ) : ?>
-					<tr><td colspan="8"><?php esc_html_e( 'No hay incidencias registradas.', 'arriendo-facil' ); ?></td></tr>
-				<?php else : ?>
-					<?php foreach ( $requests as $request ) : ?>
-						<?php
-						$request_type     = isset( $request->request_type ) ? (string) $request->request_type : 'limpieza';
-						$request_priority = isset( $request->priority ) ? (string) $request->priority : 'media';
-						$request_reporter = isset( $request->reported_by ) ? (string) $request->reported_by : 'operador';
-						$request_status   = isset( $request->status ) ? (string) $request->status : 'pending';
+		<?php if ( empty( $requests ) ) : ?>
+			<div class="af-empty" style="padding: var(--af-space-6) var(--af-space-4);">
+				<span class="af-empty__icon" aria-hidden="true">
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 12l4 4L19 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+				</span>
+				<h3 class="af-empty__title"><?php esc_html_e( 'Sin incidencias', 'arriendo-facil' ); ?></h3>
+				<p class="af-empty__text"><?php esc_html_e( 'No hay solicitudes de mantenimiento con este filtro.', 'arriendo-facil' ); ?></p>
+			</div>
+		<?php else : ?>
+			<div class="af-maint-grid">
+				<?php foreach ( $requests as $request ) : ?>
+					<?php
+					$request_type     = isset( $request->request_type ) ? (string) $request->request_type : 'limpieza';
+					$request_priority = isset( $request->priority ) ? (string) $request->priority : 'media';
+					$request_reporter = isset( $request->reported_by ) ? (string) $request->reported_by : 'operador';
+					$request_status   = isset( $request->status ) ? (string) $request->status : 'pending';
 
-						$priority_pill = 'af-pill--neutral';
-						if ( 'alta' === $request_priority ) {
-							$priority_pill = 'af-pill--danger';
-						} elseif ( 'media' === $request_priority ) {
-							$priority_pill = 'af-pill--warning';
-						}
+					$priority_tier = 'neutral';
+					if ( 'alta' === $request_priority ) {
+						$priority_tier = 'danger';
+					} elseif ( 'media' === $request_priority ) {
+						$priority_tier = 'warning';
+					}
 
-						$status_pill = 'af-pill--neutral';
-						if ( 'completed' === $request_status ) {
-							$status_pill = 'af-pill--success';
-						} elseif ( 'in_progress' === $request_status ) {
-							$status_pill = 'af-pill--info';
-						} elseif ( 'pending' === $request_status ) {
-							$status_pill = 'af-pill--warning';
-						}
-						?>
-						<tr>
-							<td data-label="<?php esc_attr_e( 'Inmueble', 'arriendo-facil' ); ?>"><?php echo esc_html( $request->accommodation_title ? $request->accommodation_title : '#' . (int) $request->accommodation_id ); ?></td>
-							<td data-label="<?php esc_attr_e( 'Tipo', 'arriendo-facil' ); ?>"><?php echo esc_html( $types[ $request_type ] ?? $request_type ); ?></td>
-							<td data-label="<?php esc_attr_e( 'Prioridad', 'arriendo-facil' ); ?>"><span class="af-pill <?php echo esc_attr( $priority_pill ); ?>"><?php echo esc_html( $priorities[ $request_priority ] ?? $request_priority ); ?></span></td>
-							<td data-label="<?php esc_attr_e( 'Reportó', 'arriendo-facil' ); ?>"><?php echo esc_html( $reporters[ $request_reporter ] ?? $request_reporter ); ?></td>
-							<td data-label="<?php esc_attr_e( 'Fecha', 'arriendo-facil' ); ?>"><?php echo esc_html( (string) $request->requested_date ); ?></td>
-							<td data-label="<?php esc_attr_e( 'Costo', 'arriendo-facil' ); ?>">$<?php echo esc_html( number_format_i18n( (float) ( $request->cost ?? 0 ), 2 ) ); ?></td>
-							<td data-label="<?php esc_attr_e( 'Estado', 'arriendo-facil' ); ?>"><span class="af-pill <?php echo esc_attr( $status_pill ); ?>"><?php echo esc_html( $statuses[ $request_status ] ?? $request_status ); ?></span></td>
-							<td data-label="<?php esc_attr_e( 'Acción', 'arriendo-facil' ); ?>">
-								<?php if ( 'completed' !== $request_status && 'cancelled' !== $request_status ) : ?>
-									<select class="af-maintenance-status" data-request="<?php echo esc_attr( (int) $request->id ); ?>" style="max-width:150px;">
-										<?php foreach ( $statuses as $status_key => $status_label ) : ?>
-											<option value="<?php echo esc_attr( $status_key ); ?>" <?php selected( $request_status, $status_key ); ?>><?php echo esc_html( $status_label ); ?></option>
-										<?php endforeach; ?>
-									</select>
-								<?php else : ?>
-									&mdash;
-								<?php endif; ?>
-							</td>
-						</tr>
-					<?php endforeach; ?>
-				<?php endif; ?>
-			</tbody>
-		</table>
+					$status_tier = 'neutral';
+					if ( 'completed' === $request_status ) {
+						$status_tier = 'success';
+					} elseif ( 'in_progress' === $request_status ) {
+						$status_tier = 'info';
+					} elseif ( 'pending' === $request_status ) {
+						$status_tier = 'warning';
+					}
+					?>
+					<article class="af-maint-card af-maint-card--<?php echo esc_attr( $priority_tier ); ?>">
+						<header class="af-maint-card__head">
+							<span class="af-pill af-pill--<?php echo esc_attr( $priority_tier ); ?>"><?php echo esc_html( $priorities[ $request_priority ] ?? $request_priority ); ?></span>
+							<span class="af-pill af-pill--<?php echo esc_attr( $status_tier ); ?>"><?php echo esc_html( $statuses[ $request_status ] ?? $request_status ); ?></span>
+						</header>
+
+						<h3 class="af-maint-card__title"><?php echo esc_html( $request->accommodation_title ? $request->accommodation_title : '#' . (int) $request->accommodation_id ); ?></h3>
+						<p class="af-maint-card__type"><?php echo esc_html( $types[ $request_type ] ?? $request_type ); ?></p>
+
+						<?php if ( ! empty( $request->notes ) ) : ?>
+							<p class="af-maint-card__notes"><?php echo esc_html( $request->notes ); ?></p>
+						<?php endif; ?>
+
+						<div class="af-maint-card__meta">
+							<span><?php echo esc_html( $reporters[ $request_reporter ] ?? $request_reporter ); ?></span>
+							<span><?php echo esc_html( (string) $request->requested_date ); ?></span>
+							<span>$<?php echo esc_html( number_format_i18n( (float) ( $request->cost ?? 0 ), 2 ) ); ?></span>
+						</div>
+
+						<footer class="af-maint-card__footer">
+							<?php if ( 'completed' !== $request_status && 'cancelled' !== $request_status ) : ?>
+								<select class="af-maintenance-status" data-request="<?php echo esc_attr( (int) $request->id ); ?>">
+									<?php foreach ( $statuses as $status_key => $status_label ) : ?>
+										<option value="<?php echo esc_attr( $status_key ); ?>" <?php selected( $request_status, $status_key ); ?>><?php echo esc_html( $status_label ); ?></option>
+									<?php endforeach; ?>
+								</select>
+							<?php else : ?>
+								<span class="af-td-meta"><?php esc_html_e( 'Cerrada', 'arriendo-facil' ); ?></span>
+							<?php endif; ?>
+						</footer>
+					</article>
+				<?php endforeach; ?>
+			</div>
+		<?php endif; ?>
 	</section>
 </div>
 

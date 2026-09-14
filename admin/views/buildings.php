@@ -13,8 +13,15 @@ $buildings_table = Arriendo_Facil_Property_Structure::buildings_table();
 
 global $wpdb;
 
-$buildings   = (array) $wpdb->get_results( "SELECT * FROM {$buildings_table} WHERE status = 'active' ORDER BY name ASC" );
+$accessible_building_ids = Arriendo_Facil_Tenancy::accessible_building_ids();
+$scope_clause            = null === $accessible_building_ids ? '' : ' AND id IN (' . Arriendo_Facil_Tenancy::ids_in_clause( $accessible_building_ids ) . ')';
+
+$buildings   = (array) $wpdb->get_results( "SELECT * FROM {$buildings_table} WHERE status = 'active'{$scope_clause} ORDER BY name ASC" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 $selected_id = isset( $_GET['building_id'] ) ? absint( wp_unslash( $_GET['building_id'] ) ) : 0;
+
+if ( $selected_id && ! Arriendo_Facil_Tenancy::can_access_building( $selected_id ) ) {
+	$selected_id = 0;
+}
 
 if ( ! $selected_id && ! empty( $buildings ) ) {
 	$selected_id = (int) $buildings[0]->id;
@@ -24,15 +31,21 @@ $selected_building = $selected_id ? Arriendo_Facil_Property_Structure::get_build
 $units             = $selected_id ? Arriendo_Facil_Property_Structure::get_units_by_building( $selected_id ) : array();
 $coefficient_total = $selected_id ? Arriendo_Facil_Property_Structure::get_coefficient_total( $selected_id ) : 0.0;
 
-$accommodations = get_posts(
-	array(
-		'post_type'      => 'accommodation',
-		'post_status'    => array( 'publish', 'draft', 'private' ),
-		'posts_per_page' => 200,
-		'orderby'        => 'title',
-		'order'          => 'ASC',
-	)
+$is_super_admin  = Arriendo_Facil_Tenancy::can_manage_all();
+$property_admins = $is_super_admin ? Arriendo_Facil_Tenancy::get_property_admins() : array();
+
+$accommodation_args = array(
+	'post_type'      => 'accommodation',
+	'post_status'    => array( 'publish', 'draft', 'private' ),
+	'posts_per_page' => 200,
+	'orderby'        => 'title',
+	'order'          => 'ASC',
 );
+$accessible_accommodation_ids_for_dropdown = Arriendo_Facil_Tenancy::accessible_accommodation_ids();
+if ( null !== $accessible_accommodation_ids_for_dropdown ) {
+	$accommodation_args['post__in'] = ! empty( $accessible_accommodation_ids_for_dropdown ) ? $accessible_accommodation_ids_for_dropdown : array( 0 );
+}
+$accommodations = get_posts( $accommodation_args );
 ?>
 <div class="wrap af-shell">
 
@@ -66,6 +79,17 @@ $accommodations = get_posts(
 				<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Alícuota mensual total (USD)', 'arriendo-facil' ); ?></span>
 				<input type="number" name="monthly_hoa_total" step="0.01" min="0" value="0.00" style="width:100%;" />
 			</label>
+			<?php if ( $is_super_admin && ! empty( $property_admins ) ) : ?>
+			<label>
+				<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Administrador de propiedades', 'arriendo-facil' ); ?></span>
+				<select name="assigned_admin_id" style="width:100%;">
+					<option value=""><?php esc_html_e( '— Asignar a mí mismo —', 'arriendo-facil' ); ?></option>
+					<?php foreach ( $property_admins as $pa ) : ?>
+						<option value="<?php echo esc_attr( $pa->ID ); ?>"><?php echo esc_html( get_user_meta( $pa->ID, 'af_company_name', true ) ? get_user_meta( $pa->ID, 'af_company_name', true ) : $pa->display_name ); ?></option>
+					<?php endforeach; ?>
+				</select>
+			</label>
+			<?php endif; ?>
 			<button type="submit" class="button af-btn af-btn--primary"><?php esc_html_e( 'Crear edificio', 'arriendo-facil' ); ?></button>
 		</form>
 	</div>

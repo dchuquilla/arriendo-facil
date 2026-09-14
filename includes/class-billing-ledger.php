@@ -186,13 +186,18 @@ class Arriendo_Facil_Billing_Ledger {
 	public function ajax_record_meter_reading() {
 		check_ajax_referer( 'af_ledger_nonce', 'nonce' );
 
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$unit_id = isset( $_POST['unit_id'] ) ? absint( wp_unslash( $_POST['unit_id'] ) ) : 0;
+		if ( ! Arriendo_Facil_Tenancy::can_access_unit( $unit_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes acceso a esta unidad.', 'arriendo-facil' ) ), 403 );
 		}
 
 		$result = self::record_meter_reading(
 			array(
-				'unit_id'         => isset( $_POST['unit_id'] ) ? absint( wp_unslash( $_POST['unit_id'] ) ) : 0,
+				'unit_id'         => $unit_id,
 				'service'         => isset( $_POST['service'] ) ? sanitize_key( wp_unslash( $_POST['service'] ) ) : '',
 				'period'          => isset( $_POST['period'] ) ? sanitize_text_field( wp_unslash( $_POST['period'] ) ) : '',
 				'current_reading' => isset( $_POST['current_reading'] ) ? (float) wp_unslash( $_POST['current_reading'] ) : 0,
@@ -475,10 +480,12 @@ class Arriendo_Facil_Billing_Ledger {
 	 * Generates canon + alicuota charges for every active lease for a period.
 	 * Safe to re-run: duplicates are rejected by the table's unique key.
 	 *
-	 * @param string $period Period in YYYY-MM format. Defaults to current month.
+	 * @param string   $period            Period in YYYY-MM format. Defaults to current month.
+	 * @param int[]|null $accommodation_ids Restrict generation to these accommodation IDs
+	 *                                       (property-admin scope). Null = all leases.
 	 * @return array{created:int,skipped:int}
 	 */
-	public static function generate_monthly_charges( $period = '' ) {
+	public static function generate_monthly_charges( $period = '', $accommodation_ids = null ) {
 		global $wpdb;
 
 		$period = $period ? sanitize_text_field( $period ) : gmdate( 'Y-m' );
@@ -489,10 +496,17 @@ class Arriendo_Facil_Billing_Ledger {
 			);
 		}
 
+		$scope_clause = '';
+		if ( is_array( $accommodation_ids ) ) {
+			$scope_clause = empty( $accommodation_ids )
+				? ' AND 1 = 0'
+				: ' AND accommodation_id IN (' . implode( ',', array_map( 'absint', $accommodation_ids ) ) . ')';
+		}
+
 		$leases = (array) $wpdb->get_results(
 			"SELECT id, accommodation_id, guest_id, monthly_rent
 			 FROM {$wpdb->prefix}af_leases
-			 WHERE status = 'active' AND deleted_at IS NULL"
+			 WHERE status = 'active' AND deleted_at IS NULL{$scope_clause}" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		);
 
 		$created = 0;
@@ -607,18 +621,27 @@ class Arriendo_Facil_Billing_Ledger {
 	/**
 	 * Returns overdue charges bucketed by aging (30/60/90+ days).
 	 *
+	 * @param int[]|null $accommodation_ids Restrict to these accommodations
+	 *                                       (property-admin scope). Null = all.
 	 * @return array<string,array<int,object>>
 	 */
-	public static function get_aging_report() {
+	public static function get_aging_report( $accommodation_ids = null ) {
 		global $wpdb;
+
+		$scope_clause = '';
+		if ( is_array( $accommodation_ids ) ) {
+			$scope_clause = empty( $accommodation_ids )
+				? ' AND 1 = 0'
+				: ' AND c.lease_id IN (SELECT id FROM ' . $wpdb->prefix . 'af_leases WHERE accommodation_id IN (' . implode( ',', array_map( 'absint', $accommodation_ids ) ) . '))';
+		}
 
 		$rows = (array) $wpdb->get_results(
 			$wpdb->prepare(
 				'SELECT c.*, DATEDIFF(%s, c.due_date) AS days_overdue
 				 FROM ' . self::charges_table() . " c
 				 WHERE c.status IN ('pending', 'partial', 'overdue')
-				   AND c.due_date < %s
-				 ORDER BY c.due_date ASC",
+				   AND c.due_date < %s{$scope_clause}
+				 ORDER BY c.due_date ASC", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 				gmdate( 'Y-m-d' ),
 				gmdate( 'Y-m-d' )
 			)
@@ -655,15 +678,18 @@ class Arriendo_Facil_Billing_Ledger {
 	public function ajax_record_payment() {
 		check_ajax_referer( 'af_ledger_nonce', 'nonce' );
 
-		// manage_options: af_owner tiene edit_posts y podria operar cargos de
-		// propiedades ajenas si se permitiera aqui (control de acceso roto/IDOR).
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$charge_id = isset( $_POST['charge_id'] ) ? absint( wp_unslash( $_POST['charge_id'] ) ) : 0;
+		if ( ! Arriendo_Facil_Tenancy::can_access_charge( $charge_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes acceso a este cargo.', 'arriendo-facil' ) ), 403 );
 		}
 
 		$result = self::record_payment(
 			array(
-				'charge_id'    => isset( $_POST['charge_id'] ) ? absint( wp_unslash( $_POST['charge_id'] ) ) : 0,
+				'charge_id'    => $charge_id,
 				'amount'       => isset( $_POST['amount'] ) ? (float) wp_unslash( $_POST['amount'] ) : 0,
 				'payment_date' => isset( $_POST['payment_date'] ) ? sanitize_text_field( wp_unslash( $_POST['payment_date'] ) ) : '',
 				'method'       => isset( $_POST['method'] ) ? sanitize_key( wp_unslash( $_POST['method'] ) ) : 'transferencia',
@@ -692,13 +718,18 @@ class Arriendo_Facil_Billing_Ledger {
 	public function ajax_create_charge() {
 		check_ajax_referer( 'af_ledger_nonce', 'nonce' );
 
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$lease_id = isset( $_POST['lease_id'] ) ? absint( wp_unslash( $_POST['lease_id'] ) ) : 0;
+		if ( ! Arriendo_Facil_Tenancy::can_access_lease( $lease_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes acceso a este contrato.', 'arriendo-facil' ) ), 403 );
 		}
 
 		$result = self::create_charge(
 			array(
-				'lease_id'    => isset( $_POST['lease_id'] ) ? absint( wp_unslash( $_POST['lease_id'] ) ) : 0,
+				'lease_id'    => $lease_id,
 				'unit_id'     => isset( $_POST['unit_id'] ) ? absint( wp_unslash( $_POST['unit_id'] ) ) : 0,
 				'guest_id'    => isset( $_POST['guest_id'] ) ? absint( wp_unslash( $_POST['guest_id'] ) ) : 0,
 				'charge_type' => isset( $_POST['charge_type'] ) ? sanitize_key( wp_unslash( $_POST['charge_type'] ) ) : '',
@@ -729,12 +760,12 @@ class Arriendo_Facil_Billing_Ledger {
 	public function ajax_generate_period_charges() {
 		check_ajax_referer( 'af_ledger_nonce', 'nonce' );
 
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
 		$period = isset( $_POST['period'] ) ? sanitize_text_field( wp_unslash( $_POST['period'] ) ) : '';
-		$result = self::generate_monthly_charges( $period );
+		$result = self::generate_monthly_charges( $period, Arriendo_Facil_Tenancy::accessible_accommodation_ids() );
 
 		wp_send_json_success(
 			array(

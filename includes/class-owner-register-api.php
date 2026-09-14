@@ -145,7 +145,7 @@ class Arriendo_Facil_Owner_Register_API {
 				'user_pass'    => $temp_password,
 				'user_email'   => $owner_email,
 				'display_name' => $client_name,
-				'role'         => 'af_owner',
+				'role'         => 'af_property_admin',
 			)
 		);
 

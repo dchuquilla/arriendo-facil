@@ -1642,6 +1642,8 @@ body.post-type-accommodation #titlediv {
 
 .af-modal__field input[type="text"],
 .af-modal__field input[type="number"],
+.af-modal__field input[type="url"],
+.af-modal__field input[type="email"],
 .af-modal__field select,
 .af-modal__field textarea {
 	width: 100%;

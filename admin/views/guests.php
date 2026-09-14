@@ -227,7 +227,7 @@ if ( $is_owner ) {
 			'title'    => __( 'Inquilinos', 'arriendo-facil' ),
 			'subtitle' => __( 'Inquilinos bajo administración. Regístralos, envíales el formulario para que completen su perfil y verifica sus documentos.', 'arriendo-facil' ),
 			'actions'  => array(
-				current_user_can( 'manage_options' ) ? sprintf(
+				current_user_can( Arriendo_Facil_Tenancy::CAP ) ? sprintf(
 					'<button type="button" class="button af-btn af-btn--primary" id="af-new-guest"><span class="af-btn__icon" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>%s</button>',
 					esc_html__( 'Nuevo inquilino', 'arriendo-facil' )
 				) : '',
@@ -549,7 +549,7 @@ if ( $is_owner ) {
 										<?php elseif ( 'no_match' === $identity_status ) : ?>
 											<span class="af-td-meta" style="color:#b32d2e;" title="<?php esc_attr_e( 'La cédula declarada NO aparece en el texto del documento subido. Revisa manualmente antes de aprobar.', 'arriendo-facil' ); ?>">⚠ <?php esc_html_e( 'no coincide, revisar', 'arriendo-facil' ); ?></span>
 										<?php endif; ?>
-										<?php if ( current_user_can( 'manage_options' ) && class_exists( 'Arriendo_Facil_Document_Verification' ) ) : ?>
+										<?php if ( current_user_can( Arriendo_Facil_Tenancy::CAP ) && class_exists( 'Arriendo_Facil_Document_Verification' ) ) : ?>
 											<?php $guest_docs = Arriendo_Facil_Document_Verification::get_guest_documents( $guest->id ); ?>
 											<?php if ( ! empty( $guest_docs ) ) : ?>
 												<div class="af-guest-docs">
@@ -572,7 +572,10 @@ if ( $is_owner ) {
 										</td>
 									<?php endif; ?>
 									<td class="af-td-actions" data-label="<?php esc_attr_e( 'Acciones', 'arriendo-facil' ); ?>">
-										<?php if ( current_user_can( 'manage_options' ) ) : ?>
+										<a class="button af-btn af-btn--ghost af-btn--sm" href="<?php echo esc_url( admin_url( 'admin.php?page=af-guests&view=profile&guest_id=' . (int) $guest->id ) ); ?>">
+											<?php esc_html_e( 'Ver ficha', 'arriendo-facil' ); ?>
+										</a>
+										<?php if ( current_user_can( Arriendo_Facil_Tenancy::CAP ) ) : ?>
 											<button type="button" class="button af-btn af-btn--primary af-btn--sm af-send-form"
 												data-guest-id="<?php echo esc_attr( $guest->id ); ?>"
 												data-guest-name="<?php echo esc_attr( trim( $guest->first_name . ' ' . $guest->last_name ) ); ?>"

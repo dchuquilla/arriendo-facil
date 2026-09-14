@@ -58,11 +58,15 @@ class Arriendo_Facil_Lease_Operations {
 
 	public function ajax_update_legal_status() {
 		check_ajax_referer( 'af_lease_operations_nonce', 'nonce' );
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
 		$lease_id = isset( $_POST['lease_id'] ) ? absint( wp_unslash( $_POST['lease_id'] ) ) : 0;
+		if ( ! Arriendo_Facil_Tenancy::can_access_lease( $lease_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes acceso a este contrato.', 'arriendo-facil' ) ), 403 );
+		}
+
 		$status   = isset( $_POST['legal_status'] ) ? sanitize_key( wp_unslash( $_POST['legal_status'] ) ) : '';
 		$notes    = isset( $_POST['legal_notes'] ) ? sanitize_textarea_field( wp_unslash( $_POST['legal_notes'] ) ) : '';
 		if ( ! $lease_id || ! array_key_exists( $status, self::legal_statuses() ) ) {
@@ -85,11 +89,15 @@ class Arriendo_Facil_Lease_Operations {
 
 	public function ajax_save_deposit_settlement() {
 		check_ajax_referer( 'af_lease_operations_nonce', 'nonce' );
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
 		$lease_id = isset( $_POST['lease_id'] ) ? absint( wp_unslash( $_POST['lease_id'] ) ) : 0;
+		if ( ! Arriendo_Facil_Tenancy::can_access_lease( $lease_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes acceso a este contrato.', 'arriendo-facil' ) ), 403 );
+		}
+
 		$damages  = isset( $_POST['damages'] ) ? max( 0, (float) wp_unslash( $_POST['damages'] ) ) : 0.0;
 		$services = isset( $_POST['services'] ) ? max( 0, (float) wp_unslash( $_POST['services'] ) ) : 0.0;
 		$status   = isset( $_POST['status'] ) ? sanitize_key( wp_unslash( $_POST['status'] ) ) : 'pendiente';

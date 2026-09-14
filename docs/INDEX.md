@@ -61,6 +61,10 @@ docs/
   - Sincronización Booking.com + Airbnb
   - Webhooks y disponibilidad
 
+- **[SUBSCRIPTION_MODEL.md](architecture/SUBSCRIPTION_MODEL.md)** - Modelo de suscripción/monetización 2.0
+  - Planes (trial/free/pago), límites por plan, publicidad, paywall
+  - ⚠️ Solo documentación — no implementado todavía
+
 ---
 
 ### 💰 **Facturación SRI (Ecuador)**

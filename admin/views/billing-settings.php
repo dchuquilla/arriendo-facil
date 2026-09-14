@@ -858,7 +858,8 @@ $af_points_ready     = ! empty( $emission_points );
 		</div>
 
 	<?php if ( $emission_points ) : ?>
-		<table class="wp-list-table widefat fixed striped" style="max-width:800px;">
+		<div class="af-table-scroll">
+		<table class="wp-list-table widefat fixed striped af-data-table" style="max-width:800px;">
 			<thead>
 				<tr>
 					<th><?php esc_html_e( 'Establecimiento', 'arriendo-facil' ); ?></th>
@@ -872,12 +873,12 @@ $af_points_ready     = ! empty( $emission_points );
 			<tbody>
 				<?php foreach ( $emission_points as $pt ) : ?>
 					<tr>
-						<td><?php echo esc_html( $pt->codigo_establecimiento ); ?></td>
-						<td><?php echo esc_html( $pt->codigo_punto_emision ); ?></td>
-						<td><strong><?php echo esc_html( $pt->codigo_establecimiento . $pt->codigo_punto_emision ); ?></strong></td>
-						<td><?php echo esc_html( $pt->descripcion ?: '—' ); ?></td>
-						<td><?php echo esc_html( number_format( (int) $pt->secuencial_actual, 0, '', '' ) ); ?></td>
-						<td>
+						<td data-label="<?php esc_attr_e( 'Establecimiento', 'arriendo-facil' ); ?>"><?php echo esc_html( $pt->codigo_establecimiento ); ?></td>
+						<td data-label="<?php esc_attr_e( 'Punto Emisión', 'arriendo-facil' ); ?>"><?php echo esc_html( $pt->codigo_punto_emision ); ?></td>
+						<td data-label="<?php esc_attr_e( 'Serie', 'arriendo-facil' ); ?>"><strong><?php echo esc_html( $pt->codigo_establecimiento . $pt->codigo_punto_emision ); ?></strong></td>
+						<td data-label="<?php esc_attr_e( 'Descripción', 'arriendo-facil' ); ?>"><?php echo esc_html( $pt->descripcion ?: '—' ); ?></td>
+						<td data-label="<?php esc_attr_e( 'Secuencial actual', 'arriendo-facil' ); ?>"><?php echo esc_html( number_format( (int) $pt->secuencial_actual, 0, '', '' ) ); ?></td>
+						<td data-label="<?php esc_attr_e( 'Activo', 'arriendo-facil' ); ?>">
 							<?php if ( $pt->activo ) : ?>
 								<span style="color:#2e7d32;">&#10003;</span>
 							<?php else : ?>
@@ -888,6 +889,7 @@ $af_points_ready     = ! empty( $emission_points );
 				<?php endforeach; ?>
 			</tbody>
 		</table>
+		</div>
 		<br />
 	<?php else : ?>
 		<p class="af-sri-empty-state"><?php esc_html_e( 'No hay puntos de emisión configurados. Agregue al menos uno para poder facturar.', 'arriendo-facil' ); ?></p>

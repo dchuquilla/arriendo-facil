@@ -32,6 +32,11 @@ if ( in_array( $status_filter, array( 'pending', 'partial', 'paid', 'overdue' ),
 	$where_args[]    = $status_filter;
 }
 
+$accessible_accommodation_ids = Arriendo_Facil_Tenancy::accessible_accommodation_ids();
+if ( null !== $accessible_accommodation_ids ) {
+	$where_clauses[] = 'c.lease_id IN (SELECT id FROM ' . $leases_table . ' WHERE accommodation_id IN (' . Arriendo_Facil_Tenancy::ids_in_clause( $accessible_accommodation_ids ) . '))';
+}
+
 $where_sql = implode( ' AND ', $where_clauses );
 
 $summary = $wpdb->get_row(
@@ -68,10 +73,13 @@ $rows = $wpdb->get_results(
 	)
 );
 
-$aging = Arriendo_Facil_Billing_Ledger::get_aging_report();
+$aging = Arriendo_Facil_Billing_Ledger::get_aging_report( $accessible_accommodation_ids );
 
 // Estado de cuenta de un contrato concreto.
 $statement_lease_id = isset( $_GET['statement_lease'] ) ? absint( wp_unslash( $_GET['statement_lease'] ) ) : 0;
+if ( $statement_lease_id && ! Arriendo_Facil_Tenancy::can_access_lease( $statement_lease_id ) ) {
+	$statement_lease_id = 0;
+}
 $statement          = $statement_lease_id ? Arriendo_Facil_Billing_Ledger::get_statement_by_lease( $statement_lease_id ) : null;
 $statement_context  = null;
 

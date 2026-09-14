@@ -357,6 +357,479 @@
 
 .af-pill--lg { font-size: var(--af-text-sm); padding: 6px 12px; }
 
+/* ── Semáforo de cobros ───────────────────────────────────────────────── */
+
+.af-semaforo {
+	margin-bottom: var(--af-space-6);
+}
+
+.af-semaforo__lights {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: var(--af-space-4);
+	margin-bottom: var(--af-space-5);
+}
+
+.af-semaforo__light {
+	display: flex;
+	align-items: center;
+	gap: var(--af-space-3);
+	padding: var(--af-space-4);
+	border-radius: var(--af-radius-lg);
+	border: 1px solid var(--af-gray-200);
+	background: var(--af-gray-0);
+	transition: transform var(--af-motion-base), box-shadow var(--af-motion-base);
+}
+
+.af-semaforo__light:hover { transform: translateY(-2px); box-shadow: var(--af-shadow-sm); }
+
+.af-semaforo__dot {
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	flex-shrink: 0;
+	box-shadow: 0 0 0 4px currentColor;
+	opacity: 0.85;
+}
+
+.af-semaforo__light--success { border-color: var(--af-success-100); }
+.af-semaforo__light--success .af-semaforo__dot { background: var(--af-success-500); color: var(--af-success-100); }
+.af-semaforo__light--warning { border-color: var(--af-warning-100); }
+.af-semaforo__light--warning .af-semaforo__dot { background: var(--af-warning-500); color: var(--af-warning-100); }
+.af-semaforo__light--danger  { border-color: var(--af-danger-100); }
+.af-semaforo__light--danger .af-semaforo__dot { background: var(--af-danger-500); color: var(--af-danger-100); }
+
+.af-semaforo__light--danger.is-pulsing .af-semaforo__dot {
+	animation: af-pulse-ring 1.8s ease-in-out infinite;
+}
+
+@keyframes af-pulse-ring {
+	0%   { box-shadow: 0 0 0 4px currentColor; opacity: 0.85; }
+	50%  { box-shadow: 0 0 0 8px currentColor; opacity: 0.45; }
+	100% { box-shadow: 0 0 0 4px currentColor; opacity: 0.85; }
+}
+
+.af-semaforo__label {
+	display: block;
+	font-size: var(--af-text-xs);
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--af-gray-500);
+}
+
+.af-semaforo__value {
+	display: block;
+	font-size: var(--af-text-xl);
+	font-weight: 700;
+	color: var(--af-gray-900);
+	line-height: 1.2;
+}
+
+.af-semaforo__meta {
+	display: block;
+	font-size: var(--af-text-xs);
+	color: var(--af-gray-400);
+}
+
+.af-semaforo__table {
+	display: flex;
+	flex-direction: column;
+	gap: var(--af-space-2);
+}
+
+.af-semaforo__row {
+	display: grid;
+	grid-template-columns: 1fr auto auto;
+	align-items: center;
+	gap: var(--af-space-3);
+	padding: var(--af-space-3) var(--af-space-4);
+	border-radius: var(--af-radius-md);
+	border: 1px solid var(--af-gray-100);
+	text-decoration: none;
+	color: inherit;
+	transition: background var(--af-motion-fast), border-color var(--af-motion-fast), transform var(--af-motion-fast);
+	animation: af-fade-up var(--af-motion-slow) both;
+}
+
+.af-semaforo__row:hover {
+	background: var(--af-gray-50, #F9FAFB);
+	border-color: var(--af-gray-200);
+	transform: translateX(2px);
+	color: inherit;
+}
+
+.af-semaforo__table > .af-semaforo__row:nth-child(1) { animation-delay: 0ms; }
+.af-semaforo__table > .af-semaforo__row:nth-child(2) { animation-delay: 30ms; }
+.af-semaforo__table > .af-semaforo__row:nth-child(3) { animation-delay: 60ms; }
+.af-semaforo__table > .af-semaforo__row:nth-child(4) { animation-delay: 90ms; }
+.af-semaforo__table > .af-semaforo__row:nth-child(5) { animation-delay: 120ms; }
+.af-semaforo__table > .af-semaforo__row:nth-child(6) { animation-delay: 150ms; }
+
+.af-semaforo__tenant { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.af-semaforo__tenant strong { font-size: var(--af-text-sm); color: var(--af-gray-900); }
+.af-semaforo__tenant small { font-size: var(--af-text-xs); color: var(--af-gray-400); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.af-semaforo__amount {
+	font-weight: 700;
+	color: var(--af-danger-700);
+	font-variant-numeric: tabular-nums;
+}
+
+.af-semaforo__empty {
+	text-align: center;
+	padding: var(--af-space-6);
+	color: var(--af-gray-400);
+	font-size: var(--af-text-sm);
+}
+
+@media (max-width: 782px) {
+	.af-semaforo__lights { grid-template-columns: 1fr; }
+	.af-semaforo__row { grid-template-columns: 1fr; text-align: left; gap: var(--af-space-1); }
+	.af-semaforo__amount { justify-self: start; }
+}
+
+/* ── Próximas salidas: tarjetas de contrato ───────────────────────────── */
+
+.af-exit-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+	gap: var(--af-space-4);
+}
+
+.af-exit-card {
+	display: flex;
+	flex-direction: column;
+	gap: var(--af-space-3);
+	padding: var(--af-space-5);
+	background: var(--af-gray-0);
+	border: 1px solid var(--af-gray-200);
+	border-radius: var(--af-radius-lg);
+	box-shadow: var(--af-shadow-xs);
+	transition: transform var(--af-motion-base), box-shadow var(--af-motion-base);
+	animation: af-fade-up var(--af-motion-slow) both;
+}
+
+.af-exit-card:hover {
+	transform: translateY(-2px);
+	box-shadow: var(--af-shadow-md);
+	border-color: var(--af-gray-300);
+}
+
+.af-exit-grid > .af-exit-card:nth-child(1) { animation-delay: 0ms; }
+.af-exit-grid > .af-exit-card:nth-child(2) { animation-delay: 40ms; }
+.af-exit-grid > .af-exit-card:nth-child(3) { animation-delay: 80ms; }
+.af-exit-grid > .af-exit-card:nth-child(4) { animation-delay: 120ms; }
+.af-exit-grid > .af-exit-card:nth-child(5) { animation-delay: 160ms; }
+.af-exit-grid > .af-exit-card:nth-child(6) { animation-delay: 200ms; }
+
+.af-exit-card__head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--af-space-2);
+}
+
+.af-exit-card__date {
+	font-size: var(--af-text-xs);
+	color: var(--af-gray-400);
+	font-variant-numeric: tabular-nums;
+}
+
+.af-exit-card__title {
+	margin: 0;
+	font-size: var(--af-text-md);
+	color: var(--af-gray-900);
+}
+
+.af-exit-card__tenant {
+	margin: -6px 0 0;
+	font-size: var(--af-text-sm);
+	color: var(--af-gray-500);
+}
+
+.af-exit-card__row {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--af-space-2);
+	padding-top: var(--af-space-2);
+	border-top: 1px dashed var(--af-gray-100);
+}
+
+.af-exit-card__label {
+	font-size: var(--af-text-xs);
+	color: var(--af-gray-400);
+}
+
+.af-exit-card__value {
+	font-size: var(--af-text-sm);
+	font-weight: 700;
+	color: var(--af-gray-900);
+	text-align: right;
+}
+
+.af-exit-card__value small {
+	display: block;
+	font-weight: 500;
+	color: var(--af-gray-400);
+	font-size: 11px;
+}
+
+.af-exit-card__footer {
+	display: flex;
+	flex-direction: column;
+	gap: var(--af-space-3);
+	margin-top: var(--af-space-2);
+	padding-top: var(--af-space-3);
+	border-top: 1px solid var(--af-gray-100);
+}
+
+.af-exit-card__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--af-space-2);
+}
+
+.af-exit-card__actions .button { flex: 1 1 auto; }
+
+/* Calculadora de garantía dentro del modal ------------------------------ */
+
+.af-deposit-calc {
+	background: var(--af-gray-50, #F9FAFB);
+	border: 1px solid var(--af-gray-100);
+	border-radius: var(--af-radius-md);
+	padding: var(--af-space-4);
+	margin-bottom: var(--af-space-4);
+}
+
+.af-deposit-calc__row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: var(--af-space-2) 0;
+	font-size: var(--af-text-sm);
+	color: var(--af-gray-600);
+}
+
+.af-deposit-calc__row + .af-modal__field { margin-top: var(--af-space-3); }
+
+.af-deposit-calc__row--total {
+	margin-top: var(--af-space-2);
+	padding-top: var(--af-space-3);
+	border-top: 1px dashed var(--af-gray-200);
+	font-size: var(--af-text-md);
+	color: var(--af-success-700);
+}
+
+.af-deposit-calc__row--total strong { font-size: var(--af-text-lg); }
+
+/* ── Ficha del inquilino: score de pago + evaluaciones ────────────────── */
+
+.af-score-card { align-items: center; text-align: center; }
+
+.af-score-ring {
+	--af-score-pct: 0;
+	width: 84px;
+	height: 84px;
+	border-radius: 50%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	margin: var(--af-space-2) auto;
+	background: conic-gradient(var(--af-ring-color, var(--af-primary-500)) calc(var(--af-score-pct) * 1%), var(--af-gray-100) 0);
+	animation: af-fade-up var(--af-motion-slow) both;
+}
+
+.af-score-ring span {
+	display: flex;
+	align-items: baseline;
+	justify-content: center;
+	width: 66px;
+	height: 66px;
+	border-radius: 50%;
+	background: var(--af-gray-0);
+	font-size: var(--af-text-xl);
+	font-weight: 800;
+	color: var(--af-gray-900);
+}
+
+.af-score-ring span small { font-size: var(--af-text-xs); font-weight: 500; color: var(--af-gray-400); margin-left: 2px; }
+
+.af-score-ring--success { --af-ring-color: var(--af-success-500); }
+.af-score-ring--warning { --af-ring-color: var(--af-warning-500); }
+.af-score-ring--danger  { --af-ring-color: var(--af-danger-500); }
+
+.af-review-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--af-space-3);
+}
+
+.af-review-list__item {
+	padding: var(--af-space-3) var(--af-space-4);
+	border: 1px solid var(--af-gray-100);
+	border-radius: var(--af-radius-md);
+	animation: af-fade-up var(--af-motion-slow) both;
+}
+
+.af-review-list__head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: var(--af-space-2);
+}
+
+.af-review-list__criteria {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--af-space-1);
+	margin-bottom: var(--af-space-2);
+}
+
+.af-review-list__comment {
+	margin: 0;
+	font-size: var(--af-text-sm);
+	color: var(--af-gray-500);
+	font-style: italic;
+}
+
+/* ── Bandeja de mantenimiento: tarjetas por incidencia ────────────────── */
+
+.af-maint-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+	gap: var(--af-space-4);
+}
+
+.af-maint-card {
+	display: flex;
+	flex-direction: column;
+	gap: var(--af-space-2);
+	padding: var(--af-space-4);
+	background: var(--af-gray-0);
+	border: 1px solid var(--af-gray-200);
+	border-left: 4px solid var(--af-gray-300);
+	border-radius: var(--af-radius-lg);
+	box-shadow: var(--af-shadow-xs);
+	transition: transform var(--af-motion-base), box-shadow var(--af-motion-base);
+	animation: af-fade-up var(--af-motion-slow) both;
+}
+
+.af-maint-card:hover { transform: translateY(-2px); box-shadow: var(--af-shadow-md); }
+
+.af-maint-card--danger  { border-left-color: var(--af-danger-500); }
+.af-maint-card--warning { border-left-color: var(--af-warning-500); }
+.af-maint-card--neutral { border-left-color: var(--af-gray-300); }
+
+.af-maint-card__head {
+	display: flex;
+	justify-content: space-between;
+	gap: var(--af-space-2);
+}
+
+.af-maint-card__title { margin: 0; font-size: var(--af-text-md); color: var(--af-gray-900); }
+.af-maint-card__type  { margin: -4px 0 0; font-size: var(--af-text-xs); color: var(--af-gray-400); text-transform: uppercase; letter-spacing: 0.03em; }
+
+.af-maint-card__notes {
+	margin: 0;
+	font-size: var(--af-text-sm);
+	color: var(--af-gray-600);
+	background: var(--af-gray-50, #F9FAFB);
+	border-radius: var(--af-radius-sm);
+	padding: var(--af-space-2) var(--af-space-3);
+}
+
+.af-maint-card__meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--af-space-3);
+	font-size: var(--af-text-xs);
+	color: var(--af-gray-400);
+}
+
+.af-maint-card__footer {
+	margin-top: auto;
+	padding-top: var(--af-space-2);
+	border-top: 1px solid var(--af-gray-100);
+}
+
+.af-maint-card__footer select { width: 100%; }
+
+/* ── Expediente digital y control legal ───────────────────────────────── */
+
+.af-legal-timeline {
+	display: flex;
+	flex-direction: column;
+	gap: var(--af-space-2);
+}
+
+.af-legal-timeline__item {
+	display: flex;
+	align-items: center;
+	gap: var(--af-space-3);
+	padding: var(--af-space-3) var(--af-space-4);
+	border: 1px solid var(--af-gray-100);
+	border-radius: var(--af-radius-md);
+	animation: af-fade-up var(--af-motion-slow) both;
+}
+
+.af-legal-timeline__body {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.af-legal-timeline__body strong { font-size: var(--af-text-sm); color: var(--af-gray-900); }
+
+.af-legal-docs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--af-space-2);
+}
+
+.af-legal-docs__item {
+	display: flex;
+	align-items: center;
+	gap: var(--af-space-2);
+	padding: var(--af-space-2) var(--af-space-3);
+	border: 1px solid var(--af-gray-200);
+	border-radius: var(--af-radius-md);
+	text-decoration: none;
+	color: var(--af-gray-700);
+	font-size: var(--af-text-sm);
+	transition: border-color var(--af-motion-fast), background var(--af-motion-fast);
+}
+
+.af-legal-docs__item:hover {
+	border-color: var(--af-primary-400);
+	background: var(--af-primary-50);
+	color: var(--af-primary-700);
+}
+
+.af-legal-docs__item small { color: var(--af-gray-400); }
+
+@media (max-width: 782px) {
+	.af-legal-timeline__item { flex-wrap: wrap; }
+}
+
+/* ── Utilidad: grid de formulario responsive (facturación SRI, etc.) ──── */
+
+.af-form-grid-2 {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(220px, 1fr));
+	gap: var(--af-space-3);
+}
+
+@media (max-width: 600px) {
+	.af-form-grid-2 { grid-template-columns: 1fr; }
+}
+
 /* ── Property card (owner dashboard) ──────────────────────────────────── */
 
 .af-property-grid {
@@ -1079,6 +1552,83 @@
    FASE 6 — Deleite (opcional)
    ═══════════════════════════════════════════════════════════════════════ */
 
+/* Hero media (video de marca en el dashboard) -------------------------- */
+.af-hero-media {
+    position: relative;
+    margin-bottom: var(--af-space-6);
+    animation: af-fade-up var(--af-motion-slow) both;
+}
+
+.af-hero-media__frame {
+    position: relative;
+    border-radius: var(--af-radius-xl);
+    overflow: hidden;
+    aspect-ratio: 21 / 7;
+    max-height: 320px;
+    background: linear-gradient(135deg, var(--af-primary-700, #0B3B5C), var(--af-primary-500, #1873A6));
+    box-shadow: var(--af-shadow-lg);
+    border: 1px solid var(--af-gray-200);
+}
+
+.af-hero-media__video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.af-hero-media__embed {
+    width: 100%;
+    height: 100%;
+}
+
+.af-hero-media__embed iframe {
+    width: 100%;
+    height: 100%;
+    display: block;
+    border: 0;
+}
+
+.af-hero-media__edit {
+    position: absolute;
+    top: var(--af-space-3);
+    right: var(--af-space-3);
+    background: rgba(15, 23, 42, 0.55);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: var(--af-radius-full);
+    padding: 6px 14px;
+    font-size: var(--af-text-xs);
+    font-weight: 600;
+    cursor: pointer;
+    backdrop-filter: blur(4px);
+    transition: background var(--af-motion-fast);
+}
+
+.af-hero-media__edit:hover { background: rgba(15, 23, 42, 0.75); }
+
+.af-hero-media--empty {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--af-space-3);
+    padding: var(--af-space-4) var(--af-space-5);
+    border: 1px dashed var(--af-gray-300);
+    border-radius: var(--af-radius-lg);
+    background: var(--af-gray-50, #F9FAFB);
+}
+
+.af-hero-media--empty p {
+    margin: 0;
+    font-size: var(--af-text-sm);
+    color: var(--af-gray-500);
+}
+
+@media (max-width: 782px) {
+    .af-hero-media__frame { aspect-ratio: 16 / 9; max-height: none; }
+}
+
 /* Welcome banner (dashboard, owners sin propiedades) ------------------ */
 .af-welcome {
     position: relative;
@@ -1230,13 +1780,24 @@
     .af-service-card,
     .af-integration-card,
     .af-section,
-    .af-skeleton {
+    .af-skeleton,
+    .af-semaforo__row,
+    .af-semaforo__dot,
+    .af-exit-card,
+    .af-score-ring,
+    .af-review-list__item,
+    .af-maint-card,
+    .af-legal-timeline__item {
         animation: none !important;
     }
     .af-kpi:hover,
     .af-service-card:hover,
     .af-integration-card:hover,
-    .af-sri-flow__step:hover {
+    .af-sri-flow__step:hover,
+    .af-semaforo__light:hover,
+    .af-semaforo__row:hover,
+    .af-exit-card:hover,
+    .af-maint-card:hover {
         transform: none;
     }
 }

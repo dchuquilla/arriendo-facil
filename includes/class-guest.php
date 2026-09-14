@@ -4378,7 +4378,7 @@ class Arriendo_Facil_Guest {
 			$post_author_id = absint( $post->post_author );
 			if ( $post_author_id > 0 ) {
 				$author = get_user_by( 'id', $post_author_id );
-				if ( $author && in_array( 'af_owner', (array) $author->roles, true ) ) {
+				if ( $author && in_array( 'af_property_admin', (array) $author->roles, true ) ) {
 					return $post_author_id;
 				}
 			}

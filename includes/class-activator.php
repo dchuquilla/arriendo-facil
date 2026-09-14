@@ -53,17 +53,21 @@ class Arriendo_Facil_Activator {
 	}
 
 	/**
-	 * Ensures the owner role exists with required capabilities.
+	 * Ensures the property-admin (subadmin) role exists with required
+	 * capabilities. This role is licensed per property-management company:
+	 * each holder only sees the buildings/units/leases/tenants scoped to
+	 * them (see Arriendo_Facil_Tenancy). Replaces the legacy `af_owner` role,
+	 * which conflated "real estate owner" with "person who logs in".
 	 *
 	 * @return void
 	 */
 	public static function ensure_owner_role() {
-		$role = get_role( 'af_owner' );
+		$role = get_role( 'af_property_admin' );
 
 		if ( ! $role ) {
 			$role = add_role(
-				'af_owner',
-				__( 'Propietario', 'arriendo-facil' ),
+				'af_property_admin',
+				__( 'Administrador de Propiedades', 'arriendo-facil' ),
 				array(
 					'read'                 => true,
 					'upload_files'         => true,
@@ -84,6 +88,7 @@ class Arriendo_Facil_Activator {
 				'publish_posts',
 				'delete_posts',
 				'af_view_billing',
+				Arriendo_Facil_Tenancy::CAP,
 			);
 
 			foreach ( $required_caps as $cap ) {
@@ -94,15 +99,20 @@ class Arriendo_Facil_Activator {
 		}
 
 		$admin_role = get_role( 'administrator' );
-		if ( $admin_role instanceof WP_Role && ! $admin_role->has_cap( 'af_view_billing' ) ) {
-			$admin_role->add_cap( 'af_view_billing' );
+		if ( $admin_role instanceof WP_Role ) {
+			foreach ( array( 'af_view_billing', Arriendo_Facil_Tenancy::CAP ) as $cap ) {
+				if ( ! $admin_role->has_cap( $cap ) ) {
+					$admin_role->add_cap( $cap );
+				}
+			}
 		}
 
 		self::sync_existing_owner_users_to_role();
+		self::migrate_legacy_af_owner_role();
 	}
 
 	/**
-	 * Migrates existing owner users to af_owner role.
+	 * Migrates existing owner-contact users to the af_property_admin role.
 	 *
 	 * @return void
 	 */
@@ -129,12 +139,35 @@ class Arriendo_Facil_Activator {
 			}
 
 			$roles = isset( $user->roles ) && is_array( $user->roles ) ? $user->roles : array();
-			if ( in_array( 'administrator', $roles, true ) || in_array( 'af_owner', $roles, true ) ) {
+			if ( in_array( 'administrator', $roles, true ) || in_array( 'af_property_admin', $roles, true ) ) {
 				continue;
 			}
 
-			$user->set_role( 'af_owner' );
+			$user->set_role( 'af_property_admin' );
 		}
+	}
+
+	/**
+	 * One-time migration: moves any user still holding the legacy `af_owner`
+	 * role to `af_property_admin`, then removes the legacy role definition
+	 * so it can't be reassigned by mistake.
+	 *
+	 * @return void
+	 */
+	private static function migrate_legacy_af_owner_role() {
+		if ( ! get_role( 'af_owner' ) ) {
+			return;
+		}
+
+		$legacy_users = get_users( array( 'role' => 'af_owner', 'fields' => 'ID' ) );
+		foreach ( $legacy_users as $legacy_user_id ) {
+			$user = get_userdata( absint( $legacy_user_id ) );
+			if ( $user instanceof WP_User ) {
+				$user->set_role( 'af_property_admin' );
+			}
+		}
+
+		remove_role( 'af_owner' );
 	}
 
 	/**

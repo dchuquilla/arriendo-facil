@@ -301,7 +301,7 @@ class Arriendo_Facil_Owner_Contact {
 				'user_pass'    => $temp_password_plain,
 				'user_email'   => $owner_email,
 				'display_name' => $subject,
-				'role'         => 'af_owner',
+				'role'         => 'af_property_admin',
 			)
 		);
 

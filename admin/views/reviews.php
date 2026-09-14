@@ -81,6 +81,9 @@ $criteria_labels     = Arriendo_Facil_Review::owner_to_tenant_criteria();
 // Contratos vigentes o terminados que aún no tienen calificación del administrador.
 $pending_leases = array();
 if ( $is_management_model ) {
+	$accessible_ids = Arriendo_Facil_Tenancy::accessible_accommodation_ids();
+	$scope_clause    = null === $accessible_ids ? '' : ' AND l.accommodation_id IN (' . Arriendo_Facil_Tenancy::ids_in_clause( $accessible_ids ) . ')';
+
 	$pending_leases = (array) $wpdb->get_results(
 		"SELECT l.id, l.start_date, l.end_date, l.status,
 		        p.post_title AS accommodation_title,
@@ -94,9 +97,9 @@ if ( $is_management_model ) {
 		       AND r.status = 'completed'
 		 WHERE l.deleted_at IS NULL
 		   AND l.status IN ('active', 'terminated')
-		   AND r.id IS NULL
+		   AND r.id IS NULL{$scope_clause}
 		 ORDER BY l.end_date ASC
-		 LIMIT 100"
+		 LIMIT 100" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 	);
 }
 ?>
@@ -159,7 +162,7 @@ if ( $is_management_model ) {
 								<?php endif; ?>
 							</td>
 							<td data-label="<?php esc_attr_e( 'Acción', 'arriendo-facil' ); ?>">
-								<?php if ( current_user_can( 'manage_options' ) ) : ?>
+								<?php if ( current_user_can( Arriendo_Facil_Tenancy::CAP ) ) : ?>
 									<button type="button" class="button button-primary af-rate-tenant"
 										data-lease="<?php echo esc_attr( (int) $pending_lease->id ); ?>"
 										data-tenant="<?php echo esc_attr( trim( (string) $pending_lease->guest_name ) ); ?>"

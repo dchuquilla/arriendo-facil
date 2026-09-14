@@ -204,7 +204,7 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 			<label for="af-lease-search-input" style="display:block; font-weight:600; margin-bottom:4px;">
 				<?php esc_html_e( 'Buscar contrato (cédula / RUC / pasaporte / nombre)', 'arriendo-facil' ); ?>
 			</label>
-			<div style="display:flex; gap:8px; align-items:center;">
+			<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
 				<input type="text" id="af-lease-search-input" placeholder="<?php esc_attr_e( 'Escribe al menos 2 caracteres…', 'arriendo-facil' ); ?>" class="regular-text" autocomplete="off" />
 				<span id="af-lease-search-spinner" hidden style="color:#888;"><?php esc_html_e( 'Buscando…', 'arriendo-facil' ); ?></span>
 			</div>
@@ -238,7 +238,7 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 				<p id="af-billing-preview-summary" style="margin-top:0; color:#555;"></p>
 				<div id="af-billing-preview-warning" style="display:none; margin:8px 0; padding:10px; border-radius:6px; background:#fff4e5; color:#7a4b00; border:1px solid #f3d2a2;"></div>
 
-				<div style="display:grid; grid-template-columns:repeat(2,minmax(220px,1fr)); gap:10px; margin-bottom:10px;">
+				<div class="af-form-grid-2" style="margin-bottom:10px;">
 					<label>
 						<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Descripcion', 'arriendo-facil' ); ?></span>
 						<input type="text" id="af-billing-preview-desc" class="regular-text" style="width:100%;" />
@@ -261,7 +261,7 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 					</label>
 				</div>
 
-				<div style="display:grid; grid-template-columns:repeat(2,minmax(220px,1fr)); gap:8px; margin-bottom:10px;">
+				<div class="af-form-grid-2" style="gap:8px; margin-bottom:10px;">
 					<div><?php esc_html_e( 'Comprador:', 'arriendo-facil' ); ?> <strong id="af-billing-preview-buyer-name">-</strong></div>
 					<div><?php esc_html_e( 'Identificacion:', 'arriendo-facil' ); ?> <strong id="af-billing-preview-buyer-id">-</strong></div>
 					<div><?php esc_html_e( 'Subtotal:', 'arriendo-facil' ); ?> <strong id="af-billing-preview-subtotal">$0.00</strong></div>
@@ -314,7 +314,8 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 		</div>
 
 		<!-- ── Invoices Table ──────────────────────────────────────── -->
-		<table class="wp-list-table widefat fixed striped" id="af-invoices-table">
+		<div class="af-table-scroll">
+		<table class="wp-list-table widefat fixed striped af-data-table" id="af-invoices-table">
 			<thead>
 				<tr>
 					<th style="width:50px;">#</th>
@@ -341,8 +342,8 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 					$has_mensajes = is_array( $mensajes_decoded ) && ! empty( $mensajes_decoded );
 					?>
 					<tr data-search="<?php echo esc_attr( strtolower( $guest_label . ' ' . $guest_id . ' ' . (string) $inv->accommodation_title . ' ' . (string) $inv->numero_comprobante ) ); ?>" data-grupo="<?php echo esc_attr( $grupo ); ?>" data-invoice-id="<?php echo (int) $inv->id; ?>" data-estado="<?php echo esc_attr( $inv->estado ); ?>">
-						<td style="font-weight:600;"><?php echo esc_html( $inv->id ); ?></td>
-						<td>
+						<td style="font-weight:600;" data-label="#"><?php echo esc_html( $inv->id ); ?></td>
+						<td data-label="<?php esc_attr_e( 'Comprobante', 'arriendo-facil' ); ?>">
 							<?php if ( $inv->numero_comprobante ) : ?>
 								<strong style="font-size:13px;"><?php echo esc_html( $inv->numero_comprobante ); ?></strong><br />
 							<?php endif; ?>
@@ -352,7 +353,7 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 								</small>
 							<?php endif; ?>
 						</td>
-						<td>
+						<td data-label="<?php esc_attr_e( 'Cliente', 'arriendo-facil' ); ?>">
 							<?php if ( '' !== $guest_label ) : ?>
 								<strong style="font-size:13px;"><?php echo esc_html( $guest_label ); ?></strong><br />
 							<?php endif; ?>
@@ -360,9 +361,9 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 								<small style="color:#888;"><?php echo esc_html( $guest_id ); ?></small>
 							<?php endif; ?>
 						</td>
-						<td style="font-size:13px;"><?php echo esc_html( $inv->accommodation_title ?: '—' ); ?></td>
-						<td style="font-weight:600; color:#2e7d32; text-align:right;">$ <?php echo esc_html( number_format( (float) $inv->total, 2 ) ); ?></td>
-						<td>
+						<td style="font-size:13px;" data-label="<?php esc_attr_e( 'Inmueble', 'arriendo-facil' ); ?>"><?php echo esc_html( $inv->accommodation_title ?: '—' ); ?></td>
+						<td style="font-weight:600; color:#2e7d32; text-align:right;" data-label="<?php esc_attr_e( 'Total', 'arriendo-facil' ); ?>">$ <?php echo esc_html( number_format( (float) $inv->total, 2 ) ); ?></td>
+						<td data-label="<?php esc_attr_e( 'Estado', 'arriendo-facil' ); ?>">
 							<span style="font-weight:600; color:<?php echo esc_attr( $estado_info['color'] ); ?>; display:inline-flex; align-items:center; gap:6px;">
 								<span style="font-size:16px;"><?php echo esc_html( $estado_info['icon'] ); ?></span>
 								<?php echo esc_html( $estado_info['label'] ); ?>
@@ -373,10 +374,10 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 								</button>
 							<?php endif; ?>
 						</td>
-						<td style="font-size:12px; color:#888;">
+						<td style="font-size:12px; color:#888;" data-label="<?php esc_attr_e( 'Fecha', 'arriendo-facil' ); ?>">
 							<?php echo esc_html( wp_date( 'd/m/Y', strtotime( $inv->created_at ) ) ); ?>
 						</td>
-						<td>
+						<td class="af-td-actions" data-label="<?php esc_attr_e( 'Acciones', 'arriendo-facil' ); ?>">
 							<div style="display:flex; gap:4px; flex-wrap:wrap;">
 								<?php if ( $inv->ride_path && file_exists( $inv->ride_path ) ) : ?>
 									<a href="<?php echo esc_url( admin_url( 'admin-ajax.php?action=af_download_ride&id=' . (int) $inv->id . '&nonce=' . wp_create_nonce( 'af_billing_nonce' ) ) ); ?>"
@@ -431,6 +432,7 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 				<?php endforeach; ?>
 			</tbody>
 		</table>
+		</div>
 	</div>
 	<?php else : ?>
 		<p style="margin-top:24px; color:#888; text-align:center; padding:40px 20px;">

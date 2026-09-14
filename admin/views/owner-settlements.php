@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-$owners = Arriendo_Facil_Owner_Settlement::get_active_owners();
+$owners = Arriendo_Facil_Owner_Settlement::get_active_owners( Arriendo_Facil_Tenancy::accessible_accommodation_ids() );
 
 $period_filter = isset( $_GET['period'] ) ? sanitize_text_field( wp_unslash( $_GET['period'] ) ) : gmdate( 'Y-m' );
 if ( ! preg_match( '/^\d{4}-\d{2}$/', $period_filter ) ) {
@@ -17,6 +17,9 @@ if ( ! preg_match( '/^\d{4}-\d{2}$/', $period_filter ) ) {
 }
 
 $selected_owner = isset( $_GET['owner_id'] ) ? absint( wp_unslash( $_GET['owner_id'] ) ) : 0;
+if ( $selected_owner && ! in_array( $selected_owner, wp_list_pluck( $owners, 'id' ), true ) ) {
+	$selected_owner = 0;
+}
 if ( ! $selected_owner && ! empty( $owners ) ) {
 	$selected_owner = $owners[0]['id'];
 }

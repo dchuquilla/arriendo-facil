@@ -30,6 +30,9 @@ $settlement = $selected_owner
 
 $owner_user   = $selected_owner ? get_userdata( $selected_owner ) : null;
 $charge_types = class_exists( 'Arriendo_Facil_Billing_Ledger' ) ? Arriendo_Facil_Billing_Ledger::charge_types() : array();
+$transfer     = $selected_owner ? Arriendo_Facil_Owner_Settlement::get_transfer( $selected_owner, $period_filter ) : null;
+$transfer_nonce = wp_create_nonce( 'af_owner_settlement_nonce' );
+$can_transfer   = current_user_can( 'manage_options' );
 ?>
 <div class="wrap af-shell">
 
@@ -112,6 +115,41 @@ $charge_types = class_exists( 'Arriendo_Facil_Billing_Ledger' ) ? Arriendo_Facil
 					<div class="af-kpi__hint"><?php esc_html_e( 'Cobrado menos gastos', 'arriendo-facil' ); ?></div>
 				</article>
 			</div>
+
+			<section class="af-section" style="padding: var(--af-space-5); margin-bottom: var(--af-space-4); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+				<div>
+					<h2 class="af-section__title" style="margin:0 0 4px;"><?php esc_html_e( 'Dispersión de fondos', 'arriendo-facil' ); ?></h2>
+					<?php if ( $transfer ) : ?>
+						<p class="af-section__subtitle" style="margin:0;">
+							<span class="af-pill af-pill--success"><?php esc_html_e( 'Transferido', 'arriendo-facil' ); ?></span>
+							<?php
+							echo esc_html(
+								sprintf(
+									/* translators: 1: amount, 2: reference, 3: date */
+									__( '$%1$s · ref. %2$s · %3$s', 'arriendo-facil' ),
+									number_format_i18n( (float) $transfer->amount, 2 ),
+									$transfer->reference ? $transfer->reference : '—',
+									mysql2date( 'd/m/Y', $transfer->transferred_at )
+								)
+							);
+							?>
+						</p>
+					<?php else : ?>
+						<p class="af-section__subtitle" style="margin:0;"><span class="af-pill af-pill--warning"><?php esc_html_e( 'Pendiente de transferir', 'arriendo-facil' ); ?></span> <?php esc_html_e( 'Aún no se registra el envío del neto a este propietario.', 'arriendo-facil' ); ?></p>
+					<?php endif; ?>
+				</div>
+				<?php if ( $can_transfer ) : ?>
+					<button type="button" class="button af-btn af-btn--primary" id="af-open-transfer"
+						data-owner="<?php echo esc_attr( $selected_owner ); ?>"
+						data-period="<?php echo esc_attr( $period_filter ); ?>"
+						data-net="<?php echo esc_attr( $settlement['net'] ); ?>"
+						data-amount="<?php echo esc_attr( $transfer ? $transfer->amount : $settlement['net'] ); ?>"
+						data-reference="<?php echo esc_attr( $transfer ? $transfer->reference : '' ); ?>"
+						data-notes="<?php echo esc_attr( $transfer ? $transfer->notes : '' ); ?>">
+						<?php echo esc_html( $transfer ? __( 'Editar transferencia', 'arriendo-facil' ) : __( 'Marcar como transferido', 'arriendo-facil' ) ); ?>
+					</button>
+				<?php endif; ?>
+			</section>
 
 			<section class="af-section">
 				<header class="af-section__header">
@@ -206,3 +244,88 @@ $charge_types = class_exists( 'Arriendo_Facil_Billing_Ledger' ) ? Arriendo_Facil
 		<?php endif; ?>
 	<?php endif; ?>
 </div>
+
+<!-- Modal: marcar como transferido -->
+<div class="af-modal" id="af-modal-transfer" role="dialog" aria-modal="true" aria-labelledby="af-modal-transfer-title">
+	<div class="af-modal__backdrop" data-af-modal-close></div>
+	<div class="af-modal__dialog">
+		<button type="button" class="af-modal__close" data-af-modal-close aria-label="<?php esc_attr_e( 'Cerrar', 'arriendo-facil' ); ?>">&times;</button>
+		<div class="af-modal__header">
+			<h2 class="af-modal__title" id="af-modal-transfer-title"><?php esc_html_e( 'Registrar transferencia al propietario', 'arriendo-facil' ); ?></h2>
+			<p class="af-modal__subtitle"><?php esc_html_e( 'Deja constancia del monto y la referencia bancaria enviados.', 'arriendo-facil' ); ?></p>
+		</div>
+		<div class="af-modal__body">
+			<p class="af-modal__status" id="af-modal-transfer-status"></p>
+			<div class="af-modal__field">
+				<label for="af-transfer-amount"><?php esc_html_e( 'Monto transferido (USD)', 'arriendo-facil' ); ?></label>
+				<input type="number" id="af-transfer-amount" min="0" step="0.01" />
+			</div>
+			<div class="af-modal__field">
+				<label for="af-transfer-reference"><?php esc_html_e( 'Referencia bancaria', 'arriendo-facil' ); ?></label>
+				<input type="text" id="af-transfer-reference" />
+			</div>
+			<div class="af-modal__field">
+				<label for="af-transfer-notes"><?php esc_html_e( 'Notas', 'arriendo-facil' ); ?></label>
+				<input type="text" id="af-transfer-notes" />
+			</div>
+		</div>
+		<div class="af-modal__footer">
+			<button type="button" class="button" data-af-modal-close><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
+			<button type="button" class="button button-primary" id="af-transfer-save"><?php esc_html_e( 'Guardar', 'arriendo-facil' ); ?></button>
+		</div>
+	</div>
+</div>
+
+<script>
+(function () {
+	const openBtn = document.getElementById('af-open-transfer');
+	const modal = document.getElementById('af-modal-transfer');
+	if (!openBtn || !modal) { return; }
+
+	const ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
+	const nonce = <?php echo wp_json_encode( $transfer_nonce ); ?>;
+
+	openBtn.addEventListener('click', function () {
+		document.getElementById('af-transfer-amount').value = openBtn.dataset.amount || openBtn.dataset.net || 0;
+		document.getElementById('af-transfer-reference').value = openBtn.dataset.reference || '';
+		document.getElementById('af-transfer-notes').value = openBtn.dataset.notes || '';
+		document.getElementById('af-modal-transfer-status').textContent = '';
+		modal.classList.add('is-open');
+		document.body.classList.add('af-modal-open');
+	});
+
+	modal.querySelectorAll('[data-af-modal-close]').forEach(function (el) {
+		el.addEventListener('click', function () {
+			modal.classList.remove('is-open');
+			document.body.classList.remove('af-modal-open');
+		});
+	});
+
+	document.getElementById('af-transfer-save').addEventListener('click', function () {
+		const statusEl = document.getElementById('af-modal-transfer-status');
+		const body = new URLSearchParams();
+		body.append('action', 'af_record_owner_transfer');
+		body.append('nonce', nonce);
+		body.append('owner_id', openBtn.dataset.owner);
+		body.append('period', openBtn.dataset.period);
+		body.append('amount', document.getElementById('af-transfer-amount').value || 0);
+		body.append('reference', document.getElementById('af-transfer-reference').value || '');
+		body.append('notes', document.getElementById('af-transfer-notes').value || '');
+
+		fetch(ajaxUrl, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+			body: body
+		}).then((r) => r.json()).then(function (json) {
+			if (!json || !json.success) {
+				statusEl.textContent = (json && json.data && json.data.message) || 'Error';
+				statusEl.className = 'af-modal__status is-error';
+				return;
+			}
+			statusEl.textContent = json.data.message;
+			statusEl.className = 'af-modal__status is-success';
+			setTimeout(function () { window.location.reload(); }, 700);
+		});
+	});
+}());
+</script>

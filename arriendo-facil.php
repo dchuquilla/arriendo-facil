@@ -220,6 +220,7 @@ function arriendo_facil_init() {
 		'Arriendo_Facil_Billing_Ledger',
 		'Arriendo_Facil_Rental_Workflow',
 		'Arriendo_Facil_Owner_Contact',
+		'Arriendo_Facil_Owner_Settlement',
 		'Arriendo_Facil_Guest',
 		'Arriendo_Facil_Document_Verification',
 		'Arriendo_Facil_Review',

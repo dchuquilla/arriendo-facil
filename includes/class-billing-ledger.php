@@ -504,7 +504,7 @@ class Arriendo_Facil_Billing_Ledger {
 		}
 
 		$leases = (array) $wpdb->get_results(
-			"SELECT id, accommodation_id, guest_id, monthly_rent
+			"SELECT id, accommodation_id, guest_id, monthly_rent, payment_due_day
 			 FROM {$wpdb->prefix}af_leases
 			 WHERE status = 'active' AND deleted_at IS NULL{$scope_clause}" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		);
@@ -518,6 +518,9 @@ class Arriendo_Facil_Billing_Ledger {
 				: null;
 			$unit_id = $unit ? (int) $unit->id : 0;
 
+			$due_day  = ! empty( $lease->payment_due_day ) ? min( 28, max( 1, (int) $lease->payment_due_day ) ) : 5;
+			$due_date = gmdate( 'Y-m-d', strtotime( $period . '-' . str_pad( (string) $due_day, 2, '0', STR_PAD_LEFT ) ) );
+
 			$canon = self::create_charge(
 				array(
 					'lease_id'    => (int) $lease->id,
@@ -526,6 +529,7 @@ class Arriendo_Facil_Billing_Ledger {
 					'charge_type' => 'canon',
 					'period'      => $period,
 					'amount'      => (float) $lease->monthly_rent,
+					'due_date'    => $due_date,
 				)
 			);
 			is_wp_error( $canon ) ? $skipped++ : $created++;
@@ -547,6 +551,7 @@ class Arriendo_Facil_Billing_Ledger {
 					'charge_type' => 'alicuota',
 					'period'      => $period,
 					'amount'      => $hoa_amount,
+					'due_date'    => $due_date,
 				)
 			);
 			is_wp_error( $hoa ) ? $skipped++ : $created++;

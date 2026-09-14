@@ -119,6 +119,96 @@ if ( class_exists( 'Arriendo_Facil_Document_Verification' ) ) {
 	$docs_pending = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_guests WHERE {$docs_where}" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 }
 
+// ── Filtros de alertas de calendario (rango de fechas + inmueble/edificio) ─
+$calendar_from  = isset( $_GET['af_date_from'] ) ? sanitize_text_field( wp_unslash( $_GET['af_date_from'] ) ) : gmdate( 'Y-m-d' );
+$calendar_to    = isset( $_GET['af_date_to'] ) ? sanitize_text_field( wp_unslash( $_GET['af_date_to'] ) ) : gmdate( 'Y-m-d', strtotime( '+30 days' ) );
+if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $calendar_from ) ) {
+	$calendar_from = gmdate( 'Y-m-d' );
+}
+if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $calendar_to ) || $calendar_to < $calendar_from ) {
+	$calendar_to = gmdate( 'Y-m-d', strtotime( $calendar_from . ' +30 days' ) );
+}
+
+$calendar_accommodation_id = isset( $_GET['af_accommodation_id'] ) ? absint( wp_unslash( $_GET['af_accommodation_id'] ) ) : 0;
+$calendar_building_id      = isset( $_GET['af_building_id'] ) ? absint( wp_unslash( $_GET['af_building_id'] ) ) : 0;
+
+$calendar_scope_ids = $scope_ids;
+if ( $calendar_building_id && class_exists( 'Arriendo_Facil_Property_Structure' ) ) {
+	$building_units = Arriendo_Facil_Property_Structure::get_units_by_building( $calendar_building_id );
+	$building_accom_ids = array_filter( array_map( static function ( $unit ) { return (int) $unit->accommodation_id; }, (array) $building_units ) );
+	$calendar_scope_ids = is_array( $calendar_scope_ids ) ? array_intersect( $calendar_scope_ids, $building_accom_ids ) : $building_accom_ids;
+}
+if ( $calendar_accommodation_id ) {
+	$calendar_scope_ids = is_array( $calendar_scope_ids ) ? array_intersect( $calendar_scope_ids, array( $calendar_accommodation_id ) ) : array( $calendar_accommodation_id );
+}
+
+$calendar_scope_clause = is_array( $calendar_scope_ids ) ? ' AND l.accommodation_id IN (' . Arriendo_Facil_Tenancy::ids_in_clause( $calendar_scope_ids ) . ')' : '';
+
+$upcoming_checkins = (array) $wpdb->get_results(
+	$wpdb->prepare(
+		"SELECT l.id, l.start_date, l.accommodation_id, p.post_title AS accommodation_title,
+		        CONCAT(g.first_name, ' ', g.last_name) AS guest_name
+		 FROM {$wpdb->prefix}af_leases l
+		 LEFT JOIN {$wpdb->posts} p ON p.ID = l.accommodation_id
+		 LEFT JOIN {$wpdb->prefix}af_guests g ON g.id = l.guest_id
+		 WHERE l.deleted_at IS NULL AND l.start_date BETWEEN %s AND %s{$calendar_scope_clause}
+		 ORDER BY l.start_date ASC
+		 LIMIT 10", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$calendar_from,
+		$calendar_to
+	)
+);
+
+$upcoming_checkouts = (array) $wpdb->get_results(
+	$wpdb->prepare(
+		"SELECT l.id, l.end_date, l.accommodation_id, p.post_title AS accommodation_title,
+		        CONCAT(g.first_name, ' ', g.last_name) AS guest_name
+		 FROM {$wpdb->prefix}af_leases l
+		 LEFT JOIN {$wpdb->posts} p ON p.ID = l.accommodation_id
+		 LEFT JOIN {$wpdb->prefix}af_guests g ON g.id = l.guest_id
+		 WHERE l.deleted_at IS NULL AND l.status = 'active' AND l.end_date BETWEEN %s AND %s{$calendar_scope_clause}
+		 ORDER BY l.end_date ASC
+		 LIMIT 10", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$calendar_from,
+		$calendar_to
+	)
+);
+
+// Dropdown options for the calendar filter (buildings + properties in scope).
+$calendar_buildings = class_exists( 'Arriendo_Facil_Property_Structure' )
+	? $wpdb->get_results( 'SELECT id, name FROM ' . Arriendo_Facil_Property_Structure::buildings_table() . " WHERE status = 'active' ORDER BY name ASC" )
+	: array();
+$calendar_properties_query = array(
+	'post_type'      => 'accommodation',
+	'post_status'    => array( 'publish', 'draft', 'private' ),
+	'posts_per_page' => 200,
+	'orderby'        => 'title',
+	'order'          => 'ASC',
+	'fields'         => 'ids',
+);
+if ( is_array( $scope_ids ) ) {
+	$calendar_properties_query['post__in'] = ! empty( $scope_ids ) ? $scope_ids : array( 0 );
+}
+$calendar_property_ids = get_posts( $calendar_properties_query );
+
+// ── Resumen de mantenimientos por prioridad ───────────────────────────────
+$maintenance_priority = array( 'alta' => 0, 'media' => 0, 'baja' => 0 );
+if ( class_exists( 'Arriendo_Facil_Maintenance' ) ) {
+	$maintenance_scope_clause = null === $scope_ids ? '' : ' AND accommodation_id IN (' . Arriendo_Facil_Tenancy::ids_in_clause( $scope_ids ) . ')';
+	$maintenance_rows = (array) $wpdb->get_results(
+		'SELECT priority, COUNT(*) AS total FROM ' . Arriendo_Facil_Maintenance::table() . "
+		 WHERE status IN ('pending', 'in_progress'){$maintenance_scope_clause}
+		 GROUP BY priority" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	);
+	foreach ( $maintenance_rows as $row ) {
+		if ( isset( $maintenance_priority[ $row->priority ] ) ) {
+			$maintenance_priority[ $row->priority ] = (int) $row->total;
+		}
+	}
+}
+$maintenance_urgent_total = $maintenance_priority['alta'];
+$maintenance_open_total   = array_sum( $maintenance_priority );
+
 $period_balance   = round( $period_charged - $period_paid, 2 );
 $collection_rate  = $period_charged > 0 ? (int) round( $period_paid / $period_charged * 100 ) : 0;
 
@@ -255,6 +345,13 @@ if ( $pending_cleaning > 0 ) {
 		'label' => _n( 'solicitud de limpieza pendiente', 'solicitudes de limpieza pendientes', $pending_cleaning, 'arriendo-facil' ),
 		'count' => $pending_cleaning,
 		'url'   => admin_url( 'admin.php?page=af-cleaning-requests' ),
+	);
+}
+if ( $maintenance_urgent_total > 0 ) {
+	$tasks[] = array(
+		'label' => _n( 'incidencia crítica de mantenimiento', 'incidencias críticas de mantenimiento', $maintenance_urgent_total, 'arriendo-facil' ),
+		'count' => $maintenance_urgent_total,
+		'url'   => admin_url( 'admin.php?page=af-maintenance' ),
 	);
 }
 if ( $pending_queue > 0 && ! $is_management_model ) {
@@ -516,22 +613,36 @@ if ( $pending_queue > 0 && ! $is_management_model ) {
 			</div>
 		</article>
 
-		<article class="af-kpi <?php echo $pending_cleaning > 0 ? 'af-kpi--attention' : 'af-kpi--success'; ?>" role="listitem">
+		<article class="af-kpi <?php echo $maintenance_urgent_total > 0 ? 'af-kpi--attention' : ( $maintenance_open_total > 0 ? '' : 'af-kpi--success' ); ?>" role="listitem">
 			<div class="af-kpi__head">
-				<span class="af-kpi__label"><?php esc_html_e( 'Limpiezas pendientes', 'arriendo-facil' ); ?></span>
+				<span class="af-kpi__label"><?php echo esc_html( $is_management_model ? __( 'Mantenimiento', 'arriendo-facil' ) : __( 'Limpiezas pendientes', 'arriendo-facil' ) ); ?></span>
 				<span class="af-kpi__icon" aria-hidden="true">
 					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 20l6-6 4 4 6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="18" cy="6" r="2" stroke="currentColor" stroke-width="1.8"/></svg>
 				</span>
 			</div>
-			<div class="af-kpi__value"><?php echo esc_html( number_format_i18n( $pending_cleaning ) ); ?></div>
+			<div class="af-kpi__value"><?php echo esc_html( number_format_i18n( $maintenance_open_total ) ); ?></div>
 			<div class="af-kpi__hint">
-				<?php echo esc_html( $pending_cleaning > 0 ? __( 'Requieren asignación o programación', 'arriendo-facil' ) : __( 'Sin solicitudes en espera', 'arriendo-facil' ) ); ?>
+				<?php
+				if ( $is_management_model && $maintenance_open_total > 0 ) {
+					echo esc_html(
+						sprintf(
+							/* translators: 1: critical count, 2: medium count, 3: low count */
+							__( '%1$d crítica · %2$d media · %3$d baja', 'arriendo-facil' ),
+							$maintenance_priority['alta'],
+							$maintenance_priority['media'],
+							$maintenance_priority['baja']
+						)
+					);
+				} else {
+					echo esc_html( $maintenance_open_total > 0 ? __( 'Requieren asignación o programación', 'arriendo-facil' ) : __( 'Sin solicitudes en espera', 'arriendo-facil' ) );
+				}
+				?>
 			</div>
 			<div class="af-kpi__footer">
-				<span class="af-pill <?php echo $pending_cleaning > 0 ? 'af-pill--warning' : 'af-pill--success'; ?>">
-					<?php echo esc_html( $pending_cleaning > 0 ? __( 'Acción requerida', 'arriendo-facil' ) : __( 'Al día', 'arriendo-facil' ) ); ?>
+				<span class="af-pill <?php echo $maintenance_urgent_total > 0 ? 'af-pill--danger' : ( $maintenance_open_total > 0 ? 'af-pill--warning' : 'af-pill--success' ); ?>">
+					<?php echo esc_html( $maintenance_urgent_total > 0 ? __( 'Prioridad crítica', 'arriendo-facil' ) : ( $maintenance_open_total > 0 ? __( 'Acción requerida', 'arriendo-facil' ) : __( 'Al día', 'arriendo-facil' ) ) ); ?>
 				</span>
-				<a class="af-kpi__link" href="<?php echo esc_url( admin_url( 'admin.php?page=af-cleaning-requests' ) ); ?>"><?php esc_html_e( 'Revisar', 'arriendo-facil' ); ?></a>
+				<a class="af-kpi__link" href="<?php echo esc_url( admin_url( $is_management_model ? 'admin.php?page=af-maintenance' : 'admin.php?page=af-cleaning-requests' ) ); ?>"><?php esc_html_e( 'Revisar', 'arriendo-facil' ); ?></a>
 			</div>
 		</article>
 
@@ -696,6 +807,87 @@ if ( $pending_queue > 0 && ! $is_management_model ) {
 		<?php endif; ?>
 	</section>
 	<?php endif; ?>
+
+	<section class="af-section" aria-labelledby="af-calendar-title">
+		<header class="af-section__header">
+			<div>
+				<h2 class="af-section__title" id="af-calendar-title"><?php esc_html_e( 'Alertas operativas de calendario', 'arriendo-facil' ); ?></h2>
+				<p class="af-section__subtitle"><?php esc_html_e( 'Visitas, check-in y check-out dentro del rango seleccionado.', 'arriendo-facil' ); ?></p>
+			</div>
+		</header>
+
+		<form method="get" style="display:flex; gap:12px; align-items:end; flex-wrap:wrap; margin-bottom: var(--af-space-4);">
+			<input type="hidden" name="page" value="arriendo-facil" />
+			<label style="display:flex; flex-direction:column; gap:4px; font-weight:600; font-size: var(--af-text-sm);">
+				<?php esc_html_e( 'Desde', 'arriendo-facil' ); ?>
+				<input type="date" name="af_date_from" value="<?php echo esc_attr( $calendar_from ); ?>" />
+			</label>
+			<label style="display:flex; flex-direction:column; gap:4px; font-weight:600; font-size: var(--af-text-sm);">
+				<?php esc_html_e( 'Hasta', 'arriendo-facil' ); ?>
+				<input type="date" name="af_date_to" value="<?php echo esc_attr( $calendar_to ); ?>" />
+			</label>
+			<?php if ( ! empty( $calendar_buildings ) ) : ?>
+				<label style="display:flex; flex-direction:column; gap:4px; font-weight:600; font-size: var(--af-text-sm);">
+					<?php esc_html_e( 'Edificio', 'arriendo-facil' ); ?>
+					<select name="af_building_id">
+						<option value="0"><?php esc_html_e( 'Todos', 'arriendo-facil' ); ?></option>
+						<?php foreach ( $calendar_buildings as $building ) : ?>
+							<option value="<?php echo esc_attr( (int) $building->id ); ?>" <?php selected( $calendar_building_id, (int) $building->id ); ?>><?php echo esc_html( $building->name ); ?></option>
+						<?php endforeach; ?>
+					</select>
+				</label>
+			<?php endif; ?>
+			<label style="display:flex; flex-direction:column; gap:4px; font-weight:600; font-size: var(--af-text-sm);">
+				<?php esc_html_e( 'Propiedad', 'arriendo-facil' ); ?>
+				<select name="af_accommodation_id">
+					<option value="0"><?php esc_html_e( 'Todas', 'arriendo-facil' ); ?></option>
+					<?php foreach ( $calendar_property_ids as $prop_id ) : ?>
+						<option value="<?php echo esc_attr( (int) $prop_id ); ?>" <?php selected( $calendar_accommodation_id, (int) $prop_id ); ?>><?php echo esc_html( get_the_title( $prop_id ) ); ?></option>
+					<?php endforeach; ?>
+				</select>
+			</label>
+			<button type="submit" class="button af-btn af-btn--primary"><?php esc_html_e( 'Filtrar', 'arriendo-facil' ); ?></button>
+		</form>
+
+		<div class="af-split">
+			<div>
+				<h3 style="margin-top:0;"><?php esc_html_e( 'Próximos check-in (mudanza)', 'arriendo-facil' ); ?></h3>
+				<?php if ( empty( $upcoming_checkins ) ) : ?>
+					<p class="af-empty__text"><?php esc_html_e( 'Sin check-ins programados en el rango.', 'arriendo-facil' ); ?></p>
+				<?php else : ?>
+					<div class="af-semaforo__table" role="table" aria-label="<?php esc_attr_e( 'Próximos check-in', 'arriendo-facil' ); ?>">
+						<?php foreach ( $upcoming_checkins as $checkin ) : ?>
+							<a class="af-semaforo__row" href="<?php echo esc_url( admin_url( 'admin.php?page=af-leases' ) ); ?>">
+								<span class="af-semaforo__tenant">
+									<strong><?php echo esc_html( trim( (string) $checkin->guest_name ) ? trim( (string) $checkin->guest_name ) : __( 'Inquilino', 'arriendo-facil' ) ); ?></strong>
+									<small><?php echo esc_html( $checkin->accommodation_title ? $checkin->accommodation_title : '—' ); ?></small>
+								</span>
+								<span class="af-pill af-pill--info"><?php echo esc_html( wp_date( 'd/m/Y', strtotime( $checkin->start_date ) ) ); ?></span>
+							</a>
+						<?php endforeach; ?>
+					</div>
+				<?php endif; ?>
+			</div>
+			<div>
+				<h3 style="margin-top:0;"><?php esc_html_e( 'Próximos check-out (salida)', 'arriendo-facil' ); ?></h3>
+				<?php if ( empty( $upcoming_checkouts ) ) : ?>
+					<p class="af-empty__text"><?php esc_html_e( 'Sin check-outs programados en el rango.', 'arriendo-facil' ); ?></p>
+				<?php else : ?>
+					<div class="af-semaforo__table" role="table" aria-label="<?php esc_attr_e( 'Próximos check-out', 'arriendo-facil' ); ?>">
+						<?php foreach ( $upcoming_checkouts as $checkout ) : ?>
+							<a class="af-semaforo__row" href="<?php echo esc_url( admin_url( 'admin.php?page=af-upcoming-exits' ) ); ?>">
+								<span class="af-semaforo__tenant">
+									<strong><?php echo esc_html( trim( (string) $checkout->guest_name ) ? trim( (string) $checkout->guest_name ) : __( 'Inquilino', 'arriendo-facil' ) ); ?></strong>
+									<small><?php echo esc_html( $checkout->accommodation_title ? $checkout->accommodation_title : '—' ); ?></small>
+								</span>
+								<span class="af-pill af-pill--warning"><?php echo esc_html( wp_date( 'd/m/Y', strtotime( $checkout->end_date ) ) ); ?></span>
+							</a>
+						<?php endforeach; ?>
+					</div>
+				<?php endif; ?>
+			</div>
+		</div>
+	</section>
 
 	<div class="af-split">
 

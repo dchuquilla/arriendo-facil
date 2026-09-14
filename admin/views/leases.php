@@ -228,6 +228,16 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 				<input type="number" name="deposit_amount" step="0.01" min="0" style="width:100%;" placeholder="0.00" />
 			</label>
 
+			<label>
+				<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Día límite de pago', 'arriendo-facil' ); ?></span>
+				<select name="payment_due_day" style="width:100%;">
+					<option value=""><?php esc_html_e( 'Día 5 (predeterminado)', 'arriendo-facil' ); ?></option>
+					<?php for ( $day = 1; $day <= 28; $day++ ) : ?>
+						<option value="<?php echo esc_attr( $day ); ?>"><?php echo esc_html( sprintf( /* translators: %d: day of month */ __( 'Día %d', 'arriendo-facil' ), $day ) ); ?></option>
+					<?php endfor; ?>
+				</select>
+			</label>
+
 			<div style="display:flex; gap:8px;">
 				<button type="submit" class="button button-primary"><?php esc_html_e( 'Crear contrato', 'arriendo-facil' ); ?></button>
 				<button type="button" class="button" id="af-lease-cancel"><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
@@ -327,6 +337,7 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 				<th><?php esc_html_e( 'Inicio', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Fin', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Canon mensual', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'Día de pago', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Saldo', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Estado', 'arriendo-facil' ); ?></th>
 			<th><?php esc_html_e( 'Factura', 'arriendo-facil' ); ?></th>
@@ -390,6 +401,7 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 						<td data-label="<?php esc_attr_e( 'Inicio', 'arriendo-facil' ); ?>"><?php echo esc_html( $lease->start_date ); ?></td>
 						<td data-label="<?php esc_attr_e( 'Fin', 'arriendo-facil' ); ?>"><?php echo esc_html( $lease->end_date ); ?></td>
 						<td data-label="<?php esc_attr_e( 'Canon mensual', 'arriendo-facil' ); ?>">$<?php echo esc_html( number_format( (float) $lease->monthly_rent, 2 ) ); ?></td>
+						<td data-label="<?php esc_attr_e( 'Día de pago', 'arriendo-facil' ); ?>"><?php echo esc_html( ! empty( $lease->payment_due_day ) ? (int) $lease->payment_due_day : 5 ); ?></td>
 						<td data-label="<?php esc_attr_e( 'Saldo', 'arriendo-facil' ); ?>">
 							<?php $lease_balance = $lease_balance_map[ (int) $lease->id ] ?? 0.0; ?>
 							<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-collections&statement_lease=' . (int) $lease->id ) ); ?>"

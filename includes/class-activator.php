@@ -701,6 +701,22 @@ class Arriendo_Facil_Activator {
 				KEY created_at (created_at)
 			) $charset_collate;",
 
+			// ── Dispersión de fondos: transferencias registradas al propietario ──
+			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_owner_transfers (
+				id                BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+				owner_id          BIGINT(20) UNSIGNED NOT NULL,
+				period            CHAR(7) NOT NULL COMMENT 'YYYY-MM',
+				amount            DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+				reference         VARCHAR(190) DEFAULT NULL,
+				notes             TEXT DEFAULT NULL,
+				transferred_by    BIGINT(20) UNSIGNED DEFAULT NULL,
+				transferred_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				UNIQUE KEY uniq_owner_period (owner_id, period),
+				KEY owner_id (owner_id),
+				KEY period (period)
+			) $charset_collate;",
+
 			// ── Idempotency keys (anti-duplication guard) ────────────────────
 			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_idempotency_keys (
 				id                BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -896,6 +912,7 @@ class Arriendo_Facil_Activator {
 			'legal_status'               => "ALTER TABLE {$leases_table} ADD COLUMN legal_status VARCHAR(30) NOT NULL DEFAULT 'pendiente'",
 			'legal_notes'                => "ALTER TABLE {$leases_table} ADD COLUMN legal_notes TEXT DEFAULT NULL",
 			'legal_updated_at'           => "ALTER TABLE {$leases_table} ADD COLUMN legal_updated_at DATETIME DEFAULT NULL",
+			'payment_due_day'            => "ALTER TABLE {$leases_table} ADD COLUMN payment_due_day TINYINT UNSIGNED DEFAULT NULL COMMENT 'Dia limite de pago mensual (1-28)'",
 		);
 		foreach ( $lease_operation_columns as $column_name => $alter_sql ) {
 			$column_exists = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = %s", DB_NAME, $leases_table, $column_name ) );

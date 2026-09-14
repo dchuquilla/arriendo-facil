@@ -198,4 +198,95 @@ class Arriendo_Facil_Owner_Settlement {
 			'property_ids'    => $property_ids,
 		);
 	}
+
+	/**
+	 * Hooks into WordPress.
+	 */
+	public function __construct() {
+		add_action( 'wp_ajax_af_record_owner_transfer', array( $this, 'ajax_record_transfer' ) );
+	}
+
+	/**
+	 * Returns the owner transfers table name.
+	 *
+	 * @return string
+	 */
+	public static function transfers_table() {
+		global $wpdb;
+
+		return $wpdb->prefix . 'af_owner_transfers';
+	}
+
+	/**
+	 * Returns the recorded transfer for an owner/period, if any.
+	 *
+	 * @param int    $owner_id Owner user ID.
+	 * @param string $period   Period in YYYY-MM format.
+	 * @return object|null
+	 */
+	public static function get_transfer( $owner_id, $period ) {
+		global $wpdb;
+
+		$owner_id = absint( $owner_id );
+		$period   = sanitize_text_field( (string) $period );
+
+		if ( ! $owner_id || ! preg_match( '/^\d{4}-\d{2}$/', $period ) ) {
+			return null;
+		}
+
+		return $wpdb->get_row(
+			$wpdb->prepare(
+				'SELECT * FROM ' . self::transfers_table() . ' WHERE owner_id = %d AND period = %s',
+				$owner_id,
+				$period
+			)
+		);
+	}
+
+	/**
+	 * Records (or updates) the dispersion of funds transferred to an owner
+	 * for a given period. Requires manage_options, this is money movement.
+	 *
+	 * @return void
+	 */
+	public function ajax_record_transfer() {
+		check_ajax_referer( 'af_owner_settlement_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$owner_id  = isset( $_POST['owner_id'] ) ? absint( $_POST['owner_id'] ) : 0;
+		$period    = isset( $_POST['period'] ) ? sanitize_text_field( wp_unslash( $_POST['period'] ) ) : '';
+		$amount    = isset( $_POST['amount'] ) ? floatval( wp_unslash( $_POST['amount'] ) ) : 0.0;
+		$reference = isset( $_POST['reference'] ) ? sanitize_text_field( wp_unslash( $_POST['reference'] ) ) : '';
+		$notes     = isset( $_POST['notes'] ) ? sanitize_textarea_field( wp_unslash( $_POST['notes'] ) ) : '';
+
+		if ( ! $owner_id || ! preg_match( '/^\d{4}-\d{2}$/', $period ) || $amount < 0 ) {
+			wp_send_json_error( array( 'message' => __( 'Datos inválidos.', 'arriendo-facil' ) ) );
+		}
+
+		global $wpdb;
+		$table = self::transfers_table();
+
+		$existing = self::get_transfer( $owner_id, $period );
+		$data     = array(
+			'owner_id'       => $owner_id,
+			'period'         => $period,
+			'amount'         => $amount,
+			'reference'      => $reference,
+			'notes'          => $notes,
+			'transferred_by' => get_current_user_id(),
+			'transferred_at' => current_time( 'mysql', true ),
+		);
+		$formats  = array( '%d', '%s', '%f', '%s', '%s', '%d', '%s' );
+
+		if ( $existing ) {
+			$wpdb->update( $table, $data, array( 'id' => (int) $existing->id ), $formats, array( '%d' ) );
+		} else {
+			$wpdb->insert( $table, $data, $formats );
+		}
+
+		wp_send_json_success( array( 'message' => __( 'Transferencia registrada.', 'arriendo-facil' ) ) );
+	}
 }

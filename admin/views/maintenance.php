@@ -17,7 +17,9 @@ $priorities = Arriendo_Facil_Maintenance::priorities();
 $statuses   = Arriendo_Facil_Maintenance::statuses();
 $reporters  = Arriendo_Facil_Maintenance::reporters();
 
-$status_filter = isset( $_GET['req_status'] ) ? sanitize_key( wp_unslash( $_GET['req_status'] ) ) : '';
+$status_filter   = isset( $_GET['req_status'] ) ? sanitize_key( wp_unslash( $_GET['req_status'] ) ) : '';
+$type_filter     = isset( $_GET['req_type'] ) ? sanitize_key( wp_unslash( $_GET['req_type'] ) ) : '';
+$priority_filter = isset( $_GET['req_priority'] ) ? sanitize_key( wp_unslash( $_GET['req_priority'] ) ) : '';
 
 $where_clauses = array( '1=1' );
 $where_args    = array();
@@ -25,6 +27,16 @@ $where_args    = array();
 if ( array_key_exists( $status_filter, $statuses ) ) {
 	$where_clauses[] = 'r.status = %s';
 	$where_args[]    = $status_filter;
+}
+
+if ( array_key_exists( $type_filter, $types ) ) {
+	$where_clauses[] = 'r.request_type = %s';
+	$where_args[]    = $type_filter;
+}
+
+if ( array_key_exists( $priority_filter, $priorities ) ) {
+	$where_clauses[] = 'r.priority = %s';
+	$where_args[]    = $priority_filter;
 }
 
 $is_owner = Arriendo_Facil_Accommodation::user_is_owner();
@@ -36,9 +48,10 @@ if ( $is_owner ) {
 
 $where_sql = implode( ' AND ', $where_clauses );
 
-$list_query = "SELECT r.*, p.post_title AS accommodation_title
+$list_query = "SELECT r.*, p.post_title AS accommodation_title, u.unit_code
 	FROM {$table} r
 	LEFT JOIN {$wpdb->posts} p ON p.ID = r.accommodation_id
+	LEFT JOIN {$wpdb->prefix}af_units u ON u.id = r.unit_id
 	WHERE {$where_sql}
 	ORDER BY FIELD(r.priority, 'alta', 'media', 'baja'), r.requested_date DESC
 	LIMIT 200";
@@ -114,6 +127,13 @@ $maintenance_properties = get_posts( $maintenance_property_args );
 			</label>
 
 			<label>
+				<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Unidad', 'arriendo-facil' ); ?></span>
+				<select name="unit_id" id="af-maintenance-unit" style="width:100%;">
+					<option value=""><?php esc_html_e( '— Sin unidad —', 'arriendo-facil' ); ?></option>
+				</select>
+			</label>
+
+			<label>
 				<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Prioridad', 'arriendo-facil' ); ?></span>
 				<select name="priority" style="width:100%;">
 					<?php foreach ( $priorities as $priority_key => $priority_label ) : ?>
@@ -184,6 +204,24 @@ $maintenance_properties = get_posts( $maintenance_property_args );
 				<?php endforeach; ?>
 			</select>
 		</label>
+		<label style="display:flex; align-items:center; gap:8px; font-weight:600;">
+			<?php esc_html_e( 'Tipo', 'arriendo-facil' ); ?>
+			<select name="req_type" style="min-height:36px;" onchange="this.form.submit()">
+				<option value=""><?php esc_html_e( 'Todos', 'arriendo-facil' ); ?></option>
+				<?php foreach ( $types as $type_key => $type_label ) : ?>
+					<option value="<?php echo esc_attr( $type_key ); ?>" <?php selected( $type_filter, $type_key ); ?>><?php echo esc_html( $type_label ); ?></option>
+				<?php endforeach; ?>
+			</select>
+		</label>
+		<label style="display:flex; align-items:center; gap:8px; font-weight:600;">
+			<?php esc_html_e( 'Prioridad', 'arriendo-facil' ); ?>
+			<select name="req_priority" style="min-height:36px;" onchange="this.form.submit()">
+				<option value=""><?php esc_html_e( 'Todas', 'arriendo-facil' ); ?></option>
+				<?php foreach ( $priorities as $priority_key => $priority_label ) : ?>
+					<option value="<?php echo esc_attr( $priority_key ); ?>" <?php selected( $priority_filter, $priority_key ); ?>><?php echo esc_html( $priority_label ); ?></option>
+				<?php endforeach; ?>
+			</select>
+		</label>
 	</form>
 
 	<section class="af-section">
@@ -243,8 +281,15 @@ $maintenance_properties = get_posts( $maintenance_property_args );
 						<div class="af-maint-card__meta">
 							<span><?php echo esc_html( $reporters[ $request_reporter ] ?? $request_reporter ); ?></span>
 							<span><?php echo esc_html( (string) $request->requested_date ); ?></span>
+							<?php if ( ! empty( $request->unit_code ) ) : ?>
+								<span><?php echo esc_html( sprintf( /* translators: %s = unit code */ __( 'Unidad %s', 'arriendo-facil' ), $request->unit_code ) ); ?></span>
+							<?php endif; ?>
 							<span>$<?php echo esc_html( number_format_i18n( (float) ( $request->cost ?? 0 ), 2 ) ); ?></span>
 						</div>
+
+						<?php if ( 'completed' === $request_status && (float) ( $request->cost ?? 0 ) > 0 && ! empty( $request->lease_id ) ) : ?>
+							<p class="af-maint-card__deduction"><?php esc_html_e( 'Costo deducido de la garantía del contrato.', 'arriendo-facil' ); ?></p>
+						<?php endif; ?>
 
 						<footer class="af-maint-card__footer">
 							<?php if ( 'completed' !== $request_status && 'cancelled' !== $request_status ) : ?>
@@ -290,6 +335,43 @@ $maintenance_properties = get_posts( $maintenance_property_args );
 			card.style.display = card.style.display === 'none' ? 'block' : 'none';
 		});
 		cancelBtn.addEventListener('click', function () { card.style.display = 'none'; });
+	}
+
+	// Preload units for the selected accommodation.
+	const unitSelect = document.getElementById('af-maintenance-unit');
+	const unitIndex = <?php
+	$units_index = array();
+	if ( class_exists( 'Arriendo_Facil_Property_Structure' ) ) {
+		foreach ( $maintenance_properties as $acc_prop ) {
+			$unit = Arriendo_Facil_Property_Structure::get_unit_by_accommodation( (int) $acc_prop->ID );
+			if ( $unit && ! empty( $unit->unit_code ) ) {
+				$units_index[ (int) $acc_prop->ID ][] = array(
+					'id'   => (int) $unit->id,
+					'code' => (string) $unit->unit_code,
+				);
+			}
+		}
+	}
+	echo wp_json_encode( array_map( 'array_values', (array) $units_index ) );
+	?>;
+
+	if (unitSelect) {
+		const propertySelect = document.querySelector('#af-maintenance-form select[name="accommodation_id"]');
+		function refreshUnits() {
+			unitSelect.innerHTML = '<option value=""><?php echo esc_js( __( '— Sin unidad —', 'arriendo-facil' ) ); ?></option>';
+			const accId = propertySelect ? propertySelect.value : '';
+			const units = unitIndex[accId] || [];
+			units.forEach(function (u) {
+				const opt = document.createElement('option');
+				opt.value = u.id;
+				opt.textContent = u.code;
+				unitSelect.appendChild(opt);
+			});
+		}
+		if (propertySelect) {
+			propertySelect.addEventListener('change', refreshUnits);
+		}
+		refreshUnits();
 	}
 
 	if (form) {

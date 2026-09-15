@@ -280,7 +280,7 @@ class Arriendo_Facil_Activator {
 			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_guest_documents (
 				id                BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
 				guest_id          BIGINT(20) UNSIGNED NOT NULL,
-				doc_type          VARCHAR(40) NOT NULL COMMENT 'garantia_alicuota, cedula_papeleta, certificado_bancario',
+				doc_type          VARCHAR(40) NOT NULL COMMENT 'garantia_alicuota, cedula_papeleta, certificado_bancario, certificado_laboral',
 				storage           VARCHAR(10) NOT NULL DEFAULT 'local' COMMENT 'r2 (privado) o local (fallback publico WP)',
 				object_key        VARCHAR(255) NOT NULL COMMENT 'clave R2 o attachment_id (fallback local)',
 				mime_type         VARCHAR(100) NOT NULL DEFAULT 'application/pdf',
@@ -312,6 +312,7 @@ class Arriendo_Facil_Activator {
 				legal_notes TEXT DEFAULT NULL,
 				legal_updated_at DATETIME DEFAULT NULL,
 				document_url  VARCHAR(255) DEFAULT NULL,
+				template_attachment_id BIGINT(20) UNSIGNED DEFAULT NULL,
 				deleted_at    DATETIME DEFAULT NULL,
 				created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 				updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -323,6 +324,12 @@ class Arriendo_Facil_Activator {
 			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_cleaning_requests (
 				id               BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
 				accommodation_id BIGINT(20) UNSIGNED NOT NULL,
+				unit_id          BIGINT(20) UNSIGNED DEFAULT NULL,
+				lease_id         BIGINT(20) UNSIGNED DEFAULT NULL,
+				request_type     VARCHAR(30) NOT NULL DEFAULT 'limpieza',
+				priority         VARCHAR(20) NOT NULL DEFAULT 'media',
+				cost             DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+				reported_by      VARCHAR(30) NOT NULL DEFAULT 'operador',
 				requested_date   DATE NOT NULL,
 				completed_date   DATE DEFAULT NULL,
 				status           VARCHAR(20) NOT NULL DEFAULT 'pending',
@@ -330,7 +337,9 @@ class Arriendo_Facil_Activator {
 				created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 				updated_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 				PRIMARY KEY (id),
-				KEY accommodation_id (accommodation_id)
+				KEY accommodation_id (accommodation_id),
+				KEY lease_id (lease_id),
+				KEY unit_id (unit_id)
 			) $charset_collate;",
 
 			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_owner_contacts (
@@ -390,6 +399,8 @@ class Arriendo_Facil_Activator {
 				email       VARCHAR(200) NOT NULL,
 				phone       VARCHAR(50) DEFAULT NULL,
 				id_number   VARCHAR(100) DEFAULT NULL,
+				nationality VARCHAR(100) DEFAULT NULL,
+				birth_city  VARCHAR(150) DEFAULT NULL,
 				ai_score    DECIMAL(5,2) DEFAULT NULL,
 				created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 				updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -851,6 +862,8 @@ class Arriendo_Facil_Activator {
 			'doc_verified_at' => "ALTER TABLE {$guests_table} ADD COLUMN doc_verified_at DATETIME DEFAULT NULL",
 			'doc_notes'       => "ALTER TABLE {$guests_table} ADD COLUMN doc_notes TEXT DEFAULT NULL",
 			'identity_match_status' => "ALTER TABLE {$guests_table} ADD COLUMN identity_match_status VARCHAR(20) NOT NULL DEFAULT 'not_checked'",
+			'nationality'     => "ALTER TABLE {$guests_table} ADD COLUMN nationality VARCHAR(100) DEFAULT NULL",
+			'birth_city'      => "ALTER TABLE {$guests_table} ADD COLUMN birth_city VARCHAR(150) DEFAULT NULL",
 		);
 
 		foreach ( $guest_doc_columns as $column_name => $alter_sql ) {
@@ -879,6 +892,7 @@ class Arriendo_Facil_Activator {
 			'cost'         => "ALTER TABLE {$cleaning_table} ADD COLUMN cost DECIMAL(12,2) NOT NULL DEFAULT 0.00",
 			'lease_id'     => "ALTER TABLE {$cleaning_table} ADD COLUMN lease_id BIGINT(20) UNSIGNED DEFAULT NULL",
 			'reported_by'  => "ALTER TABLE {$cleaning_table} ADD COLUMN reported_by VARCHAR(30) NOT NULL DEFAULT 'operador'",
+			'unit_id'      => "ALTER TABLE {$cleaning_table} ADD COLUMN unit_id BIGINT(20) UNSIGNED DEFAULT NULL",
 		);
 
 		foreach ( $cleaning_columns as $column_name => $alter_sql ) {
@@ -902,6 +916,7 @@ class Arriendo_Facil_Activator {
 		// PMS legal and deposit operations added without changing the lease lifecycle.
 		$leases_table = $wpdb->prefix . 'af_leases';
 		$lease_operation_columns = array(
+			'template_attachment_id'   => "ALTER TABLE {$leases_table} ADD COLUMN template_attachment_id BIGINT(20) UNSIGNED DEFAULT NULL",
 			'deposit_amount'             => "ALTER TABLE {$leases_table} ADD COLUMN deposit_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00",
 			'deposit_damage_deduction'   => "ALTER TABLE {$leases_table} ADD COLUMN deposit_damage_deduction DECIMAL(10,2) NOT NULL DEFAULT 0.00",
 			'deposit_service_deduction'  => "ALTER TABLE {$leases_table} ADD COLUMN deposit_service_deduction DECIMAL(10,2) NOT NULL DEFAULT 0.00",
@@ -1404,6 +1419,7 @@ class Arriendo_Facil_Activator {
 			wp_clear_scheduled_hook( 'af_sri_retry_cron' );
 			wp_clear_scheduled_hook( 'af_process_ai_queue' );
 			wp_clear_scheduled_hook( 'af_review_dispatch_cron' );
+			wp_clear_scheduled_hook( 'af_guest_reminders_cron' );
 		}
 		flush_rewrite_rules();
 	}

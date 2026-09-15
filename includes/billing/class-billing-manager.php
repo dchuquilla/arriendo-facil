@@ -127,7 +127,7 @@ class Arriendo_Facil_Billing_Manager {
 		// Translate flat frontend overrides (descripcion, precio_unitario, etc.) to nested payload structure.
 		$nested_overrides = $this->translate_flat_overrides( $overrides );
 
-		$payload = $this->build_payload_from_lease_context( $context, $nested_overrides );
+		$payload = $this->build_payload_from_lease_context( $context, $nested_overrides, $period );
 		if ( is_wp_error( $payload ) ) {
 			return $payload;
 		}
@@ -849,7 +849,7 @@ class Arriendo_Facil_Billing_Manager {
 		}
 
 		$nested_overrides = $this->translate_flat_overrides( $overrides );
-		$payload          = $this->build_payload_from_lease_context( $context, $nested_overrides );
+		$payload          = $this->build_payload_from_lease_context( $context, $nested_overrides, $period );
 		if ( is_wp_error( $payload ) ) {
 			return $payload;
 		}
@@ -914,8 +914,14 @@ class Arriendo_Facil_Billing_Manager {
 
 	/**
 	 * Default payload builder for lease invoices.
+	 *
+	 * @param array  $context   Lease/guest/accommodation context.
+	 * @param array  $overrides Flat override map.
+	 * @param string $period    Billing period YYYY-MM. When provided, invoice
+	 *                          items are fed from the billing ledger (canon,
+	 *                          alicuota, servicios y otros cargos del periodo).
 	 */
-	protected function build_payload_from_lease_context( array $context, array $overrides ) {
+	protected function build_payload_from_lease_context( array $context, array $overrides, string $period = '' ) {
 		$lease = isset( $context['lease'] ) ? $context['lease'] : null;
 		if ( ! is_object( $lease ) ) {
 			return new WP_Error( 'lease_not_found', __( 'No se encontro el contrato para facturar.', 'arriendo-facil' ) );
@@ -932,7 +938,22 @@ class Arriendo_Facil_Billing_Manager {
 		}
 
 		$accommodation = isset( $context['accommodation_title'] ) ? (string) $context['accommodation_title'] : 'Inmueble';
-		$rent          = isset( $lease->monthly_rent ) ? (float) $lease->monthly_rent : 0.0;
+
+		// Build invoice items from the billing ledger when a period is given;
+		// otherwise fall back to the statutory canon line item.
+		$items = $this->build_ledger_items( (int) $lease->id, $period, $accommodation );
+		if ( empty( $items ) ) {
+			$rent  = isset( $lease->monthly_rent ) ? (float) $lease->monthly_rent : 0.0;
+			$items = array(
+				array(
+					'codigo_principal' => 'ARRIENDO',
+					'descripcion'      => sprintf( 'Canon de arriendo - %s', $accommodation ),
+					'cantidad'         => 1,
+					'precio_unitario'  => $rent,
+					'descuento'        => 0,
+				),
+			);
+		}
 
 		$payload = array(
 			'fecha_emision'            => wp_date( 'd/m/Y' ),
@@ -943,21 +964,63 @@ class Arriendo_Facil_Billing_Manager {
 			'forma_pago'               => '01',
 			'plazo'                    => '30',
 			'unidad_tiempo'            => 'dias',
-			'items'                    => array(
-				array(
-					'codigo_principal' => 'ARRIENDO',
-					'descripcion'      => sprintf( 'Canon de arriendo - %s', $accommodation ),
-					'cantidad'         => 1,
-					'precio_unitario'  => $rent,
-					'descuento'        => 0,
-				),
-			),
+			'items'                    => $items,
 			'info_adicional' => array(
 				'email' => (string) ( $context['guest_email'] ?? '' ),
 			),
 		);
 
 		return array_replace_recursive( $payload, $overrides );
+	}
+
+	/**
+	 * Builds invoice line items from the ledger charges of a leasing period.
+	 * The unified "canon" charge already includes the HOA (alicuota) amount.
+	 *
+	 * @param int    $lease_id      Lease ID.
+	 * @param string $period        Period YYYY-MM.
+	 * @param string $accommodation Property title used as fallback description.
+	 * @return array<int,array<string,mixed>>
+	 */
+	protected function build_ledger_items( int $lease_id, string $period, string $accommodation ): array {
+		if ( ! class_exists( 'Arriendo_Facil_Billing_Ledger' ) || '' === $period ) {
+			return array();
+		}
+
+		$charges = Arriendo_Facil_Billing_Ledger::get_charges_by_lease_period( $lease_id, $period );
+		$labels  = Arriendo_Facil_Billing_Ledger::charge_types();
+		if ( empty( $charges ) ) {
+			return array();
+		}
+
+		$items = array();
+		foreach ( $charges as $charge ) {
+			$amount = round( (float) $charge->amount, 2 );
+			if ( $amount <= 0 ) {
+				continue;
+			}
+
+			$type = (string) $charge->charge_type;
+			if ( 'canon' === $type ) {
+				$descripcion = sprintf( 'Canon de arriendo (incluye alicuota) - %s', $accommodation );
+			} else {
+				$descripcion = (string) $charge->description;
+				if ( '' === $descripcion ) {
+					$descripcion = (string) ( $labels[ $type ] ?? ucfirst( $type ) );
+				}
+			}
+
+			$items[] = array(
+				'codigo_principal' => strtoupper( mb_substr( $type, 0, 12 ) ),
+				'codigo_auxiliar'  => sprintf( '%d-%d', $lease_id, (int) $charge->id ),
+				'descripcion'      => $descripcion,
+				'cantidad'         => 1,
+				'precio_unitario'  => $amount,
+				'descuento'        => 0,
+			);
+		}
+
+		return $items;
 	}
 
 	/**

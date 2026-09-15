@@ -90,6 +90,15 @@ class Arriendo_Facil_Admin {
 
 		add_submenu_page(
 			'arriendo-facil',
+			__( 'Catálogo de propiedades', 'arriendo-facil' ),
+			__( 'Catálogo', 'arriendo-facil' ),
+			'edit_posts',
+			'af-catalog',
+			array( $this, 'render_catalog' )
+		);
+
+		add_submenu_page(
+			'arriendo-facil',
 			__( 'Contratos', 'arriendo-facil' ),
 			__( 'Contratos', 'arriendo-facil' ),
 			'edit_posts',
@@ -1943,6 +1952,10 @@ class Arriendo_Facil_Admin {
 	/**
 	 * Renders the leases admin page.
 	 */
+	public function render_catalog() {
+		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/catalog.php';
+	}
+
 	public function render_leases() {
 		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/leases.php';
 	}

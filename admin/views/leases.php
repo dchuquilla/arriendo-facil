@@ -209,6 +209,17 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 			</label>
 
 			<label>
+				<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Plantilla del contrato', 'arriendo-facil' ); ?></span>
+				<select name="template_attachment_id" id="af-lease-template" style="width:100%;">
+					<option value=""><?php esc_html_e( 'Plantilla del propietario (última)', 'arriendo-facil' ); ?></option>
+				</select>
+				<span class="af-modal__hint" style="display:block;">
+					<?php esc_html_e( 'Se usará para generar el documento del contrato.', 'arriendo-facil' ); ?>
+					<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-owner-contacts' ) ); ?>"><?php esc_html_e( 'Administrar plantillas', 'arriendo-facil' ); ?></a>
+				</span>
+			</label>
+
+			<label>
 				<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Inicio', 'arriendo-facil' ); ?> *</span>
 				<input type="date" name="start_date" required style="width:100%;" />
 			</label>
@@ -269,7 +280,46 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 			const opt = this.options[this.selectedIndex];
 			const rent = opt ? opt.getAttribute('data-rent') : '';
 			if (rent && !form.monthly_rent.value) { form.monthly_rent.value = parseFloat(rent).toFixed(2); }
+			refreshTemplates(opt ? opt.value : '');
 		});
+
+		// Preload owner DOCX templates per accommodation so the operator can
+		// choose which one generates the lease document.
+		const templateIndex = <?php
+		$template_index = array();
+		if ( $lease_service && class_exists( 'Arriendo_Facil_Guest' ) ) {
+			$guest_service = new Arriendo_Facil_Guest();
+			foreach ( (array) $lease_accommodations as $acc_item ) {
+				$templates = $guest_service->get_owner_contract_templates_for_accommodation( (int) $acc_item->ID );
+				if ( ! empty( $templates ) ) {
+					$template_index[ (int) $acc_item->ID ] = array_map(
+						static function ( $t ) {
+							return array(
+								'id'   => (int) $t['id'],
+								'name' => (string) $t['title'] . ( $t['file_name'] ? ' — ' . $t['file_name'] : '' ),
+							);
+						},
+						$templates
+					);
+				}
+			}
+		}
+		echo wp_json_encode( $template_index );
+		?>;
+		const templateSelect = document.getElementById('af-lease-template');
+
+		function refreshTemplates(accommodationId) {
+			if (!templateSelect) { return; }
+			templateSelect.innerHTML = '<option value=""><?php echo esc_js( __( 'Plantilla del propietario (última)', 'arriendo-facil' ) ); ?></option>';
+			const templates = (templateIndex[accommodationId] || []);
+			templates.forEach(function (t) {
+				const opt = document.createElement('option');
+				opt.value = t.id;
+				opt.textContent = t.name;
+				templateSelect.appendChild(opt);
+			});
+		}
+		refreshTemplates(form.accommodation_id.value);
 
 		form.addEventListener('submit', function (e) {
 			e.preventDefault();

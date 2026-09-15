@@ -25,6 +25,7 @@ class Arriendo_Facil_Billing_Ledger {
 		add_action( 'wp_ajax_af_create_charge', array( $this, 'ajax_create_charge' ) );
 		add_action( 'wp_ajax_af_generate_period_charges', array( $this, 'ajax_generate_period_charges' ) );
 		add_action( 'wp_ajax_af_record_meter_reading', array( $this, 'ajax_record_meter_reading' ) );
+		add_action( 'wp_ajax_af_void_charge', array( $this, 'ajax_void_charge' ) );
 		add_action( 'af_generate_monthly_charges', array( __CLASS__, 'generate_monthly_charges' ) );
 		add_action( 'af_flag_overdue_charges', array( __CLASS__, 'flag_overdue_charges' ) );
 	}
@@ -370,15 +371,13 @@ class Arriendo_Facil_Billing_Ledger {
 			return new WP_Error( 'af_payment_amount_invalid', __( 'El monto del pago debe ser mayor a cero.', 'arriendo-facil' ) );
 		}
 
+		// Overpayments are allowed: the excess becomes a credit to the lease and
+		// is applied to future charges (see get_lease_credit()).
 		$outstanding = round( (float) $charge->amount - (float) $charge->amount_paid, 2 );
-		if ( $amount > $outstanding ) {
+		if ( $outstanding <= 0 ) {
 			return new WP_Error(
-				'af_payment_amount_exceeds',
-				sprintf(
-					/* translators: %s: outstanding balance */
-					__( 'El pago excede el saldo pendiente (%s).', 'arriendo-facil' ),
-					number_format_i18n( $outstanding, 2 )
-				)
+				'af_payment_charge_fully_paid',
+				__( 'Este cargo ya está saldado; registra el excedente como un pago anticipado sobre el próximo cargo.', 'arriendo-facil' )
 			);
 		}
 
@@ -477,6 +476,76 @@ class Arriendo_Facil_Billing_Ledger {
 	}
 
 	/**
+	 * Voids a charge. Only charges with no recorded payments can be voided,
+	 * otherwise the accounting trail (payments) would become orphaned.
+	 *
+	 * @param int $charge_id Charge ID.
+	 * @return true|WP_Error
+	 */
+	public static function void_charge( $charge_id ) {
+		global $wpdb;
+
+		$charge_id = absint( $charge_id );
+		$charge    = self::get_charge( $charge_id );
+		if ( ! $charge ) {
+			return new WP_Error( 'af_charge_invalid', __( 'Cargo invalido.', 'arriendo-facil' ) );
+		}
+
+		if ( 'void' === $charge->status ) {
+			return new WP_Error( 'af_charge_already_void', __( 'El cargo ya esta anulado.', 'arriendo-facil' ) );
+		}
+
+		if ( (float) $charge->amount_paid > 0 ) {
+			return new WP_Error(
+				'af_charge_has_payments',
+				__( 'No se puede anular un cargo que ya tiene pagos registrados.', 'arriendo-facil' )
+			);
+		}
+
+		$updated = $wpdb->update(
+			self::charges_table(),
+			array( 'status' => 'void' ),
+			array( 'id' => $charge_id ),
+			array( '%s' ),
+			array( '%d' )
+		);
+
+		if ( false === $updated ) {
+			return new WP_Error( 'af_charge_void_failed', __( 'No se pudo anular el cargo.', 'arriendo-facil' ) );
+		}
+
+		return true;
+	}
+
+	/**
+	 * Returns the total outstanding credit a lease has accumulated from
+	 * overpayments. Computed as the sum of positive differences between the
+	 * amount paid and the amount due across all non-void charges.
+	 *
+	 * @param int $lease_id Lease ID.
+	 * @return float
+	 */
+	public static function get_lease_credit( $lease_id ) {
+		global $wpdb;
+
+		$lease_id = absint( $lease_id );
+		if ( ! $lease_id ) {
+			return 0.0;
+		}
+
+		$credit = (float) $wpdb->get_var(
+			$wpdb->prepare(
+				'SELECT COALESCE(SUM(amount_paid - amount), 0)
+				 FROM ' . self::charges_table() . "
+				 WHERE lease_id = %d AND status != 'void' AND amount_paid > amount",
+				$lease_id
+			)
+		);
+
+		return round( $credit, 2 );
+	}
+
+	/**
 	 * Generates canon + alicuota charges for every active lease for a period.
 	 * Safe to re-run: duplicates are rejected by the table's unique key.
 	 *
@@ -521,6 +590,18 @@ class Arriendo_Facil_Billing_Ledger {
 			$due_day  = ! empty( $lease->payment_due_day ) ? min( 28, max( 1, (int) $lease->payment_due_day ) ) : 5;
 			$due_date = gmdate( 'Y-m-d', strtotime( $period . '-' . str_pad( (string) $due_day, 2, '0', STR_PAD_LEFT ) ) );
 
+			// Cargo unificado: canon + alicuota en una sola linea del periodo.
+			$canon_amount = (float) $lease->monthly_rent;
+			$description  = null;
+
+			if ( $unit_id ) {
+				$hoa_amount = Arriendo_Facil_Property_Structure::calculate_unit_hoa( $unit_id );
+				if ( $hoa_amount > 0 ) {
+					$canon_amount += $hoa_amount;
+					$description   = __( 'Canon + alicuota', 'arriendo-facil' );
+				}
+			}
+
 			$canon = self::create_charge(
 				array(
 					'lease_id'    => (int) $lease->id,
@@ -528,33 +609,12 @@ class Arriendo_Facil_Billing_Ledger {
 					'guest_id'    => (int) $lease->guest_id,
 					'charge_type' => 'canon',
 					'period'      => $period,
-					'amount'      => (float) $lease->monthly_rent,
+					'amount'      => $canon_amount,
 					'due_date'    => $due_date,
+					'description' => $description,
 				)
 			);
 			is_wp_error( $canon ) ? $skipped++ : $created++;
-
-			if ( ! $unit_id ) {
-				continue;
-			}
-
-			$hoa_amount = Arriendo_Facil_Property_Structure::calculate_unit_hoa( $unit_id );
-			if ( $hoa_amount <= 0 ) {
-				continue;
-			}
-
-			$hoa = self::create_charge(
-				array(
-					'lease_id'    => (int) $lease->id,
-					'unit_id'     => $unit_id,
-					'guest_id'    => (int) $lease->guest_id,
-					'charge_type' => 'alicuota',
-					'period'      => $period,
-					'amount'      => $hoa_amount,
-					'due_date'    => $due_date,
-				)
-			);
-			is_wp_error( $hoa ) ? $skipped++ : $created++;
 		}
 
 		return array(
@@ -579,6 +639,32 @@ class Arriendo_Facil_Billing_Ledger {
 
 		return $wpdb->get_row(
 			$wpdb->prepare( 'SELECT * FROM ' . self::charges_table() . ' WHERE id = %d', $charge_id )
+		);
+	}
+
+	/**
+	 * Returns non-void charges for a lease in a given period (YYYY-MM).
+	 *
+	 * @param int    $lease_id Lease ID.
+	 * @param string $period   Period in YYYY-MM format.
+	 * @return object[]
+	 */
+	public static function get_charges_by_lease_period( $lease_id, $period ) {
+		global $wpdb;
+
+		$lease_id = absint( $lease_id );
+		$period   = sanitize_text_field( (string) $period );
+		if ( ! $lease_id || ! preg_match( '/^\d{4}-\d{2}$/', $period ) ) {
+			return array();
+		}
+
+		return (array) $wpdb->get_results(
+			$wpdb->prepare(
+				'SELECT * FROM ' . self::charges_table() . ' WHERE lease_id = %d AND period = %s AND status != %s ORDER BY charge_type ASC',
+				$lease_id,
+				$period,
+				'void'
+			)
 		);
 	}
 
@@ -615,11 +701,14 @@ class Arriendo_Facil_Billing_Ledger {
 			$total_paid    += (float) $charge->amount_paid;
 		}
 
+		$credit = self::get_lease_credit( $lease_id );
+
 		return array(
 			'charges'       => $charges,
 			'total_charged' => round( $total_charged, 2 ),
 			'total_paid'    => round( $total_paid, 2 ),
 			'balance'       => round( $total_charged - $total_paid, 2 ),
+			'credit'        => $credit,
 		);
 	}
 
@@ -673,6 +762,32 @@ class Arriendo_Facil_Billing_Ledger {
 		}
 
 		return $buckets;
+	}
+
+	/**
+	 * AJAX: voids a charge (only if it has no payments yet).
+	 *
+	 * @return void
+	 */
+	public function ajax_void_charge() {
+		check_ajax_referer( 'af_ledger_nonce', 'nonce' );
+
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$charge_id = isset( $_POST['charge_id'] ) ? absint( wp_unslash( $_POST['charge_id'] ) ) : 0;
+		if ( ! Arriendo_Facil_Tenancy::can_access_charge( $charge_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes acceso a este cargo.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$result = self::void_charge( $charge_id );
+
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ), 400 );
+		}
+
+		wp_send_json_success( array( 'message' => __( 'Cargo anulado correctamente.', 'arriendo-facil' ) ) );
 	}
 
 	/**

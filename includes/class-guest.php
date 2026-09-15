@@ -41,6 +41,7 @@ class Arriendo_Facil_Guest {
 		add_action( 'wp_ajax_af_get_guests', array( $this, 'ajax_get_guests' ) );
 		add_action( 'wp_ajax_af_score_guest', array( $this, 'ajax_score_guest' ) );
 		add_action( 'af_process_guest_post_submit', array( $this, 'process_guest_post_submit_async' ), 10, 1 );
+		add_action( 'af_guest_reminders_cron', array( $this, 'dispatch_guest_reminders' ) );
 		add_shortcode( 'af_tenant_signup', array( $this, 'render_tenant_signup_shortcode' ) );
 	}
 
@@ -2217,6 +2218,8 @@ class Arriendo_Facil_Guest {
 		$referencia_personal_1 = isset( $_POST['referencia_personal_1'] ) ? sanitize_text_field( wp_unslash( $_POST['referencia_personal_1'] ) ) : '';
 		$referencia_personal_2 = isset( $_POST['referencia_personal_2'] ) ? sanitize_text_field( wp_unslash( $_POST['referencia_personal_2'] ) ) : '';
 		$personas_viviran      = isset( $_POST['personas_viviran'] ) ? absint( wp_unslash( $_POST['personas_viviran'] ) ) : 0;
+		$nationality = isset( $_POST['nationality'] ) ? sanitize_text_field( wp_unslash( $_POST['nationality'] ) ) : '';
+		$birth_city  = isset( $_POST['birth_city'] ) ? sanitize_text_field( wp_unslash( $_POST['birth_city'] ) ) : '';
 
 		$name_parts = preg_split( '/\s+/', trim( $name ) );
 		$first_name = ! empty( $name_parts[0] ) ? $name_parts[0] : '';
@@ -2290,8 +2293,10 @@ class Arriendo_Facil_Guest {
 				'referencia_personal_1' => $referencia_personal_1,
 				'referencia_personal_2' => $referencia_personal_2,
 				'personas_viviran'      => $personas_viviran,
+				'nationality'           => $nationality ? $nationality : null,
+				'birth_city'            => $birth_city ? $birth_city : null,
 			),
-			array( '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%d', '%s', '%s', '%d' )
+			array( '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%d', '%s', '%s', '%d', '%s', '%s' )
 		);
 
 		if ( $inserted ) {
@@ -2311,6 +2316,158 @@ class Arriendo_Facil_Guest {
 		} else {
 			wp_send_json_error( array( 'message' => __( 'No se pudo crear el huesped.', 'arriendo-facil' ) ) );
 		}
+	}
+
+	/**
+	 * Daily automatic reminders for guests.
+	 *
+	 * Emails tenants whose documents are still pending and reminds active
+	 * tenants that their lease is about to end. Each email is throttled with
+	 * an option timestamp so a guest is never spammed daily.
+	 *
+	 * @return void
+	 */
+	public function dispatch_guest_reminders() {
+		if ( ! function_exists( 'wp_mail' ) ) {
+			return;
+		}
+
+		global $wpdb;
+		$now = time();
+
+		// 1) Documento pendiente: avisa a inquilinos que aún no completan su
+		// documentación desde hace al menos 3 días. Máximo una vez por semana.
+		$doc_cutoff = gmdate( 'Y-m-d H:i:s', $now - 3 * DAY_IN_SECONDS );
+		$guests     = (array) $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT id, first_name, last_name, email
+				 FROM {$wpdb->prefix}af_guests
+				 WHERE doc_status IN ('pendiente','rechazado')
+				   AND created_at < %s
+				   AND email <> ''
+				 ORDER BY id DESC
+				 LIMIT 100",
+				$doc_cutoff
+			)
+		);
+
+		$admin_url = admin_url( 'admin.php?page=af-guests&view=profile' );
+
+		foreach ( $guests as $guest ) {
+			$throttle_key = 'af_guest_doc_reminder_' . (int) $guest->id;
+			$last_sent    = (int) get_option( $throttle_key, 0 );
+			if ( $last_sent && ( $now - $last_sent ) < 7 * DAY_IN_SECONDS ) {
+				continue;
+			}
+
+			$subject = __( '[ArriendoFacil] Documentacion pendiente de revisar', 'arriendo-facil' );
+			$message = '<p>' . sprintf(
+				esc_html__( 'Hola %s,', 'arriendo-facil' ),
+				esc_html( trim( $guest->first_name . ' ' . $guest->last_name ) )
+			) . '</p>';
+			$message .= '<p>' . esc_html__( 'Aun no hemos completado la revision de tu documentacion para el arriendo. Por favor revisa tu perfil y carga los documentos faltantes.', 'arriendo-facil' ) . '</p>';
+			$message .= '<p>' . esc_html__( 'Si ya los cargaste, este correo es solo un recordatorio para el equipo.', 'arriendo-facil' ) . '</p>';
+
+			if ( wp_mail( $guest->email, $subject, $message, array( 'Content-Type: text/html; charset=UTF-8' ) ) ) {
+				update_option( $throttle_key, $now );
+			}
+		}
+
+		// El recordatorio al equipo operativo aparte (un solo correo global si
+		// hay documentos pendientes) acelera el cierre comercial, no al inquilino.
+		$operator_reminder_key = 'af_guest_doc_operator_reminder';
+		$last_operator_sent    = (int) get_option( $operator_reminder_key, 0 );
+		if ( count( $guests ) > 0 && ( ! $last_operator_sent || $last_operator_sent && ( $now - $last_operator_sent ) >= 7 * DAY_IN_SECONDS ) ) {
+			$operator_emails = $this->get_operator_emails_for_guest_docs();
+			if ( ! empty( $operator_emails ) ) {
+				$subject = __( '[ArriendoFacil] Hay documentacion de inquilinos pendiente', 'arriendo-facil' );
+				$message = '<p>' . esc_html__( 'El siguiente inquilino tiene documentacion pendiente de revisar:', 'arriendo-facil' ) . '</p><ul>';
+				foreach ( $guests as $guest ) {
+					$message .= '<li>' . esc_html( trim( $guest->first_name . ' ' . $guest->last_name ) ) . ' &lt;' . esc_html( $guest->email ) . '&gt;</li>';
+				}
+				$message .= '</ul><p>' . sprintf(
+					'<a href="%1$s">%2$s</a>',
+					esc_url( $admin_url ),
+					esc_html__( 'Ir a la ficha del inquilino', 'arriendo-facil' )
+				) . '</p>';
+
+				$sent_any = false;
+				foreach ( $operator_emails as $recipient ) {
+					if ( wp_mail( $recipient, $subject, $message, array( 'Content-Type: text/html; charset=UTF-8' ) ) ) {
+						$sent_any = true;
+					}
+				}
+				if ( $sent_any ) {
+					update_option( $operator_reminder_key, $now );
+				}
+			}
+		}
+
+		// 2) Renovacion: avisa con 60 y 30 dias de anticipacion que el
+		// contrato activo de un inquilino esta por vencer.
+		$lease_table = $wpdb->prefix . 'af_leases';
+		$renewal_cutoff = gmdate( 'Y-m-d', $now + 60 * DAY_IN_SECONDS );
+
+		$leases = (array) $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT l.id, l.end_date, g.email, g.first_name, g.last_name
+				 FROM {$lease_table} l
+				 INNER JOIN {$wpdb->prefix}af_guests g ON g.id = l.guest_id
+				 WHERE l.status = 'active'
+				   AND l.end_date >= %s
+				   AND l.end_date <= %s
+				 ORDER BY l.end_date ASC
+				 LIMIT 100",
+				gmdate( 'Y-m-d' ),
+				$renewal_cutoff
+			)
+		);
+
+		foreach ( $leases as $lease ) {
+			$throttle_key = 'af_lease_renewal_reminder_' . (int) $lease->id;
+			$last_sent    = (int) get_option( $throttle_key, 0 );
+			if ( $last_sent && ( $now - $last_sent ) < 30 * DAY_IN_SECONDS ) {
+				continue;
+			}
+
+			$days_left = max( 0, (int) ( ( strtotime( $lease->end_date ) - $now ) / DAY_IN_SECONDS ) );
+			$subject = __( '[ArriendoFacil] Tu contrato esta por vencer', 'arriendo-facil' );
+			$message = '<p>' . sprintf(
+				esc_html__( 'Hola %s,', 'arriendo-facil' ),
+				esc_html( trim( $lease->first_name . ' ' . $lease->last_name ) )
+			) . '</p>';
+			$message .= '<p>' . sprintf(
+				esc_html__( 'Tu contrato vence el %1$s. Si deseas renovarlo o tienes dudas, ponte en contacto con la administracion.', 'arriendo-facil' ),
+				esc_html( mysql2date( get_option( 'date_format' ), $lease->end_date ) )
+			) . '</p>';
+
+			if ( wp_mail( $lease->email, $subject, $message, array( 'Content-Type: text/html; charset=UTF-8' ) ) ) {
+				update_option( $throttle_key, $now );
+			}
+		}
+	}
+
+	/**
+	 * Collects recipient addresses for operator-side reminders about pending guest docs.
+	 *
+	 * @return string[]
+	 */
+	private function get_operator_emails_for_guest_docs() {
+		$emails = array();
+		$users  = get_users(
+			array(
+				'role__in'        => array( 'administrator', 'af_property_admin' ),
+				'fields'          => 'user_email',
+				'number'          => 10,
+				'search_columns'  => array( 'user_email' ),
+			)
+		);
+		foreach ( $users as $email ) {
+			if ( is_email( $email ) ) {
+				$emails[] = $email;
+			}
+		}
+		return array_unique( $emails );
 	}
 
 	/**
@@ -2337,6 +2494,8 @@ class Arriendo_Facil_Guest {
 			'personas_viviran'     => 'ALTER TABLE ' . $table . ' ADD COLUMN personas_viviran TINYINT UNSIGNED DEFAULT NULL',
 			'phone_encrypted'      => 'ALTER TABLE ' . $table . ' ADD COLUMN phone_encrypted LONGTEXT DEFAULT NULL',
 			'id_number_encrypted'  => 'ALTER TABLE ' . $table . ' ADD COLUMN id_number_encrypted LONGTEXT DEFAULT NULL',
+			'nationality'          => 'ALTER TABLE ' . $table . ' ADD COLUMN nationality VARCHAR(100) DEFAULT NULL',
+			'birth_city'           => 'ALTER TABLE ' . $table . ' ADD COLUMN birth_city VARCHAR(150) DEFAULT NULL',
 		);
 
 		foreach ( $columns as $column_name => $sql ) {
@@ -4281,13 +4440,28 @@ class Arriendo_Facil_Guest {
 	 * @param int $accommodation_id Accommodation ID.
 	 * @return array<string,mixed>
 	 */
-	private function get_owner_contract_example_context( $accommodation_id ) {
+	private function get_owner_contract_example_context( $accommodation_id, $template_attachment_id = 0 ) {
 		$accommodation_id = absint( $accommodation_id );
 		$owner_user_id = $this->resolve_accommodation_owner_user_id( $accommodation_id );
 
 		if ( ! $owner_user_id ) {
 			error_log( 'Arriendo Facil owner-template lookup: accommodation has no resolved owner. accommodation_id=' . $accommodation_id );
 			return array();
+		}
+
+		$template_attachment_id = absint( $template_attachment_id );
+
+		// Explicit template selection takes precedence over the latest upload.
+		if ( $template_attachment_id ) {
+			$chosen = get_post( $template_attachment_id );
+			if ( $chosen && 'attachment' === $chosen->post_type ) {
+				$attachment_owner = (int) get_post_meta( $template_attachment_id, '_af_owner_user_id', true );
+				$is_owner_doc     = ( $attachment_owner && $attachment_owner === $owner_user_id )
+					|| (int) get_post_meta( $template_attachment_id, '_af_owner_contract_example', true ) === 1;
+				if ( $is_owner_doc ) {
+					return $this->build_contract_template_context_from_attachment( $template_attachment_id, $owner_user_id );
+				}
+			}
 		}
 
 		$attachment_ids = get_posts(
@@ -4349,6 +4523,60 @@ class Arriendo_Facil_Guest {
 		}
 
 		return $this->build_contract_template_context_from_attachment( $attachment_id, $owner_user_id );
+	}
+
+	/**
+	 * Lists the DOCX contract templates available for an accommodation owner,
+	 * used to let operators pick which template generates the lease document.
+	 *
+	 * @param int $accommodation_id Accommodation post ID.
+	 * @return array<int,array{id:int,title:string,file_name:string,mime_type:string}>
+	 */
+	public function get_owner_contract_templates_for_accommodation( $accommodation_id ) {
+		$accommodation_id = absint( $accommodation_id );
+		$owner_user_id    = $this->resolve_accommodation_owner_user_id( $accommodation_id );
+		if ( ! $owner_user_id ) {
+			return array();
+		}
+
+		$ids = get_posts(
+			array(
+				'post_type'      => 'attachment',
+				'post_status'    => 'inherit',
+				'posts_per_page' => 50,
+				'orderby'        => 'date',
+				'order'          => 'DESC',
+				'fields'         => 'ids',
+				'meta_query'     => array(
+					'relation' => 'OR',
+					array(
+						'key'   => '_af_owner_contract_example',
+						'value' => '1',
+					),
+					array(
+						'key'   => '_af_sensitive_doc_type',
+						'value' => 'contract_example',
+					),
+				),
+			)
+		);
+
+		$templates = array();
+		foreach ( $ids as $attachment_id ) {
+			$attachment_owner = (int) get_post_meta( $attachment_id, '_af_owner_user_id', true );
+			if ( $attachment_owner && $attachment_owner !== $owner_user_id ) {
+				continue;
+			}
+			$mime     = (string) get_post_mime_type( $attachment_id );
+			$templates[] = array(
+				'id'        => (int) $attachment_id,
+				'title'     => (string) get_the_title( $attachment_id ),
+				'file_name' => (string) wp_basename( (string) get_attached_file( $attachment_id ) ),
+				'mime_type' => $mime,
+			);
+		}
+
+		return $templates;
 	}
 
 	/**
@@ -5453,9 +5681,10 @@ class Arriendo_Facil_Guest {
 	 */
 	private function upload_guest_documents( $guest_id, &$raw_bytes_out = array() ) {
 		$fields = array(
-			'guest_garantia_alicuota_pdf'   => 'garantia_alicuota',
-			'guest_cedula_papeleta_pdf'     => 'cedula_papeleta',
-			'guest_certificado_bancario_pdf'=> 'certificado_bancario',
+			'guest_garantia_alicuota_pdf'    => 'garantia_alicuota',
+			'guest_cedula_papeleta_pdf'      => 'cedula_papeleta',
+			'guest_certificado_bancario_pdf' => 'certificado_bancario',
+			'guest_certificado_laboral_pdf'  => 'certificado_laboral',
 		);
 
 		require_once ABSPATH . 'wp-admin/includes/file.php';

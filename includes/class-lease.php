@@ -274,6 +274,7 @@ class Arriendo_Facil_Lease {
 		$deposit_amount   = isset( $_POST['deposit_amount'] ) ? max( 0, floatval( wp_unslash( $_POST['deposit_amount'] ) ) ) : 0.0;
 		$payment_due_day  = isset( $_POST['payment_due_day'] ) ? absint( $_POST['payment_due_day'] ) : 0;
 		$payment_due_day  = ( $payment_due_day >= 1 && $payment_due_day <= 28 ) ? $payment_due_day : 0;
+		$template_attachment_id = isset( $_POST['template_attachment_id'] ) ? absint( $_POST['template_attachment_id'] ) : 0;
 
 		if ( ! $accommodation_id || ! $guest_id || ! $start_date || ! $end_date ) {
 			wp_send_json_error( array( 'message' => __( 'Faltan campos obligatorios.', 'arriendo-facil' ) ) );
@@ -298,8 +299,8 @@ class Arriendo_Facil_Lease {
 				$scope,
 				$idempotency_key,
 				DAY_IN_SECONDS,
-				function () use ( $accommodation_id, $guest_id, $start_date, $end_date, $monthly_rent, $deposit_amount, $payment_due_day ) {
-					return $this->insert_lease_record( $accommodation_id, $guest_id, $start_date, $end_date, $monthly_rent, $deposit_amount, $payment_due_day );
+				function () use ( $accommodation_id, $guest_id, $start_date, $end_date, $monthly_rent, $deposit_amount, $payment_due_day, $template_attachment_id ) {
+					return $this->insert_lease_record( $accommodation_id, $guest_id, $start_date, $end_date, $monthly_rent, $deposit_amount, $payment_due_day, $template_attachment_id );
 				},
 				$fingerprint
 			);
@@ -323,7 +324,7 @@ class Arriendo_Facil_Lease {
 			wp_send_json_error( array( 'message' => __( 'No se pudo crear el contrato.', 'arriendo-facil' ) ) );
 		}
 
-		$result = $this->insert_lease_record( $accommodation_id, $guest_id, $start_date, $end_date, $monthly_rent, $deposit_amount, $payment_due_day );
+		$result = $this->insert_lease_record( $accommodation_id, $guest_id, $start_date, $end_date, $monthly_rent, $deposit_amount, $payment_due_day, $template_attachment_id );
 		if ( is_array( $result ) && ! empty( $result['id'] ) ) {
 			wp_send_json_success( array( 'id' => (int) $result['id'] ) );
 		}
@@ -340,9 +341,10 @@ class Arriendo_Facil_Lease {
 	 * @param float  $monthly_rent     Monthly rent.
 	 * @param float  $deposit_amount   Refundable deposit received.
 	 * @param int    $payment_due_day  Monthly payment due day (1-28), 0 = not set.
+	 * @param int    $template_attachment_id Owner DOCX template to use for the contract, 0 = latest.
 	 * @return array
 	 */
-	private function insert_lease_record( int $accommodation_id, int $guest_id, string $start_date, string $end_date, float $monthly_rent, float $deposit_amount = 0.0, int $payment_due_day = 0 ): array {
+	private function insert_lease_record( int $accommodation_id, int $guest_id, string $start_date, string $end_date, float $monthly_rent, float $deposit_amount = 0.0, int $payment_due_day = 0, int $template_attachment_id = 0 ): array {
 		global $wpdb;
 		$inserted = $wpdb->insert(
 			$wpdb->prefix . 'af_leases',
@@ -354,9 +356,10 @@ class Arriendo_Facil_Lease {
 				'monthly_rent'     => $monthly_rent,
 				'deposit_amount'   => $deposit_amount,
 				'payment_due_day'  => $payment_due_day ? $payment_due_day : null,
+				'template_attachment_id' => $template_attachment_id ? $template_attachment_id : null,
 				'status'           => 'draft',
 			),
-			array( '%d', '%d', '%s', '%s', '%f', '%f', '%d', '%s' )
+			array( '%d', '%d', '%s', '%s', '%f', '%f', '%d', '%d', '%s' )
 		);
 
 		if ( ! $inserted ) {
@@ -444,6 +447,30 @@ class Arriendo_Facil_Lease {
 			$wpdb->prepare(
 				"SELECT * FROM {$wpdb->prefix}af_leases WHERE id = %d AND deleted_at IS NULL",
 				$lease_id
+			)
+		);
+	}
+
+	/**
+	 * Resolves the currently active lease for an accommodation.
+	 *
+	 * @param int $accommodation_id Accommodation post ID.
+	 * @return int Lease ID, or 0 when no active lease exists.
+	 */
+	public static function get_active_lease_id_for_accommodation( $accommodation_id ) {
+		global $wpdb;
+
+		$accommodation_id = absint( $accommodation_id );
+		if ( ! $accommodation_id ) {
+			return 0;
+		}
+
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT id FROM {$wpdb->prefix}af_leases
+				 WHERE accommodation_id = %d AND status = 'active' AND deleted_at IS NULL
+				 ORDER BY id DESC LIMIT 1",
+				$accommodation_id
 			)
 		);
 	}
@@ -544,6 +571,7 @@ class Arriendo_Facil_Lease {
 		$lease_id         = isset( $lease->id ) ? absint( $lease->id ) : 0;
 		$accommodation_id = isset( $lease->accommodation_id ) ? absint( $lease->accommodation_id ) : 0;
 		$guest_id         = isset( $lease->guest_id ) ? absint( $lease->guest_id ) : 0;
+		$template_attachment_id = isset( $lease->template_attachment_id ) ? absint( $lease->template_attachment_id ) : 0;
 
 		if ( ! $lease_id || ! $accommodation_id ) {
 			return false;
@@ -554,7 +582,7 @@ class Arriendo_Facil_Lease {
 
 			$ref_get_context = new ReflectionMethod( 'Arriendo_Facil_Guest', 'get_owner_contract_example_context' );
 			$ref_get_context->setAccessible( true );
-			$owner_template = $ref_get_context->invoke( $guest_service, $accommodation_id );
+			$owner_template = $ref_get_context->invoke( $guest_service, $accommodation_id, $template_attachment_id );
 
 			if ( ! is_array( $owner_template ) || empty( $owner_template['attachment_id'] ) ) {
 				return false;

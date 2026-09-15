@@ -132,6 +132,19 @@
 	box-shadow: var(--af-shadow-sm);
 }
 
+.af-shell .af-btn--danger {
+	background: var(--af-danger-600, #DC2626);
+	border-color: var(--af-danger-600, #DC2626);
+	color: #fff;
+}
+
+.af-shell .af-btn--danger:hover,
+.af-shell .af-btn--danger:focus {
+	background: var(--af-danger-700, #B91C1C);
+	border-color: var(--af-danger-700, #B91C1C);
+	color: #fff;
+}
+
 .af-shell .button.af-btn--ghost,
 .af-shell .af-btn--ghost {
 	background: var(--af-gray-0);
@@ -751,6 +764,16 @@
 	color: var(--af-gray-400);
 }
 
+.af-maint-card__deduction {
+	margin: var(--af-space-2) 0 0;
+	padding: var(--af-space-2) var(--af-space-3);
+	background: var(--af-warning-50, #FFFBEB);
+	border: 1px solid var(--af-warning-200, #FDE68A);
+	border-radius: var(--af-radius-sm);
+	font-size: var(--af-text-xs);
+	color: var(--af-gray-700);
+}
+
 .af-maint-card__footer {
 	margin-top: auto;
 	padding-top: var(--af-space-2);
@@ -942,6 +965,47 @@
 	font-weight: 500;
 }
 
+/* ── Visual catalog enhancements ──────────────────────────────────────── */
+
+.af-catalog-card__type {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: var(--af-text-xs);
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--af-primary-700, #14432B);
+}
+
+.af-catalog-card__type-icon {
+	font-size: 14px;
+	line-height: 1;
+}
+
+.af-catalog-card__specs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 10px;
+	margin: 0;
+	font-size: var(--af-text-xs);
+	color: var(--af-gray-600, #5A584F);
+}
+
+.af-catalog-card__specs span {
+	white-space: nowrap;
+}
+
+.af-catalog-card__owner {
+	color: var(--af-gray-500, #7A7870);
+}
+
+.af-catalog-card__hint {
+	font-size: var(--af-text-xs);
+	font-weight: 600;
+	color: var(--af-primary-700, #14432B);
+}
+
 /* ── Task list (dashboard sidebar) ────────────────────────────────────── */
 
 .af-tasklist {
@@ -1056,6 +1120,66 @@
 	grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
 	gap: var(--af-space-6);
 	align-items: start;
+}
+
+/* Alerts de calendario: check-in, check-out y visitas en tres columnas. */
+.af-calendar-columns {
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 1200px) {
+	.af-calendar-columns { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+
+@media (max-width: 960px) {
+	.af-calendar-columns { grid-template-columns: 1fr; }
+}
+
+/* ── Cronograma 30/60/90 (dashboard) ─────────────────────────────────── */
+
+.af-schedule__buckets {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: var(--af-space-3);
+	margin-bottom: var(--af-space-4);
+}
+
+.af-schedule__bucket {
+	display: flex;
+	flex-direction: column;
+	gap: var(--af-space-1);
+	padding: var(--af-space-4);
+	border-radius: var(--af-radius-md);
+	background: var(--af-gray-0);
+	border: 1px solid var(--af-gray-200);
+}
+
+.af-schedule__bucket--danger  { border-left: 4px solid var(--af-danger-500); }
+.af-schedule__bucket--warning { border-left: 4px solid var(--af-warning-500); }
+.af-schedule__bucket--neutral { border-left: 4px solid var(--af-gray-400); }
+
+.af-schedule__days {
+	font-size: var(--af-text-sm);
+	font-weight: 600;
+	color: var(--af-gray-500);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.af-schedule__count {
+	font-size: var(--af-text-2xl);
+	font-weight: 700;
+	line-height: 1;
+	color: var(--af-gray-900);
+}
+
+.af-schedule__label {
+	font-size: var(--af-text-sm);
+	color: var(--af-gray-500);
+}
+
+@media (max-width: 960px) {
+	.af-schedule__buckets { grid-template-columns: 1fr; }
 }
 
 /* ── Toast ────────────────────────────────────────────────────────────── */
@@ -2055,4 +2179,32 @@
     .af-tabs__tab { flex: 1 1 auto; justify-content: center; padding: 10px 12px; }
     .af-tabs__label { font-size: var(--af-text-xs); }
     .af-section__head { flex-direction: column; align-items: stretch; }
+}
+
+/* ── Datos de identidad del inquilino (ficha) ─────────────────────── */
+
+.af-info-strip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--af-space-4);
+    padding: var(--af-space-4) var(--af-space-5);
+    background: var(--af-surface-50, #f8fafc);
+    border: 1px solid var(--af-gray-200);
+    border-radius: var(--af-radius-md);
+    color: var(--af-gray-700);
+    font-size: var(--af-text-sm);
+}
+.af-info-strip strong {
+    color: var(--af-gray-900);
+    font-weight: 600;
+}
+.af-info-strip b {
+    color: var(--af-gray-900);
+    font-weight: 600;
+}
+.af-info-strip span {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
 }

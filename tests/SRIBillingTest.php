@@ -277,7 +277,7 @@ class SRIBillingTest extends TestCase {
 		$root = $dom->documentElement;
 		$this->assertSame( 'factura', $root->tagName );
 		$this->assertSame( 'comprobante', $root->getAttribute( 'id' ) );
-		$this->assertSame( '2.1.0', $root->getAttribute( 'version' ) );
+		$this->assertSame( '1.1.0', $root->getAttribute( 'version' ) );
 	}
 
 	public function test_build_info_tributaria_ruc() {
@@ -323,6 +323,62 @@ class SRIBillingTest extends TestCase {
 
 		$qty = $xpath->evaluate( 'string(//detalles/detalle/cantidad)' );
 		$this->assertSame( '1.000000', $qty );
+	}
+
+	public function test_build_detalle_from_ledger_shaped_items() {
+		// Items shaped exactly as Arriendo_Facil_Billing_Manager::build_ledger_items()
+		// emits: canon+alicuota combined + a service charge from the ledger.
+		$items = array(
+			array(
+				'codigo_principal' => 'CANON',
+				'codigo_auxiliar'  => '12-101',
+				'descripcion'      => 'Canon de arriendo (incluye alicuota) - Apto 3B',
+				'cantidad'         => 1,
+				'precio_unitario'  => 600.00,
+				'descuento'        => 0,
+			),
+			array(
+				'codigo_principal' => 'AGUA',
+				'codigo_auxiliar'  => '12-102',
+				'descripcion'      => 'Lectura de agua - 20 m3',
+				'cantidad'         => 1,
+				'precio_unitario'  => 15.00,
+				'descuento'        => 0,
+			),
+		);
+
+		$totals = Arriendo_Facil_SRI_XML_Factura::compute_totals( $items, '0' );
+		$this->assertSame( 615.00, $totals['importe_total'] );
+
+		$p     = $this->base_clave_params();
+		$clave = Arriendo_Facil_SRI_Clave_Acceso::generate(
+			$this->make_fecha(),
+			$p['tipo_comprobante'],
+			$p['ruc'],
+			$p['ambiente'],
+			$p['cod_establecimiento'],
+			$p['cod_punto_emision'],
+			$p['secuencial']
+		);
+
+		$data   = array_merge( $this->minimal_invoice_data( $clave ), $totals );
+		$xml    = ( new Arriendo_Facil_SRI_XML_Factura() )->build( $data );
+		$dom    = new DOMDocument();
+		$dom->loadXML( $xml );
+		$xpath  = new DOMXPath( $dom );
+
+		$detalles = $xpath->query( '//detalles/detalle' );
+		$this->assertSame( 2, $detalles->length, 'Canon + service must map to two detalle rows.' );
+
+		$desc   = $xpath->evaluate( 'string(//detalles/detalle[1]/descripcion)' );
+		$aux    = $xpath->evaluate( 'string(//detalles/detalle[1]/codigoAuxiliar)' );
+		$codigo = $xpath->evaluate( 'string(//detalles/detalle[1]/codigoPrincipal)' );
+		$this->assertStringContainsString( 'Canon de arriendo', $desc );
+		$this->assertSame( '12-101', $aux, 'codigo_auxiliar must keep the lease-charge reference.' );
+		$this->assertSame( 'CANON', $codigo );
+
+		$total = $xpath->evaluate( 'string(//infoFactura/importeTotal)' );
+		$this->assertSame( '615.00', $total );
 	}
 
 	public function test_build_info_adicional_email() {

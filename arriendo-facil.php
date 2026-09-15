@@ -179,6 +179,11 @@ function arriendo_facil_register_cron_jobs() {
 	if ( ! wp_next_scheduled( 'af_generate_monthly_charges_cron' ) ) {
 		wp_schedule_event( time() + 30 * MINUTE_IN_SECONDS, 'daily', 'af_generate_monthly_charges_cron' );
 	}
+
+	// Automatic daily reminders: pending docs + lease renewal near end.
+	if ( ! wp_next_scheduled( 'af_guest_reminders_cron' ) ) {
+		wp_schedule_event( time() + 25 * MINUTE_IN_SECONDS, 'daily', 'af_guest_reminders_cron' );
+	}
 }
 
 /**

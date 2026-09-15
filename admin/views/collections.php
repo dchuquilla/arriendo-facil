@@ -132,6 +132,10 @@ if ( $statement_lease_id ) {
 			<div class="af-kpi__head"><span class="af-kpi__label"><?php esc_html_e( 'Total facturado', 'arriendo-facil' ); ?></span></div>
 			<div class="af-kpi__value">$<?php echo esc_html( number_format_i18n( $statement['total_charged'], 2 ) ); ?></div>
 		</article>
+		<article class="af-kpi <?php echo (float) $statement['credit'] > 0 ? 'af-kpi--success' : ''; ?>">
+			<div class="af-kpi__head"><span class="af-kpi__label"><?php esc_html_e( 'Saldo a favor', 'arriendo-facil' ); ?></span></div>
+			<div class="af-kpi__value">$<?php echo esc_html( number_format_i18n( (float) $statement['credit'], 2 ) ); ?></div>
+		</article>
 		<article class="af-kpi af-kpi--success">
 			<div class="af-kpi__head"><span class="af-kpi__label"><?php esc_html_e( 'Total pagado', 'arriendo-facil' ); ?></span></div>
 			<div class="af-kpi__value">$<?php echo esc_html( number_format_i18n( $statement['total_paid'], 2 ) ); ?></div>
@@ -334,6 +338,13 @@ if ( $statement_lease_id ) {
 										<?php esc_html_e( 'Registrar pago', 'arriendo-facil' ); ?>
 									</button>
 								<?php endif; ?>
+								<?php if ( (float) $row->amount_paid <= 0 ) : ?>
+									<button type="button" class="button af-void-charge"
+										data-charge="<?php echo esc_attr( (int) $row->id ); ?>"
+										data-concept="<?php echo esc_attr( $charge_types[ $row->charge_type ] ?? $row->charge_type ); ?>">
+										<?php esc_html_e( 'Anular', 'arriendo-facil' ); ?>
+									</button>
+								<?php endif; ?>
 								<?php if ( ! empty( $row->lease_id ) ) : ?>
 									<a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=af-collections&statement_lease=' . (int) $row->lease_id ) ); ?>">
 										<?php esc_html_e( 'Estado de cuenta', 'arriendo-facil' ); ?>
@@ -412,6 +423,26 @@ if ( $statement_lease_id ) {
 	</div>
 </div>
 
+<!-- Modal: anular cargo -->
+<div class="af-modal" id="af-modal-void" role="dialog" aria-modal="true" aria-labelledby="af-modal-void-title">
+	<div class="af-modal__backdrop" data-af-modal-close></div>
+	<div class="af-modal__dialog">
+		<button type="button" class="af-modal__close" data-af-modal-close aria-label="<?php esc_attr_e( 'Cerrar', 'arriendo-facil' ); ?>">&times;</button>
+		<div class="af-modal__header">
+			<h2 class="af-modal__title" id="af-modal-void-title"><?php esc_html_e( 'Anular cargo', 'arriendo-facil' ); ?></h2>
+			<p class="af-modal__subtitle" id="af-void-subtitle"></p>
+		</div>
+		<div class="af-modal__body">
+			<p class="af-modal__status" id="af-void-status"></p>
+			<p><?php esc_html_e( 'El cargo se marcará como anulado y desaparecerá de la cobranza. Esta acción no se puede deshacer.', 'arriendo-facil' ); ?></p>
+		</div>
+		<div class="af-modal__footer">
+			<button type="button" class="button" data-af-modal-close><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
+			<button type="button" class="button af-btn af-btn--danger" id="af-void-confirm"><?php esc_html_e( 'Anular definitivamente', 'arriendo-facil' ); ?></button>
+		</div>
+	</div>
+</div>
+
 <script>
 (function () {
 	const ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
@@ -478,8 +509,7 @@ if ( $statement_lease_id ) {
 
 			paySubtitle.textContent = btn.getAttribute('data-concept') + ' — ' + btn.getAttribute('data-tenant');
 			payAmount.value = payMax.toFixed(2);
-			payAmount.max = payMax;
-			payOutstanding.textContent = <?php echo wp_json_encode( __( 'Saldo pendiente:', 'arriendo-facil' ) ); ?> + ' $' + payMax.toFixed(2);
+			payOutstanding.textContent = <?php echo wp_json_encode( __( 'Saldo pendiente:', 'arriendo-facil' ) ); ?> + ' $' + payMax.toFixed(2) + ' — ' + <?php echo wp_json_encode( __( 'puedes superarlo y el excedente quedará como saldo a favor.', 'arriendo-facil' ) ); ?>;
 			payReference.value = '';
 			clearStatus(payStatus);
 			openModal(payModal);
@@ -491,11 +521,6 @@ if ( $statement_lease_id ) {
 
 		if (!amount || amount <= 0) {
 			setStatus(payStatus, <?php echo wp_json_encode( __( 'Ingresa un monto mayor a cero.', 'arriendo-facil' ) ); ?>, 'error');
-			return;
-		}
-
-		if (amount > payMax) {
-			setStatus(payStatus, <?php echo wp_json_encode( __( 'El monto no puede superar el saldo pendiente.', 'arriendo-facil' ) ); ?>, 'error');
 			return;
 		}
 
@@ -517,6 +542,40 @@ if ( $statement_lease_id ) {
 				return;
 			}
 			setStatus(payStatus, json.data.message, 'success');
+			setTimeout(function () { window.location.reload(); }, 900);
+		});
+	});
+
+	// ---- Anular cargo ----
+	const voidModal = document.getElementById('af-modal-void');
+	const voidStatus = document.getElementById('af-void-status');
+	const voidSubtitle = document.getElementById('af-void-subtitle');
+	const voidConfirm = document.getElementById('af-void-confirm');
+
+	document.querySelectorAll('.af-void-charge').forEach(function (btn) {
+		btn.addEventListener('click', function () {
+			voidSubtitle.textContent = btn.getAttribute('data-concept');
+			clearStatus(voidStatus);
+			voidConfirm.dataset.charge = btn.getAttribute('data-charge');
+			openModal(voidModal);
+		});
+	});
+
+	voidConfirm.addEventListener('click', function () {
+		voidConfirm.disabled = true;
+		clearStatus(voidStatus);
+
+		post({
+			action: 'af_void_charge',
+			nonce: nonce,
+			charge_id: voidConfirm.dataset.charge
+		}).then(function (json) {
+			voidConfirm.disabled = false;
+			if (!json || !json.success) {
+				setStatus(voidStatus, (json && json.data && json.data.message) || 'Error', 'error');
+				return;
+			}
+			setStatus(voidStatus, json.data.message, 'success');
 			setTimeout(function () { window.location.reload(); }, 900);
 		});
 	});

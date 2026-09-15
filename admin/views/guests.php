@@ -315,11 +315,23 @@ if ( $is_owner ) {
 						<td><input type="file" id="af_guest_cedula_papeleta_pdf" name="guest_cedula_papeleta_pdf" class="regular-text" accept="application/pdf,.pdf" /></td>
 					</tr>
 					<tr>
-						<th scope="row"><label for="af_guest_certificado_bancario_pdf"><?php esc_html_e( 'Certificado bancario (PDF)', 'arriendo-facil' ); ?></label></th>
-						<td><input type="file" id="af_guest_certificado_bancario_pdf" name="guest_certificado_bancario_pdf" class="regular-text" accept="application/pdf,.pdf" /></td>
-					</tr>
-				</table>
-			<?php endif; ?>
+					<th scope="row"><label for="af_guest_genero"><?php esc_html_e( 'Nacionalidad', 'arriendo-facil' ); ?></label></th>
+					<td><input type="text" id="af_guest_nationality" name="nationality" class="regular-text" maxlength="100" placeholder="<?php esc_attr_e( 'Ej: Ecuatoriana', 'arriendo-facil' ); ?>" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="af_guest_birth_city"><?php esc_html_e( 'Ciudad de nacimiento', 'arriendo-facil' ); ?></label></th>
+					<td><input type="text" id="af_guest_birth_city" name="birth_city" class="regular-text" maxlength="150" placeholder="<?php esc_attr_e( 'Ej: Quito', 'arriendo-facil' ); ?>" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="af_guest_certificado_bancario_pdf"><?php esc_html_e( 'Certificado bancario (PDF)', 'arriendo-facil' ); ?></label></th>
+					<td><input type="file" id="af_guest_certificado_bancario_pdf" name="guest_certificado_bancario_pdf" class="regular-text" accept="application/pdf,.pdf" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="af_guest_certificado_laboral_pdf"><?php esc_html_e( 'Certificado laboral (PDF)', 'arriendo-facil' ); ?></label></th>
+					<td><input type="file" id="af_guest_certificado_laboral_pdf" name="guest_certificado_laboral_pdf" class="regular-text" accept="application/pdf,.pdf" /></td>
+				</tr>
+			</table>
+		<?php endif; ?>
 
 			<p class="submit">
 				<button type="submit" class="button button-primary"><?php esc_html_e( 'Guardar y continuar', 'arriendo-facil' ); ?></button>

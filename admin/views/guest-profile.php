@@ -211,6 +211,26 @@ $full_name  = trim( $guest->first_name . ' ' . $guest->last_name );
 		</article>
 	</div>
 
+	<?php
+	$has_identity_extras = ! empty( $guest->nationality ) || ! empty( $guest->birth_city ) || ! empty( $guest->id_number );
+	if ( $has_identity_extras ) :
+		?>
+		<div class="af-split af-split--identity" style="margin-top: var(--af-space-5);">
+			<div class="af-info-strip">
+				<strong><?php esc_html_e( 'Datos de identidad', 'arriendo-facil' ); ?></strong>
+				<?php if ( ! empty( $guest->id_number ) ) : ?>
+					<span><?php esc_html_e( 'Cédula / RUC:', 'arriendo-facil' ); ?> <b><?php echo esc_html( $guest->id_number ); ?></b></span>
+				<?php endif; ?>
+				<?php if ( ! empty( $guest->nationality ) ) : ?>
+					<span><?php esc_html_e( 'Nacionalidad:', 'arriendo-facil' ); ?> <b><?php echo esc_html( $guest->nationality ); ?></b></span>
+				<?php endif; ?>
+				<?php if ( ! empty( $guest->birth_city ) ) : ?>
+					<span><?php esc_html_e( 'Ciudad de nacimiento:', 'arriendo-facil' ); ?> <b><?php echo esc_html( $guest->birth_city ); ?></b></span>
+				<?php endif; ?>
+			</div>
+		</div>
+	<?php endif; ?>
+
 	<div class="af-split">
 		<section class="af-section" aria-labelledby="af-profile-leases">
 			<header class="af-section__header">

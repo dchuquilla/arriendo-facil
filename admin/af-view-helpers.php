@@ -44,6 +44,7 @@ if ( ! function_exists( 'af_pill' ) ) {
 			'terminated'          => array( 'danger',  __( 'Terminado', 'arriendo-facil' ) ),
 			'rejected'            => array( 'danger',  __( 'Rechazada', 'arriendo-facil' ) ),
 			'occupied'            => array( 'danger',  __( 'Ocupado', 'arriendo-facil' ) ),
+			'rented'              => array( 'danger',  __( 'Arrendado', 'arriendo-facil' ) ),
 			'devuelta'            => array( 'danger',  __( 'Devuelta', 'arriendo-facil' ) ),
 			'no_autorizada'       => array( 'danger',  __( 'No autorizada', 'arriendo-facil' ) ),
 			'rechazada'           => array( 'danger',  __( 'Rechazada', 'arriendo-facil' ) ),

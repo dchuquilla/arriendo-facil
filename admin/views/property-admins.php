@@ -54,6 +54,13 @@ foreach ( $property_admins as $admin_user ) {
 	$license_status = get_user_meta( $user_id, 'af_license_status', true );
 	$license_status  = $license_status ? $license_status : 'active';
 
+	$signup_source        = get_user_meta( $user_id, 'af_signup_source', true );
+	$doc_status           = get_user_meta( $user_id, 'af_admin_doc_status', true );
+	$identity_match       = get_user_meta( $user_id, 'af_admin_identity_match_status', true );
+	$admin_documents      = (array) get_user_meta( $user_id, 'af_admin_documents', true );
+	$verified_by          = (int) get_user_meta( $user_id, 'af_admin_doc_verified_by', true );
+	$verified_at          = get_user_meta( $user_id, 'af_admin_doc_verified_at', true );
+
 	$rows[] = array(
 		'user'             => $admin_user,
 		'company'          => get_user_meta( $user_id, 'af_company_name', true ),
@@ -64,6 +71,13 @@ foreach ( $property_admins as $admin_user ) {
 		'collected_period' => $collected,
 		'pending_period'   => $pending,
 		'license_status'   => $license_status,
+		'signup_source'    => $signup_source ? $signup_source : 'manual',
+		'doc_status'       => $doc_status ? $doc_status : 'pendiente',
+		'identity_match'   => $identity_match ? $identity_match : 'not_checked',
+		'doc_count'        => count( array_filter( $admin_documents ) ),
+		'doc_notes'        => get_user_meta( $user_id, 'af_admin_doc_notes', true ),
+		'verified_by'      => $verified_by,
+		'verified_at'      => $verified_at,
 	);
 }
 
@@ -146,17 +160,28 @@ $totals_platform = array(
 					<th><?php esc_html_e( 'Contratos activos', 'arriendo-facil' ); ?></th>
 					<th><?php esc_html_e( 'Cobrado / Pendiente (mes)', 'arriendo-facil' ); ?></th>
 					<th><?php esc_html_e( 'Licencia', 'arriendo-facil' ); ?></th>
+					<th><?php esc_html_e( 'Verificación', 'arriendo-facil' ); ?></th>
 					<th><?php esc_html_e( 'Acciones', 'arriendo-facil' ); ?></th>
 				</tr>
 			</thead>
 			<tbody>
 				<?php if ( empty( $rows ) ) : ?>
-					<tr><td colspan="7"><?php esc_html_e( 'Aún no hay administradores de propiedades licenciados.', 'arriendo-facil' ); ?></td></tr>
+					<tr><td colspan="8"><?php esc_html_e( 'Aún no hay administradores de propiedades licenciados.', 'arriendo-facil' ); ?></td></tr>
 				<?php else : ?>
 					<?php foreach ( $rows as $row ) : ?>
 						<?php
 						$admin_user = $row['user'];
 						$is_active  = 'active' === $row['license_status'];
+						$is_self    = 'self' === $row['signup_source'];
+
+						$doc_badges = array(
+							'pendiente'   => array( 'af-pill--warning', __( 'Pendiente', 'arriendo-facil' ) ),
+							'en_revision' => array( 'af-pill--info', __( 'En revisión', 'arriendo-facil' ) ),
+							'verificado'  => array( 'af-pill--success', __( 'Verificado', 'arriendo-facil' ) ),
+							'rechazado'   => array( 'af-pill--danger', __( 'Rechazado', 'arriendo-facil' ) ),
+							'manual'      => array( 'af-pill', __( 'No aplica', 'arriendo-facil' ) ),
+						);
+						$badge = isset( $doc_badges[ $row['doc_status'] ] ) ? $doc_badges[ $row['doc_status'] ] : $doc_badges['pendiente'];
 						?>
 						<tr>
 							<td data-label="<?php esc_attr_e( 'Administrador', 'arriendo-facil' ); ?>">
@@ -175,16 +200,58 @@ $totals_platform = array(
 									<?php echo $is_active ? esc_html__( 'Activa', 'arriendo-facil' ) : esc_html__( 'Suspendida', 'arriendo-facil' ); ?>
 								</span>
 							</td>
+							<td data-label="<?php esc_attr_e( 'Verificación', 'arriendo-facil' ); ?>">
+								<span class="af-pill <?php echo esc_attr( $badge[0] ); ?>"><?php echo esc_html( $badge[1] ); ?></span>
+								<br />
+								<span style="color:#666; font-size:12px;">
+									<?php
+									printf(
+										/* translators: %s: signup source (Auto-registro or Manual) */
+										esc_html__( 'Origen: %s', 'arriendo-facil' ),
+										$is_self ? esc_html__( 'Auto-registro', 'arriendo-facil' ) : esc_html__( 'Manual', 'arriendo-facil' )
+									);
+									?>
+									<?php if ( $is_self ) : ?>
+										&middot; <?php echo esc_html( number_format_i18n( $row['doc_count'] ) . '/3 ' . __( 'docs', 'arriendo-facil' ) ); ?>
+									<?php endif; ?>
+								</span>
+								<?php if ( $is_self && '' !== $row['doc_notes'] ) : ?>
+									<div style="color:#8a6d1c; font-size:12px; margin-top:4px;"><?php echo esc_html( $row['doc_notes'] ); ?></div>
+								<?php endif; ?>
+							</td>
 							<td data-label="<?php esc_attr_e( 'Acciones', 'arriendo-facil' ); ?>">
 								<button type="button" class="button af-toggle-license" data-user-id="<?php echo esc_attr( $admin_user->ID ); ?>" data-next-status="<?php echo $is_active ? 'suspended' : 'active'; ?>">
 									<?php echo $is_active ? esc_html__( 'Suspender', 'arriendo-facil' ) : esc_html__( 'Activar', 'arriendo-facil' ); ?>
 								</button>
+								<?php if ( $is_self ) : ?>
+									<button type="button" class="button af-review-admin" data-user-id="<?php echo esc_attr( $admin_user->ID ); ?>" data-user-name="<?php echo esc_attr( $row['company'] ? $row['company'] : $admin_user->display_name ); ?>">
+										<?php esc_html_e( 'Revisar', 'arriendo-facil' ); ?>
+									</button>
+								<?php endif; ?>
 							</td>
 						</tr>
 					<?php endforeach; ?>
 				<?php endif; ?>
 			</tbody>
 		</table>
+	</div>
+</div>
+
+<div id="af-admin-review-modal" style="display:none;">
+	<div id="af-admin-review-backdrop" style="position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:9990;"></div>
+	<div style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:9991; background:#fff; border-radius:12px; padding:24px; width:min(480px, 92vw); box-shadow:0 20px 50px rgba(0,0,0,.3);">
+		<h2 style="margin-top:0;" id="af-admin-review-title"><?php esc_html_e( 'Revisar verificación', 'arriendo-facil' ); ?></h2>
+		<p class="description"><?php esc_html_e( 'Revisa la documentación del administrador y aprueba, rechaza o reinicia su verificación.', 'arriendo-facil' ); ?></p>
+		<label style="display:block; margin-bottom:12px;">
+			<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Observaciones (se envían al usuario)', 'arriendo-facil' ); ?></span>
+			<textarea id="af-admin-review-notes" rows="3" class="large-text" maxlength="1000" placeholder="<?php esc_attr_e( 'Comentarios opcionales para el administrador...', 'arriendo-facil' ); ?>"></textarea>
+		</label>
+		<div style="display:flex; gap:8px; flex-wrap:wrap;">
+			<button type="button" class="button button-primary" data-review-action="approve"><?php esc_html_e( 'Aprobar', 'arriendo-facil' ); ?></button>
+			<button type="button" class="button" data-review-action="reject"><?php esc_html_e( 'Rechazar', 'arriendo-facil' ); ?></button>
+			<button type="button" class="button" data-review-action="reset"><?php esc_html_e( 'Reiniciar', 'arriendo-facil' ); ?></button>
+			<button type="button" class="button" data-review-close style="margin-left:auto;"><?php esc_html_e( 'Cerrar', 'arriendo-facil' ); ?></button>
+		</div>
 	</div>
 </div>
 
@@ -237,6 +304,48 @@ $totals_platform = array(
 		btn.addEventListener('click', function () {
 			btn.disabled = true;
 			post('af_set_property_admin_status', { user_id: btn.dataset.userId, status: btn.dataset.nextStatus }).then((res) => {
+				if (res && res.success) {
+					window.location.reload();
+				} else {
+					btn.disabled = false;
+					alert((res && res.data && res.data.message) ? res.data.message : 'Error');
+				}
+			});
+		});
+	});
+
+	const reviewModal = document.getElementById('af-admin-review-modal');
+	const reviewNotes = document.getElementById('af-admin-review-notes');
+	const reviewTitle = document.getElementById('af-admin-review-title');
+	let reviewUserId = 0;
+
+	function closeReview() { reviewModal.style.display = 'none'; }
+
+	document.querySelectorAll('.af-review-admin').forEach(function (btn) {
+		btn.addEventListener('click', function () {
+			reviewUserId = parseInt(btn.dataset.userId, 10) || 0;
+			reviewTitle.textContent = '<?php echo esc_js( __( 'Revisar verificación de', 'arriendo-facil' ) ); ?> ' + (btn.dataset.userName || '');
+			reviewNotes.value = '';
+			reviewModal.style.display = 'block';
+		});
+	});
+
+	document.querySelector('[data-review-close]').addEventListener('click', closeReview);
+	document.getElementById('af-admin-review-backdrop').addEventListener('click', closeReview);
+
+	document.querySelectorAll('[data-review-action]').forEach(function (btn) {
+		btn.addEventListener('click', function () {
+			if (!reviewUserId) { return; }
+			if (btn.dataset.reviewAction === 'approve'
+				&& !window.confirm('<?php echo esc_js( __( 'Aprobar la verificación de este administrador? Se habilitará para usar datos reales.', 'arriendo-facil' ) ); ?>')) {
+				return;
+			}
+			btn.disabled = true;
+			post('af_review_admin_verification', {
+				user_id: reviewUserId,
+				action_type: btn.dataset.reviewAction,
+				notes: reviewNotes.value
+			}).then((res) => {
 				if (res && res.success) {
 					window.location.reload();
 				} else {

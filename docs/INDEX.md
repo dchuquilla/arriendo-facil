@@ -63,7 +63,7 @@ docs/
 
 - **[SUBSCRIPTION_MODEL.md](architecture/SUBSCRIPTION_MODEL.md)** - Modelo de suscripción/monetización 2.0
   - Planes (trial/free/pago), límites por plan, publicidad, paywall
-  - ⚠️ Solo documentación — no implementado todavía
+  - ✅ Auto-registro público (§6) y demo `/ver-demo/` implementados (2026-09); monetización pendiente
 
 ---
 

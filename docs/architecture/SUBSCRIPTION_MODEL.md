@@ -1,9 +1,15 @@
 # Modelo de suscripción y monetización — Arriendo Fácil 2.0
 
-> **Estado: SOLO DOCUMENTACIÓN.** Nada de esto está implementado todavía. Este
-> documento deja el diseño y las secciones planificadas para que la siguiente
-> pasada de desarrollo implemente sobre una base ya acordada. No crear código
-> a partir de este documento sin confirmación explícita del usuario.
+> **Estado: PARCIALMENTE IMPLEMENTADO.**
+> - **Implementado (2026-09):** el flujo de **auto-registro público del
+>   administrador** (§6) con verificación de correo obligatoria, siembra de
+>   demo aislada y onboarding supervisado. También se construyó la **página
+>   pública de vista previa del panel** (`/ver-demo/`) que réplica el
+>   dashboard read-only e invita a crear cuenta.
+> - **Pendiente (no implementado):** planes trial/free/pago, tarjeta,
+>   publicidad (ads), paywall por sección, límites cuantitativos y
+>   automatizaciones premium (§2–§5, §7–§8 de moneda/metodo). No crear
+>   código sobre esas secciones sin confirmación explícita del usuario.
 
 ## 1. Objetivo de negocio
 
@@ -106,44 +112,89 @@ del arrendador, no un "premium feature".
 
 ## 6. Registro del administrador: auto-registro vs alta manual
 
-**Conflicto detectado con lo ya construido:** en la fase anterior se
-implementó `admin/views/property-admins.php` con alta **manual** hecha por
-el super admin (sin envío de correo, credenciales mostradas una vez). Ahora
-se indica que **el administrador de propiedades se registra él mismo**.
+### ✅ IMPLEMENTADO (2026-09)
 
-Ambos flujos pueden coexistir, pero hay que decidir la relación entre ellos:
+El auto-registro público del administrador de propiedades **ya está
+construido y operativo**. Ambos flujos coexisten:
 
-- **Alta manual (ya existe)**: útil para ventas asistidas, clientes VIP,
-  cuentas de cortesía, o cuando el super admin necesita crear la cuenta antes
-  de que el cliente tenga tarjeta lista. No dispara trial/tarjeta.
-- **Auto-registro (nuevo, a diseñar)**: formulario público de registro
-  (fuera de `wp-admin`, en el sitio de marketing) donde el propio
-  administrador de propiedades crea su cuenta, ingresa datos de la empresa y
-  opcionalmente la tarjeta. Debe:
-  - Crear el usuario con rol `af_property_admin` (reutilizar
-    `Arriendo_Facil_Activator::ensure_owner_role()`).
-  - Iniciar el estado de licencia correspondiente (`trial` o `free` según si
-    ingresó tarjeta).
-  - Igual que el resto del sitio: sin envío de correo obligatorio, pero aquí
-    sí hace falta enviar credenciales/confirmación al propio usuario que se
-    registró (es diferente al caso "nosotros creamos la cuenta de un
-    tercero"). **Pendiente de confirmar con el usuario** si el auto-registro
-    sí debe enviar correo de confirmación (verificación de email, reseteo de
-    contraseña) aunque el resto de flujos internos no lo hagan — es un caso
-    distinto porque el usuario se está autenticando a sí mismo.
-- Preguntas abiertas para el usuario:
-  1. ¿El auto-registro reemplaza el panel de alta manual o coexisten?
-  2. ¿Se requiere verificación de correo antes de dar acceso, o se confía en
-     la validación de la tarjeta como filtro?
-  3. ¿Quién procesa el cobro real? (pasarela a definir — Ecuador ya tiene
-     integración planificada con Deuna/Banco Pichincha en
-     `docs/payments/`, revisar si aplica para suscripciones recurrentes o
-     solo para dispersión de fondos a propietarios, que es un flujo distinto).
+- **Alta manual (ya existía, sigue igual)**: el super admin crea la cuenta
+  desde `admin/views/property-admins.php` (sin correo de confirmación,
+  `af_signup_source = 'manual'`). No dispara trial/tarjeta.
+- **Auto-registro público (implementado)**:
+  - Shortcode `[af_property_admin_signup]` en
+    `includes/class-property-admin-registration.php`, renderizado en la
+    página pública `/solicitar-demo/`
+    (`page-solicitar-demo.php` del tema hijo `twentytwentyfive-child`).
+  - Formulario público (fuera de wp-admin) con: nombre de empresa,
+    responsable, correo, teléfono, identificación (cédula/RUC validada
+    con `Arriendo_Facil_Identity_Validator`), nacionalidad, ciudad y
+    contraseña con política estricta (≥10 chars, mayúscula, minúscula,
+    número, símbolo).
+  - Crea el usuario con rol `af_property_admin` reutilizando
+    `Arriendo_Facil_Activator::ensure_owner_role()`.
+  - Anti-abuso: nonce, honeypot, firma HMAC del formulario con timestamp,
+    rate-limit por IP/UA y por correo, cifrado libsodium de datos
+    sensibles (teléfono e identificación), y fingerprint de identificación
+    para evitar duplicados.
+  - **Verificación de correo obligatoria**: la cuenta nace con
+    `af_admin_email_verified = 0`, se envía un correo con token de 24 h y
+    el login se bloquea hasta verificarla
+    (`enforce_email_verification_on_login`). Confirma la pregunta abierta 2
+    de §6: **sí se requiere verificación de correo**.
+  - Al verificar el token se siembra un **dataset demo aislado** por cuenta
+    (`Arriendo_Facil_Property_Admin_Demo::seed_demo`, guardado en
+    `af_demo_seeded` / `af_demo_dataset`): edificio, unidades, inquilino,
+    contrato y cobros, todos con `_af_owner_id = user_id` para que nunca se
+    mezclen con datos reales.
+  - Onboarding supervisado (`includes/class-property-admin-onboarding.php`):
+    la cuenta sigue con `af_admin_doc_status = 'pendiente'`; las páginas
+    operativas (`GATED_SLUGS`, 17 slugs de negocio) quedan ocultas hasta
+    que el prospecto completa perfil/documentos y el super admin aprueba
+    desde Administradores. El Panel (`arriendo-facil`) y "Mi perfil"
+    (`af-admin-profile`) sí quedan accesibles para que explore la demo.
+  - Cron diario `af_admin_profile_reminders_cron` recuerda al prospecto los
+    pasos pendientes (verificar correo, completar perfil) y alerta al
+    equipo cuando hay documentos por revisar.
+  - Emails de apoyo: verificación (24 h), reenvío, recordatorios de perfil,
+    y notificación al equipo de un nuevo registro.
+
+### Flujo de demo público (marketing → cuenta)
+
+Además de la página `/solicitar-demo/`, se construyó una **vista previa
+read-only del panel** en `/ver-demo/` (`page-ver-demo.php`):
+- Réplica visual del dashboard usando el sistema `af-shell` del plugin
+  (tokens + shell + forms) con **datos quemados de ejemplo** (KPIs,
+  semáforo de cobros, calendario check-in/out/visitas, contratos 30/60/90,
+  accesos rápidos, tareas). No toca la base de datos ni requiere auth.
+- Los CTA del sitio (header, footer, hero y flip-cards de la home) apuntan
+  a `af_demo_preview_url()` (`/ver-demo/`); el modal de esa página invita a
+  **crear la cuenta** y lleva a `af_demo_signup_url()` (`/solicitar-demo/`).
+- Helpers en `functions.php` del tema: `af_demo_preview_url()` y
+  `af_ensure_demo_preview_page()` (auto-crea la página si falta, patrón
+  igual al existente de `solicitar-demo`). Ambas páginas están en el
+  sitemap.
+
+### Preguntas resueltas
+
+1. **¿El auto-registro reemplaza el panel de alta manual o coexisten?**
+   → **Coexisten**, diferenciados por `af_signup_source` (`self` vs
+   `manual`). El manual sigue siendo útil para venta asistida/VIP.
+2. **¿Se requiere verificación de correo antes de dar acceso?**
+   → **Sí, obligatoria** (token de 24 h, login bloqueado hasta verificar),
+   además de revisión documental supervisada antes de datos reales.
+3. **¿Quién procesa el cobro real? (pasarela recurrente)** → **Sigue
+   abierta** — sin decisión ni implementación (ver §10).
 
 ## 7. Modelo de datos propuesto (a crear cuando se implemente, NO CREAR AHORA)
 
 Extiende lo ya existente (`af_license_status` en usermeta, hoy solo
 `active`/`suspended`).
+
+> **Nota implementación (2026-09):** las metas `af_signup_source`,
+> `af_admin_email_verified`, `af_admin_doc_status`, `af_admin_onboarding_step`
+> y `af_demo_seeded`/`af_demo_dataset` ya existen y se usan en el
+> auto-registro (§6). No duplicarlas; la tabla de suscripción de abajo es
+> para la fase de monetización y aún NO existe.
 
 - Nueva tabla `af_subscriptions` (o extender usermeta si se prefiere evitar
   una tabla nueva):
@@ -192,7 +243,8 @@ Extiende lo ya existente (`af_license_status` en usermeta, hoy solo
 5. Publicidad (ads) — definir si son banners propios (afiliados/patrocinios)
    o red de ads externa (Google AdSense no aplica bien a wp-admin; más
    probable que sean banners propios promocionando el upgrade).
-6. Flujo de registro público + tarjeta + pasarela de cobro recurrente.
+6. Tarjeta + pasarela de cobro recurrente. *Nota: el registro público ya está
+   implementado (§6); falta solo la parte de cobro/plan.*
 7. Panel de soporte/facturación para que el super admin gestione cambios de
    plan manuales, reembolsos, extensiones de trial, etc.
 
@@ -202,8 +254,11 @@ Extiende lo ya existente (`af_license_status` en usermeta, hoy solo
 - Pasarela de pago a usar para cobros recurrentes de la licencia (no del
   dispersión a propietarios, que es un flujo distinto ya documentado en
   `docs/payments/`).
-- Si el auto-registro público reemplaza o coexiste con el alta manual del
-  super admin.
+- ~~Si el auto-registro público reemplaza o coexiste con el alta manual del
+  super admin~~ → **RESUELTO (2026-09): coexisten** vía `af_signup_source`
+  (`self`/`manual`), ver §6.
+- ~~Si la verificación de correo es obligatoria~~ → **RESUELTO (2026-09):
+  sí es obligatoria** (token 24 h + revisión documental supervisada), ver §6.
 - Si la Facturación SRI queda dentro o fuera del paywall.
 - Comportamiento exacto al quitar la tarjeta: ¿degradación inmediata o al
   cierre del ciclo ya pagado?

@@ -1420,6 +1420,7 @@ class Arriendo_Facil_Activator {
 			wp_clear_scheduled_hook( 'af_process_ai_queue' );
 			wp_clear_scheduled_hook( 'af_review_dispatch_cron' );
 			wp_clear_scheduled_hook( 'af_guest_reminders_cron' );
+			wp_clear_scheduled_hook( 'af_admin_profile_reminders_cron' );
 		}
 		flush_rewrite_rules();
 	}

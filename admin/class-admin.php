@@ -38,6 +38,7 @@ class Arriendo_Facil_Admin {
 		add_filter( 'update_footer', array( $this, 'owner_admin_footer_text' ), 999 );
 		add_filter( 'screen_options_show_screen', array( $this, 'owner_hide_screen_options' ), 999 );
 		add_filter( 'admin_body_class', array( $this, 'tag_native_pages_body_class' ) );
+		add_action( 'in_admin_header', array( $this, 'render_custom_shell_nav' ) );
 		add_action( 'pre_get_posts', array( $this, 'restrict_accommodation_list_to_owner' ) );
 		add_filter( 'views_edit-accommodation', array( $this, 'filter_accommodation_status_views_for_owner' ) );
 		add_action( 'wp_dashboard_setup', array( $this, 'remove_owner_dashboard_widgets' ), 999 );
@@ -498,11 +499,278 @@ class Arriendo_Facil_Admin {
 			$extra[] = 'af-tenant-dashboard';
 		}
 
+		if ( $this->should_use_custom_shell() ) {
+			$extra[] = 'af-custom-shell';
+		}
+
 		if ( ! empty( $extra ) ) {
 			$classes .= ' ' . implode( ' ', $extra );
 		}
 
 		return $classes;
+	}
+
+	/**
+	 * Whether the current request is one of the plugin's own admin screens
+	 * (Panel, Contratos, Propiedades, Inmuebles, etc.), as opposed to core
+	 * WordPress screens (Posts, Plugins, Settings...).
+	 *
+	 * @return bool
+	 */
+	private function is_own_admin_screen() {
+		global $pagenow, $typenow;
+
+		if ( 'admin.php' === $pagenow ) {
+			$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
+			return 'arriendo-facil' === $page || 0 === strpos( $page, 'af-' );
+		}
+
+		if ( in_array( $pagenow, array( 'edit.php', 'post.php', 'post-new.php' ), true ) ) {
+			return 'accommodation' === $typenow;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Returns the slug identifying the current screen for nav highlighting.
+	 *
+	 * @return string
+	 */
+	private function current_shell_slug() {
+		global $pagenow, $typenow;
+
+		if ( in_array( $pagenow, array( 'edit.php', 'post.php', 'post-new.php' ), true ) && 'accommodation' === $typenow ) {
+			return 'edit-accommodation';
+		}
+
+		return isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
+	}
+
+	/**
+	 * Whether the current user/screen should get the branded app shell
+	 * (custom sidebar) instead of the native WordPress admin chrome.
+	 * Restricted to the plugin's own screens for administrators and
+	 * property admins; tenants keep their dedicated dashboard styling.
+	 *
+	 * @return bool
+	 */
+	private function should_use_custom_shell() {
+		if ( ! is_admin() || $this->is_restricted_tenant() ) {
+			return false;
+		}
+
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			return false;
+		}
+
+		if ( ! $this->is_own_admin_screen() ) {
+			return false;
+		}
+
+		/**
+		 * Lets external code (e.g. the site's active theme functions.php)
+		 * toggle the branded admin shell on/off without touching plugin
+		 * code. Defaults to enabled; kept in the plugin (not the theme) so
+		 * the property-admin dashboard keeps working regardless of which
+		 * public-facing theme is active.
+		 *
+		 * @param bool $enabled Whether to render the custom shell.
+		 */
+		return (bool) apply_filters( 'af_admin_shell_enabled', true );
+	}
+
+	/**
+	 * Builds the nav items for the custom app shell sidebar, filtered by
+	 * capability and by the property-admin onboarding gate.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function get_shell_nav_items() {
+		$gated = class_exists( 'Arriendo_Facil_Property_Admin_Onboarding' )
+			&& Arriendo_Facil_Property_Admin_Onboarding::needs_identity_verification();
+
+		$billing_cap = (string) apply_filters( 'af_billing_capability', 'af_view_billing' );
+
+		$items = array(
+			array(
+				'slug'  => 'arriendo-facil',
+				'label' => __( 'Panel', 'arriendo-facil' ),
+				'url'   => admin_url( 'admin.php?page=arriendo-facil' ),
+				'icon'  => 'dashicons-chart-line',
+				'cap'   => 'edit_posts',
+				'gate'  => false,
+			),
+			array(
+				'slug'  => 'edit-accommodation',
+				'label' => __( 'Inmuebles', 'arriendo-facil' ),
+				'url'   => admin_url( 'edit.php?post_type=accommodation' ),
+				'icon'  => 'dashicons-admin-home',
+				'cap'   => 'edit_posts',
+				'gate'  => false,
+			),
+			array(
+				'slug'  => 'af-catalog',
+				'label' => __( 'Catálogo', 'arriendo-facil' ),
+				'url'   => admin_url( 'admin.php?page=af-catalog' ),
+				'icon'  => 'dashicons-screenoptions',
+				'cap'   => 'edit_posts',
+				'gate'  => true,
+			),
+			array(
+				'slug'  => 'af-leases',
+				'label' => __( 'Contratos', 'arriendo-facil' ),
+				'url'   => admin_url( 'admin.php?page=af-leases' ),
+				'icon'  => 'dashicons-media-document',
+				'cap'   => 'edit_posts',
+				'gate'  => true,
+			),
+			array(
+				'slug'  => 'af-buildings',
+				'label' => __( 'Edificios y unidades', 'arriendo-facil' ),
+				'url'   => admin_url( 'admin.php?page=af-buildings' ),
+				'icon'  => 'dashicons-building',
+				'cap'   => Arriendo_Facil_Tenancy::CAP,
+				'gate'  => true,
+			),
+			array(
+				'slug'  => 'af-guests',
+				'label' => __( 'Inquilinos', 'arriendo-facil' ),
+				'url'   => admin_url( 'admin.php?page=af-guests' ),
+				'icon'  => 'dashicons-groups',
+				'cap'   => 'edit_posts',
+				'gate'  => true,
+			),
+			array(
+				'slug'  => 'af-collections',
+				'label' => __( 'Pagos y dispersión', 'arriendo-facil' ),
+				'url'   => admin_url( 'admin.php?page=af-collections' ),
+				'icon'  => 'dashicons-money-alt',
+				'cap'   => Arriendo_Facil_Tenancy::CAP,
+				'gate'  => true,
+			),
+			array(
+				'slug'  => 'af-maintenance',
+				'label' => __( 'Mantenimiento', 'arriendo-facil' ),
+				'url'   => admin_url( 'admin.php?page=af-maintenance' ),
+				'icon'  => 'dashicons-admin-tools',
+				'cap'   => Arriendo_Facil_Tenancy::CAP,
+				'gate'  => true,
+			),
+			array(
+				'slug'  => 'af-reviews',
+				'label' => __( 'Reviews', 'arriendo-facil' ),
+				'url'   => admin_url( 'admin.php?page=af-reviews' ),
+				'icon'  => 'dashicons-star-half',
+				'cap'   => 'edit_posts',
+				'gate'  => true,
+			),
+			array(
+				'slug'  => 'af-billing',
+				'label' => __( 'Facturación electrónica', 'arriendo-facil' ),
+				'url'   => admin_url( 'admin.php?page=af-billing' ),
+				'icon'  => 'dashicons-media-spreadsheet',
+				'cap'   => $billing_cap,
+				'gate'  => true,
+			),
+			array(
+				'slug'  => 'af-billing-settings',
+				'label' => __( 'Config. SRI', 'arriendo-facil' ),
+				'url'   => admin_url( 'admin.php?page=af-billing-settings' ),
+				'icon'  => 'dashicons-admin-generic',
+				'cap'   => $billing_cap,
+				'gate'  => true,
+			),
+			array(
+				'slug'  => 'af-admin-profile',
+				'label' => __( 'Mi perfil', 'arriendo-facil' ),
+				'url'   => admin_url( 'admin.php?page=af-admin-profile' ),
+				'icon'  => 'dashicons-admin-users',
+				'cap'   => 'edit_posts',
+				'gate'  => false,
+			),
+			array(
+				'slug'  => 'af-property-admins',
+				'label' => __( 'Administradores', 'arriendo-facil' ),
+				'url'   => admin_url( 'admin.php?page=af-property-admins' ),
+				'icon'  => 'dashicons-businessperson',
+				'cap'   => 'manage_options',
+				'gate'  => false,
+			),
+		);
+
+		$current = $this->current_shell_slug();
+		$output  = array();
+
+		foreach ( $items as $item ) {
+			if ( ! current_user_can( $item['cap'] ) ) {
+				continue;
+			}
+
+			if ( $item['gate'] && $gated ) {
+				continue;
+			}
+
+			$item['active'] = ( '' !== $current && $current === $item['slug'] );
+			$output[]        = $item;
+		}
+
+		return $output;
+	}
+
+	/**
+	 * Prints the branded app-shell sidebar (replacing the native WP admin
+	 * menu/toolbar visually via af-admin-shell-nav.css) on the plugin's own
+	 * screens.
+	 *
+	 * @return void
+	 */
+	public function render_custom_shell_nav() {
+		if ( ! $this->should_use_custom_shell() ) {
+			return;
+		}
+
+		$items = $this->get_shell_nav_items();
+		if ( empty( $items ) ) {
+			return;
+		}
+
+		$current_user = wp_get_current_user();
+		?>
+		<div id="af-app-sidebar" class="af-app-sidebar af-shell" role="navigation" aria-label="<?php esc_attr_e( 'Arriendo Fácil', 'arriendo-facil' ); ?>">
+			<div class="af-app-sidebar__brand">
+				<a href="<?php echo esc_url( admin_url( 'admin.php?page=arriendo-facil' ) ); ?>" class="af-app-sidebar__logo">
+					<span class="dashicons dashicons-admin-home" aria-hidden="true"></span>
+					<span class="af-app-sidebar__logo-text"><?php esc_html_e( 'Arriendo Fácil', 'arriendo-facil' ); ?></span>
+				</a>
+				<button type="button" class="af-app-sidebar__toggle" id="af-app-sidebar-toggle" aria-label="<?php esc_attr_e( 'Contraer menú', 'arriendo-facil' ); ?>">
+					<span class="dashicons dashicons-arrow-left-alt2" aria-hidden="true"></span>
+				</button>
+			</div>
+			<ul class="af-app-sidebar__nav">
+				<?php foreach ( $items as $item ) : ?>
+					<li class="af-app-sidebar__item<?php echo $item['active'] ? ' is-active' : ''; ?>">
+						<a href="<?php echo esc_url( $item['url'] ); ?>">
+							<span class="dashicons <?php echo esc_attr( $item['icon'] ); ?>" aria-hidden="true"></span>
+							<span class="af-app-sidebar__label"><?php echo esc_html( $item['label'] ); ?></span>
+						</a>
+					</li>
+				<?php endforeach; ?>
+			</ul>
+			<div class="af-app-sidebar__footer">
+				<a class="af-app-sidebar__user" href="<?php echo esc_url( admin_url( 'admin.php?page=af-admin-profile' ) ); ?>">
+					<?php echo get_avatar( $current_user->ID, 32 ); ?>
+					<span class="af-app-sidebar__user-name"><?php echo esc_html( $current_user->display_name ); ?></span>
+				</a>
+				<a class="af-app-sidebar__logout" href="<?php echo esc_url( wp_logout_url( home_url( '/' ) ) ); ?>" title="<?php esc_attr_e( 'Cerrar sesión', 'arriendo-facil' ); ?>">
+					<span class="dashicons dashicons-migrate" aria-hidden="true"></span>
+				</a>
+			</div>
+		</div>
+		<button type="button" id="af-app-sidebar-mobile-toggle" class="af-app-sidebar-mobile-toggle" aria-label="<?php esc_attr_e( 'Abrir menú', 'arriendo-facil' ); ?>" aria-expanded="false">
+			<span class="dashicons dashicons-menu" aria-hidden="true"></span>
+		</button>
+		<?php
 	}
 
 	/**
@@ -1827,6 +2095,26 @@ class Arriendo_Facil_Admin {
 				ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/af-tenant-dashboard.css',
 				array( 'af-tokens', 'af-shell', 'af-admin-chrome' ),
 				$tenant_dash_css_version
+			);
+		}
+
+		if ( $this->should_use_custom_shell() ) {
+			$shell_nav_css_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-admin-shell-nav.css';
+			$shell_nav_js_path  = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/af-admin-shell-nav.js';
+
+			wp_enqueue_style(
+				'af-admin-shell-nav',
+				ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/af-admin-shell-nav.css',
+				array( 'af-tokens', 'af-shell', 'af-admin-chrome' ),
+				file_exists( $shell_nav_css_path ) ? (string) filemtime( $shell_nav_css_path ) : ARRIENDO_FACIL_VERSION
+			);
+
+			wp_enqueue_script(
+				'af-admin-shell-nav',
+				ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/af-admin-shell-nav.js',
+				array(),
+				file_exists( $shell_nav_js_path ) ? (string) filemtime( $shell_nav_js_path ) : ARRIENDO_FACIL_VERSION,
+				true
 			);
 		}
 

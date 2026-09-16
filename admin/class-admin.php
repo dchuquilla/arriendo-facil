@@ -2251,6 +2251,9 @@ class Arriendo_Facil_Admin {
 		update_user_meta( $user_id, 'af_contact_name', $contact_name );
 		update_user_meta( $user_id, 'af_contact_phone', $phone );
 		update_user_meta( $user_id, 'af_license_status', 'active' );
+		update_user_meta( $user_id, 'af_signup_source', 'manual' );
+		update_user_meta( $user_id, 'af_admin_email_verified', 1 );
+		update_user_meta( $user_id, 'af_admin_doc_status', 'manual' );
 
 		wp_send_json_success(
 			array(

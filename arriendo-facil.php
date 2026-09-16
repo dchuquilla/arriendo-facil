@@ -52,6 +52,9 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-rental-workflow.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-owner-contact.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-owner-register-api.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-guest.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-property-admin-registration.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-property-admin-demo.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-property-admin-onboarding.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-review.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ai-service.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ical-parser.php';
@@ -184,6 +187,11 @@ function arriendo_facil_register_cron_jobs() {
 	if ( ! wp_next_scheduled( 'af_guest_reminders_cron' ) ) {
 		wp_schedule_event( time() + 25 * MINUTE_IN_SECONDS, 'daily', 'af_guest_reminders_cron' );
 	}
+
+	// Automatic daily reminders: property-admin self-registration onboarding.
+	if ( ! wp_next_scheduled( 'af_admin_profile_reminders_cron' ) ) {
+		wp_schedule_event( time() + 35 * MINUTE_IN_SECONDS, 'daily', 'af_admin_profile_reminders_cron' );
+	}
 }
 
 /**
@@ -227,6 +235,8 @@ function arriendo_facil_init() {
 		'Arriendo_Facil_Owner_Contact',
 		'Arriendo_Facil_Owner_Settlement',
 		'Arriendo_Facil_Guest',
+		'Arriendo_Facil_Property_Admin_Registration',
+		'Arriendo_Facil_Property_Admin_Onboarding',
 		'Arriendo_Facil_Document_Verification',
 		'Arriendo_Facil_Review',
 		'Arriendo_Facil_Billing_API',

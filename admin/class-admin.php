@@ -1853,6 +1853,15 @@ class Arriendo_Facil_Admin {
 			true
 		);
 
+		$tabs_js_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/admin-tabs.js';
+		wp_enqueue_script(
+			'af-admin-tabs',
+			ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/admin-tabs.js',
+			array(),
+			file_exists( $tabs_js_path ) ? (string) filemtime( $tabs_js_path ) : ARRIENDO_FACIL_VERSION,
+			true
+		);
+
 		$php_post_max_bytes = wp_convert_hr_to_bytes( ini_get( 'post_max_size' ) );
 		$safe_request_bytes = (int) apply_filters( 'af_owner_contact_safe_request_bytes', min( $php_post_max_bytes, 30 * 1024 * 1024 ) );
 
@@ -1870,6 +1879,11 @@ class Arriendo_Facil_Admin {
 				'guestNonce'         => wp_create_nonce( 'af_guest_nonce' ),
 			)
 		);
+
+		// Chart.js solo en las pantallas con gráficos (Panel y Administradores).
+		if ( in_array( $hook, array( 'toplevel_page_arriendo-facil', 'arriendo-facil_page_af-property-admins' ), true ) ) {
+			wp_enqueue_script( 'chart-js', 'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js', array(), '4.4.4', true );
+		}
 
 		$screen = get_current_screen();
 		if ( $screen && 'accommodation' === $screen->post_type && in_array( $hook, array( 'post.php', 'post-new.php' ), true ) ) {

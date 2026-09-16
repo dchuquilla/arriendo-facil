@@ -291,6 +291,25 @@ if ( $statement_lease_id ) {
 			</div>
 		</header>
 
+		<?php
+		$collections_tabs = array(
+			''        => __( 'Todos', 'arriendo-facil' ),
+			'paid'    => __( 'Pagos recibidos', 'arriendo-facil' ),
+			'pending' => __( 'Pendientes', 'arriendo-facil' ),
+			'overdue' => __( 'Atrasados', 'arriendo-facil' ),
+		);
+		?>
+		<div class="af-status-tabs">
+			<?php foreach ( $collections_tabs as $tab_value => $tab_label ) : ?>
+				<a class="af-status-tabs__btn<?php echo $status_filter === $tab_value ? ' is-active' : ''; ?>"
+					href="<?php echo esc_url( add_query_arg( array( 'page' => 'af-collections', 'period' => $period_filter, 'charge_status' => $tab_value ), admin_url( 'admin.php' ) ) ); ?>">
+					<?php echo esc_html( $tab_label ); ?>
+				</a>
+			<?php endforeach; ?>
+		</div>
+
+		<div class="af-split">
+		<div>
 		<table class="wp-list-table widefat fixed striped af-data-table">
 			<thead>
 				<tr>
@@ -356,6 +375,26 @@ if ( $statement_lease_id ) {
 				<?php endif; ?>
 			</tbody>
 		</table>
+		</div>
+
+		<aside class="af-section" aria-labelledby="af-collections-transfer-title">
+			<header class="af-section__header">
+				<div>
+					<h2 class="af-section__title" id="af-collections-transfer-title"><?php esc_html_e( 'Dispersión de fondos', 'arriendo-facil' ); ?></h2>
+					<p class="af-section__subtitle"><?php esc_html_e( 'Procesa las liquidaciones hacia los propietarios.', 'arriendo-facil' ); ?></p>
+				</div>
+			</header>
+			<a class="button af-btn af-btn--primary" style="width:100%; justify-content:center; margin-bottom: var(--af-space-4);" href="<?php echo esc_url( admin_url( 'admin.php?page=af-owner-settlements' ) ); ?>">
+				<?php esc_html_e( 'Realizar transferencia', 'arriendo-facil' ); ?>
+			</a>
+			<h3 style="margin: 0 0 var(--af-space-2);"><?php esc_html_e( 'Métodos de pago aceptados', 'arriendo-facil' ); ?></h3>
+			<ul class="af-tasklist">
+				<?php foreach ( $methods as $method_label ) : ?>
+					<li><span class="af-tasklist__item" style="cursor:default;"><span class="af-tasklist__label"><?php echo esc_html( $method_label ); ?></span></span></li>
+				<?php endforeach; ?>
+			</ul>
+		</aside>
+		</div>
 	</section>
 </div>
 

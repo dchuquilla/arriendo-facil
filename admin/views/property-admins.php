@@ -119,6 +119,57 @@ $totals_platform = array(
 		</article>
 	</div>
 
+	<?php if ( ! empty( $rows ) ) : ?>
+	<section class="af-section" aria-labelledby="af-chart-admins-title">
+		<header class="af-section__header">
+			<div>
+				<h2 class="af-section__title" id="af-chart-admins-title"><?php esc_html_e( 'Cobranza por administrador (este mes)', 'arriendo-facil' ); ?></h2>
+				<p class="af-section__subtitle"><?php esc_html_e( 'Comparativo de lo cobrado vs. lo pendiente por cada licencia.', 'arriendo-facil' ); ?></p>
+			</div>
+		</header>
+		<div class="af-chart-canvas">
+			<canvas id="af-chart-admins" role="img" aria-label="<?php esc_attr_e( 'Gráfico de cobranza por administrador', 'arriendo-facil' ); ?>"></canvas>
+		</div>
+	</section>
+	<script type="application/json" id="af-admins-chart-data"><?php
+		echo wp_json_encode(
+			array(
+				'labels'    => wp_list_pluck( wp_list_pluck( $rows, 'user' ), 'display_name' ),
+				'collected' => array_map( 'floatval', wp_list_pluck( $rows, 'collected_period' ) ),
+				'pending'   => array_map( 'floatval', wp_list_pluck( $rows, 'pending_period' ) ),
+			)
+		);
+	?></script>
+	<script>
+	( function() {
+		if ( typeof Chart === 'undefined' ) {
+			return;
+		}
+		var dataEl = document.getElementById( 'af-admins-chart-data' );
+		var canvas = document.getElementById( 'af-chart-admins' );
+		if ( ! dataEl || ! canvas ) {
+			return;
+		}
+		var data = JSON.parse( dataEl.textContent );
+		new Chart( canvas, {
+			type: 'bar',
+			data: {
+				labels: data.labels,
+				datasets: [
+					{ label: '<?php echo esc_js( __( 'Cobrado', 'arriendo-facil' ) ); ?>', data: data.collected, backgroundColor: '#0F9D58' },
+					{ label: '<?php echo esc_js( __( 'Pendiente', 'arriendo-facil' ) ); ?>', data: data.pending, backgroundColor: '#F59E0B' }
+				]
+			},
+			options: {
+				responsive: true,
+				maintainAspectRatio: false,
+				scales: { x: { stacked: false }, y: { beginAtZero: true } }
+			}
+		} );
+	} )();
+	</script>
+	<?php endif; ?>
+
 	<div class="af-section" style="padding: var(--af-space-5); margin: var(--af-space-4) 0;">
 		<h2 class="af-section__title" style="margin-top:0;"><?php esc_html_e( 'Nueva licencia (administrador de propiedades)', 'arriendo-facil' ); ?></h2>
 		<p class="af-modal__status" id="af-property-admin-status"></p>

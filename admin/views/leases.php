@@ -376,6 +376,26 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 			</div>
 		</header>
 
+		<?php
+		$lease_tab_counts = array( 'active' => 0, 'por_vencer' => 0, 'draft' => 0, 'terminated' => 0 );
+		foreach ( (array) $leases as $lt_lease ) {
+			$lt_group = (string) $lt_lease->status;
+			if ( 'active' === $lt_group && ! empty( $lt_lease->end_date ) && strtotime( $lt_lease->end_date ) <= strtotime( '+60 days' ) ) {
+				$lt_group = 'por_vencer';
+			}
+			if ( isset( $lease_tab_counts[ $lt_group ] ) ) {
+				$lease_tab_counts[ $lt_group ]++;
+			}
+		}
+		?>
+		<div class="af-status-tabs" data-tabs-target="#af-leases-tbody">
+			<button type="button" class="af-status-tabs__btn is-active" data-tab-value=""><?php esc_html_e( 'Todos', 'arriendo-facil' ); ?> <span class="af-status-tabs__count"><?php echo esc_html( number_format_i18n( $total_leases ) ); ?></span></button>
+			<button type="button" class="af-status-tabs__btn" data-tab-value="active"><?php esc_html_e( 'Activos', 'arriendo-facil' ); ?> <span class="af-status-tabs__count"><?php echo esc_html( number_format_i18n( $lease_tab_counts['active'] ) ); ?></span></button>
+			<button type="button" class="af-status-tabs__btn" data-tab-value="por_vencer"><?php esc_html_e( 'Por vencer', 'arriendo-facil' ); ?> <span class="af-status-tabs__count"><?php echo esc_html( number_format_i18n( $lease_tab_counts['por_vencer'] ) ); ?></span></button>
+			<button type="button" class="af-status-tabs__btn" data-tab-value="draft"><?php esc_html_e( 'Borradores', 'arriendo-facil' ); ?> <span class="af-status-tabs__count"><?php echo esc_html( number_format_i18n( $lease_tab_counts['draft'] ) ); ?></span></button>
+			<button type="button" class="af-status-tabs__btn" data-tab-value="terminated"><?php esc_html_e( 'Terminados', 'arriendo-facil' ); ?> <span class="af-status-tabs__count"><?php echo esc_html( number_format_i18n( $lease_tab_counts['terminated'] ) ); ?></span></button>
+		</div>
+
 	<div class="af-table-scroll">
 	<table class="wp-list-table widefat fixed striped af-leases-table af-data-table">
 		<thead>
@@ -395,9 +415,15 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 				<th><?php esc_html_e( 'Acciones', 'arriendo-facil' ); ?></th>
 			</tr>
 		</thead>
-		<tbody>
+		<tbody id="af-leases-tbody">
 			<?php if ( $leases ) : ?>
 				<?php foreach ( $leases as $lease ) : ?>
+					<?php
+					$row_tab_group = (string) $lease->status;
+					if ( 'active' === $row_tab_group && ! empty( $lease->end_date ) && strtotime( $lease->end_date ) <= strtotime( '+60 days' ) ) {
+						$row_tab_group = 'por_vencer';
+					}
+					?>
 					<?php
 					if ( $lease_service && empty( $lease->document_url ) ) {
 						$saved_accommodation_title = isset( $lease->accommodation_title ) ? $lease->accommodation_title : null;
@@ -441,7 +467,7 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 						admin_url( 'admin-ajax.php' )
 					);
 					?>
-					<tr class="af-lease-row">
+					<tr class="af-lease-row" data-tab-group="<?php echo esc_attr( $row_tab_group ); ?>">
 						<td data-label="<?php esc_attr_e( 'ID', 'arriendo-facil' ); ?>"><?php echo esc_html( $lease->id ); ?></td>
 							<td data-label="<?php esc_attr_e( 'Inmueble', 'arriendo-facil' ); ?>"><?php echo esc_html( ( isset( $lease->accommodation_title ) ? $lease->accommodation_title : null ) ?: ( isset( $lease->accommodation_id ) ? get_the_title( (int) $lease->accommodation_id ) : '' ) ?: $lease->accommodation_id ); ?></td>
 						<td data-label="<?php esc_attr_e( 'Unidad', 'arriendo-facil' ); ?>">

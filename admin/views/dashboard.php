@@ -914,7 +914,7 @@ $recent_reviews        = (array) $wpdb->get_results(
 
 	<script type="application/json" id="af-dashboard-chart-data"><?php echo wp_json_encode( array( 'occupancy' => $occupancy_chart, 'revenue' => $revenue_chart ) ); ?></script>
 	<script>
-	( function() {
+	document.addEventListener( 'DOMContentLoaded', function() {
 		if ( typeof Chart === 'undefined' ) {
 			return;
 		}
@@ -969,7 +969,7 @@ $recent_reviews        = (array) $wpdb->get_results(
 				}
 			} );
 		}
-	} )();
+	} );
 	</script>
 
 	<section class="af-section" aria-labelledby="af-recent-leases-title">

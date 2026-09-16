@@ -370,6 +370,59 @@
 
 .af-pill--lg { font-size: var(--af-text-sm); padding: 6px 12px; }
 
+/* ── Tabs de filtro reutilizables (Contratos/Huéspedes/Reviews/Pagos) ───── */
+
+.af-status-tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--af-space-2);
+	margin-bottom: var(--af-space-4);
+	border-bottom: 1px solid var(--af-gray-100);
+	padding-bottom: var(--af-space-3);
+}
+
+.af-status-tabs__btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 8px 14px;
+	border: 1px solid var(--af-gray-200);
+	border-radius: var(--af-radius-full);
+	background: var(--af-gray-0);
+	color: var(--af-gray-600);
+	font-size: var(--af-text-sm);
+	font-weight: 600;
+	cursor: pointer;
+	transition: background var(--af-motion-fast), color var(--af-motion-fast), border-color var(--af-motion-fast);
+}
+
+.af-status-tabs__btn:hover {
+	background: var(--af-primary-50);
+	color: var(--af-primary-700);
+}
+
+.af-status-tabs__btn.is-active {
+	background: var(--af-primary-500);
+	border-color: var(--af-primary-500);
+	color: #fff;
+}
+
+.af-status-tabs__count {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 20px;
+	height: 20px;
+	padding: 0 5px;
+	border-radius: var(--af-radius-full);
+	background: rgba(0, 0, 0, 0.08);
+	font-size: var(--af-text-xs);
+}
+
+.af-status-tabs__btn.is-active .af-status-tabs__count {
+	background: rgba(255, 255, 255, 0.25);
+}
+
 /* ── Semáforo de cobros ───────────────────────────────────────────────── */
 
 .af-semaforo {
@@ -708,6 +761,25 @@
 	font-size: var(--af-text-sm);
 	color: var(--af-gray-500);
 	font-style: italic;
+}
+
+.af-review-list__meta {
+	margin: 0 0 var(--af-space-1);
+	font-size: var(--af-text-xs);
+	color: var(--af-gray-400);
+}
+
+.af-review-list__stars {
+	color: var(--af-warning-500);
+	font-size: var(--af-text-sm);
+	letter-spacing: 1px;
+}
+
+/* Apila dos widgets af-section en la columna angosta de un .af-split. */
+.af-aside-stack {
+	display: flex;
+	flex-direction: column;
+	gap: var(--af-space-6);
 }
 
 /* ── Bandeja de mantenimiento: tarjetas por incidencia ────────────────── */
@@ -1125,6 +1197,21 @@
 /* Alerts de calendario: check-in, check-out y visitas en tres columnas. */
 .af-calendar-columns {
 	grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* Fila de gráficos del dashboard (ocupación + ingresos), columnas iguales. */
+.af-charts-row {
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.af-chart-canvas {
+	position: relative;
+	height: 260px;
+	width: 100%;
+}
+
+.af-chart-canvas--donut {
+	height: 240px;
 }
 
 @media (max-width: 1200px) {

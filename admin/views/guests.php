@@ -506,6 +506,21 @@ if ( $is_owner ) {
 					</header>
 
 					<?php if ( $guests ) : ?>
+					<?php
+					$guest_tab_counts = array( 'pendiente' => 0, 'verificado' => 0, 'rechazado' => 0 );
+					foreach ( $guests as $gt_guest ) {
+						$gt_status = isset( $gt_guest->doc_status ) && $gt_guest->doc_status ? (string) $gt_guest->doc_status : 'pendiente';
+						if ( isset( $guest_tab_counts[ $gt_status ] ) ) {
+							$guest_tab_counts[ $gt_status ]++;
+						}
+					}
+					?>
+					<div class="af-status-tabs" data-tabs-target="#af-guests-tbody">
+						<button type="button" class="af-status-tabs__btn is-active" data-tab-value=""><?php esc_html_e( 'Todos', 'arriendo-facil' ); ?> <span class="af-status-tabs__count"><?php echo esc_html( number_format_i18n( count( $guests ) ) ); ?></span></button>
+						<button type="button" class="af-status-tabs__btn" data-tab-value="pendiente"><?php esc_html_e( 'Pendientes', 'arriendo-facil' ); ?> <span class="af-status-tabs__count"><?php echo esc_html( number_format_i18n( $guest_tab_counts['pendiente'] ) ); ?></span></button>
+						<button type="button" class="af-status-tabs__btn" data-tab-value="verificado"><?php esc_html_e( 'Verificados', 'arriendo-facil' ); ?> <span class="af-status-tabs__count"><?php echo esc_html( number_format_i18n( $guest_tab_counts['verificado'] ) ); ?></span></button>
+						<button type="button" class="af-status-tabs__btn" data-tab-value="rechazado"><?php esc_html_e( 'Rechazados', 'arriendo-facil' ); ?> <span class="af-status-tabs__count"><?php echo esc_html( number_format_i18n( $guest_tab_counts['rechazado'] ) ); ?></span></button>
+					</div>
 					<table class="wp-list-table widefat af-data-table af-data-table--guests">
 						<thead>
 							<tr>
@@ -520,7 +535,7 @@ if ( $is_owner ) {
 								<th><?php esc_html_e( 'Acciones', 'arriendo-facil' ); ?></th>
 							</tr>
 						</thead>
-						<tbody>
+						<tbody id="af-guests-tbody">
 							<?php
 							$doc_statuses = class_exists( 'Arriendo_Facil_Document_Verification' )
 								? Arriendo_Facil_Document_Verification::statuses()
@@ -542,7 +557,7 @@ if ( $is_owner ) {
 									$doc_variant = 'danger';
 								}
 							?>
-								<tr>
+								<tr data-tab-group="<?php echo esc_attr( $doc_status ); ?>">
 									<td data-label="<?php esc_attr_e( 'Identificación', 'arriendo-facil' ); ?>"><?php echo esc_html( $guest->id_number ); ?></td>
 									<td data-label="<?php esc_attr_e( 'Nombre', 'arriendo-facil' ); ?>">
 										<strong><?php echo esc_html( $guest->first_name . ' ' . $guest->last_name ); ?></strong>

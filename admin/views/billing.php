@@ -158,6 +158,44 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 	);
 	?>
 
+	<?php
+	$sri_connected     = ! empty( $cfg['ruc'] ) && ! empty( $cfg['cert_filename'] );
+	$last_invoice      = ! empty( $invoices ) ? $invoices[0] : null;
+	$last_invoice_info = $last_invoice && isset( $estado_labels[ $last_invoice->estado ] ) ? $estado_labels[ $last_invoice->estado ] : null;
+	?>
+	<div class="af-split af-sri-status-row">
+		<div class="af-section af-sri-connect-card af-sri-connect-card--<?php echo $sri_connected ? 'ok' : 'error'; ?>">
+			<span class="af-sri-connect-card__icon" aria-hidden="true"><?php echo $sri_connected ? '✅' : '⚠️'; ?></span>
+			<div>
+				<h3 class="af-sri-connect-card__title"><?php esc_html_e( 'SRI · Sistema de Rentas Internas', 'arriendo-facil' ); ?></h3>
+				<p class="af-sri-connect-card__text">
+					<?php
+					echo esc_html(
+						$sri_connected
+							? __( 'Conectado — tu sistema de facturación está correctamente configurado.', 'arriendo-facil' )
+							: __( 'Sin configurar — completa la Configuración SRI para poder emitir comprobantes.', 'arriendo-facil' )
+					);
+					?>
+				</p>
+			</div>
+		</div>
+
+		<aside class="af-section af-sri-connect-card">
+			<h3 class="af-sri-connect-card__title" style="margin-top:0;"><?php esc_html_e( 'Último comprobante', 'arriendo-facil' ); ?></h3>
+			<?php if ( $last_invoice ) : ?>
+				<p class="af-sri-connect-card__text">
+					<strong><?php echo esc_html( $last_invoice->numero_comprobante ? $last_invoice->numero_comprobante : '#' . (int) $last_invoice->id ); ?></strong><br />
+					<?php echo esc_html( wp_date( 'd/m/Y', strtotime( (string) $last_invoice->created_at ) ) ); ?> · $<?php echo esc_html( number_format_i18n( (float) $last_invoice->total, 2 ) ); ?>
+				</p>
+				<?php if ( $last_invoice_info ) : ?>
+					<span class="af-pill" style="background: <?php echo esc_attr( $last_invoice_info['color'] ); ?>1a; color: <?php echo esc_attr( $last_invoice_info['color'] ); ?>;"><?php echo esc_html( $last_invoice_info['icon'] . ' ' . $last_invoice_info['label'] ); ?></span>
+				<?php endif; ?>
+			<?php else : ?>
+				<p class="af-empty__text"><?php esc_html_e( 'Aún no se ha emitido ningún comprobante.', 'arriendo-facil' ); ?></p>
+			<?php endif; ?>
+		</aside>
+	</div>
+
 	<div class="af-sri-flow" aria-label="<?php esc_attr_e( 'Ciclo del comprobante SRI', 'arriendo-facil' ); ?>">
 		<ol class="af-sri-flow__list">
 			<li class="af-sri-flow__step"><span class="af-sri-flow__num">1</span><span class="af-sri-flow__label"><?php esc_html_e( 'Generada', 'arriendo-facil' ); ?></span></li>

@@ -244,6 +244,23 @@ if ( $is_management_model ) {
 			</div>
 		</header>
 
+	<?php
+	$review_tab_counts = array( 'positivas' => 0, 'neutras' => 0, 'negativas' => 0 );
+	foreach ( (array) $rows as $rt_row ) {
+		$rt_stars = (float) $rt_row->stars;
+		$rt_group = $rt_stars >= 4 ? 'positivas' : ( $rt_stars >= 3 ? 'neutras' : 'negativas' );
+		$review_tab_counts[ $rt_group ]++;
+	}
+	?>
+	<div class="af-status-tabs" data-tabs-target="#af-reviews-tbody">
+		<button type="button" class="af-status-tabs__btn is-active" data-tab-value=""><?php esc_html_e( 'Todas', 'arriendo-facil' ); ?> <span class="af-status-tabs__count"><?php echo esc_html( number_format_i18n( count( (array) $rows ) ) ); ?></span></button>
+		<button type="button" class="af-status-tabs__btn" data-tab-value="positivas"><?php esc_html_e( 'Positivas', 'arriendo-facil' ); ?> <span class="af-status-tabs__count"><?php echo esc_html( number_format_i18n( $review_tab_counts['positivas'] ) ); ?></span></button>
+		<button type="button" class="af-status-tabs__btn" data-tab-value="neutras"><?php esc_html_e( 'Neutras', 'arriendo-facil' ); ?> <span class="af-status-tabs__count"><?php echo esc_html( number_format_i18n( $review_tab_counts['neutras'] ) ); ?></span></button>
+		<button type="button" class="af-status-tabs__btn" data-tab-value="negativas"><?php esc_html_e( 'Negativas', 'arriendo-facil' ); ?> <span class="af-status-tabs__count"><?php echo esc_html( number_format_i18n( $review_tab_counts['negativas'] ) ); ?></span></button>
+	</div>
+
+	<div class="af-split">
+	<div>
 	<table class="wp-list-table widefat fixed striped af-data-table">
 		<thead>
 			<tr>
@@ -256,7 +273,7 @@ if ( $is_management_model ) {
 				<th><?php esc_html_e( 'Fecha', 'arriendo-facil' ); ?></th>
 			</tr>
 		</thead>
-		<tbody>
+		<tbody id="af-reviews-tbody">
 			<?php if ( empty( $rows ) ) : ?>
 				<tr>
 					<td colspan="7"><?php esc_html_e( 'No hay reseñas completadas para los filtros actuales.', 'arriendo-facil' ); ?></td>
@@ -269,15 +286,18 @@ if ( $is_management_model ) {
 					$title     = isset( $row->accommodation_title ) && '' !== trim( (string) $row->accommodation_title ) ? (string) $row->accommodation_title : '#' . absint( $row->accommodation_id );
 					$stars     = (float) $row->stars;
 					$star_pill = 'af-pill--danger';
+					$row_tab_group = 'negativas';
 					if ( $stars >= 4 ) {
 						$star_pill = 'af-pill--success';
+						$row_tab_group = 'positivas';
 					} elseif ( $stars >= 3 ) {
 						$star_pill = 'af-pill--warning';
+						$row_tab_group = 'neutras';
 					}
 					$criteria_labels = Arriendo_Facil_Review::owner_to_tenant_criteria();
 					$criteria_scores = 'owner_to_tenant' === $direction && ! empty( $row->criteria_scores ) ? json_decode( (string) $row->criteria_scores, true ) : null;
 					?>
-					<tr>
+					<tr data-tab-group="<?php echo esc_attr( $row_tab_group ); ?>">
 						<td data-label="<?php esc_attr_e( 'ID', 'arriendo-facil' ); ?>"><?php echo esc_html( (int) $row->id ); ?></td>
 						<td data-label="<?php esc_attr_e( 'Contrato', 'arriendo-facil' ); ?>"><?php echo esc_html( (int) $row->lease_id ); ?></td>
 						<td data-label="<?php esc_attr_e( 'Propiedad', 'arriendo-facil' ); ?>"><?php echo esc_html( $title ); ?></td>
@@ -302,6 +322,44 @@ if ( $is_management_model ) {
 			<?php endif; ?>
 		</tbody>
 	</table>
+	</div>
+
+	<aside class="af-section" aria-labelledby="af-review-detail-title">
+		<header class="af-section__header">
+			<div>
+				<h2 class="af-section__title" id="af-review-detail-title"><?php esc_html_e( 'Detalle de la review', 'arriendo-facil' ); ?></h2>
+			</div>
+		</header>
+		<?php if ( empty( $rows ) ) : ?>
+			<p class="af-empty__text"><?php esc_html_e( 'Selecciona o registra una reseña para ver el detalle aquí.', 'arriendo-facil' ); ?></p>
+		<?php else : ?>
+			<?php
+			$detail_row    = $rows[0];
+			$detail_title  = isset( $detail_row->accommodation_title ) && '' !== trim( (string) $detail_row->accommodation_title ) ? (string) $detail_row->accommodation_title : '#' . absint( $detail_row->accommodation_id );
+			$detail_stars  = (int) round( (float) $detail_row->stars );
+			$detail_scores = ! empty( $detail_row->criteria_scores ) ? json_decode( (string) $detail_row->criteria_scores, true ) : null;
+			?>
+			<div class="af-review-list__item">
+				<div class="af-review-list__head">
+					<strong><?php echo esc_html( sprintf( /* translators: %d: lease id */ __( 'Contrato #%d', 'arriendo-facil' ), (int) $detail_row->lease_id ) ); ?></strong>
+					<span class="af-review-list__stars"><?php echo esc_html( str_repeat( '★', $detail_stars ) . str_repeat( '☆', 5 - $detail_stars ) ); ?></span>
+				</div>
+				<p class="af-review-list__meta"><?php echo esc_html( $detail_title ); ?></p>
+				<?php if ( is_array( $detail_scores ) ) : ?>
+					<ul class="af-review-list__criteria">
+						<?php foreach ( Arriendo_Facil_Review::owner_to_tenant_criteria() as $dc_key => $dc_label ) : ?>
+							<?php if ( isset( $detail_scores[ $dc_key ] ) ) : ?>
+								<li class="af-pill af-pill--neutral"><?php echo esc_html( $dc_label ); ?>: <?php echo esc_html( (int) $detail_scores[ $dc_key ] ); ?>/5</li>
+							<?php endif; ?>
+						<?php endforeach; ?>
+					</ul>
+				<?php endif; ?>
+				<p class="af-review-list__comment"><?php echo esc_html( isset( $detail_row->submitted_at ) ? (string) $detail_row->submitted_at : '' ); ?></p>
+			</div>
+		<?php endif; ?>
+	</aside>
+
+	</div>
 	</section>
 </div>
 

@@ -136,7 +136,50 @@
 	border-radius: 6px;
 }
 
+/* Tarjeta "Conectado al SRI" + "Último comprobante" (vista Facturación). */
+.af-sri-status-row {
+	margin: 0 0 20px;
+	align-items: stretch;
+}
+
+.af-sri-connect-card {
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	margin: 0;
+}
+
+.af-sri-connect-card--ok {
+	border-color: #b7e1c2;
+	background: #f3fbf5;
+}
+
+.af-sri-connect-card--error {
+	border-color: #f3d2a2;
+	background: #fffaf2;
+}
+
+.af-sri-connect-card__icon {
+	font-size: 22px;
+	line-height: 1;
+}
+
+.af-sri-connect-card__title {
+	margin: 0 0 4px;
+	font-size: 15px;
+}
+
+.af-sri-connect-card__text {
+	margin: 0;
+	font-size: 13px;
+	color: #5b6673;
+}
+
 @media (max-width: 960px) {
+	.af-sri-status-row {
+		grid-template-columns: 1fr;
+	}
+
 	.af-sri-status-grid {
 		grid-template-columns: 1fr;
 	}

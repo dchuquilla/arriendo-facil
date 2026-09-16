@@ -436,6 +436,70 @@ if ( $pending_queue > 0 && ! $is_management_model ) {
 		'url'   => admin_url( 'admin.php?page=af-guests' ),
 	);
 }
+
+// ── Datos para gráficos (Resumen de ocupación + Ingresos por arriendos) ──
+$occupancy_chart = array( 'available' => 0, 'occupied' => 0, 'maintenance' => 0 );
+$occupancy_query = array(
+	'post_type'      => 'accommodation',
+	'post_status'    => array( 'publish', 'private' ),
+	'posts_per_page' => -1,
+	'fields'         => 'ids',
+);
+if ( is_array( $scope_ids ) ) {
+	$occupancy_query['post__in'] = ! empty( $scope_ids ) ? $scope_ids : array( 0 );
+}
+foreach ( get_posts( $occupancy_query ) as $occupancy_post_id ) {
+	$occ_status = (string) get_post_meta( $occupancy_post_id, '_af_status', true );
+	if ( in_array( $occ_status, array( 'occupied', 'rented' ), true ) ) {
+		$occupancy_chart['occupied']++;
+	} elseif ( 'maintenance' === $occ_status ) {
+		$occupancy_chart['maintenance']++;
+	} else {
+		$occupancy_chart['available']++;
+	}
+}
+
+$revenue_chart = array( 'labels' => array(), 'values' => array() );
+if ( $has_ledger ) {
+	$revenue_scope_clause = null === $scope_ids ? '' : ' AND lease_id IN (SELECT id FROM ' . $wpdb->prefix . 'af_leases WHERE accommodation_id IN (' . Arriendo_Facil_Tenancy::ids_in_clause( $scope_ids ) . '))';
+	for ( $months_ago = 5; $months_ago >= 0; $months_ago-- ) {
+		$chart_period            = gmdate( 'Y-m', strtotime( "-{$months_ago} months" ) );
+		$revenue_chart['labels'][] = wp_date( 'M', strtotime( $chart_period . '-01' ) );
+		$revenue_chart['values'][] = (float) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COALESCE(SUM(amount_paid), 0) FROM {$charges_table} WHERE period = %s{$revenue_scope_clause}", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+				$chart_period
+			)
+		);
+	}
+}
+
+// ── Contratos recientes (tabla compacta, últimos 6) ──────────────────────
+$recent_leases_scope = null === $scope_ids ? '' : ' AND l.accommodation_id IN (' . Arriendo_Facil_Tenancy::ids_in_clause( $scope_ids ) . ')';
+$recent_leases        = (array) $wpdb->get_results(
+	"SELECT l.id, l.start_date, l.end_date, l.status, l.accommodation_id,
+	        p.post_title AS accommodation_title, CONCAT(g.first_name, ' ', g.last_name) AS guest_name
+	 FROM {$wpdb->prefix}af_leases l
+	 LEFT JOIN {$wpdb->posts} p ON p.ID = l.accommodation_id
+	 LEFT JOIN {$wpdb->prefix}af_guests g ON g.id = l.guest_id
+	 WHERE l.deleted_at IS NULL{$recent_leases_scope}
+	 ORDER BY l.id DESC
+	 LIMIT 6" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+);
+
+// ── Reviews recientes (últimas 5 completadas admin→inquilino) ────────────
+$recent_reviews_scope = null === $scope_ids ? '' : ' AND r.accommodation_id IN (' . Arriendo_Facil_Tenancy::ids_in_clause( $scope_ids ) . ')';
+$recent_reviews        = (array) $wpdb->get_results(
+	"SELECT r.id, r.stars, r.comment_text, r.accommodation_id, p.post_title AS accommodation_title,
+	        CONCAT(g.first_name, ' ', g.last_name) AS guest_name
+	 FROM {$wpdb->prefix}af_reviews r
+	 LEFT JOIN {$wpdb->posts} p ON p.ID = r.accommodation_id
+	 LEFT JOIN {$wpdb->prefix}af_leases l ON l.id = r.lease_id
+	 LEFT JOIN {$wpdb->prefix}af_guests g ON g.id = l.guest_id
+	 WHERE r.status = 'completed' AND r.review_direction = 'owner_to_tenant'{$recent_reviews_scope}
+	 ORDER BY r.id DESC
+	 LIMIT 5" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+);
 ?>
 <div class="wrap af-shell af-dashboard">
 
@@ -820,6 +884,121 @@ if ( $pending_queue > 0 && ! $is_management_model ) {
 
 	</div>
 
+	<div class="af-split af-charts-row">
+		<section class="af-section" aria-labelledby="af-chart-occupancy-title">
+			<header class="af-section__header">
+				<div>
+					<h2 class="af-section__title" id="af-chart-occupancy-title"><?php esc_html_e( 'Resumen de ocupación', 'arriendo-facil' ); ?></h2>
+					<p class="af-section__subtitle"><?php esc_html_e( 'Disponibles, ocupadas y en mantenimiento.', 'arriendo-facil' ); ?></p>
+				</div>
+			</header>
+			<div class="af-chart-canvas af-chart-canvas--donut">
+				<canvas id="af-chart-occupancy" role="img" aria-label="<?php esc_attr_e( 'Gráfico de ocupación de propiedades', 'arriendo-facil' ); ?>"></canvas>
+			</div>
+		</section>
+
+		<?php if ( $has_ledger ) : ?>
+		<section class="af-section" aria-labelledby="af-chart-revenue-title">
+			<header class="af-section__header">
+				<div>
+					<h2 class="af-section__title" id="af-chart-revenue-title"><?php esc_html_e( 'Ingresos por arriendos', 'arriendo-facil' ); ?></h2>
+					<p class="af-section__subtitle"><?php esc_html_e( 'Cobrado en los últimos 6 meses.', 'arriendo-facil' ); ?></p>
+				</div>
+			</header>
+			<div class="af-chart-canvas">
+				<canvas id="af-chart-revenue" role="img" aria-label="<?php esc_attr_e( 'Gráfico de ingresos por arriendos', 'arriendo-facil' ); ?>"></canvas>
+			</div>
+		</section>
+		<?php endif; ?>
+	</div>
+
+	<script type="application/json" id="af-dashboard-chart-data"><?php echo wp_json_encode( array( 'occupancy' => $occupancy_chart, 'revenue' => $revenue_chart ) ); ?></script>
+	<script>
+	( function() {
+		if ( typeof Chart === 'undefined' ) {
+			return;
+		}
+		var dataEl = document.getElementById( 'af-dashboard-chart-data' );
+		if ( ! dataEl ) {
+			return;
+		}
+		var data = JSON.parse( dataEl.textContent );
+
+		var occupancyEl = document.getElementById( 'af-chart-occupancy' );
+		if ( occupancyEl ) {
+			new Chart( occupancyEl, {
+				type: 'doughnut',
+				data: {
+					labels: [ '<?php echo esc_js( __( 'Disponibles', 'arriendo-facil' ) ); ?>', '<?php echo esc_js( __( 'Ocupadas', 'arriendo-facil' ) ); ?>', '<?php echo esc_js( __( 'Mantenimiento', 'arriendo-facil' ) ); ?>' ],
+					datasets: [ {
+						data: [ data.occupancy.available, data.occupancy.occupied, data.occupancy.maintenance ],
+						backgroundColor: [ '#0F9D58', '#2563EB', '#F59E0B' ],
+						borderWidth: 0
+					} ]
+				},
+				options: {
+					responsive: true,
+					maintainAspectRatio: false,
+					cutout: '68%',
+					plugins: { legend: { position: 'bottom' } }
+				}
+			} );
+		}
+
+		var revenueEl = document.getElementById( 'af-chart-revenue' );
+		if ( revenueEl && data.revenue.labels.length ) {
+			new Chart( revenueEl, {
+				type: 'line',
+				data: {
+					labels: data.revenue.labels,
+					datasets: [ {
+						label: '<?php echo esc_js( __( 'Cobrado', 'arriendo-facil' ) ); ?>',
+						data: data.revenue.values,
+						borderColor: '#2563EB',
+						backgroundColor: 'rgba(37,99,235,0.12)',
+						fill: true,
+						tension: 0.35,
+						pointRadius: 3
+					} ]
+				},
+				options: {
+					responsive: true,
+					maintainAspectRatio: false,
+					plugins: { legend: { display: false } },
+					scales: { y: { beginAtZero: true } }
+				}
+			} );
+		}
+	} )();
+	</script>
+
+	<section class="af-section" aria-labelledby="af-recent-leases-title">
+		<header class="af-section__header">
+			<div>
+				<h2 class="af-section__title" id="af-recent-leases-title"><?php esc_html_e( 'Contratos recientes', 'arriendo-facil' ); ?></h2>
+				<p class="af-section__subtitle"><?php esc_html_e( 'Las últimas altas de contrato.', 'arriendo-facil' ); ?></p>
+			</div>
+			<a class="af-kpi__link" href="<?php echo esc_url( admin_url( 'admin.php?page=af-leases' ) ); ?>"><?php esc_html_e( 'Ver todos →', 'arriendo-facil' ); ?></a>
+		</header>
+
+		<?php if ( empty( $recent_leases ) ) : ?>
+			<p class="af-empty__text"><?php esc_html_e( 'Aún no hay contratos registrados.', 'arriendo-facil' ); ?></p>
+		<?php else : ?>
+			<div class="af-semaforo__table" role="table" aria-label="<?php esc_attr_e( 'Contratos recientes', 'arriendo-facil' ); ?>">
+				<?php foreach ( $recent_leases as $recent_lease ) : ?>
+					<a class="af-semaforo__row" href="<?php echo esc_url( admin_url( 'admin.php?page=af-leases' ) ); ?>">
+						<span class="af-semaforo__tenant">
+							<strong><?php echo esc_html( trim( (string) $recent_lease->guest_name ) ? trim( (string) $recent_lease->guest_name ) : __( 'Inquilino', 'arriendo-facil' ) ); ?></strong>
+							<small><?php echo esc_html( $recent_lease->accommodation_title ? $recent_lease->accommodation_title : '—' ); ?></small>
+						</span>
+						<?php echo af_pill( $recent_lease->status ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- af_pill() escapes internally. ?>
+						<span class="af-semaforo__amount"><?php echo esc_html( wp_date( 'd/m/Y', strtotime( $recent_lease->end_date ) ) ); ?></span>
+					</a>
+				<?php endforeach; ?>
+			</div>
+		<?php endif; ?>
+	</section>
+
 	<?php if ( $is_management_model && $has_ledger ) : ?>
 	<section class="af-section af-semaforo" aria-labelledby="af-semaforo-title">
 		<header class="af-section__header">
@@ -1175,6 +1354,7 @@ if ( $pending_queue > 0 && ! $is_management_model ) {
 			<?php endif; ?>
 		</section>
 
+		<div class="af-aside-stack">
 		<aside class="af-section" aria-labelledby="af-dashboard-tasks">
 			<header class="af-section__header">
 				<div>
@@ -1205,6 +1385,38 @@ if ( $pending_queue > 0 && ! $is_management_model ) {
 				</div>
 			<?php endif; ?>
 		</aside>
+
+		<aside class="af-section" aria-labelledby="af-recent-reviews-title">
+			<header class="af-section__header">
+				<div>
+					<h2 class="af-section__title" id="af-recent-reviews-title"><?php esc_html_e( 'Reviews recientes', 'arriendo-facil' ); ?></h2>
+					<p class="af-section__subtitle"><?php esc_html_e( 'Últimas calificaciones registradas a inquilinos.', 'arriendo-facil' ); ?></p>
+				</div>
+				<a class="af-kpi__link" href="<?php echo esc_url( admin_url( 'admin.php?page=af-reviews' ) ); ?>"><?php esc_html_e( 'Ver todas →', 'arriendo-facil' ); ?></a>
+			</header>
+
+			<?php if ( empty( $recent_reviews ) ) : ?>
+				<p class="af-empty__text"><?php esc_html_e( 'Aún no hay calificaciones registradas.', 'arriendo-facil' ); ?></p>
+			<?php else : ?>
+				<ul class="af-review-list">
+					<?php foreach ( $recent_reviews as $recent_review ) : ?>
+						<li class="af-review-list__item">
+							<div class="af-review-list__head">
+								<strong><?php echo esc_html( trim( (string) $recent_review->guest_name ) ? trim( (string) $recent_review->guest_name ) : __( 'Inquilino', 'arriendo-facil' ) ); ?></strong>
+								<span class="af-review-list__stars" aria-label="<?php echo esc_attr( sprintf( /* translators: %d: stars */ __( '%d de 5 estrellas', 'arriendo-facil' ), (int) $recent_review->stars ) ); ?>">
+									<?php echo esc_html( str_repeat( '★', (int) $recent_review->stars ) . str_repeat( '☆', 5 - (int) $recent_review->stars ) ); ?>
+								</span>
+							</div>
+							<p class="af-review-list__meta"><?php echo esc_html( $recent_review->accommodation_title ? $recent_review->accommodation_title : '—' ); ?></p>
+							<?php if ( ! empty( $recent_review->comment_text ) ) : ?>
+								<p class="af-review-list__comment"><?php echo esc_html( wp_trim_words( $recent_review->comment_text, 16 ) ); ?></p>
+							<?php endif; ?>
+						</li>
+					<?php endforeach; ?>
+				</ul>
+			<?php endif; ?>
+		</aside>
+		</div>
 
 	</div>
 

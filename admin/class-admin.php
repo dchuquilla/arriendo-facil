@@ -629,7 +629,8 @@ class Arriendo_Facil_Admin {
 	 * @return array<int, array<string, mixed>>
 	 */
 	private function get_shell_nav_items() {
-		$gated = class_exists( 'Arriendo_Facil_Property_Admin_Onboarding' )
+		$gated = apply_filters( 'af_property_admin_gate_operational_menus', false )
+			&& class_exists( 'Arriendo_Facil_Property_Admin_Onboarding' )
 			&& Arriendo_Facil_Property_Admin_Onboarding::needs_identity_verification();
 
 		$billing_cap = (string) apply_filters( 'af_billing_capability', 'af_view_billing' );
@@ -870,6 +871,24 @@ class Arriendo_Facil_Admin {
 		<button type="button" id="af-app-sidebar-mobile-toggle" class="af-app-sidebar-mobile-toggle" aria-label="<?php esc_attr_e( 'Abrir menú', 'arriendo-facil' ); ?>" aria-expanded="false">
 			<span class="dashicons dashicons-menu" aria-hidden="true"></span>
 		</button>
+
+		<div class="af-app-topbar af-shell">
+			<form class="af-app-topbar__search" method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" role="search">
+				<input type="hidden" name="page" value="af-catalog" />
+				<span class="dashicons dashicons-search" aria-hidden="true"></span>
+				<input type="search" name="s" placeholder="<?php esc_attr_e( 'Buscar propiedades, contratos…', 'arriendo-facil' ); ?>" aria-label="<?php esc_attr_e( 'Buscar', 'arriendo-facil' ); ?>" />
+			</form>
+			<div class="af-app-topbar__actions">
+				<a class="af-app-topbar__bell" href="<?php echo esc_url( admin_url( 'admin.php?page=arriendo-facil#af-alerts' ) ); ?>" aria-label="<?php esc_attr_e( 'Alertas operativas', 'arriendo-facil' ); ?>">
+					<span class="dashicons dashicons-bell" aria-hidden="true"></span>
+				</a>
+				<a class="af-app-topbar__user" href="<?php echo esc_url( admin_url( 'admin.php?page=af-admin-profile' ) ); ?>">
+					<?php echo get_avatar( $current_user->ID, 28 ); ?>
+					<span class="af-app-topbar__user-name"><?php echo esc_html( $current_user->display_name ); ?></span>
+					<span class="dashicons dashicons-arrow-down-alt2" aria-hidden="true"></span>
+				</a>
+			</div>
+		</div>
 		<?php
 	}
 
@@ -2147,6 +2166,15 @@ class Arriendo_Facil_Admin {
 			ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/af-tokens.css',
 			array(),
 			$tokens_css_version
+		);
+
+		// Inter webfont — af-tokens/af-admin-chrome reference it, but it was never
+		// actually loaded, so every admin screen fell back to the OS system font.
+		wp_enqueue_style(
+			'af-google-font-inter',
+			'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap',
+			array(),
+			null
 		);
 
 		// Global chrome rebrand (sidebar, adminbar, notices, body bg) on ALL admin pages.

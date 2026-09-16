@@ -263,6 +263,23 @@ function arriendo_facil_init() {
 add_action( 'plugins_loaded', 'arriendo_facil_init' );
 
 /**
+ * Re-runs the per-user capability self-heal on `init`. `is_user_logged_in()`
+ * and `wp_get_current_user()` are unreliable during `plugins_loaded` (the
+ * auth cookie hasn't been validated into `$current_user` yet), so the copy
+ * called from `ensure_owner_role()` above silently no-ops on every request.
+ * `admin_menu` (where WordPress caches the capability check for each
+ * registered page) fires after `init`, so this timing is early enough.
+ *
+ * @return void
+ */
+function arriendo_facil_heal_current_user_capabilities_on_init() {
+	if ( class_exists( 'Arriendo_Facil_Activator' ) ) {
+		Arriendo_Facil_Activator::heal_current_user_capabilities();
+	}
+}
+add_action( 'init', 'arriendo_facil_heal_current_user_capabilities_on_init', 5 );
+
+/**
  * Runs one-time schema upgrades for ZIP-based plugin updates.
  *
  * This ensures new tables/columns are created even when the plugin is updated

@@ -1,0 +1,240 @@
+/**
+ * Arriendo Facil — Custom admin app shell.
+ *
+ * Replaces the native WP admin bar + sidebar with a branded, fixed navy
+ * sidebar for the plugin's own screens (Panel, Contratos, Propiedades,
+ * Inquilinos, Pagos, Reviews, Facturación, Mi perfil...).
+ *
+ * Scoped entirely to body.af-custom-shell so it never touches unrelated
+ * wp-admin screens (Posts, Plugins, Settings, other plugins...).
+ */
+
+body.af-custom-shell #wpadminbar,
+body.af-custom-shell #adminmenumain,
+body.af-custom-shell #adminmenuback,
+body.af-custom-shell #adminmenuwrap,
+body.af-custom-shell #screen-meta-links,
+body.af-custom-shell #wpfooter {
+	display: none !important;
+}
+
+html.wp-toolbar body.af-custom-shell {
+	padding-top: 0 !important;
+}
+
+body.af-custom-shell #wpcontent {
+	margin-left: 264px;
+	transition: margin-left var(--af-motion-base, 180ms ease);
+}
+
+body.af-custom-shell.af-sidebar-collapsed #wpcontent {
+	margin-left: 76px;
+}
+
+@media (max-width: 782px) {
+	body.af-custom-shell #wpcontent {
+		margin-left: 0;
+		padding-top: 56px;
+	}
+}
+
+/* ── Sidebar shell ─────────────────────────────────────────────────────── */
+
+.af-app-sidebar {
+	position: fixed;
+	top: 0;
+	left: 0;
+	bottom: 0;
+	width: 264px;
+	background: var(--af-gray-900, #1B1A16);
+	color: var(--af-gray-100, #EEEDE8);
+	z-index: 100050;
+	display: flex;
+	flex-direction: column;
+	font-family: var(--af-font-family);
+	box-shadow: var(--af-shadow-lg);
+	transition: width var(--af-motion-base, 180ms ease), transform var(--af-motion-base, 180ms ease);
+}
+
+body.af-sidebar-collapsed .af-app-sidebar {
+	width: 76px;
+}
+
+body.af-sidebar-collapsed .af-app-sidebar__label,
+body.af-sidebar-collapsed .af-app-sidebar__logo-text,
+body.af-sidebar-collapsed .af-app-sidebar__user-name {
+	display: none;
+}
+
+.af-app-sidebar__brand {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--af-space-2);
+	padding: var(--af-space-5) var(--af-space-4);
+	border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.af-app-sidebar__logo {
+	display: flex;
+	align-items: center;
+	gap: var(--af-space-2);
+	color: #fff;
+	text-decoration: none;
+	font-weight: 700;
+	font-size: var(--af-text-base);
+	min-width: 0;
+}
+
+.af-app-sidebar__logo .dashicons {
+	color: var(--af-primary-400, #60A5FA);
+	flex-shrink: 0;
+}
+
+.af-app-sidebar__logo-text {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.af-app-sidebar__toggle {
+	background: transparent;
+	border: none;
+	color: var(--af-gray-400, #A8A69E);
+	cursor: pointer;
+	padding: var(--af-space-1);
+	border-radius: var(--af-radius-sm);
+	flex-shrink: 0;
+	line-height: 1;
+}
+
+.af-app-sidebar__toggle:hover {
+	color: #fff;
+	background: rgba(255, 255, 255, 0.08);
+}
+
+body.af-sidebar-collapsed .af-app-sidebar__toggle .dashicons {
+	transform: rotate(180deg);
+	display: inline-block;
+}
+
+.af-app-sidebar__nav {
+	list-style: none;
+	margin: var(--af-space-3) 0;
+	padding: 0 var(--af-space-3);
+	flex: 1;
+	overflow-y: auto;
+	overflow-x: hidden;
+}
+
+.af-app-sidebar__item a {
+	display: flex;
+	align-items: center;
+	gap: var(--af-space-3);
+	padding: var(--af-space-3);
+	margin-bottom: 2px;
+	border-radius: var(--af-radius-md);
+	color: var(--af-gray-300, #CFCEC6);
+	text-decoration: none;
+	font-size: var(--af-text-sm);
+	font-weight: 500;
+	white-space: nowrap;
+	transition: background-color var(--af-motion-fast), color var(--af-motion-fast);
+}
+
+.af-app-sidebar__item a:hover,
+.af-app-sidebar__item a:focus {
+	background: rgba(255, 255, 255, 0.06);
+	color: #fff;
+}
+
+.af-app-sidebar__item.is-active a {
+	background: var(--af-primary-500, #2563EB);
+	color: #fff;
+	box-shadow: var(--af-shadow-sm);
+}
+
+.af-app-sidebar__item .dashicons {
+	flex-shrink: 0;
+}
+
+.af-app-sidebar__footer {
+	border-top: 1px solid rgba(255, 255, 255, 0.08);
+	padding: var(--af-space-3);
+	display: flex;
+	align-items: center;
+	gap: var(--af-space-2);
+}
+
+.af-app-sidebar__user {
+	display: flex;
+	align-items: center;
+	gap: var(--af-space-2);
+	color: #fff;
+	text-decoration: none;
+	min-width: 0;
+	flex: 1;
+}
+
+.af-app-sidebar__user img {
+	border-radius: 50%;
+	flex-shrink: 0;
+	display: block;
+}
+
+.af-app-sidebar__user-name {
+	font-size: var(--af-text-sm);
+	font-weight: 600;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.af-app-sidebar__logout {
+	color: var(--af-gray-400, #A8A69E);
+	flex-shrink: 0;
+	padding: var(--af-space-2);
+	border-radius: var(--af-radius-sm);
+	text-decoration: none;
+	line-height: 1;
+}
+
+.af-app-sidebar__logout:hover {
+	color: #fff;
+	background: rgba(255, 255, 255, 0.08);
+}
+
+/* ── Mobile drawer ───────────────────────────────────────────────────────── */
+
+.af-app-sidebar-mobile-toggle {
+	display: none;
+}
+
+@media (max-width: 782px) {
+	.af-app-sidebar {
+		transform: translateX(-100%);
+	}
+
+	body.af-sidebar-open .af-app-sidebar {
+		transform: translateX(0);
+		width: 264px;
+	}
+
+	.af-app-sidebar-mobile-toggle {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		position: fixed;
+		top: var(--af-space-3);
+		left: var(--af-space-3);
+		z-index: 100060;
+		width: 40px;
+		height: 40px;
+		border-radius: var(--af-radius-md);
+		border: none;
+		background: var(--af-gray-900, #1B1A16);
+		color: #fff;
+		box-shadow: var(--af-shadow-md);
+		cursor: pointer;
+	}
+}

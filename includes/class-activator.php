@@ -109,6 +109,38 @@ class Arriendo_Facil_Activator {
 
 		self::sync_existing_owner_users_to_role();
 		self::migrate_legacy_af_owner_role();
+		self::heal_current_user_capabilities();
+	}
+
+	/**
+	 * Defensive self-heal: grants the required capabilities directly on the
+	 * user object of the currently logged-in property admin/administrator.
+	 * Guards against accounts whose role definition was updated with new
+	 * caps (e.g. `af_manage_properties`) after the user's own capability
+	 * cache (`wp_capabilities` user meta) was already populated.
+	 *
+	 * @return void
+	 */
+	private static function heal_current_user_capabilities() {
+		if ( ! function_exists( 'wp_get_current_user' ) || ! is_user_logged_in() ) {
+			return;
+		}
+
+		$current_user = wp_get_current_user();
+		if ( ! ( $current_user instanceof WP_User ) || ! $current_user->exists() ) {
+			return;
+		}
+
+		$roles = (array) $current_user->roles;
+		if ( ! in_array( 'af_property_admin', $roles, true ) && ! in_array( 'administrator', $roles, true ) ) {
+			return;
+		}
+
+		foreach ( array( 'af_view_billing', Arriendo_Facil_Tenancy::CAP ) as $cap ) {
+			if ( ! $current_user->has_cap( $cap ) ) {
+				$current_user->add_cap( $cap );
+			}
+		}
 	}
 
 	/**

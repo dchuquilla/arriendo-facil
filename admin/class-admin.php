@@ -513,12 +513,54 @@ class Arriendo_Facil_Admin {
 	/**
 	 * Whether the current request is one of the plugin's own admin screens
 	 * (Panel, Contratos, Propiedades, Inmuebles, etc.), as opposed to core
-	 * WordPress screens (Posts, Plugins, Settings...).
+	 * WordPress screens (Posts, Plugins, Users, Settings, Tools...).
+	 *
+	 * Uses an allow-list (only our own `admin.php?page=af-*`/`arriendo-facil`
+	 * screens and the `accommodation` CPT) PLUS an explicit deny-list of
+	 * core WP admin files as a second, independent guard — so core screens
+	 * never lose their native chrome for ANY role, including administrators,
+	 * even if the allow-list logic above ever changes.
 	 *
 	 * @return bool
 	 */
 	private function is_own_admin_screen() {
 		global $pagenow, $typenow;
+
+		$core_wp_pages = array(
+			'index.php',
+			'plugins.php',
+			'plugin-install.php',
+			'plugin-editor.php',
+			'users.php',
+			'user-new.php',
+			'user-edit.php',
+			'profile.php',
+			'options-general.php',
+			'options-writing.php',
+			'options-reading.php',
+			'options-discussion.php',
+			'options-media.php',
+			'options-permalink.php',
+			'options-privacy.php',
+			'tools.php',
+			'import.php',
+			'export.php',
+			'site-health.php',
+			'update-core.php',
+			'themes.php',
+			'theme-editor.php',
+			'customize.php',
+			'nav-menus.php',
+			'widgets.php',
+			'upload.php',
+			'media-new.php',
+			'edit-comments.php',
+			'network',
+		);
+
+		if ( in_array( $pagenow, $core_wp_pages, true ) ) {
+			return false;
+		}
 
 		if ( 'admin.php' === $pagenow ) {
 			$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
@@ -719,6 +761,50 @@ class Arriendo_Facil_Admin {
 	}
 
 	/**
+	 * Links back to core WordPress admin screens (Plugins, Users, Settings,
+	 * Tools...), shown only to super admins (`manage_options`) at the bottom
+	 * of the custom sidebar. Without this, a super admin browsing our own
+	 * screens would have no visible way back to core wp-admin sections,
+	 * since the custom shell hides the native #adminmenu there. Property
+	 * admins never manage plugins/users/settings, so they never see this.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function get_wp_core_links() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return array();
+		}
+
+		return array(
+			array(
+				'label' => __( 'Escritorio de WordPress', 'arriendo-facil' ),
+				'url'   => admin_url( 'index.php' ),
+				'icon'  => 'dashicons-wordpress-alt',
+			),
+			array(
+				'label' => __( 'Plugins', 'arriendo-facil' ),
+				'url'   => admin_url( 'plugins.php' ),
+				'icon'  => 'dashicons-admin-plugins',
+			),
+			array(
+				'label' => __( 'Usuarios', 'arriendo-facil' ),
+				'url'   => admin_url( 'users.php' ),
+				'icon'  => 'dashicons-admin-users',
+			),
+			array(
+				'label' => __( 'Ajustes', 'arriendo-facil' ),
+				'url'   => admin_url( 'options-general.php' ),
+				'icon'  => 'dashicons-admin-settings',
+			),
+			array(
+				'label' => __( 'Herramientas', 'arriendo-facil' ),
+				'url'   => admin_url( 'tools.php' ),
+				'icon'  => 'dashicons-admin-tools',
+			),
+		);
+	}
+
+	/**
 	 * Prints the branded app-shell sidebar (replacing the native WP admin
 	 * menu/toolbar visually via af-admin-shell-nav.css) on the plugin's own
 	 * screens.
@@ -735,7 +821,8 @@ class Arriendo_Facil_Admin {
 			return;
 		}
 
-		$current_user = wp_get_current_user();
+		$wp_core_links = $this->get_wp_core_links();
+		$current_user  = wp_get_current_user();
 		?>
 		<div id="af-app-sidebar" class="af-app-sidebar af-shell" role="navigation" aria-label="<?php esc_attr_e( 'Arriendo Fácil', 'arriendo-facil' ); ?>">
 			<div class="af-app-sidebar__brand">
@@ -757,6 +844,19 @@ class Arriendo_Facil_Admin {
 					</li>
 				<?php endforeach; ?>
 			</ul>
+			<?php if ( ! empty( $wp_core_links ) ) : ?>
+				<div class="af-app-sidebar__section-label"><?php esc_html_e( 'WordPress', 'arriendo-facil' ); ?></div>
+				<ul class="af-app-sidebar__nav af-app-sidebar__nav--wp-core">
+					<?php foreach ( $wp_core_links as $link ) : ?>
+						<li class="af-app-sidebar__item">
+							<a href="<?php echo esc_url( $link['url'] ); ?>">
+								<span class="dashicons <?php echo esc_attr( $link['icon'] ); ?>" aria-hidden="true"></span>
+								<span class="af-app-sidebar__label"><?php echo esc_html( $link['label'] ); ?></span>
+							</a>
+						</li>
+					<?php endforeach; ?>
+				</ul>
+			<?php endif; ?>
 			<div class="af-app-sidebar__footer">
 				<a class="af-app-sidebar__user" href="<?php echo esc_url( admin_url( 'admin.php?page=af-admin-profile' ) ); ?>">
 					<?php echo get_avatar( $current_user->ID, 32 ); ?>

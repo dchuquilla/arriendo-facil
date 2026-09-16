@@ -141,7 +141,7 @@ $totals_platform = array(
 		);
 	?></script>
 	<script>
-	( function() {
+	document.addEventListener( 'DOMContentLoaded', function() {
 		if ( typeof Chart === 'undefined' ) {
 			return;
 		}
@@ -166,7 +166,7 @@ $totals_platform = array(
 				scales: { x: { stacked: false }, y: { beginAtZero: true } }
 			}
 		} );
-	} )();
+	} );
 	</script>
 	<?php endif; ?>
 

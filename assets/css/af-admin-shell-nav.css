@@ -14,7 +14,8 @@ body.af-custom-shell #adminmenumain,
 body.af-custom-shell #adminmenuback,
 body.af-custom-shell #adminmenuwrap,
 body.af-custom-shell #screen-meta-links,
-body.af-custom-shell #wpfooter {
+body.af-custom-shell #wpfooter,
+body.af-custom-shell #dolly {
 	display: none !important;
 }
 
@@ -24,6 +25,7 @@ html.wp-toolbar body.af-custom-shell {
 
 body.af-custom-shell #wpcontent {
 	margin-left: 264px;
+	padding-top: 64px;
 	transition: margin-left var(--af-motion-base, 180ms ease);
 }
 
@@ -34,9 +36,124 @@ body.af-custom-shell.af-sidebar-collapsed #wpcontent {
 @media (max-width: 782px) {
 	body.af-custom-shell #wpcontent {
 		margin-left: 0;
-		padding-top: 56px;
+		padding-top: 120px;
 	}
 }
+
+/* ── Top bar ─────────────────────────────────────────────────────────── */
+
+.af-app-topbar {
+	position: fixed;
+	top: 0;
+	left: 264px;
+	right: 0;
+	height: 64px;
+	z-index: 100040;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--af-space-4);
+	padding: 0 var(--af-space-6);
+	background: var(--af-gray-0, #fff);
+	border-bottom: 1px solid var(--af-gray-200, #E2E1DB);
+	font-family: var(--af-font-family);
+	transition: left var(--af-motion-base, 180ms ease);
+}
+
+body.af-sidebar-collapsed .af-app-topbar {
+	left: 76px;
+}
+
+@media (max-width: 782px) {
+	.af-app-topbar {
+		left: 0;
+		flex-wrap: wrap;
+		height: auto;
+		padding: var(--af-space-3) var(--af-space-4) var(--af-space-3) 64px;
+		gap: var(--af-space-2);
+	}
+}
+
+.af-app-topbar__search {
+	display: flex;
+	align-items: center;
+	gap: var(--af-space-2);
+	flex: 1 1 320px;
+	max-width: 420px;
+	height: 40px;
+	padding: 0 var(--af-space-3);
+	background: var(--af-gray-50, #F7F7F5);
+	border: 1px solid var(--af-gray-200, #E2E1DB);
+	border-radius: var(--af-radius-full);
+	color: var(--af-gray-500, #7A7870);
+}
+
+.af-app-topbar__search .dashicons {
+	flex-shrink: 0;
+	font-size: 18px;
+	width: 18px;
+	height: 18px;
+}
+
+.af-app-topbar__search input[type="search"] {
+	all: unset;
+	flex: 1;
+	font-size: var(--af-text-sm);
+	color: var(--af-gray-900, #1B1A16);
+}
+
+.af-app-topbar__actions {
+	display: flex;
+	align-items: center;
+	gap: var(--af-space-3);
+	flex-shrink: 0;
+}
+
+.af-app-topbar__bell {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 38px;
+	height: 38px;
+	border-radius: var(--af-radius-full);
+	color: var(--af-gray-600, #5B594F);
+	text-decoration: none;
+	background: var(--af-gray-50, #F7F7F5);
+}
+
+.af-app-topbar__bell:hover {
+	background: var(--af-primary-50, #EFF6FF);
+	color: var(--af-primary-600, #1D4ED8);
+}
+
+.af-app-topbar__user {
+	display: flex;
+	align-items: center;
+	gap: var(--af-space-2);
+	text-decoration: none;
+	color: var(--af-gray-900, #1B1A16);
+	font-weight: 600;
+	font-size: var(--af-text-sm);
+}
+
+.af-app-topbar__user img {
+	border-radius: 50%;
+	display: block;
+}
+
+.af-app-topbar__user .dashicons {
+	color: var(--af-gray-400, #A8A69E);
+	font-size: 16px;
+	width: 16px;
+	height: 16px;
+}
+
+@media (max-width: 782px) {
+	.af-app-topbar__user-name {
+		display: none;
+	}
+}
+
 
 /* ── Sidebar shell ─────────────────────────────────────────────────────── */
 

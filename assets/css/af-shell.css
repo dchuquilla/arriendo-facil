@@ -250,11 +250,16 @@
 
 .af-kpi:hover::before { opacity: 1; }
 
-.af-kpi--attention { border-color: var(--af-warning-100); }
+.af-kpi--attention { border-color: var(--af-warning-100); background: var(--af-warning-50); }
 .af-kpi--attention::before { background: var(--af-warning-500); opacity: 1; }
 
+.af-kpi--success { border-color: var(--af-success-100); background: var(--af-success-50); }
 .af-kpi--success::before { background: var(--af-success-500); opacity: 1; }
+
+.af-kpi--info { border-color: var(--af-info-100); background: var(--af-info-50); }
 .af-kpi--info::before    { background: var(--af-info-500); opacity: 1; }
+
+.af-kpi--accent { border-color: var(--af-accent-100); background: var(--af-accent-50); }
 .af-kpi--accent::before  { background: var(--af-accent-500); opacity: 1; }
 
 /* Compact action forms keep operational tables legible without hiding controls. */

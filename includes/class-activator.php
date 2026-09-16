@@ -119,9 +119,14 @@ class Arriendo_Facil_Activator {
 	 * caps (e.g. `af_manage_properties`) after the user's own capability
 	 * cache (`wp_capabilities` user meta) was already populated.
 	 *
+	 * Must run on `init` (or later) — never from `plugins_loaded`, since
+	 * `is_user_logged_in()`/`wp_get_current_user()` are not reliable that
+	 * early (the auth cookie hasn't been validated into `$current_user`
+	 * yet), which silently made this no-op on every request.
+	 *
 	 * @return void
 	 */
-	private static function heal_current_user_capabilities() {
+	public static function heal_current_user_capabilities() {
 		if ( ! function_exists( 'wp_get_current_user' ) || ! is_user_logged_in() ) {
 			return;
 		}

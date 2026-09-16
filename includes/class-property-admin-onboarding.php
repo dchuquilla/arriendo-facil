@@ -706,9 +706,18 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 	 * Hides operational plugin menus until the self-sourced admin verifies
 	 * identity. The Panel and "Mi perfil" stay visible.
 	 *
+	 * Disabled by default: property admins see all modules (matching the
+	 * product's intended dashboard) as soon as they sign up; identity review
+	 * stays informational (banner + super admin review screen) instead of a
+	 * hard block. Re-enable with `add_filter('af_property_admin_gate_operational_menus', '__return_true')`.
+	 *
 	 * @return void
 	 */
 	public function hide_operational_menus_for_unverified() {
+		if ( ! apply_filters( 'af_property_admin_gate_operational_menus', false ) ) {
+			return;
+		}
+
 		if ( ! self::needs_identity_verification() ) {
 			return;
 		}
@@ -722,9 +731,15 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 	 * Blocks direct access to operational plugin pages while the account is
 	 * not identity-verified, redirecting to the onboarding profile page.
 	 *
+	 * Disabled by default — see `hide_operational_menus_for_unverified()`.
+	 *
 	 * @return void
 	 */
 	public function enforce_verification_gate() {
+		if ( ! apply_filters( 'af_property_admin_gate_operational_menus', false ) ) {
+			return;
+		}
+
 		if ( ! self::needs_identity_verification() ) {
 			return;
 		}

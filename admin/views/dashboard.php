@@ -1062,7 +1062,7 @@ $recent_reviews        = (array) $wpdb->get_results(
 	</section>
 	<?php endif; ?>
 
-	<section class="af-section" aria-labelledby="af-calendar-title">
+	<section class="af-section" aria-labelledby="af-calendar-title" id="af-alerts">
 		<header class="af-section__header">
 			<div>
 				<h2 class="af-section__title" id="af-calendar-title"><?php esc_html_e( 'Alertas operativas de calendario', 'arriendo-facil' ); ?></h2>

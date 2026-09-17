@@ -485,6 +485,13 @@ class Arriendo_Facil_Admin {
 		if ( 'edit.php' === $pagenow && 'accommodation' === $typenow ) {
 			$extra[] = 'af-native-inmuebles';
 			$extra[] = 'af-shell';
+
+			// Los subadmins (af_property_admin) obtienen la vista simplificada
+			// (sin bulk actions, checkboxes ni filtros nativos). El super admin
+			// conserva la tabla nativa completa de WordPress.
+			if ( ! current_user_can( 'manage_options' ) ) {
+				$extra[] = 'af-restricted-list';
+			}
 		}
 
 		if ( 'profile.php' === $pagenow || 'user-edit.php' === $pagenow ) {

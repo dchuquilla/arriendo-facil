@@ -72,6 +72,7 @@ class Arriendo_Facil_Accommodation_List_Admin {
 				$new['af_thumb']  = __( 'Imagen', 'arriendo-facil' );
 				$new['af_status'] = __( 'Estado', 'arriendo-facil' );
 				$new['af_price']  = __( 'Renta mensual', 'arriendo-facil' );
+				$new['af_meta']   = __( 'Tipo y ubicación', 'arriendo-facil' );
 			}
 			$new[ $key ] = $label;
 		}
@@ -84,6 +85,9 @@ class Arriendo_Facil_Accommodation_List_Admin {
 		}
 		if ( ! isset( $new['af_price'] ) ) {
 			$new['af_price'] = __( 'Renta mensual', 'arriendo-facil' );
+		}
+		if ( ! isset( $new['af_meta'] ) ) {
+			$new['af_meta'] = __( 'Tipo y ubicación', 'arriendo-facil' );
 		}
 
 		return $new;
@@ -116,8 +120,7 @@ class Arriendo_Facil_Accommodation_List_Admin {
 				$status = (string) get_post_meta( $post_id, '_af_status', true );
 				$labels = $this->get_status_labels();
 				if ( '' === $status || ! isset( $labels[ $status ] ) ) {
-					echo '<span class="af-list-empty">—</span>';
-					break;
+					$status = 'available';
 				}
 				echo af_pill( $status, $labels[ $status ] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped markup.
 				break;
@@ -134,7 +137,60 @@ class Arriendo_Facil_Accommodation_List_Admin {
 					esc_html__( '/ mes', 'arriendo-facil' )
 				);
 				break;
+
+			case 'af_meta':
+				$this->render_meta( $post_id );
+				break;
 		}
+	}
+
+	/**
+	 * Returns the localized property-type icons used across the admin.
+	 *
+	 * @return array<string, string>
+	 */
+	private function get_type_icons() {
+		return array(
+			'apartment'  => 'building',
+			'house'      => 'home',
+			'office'     => 'building-2',
+			'room'       => 'bed',
+			'commercial' => 'store',
+		);
+	}
+
+	/**
+	 * Renders the property type + location line inside the card meta cell.
+	 *
+	 * @param int $post_id Accommodation post ID.
+	 */
+	private function render_meta( $post_id ) {
+		$type  = (string) get_post_meta( $post_id, '_af_property_type', true );
+		$addr  = trim( (string) get_post_meta( $post_id, '_af_address', true ) );
+		$city  = trim( (string) get_post_meta( $post_id, '_af_city', true ) );
+		$place = trim( $addr . ( '' !== $city ? ', ' . $city : '' ) );
+
+		$labels = $this->get_type_labels();
+		$icons  = $this->get_type_icons();
+
+		echo '<div class="af-list-meta">';
+
+		if ( '' !== $type && isset( $labels[ $type ] ) ) {
+			$icon = isset( $icons[ $type ] ) ? $icons[ $type ] : 'building';
+			echo '<span class="af-list-meta__item">'
+				. '<span class="af-list-meta__icon" aria-hidden="true">' . af_lucide( $icon, 13 ) . '</span>' // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper.
+				. '<span class="af-list-meta__text">' . esc_html( $labels[ $type ] ) . '</span>'
+				. '</span>';
+		}
+
+		if ( '' !== $place ) {
+			echo '<span class="af-list-meta__item">'
+				. '<span class="af-list-meta__icon" aria-hidden="true">' . af_lucide( 'map-pin', 13 ) . '</span>' // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper.
+				. '<span class="af-list-meta__text">' . esc_html( $place ) . '</span>'
+				. '</span>';
+		}
+
+		echo '</div>';
 	}
 
 	/**
@@ -144,12 +200,12 @@ class Arriendo_Facil_Accommodation_List_Admin {
 	 */
 	private function render_thumb( $post_id ) {
 		$title = get_the_title( $post_id );
-		$url   = get_the_post_thumbnail_url( $post_id, 'thumbnail' );
+		$url   = get_the_post_thumbnail_url( $post_id, 'medium' );
 
 		if ( ! $url ) {
 			$gallery = get_post_meta( $post_id, '_af_gallery', true );
 			if ( is_array( $gallery ) && ! empty( $gallery ) ) {
-				$url = wp_get_attachment_image_url( (int) reset( $gallery ), 'thumbnail' );
+				$url = wp_get_attachment_image_url( (int) reset( $gallery ), 'medium' );
 			}
 		}
 

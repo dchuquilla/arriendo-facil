@@ -905,7 +905,7 @@ class Arriendo_Facil_Admin {
 					<?php echo af_lucide( 'home', 22 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
 					<span class="af-app-sidebar__logo-copy">
 						<span class="af-app-sidebar__logo-text"><?php esc_html_e( 'Arriendo Fácil', 'arriendo-facil' ); ?></span>
-						<span class="af-app-sidebar__logo-tagline"><?php esc_html_e( 'Tu propiedad, en buenas manos', 'arriendo-facil' ); ?></span>
+						<span class="af-app-sidebar__logo-tagline"><?php echo esc_html( $current_user->display_name ); ?></span>
 					</span>
 				</a>
 				<button type="button" class="af-app-sidebar__toggle" id="af-app-sidebar-toggle" aria-label="<?php esc_attr_e( 'Contraer menú', 'arriendo-facil' ); ?>">
@@ -2410,6 +2410,17 @@ class Arriendo_Facil_Admin {
 		// Chart.js solo en las pantallas con gráficos (Panel y Administradores).
 		if ( in_array( $hook, array( 'toplevel_page_arriendo-facil', 'arriendo-facil_page_af-property-admins' ), true ) ) {
 			wp_enqueue_script( 'chart-js', 'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js', array(), '4.4.4', true );
+		}
+
+		// Estilos del Panel (hero de cobranza, tarjetas de estado y métricas operativas).
+		if ( 'toplevel_page_arriendo-facil' === $hook ) {
+			$dashboard_css_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-dashboard.css';
+			wp_enqueue_style(
+				'af-dashboard',
+				ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/af-dashboard.css',
+				array( 'af-tokens', 'af-shell', 'af-admin-chrome', 'af-admin-shell-nav' ),
+				file_exists( $dashboard_css_path ) ? (string) filemtime( $dashboard_css_path ) : ARRIENDO_FACIL_VERSION
+			);
 		}
 
 		$screen = get_current_screen();

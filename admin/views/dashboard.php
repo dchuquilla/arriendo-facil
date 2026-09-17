@@ -617,270 +617,152 @@ $recent_reviews        = (array) $wpdb->get_results(
 		</section>
 	<?php endif; ?>
 
-	<div class="af-kpi-grid" role="list">
+	<div class="af-overview">
 
 		<?php if ( $is_management_model ) : ?>
-			<article class="af-kpi af-kpi--success" role="listitem">
-				<div class="af-kpi__head">
-					<span class="af-kpi__label"><?php esc_html_e( 'Cobrado este mes', 'arriendo-facil' ); ?></span>
-				</div>
-				<div class="af-kpi__value">$<?php echo esc_html( number_format_i18n( $period_paid, 2 ) ); ?></div>
-				<div class="af-kpi__hint">
-					<?php
-					echo esc_html(
-						sprintf(
-							/* translators: %s: total charged for the period */
-							__( 'de $%s facturados', 'arriendo-facil' ),
-							number_format_i18n( $period_charged, 2 )
-						)
-					);
-					?>
-				</div>
-				<div class="af-kpi__footer">
-					<span class="af-pill <?php echo $collection_rate >= 80 ? 'af-pill--success' : 'af-pill--warning'; ?>"><?php echo esc_html( $collection_rate ); ?>%</span>
-					<a class="af-kpi__link" href="<?php echo esc_url( admin_url( 'admin.php?page=af-collections' ) ); ?>"><?php esc_html_e( 'Ver cobranza', 'arriendo-facil' ); ?></a>
-				</div>
-			</article>
 
-			<article class="af-kpi <?php echo $period_balance > 0 ? 'af-kpi--attention' : ''; ?>" role="listitem">
-				<div class="af-kpi__head">
-					<span class="af-kpi__label"><?php esc_html_e( 'Por cobrar', 'arriendo-facil' ); ?></span>
+			<section class="af-overview-hero" aria-labelledby="af-overview-collected-title">
+				<div class="af-overview-hero__main">
+					<span class="af-overview-hero__eyebrow" id="af-overview-collected-title"><?php esc_html_e( 'Cobrado este mes', 'arriendo-facil' ); ?></span>
+					<span class="af-overview-hero__value">$<?php echo esc_html( number_format_i18n( $period_paid, 2 ) ); ?></span>
+					<span class="af-overview-hero__meta">
+						<?php echo esc_html( sprintf( /* translators: %s: total charged for the period */ __( 'de $%s facturados', 'arriendo-facil' ), number_format_i18n( $period_charged, 2 ) ) ); ?>
+					</span>
+					<div class="af-overview-hero__bar" role="img" aria-label="<?php echo esc_attr( sprintf( /* translators: %d: collection rate */ __( 'Tasa de cobro: %d%%', 'arriendo-facil' ), (int) $collection_rate ) ); ?>">
+						<span style="width: <?php echo esc_attr( min( 100, max( 0, (float) $collection_rate ) ) ); ?>%"></span>
+					</div>
+					<div class="af-overview-hero__actions">
+						<a class="af-overview-hero__cta" href="<?php echo esc_url( admin_url( 'admin.php?page=af-collections' ) ); ?>">
+							<?php esc_html_e( 'Ver cobranza', 'arriendo-facil' ); ?> <span aria-hidden="true">&rarr;</span>
+						</a>
+					</div>
 				</div>
-				<div class="af-kpi__value">$<?php echo esc_html( number_format_i18n( $period_balance, 2 ) ); ?></div>
-				<div class="af-kpi__hint"><?php esc_html_e( 'Saldo del periodo actual', 'arriendo-facil' ); ?></div>
-				<div class="af-kpi__footer">
-					<span class="af-pill af-pill--info"><?php echo esc_html( $current_period ); ?></span>
+				<div class="af-overview-hero__side">
+					<span class="af-overview-hero__rate"><?php echo esc_html( $collection_rate ); ?>%</span>
+					<span class="af-overview-hero__rate-label"><?php esc_html_e( 'de cobro del periodo', 'arriendo-facil' ); ?></span>
+					<span class="af-pill af-pill--hero"><?php echo esc_html( $current_period ); ?></span>
 				</div>
-			</article>
+			</section>
 
-			<article class="af-kpi <?php echo $overdue_count > 0 ? 'af-kpi--attention' : 'af-kpi--success'; ?>" role="listitem">
-				<div class="af-kpi__head">
-					<span class="af-kpi__label"><?php esc_html_e( 'En mora', 'arriendo-facil' ); ?></span>
-				</div>
-				<div class="af-kpi__value">$<?php echo esc_html( number_format_i18n( $overdue_amount, 2 ) ); ?></div>
-				<div class="af-kpi__hint">
-					<?php
-					echo esc_html(
-						sprintf(
-							/* translators: %d: overdue charges count */
-							_n( '%d cargo vencido', '%d cargos vencidos', $overdue_count, 'arriendo-facil' ),
-							$overdue_count
-						)
-					);
-					?>
-				</div>
-				<div class="af-kpi__footer">
-					<a class="af-kpi__link" href="<?php echo esc_url( admin_url( 'admin.php?page=af-collections&charge_status=overdue' ) ); ?>"><?php esc_html_e( 'Gestionar', 'arriendo-facil' ); ?></a>
-				</div>
-			</article>
+			<div class="af-overview-stats">
+				<article class="af-overview-stat">
+					<span class="af-overview-stat__icon" aria-hidden="true"><?php echo af_lucide( 'credit-card', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+					<span class="af-overview-stat__body">
+						<span class="af-overview-stat__label"><?php esc_html_e( 'Por cobrar', 'arriendo-facil' ); ?></span>
+						<span class="af-overview-stat__value">$<?php echo esc_html( number_format_i18n( $period_balance, 2 ) ); ?></span>
+						<span class="af-overview-stat__hint"><?php esc_html_e( 'Saldo del periodo actual', 'arriendo-facil' ); ?></span>
+					</span>
+				</article>
 
-			<article class="af-kpi <?php echo $expiring_count > 0 ? 'af-kpi--attention' : ''; ?>" role="listitem">
-				<div class="af-kpi__head">
-					<span class="af-kpi__label"><?php esc_html_e( 'Contratos por vencer', 'arriendo-facil' ); ?></span>
-				</div>
-				<div class="af-kpi__value"><?php echo esc_html( number_format_i18n( $expiring_count ) ); ?></div>
-				<div class="af-kpi__hint"><?php esc_html_e( 'En los próximos 60 días', 'arriendo-facil' ); ?></div>
-				<div class="af-kpi__footer">
-					<a class="af-kpi__link" href="<?php echo esc_url( admin_url( 'admin.php?page=af-leases' ) ); ?>"><?php esc_html_e( 'Ver contratos', 'arriendo-facil' ); ?></a>
-				</div>
-			</article>
+				<article class="af-overview-stat <?php echo $overdue_count > 0 ? 'is-danger' : 'is-ok'; ?>">
+					<span class="af-overview-stat__icon" aria-hidden="true"><?php echo af_lucide( 'circle-alert', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+					<span class="af-overview-stat__body">
+						<span class="af-overview-stat__label"><?php esc_html_e( 'En mora', 'arriendo-facil' ); ?></span>
+						<span class="af-overview-stat__value">$<?php echo esc_html( number_format_i18n( $overdue_amount, 2 ) ); ?></span>
+						<span class="af-overview-stat__hint">
+							<?php echo esc_html( sprintf( /* translators: %d: overdue charges count */ _n( '%d cargo vencido', '%d cargos vencidos', $overdue_count, 'arriendo-facil' ), $overdue_count ) ); ?>
+						</span>
+					</span>
+					<?php if ( $overdue_count > 0 ) : ?>
+						<a class="af-overview-stat__link" href="<?php echo esc_url( admin_url( 'admin.php?page=af-collections&charge_status=overdue' ) ); ?>"><?php esc_html_e( 'Gestionar', 'arriendo-facil' ); ?></a>
+					<?php endif; ?>
+				</article>
+
+				<article class="af-overview-stat <?php echo $expiring_count > 0 ? 'is-warn' : ''; ?>">
+					<span class="af-overview-stat__icon" aria-hidden="true"><?php echo af_lucide( 'calendar', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+					<span class="af-overview-stat__body">
+						<span class="af-overview-stat__label"><?php esc_html_e( 'Contratos por vencer', 'arriendo-facil' ); ?></span>
+						<span class="af-overview-stat__value"><?php echo esc_html( number_format_i18n( $expiring_count ) ); ?></span>
+						<span class="af-overview-stat__hint"><?php esc_html_e( 'En los próximos 60 días', 'arriendo-facil' ); ?></span>
+					</span>
+					<?php if ( $expiring_count > 0 ) : ?>
+						<a class="af-overview-stat__link" href="<?php echo esc_url( admin_url( 'admin.php?page=af-leases' ) ); ?>"><?php esc_html_e( 'Ver contratos', 'arriendo-facil' ); ?></a>
+					<?php endif; ?>
+				</article>
+			</div>
+
 		<?php endif; ?>
 
-		<article class="af-kpi" role="listitem">
-			<div class="af-kpi__head">
-				<span class="af-kpi__label"><?php esc_html_e( 'Alojamientos', 'arriendo-facil' ); ?></span>
-				<span class="af-kpi__icon" aria-hidden="true">
-					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 11l9-8 9 8v10a1 1 0 01-1 1h-5v-6H10v6H4a1 1 0 01-1-1V11z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+		<div class="af-overview-chips">
+			<a class="af-overview-chip" href="<?php echo esc_url( admin_url( 'edit.php?post_type=accommodation' ) ); ?>">
+				<span class="af-overview-chip__icon" aria-hidden="true"><?php echo af_lucide( 'building-2', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+				<span class="af-overview-chip__value"><?php echo esc_html( number_format_i18n( $accommodation_count ) ); ?></span>
+				<span class="af-overview-chip__label"><?php esc_html_e( 'Alojamientos', 'arriendo-facil' ); ?></span>
+				<span class="af-overview-chip__meta">
+					<?php echo esc_html( sprintf( /* translators: %d: active leases count */ _n( '%d activo', '%d activos', $active_leases, 'arriendo-facil' ), $active_leases ) ); ?>
 				</span>
-			</div>
-			<div class="af-kpi__value"><?php echo esc_html( number_format_i18n( $accommodation_count ) ); ?></div>
-			<div class="af-kpi__hint">
-				<?php echo esc_html( $is_owner ? __( 'Propiedades publicadas a tu nombre', 'arriendo-facil' ) : __( 'Publicadas en la plataforma', 'arriendo-facil' ) ); ?>
-			</div>
-			<div class="af-kpi__footer">
-				<span class="af-pill af-pill--info">
+			</a>
+
+			<a class="af-overview-chip <?php echo $draft_leases > 0 ? 'is-warn' : ''; ?>" href="<?php echo esc_url( admin_url( 'admin.php?page=af-leases' ) ); ?>">
+				<span class="af-overview-chip__icon" aria-hidden="true"><?php echo af_lucide( 'file-text', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+				<span class="af-overview-chip__value"><?php echo esc_html( number_format_i18n( $lease_count ) ); ?></span>
+				<span class="af-overview-chip__label"><?php esc_html_e( 'Contratos', 'arriendo-facil' ); ?></span>
+				<span class="af-overview-chip__meta">
 					<?php
-					echo esc_html(
-						sprintf(
-							/* translators: %d: active leases count */
-							_n( '%d activo', '%d activos', $active_leases, 'arriendo-facil' ),
-							$active_leases
-						)
-					);
-					?>
-				</span>
-				<a class="af-kpi__link" href="<?php echo esc_url( admin_url( 'edit.php?post_type=accommodation' ) ); ?>"><?php esc_html_e( 'Ver', 'arriendo-facil' ); ?></a>
-			</div>
-		</article>
-
-		<article class="af-kpi <?php echo $draft_leases > 0 ? 'af-kpi--attention' : ''; ?>" role="listitem">
-			<div class="af-kpi__head">
-				<span class="af-kpi__label"><?php esc_html_e( 'Contratos', 'arriendo-facil' ); ?></span>
-				<span class="af-kpi__icon" aria-hidden="true">
-					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 3h9l4 4v14a1 1 0 01-1 1H6a1 1 0 01-1-1V4a1 1 0 011-1z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M14 3v5h5M8 13h8M8 17h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-				</span>
-			</div>
-			<div class="af-kpi__value"><?php echo esc_html( number_format_i18n( $lease_count ) ); ?></div>
-			<div class="af-kpi__hint">
-				<?php
-				echo esc_html(
-					sprintf(
-						/* translators: %d: active leases */
-						_n( '%d contrato activo', '%d contratos activos', $active_leases, 'arriendo-facil' ),
-						$active_leases
-					)
-				);
-				?>
-			</div>
-			<div class="af-kpi__footer">
-				<?php if ( $draft_leases > 0 ) : ?>
-					<span class="af-pill af-pill--warning">
-						<?php
-						echo esc_html(
-							sprintf(
-								/* translators: %d: draft leases */
-								_n( '%d borrador', '%d borradores', $draft_leases, 'arriendo-facil' ),
-								$draft_leases
-							)
-						);
-						?>
-					</span>
-				<?php else : ?>
-					<span class="af-pill af-pill--success"><?php esc_html_e( 'Todo al día', 'arriendo-facil' ); ?></span>
-				<?php endif; ?>
-				<a class="af-kpi__link" href="<?php echo esc_url( admin_url( 'admin.php?page=af-leases' ) ); ?>"><?php esc_html_e( 'Gestionar', 'arriendo-facil' ); ?></a>
-			</div>
-		</article>
-
-		<article class="af-kpi <?php echo $maintenance_urgent_total > 0 ? 'af-kpi--attention' : ( $maintenance_open_total > 0 ? '' : 'af-kpi--success' ); ?>" role="listitem">
-			<div class="af-kpi__head">
-				<span class="af-kpi__label"><?php echo esc_html( $is_management_model ? __( 'Mantenimiento', 'arriendo-facil' ) : __( 'Limpiezas pendientes', 'arriendo-facil' ) ); ?></span>
-				<span class="af-kpi__icon" aria-hidden="true">
-					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 20l6-6 4 4 6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="18" cy="6" r="2" stroke="currentColor" stroke-width="1.8"/></svg>
-				</span>
-			</div>
-			<div class="af-kpi__value"><?php echo esc_html( number_format_i18n( $maintenance_open_total ) ); ?></div>
-			<div class="af-kpi__hint">
-				<?php
-				if ( $is_management_model && $maintenance_open_total > 0 ) {
-					echo esc_html(
-						sprintf(
-							/* translators: 1: critical count, 2: medium count, 3: low count */
-							__( '%1$d crítica · %2$d media · %3$d baja', 'arriendo-facil' ),
-							$maintenance_priority['alta'],
-							$maintenance_priority['media'],
-							$maintenance_priority['baja']
-						)
-					);
-				} else {
-					echo esc_html( $maintenance_open_total > 0 ? __( 'Requieren asignación o programación', 'arriendo-facil' ) : __( 'Sin solicitudes en espera', 'arriendo-facil' ) );
-				}
-				?>
-			</div>
-			<div class="af-kpi__footer">
-				<span class="af-pill <?php echo $maintenance_urgent_total > 0 ? 'af-pill--danger' : ( $maintenance_open_total > 0 ? 'af-pill--warning' : 'af-pill--success' ); ?>">
-					<?php echo esc_html( $maintenance_urgent_total > 0 ? __( 'Prioridad crítica', 'arriendo-facil' ) : ( $maintenance_open_total > 0 ? __( 'Acción requerida', 'arriendo-facil' ) : __( 'Al día', 'arriendo-facil' ) ) ); ?>
-				</span>
-				<a class="af-kpi__link" href="<?php echo esc_url( admin_url( $is_management_model ? 'admin.php?page=af-maintenance' : 'admin.php?page=af-cleaning-requests' ) ); ?>"><?php esc_html_e( 'Revisar', 'arriendo-facil' ); ?></a>
-			</div>
-		</article>
-
-		<article class="af-kpi af-kpi--accent" role="listitem">
-			<div class="af-kpi__head">
-				<span class="af-kpi__label"><?php esc_html_e( 'Valoraciones', 'arriendo-facil' ); ?></span>
-				<span class="af-kpi__icon" aria-hidden="true">
-					<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3 6.5 7 .9-5.1 4.7 1.3 7L12 17.8 5.8 21l1.3-7L2 9.4l7-.9L12 2z"/></svg>
-				</span>
-			</div>
-			<div class="af-kpi__value">
-				<?php echo esc_html( $review_count > 0 ? number_format_i18n( $avg_stars, 1 ) : '—' ); ?>
-				<?php if ( $review_count > 0 ) : ?>
-					<small style="font-size: var(--af-text-base); color: var(--af-gray-400); font-weight: 500;">/ 5</small>
-				<?php endif; ?>
-			</div>
-			<div class="af-kpi__hint">
-				<?php
-				echo esc_html(
-					sprintf(
-						/* translators: 1: review count, 2: positive % */
-						_n( '%1$d reseña · %2$d%% positivas', '%1$d reseñas · %2$d%% positivas', $review_count, 'arriendo-facil' ),
-						$review_count,
-						$positive_rate
-					)
-				);
-				?>
-			</div>
-			<div class="af-kpi__footer">
-				<span class="af-pill af-pill--accent">
-					<?php
-					if ( $avg_stars >= 4.5 ) {
-						esc_html_e( 'Excelente', 'arriendo-facil' );
-					} elseif ( $avg_stars >= 3.5 ) {
-						esc_html_e( 'Muy bueno', 'arriendo-facil' );
-					} elseif ( $review_count > 0 ) {
-						esc_html_e( 'A mejorar', 'arriendo-facil' );
+					if ( $draft_leases > 0 ) {
+						echo esc_html( sprintf( /* translators: %d: draft leases */ _n( '%d borrador', '%d borradores', $draft_leases, 'arriendo-facil' ), $draft_leases ) );
 					} else {
-						esc_html_e( 'Sin datos aún', 'arriendo-facil' );
+						esc_html_e( 'Todo al día', 'arriendo-facil' );
 					}
 					?>
 				</span>
-				<a class="af-kpi__link" href="<?php echo esc_url( admin_url( 'admin.php?page=af-reviews' ) ); ?>"><?php esc_html_e( 'Ver todas', 'arriendo-facil' ); ?></a>
-			</div>
-		</article>
+			</a>
 
-		<?php if ( ! $is_owner && null !== $active_contacts && defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) : ?>
-			<article class="af-kpi" role="listitem">
-				<div class="af-kpi__head">
-					<span class="af-kpi__label"><?php esc_html_e( 'Propietarios', 'arriendo-facil' ); ?></span>
-					<span class="af-kpi__icon" aria-hidden="true">
-						<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 12a4 4 0 100-8 4 4 0 000 8zM4 21a8 8 0 0116 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-					</span>
-				</div>
-				<div class="af-kpi__value"><?php echo esc_html( number_format_i18n( $active_contacts ) ); ?></div>
-				<div class="af-kpi__hint"><?php esc_html_e( 'Contactos activos', 'arriendo-facil' ); ?></div>
-				<div class="af-kpi__footer">
-					<span class="af-pill af-pill--info"><?php esc_html_e( 'Registrados', 'arriendo-facil' ); ?></span>
-					<a class="af-kpi__link" href="<?php echo esc_url( admin_url( 'admin.php?page=af-owner-contacts' ) ); ?>"><?php esc_html_e( 'Ver', 'arriendo-facil' ); ?></a>
-				</div>
-			</article>
-		<?php endif; ?>
+			<a class="af-overview-chip <?php echo $maintenance_urgent_total > 0 ? 'is-danger' : ( $maintenance_open_total > 0 ? 'is-warn' : 'is-ok' ); ?>" href="<?php echo esc_url( admin_url( $is_management_model ? 'admin.php?page=af-maintenance' : 'admin.php?page=af-cleaning-requests' ) ); ?>">
+				<span class="af-overview-chip__icon" aria-hidden="true"><?php echo af_lucide( 'wrench', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+				<span class="af-overview-chip__value"><?php echo esc_html( number_format_i18n( $maintenance_open_total ) ); ?></span>
+				<span class="af-overview-chip__label"><?php echo esc_html( $is_management_model ? __( 'Mantenimiento', 'arriendo-facil' ) : __( 'Limpiezas pendientes', 'arriendo-facil' ) ); ?></span>
+				<span class="af-overview-chip__meta">
+					<?php
+					if ( $maintenance_urgent_total > 0 ) {
+						esc_html_e( 'Prioridad crítica', 'arriendo-facil' );
+					} elseif ( $maintenance_open_total > 0 ) {
+						esc_html_e( 'Acción requerida', 'arriendo-facil' );
+					} else {
+						esc_html_e( 'Al día', 'arriendo-facil' );
+					}
+					?>
+				</span>
+			</a>
 
-		<article class="af-kpi" role="listitem">
-			<div class="af-kpi__head">
-				<span class="af-kpi__label"><?php esc_html_e( 'Inquilinos', 'arriendo-facil' ); ?></span>
-				<span class="af-kpi__icon" aria-hidden="true">
-					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M17 21v-2a4 4 0 00-4-4H7a4 4 0 00-4 4v2M21 21v-2a4 4 0 00-3-3.87M9 11a4 4 0 100-8 4 4 0 000 8zM17 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+			<a class="af-overview-chip" href="<?php echo esc_url( admin_url( 'admin.php?page=af-reviews' ) ); ?>">
+				<span class="af-overview-chip__icon" aria-hidden="true"><?php echo af_lucide( 'star', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+				<span class="af-overview-chip__value">
+					<?php echo esc_html( $review_count > 0 ? number_format_i18n( $avg_stars, 1 ) : '—' ); ?>
+					<?php if ( $review_count > 0 ) : ?><small class="af-overview-chip__unit">/ 5</small><?php endif; ?>
 				</span>
-			</div>
-			<div class="af-kpi__value"><?php echo esc_html( number_format_i18n( $guest_count ) ); ?></div>
-			<div class="af-kpi__hint">
-				<?php
-				if ( $is_management_model ) {
-					echo esc_html(
-						sprintf(
-							/* translators: %d: tenants with pending documents */
-							_n( '%d con documentos pendientes', '%d con documentos pendientes', $docs_pending, 'arriendo-facil' ),
-							$docs_pending
-						)
-					);
-				} else {
-					echo esc_html(
-						sprintf(
-							/* translators: %d: pending queue */
-							_n( '%d en cola', '%d en cola', $pending_queue, 'arriendo-facil' ),
-							$pending_queue
-						)
-					);
-				}
-				?>
-			</div>
-			<div class="af-kpi__footer">
-				<span class="af-pill <?php echo $pending_queue > 0 ? 'af-pill--warning' : 'af-pill--neutral'; ?>">
-					<?php echo esc_html( $pending_queue > 0 ? __( 'Por aprobar', 'arriendo-facil' ) : __( 'Al día', 'arriendo-facil' ) ); ?>
+				<span class="af-overview-chip__label"><?php esc_html_e( 'Valoraciones', 'arriendo-facil' ); ?></span>
+				<span class="af-overview-chip__meta">
+					<?php echo esc_html( sprintf( /* translators: 1: review count, 2: positive % */ _n( '%1$d reseña · %2$d%% positivas', '%1$d reseñas · %2$d%% positivas', $review_count, 'arriendo-facil' ), $review_count, $positive_rate ) ); ?>
 				</span>
-				<a class="af-kpi__link" href="<?php echo esc_url( admin_url( 'admin.php?page=af-guests' ) ); ?>"><?php esc_html_e( 'Gestionar', 'arriendo-facil' ); ?></a>
-			</div>
-		</article>
+			</a>
+
+			<?php if ( ! $is_owner && null !== $active_contacts && defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) : ?>
+				<a class="af-overview-chip" href="<?php echo esc_url( admin_url( 'admin.php?page=af-owner-contacts' ) ); ?>">
+					<span class="af-overview-chip__icon" aria-hidden="true"><?php echo af_lucide( 'user-check', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+					<span class="af-overview-chip__value"><?php echo esc_html( number_format_i18n( $active_contacts ) ); ?></span>
+					<span class="af-overview-chip__label"><?php esc_html_e( 'Propietarios', 'arriendo-facil' ); ?></span>
+					<span class="af-overview-chip__meta"><?php esc_html_e( 'Contactos activos', 'arriendo-facil' ); ?></span>
+				</a>
+			<?php endif; ?>
+
+			<a class="af-overview-chip <?php echo $pending_queue > 0 ? 'is-warn' : 'is-ok'; ?>" href="<?php echo esc_url( admin_url( 'admin.php?page=af-guests' ) ); ?>">
+				<span class="af-overview-chip__icon" aria-hidden="true"><?php echo af_lucide( 'users', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+				<span class="af-overview-chip__value"><?php echo esc_html( number_format_i18n( $guest_count ) ); ?></span>
+				<span class="af-overview-chip__label"><?php esc_html_e( 'Inquilinos', 'arriendo-facil' ); ?></span>
+				<span class="af-overview-chip__meta">
+					<?php
+					if ( $is_management_model ) {
+						echo esc_html( sprintf( /* translators: %d: tenants with pending documents */ _n( '%d con documentos pendientes', '%d con documentos pendientes', $docs_pending, 'arriendo-facil' ), $docs_pending ) );
+					} elseif ( $pending_queue > 0 ) {
+						echo esc_html( sprintf( /* translators: %d: pending queue */ _n( '%d en cola', '%d en cola', $pending_queue, 'arriendo-facil' ), $pending_queue ) );
+					} else {
+						esc_html_e( 'Al día', 'arriendo-facil' );
+					}
+					?>
+				</span>
+			</a>
+		</div>
 
 	</div>
 

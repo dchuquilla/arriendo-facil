@@ -769,9 +769,12 @@ $recent_reviews        = (array) $wpdb->get_results(
 	<div class="af-split af-charts-row">
 		<section class="af-section" aria-labelledby="af-chart-occupancy-title">
 			<header class="af-section__header">
-				<div>
-					<h2 class="af-section__title" id="af-chart-occupancy-title"><?php esc_html_e( 'Resumen de ocupación', 'arriendo-facil' ); ?></h2>
-					<p class="af-section__subtitle"><?php esc_html_e( 'Disponibles, ocupadas y en mantenimiento.', 'arriendo-facil' ); ?></p>
+				<div class="af-section__head">
+					<span class="af-section__icon af-section__icon--slate" aria-hidden="true"><?php echo af_lucide( 'building-2', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+					<div>
+						<h2 class="af-section__title" id="af-chart-occupancy-title"><?php esc_html_e( 'Resumen de ocupación', 'arriendo-facil' ); ?></h2>
+						<p class="af-section__subtitle"><?php esc_html_e( 'Disponibles, ocupadas y en mantenimiento.', 'arriendo-facil' ); ?></p>
+					</div>
 				</div>
 			</header>
 			<div class="af-chart-canvas af-chart-canvas--donut">
@@ -782,9 +785,12 @@ $recent_reviews        = (array) $wpdb->get_results(
 		<?php if ( $has_ledger ) : ?>
 		<section class="af-section" aria-labelledby="af-chart-revenue-title">
 			<header class="af-section__header">
-				<div>
-					<h2 class="af-section__title" id="af-chart-revenue-title"><?php esc_html_e( 'Ingresos por arriendos', 'arriendo-facil' ); ?></h2>
-					<p class="af-section__subtitle"><?php esc_html_e( 'Cobrado en los últimos 6 meses.', 'arriendo-facil' ); ?></p>
+				<div class="af-section__head">
+					<span class="af-section__icon" aria-hidden="true"><?php echo af_lucide( 'trending-up', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+					<div>
+						<h2 class="af-section__title" id="af-chart-revenue-title"><?php esc_html_e( 'Ingresos por arriendos', 'arriendo-facil' ); ?></h2>
+						<p class="af-section__subtitle"><?php esc_html_e( 'Cobrado en los últimos 6 meses.', 'arriendo-facil' ); ?></p>
+					</div>
 				</div>
 			</header>
 			<div class="af-chart-canvas">
@@ -854,11 +860,21 @@ $recent_reviews        = (array) $wpdb->get_results(
 	} );
 	</script>
 
+	<?php
+	$af_initial = static function ( $af_name = '' ) {
+		$af_name   = trim( (string) $af_name );
+		$af_letter = function_exists( 'mb_substr' ) ? mb_substr( $af_name, 0, 1, 'UTF-8' ) : substr( $af_name, 0, 1 );
+		return function_exists( 'mb_strtoupper' ) ? mb_strtoupper( $af_letter, 'UTF-8' ) : strtoupper( $af_letter );
+	};
+	?>
 	<section class="af-section" aria-labelledby="af-recent-leases-title">
 		<header class="af-section__header">
-			<div>
-				<h2 class="af-section__title" id="af-recent-leases-title"><?php esc_html_e( 'Contratos recientes', 'arriendo-facil' ); ?></h2>
-				<p class="af-section__subtitle"><?php esc_html_e( 'Las últimas altas de contrato.', 'arriendo-facil' ); ?></p>
+			<div class="af-section__head">
+				<span class="af-section__icon" aria-hidden="true"><?php echo af_lucide( 'file-text', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+				<div>
+					<h2 class="af-section__title" id="af-recent-leases-title"><?php esc_html_e( 'Contratos recientes', 'arriendo-facil' ); ?></h2>
+					<p class="af-section__subtitle"><?php esc_html_e( 'Las últimas altas de contrato.', 'arriendo-facil' ); ?></p>
+				</div>
 			</div>
 			<a class="af-kpi__link" href="<?php echo esc_url( admin_url( 'admin.php?page=af-leases' ) ); ?>"><?php esc_html_e( 'Ver todos →', 'arriendo-facil' ); ?></a>
 		</header>
@@ -868,9 +884,11 @@ $recent_reviews        = (array) $wpdb->get_results(
 		<?php else : ?>
 			<div class="af-semaforo__table" role="table" aria-label="<?php esc_attr_e( 'Contratos recientes', 'arriendo-facil' ); ?>">
 				<?php foreach ( $recent_leases as $recent_lease ) : ?>
-					<a class="af-semaforo__row" href="<?php echo esc_url( admin_url( 'admin.php?page=af-leases' ) ); ?>">
+					<?php $row_name = trim( (string) $recent_lease->guest_name ) ? trim( (string) $recent_lease->guest_name ) : __( 'Inquilino', 'arriendo-facil' ); ?>
+					<a class="af-semaforo__row af-semaforo__row--with-avatar" href="<?php echo esc_url( admin_url( 'admin.php?page=af-leases' ) ); ?>">
+						<span class="af-semaforo__avatar" aria-hidden="true"><?php echo esc_html( $af_initial( $row_name ) ); ?></span>
 						<span class="af-semaforo__tenant">
-							<strong><?php echo esc_html( trim( (string) $recent_lease->guest_name ) ? trim( (string) $recent_lease->guest_name ) : __( 'Inquilino', 'arriendo-facil' ) ); ?></strong>
+							<strong><?php echo esc_html( $row_name ); ?></strong>
 							<small><?php echo esc_html( $recent_lease->accommodation_title ? $recent_lease->accommodation_title : '—' ); ?></small>
 						</span>
 						<?php echo af_pill( $recent_lease->status ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- af_pill() escapes internally. ?>
@@ -884,9 +902,12 @@ $recent_reviews        = (array) $wpdb->get_results(
 	<?php if ( $is_management_model && $has_ledger ) : ?>
 	<section class="af-section af-semaforo" aria-labelledby="af-semaforo-title">
 		<header class="af-section__header">
-			<div>
-				<h2 class="af-section__title" id="af-semaforo-title"><?php esc_html_e( 'Semáforo de cobros', 'arriendo-facil' ); ?></h2>
-				<p class="af-section__subtitle"><?php echo esc_html( sprintf( /* translators: %s: period */ __( 'Estado de los cargos de %s en tiempo real.', 'arriendo-facil' ), $current_period ) ); ?></p>
+			<div class="af-section__head">
+				<span class="af-section__icon af-section__icon--amber" aria-hidden="true"><?php echo af_lucide( 'credit-card', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+				<div>
+					<h2 class="af-section__title" id="af-semaforo-title"><?php esc_html_e( 'Semáforo de cobros', 'arriendo-facil' ); ?></h2>
+					<p class="af-section__subtitle"><?php echo esc_html( sprintf( /* translators: %s: period */ __( 'Estado de los cargos de %s en tiempo real.', 'arriendo-facil' ), $current_period ) ); ?></p>
+				</div>
 			</div>
 			<a class="af-kpi__link" href="<?php echo esc_url( admin_url( 'admin.php?page=af-collections' ) ); ?>"><?php esc_html_e( 'Ver control de pagos →', 'arriendo-facil' ); ?></a>
 		</header>
@@ -925,10 +946,12 @@ $recent_reviews        = (array) $wpdb->get_results(
 					$days = (int) $mora_row->days_overdue;
 					$tier = $days > 60 ? 'danger' : ( $days > 30 ? 'warning' : 'neutral' );
 					$due  = (float) $mora_row->amount - (float) $mora_row->amount_paid;
+					$row_name = trim( (string) $mora_row->guest_name ) ? trim( (string) $mora_row->guest_name ) : __( 'Inquilino', 'arriendo-facil' );
 					?>
-					<a class="af-semaforo__row" href="<?php echo esc_url( admin_url( 'admin.php?page=af-collections&statement_lease=' . (int) $mora_row->lease_id ) ); ?>">
+					<a class="af-semaforo__row af-semaforo__row--with-avatar" href="<?php echo esc_url( admin_url( 'admin.php?page=af-collections&statement_lease=' . (int) $mora_row->lease_id ) ); ?>">
+						<span class="af-semaforo__avatar" aria-hidden="true"><?php echo esc_html( $af_initial( $row_name ) ); ?></span>
 						<span class="af-semaforo__tenant">
-							<strong><?php echo esc_html( trim( (string) $mora_row->guest_name ) ? trim( (string) $mora_row->guest_name ) : __( 'Inquilino', 'arriendo-facil' ) ); ?></strong>
+							<strong><?php echo esc_html( $row_name ); ?></strong>
 							<small><?php echo esc_html( $mora_row->accommodation_title ? $mora_row->accommodation_title : '—' ); ?></small>
 						</span>
 						<span class="af-pill af-pill--<?php echo esc_attr( $tier ); ?>">
@@ -946,59 +969,70 @@ $recent_reviews        = (array) $wpdb->get_results(
 
 	<section class="af-section" aria-labelledby="af-calendar-title" id="af-alerts">
 		<header class="af-section__header">
-			<div>
-				<h2 class="af-section__title" id="af-calendar-title"><?php esc_html_e( 'Alertas operativas de calendario', 'arriendo-facil' ); ?></h2>
-				<p class="af-section__subtitle"><?php esc_html_e( 'Visitas, check-in y check-out dentro del rango seleccionado.', 'arriendo-facil' ); ?></p>
+			<div class="af-section__head">
+				<span class="af-section__icon af-section__icon--rose" aria-hidden="true"><?php echo af_lucide( 'calendar', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+				<div>
+					<h2 class="af-section__title" id="af-calendar-title"><?php esc_html_e( 'Alertas operativas de calendario', 'arriendo-facil' ); ?></h2>
+					<p class="af-section__subtitle"><?php esc_html_e( 'Visitas, check-in y check-out dentro del rango seleccionado.', 'arriendo-facil' ); ?></p>
+				</div>
 			</div>
 		</header>
 
-		<form method="get" style="display:flex; gap:12px; align-items:end; flex-wrap:wrap; margin-bottom: var(--af-space-4);">
-			<input type="hidden" name="page" value="arriendo-facil" />
-			<label style="display:flex; flex-direction:column; gap:4px; font-weight:600; font-size: var(--af-text-sm);">
-				<?php esc_html_e( 'Desde', 'arriendo-facil' ); ?>
-				<input type="date" name="af_date_from" value="<?php echo esc_attr( $calendar_from ); ?>" />
-			</label>
-			<label style="display:flex; flex-direction:column; gap:4px; font-weight:600; font-size: var(--af-text-sm);">
-				<?php esc_html_e( 'Hasta', 'arriendo-facil' ); ?>
-				<input type="date" name="af_date_to" value="<?php echo esc_attr( $calendar_to ); ?>" />
-			</label>
-			<?php if ( ! empty( $filter_admins ) ) : ?>
-				<label style="display:flex; flex-direction:column; gap:4px; font-weight:600; font-size: var(--af-text-sm);">
-					<?php esc_html_e( 'Administrador', 'arriendo-facil' ); ?>
-					<select name="af_admin_id">
-						<option value="0"><?php esc_html_e( 'Todos', 'arriendo-facil' ); ?></option>
-						<?php foreach ( $filter_admins as $admin_user ) : ?>
-							<option value="<?php echo esc_attr( (int) $admin_user->ID ); ?>" <?php selected( $filter_admin_id, (int) $admin_user->ID ); ?>><?php echo esc_html( $admin_user->display_name ); ?></option>
+		<form class="af-calendar-filters" method="get">
+			<div class="af-calendar-filters__group">
+				<input type="hidden" name="page" value="arriendo-facil" />
+				<label class="af-calendar-filters__field">
+					<span><?php esc_html_e( 'Desde', 'arriendo-facil' ); ?></span>
+					<input type="date" name="af_date_from" value="<?php echo esc_attr( $calendar_from ); ?>" />
+				</label>
+				<label class="af-calendar-filters__field">
+					<span><?php esc_html_e( 'Hasta', 'arriendo-facil' ); ?></span>
+					<input type="date" name="af_date_to" value="<?php echo esc_attr( $calendar_to ); ?>" />
+				</label>
+				<?php if ( ! empty( $filter_admins ) ) : ?>
+					<label class="af-calendar-filters__field">
+						<span><?php esc_html_e( 'Administrador', 'arriendo-facil' ); ?></span>
+						<select name="af_admin_id">
+							<option value="0"><?php esc_html_e( 'Todos', 'arriendo-facil' ); ?></option>
+							<?php foreach ( $filter_admins as $admin_user ) : ?>
+								<option value="<?php echo esc_attr( (int) $admin_user->ID ); ?>" <?php selected( $filter_admin_id, (int) $admin_user->ID ); ?>><?php echo esc_html( $admin_user->display_name ); ?></option>
+							<?php endforeach; ?>
+						</select>
+					</label>
+				<?php endif; ?>
+				<?php if ( ! empty( $calendar_buildings ) ) : ?>
+					<label class="af-calendar-filters__field">
+						<span><?php esc_html_e( 'Edificio', 'arriendo-facil' ); ?></span>
+						<select name="af_building_id">
+							<option value="0"><?php esc_html_e( 'Todos', 'arriendo-facil' ); ?></option>
+							<?php foreach ( $calendar_buildings as $building ) : ?>
+								<option value="<?php echo esc_attr( (int) $building->id ); ?>" <?php selected( $calendar_building_id, (int) $building->id ); ?>><?php echo esc_html( $building->name ); ?></option>
+							<?php endforeach; ?>
+						</select>
+					</label>
+				<?php endif; ?>
+				<label class="af-calendar-filters__field">
+					<span><?php esc_html_e( 'Propiedad', 'arriendo-facil' ); ?></span>
+					<select name="af_accommodation_id">
+						<option value="0"><?php esc_html_e( 'Todas', 'arriendo-facil' ); ?></option>
+						<?php foreach ( $calendar_property_ids as $prop_id ) : ?>
+							<option value="<?php echo esc_attr( (int) $prop_id ); ?>" <?php selected( $calendar_accommodation_id, (int) $prop_id ); ?>><?php echo esc_html( get_the_title( $prop_id ) ); ?></option>
 						<?php endforeach; ?>
 					</select>
 				</label>
-			<?php endif; ?>
-			<?php if ( ! empty( $calendar_buildings ) ) : ?>
-				<label style="display:flex; flex-direction:column; gap:4px; font-weight:600; font-size: var(--af-text-sm);">
-					<?php esc_html_e( 'Edificio', 'arriendo-facil' ); ?>
-					<select name="af_building_id">
-						<option value="0"><?php esc_html_e( 'Todos', 'arriendo-facil' ); ?></option>
-						<?php foreach ( $calendar_buildings as $building ) : ?>
-							<option value="<?php echo esc_attr( (int) $building->id ); ?>" <?php selected( $calendar_building_id, (int) $building->id ); ?>><?php echo esc_html( $building->name ); ?></option>
-						<?php endforeach; ?>
-					</select>
-				</label>
-			<?php endif; ?>
-			<label style="display:flex; flex-direction:column; gap:4px; font-weight:600; font-size: var(--af-text-sm);">
-				<?php esc_html_e( 'Propiedad', 'arriendo-facil' ); ?>
-				<select name="af_accommodation_id">
-					<option value="0"><?php esc_html_e( 'Todas', 'arriendo-facil' ); ?></option>
-					<?php foreach ( $calendar_property_ids as $prop_id ) : ?>
-						<option value="<?php echo esc_attr( (int) $prop_id ); ?>" <?php selected( $calendar_accommodation_id, (int) $prop_id ); ?>><?php echo esc_html( get_the_title( $prop_id ) ); ?></option>
-					<?php endforeach; ?>
-				</select>
-			</label>
+			</div>
 			<button type="submit" class="button af-btn af-btn--primary"><?php esc_html_e( 'Filtrar', 'arriendo-facil' ); ?></button>
 		</form>
 
-		<div class="af-calendar-columns af-split">
-			<div>
-				<h3 style="margin-top:0;"><?php esc_html_e( 'Próximos check-in (mudanza)', 'arriendo-facil' ); ?></h3>
+		<div class="af-calendar-cols">
+			<article class="af-calendar-col af-calendar-col--in">
+				<header class="af-calendar-col__head">
+					<span class="af-calendar-col__icon" aria-hidden="true"><?php echo af_lucide( 'log-in', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+					<div class="af-calendar-col__title">
+						<h3><?php esc_html_e( 'Próximos check-in (mudanza)', 'arriendo-facil' ); ?></h3>
+						<span class="af-calendar-col__count"><?php echo esc_html( sprintf( /* translators: %d: count */ _n( '%d programado', '%d programados', count( $upcoming_checkins ), 'arriendo-facil' ), count( $upcoming_checkins ) ) ); ?></span>
+					</div>
+				</header>
 				<?php if ( empty( $upcoming_checkins ) ) : ?>
 					<p class="af-empty__text"><?php esc_html_e( 'Sin check-ins programados en el rango.', 'arriendo-facil' ); ?></p>
 				<?php else : ?>
@@ -1014,9 +1048,16 @@ $recent_reviews        = (array) $wpdb->get_results(
 						<?php endforeach; ?>
 					</div>
 				<?php endif; ?>
-			</div>
-			<div>
-				<h3 style="margin-top:0;"><?php esc_html_e( 'Próximos check-out (salida)', 'arriendo-facil' ); ?></h3>
+			</article>
+
+			<article class="af-calendar-col af-calendar-col--out">
+				<header class="af-calendar-col__head">
+					<span class="af-calendar-col__icon" aria-hidden="true"><?php echo af_lucide( 'log-out', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+					<div class="af-calendar-col__title">
+						<h3><?php esc_html_e( 'Próximos check-out (salida)', 'arriendo-facil' ); ?></h3>
+						<span class="af-calendar-col__count"><?php echo esc_html( sprintf( /* translators: %d: count */ _n( '%d programado', '%d programados', count( $upcoming_checkouts ), 'arriendo-facil' ), count( $upcoming_checkouts ) ) ); ?></span>
+					</div>
+				</header>
 				<?php if ( empty( $upcoming_checkouts ) ) : ?>
 					<p class="af-empty__text"><?php esc_html_e( 'Sin check-outs programados en el rango.', 'arriendo-facil' ); ?></p>
 				<?php else : ?>
@@ -1032,9 +1073,16 @@ $recent_reviews        = (array) $wpdb->get_results(
 						<?php endforeach; ?>
 					</div>
 				<?php endif; ?>
-			</div>
-			<div>
-				<h3 style="margin-top:0;"><?php esc_html_e( 'Visitas agendadas', 'arriendo-facil' ); ?></h3>
+			</article>
+
+			<article class="af-calendar-col af-calendar-col--visit">
+				<header class="af-calendar-col__head">
+					<span class="af-calendar-col__icon" aria-hidden="true"><?php echo af_lucide( 'user-plus', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+					<div class="af-calendar-col__title">
+						<h3><?php esc_html_e( 'Visitas agendadas', 'arriendo-facil' ); ?></h3>
+						<span class="af-calendar-col__count"><?php echo esc_html( sprintf( /* translators: %d: count */ _n( '%d agendada', '%d agendadas', count( $upcoming_visits ), 'arriendo-facil' ), count( $upcoming_visits ) ) ); ?></span>
+					</div>
+				</header>
 				<?php if ( empty( $upcoming_visits ) ) : ?>
 					<p class="af-empty__text"><?php esc_html_e( 'Sin visitas confirmadas en el rango.', 'arriendo-facil' ); ?></p>
 				<?php else : ?>
@@ -1050,29 +1098,34 @@ $recent_reviews        = (array) $wpdb->get_results(
 						<?php endforeach; ?>
 					</div>
 				<?php endif; ?>
-			</div>
+			</article>
 		</div>
 	</section>
 
 	<section class="af-section af-schedule" aria-labelledby="af-schedule-title">
 		<header class="af-section__header">
-			<div>
-				<h2 class="af-section__title" id="af-schedule-title"><?php esc_html_e( 'Contratos por vencer — 30/60/90', 'arriendo-facil' ); ?></h2>
-				<p class="af-section__subtitle"><?php esc_html_e( 'Cronograma de próximas salidas para anticipar renovaciones y liquidar garantías.', 'arriendo-facil' ); ?></p>
+			<div class="af-section__head">
+				<span class="af-section__icon" aria-hidden="true"><?php echo af_lucide( 'clock', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+				<div>
+					<h2 class="af-section__title" id="af-schedule-title"><?php esc_html_e( 'Contratos por vencer — 30/60/90', 'arriendo-facil' ); ?></h2>
+					<p class="af-section__subtitle"><?php esc_html_e( 'Cronograma de próximas salidas para anticipar renovaciones y liquidar garantías.', 'arriendo-facil' ); ?></p>
+				</div>
 			</div>
 			<a class="af-kpi__link" href="<?php echo esc_url( admin_url( 'admin.php?page=af-upcoming-exits' ) ); ?>"><?php esc_html_e( 'Ver próximas salidas →', 'arriendo-facil' ); ?></a>
 		</header>
 
 		<div class="af-schedule__buckets" role="list">
 			<?php foreach ( array( '30' => 'danger', '60' => 'warning', '90' => 'neutral' ) as $bucket_key => $bucket_tone ) : ?>
+				<?php
+				$bucket_icon  = '30' === $bucket_key ? 'circle-alert' : ( '60' === $bucket_key ? 'clock' : 'calendar' );
+				$bucket_label = '30' === $bucket_key
+					? __( 'Decisión inmediata', 'arriendo-facil' )
+					: ( '60' === $bucket_key ? __( 'Iniciar renovación', 'arriendo-facil' ) : __( 'Planificación', 'arriendo-facil' ) );
+				?>
 				<article class="af-schedule__bucket af-schedule__bucket--<?php echo esc_attr( $bucket_tone ); ?>" role="listitem">
+					<span class="af-schedule__icon" aria-hidden="true"><?php echo af_lucide( $bucket_icon, 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
 					<span class="af-schedule__days"><?php echo esc_html( sprintf( /* translators: %s: days range */ __( '≤ %s días', 'arriendo-facil' ), $bucket_key ) ); ?></span>
 					<span class="af-schedule__count"><?php echo esc_html( number_format_i18n( $exit_buckets[ $bucket_key ] ) ); ?></span>
-					<?php
-					$bucket_label = '30' === $bucket_key
-						? __( 'Decisión inmediata', 'arriendo-facil' )
-						: ( '60' === $bucket_key ? __( 'Iniciar renovación', 'arriendo-facil' ) : __( 'Planificación', 'arriendo-facil' ) );
-					?>
 					<span class="af-schedule__label"><?php echo esc_html( $bucket_label ); ?></span>
 				</article>
 			<?php endforeach; ?>
@@ -1084,11 +1137,13 @@ $recent_reviews        = (array) $wpdb->get_results(
 					<?php
 					$lease   = $exit_card['lease'];
 					$urgency = '30' === $exit_card['bucket'] ? 'af-pill--danger' : ( '60' === $exit_card['bucket'] ? 'af-pill--warning' : 'af-pill--neutral' );
+					$row_name = trim( (string) $lease->guest_name ) ? trim( (string) $lease->guest_name ) : __( 'Sin inquilino', 'arriendo-facil' );
 					?>
-					<a class="af-semaforo__row" href="<?php echo esc_url( admin_url( 'admin.php?page=af-upcoming-exits' ) ); ?>">
+					<a class="af-semaforo__row af-semaforo__row--with-avatar" href="<?php echo esc_url( admin_url( 'admin.php?page=af-upcoming-exits' ) ); ?>">
+						<span class="af-semaforo__avatar" aria-hidden="true"><?php echo esc_html( $af_initial( $row_name ) ); ?></span>
 						<span class="af-semaforo__tenant">
 							<strong><?php echo esc_html( $lease->accommodation_title ? $lease->accommodation_title : '#' . (int) $lease->accommodation_id ); ?></strong>
-							<small><?php echo esc_html( trim( (string) $lease->guest_name ) ? trim( (string) $lease->guest_name ) : __( 'Sin inquilino', 'arriendo-facil' ) ); ?></small>
+							<small><?php echo esc_html( $row_name ); ?></small>
 						</span>
 						<span class="af-pill <?php echo esc_attr( $urgency ); ?>">
 							<?php
@@ -1112,7 +1167,9 @@ $recent_reviews        = (array) $wpdb->get_results(
 
 		<section class="af-section" aria-labelledby="af-dashboard-focus">
 			<header class="af-section__header">
-				<div>
+				<div class="af-section__head">
+					<span class="af-section__icon af-section__icon--slate" aria-hidden="true"><?php echo af_lucide( $is_owner ? 'home' : 'layout-grid', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+					<div>
 					<h2 class="af-section__title" id="af-dashboard-focus">
 						<?php echo esc_html( $is_owner ? __( 'Tus propiedades', 'arriendo-facil' ) : __( 'Accesos rápidos', 'arriendo-facil' ) ); ?>
 					</h2>
@@ -1125,6 +1182,7 @@ $recent_reviews        = (array) $wpdb->get_results(
 						);
 						?>
 					</p>
+					</div>
 				</div>
 			</header>
 
@@ -1196,36 +1254,42 @@ $recent_reviews        = (array) $wpdb->get_results(
 
 				<div class="af-property-grid">
 					<a class="af-property-card" href="<?php echo esc_url( admin_url( 'post-new.php?post_type=accommodation' ) ); ?>">
+						<div class="af-property-card__media af-property-card__media--icon" aria-hidden="true"><?php echo af_lucide( 'home', 24 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></div>
 						<div class="af-property-card__body">
 							<h3 class="af-property-card__title"><?php esc_html_e( '+ Nuevo alojamiento', 'arriendo-facil' ); ?></h3>
 							<p class="af-property-card__meta"><?php esc_html_e( 'Publicar una propiedad en la plataforma.', 'arriendo-facil' ); ?></p>
 						</div>
 					</a>
 					<a class="af-property-card" href="<?php echo esc_url( admin_url( 'admin.php?page=af-leases' ) ); ?>">
+						<div class="af-property-card__media af-property-card__media--icon" aria-hidden="true"><?php echo af_lucide( 'file-text', 24 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></div>
 						<div class="af-property-card__body">
 							<h3 class="af-property-card__title"><?php esc_html_e( 'Gestionar contratos', 'arriendo-facil' ); ?></h3>
 							<p class="af-property-card__meta"><?php esc_html_e( 'Ver, activar y facturar contratos vigentes.', 'arriendo-facil' ); ?></p>
 						</div>
 					</a>
 					<a class="af-property-card" href="<?php echo esc_url( admin_url( 'admin.php?page=af-cleaning-requests' ) ); ?>">
+						<div class="af-property-card__media af-property-card__media--icon" aria-hidden="true"><?php echo af_lucide( 'sparkles', 24 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></div>
 						<div class="af-property-card__body">
 							<h3 class="af-property-card__title"><?php esc_html_e( 'Solicitudes de limpieza', 'arriendo-facil' ); ?></h3>
 							<p class="af-property-card__meta"><?php esc_html_e( 'Asigna, programa y da seguimiento.', 'arriendo-facil' ); ?></p>
 						</div>
 					</a>
 					<a class="af-property-card" href="<?php echo esc_url( admin_url( 'admin.php?page=af-billing' ) ); ?>">
+						<div class="af-property-card__media af-property-card__media--icon" aria-hidden="true"><?php echo af_lucide( 'receipt', 24 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></div>
 						<div class="af-property-card__body">
 							<h3 class="af-property-card__title"><?php esc_html_e( 'Facturación electrónica', 'arriendo-facil' ); ?></h3>
 							<p class="af-property-card__meta"><?php esc_html_e( 'Emitir y firmar comprobantes SRI del período.', 'arriendo-facil' ); ?></p>
 						</div>
 					</a>
 					<a class="af-property-card" href="<?php echo esc_url( admin_url( 'admin.php?page=af-ota-sync-dashboard' ) ); ?>">
+						<div class="af-property-card__media af-property-card__media--icon" aria-hidden="true"><?php echo af_lucide( 'globe', 24 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></div>
 						<div class="af-property-card__body">
 							<h3 class="af-property-card__title"><?php esc_html_e( 'Sincronización OTA', 'arriendo-facil' ); ?></h3>
 							<p class="af-property-card__meta"><?php esc_html_e( 'Airbnb y Booking en tiempo real.', 'arriendo-facil' ); ?></p>
 						</div>
 					</a>
 					<a class="af-property-card" href="<?php echo esc_url( admin_url( 'admin.php?page=af-ai-settings' ) ); ?>">
+						<div class="af-property-card__media af-property-card__media--icon" aria-hidden="true"><?php echo af_lucide( 'bot', 24 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></div>
 						<div class="af-property-card__body">
 							<h3 class="af-property-card__title"><?php esc_html_e( 'Ajustes de IA', 'arriendo-facil' ); ?></h3>
 							<p class="af-property-card__meta"><?php esc_html_e( 'Modelos y credenciales para automatización.', 'arriendo-facil' ); ?></p>
@@ -1239,17 +1303,42 @@ $recent_reviews        = (array) $wpdb->get_results(
 		<div class="af-aside-stack">
 		<aside class="af-section" aria-labelledby="af-dashboard-tasks">
 			<header class="af-section__header">
-				<div>
-					<h2 class="af-section__title" id="af-dashboard-tasks"><?php esc_html_e( 'Requiere tu atención', 'arriendo-facil' ); ?></h2>
-					<p class="af-section__subtitle"><?php esc_html_e( 'Prioridad del día. Toca para resolver.', 'arriendo-facil' ); ?></p>
+				<div class="af-section__head">
+					<span class="af-section__icon af-section__icon--rose" aria-hidden="true"><?php echo af_lucide( 'bell', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+					<div>
+						<h2 class="af-section__title" id="af-dashboard-tasks"><?php esc_html_e( 'Requiere tu atención', 'arriendo-facil' ); ?></h2>
+						<p class="af-section__subtitle"><?php esc_html_e( 'Prioridad del día. Toca para resolver.', 'arriendo-facil' ); ?></p>
+					</div>
 				</div>
 			</header>
 
 			<?php if ( ! empty( $tasks ) ) : ?>
 				<ul class="af-tasklist">
 					<?php foreach ( $tasks as $task ) : ?>
+						<?php
+						$task_icon = 'bell';
+						foreach ( array(
+							'af-maintenance'        => 'wrench',
+							'af-cleaning-requests'  => 'sparkles',
+							'af-leases'             => 'file-text',
+							'af-upcoming-exits'     => 'calendar',
+							'af-collections'        => 'credit-card',
+							'af-reviews'            => 'star',
+							'af-guests'             => 'user',
+							'af-pending-approvals'  => 'user-check',
+							'af-billing'            => 'receipt',
+							'af-ota-sync-dashboard' => 'globe',
+							'af-ai-settings'        => 'bot',
+						) as $af_slug => $af_icon ) {
+							if ( false !== strpos( $task['url'], 'page=' . $af_slug ) ) {
+								$task_icon = $af_icon;
+								break;
+							}
+						}
+						?>
 						<li>
 							<a class="af-tasklist__item" href="<?php echo esc_url( $task['url'] ); ?>">
+								<span class="af-tasklist__icon" aria-hidden="true"><?php echo af_lucide( $task_icon, 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
 								<span class="af-tasklist__badge"><?php echo esc_html( number_format_i18n( $task['count'] ) ); ?></span>
 								<span class="af-tasklist__label"><?php echo esc_html( $task['label'] ); ?></span>
 								<span class="af-tasklist__arrow" aria-hidden="true">→</span>
@@ -1259,9 +1348,7 @@ $recent_reviews        = (array) $wpdb->get_results(
 				</ul>
 			<?php else : ?>
 				<div class="af-empty" style="padding: var(--af-space-6) var(--af-space-4);">
-					<span class="af-empty__icon" aria-hidden="true">
-						<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 12l4 4L19 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-					</span>
+					<span class="af-empty__icon" aria-hidden="true"><?php echo af_lucide( 'check', 26 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
 					<h3 class="af-empty__title"><?php esc_html_e( 'Todo bajo control', 'arriendo-facil' ); ?></h3>
 					<p class="af-empty__text"><?php esc_html_e( 'No hay pendientes urgentes. Buen momento para revisar reseñas o programar limpiezas.', 'arriendo-facil' ); ?></p>
 				</div>
@@ -1270,9 +1357,12 @@ $recent_reviews        = (array) $wpdb->get_results(
 
 		<aside class="af-section" aria-labelledby="af-recent-reviews-title">
 			<header class="af-section__header">
-				<div>
-					<h2 class="af-section__title" id="af-recent-reviews-title"><?php esc_html_e( 'Reviews recientes', 'arriendo-facil' ); ?></h2>
-					<p class="af-section__subtitle"><?php esc_html_e( 'Últimas calificaciones registradas a inquilinos.', 'arriendo-facil' ); ?></p>
+				<div class="af-section__head">
+					<span class="af-section__icon af-section__icon--amber" aria-hidden="true"><?php echo af_lucide( 'star', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+					<div>
+						<h2 class="af-section__title" id="af-recent-reviews-title"><?php esc_html_e( 'Reviews recientes', 'arriendo-facil' ); ?></h2>
+						<p class="af-section__subtitle"><?php esc_html_e( 'Últimas calificaciones registradas a inquilinos.', 'arriendo-facil' ); ?></p>
+					</div>
 				</div>
 				<a class="af-kpi__link" href="<?php echo esc_url( admin_url( 'admin.php?page=af-reviews' ) ); ?>"><?php esc_html_e( 'Ver todas →', 'arriendo-facil' ); ?></a>
 			</header>
@@ -1282,17 +1372,23 @@ $recent_reviews        = (array) $wpdb->get_results(
 			<?php else : ?>
 				<ul class="af-review-list">
 					<?php foreach ( $recent_reviews as $recent_review ) : ?>
+						<?php $row_name = trim( (string) $recent_review->guest_name ) ? trim( (string) $recent_review->guest_name ) : __( 'Inquilino', 'arriendo-facil' ); ?>
 						<li class="af-review-list__item">
-							<div class="af-review-list__head">
-								<strong><?php echo esc_html( trim( (string) $recent_review->guest_name ) ? trim( (string) $recent_review->guest_name ) : __( 'Inquilino', 'arriendo-facil' ) ); ?></strong>
-								<span class="af-review-list__stars" aria-label="<?php echo esc_attr( sprintf( /* translators: %d: stars */ __( '%d de 5 estrellas', 'arriendo-facil' ), (int) $recent_review->stars ) ); ?>">
-									<?php echo esc_html( str_repeat( '★', (int) $recent_review->stars ) . str_repeat( '☆', 5 - (int) $recent_review->stars ) ); ?>
-								</span>
+							<div class="af-review-list__body">
+								<span class="af-review-list__avatar" aria-hidden="true"><?php echo esc_html( $af_initial( $row_name ) ); ?></span>
+								<div class="af-review-list__content">
+									<div class="af-review-list__head">
+										<strong><?php echo esc_html( $row_name ); ?></strong>
+										<span class="af-review-list__stars" aria-label="<?php echo esc_attr( sprintf( /* translators: %d: stars */ __( '%d de 5 estrellas', 'arriendo-facil' ), (int) $recent_review->stars ) ); ?>">
+											<?php echo esc_html( str_repeat( '★', (int) $recent_review->stars ) . str_repeat( '☆', 5 - (int) $recent_review->stars ) ); ?>
+										</span>
+									</div>
+									<p class="af-review-list__meta"><?php echo esc_html( $recent_review->accommodation_title ? $recent_review->accommodation_title : '—' ); ?></p>
+									<?php if ( ! empty( $recent_review->comment_text ) ) : ?>
+										<p class="af-review-list__comment"><?php echo esc_html( wp_trim_words( $recent_review->comment_text, 16 ) ); ?></p>
+									<?php endif; ?>
+								</div>
 							</div>
-							<p class="af-review-list__meta"><?php echo esc_html( $recent_review->accommodation_title ? $recent_review->accommodation_title : '—' ); ?></p>
-							<?php if ( ! empty( $recent_review->comment_text ) ) : ?>
-								<p class="af-review-list__comment"><?php echo esc_html( wp_trim_words( $recent_review->comment_text, 16 ) ); ?></p>
-							<?php endif; ?>
 						</li>
 					<?php endforeach; ?>
 				</ul>

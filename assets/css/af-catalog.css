@@ -1,0 +1,232 @@
+/**
+ * Arriendo Facil - Catalog (Inmuebles) polish layer.
+ *
+ * Enqueued only on admin.php?page=af-catalog, after af-tokens + af-shell.
+ */
+
+/* ── Grid ────────────────────────────────────────────────────────────────── */
+
+.af-catalog-page .af-property-grid {
+	grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+	gap: var(--af-space-5);
+}
+
+.af-catalog-page .af-property-card {
+	transition: transform var(--af-motion-base), box-shadow var(--af-motion-base), border-color var(--af-motion-fast), background var(--af-motion-fast);
+}
+
+.af-catalog-page .af-property-card:hover {
+	border-color: var(--af-primary-200, #8FDBCA);
+	box-shadow: 0 12px 28px -10px rgba(0, 168, 132, 0.22);
+}
+
+/* ── Media: degradado inferior para legibilidad del badge ────────────────── */
+
+.af-catalog-page .af-property-card__media::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(180deg, rgba(15, 23, 42, 0) 55%, rgba(15, 23, 42, 0.32) 100%);
+	pointer-events: none;
+}
+
+.af-catalog-page .af-property-card__badges {
+	top: auto;
+	bottom: var(--af-space-3);
+	left: var(--af-space-3);
+	right: var(--af-space-3);
+}
+
+.af-catalog-page .af-property-card__placeholder {
+	background: linear-gradient(135deg, var(--af-primary-50, #E6F7F3), var(--af-gray-50, #F8FAFC));
+	color: var(--af-primary-600, #00926F);
+}
+
+.af-catalog-page .af-property-card:hover .af-property-card__placeholder {
+	background: linear-gradient(135deg, var(--af-primary-100, #D5F3E9), var(--af-primary-50, #E6F7F3));
+	color: var(--af-primary-700, #007058);
+}
+
+/* ── Tipografía del cuerpo ──────────────────────────────────────────────── */
+
+.af-catalog-page .af-catalog-card__type {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	align-self: flex-start;
+	white-space: nowrap;
+	padding: 3px 10px;
+	border-radius: var(--af-radius-full);
+	background: var(--af-primary-50, #E6F7F3);
+	color: var(--af-primary-700, #007058);
+	font-size: 11px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+
+.af-catalog-page .af-catalog-card__type-icon {
+	display: inline-flex;
+	line-height: 1;
+}
+
+.af-catalog-page .af-property-card__title {
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+	min-height: calc(var(--af-text-base, 16px) * 1.35 * 2);
+}
+
+.af-catalog-page .af-property-card__body {
+	flex: 1;
+}
+
+.af-catalog-page .af-catalog-card__address {
+	display: flex;
+	align-items: flex-start;
+	gap: 6px;
+	margin: 0;
+	font-size: var(--af-text-xs);
+	color: var(--af-gray-500, #64748B);
+}
+
+.af-catalog-page .af-catalog-card__address-text {
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+	min-width: 0;
+}
+
+.af-catalog-page .af-catalog-card__address-icon {
+	display: inline-flex;
+	flex: 0 0 auto;
+	margin-top: 1px;
+	color: var(--af-gray-400, #94A3B8);
+}
+
+.af-catalog-page .af-catalog-card__specs {
+	gap: 6px 14px;
+	margin: 0;
+	font-size: var(--af-text-xs);
+	color: var(--af-gray-600, #475569);
+}
+
+.af-catalog-page .af-catalog-card__spec {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	min-width: 0;
+}
+
+.af-catalog-page .af-catalog-card__spec-icon {
+	display: inline-flex;
+	flex: 0 0 auto;
+	color: var(--af-gray-400, #94A3B8);
+}
+
+.af-catalog-page .af-catalog-card__owner {
+	color: var(--af-gray-500, #64748B);
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* ── Precio + CTA ───────────────────────────────────────────────────────── */
+
+.af-catalog-page .af-property-card__footer {
+	margin-top: auto;
+}
+
+.af-catalog-page .af-property-card__price {
+	font-size: var(--af-text-lg, 18px);
+}
+
+.af-catalog-page .af-property-card__price small {
+	font-size: var(--af-text-xs);
+	color: var(--af-gray-500, #64748B);
+	font-weight: 500;
+}
+
+.af-catalog-page .af-catalog-card__hint {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 5px 10px;
+	border-radius: var(--af-radius-full);
+	background: var(--af-primary-50, #E6F7F3);
+	color: var(--af-primary-700, #007058);
+	font-size: var(--af-text-xs);
+	font-weight: 700;
+	transition: background var(--af-motion-fast), color var(--af-motion-fast);
+}
+
+.af-catalog-page .af-property-card:hover .af-catalog-card__hint {
+	background: var(--af-primary-500, #00A884);
+	color: #fff;
+}
+
+.af-catalog-page .af-catalog-card__hint-arrow {
+	display: inline-block;
+	transition: transform var(--af-motion-fast);
+}
+
+.af-catalog-page .af-property-card:hover .af-catalog-card__hint-arrow {
+	transform: translateX(2px);
+}
+
+/* ── Barra de filtros ───────────────────────────────────────────────────── */
+
+.af-catalog-page .af-catalog-filters {
+	padding: var(--af-space-5);
+	padding-bottom: 0;
+	background: var(--af-gray-50, #F8FAFC);
+	border-color: var(--af-gray-200, #E2E8F0);
+	box-shadow: none;
+}
+
+.af-catalog-page .af-catalog-filters .af-filter-bar {
+	padding: 0;
+}
+
+.af-catalog-page .af-catalog-filters .af-form-field__label {
+	font-size: var(--af-text-xs);
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--af-gray-500, #64748B);
+}
+
+.af-catalog-page .af-input-with-icon {
+	position: relative;
+	display: block;
+}
+
+.af-catalog-page .af-input-with-icon__svg {
+	position: absolute;
+	left: 12px;
+	top: 50%;
+	transform: translateY(-50%);
+	display: inline-flex;
+	color: var(--af-gray-400, #94A3B8);
+	pointer-events: none;
+}
+
+.af-catalog-page .af-input-with-icon input[type="search"] {
+	padding-left: 38px;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 782px) {
+	.af-catalog-page .af-catalog-filters {
+		padding: var(--af-space-4);
+	}
+
+	.af-catalog-page .af-property-card__badges {
+		top: auto;
+		bottom: var(--af-space-2);
+	}
+}

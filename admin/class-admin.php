@@ -484,6 +484,7 @@ class Arriendo_Facil_Admin {
 
 		if ( 'edit.php' === $pagenow && 'accommodation' === $typenow ) {
 			$extra[] = 'af-native-inmuebles';
+			$extra[] = 'af-shell';
 		}
 
 		if ( 'profile.php' === $pagenow || 'user-edit.php' === $pagenow ) {

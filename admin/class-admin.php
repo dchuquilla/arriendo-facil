@@ -2442,6 +2442,17 @@ class Arriendo_Facil_Admin {
 			);
 		}
 
+		// Estilos de Edificios y unidades.
+		if ( 'arriendo-facil_page_af-buildings' === $hook ) {
+			$buildings_css_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-buildings.css';
+			wp_enqueue_style(
+				'af-buildings',
+				ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/af-buildings.css',
+				array( 'af-tokens', 'af-shell', 'af-forms', 'af-admin-chrome' ),
+				file_exists( $buildings_css_path ) ? (string) filemtime( $buildings_css_path ) : ARRIENDO_FACIL_VERSION
+			);
+		}
+
 		$screen = get_current_screen();
 		if ( $screen && 'accommodation' === $screen->post_type && in_array( $hook, array( 'post.php', 'post-new.php' ), true ) ) {
 			wp_enqueue_media();

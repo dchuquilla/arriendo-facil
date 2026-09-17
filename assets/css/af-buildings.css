@@ -1,0 +1,241 @@
+/**
+ * Arriendo Facil - Edificios y unidades polish layer.
+ *
+ * Enqueued only on admin.php?page=af-buildings, after af-tokens + af-shell +
+ * af-forms. Repaints the building/unit structure screens so the hierarchy
+ * (edificio -> unidades) reads clearly: a quick switcher, KPI overview, tidy
+ * creation forms and a scannable units table.
+ */
+
+.af-buildings-page .af-kpi-grid {
+	margin-bottom: var(--af-space-5);
+}
+
+/* ── Building switcher ──────────────────────────────────────────────────── */
+
+.af-building-switcher {
+	display: flex;
+	gap: var(--af-space-3);
+	overflow-x: auto;
+	padding: var(--af-space-1);
+	margin: 0 0 var(--af-space-5);
+	scrollbar-width: thin;
+}
+
+.af-building-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 12px;
+	flex: 0 0 auto;
+	min-width: 220px;
+	padding: 12px 16px;
+	border: 1px solid var(--af-gray-200, #E2E8F0);
+	border-radius: var(--af-radius-lg, 14px);
+	background: var(--af-gray-0, #fff);
+	box-shadow: var(--af-shadow-xs, 0 1px 2px rgba(16, 24, 40, 0.05));
+	text-decoration: none;
+	transition: border-color var(--af-motion-base, 0.15s), box-shadow var(--af-motion-base, 0.15s), transform var(--af-motion-base, 0.15s);
+}
+
+.af-building-chip:hover {
+	border-color: var(--af-primary-300, #6CCFBA);
+	box-shadow: var(--af-shadow-sm, 0 2px 6px rgba(16, 24, 40, 0.06));
+	transform: translateY(-1px);
+	text-decoration: none;
+}
+
+.af-building-chip.is-active {
+	border-color: var(--af-primary-500, #00A884);
+	background: var(--af-primary-50, #E6F7F3);
+	box-shadow: 0 0 0 3px rgba(0, 168, 132, 0.18);
+}
+
+.af-building-chip__icon {
+	display: inline-flex;
+	flex: 0 0 auto;
+	align-items: center;
+	justify-content: center;
+	width: 38px;
+	height: 38px;
+	border-radius: var(--af-radius-md, 10px);
+	background: var(--af-gray-100, #F1F5F9);
+	color: var(--af-gray-500, #64748B);
+	transition: background var(--af-motion-fast, 0.1s), color var(--af-motion-fast, 0.1s);
+}
+
+.af-building-chip.is-active .af-building-chip__icon {
+	background: var(--af-primary-500, #00A884);
+	color: #fff;
+}
+
+.af-building-chip__body {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.af-building-chip__name {
+	font-size: 13.5px;
+	font-weight: 700;
+	color: var(--af-gray-900, #0F172A);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.af-building-chip__meta {
+	font-size: 11.5px;
+	color: var(--af-gray-500, #64748B);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.af-building-chip__count {
+	flex: 0 0 auto;
+	margin-left: auto;
+	padding: 3px 10px;
+	border-radius: var(--af-radius-full, 100px);
+	background: var(--af-gray-100, #F1F5F9);
+	color: var(--af-gray-600, #475569);
+	font-size: 11px;
+	font-weight: 700;
+	white-space: nowrap;
+}
+
+.af-building-chip.is-active .af-building-chip__count {
+	background: var(--af-gray-0, #fff);
+	color: var(--af-primary-700, #007058);
+}
+
+/* ── Creation forms ─────────────────────────────────────────────────────── */
+
+.af-buildings-form {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+	gap: var(--af-space-4, 16px);
+	align-items: end;
+	margin-top: var(--af-space-4, 16px);
+}
+
+.af-buildings-form .af-form-field {
+	gap: 7px;
+}
+
+.af-buildings-form .button {
+	min-height: 38px;
+	margin: 0;
+	white-space: nowrap;
+}
+
+.af-buildings-page .af-modal__status {
+	margin: 0;
+}
+
+.af-buildings-page .af-section__subtitle {
+	margin-top: 2px;
+}
+
+/* ── Units table ────────────────────────────────────────────────────────── */
+
+.af-units-table tbody td {
+	vertical-align: middle;
+}
+
+.af-unit-code {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 14px;
+	font-weight: 800;
+	color: var(--af-gray-900, #0F172A);
+}
+
+.af-unit-code .af-icon {
+	color: var(--af-primary-500, #00A884);
+}
+
+.af-unit-linked {
+	font-size: 12.5px;
+	color: var(--af-gray-600, #475569);
+}
+
+.af-coef {
+	display: inline-flex;
+	flex-direction: column;
+	gap: 5px;
+	min-width: 120px;
+}
+
+.af-coef strong {
+	font-family: var(--af-font-numeric, ui-monospace, SFMono-Regular, Menlo, monospace);
+	font-variant-numeric: tabular-nums;
+	font-size: 13px;
+	color: var(--af-gray-800, #1E293B);
+}
+
+.af-coef__bar {
+	display: block;
+	width: 120px;
+	height: 5px;
+	border-radius: 100px;
+	background: var(--af-gray-100, #F1F5F9);
+	overflow: hidden;
+}
+
+.af-coef__bar > span {
+	display: block;
+	height: 100%;
+	border-radius: inherit;
+	background: var(--af-primary-500, #00A884);
+	transition: width var(--af-motion-base, 0.15s);
+}
+
+.af-coef.is-over .af-coef__bar > span {
+	background: var(--af-warning-500, #F59E0B);
+}
+
+.af-unit-hoa {
+	font-family: var(--af-font-numeric, ui-monospace, SFMono-Regular, Menlo, monospace);
+	font-variant-numeric: tabular-nums;
+	font-size: 14px;
+	font-weight: 800;
+	color: var(--af-gray-900, #0F172A);
+	white-space: nowrap;
+}
+
+.af-units-table tfoot td {
+	font-weight: 700;
+	color: var(--af-gray-700, #334155);
+	background: var(--af-gray-50, #F8FAFC);
+	border-top: 1px solid var(--af-gray-200, #E2E8F0);
+}
+
+.af-units-table tfoot .af-totals-label {
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	font-size: 11px;
+	color: var(--af-gray-500, #64748B);
+	font-weight: 700;
+}
+
+.af-units-table td.no-items-cell {
+	padding: 48px 20px;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 782px) {
+	.af-building-chip {
+		min-width: 200px;
+	}
+
+	.af-buildings-form {
+		grid-template-columns: 1fr;
+	}
+
+	.af-buildings-form .af-form-field--full {
+		grid-column: auto;
+	}
+}

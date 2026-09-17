@@ -497,18 +497,24 @@
 
 .af-section__head {
 	display: flex;
-	align-items: flex-start;
+	align-items: center;
 	gap: var(--af-space-3);
 	min-width: 0;
 	flex: 1;
+	align-self: stretch;
 }
 
 .af-section__header {
 	flex-wrap: wrap;
+	gap: var(--af-space-3);
 }
 
 .af-section__head .af-section__title {
-	margin-bottom: var(--af-space-1);
+	margin-bottom: calc(var(--af-space-1) / 2);
+}
+
+.af-section__head .af-section__subtitle {
+	margin: 0;
 }
 
 .af-section__icon {
@@ -521,6 +527,7 @@
 	border-radius: var(--af-radius-md);
 	background: var(--af-primary-50, #E6F7F3);
 	color: var(--af-primary-600, #00926F);
+	transform: translateY(1px);
 }
 
 .af-section__icon--amber {

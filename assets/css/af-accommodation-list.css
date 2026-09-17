@@ -1,0 +1,315 @@
+/**
+ * Arriendo Facil — Native accommodation list polish.
+ *
+ * Target: edit.php?post_type=accommodation (body.af-native-inmuebles).
+ * Loads after af-tokens + af-shell + af-admin-chrome so it repaints the
+ * legacy warm palette of the native-pages block with the current
+ * green/slate design system, and styles the new list columns.
+ */
+
+/* ── Layout & hero ──────────────────────────────────────────────────────── */
+
+body.af-native-inmuebles #wpbody-content {
+	padding-bottom: 48px;
+}
+
+body.af-native-inmuebles .wrap {
+	max-width: var(--af-page-max, 1440px);
+	padding: 8px 4px 0;
+}
+
+body.af-native-inmuebles .wrap > h1.wp-heading-inline {
+	color: var(--af-gray-900, #0F172A);
+	letter-spacing: -0.02em;
+}
+
+body.af-native-inmuebles .wrap > h1.wp-heading-inline + a.page-title-action {
+	background: var(--af-primary-500, #00A884);
+	border-radius: var(--af-radius-md, 10px);
+	box-shadow: var(--af-shadow-xs, 0 1px 2px rgba(16, 24, 40, 0.05));
+	color: #fff;
+}
+
+body.af-native-inmuebles .wrap > h1.wp-heading-inline + a.page-title-action:hover,
+body.af-native-inmuebles .wrap > h1.wp-heading-inline + a.page-title-action:focus {
+	background: var(--af-primary-600, #00926F);
+	box-shadow: var(--af-shadow-sm, 0 2px 6px rgba(16, 24, 40, 0.06));
+}
+
+body.af-native-inmuebles .subtitle {
+	color: var(--af-gray-500, #64748B);
+}
+
+/* ── Views (Todos | Publicados | Borradores | Papelera) ─────────────────── */
+
+body.af-native-inmuebles .subsubsub {
+	background: var(--af-gray-100, #F1F5F9);
+	border-radius: var(--af-radius-md, 14px);
+	padding: var(--af-space-3) var(--af-space-4);
+}
+
+body.af-native-inmuebles .subsubsub a {
+	color: var(--af-gray-500, #64748B);
+	margin: 0 var(--af-space-1);
+	padding: 6px 12px;
+	border-radius: var(--af-radius-md, 10px);
+}
+
+body.af-native-inmuebles .subsubsub a:hover {
+	color: var(--af-gray-900, #0F172A);
+	background: var(--af-gray-50, #F8FAFC);
+}
+
+body.af-native-inmuebles .subsubsub a.current {
+	background: var(--af-gray-0, #fff);
+	color: var(--af-gray-900, #0F172A);
+	box-shadow: var(--af-shadow-xs, 0 1px 2px rgba(16, 24, 40, 0.05));
+}
+
+/* ── Filter / search bar ────────────────────────────────────────────────── */
+
+body.af-native-inmuebles .tablenav.top {
+	background: var(--af-gray-0, #fff);
+	border: 1px solid var(--af-gray-200, #E2E8F0);
+	border-radius: var(--af-radius-lg, 14px);
+	box-shadow: var(--af-shadow-xs, 0 1px 2px rgba(16, 24, 40, 0.05));
+	padding: var(--af-space-3) var(--af-space-4);
+}
+
+body.af-native-inmuebles .tablenav select,
+body.af-native-inmuebles .tablenav input[type="search"] {
+	border: 1px solid var(--af-gray-200, #E2E8F0);
+	border-radius: var(--af-radius-md, 10px);
+	padding: 6px 12px;
+	margin: 0 var(--af-space-2);
+}
+
+body.af-native-inmuebles .tablenav select:focus,
+body.af-native-inmuebles .tablenav input[type="search"]:focus {
+	border-color: var(--af-primary-400, #3DBBA0);
+	box-shadow: var(--af-focus-ring, 0 0 0 3px rgba(0, 168, 132, 0.35));
+	outline: none;
+}
+
+body.af-native-inmuebles .tablenav .button {
+	border-radius: var(--af-radius-md, 10px);
+	border-color: var(--af-primary-500, #00A884);
+	background: var(--af-primary-500, #00A884);
+	color: #fff;
+	margin-left: var(--af-space-2);
+}
+
+body.af-native-inmuebles .tablenav .button:hover {
+	background: var(--af-primary-600, #00926F);
+	border-color: var(--af-primary-600, #00926F);
+}
+
+/* ── List table card ────────────────────────────────────────────────────── */
+
+body.af-native-inmuebles .wp-list-table {
+	border: 1px solid var(--af-gray-200, #E2E8F0);
+	border-radius: var(--af-radius-lg, 14px);
+	box-shadow: var(--af-shadow-sm, 0 2px 6px rgba(16, 24, 40, 0.06));
+	width: 100%;
+}
+
+body.af-native-inmuebles .wp-list-table thead th,
+body.af-native-inmuebles .wp-list-table tfoot th {
+	background: var(--af-gray-50, #F8FAFC);
+	color: var(--af-gray-600, #475569);
+	border-bottom: 1px solid var(--af-gray-200, #E2E8F0);
+	padding: var(--af-space-3) var(--af-space-4);
+}
+
+body.af-native-inmuebles .wp-list-table thead th a,
+body.af-native-inmuebles .wp-list-table thead th a:hover {
+	color: var(--af-gray-600, #475569);
+	text-decoration: none;
+}
+
+body.af-native-inmuebles .wp-list-table thead th.sorted a,
+body.af-native-inmuebles .wp-list-table thead th a:hover {
+	color: var(--af-primary-700, #007058);
+}
+
+body.af-native-inmuebles .wp-list-table tbody tr td {
+	border-bottom: 1px solid var(--af-gray-100, #F1F5F9);
+	padding: var(--af-space-3) var(--af-space-4);
+}
+
+body.af-native-inmuebles .wp-list-table tbody tr:hover td {
+	background: var(--af-gray-50, #F8FAFC);
+}
+
+/* Column: Título - make it stand out */
+body.af-native-inmuebles .wp-list-table .column-title a.row-title {
+	color: var(--af-gray-900, #0F172A);
+	font-weight: 600;
+	display: flex;
+	align-items: center;
+	gap: var(--af-space-1);
+}
+
+body.af-native-inmuebles .wp-list-table .column-title a.row-title:hover {
+	color: var(--af-primary-700, #007058);
+}
+
+/* Column: Imagen */
+body.af-native-inmuebles .wp-list-table .column-af_thumb {
+	width: 56px;
+	padding: 8px !important;
+	text-align: center;
+}
+
+body.af-native-inmuebles .af-list-thumb {
+	display: block;
+	width: 40px;
+	height: 40px;
+	margin: 0 auto;
+	object-fit: cover;
+	border-radius: var(--af-radius-md, 10px);
+	box-shadow: var(--af-shadow-xs, 0 1px 2px rgba(16, 24, 40, 0.05));
+	background: var(--af-gray-100, #F1F5F9);
+}
+
+body.af-native-inmuebles .af-list-thumb--placeholder {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: linear-gradient(135deg, var(--af-primary-50, #E6F7F3), var(--af-gray-50, #F8FAFC));
+	color: var(--af-primary-600, #00926F);
+	font-size: 14px;
+}
+
+/* Column: Estado */
+body.af-native-inmuebles .wp-list-table .column-af_status {
+	width: 130px;
+	text-align: center;
+}
+
+body.af-native-inmuebles .column-af_status .af-pill {
+	font-size: 12px;
+	padding: 4px 8px;
+}
+
+/* Column: Renta mensual */
+body.af-native-inmuebles .wp-list-table .column-af_price {
+	width: 130px;
+	text-align: right;
+}
+
+body.af-native-inmuebles .af-list-price {
+	font-family: var(--af-font-numeric, ui-monospace, SFMono-Regular, Menlo, monospace);
+	font-variant-numeric: tabular-nums;
+	font-weight: 700;
+	color: var(--af-gray-900, #0F172A);
+	white-space: nowrap;
+}
+
+body.af-native-inmuebles .af-list-price small {
+	color: var(--af-gray-500, #64748B);
+	font-size: var(--af-text-xs, 12px);
+	font-weight: 500;
+}
+
+/* ── Empty state ────────────────────────────────────────────────────────── */
+
+body.af-native-inmuebles .wp-list-table .af-list-empty {
+	display: block;
+	text-align: center;
+	padding: 40px 20px;
+	color: var(--af-gray-300, #CBD5E1);
+}
+
+/* ── Toggle columns (Destacada / Ocupada) ───────────────────────────────── */
+
+body.af-native-inmuebles .wp-list-table .column-af_featured,
+body.af-native-inmuebles .wp-list-table .column-af_occupied {
+	width: 80px;
+	text-align: center;
+}
+
+body.af-native-inmuebles .af-featured-toggle-state,
+body.af-native-inmuebles .af-occupied-toggle-state {
+	font-size: 11px;
+	color: var(--af-gray-500, #64748B);
+	padding: 4px 8px;
+	border-radius: var(--af-radius-full, 100px);
+	display: inline-block;
+}
+
+body.af-native-inmuebles .af-featured-toggle-wrap.is-on .af-featured-toggle-state {
+	color: var(--af-success-700, #0A6B3C);
+	background: var(--af-success-50, #DCFCE7);
+}
+
+body.af-native-inmuebles .af-occupied-toggle-wrap.is-on .af-occupied-toggle-state {
+	color: var(--af-danger-700, #971818);
+	background: var(--af-danger-50, #FEECEC);
+}
+
+/* ── Pagination & checkboxes ────────────────────────────────────────────── */
+
+body.af-native-inmuebles .tablenav-pages .pagination-links a,
+body.af-native-inmuebles .tablenav-pages .pagination-links span.current {
+	background: var(--af-gray-0, #fff);
+	border: 1px solid var(--af-gray-200, #E2E8F0);
+	color: var(--af-gray-700, #334155);
+	margin: 0 2px;
+	border-radius: var(--af-radius-md, 10px);
+	padding: 6px 12px;
+}
+
+body.af-native-inmuebles .tablenav-pages .pagination-links a:hover {
+	background: var(--af-gray-50, #F8FAFC);
+	border-color: var(--af-primary-400, #3DBBA0);
+	color: var(--af-primary-700, #007058);
+}
+
+body.af-native-inmuebles .tablenav-pages .pagination-links span.current {
+	background: var(--af-primary-500, #00A884);
+	border-color: var(--af-primary-500, #00A884);
+	color: #fff;
+}
+
+body.af-native-inmuebles .wp-list-table input[type="checkbox"] {
+	accent-color: var(--af-primary-500, #00A884);
+}
+
+/* ── Responsive collapse (≤ 900px) ──────────────────────────────────────── */
+
+@media (max-width: 900px) {
+	body.af-native-inmuebles .wp-list-table tbody tr {
+		border: 1px solid var(--af-gray-200, #E2E8F0);
+		border-radius: var(--af-radius-md, 10px);
+		box-shadow: var(--af-shadow-xs, 0 1px 2px rgba(16, 24, 40, 0.05));
+		margin: 0 var(--af-space-2);
+	}
+
+	body.af-native-inmuebles .wp-list-table tbody tr td {
+		border-bottom: 1px dashed var(--af-gray-100, #F1F5F9);
+		padding: var(--af-space-3) var(--af-space-4);
+	}
+
+	body.af-native-inmuebles .wp-list-table tbody tr td::before {
+		color: var(--af-gray-500, #64748B);
+		font-weight: 500;
+	}
+
+	body.af-native-inmuebles .wp-list-table .column-af_thumb {
+		width: auto;
+	}
+
+	body.af-native-inmuebles .af-list-thumb {
+		margin: 0 0 0 auto;
+	}
+}
+
+/* ── Responsive collapse (≤ 640px) ──────────────────────────────────────── */
+
+@media (max-width: 640px) {
+	body.af-native-inmuebles .wrap > h1.wp-heading-inline + a.page-title-action {
+		border-radius: var(--af-radius-md, 10px);
+		padding: var(--af-space-3) var(--af-space-4);
+	}
+}

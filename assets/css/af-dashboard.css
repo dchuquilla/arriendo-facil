@@ -1,0 +1,357 @@
+/**
+ * Arriendo Fácil — Panel (dashboard overview)
+ *
+* Componentes del panel: hero de cobranza, tarjetas de estado y
+ * métricas operativas. Todo se estiliza exclusivamente con tokens
+ * de .af-shell para mantener consistencia de marca.
+ */
+
+/* ── Contenedor general ─────────────────────────────────────────────────── */
+
+.af-overview {
+	display: grid;
+	gap: var(--af-space-4);
+	margin-bottom: var(--af-space-6);
+}
+
+/* ── Hero: Cobrado este mes ─────────────────────────────────────────────── */
+
+.af-overview-hero {
+	position: relative;
+	display: grid;
+	grid-template-columns: 1fr auto;
+	gap: var(--af-space-6);
+	align-items: center;
+	padding: var(--af-space-6) var(--af-space-8);
+	border-radius: var(--af-radius-lg);
+	color: #fff;
+	background: linear-gradient(135deg, var(--af-primary-700, #007058) 0%, var(--af-primary-600, #00926F) 48%, var(--af-primary-400, #3DBBA0) 100%);
+	box-shadow: 0 14px 30px -12px rgba(0, 147, 111, 0.55);
+	overflow: hidden;
+}
+
+.af-overview-hero::before,
+.af-overview-hero::after {
+	content: "";
+	position: absolute;
+	border-radius: 50%;
+	pointer-events: none;
+}
+
+.af-overview-hero::before {
+	right: -72px;
+	top: -72px;
+	width: 240px;
+	height: 240px;
+	background: rgba(255, 255, 255, 0.10);
+}
+
+.af-overview-hero::after {
+	right: 24px;
+	bottom: -110px;
+	width: 200px;
+	height: 200px;
+	background: rgba(255, 255, 255, 0.08);
+}
+
+.af-overview-hero__main,
+.af-overview-hero__side {
+	position: relative;
+	z-index: 1;
+}
+
+.af-overview-hero__main {
+	display: flex;
+	flex-direction: column;
+	gap: var(--af-space-2);
+	min-width: 0;
+}
+
+.af-overview-hero__eyebrow {
+	font-size: var(--af-text-sm);
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: rgba(255, 255, 255, 0.85);
+}
+
+.af-overview-hero__value {
+	font-size: clamp(2.25rem, 4.5vw, 3.25rem);
+	font-weight: 800;
+	line-height: 1.05;
+	letter-spacing: -0.02em;
+}
+
+.af-overview-hero__meta {
+	font-size: var(--af-text-sm);
+	font-weight: 500;
+	color: rgba(255, 255, 255, 0.92);
+}
+
+.af-overview-hero__bar {
+	height: 8px;
+	max-width: 480px;
+	border-radius: var(--af-radius-full);
+	background: rgba(255, 255, 255, 0.25);
+	overflow: hidden;
+	margin-top: var(--af-space-2);
+}
+
+.af-overview-hero__bar span {
+	display: block;
+	height: 100%;
+	border-radius: var(--af-radius-full);
+	background: #fff;
+	transition: width var(--af-motion-slow);
+}
+
+.af-overview-hero__actions {
+	display: flex;
+	gap: var(--af-space-2);
+	margin-top: var(--af-space-3);
+}
+
+.af-overview-hero__cta {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--af-space-2);
+	padding: var(--af-space-2) var(--af-space-4);
+	border-radius: var(--af-radius-md);
+	background: #fff;
+	color: var(--af-primary-700, #007058);
+	font-size: var(--af-text-sm);
+	font-weight: 700;
+	text-decoration: none;
+	box-shadow: var(--af-shadow-xs);
+	transition: transform var(--af-motion-fast), box-shadow var(--af-motion-fast);
+}
+
+.af-overview-hero__cta:hover,
+.af-overview-hero__cta:focus {
+	transform: translateY(-1px);
+	box-shadow: var(--af-shadow-md);
+	color: var(--af-primary-900, #023D30);
+}
+
+.af-overview-hero__side {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: var(--af-space-2);
+	text-align: right;
+}
+
+.af-overview-hero__rate {
+	font-size: clamp(2rem, 3vw, 2.75rem);
+	font-weight: 800;
+	line-height: 1;
+	letter-spacing: -0.02em;
+}
+
+.af-overview-hero__rate-label {
+	font-size: var(--af-text-xs);
+	font-weight: 500;
+	color: rgba(255, 255, 255, 0.85);
+}
+
+.af-overview-hero .af-pill--hero {
+	background: rgba(255, 255, 255, 0.16);
+	color: #fff;
+	font-weight: 600;
+}
+
+/* ── Tarjetas de estado: Por cobrar / En mora / Contratos por vencer ────── */
+
+.af-overview-stats {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+	gap: var(--af-space-4);
+}
+
+.af-overview-stat {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--af-space-3);
+	padding: var(--af-space-4);
+	background: var(--af-gray-0, #fff);
+	border: 1px solid var(--af-gray-100, #F1F5F9);
+	border-radius: var(--af-radius-md);
+	box-shadow: var(--af-shadow-xs);
+	transition: box-shadow var(--af-motion-fast), transform var(--af-motion-fast);
+}
+
+.af-overview-stat:hover {
+	box-shadow: var(--af-shadow-md);
+	transform: translateY(-1px);
+}
+
+.af-overview-stat__icon {
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 42px;
+	height: 42px;
+	border-radius: var(--af-radius-md);
+	background: var(--af-primary-50, #E6F7F3);
+	color: var(--af-primary-600, #00926F);
+}
+
+.af-overview-stat.is-warn .af-overview-stat__icon {
+	background: var(--af-warning-50, #FEF6E6);
+	color: var(--af-warning-700, #A26708);
+}
+
+.af-overview-stat.is-danger .af-overview-stat__icon {
+	background: var(--af-danger-50, #FEECEC);
+	color: var(--af-danger-700, #971818);
+}
+
+.af-overview-stat.is-ok .af-overview-stat__icon {
+	background: var(--af-success-50, #E6F7EE);
+	color: var(--af-success-700, #0A6B3C);
+}
+
+.af-overview-stat__body {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.af-overview-stat__label {
+	font-size: var(--af-text-sm);
+	font-weight: 600;
+	color: var(--af-gray-500, #64748B);
+}
+
+.af-overview-stat__value {
+	font-size: var(--af-text-xl);
+	font-weight: 800;
+	line-height: 1.15;
+	letter-spacing: -0.01em;
+	color: var(--af-gray-900, #0F172A);
+}
+
+.af-overview-stat__hint {
+	font-size: var(--af-text-xs);
+	font-weight: 500;
+	color: var(--af-gray-400, #94A3B8);
+}
+
+.af-overview-stat__link {
+	margin-left: auto;
+	align-self: flex-end;
+	font-size: var(--af-text-xs);
+	font-weight: 700;
+	color: var(--af-primary-600, #00926F);
+	text-decoration: none;
+	white-space: nowrap;
+}
+
+.af-overview-stat__link:hover {
+	color: var(--af-primary-700, #007058);
+	text-decoration: underline;
+}
+
+/* ── Métricas operativas (chips) ────────────────────────────────────────── */
+
+.af-overview-chips {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+	gap: var(--af-space-3);
+}
+
+.af-overview-chip {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: var(--af-space-4);
+	background: var(--af-gray-0, #fff);
+	border: 1px solid var(--af-gray-100, #F1F5F9);
+	border-radius: var(--af-radius-md);
+	text-decoration: none;
+	transition: border-color var(--af-motion-fast), box-shadow var(--af-motion-fast), transform var(--af-motion-fast);
+}
+
+.af-overview-chip:hover,
+.af-overview-chip:focus {
+	border-color: var(--af-primary-200, #8FDBCA);
+	box-shadow: var(--af-shadow-md);
+	transform: translateY(-2px);
+}
+
+.af-overview-chip__icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 32px;
+	margin-bottom: var(--af-space-2);
+	border-radius: var(--af-radius-sm);
+	background: var(--af-primary-50, #E6F7F3);
+	color: var(--af-primary-600, #00926F);
+}
+
+.af-overview-chip.is-warn .af-overview-chip__icon {
+	background: var(--af-warning-50, #FEF6E6);
+	color: var(--af-warning-700, #A26708);
+}
+
+.af-overview-chip.is-danger .af-overview-chip__icon {
+	background: var(--af-danger-50, #FEECEC);
+	color: var(--af-danger-700, #971818);
+}
+
+.af-overview-chip.is-ok .af-overview-chip__icon {
+	background: var(--af-success-50, #E6F7EE);
+	color: var(--af-success-700, #0A6B3C);
+}
+
+.af-overview-chip__value {
+	font-size: var(--af-text-2xl);
+	font-weight: 800;
+	line-height: 1.1;
+	letter-spacing: -0.02em;
+	color: var(--af-gray-900, #0F172A);
+}
+
+.af-overview-chip__unit {
+	font-size: var(--af-text-sm);
+	font-weight: 600;
+	color: var(--af-gray-400, #94A3B8);
+}
+
+.af-overview-chip__label {
+	font-size: var(--af-text-sm);
+	font-weight: 600;
+	color: var(--af-gray-600, #475569);
+}
+
+.af-overview-chip__meta {
+	font-size: var(--af-text-xs);
+	font-weight: 500;
+	color: var(--af-gray-400, #94A3B8);
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 720px) {
+	.af-overview-hero {
+		grid-template-columns: 1fr;
+		gap: var(--af-space-4);
+		padding: var(--af-space-5);
+	}
+
+	.af-overview-hero__side {
+		flex-direction: row;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: flex-start;
+		text-align: left;
+	}
+
+	.af-overview-stats {
+		grid-template-columns: 1fr;
+	}
+}

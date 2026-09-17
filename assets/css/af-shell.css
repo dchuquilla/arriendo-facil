@@ -1626,7 +1626,7 @@
     place-items: center;
     border-radius: 12px;
     color: #fff;
-    background: var(--af-primary-600, #2563EB);
+    background: var(--af-primary-600, #00A884);
 }
 .af-integration-brand--booking { background: #003580; }   /* Booking navy */
 .af-integration-brand--airbnb  { background: #FF385C; }   /* Airbnb coral */
@@ -1640,7 +1640,7 @@
     font-weight: 600;
     color: var(--af-gray-900);
     padding-left: var(--af-space-3);
-    border-left: 3px solid var(--af-primary-500, #2563EB);
+    border-left: 3px solid var(--af-primary-500, #00A884);
 }
 
 .af-step-list {
@@ -1649,14 +1649,14 @@
     color: var(--af-gray-700);
 }
 .af-step-list li { padding-block: 2px; }
-.af-step-list a { color: var(--af-primary-600, #2563EB); text-decoration: none; }
+.af-step-list a { color: var(--af-primary-600, #00A884); text-decoration: none; }
 .af-step-list a:hover { text-decoration: underline; }
 
 .af-code-block {
     padding: var(--af-space-3) var(--af-space-4);
     background: var(--af-gray-50);
     border: 1px solid var(--af-gray-200);
-    border-left: 3px solid var(--af-primary-500, #2563EB);
+    border-left: 3px solid var(--af-primary-500, #00A884);
     border-radius: var(--af-radius-sm);
     margin: var(--af-space-3) 0;
 }
@@ -1726,8 +1726,8 @@
     width: 26px;
     height: 26px;
     border-radius: 999px;
-    background: var(--af-primary-50, #EFF6FF);
-    color: var(--af-primary-700, #1D4ED8);
+    background: var(--af-primary-50, #E6F7F3);
+    color: var(--af-primary-700, #00926F);
     font-weight: 700;
     font-size: var(--af-text-xs);
 }
@@ -1857,7 +1857,7 @@
     border-radius: var(--af-radius-lg);
     background:
         radial-gradient(120% 180% at 100% 0%, rgba(245, 56, 92, .12) 0%, transparent 55%),
-        linear-gradient(135deg, var(--af-primary-50, #EFF6FF) 0%, var(--af-gray-0, #fff) 60%);
+        linear-gradient(135deg, var(--af-primary-50, #E6F7F3) 0%, var(--af-gray-0, #fff) 60%);
     border: 1px solid var(--af-gray-200);
     box-shadow: var(--af-shadow-sm);
     overflow: hidden;
@@ -1879,7 +1879,7 @@
     place-items: center;
     border-radius: var(--af-radius-lg);
     background: rgba(37, 99, 235, .08);
-    color: var(--af-primary-600, #1D4ED8);
+    color: var(--af-primary-600, #00926F);
 }
 .af-welcome__art svg { width: 56px; height: 56px; }
 .af-welcome__body { position: relative; z-index: 1; }

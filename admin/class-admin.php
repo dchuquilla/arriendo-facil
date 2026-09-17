@@ -628,6 +628,57 @@ class Arriendo_Facil_Admin {
 	 *
 	 * @return array<int, array<string, mixed>>
 	 */
+	/**
+	 * Module definitions for the custom app shell sidebar, mirroring the
+	 * product prototype: Panel, Propiedades, Contratos, Huéspedes,
+	 * Pagos y dispersión, Reviews, Facturación SRI y Configuración.
+	 *
+	 * @return array<string, array<string, string>>
+	 */
+	private function get_shell_nav_groups() {
+		return array(
+			'panel'       => array(
+				'label' => __( 'Panel', 'arriendo-facil' ),
+				'icon'  => 'layout-dashboard',
+			),
+			'propiedades' => array(
+				'label' => __( 'Propiedades', 'arriendo-facil' ),
+				'icon'  => 'building-2',
+			),
+			'contratos'   => array(
+				'label' => __( 'Contratos', 'arriendo-facil' ),
+				'icon'  => 'file-text',
+			),
+			'huespedes'   => array(
+				'label' => __( 'Huéspedes', 'arriendo-facil' ),
+				'icon'  => 'users',
+			),
+			'pagos'       => array(
+				'label' => __( 'Pagos y dispersión', 'arriendo-facil' ),
+				'icon'  => 'credit-card',
+			),
+			'reviews'     => array(
+				'label' => __( 'Reviews', 'arriendo-facil' ),
+				'icon'  => 'star',
+			),
+			'facturacion' => array(
+				'label' => __( 'Facturación SRI', 'arriendo-facil' ),
+				'icon'  => 'receipt',
+			),
+			'config'      => array(
+				'label' => __( 'Configuración', 'arriendo-facil' ),
+				'icon'  => 'settings',
+			),
+		);
+	}
+
+	/**
+	 * Builds the nav items for the custom app shell sidebar, assigned to the
+	 * prototype modules via the 'group' key, filtered by capability and by
+	 * the property-admin onboarding gate.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
 	private function get_shell_nav_items() {
 		$gated = apply_filters( 'af_property_admin_gate_operational_menus', false )
 			&& class_exists( 'Arriendo_Facil_Property_Admin_Onboarding' )
@@ -640,7 +691,8 @@ class Arriendo_Facil_Admin {
 				'slug'  => 'arriendo-facil',
 				'label' => __( 'Panel', 'arriendo-facil' ),
 				'url'   => admin_url( 'admin.php?page=arriendo-facil' ),
-				'icon'  => 'dashicons-chart-line',
+				'icon'  => 'layout-dashboard',
+				'group' => 'panel',
 				'cap'   => 'edit_posts',
 				'gate'  => false,
 			),
@@ -648,7 +700,8 @@ class Arriendo_Facil_Admin {
 				'slug'  => 'edit-accommodation',
 				'label' => __( 'Inmuebles', 'arriendo-facil' ),
 				'url'   => admin_url( 'edit.php?post_type=accommodation' ),
-				'icon'  => 'dashicons-admin-home',
+				'icon'  => 'building-2',
+				'group' => 'propiedades',
 				'cap'   => 'edit_posts',
 				'gate'  => false,
 			),
@@ -656,7 +709,8 @@ class Arriendo_Facil_Admin {
 				'slug'  => 'af-catalog',
 				'label' => __( 'Catálogo', 'arriendo-facil' ),
 				'url'   => admin_url( 'admin.php?page=af-catalog' ),
-				'icon'  => 'dashicons-screenoptions',
+				'icon'  => 'layout-grid',
+				'group' => 'propiedades',
 				'cap'   => 'edit_posts',
 				'gate'  => true,
 			),
@@ -664,7 +718,8 @@ class Arriendo_Facil_Admin {
 				'slug'  => 'af-leases',
 				'label' => __( 'Contratos', 'arriendo-facil' ),
 				'url'   => admin_url( 'admin.php?page=af-leases' ),
-				'icon'  => 'dashicons-media-document',
+				'icon'  => 'file-text',
+				'group' => 'contratos',
 				'cap'   => 'edit_posts',
 				'gate'  => true,
 			),
@@ -672,7 +727,8 @@ class Arriendo_Facil_Admin {
 				'slug'  => 'af-buildings',
 				'label' => __( 'Edificios y unidades', 'arriendo-facil' ),
 				'url'   => admin_url( 'admin.php?page=af-buildings' ),
-				'icon'  => 'dashicons-building',
+				'icon'  => 'building',
+				'group' => 'propiedades',
 				'cap'   => Arriendo_Facil_Tenancy::CAP,
 				'gate'  => true,
 			),
@@ -680,7 +736,8 @@ class Arriendo_Facil_Admin {
 				'slug'  => 'af-guests',
 				'label' => __( 'Inquilinos', 'arriendo-facil' ),
 				'url'   => admin_url( 'admin.php?page=af-guests' ),
-				'icon'  => 'dashicons-groups',
+				'icon'  => 'users',
+				'group' => 'huespedes',
 				'cap'   => 'edit_posts',
 				'gate'  => true,
 			),
@@ -688,7 +745,8 @@ class Arriendo_Facil_Admin {
 				'slug'  => 'af-collections',
 				'label' => __( 'Pagos y dispersión', 'arriendo-facil' ),
 				'url'   => admin_url( 'admin.php?page=af-collections' ),
-				'icon'  => 'dashicons-money-alt',
+				'icon'  => 'credit-card',
+				'group' => 'pagos',
 				'cap'   => Arriendo_Facil_Tenancy::CAP,
 				'gate'  => true,
 			),
@@ -696,7 +754,8 @@ class Arriendo_Facil_Admin {
 				'slug'  => 'af-maintenance',
 				'label' => __( 'Mantenimiento', 'arriendo-facil' ),
 				'url'   => admin_url( 'admin.php?page=af-maintenance' ),
-				'icon'  => 'dashicons-admin-tools',
+				'icon'  => 'wrench',
+				'group' => 'propiedades',
 				'cap'   => Arriendo_Facil_Tenancy::CAP,
 				'gate'  => true,
 			),
@@ -704,7 +763,8 @@ class Arriendo_Facil_Admin {
 				'slug'  => 'af-reviews',
 				'label' => __( 'Reviews', 'arriendo-facil' ),
 				'url'   => admin_url( 'admin.php?page=af-reviews' ),
-				'icon'  => 'dashicons-star-half',
+				'icon'  => 'star',
+				'group' => 'reviews',
 				'cap'   => 'edit_posts',
 				'gate'  => true,
 			),
@@ -712,7 +772,8 @@ class Arriendo_Facil_Admin {
 				'slug'  => 'af-billing',
 				'label' => __( 'Facturación electrónica', 'arriendo-facil' ),
 				'url'   => admin_url( 'admin.php?page=af-billing' ),
-				'icon'  => 'dashicons-media-spreadsheet',
+				'icon'  => 'receipt',
+				'group' => 'facturacion',
 				'cap'   => $billing_cap,
 				'gate'  => true,
 			),
@@ -720,7 +781,8 @@ class Arriendo_Facil_Admin {
 				'slug'  => 'af-billing-settings',
 				'label' => __( 'Config. SRI', 'arriendo-facil' ),
 				'url'   => admin_url( 'admin.php?page=af-billing-settings' ),
-				'icon'  => 'dashicons-admin-generic',
+				'icon'  => 'settings',
+				'group' => 'facturacion',
 				'cap'   => $billing_cap,
 				'gate'  => true,
 			),
@@ -728,7 +790,8 @@ class Arriendo_Facil_Admin {
 				'slug'  => 'af-admin-profile',
 				'label' => __( 'Mi perfil', 'arriendo-facil' ),
 				'url'   => admin_url( 'admin.php?page=af-admin-profile' ),
-				'icon'  => 'dashicons-admin-users',
+				'icon'  => 'user',
+				'group' => 'config',
 				'cap'   => 'edit_posts',
 				'gate'  => false,
 			),
@@ -736,7 +799,8 @@ class Arriendo_Facil_Admin {
 				'slug'  => 'af-property-admins',
 				'label' => __( 'Administradores', 'arriendo-facil' ),
 				'url'   => admin_url( 'admin.php?page=af-property-admins' ),
-				'icon'  => 'dashicons-businessperson',
+				'icon'  => 'user-check',
+				'group' => 'config',
 				'cap'   => 'manage_options',
 				'gate'  => false,
 			),
@@ -780,27 +844,27 @@ class Arriendo_Facil_Admin {
 			array(
 				'label' => __( 'Escritorio de WordPress', 'arriendo-facil' ),
 				'url'   => admin_url( 'index.php' ),
-				'icon'  => 'dashicons-wordpress-alt',
+				'icon'  => 'globe',
 			),
 			array(
 				'label' => __( 'Plugins', 'arriendo-facil' ),
 				'url'   => admin_url( 'plugins.php' ),
-				'icon'  => 'dashicons-admin-plugins',
+				'icon'  => 'puzzle',
 			),
 			array(
 				'label' => __( 'Usuarios', 'arriendo-facil' ),
 				'url'   => admin_url( 'users.php' ),
-				'icon'  => 'dashicons-admin-users',
+				'icon'  => 'users',
 			),
 			array(
 				'label' => __( 'Ajustes', 'arriendo-facil' ),
 				'url'   => admin_url( 'options-general.php' ),
-				'icon'  => 'dashicons-admin-settings',
+				'icon'  => 'sliders-horizontal',
 			),
 			array(
 				'label' => __( 'Herramientas', 'arriendo-facil' ),
 				'url'   => admin_url( 'tools.php' ),
-				'icon'  => 'dashicons-admin-tools',
+				'icon'  => 'wrench',
 			),
 		);
 	}
@@ -822,27 +886,74 @@ class Arriendo_Facil_Admin {
 			return;
 		}
 
+		$groups  = $this->get_shell_nav_groups();
+		$grouped = array();
+		foreach ( array_keys( $groups ) as $group_slug ) {
+			$grouped[ $group_slug ] = array();
+		}
+		foreach ( $items as $item ) {
+			$group                    = isset( $item['group'] ) && isset( $grouped[ $item['group'] ] ) ? $item['group'] : 'panel';
+			$grouped[ $group ][]      = $item;
+		}
+
 		$wp_core_links = $this->get_wp_core_links();
 		$current_user  = wp_get_current_user();
 		?>
 		<div id="af-app-sidebar" class="af-app-sidebar af-shell" role="navigation" aria-label="<?php esc_attr_e( 'Arriendo Fácil', 'arriendo-facil' ); ?>">
 			<div class="af-app-sidebar__brand">
 				<a href="<?php echo esc_url( admin_url( 'admin.php?page=arriendo-facil' ) ); ?>" class="af-app-sidebar__logo">
-					<span class="dashicons dashicons-admin-home" aria-hidden="true"></span>
-					<span class="af-app-sidebar__logo-text"><?php esc_html_e( 'Arriendo Fácil', 'arriendo-facil' ); ?></span>
+					<?php echo af_lucide( 'home', 22 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
+					<span class="af-app-sidebar__logo-copy">
+						<span class="af-app-sidebar__logo-text"><?php esc_html_e( 'Arriendo Fácil', 'arriendo-facil' ); ?></span>
+						<span class="af-app-sidebar__logo-tagline"><?php esc_html_e( 'Tu propiedad, en buenas manos', 'arriendo-facil' ); ?></span>
+					</span>
 				</a>
 				<button type="button" class="af-app-sidebar__toggle" id="af-app-sidebar-toggle" aria-label="<?php esc_attr_e( 'Contraer menú', 'arriendo-facil' ); ?>">
-					<span class="dashicons dashicons-arrow-left-alt2" aria-hidden="true"></span>
+					<?php echo af_lucide( 'chevrons-left', 20 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
 				</button>
 			</div>
 			<ul class="af-app-sidebar__nav">
-				<?php foreach ( $items as $item ) : ?>
-					<li class="af-app-sidebar__item<?php echo $item['active'] ? ' is-active' : ''; ?>">
-						<a href="<?php echo esc_url( $item['url'] ); ?>">
-							<span class="dashicons <?php echo esc_attr( $item['icon'] ); ?>" aria-hidden="true"></span>
-							<span class="af-app-sidebar__label"><?php echo esc_html( $item['label'] ); ?></span>
-						</a>
-					</li>
+				<?php foreach ( $groups as $group_slug => $group_meta ) : ?>
+					<?php
+					if ( empty( $grouped[ $group_slug ] ) ) {
+						continue;
+					}
+					$is_single = 1 === count( $grouped[ $group_slug ] );
+					?>
+					<?php if ( $is_single ) : ?>
+						<?php $nav_item = $grouped[ $group_slug ][0]; ?>
+						<li class="af-app-sidebar__item<?php echo $nav_item['active'] ? ' is-active' : ''; ?>">
+							<a href="<?php echo esc_url( $nav_item['url'] ); ?>">
+								<?php echo af_lucide( $nav_item['icon'], 20 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
+								<span class="af-app-sidebar__label"><?php echo esc_html( $nav_item['label'] ); ?></span>
+							</a>
+						</li>
+					<?php else : ?>
+						<?php
+						$group_active = false;
+						foreach ( $grouped[ $group_slug ] as $nav_item ) {
+							if ( ! empty( $nav_item['active'] ) ) {
+								$group_active = true;
+							}
+						}
+						?>
+						<li class="af-app-sidebar__group<?php echo $group_active ? ' is-active' : ''; ?>">
+							<a class="af-app-sidebar__group-link" href="<?php echo esc_url( $grouped[ $group_slug ][0]['url'] ); ?>">
+								<?php echo af_lucide( $group_meta['icon'], 20 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
+								<span class="af-app-sidebar__group-label"><?php echo esc_html( $group_meta['label'] ); ?></span>
+								<span class="af-app-sidebar__group-chevron"><?php echo af_lucide( 'chevron-down', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+							</a>
+							<ul class="af-app-sidebar__subnav">
+								<?php foreach ( $grouped[ $group_slug ] as $nav_item ) : ?>
+									<li class="af-app-sidebar__item<?php echo $nav_item['active'] ? ' is-active' : ''; ?>">
+										<a href="<?php echo esc_url( $nav_item['url'] ); ?>">
+											<span class="af-app-sidebar__label"><?php echo esc_html( $nav_item['label'] ); ?></span>
+										</a>
+									</li>
+								<?php endforeach; ?>
+							</ul>
+						</li>
+					<?php endif; ?>
 				<?php endforeach; ?>
 			</ul>
 			<?php if ( ! empty( $wp_core_links ) ) : ?>
@@ -851,7 +962,7 @@ class Arriendo_Facil_Admin {
 					<?php foreach ( $wp_core_links as $link ) : ?>
 						<li class="af-app-sidebar__item">
 							<a href="<?php echo esc_url( $link['url'] ); ?>">
-								<span class="dashicons <?php echo esc_attr( $link['icon'] ); ?>" aria-hidden="true"></span>
+								<?php echo af_lucide( $link['icon'], 20 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
 								<span class="af-app-sidebar__label"><?php echo esc_html( $link['label'] ); ?></span>
 							</a>
 						</li>
@@ -864,28 +975,28 @@ class Arriendo_Facil_Admin {
 					<span class="af-app-sidebar__user-name"><?php echo esc_html( $current_user->display_name ); ?></span>
 				</a>
 				<a class="af-app-sidebar__logout" href="<?php echo esc_url( wp_logout_url( home_url( '/' ) ) ); ?>" title="<?php esc_attr_e( 'Cerrar sesión', 'arriendo-facil' ); ?>">
-					<span class="dashicons dashicons-migrate" aria-hidden="true"></span>
+					<?php echo af_lucide( 'log-out', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
 				</a>
 			</div>
 		</div>
 		<button type="button" id="af-app-sidebar-mobile-toggle" class="af-app-sidebar-mobile-toggle" aria-label="<?php esc_attr_e( 'Abrir menú', 'arriendo-facil' ); ?>" aria-expanded="false">
-			<span class="dashicons dashicons-menu" aria-hidden="true"></span>
+			<?php echo af_lucide( 'menu', 20 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
 		</button>
 
 		<div class="af-app-topbar af-shell">
 			<form class="af-app-topbar__search" method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" role="search">
 				<input type="hidden" name="page" value="af-catalog" />
-				<span class="dashicons dashicons-search" aria-hidden="true"></span>
+				<?php echo af_lucide( 'search', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
 				<input type="search" name="s" placeholder="<?php esc_attr_e( 'Buscar propiedades, contratos…', 'arriendo-facil' ); ?>" aria-label="<?php esc_attr_e( 'Buscar', 'arriendo-facil' ); ?>" />
 			</form>
 			<div class="af-app-topbar__actions">
 				<a class="af-app-topbar__bell" href="<?php echo esc_url( admin_url( 'admin.php?page=arriendo-facil#af-alerts' ) ); ?>" aria-label="<?php esc_attr_e( 'Alertas operativas', 'arriendo-facil' ); ?>">
-					<span class="dashicons dashicons-bell" aria-hidden="true"></span>
+					<?php echo af_lucide( 'bell', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
 				</a>
 				<a class="af-app-topbar__user" href="<?php echo esc_url( admin_url( 'admin.php?page=af-admin-profile' ) ); ?>">
 					<?php echo get_avatar( $current_user->ID, 28 ); ?>
 					<span class="af-app-topbar__user-name"><?php echo esc_html( $current_user->display_name ); ?></span>
-					<span class="dashicons dashicons-arrow-down-alt2" aria-hidden="true"></span>
+					<?php echo af_lucide( 'chevron-down', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
 				</a>
 			</div>
 		</div>

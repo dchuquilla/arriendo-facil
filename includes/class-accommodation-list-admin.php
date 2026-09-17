@@ -62,6 +62,11 @@ class Arriendo_Facil_Accommodation_List_Admin {
 	/**
 	 * Adds the thumbnail, status and monthly-rent columns.
 	 *
+	 * The custom columns are inserted right before and right after the title
+	 * column so the DOM reads naturally: Imagen → Inmueble → (Destacada /
+	 * Ocupada, appended by their own admin classes) → Tipo y ubicación →
+	 * Renta mensual → Estado → Fecha.
+	 *
 	 * @param array $columns Existing columns.
 	 * @return array
 	 */
@@ -69,12 +74,14 @@ class Arriendo_Facil_Accommodation_List_Admin {
 		$new = array();
 		foreach ( $columns as $key => $label ) {
 			if ( 'title' === $key ) {
-				$new['af_thumb']  = __( 'Imagen', 'arriendo-facil' );
-				$new['af_status'] = __( 'Estado', 'arriendo-facil' );
-				$new['af_price']  = __( 'Renta mensual', 'arriendo-facil' );
-				$new['af_meta']   = __( 'Tipo y ubicación', 'arriendo-facil' );
+				$new['af_thumb'] = __( 'Imagen', 'arriendo-facil' );
 			}
 			$new[ $key ] = $label;
+			if ( 'title' === $key ) {
+				$new['af_meta']   = __( 'Tipo y ubicación', 'arriendo-facil' );
+				$new['af_price']  = __( 'Renta mensual', 'arriendo-facil' );
+				$new['af_status'] = __( 'Estado', 'arriendo-facil' );
+			}
 		}
 
 		if ( ! isset( $new['af_thumb'] ) ) {

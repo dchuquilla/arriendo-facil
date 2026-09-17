@@ -46,8 +46,21 @@ if ( null !== $accessible_accommodation_ids_for_dropdown ) {
 	$accommodation_args['post__in'] = ! empty( $accessible_accommodation_ids_for_dropdown ) ? $accessible_accommodation_ids_for_dropdown : array( 0 );
 }
 $accommodations = get_posts( $accommodation_args );
+
+// Unit count per building, used by the building switcher chips.
+$unit_counts = array();
+if ( ! empty( $buildings ) ) {
+	$building_ids = array_map( 'absint', wp_list_pluck( $buildings, 'id' ) );
+	$ids_sql      = Arriendo_Facil_Tenancy::ids_in_clause( $building_ids );
+	$unit_rows    = $wpdb->get_results(
+		'SELECT building_id, COUNT(*) AS total FROM ' . Arriendo_Facil_Property_Structure::units_table() . " WHERE building_id IN ({$ids_sql}) AND status = 'active' GROUP BY building_id" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	);
+	foreach ( (array) $unit_rows as $row ) {
+		$unit_counts[ (int) $row->building_id ] = (int) $row->total;
+	}
+}
 ?>
-<div class="wrap af-shell">
+<div class="wrap af-shell af-buildings-page">
 
 	<?php
 	af_page_header(
@@ -59,77 +72,102 @@ $accommodations = get_posts( $accommodation_args );
 	);
 	?>
 
-	<div class="af-section" style="padding: var(--af-space-5); margin-bottom: var(--af-space-4);">
-		<h2 class="af-section__title" style="margin-top:0;"><?php esc_html_e( 'Nuevo edificio', 'arriendo-facil' ); ?></h2>
-		<p class="af-modal__status" id="af-building-status"></p>
-		<form id="af-building-form" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px; align-items:end;">
-			<label>
-				<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Nombre', 'arriendo-facil' ); ?> *</span>
-				<input type="text" name="name" required class="regular-text" style="width:100%;" />
-			</label>
-			<label>
-				<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Dirección', 'arriendo-facil' ); ?></span>
-				<input type="text" name="address" class="regular-text" style="width:100%;" />
-			</label>
-			<label>
-				<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Ciudad', 'arriendo-facil' ); ?></span>
-				<input type="text" name="city" class="regular-text" style="width:100%;" />
-			</label>
-			<label>
-				<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Alícuota mensual total (USD)', 'arriendo-facil' ); ?></span>
-				<input type="number" name="monthly_hoa_total" step="0.01" min="0" value="0.00" style="width:100%;" />
-			</label>
-			<?php if ( $is_super_admin && ! empty( $property_admins ) ) : ?>
-			<label>
-				<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Administrador de propiedades', 'arriendo-facil' ); ?></span>
-				<select name="assigned_admin_id" style="width:100%;">
-					<option value=""><?php esc_html_e( '— Asignar a mí mismo —', 'arriendo-facil' ); ?></option>
-					<?php foreach ( $property_admins as $pa ) : ?>
-						<option value="<?php echo esc_attr( $pa->ID ); ?>"><?php echo esc_html( get_user_meta( $pa->ID, 'af_company_name', true ) ? get_user_meta( $pa->ID, 'af_company_name', true ) : $pa->display_name ); ?></option>
-					<?php endforeach; ?>
-				</select>
-			</label>
-			<?php endif; ?>
-			<button type="submit" class="button af-btn af-btn--primary"><?php esc_html_e( 'Crear edificio', 'arriendo-facil' ); ?></button>
-		</form>
-	</div>
-
 	<?php if ( empty( $buildings ) ) : ?>
-		<div class="af-section" style="padding: var(--af-space-5);">
-			<p><?php esc_html_e( 'Aún no hay edificios registrados. Crea el primero para empezar a prorratear alícuotas.', 'arriendo-facil' ); ?></p>
+
+		<div class="af-empty" style="margin-bottom: var(--af-space-5);">
+			<span class="af-empty__icon" aria-hidden="true"><?php echo af_lucide( 'building-2', 28 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+			<h3 class="af-empty__title"><?php esc_html_e( 'Aún no hay edificios registrados', 'arriendo-facil' ); ?></h3>
+			<p class="af-empty__text"><?php esc_html_e( 'Crea el primero para empezar a prorratear alícuotas entre sus unidades.', 'arriendo-facil' ); ?></p>
 		</div>
+
+		<section class="af-section">
+			<header class="af-section__header">
+				<div class="af-section__head">
+					<h2 class="af-section__title"><?php esc_html_e( 'Nuevo edificio', 'arriendo-facil' ); ?></h2>
+					<p class="af-section__subtitle"><?php esc_html_e( 'Registra el edificio con su alícuota mensual total. Luego añade las unidades y sus coeficientes.', 'arriendo-facil' ); ?></p>
+				</div>
+			</header>
+			<p class="af-modal__status" id="af-building-status"></p>
+			<form id="af-building-form" class="af-buildings-form">
+				<div class="af-form-field">
+					<label class="af-form-field__label" for="af-building-name"><?php esc_html_e( 'Nombre', 'arriendo-facil' ); ?> <span class="af-required" aria-hidden="true">*</span></label>
+					<input type="text" id="af-building-name" name="name" required class="regular-text" />
+				</div>
+				<div class="af-form-field">
+					<label class="af-form-field__label" for="af-building-address"><?php esc_html_e( 'Dirección', 'arriendo-facil' ); ?></label>
+					<input type="text" id="af-building-address" name="address" class="regular-text" />
+				</div>
+				<div class="af-form-field">
+					<label class="af-form-field__label" for="af-building-city"><?php esc_html_e( 'Ciudad', 'arriendo-facil' ); ?></label>
+					<input type="text" id="af-building-city" name="city" class="regular-text" />
+				</div>
+				<div class="af-form-field">
+					<label class="af-form-field__label" for="af-building-hoa"><?php esc_html_e( 'Alícuota mensual total (USD)', 'arriendo-facil' ); ?></label>
+					<input type="number" id="af-building-hoa" name="monthly_hoa_total" step="0.01" min="0" value="0.00" />
+				</div>
+				<?php if ( $is_super_admin && ! empty( $property_admins ) ) : ?>
+				<div class="af-form-field">
+					<label class="af-form-field__label" for="af-building-admin"><?php esc_html_e( 'Administrador de propiedades', 'arriendo-facil' ); ?></label>
+					<select id="af-building-admin" name="assigned_admin_id">
+						<option value=""><?php esc_html_e( '— Asignar a mí mismo —', 'arriendo-facil' ); ?></option>
+						<?php foreach ( $property_admins as $pa ) : ?>
+							<option value="<?php echo esc_attr( $pa->ID ); ?>"><?php echo esc_html( get_user_meta( $pa->ID, 'af_company_name', true ) ? get_user_meta( $pa->ID, 'af_company_name', true ) : $pa->display_name ); ?></option>
+						<?php endforeach; ?>
+					</select>
+				</div>
+				<?php endif; ?>
+				<button type="submit" class="button af-btn af-btn--primary"><?php esc_html_e( 'Crear edificio', 'arriendo-facil' ); ?></button>
+			</form>
+		</section>
+
 	<?php else : ?>
 
-		<form method="get" class="af-section" style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; padding: var(--af-space-4) var(--af-space-5); margin-bottom: var(--af-space-4);">
-			<input type="hidden" name="page" value="af-buildings" />
-			<label style="display:flex; align-items:center; gap:8px; font-weight:600;">
-				<?php esc_html_e( 'Edificio', 'arriendo-facil' ); ?>
-				<select name="building_id" style="min-height:36px;" onchange="this.form.submit()">
-					<?php foreach ( $buildings as $building ) : ?>
-						<option value="<?php echo esc_attr( (int) $building->id ); ?>" <?php selected( $selected_id, (int) $building->id ); ?>>
-							<?php echo esc_html( $building->name ); ?>
-						</option>
-					<?php endforeach; ?>
-				</select>
-			</label>
-		</form>
+		<nav class="af-building-switcher" aria-label="<?php esc_attr_e( 'Seleccionar edificio', 'arriendo-facil' ); ?>">
+			<?php foreach ( $buildings as $building ) : ?>
+				<?php
+				$is_active = $selected_id === (int) $building->id;
+				$count     = isset( $unit_counts[ (int) $building->id ] ) ? $unit_counts[ (int) $building->id ] : 0;
+				$place     = trim( trim( (string) $building->address ) . ( ! empty( $building->city ) ? ', ' . $building->city : '' ) );
+				?>
+				<a class="af-building-chip <?php echo $is_active ? 'is-active' : ''; ?>" href="<?php echo esc_url( add_query_arg( array( 'page' => 'af-buildings', 'building_id' => (int) $building->id ), admin_url( 'admin.php' ) ) ); ?>">
+					<span class="af-building-chip__icon" aria-hidden="true"><?php echo af_lucide( 'building-2', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+					<span class="af-building-chip__body">
+						<span class="af-building-chip__name"><?php echo esc_html( $building->name ); ?></span>
+						<?php if ( '' !== $place ) : ?>
+							<span class="af-building-chip__meta"><?php echo esc_html( $place ); ?></span>
+						<?php endif; ?>
+					</span>
+					<span class="af-building-chip__count"><?php echo esc_html( sprintf( /* translators: %d: number of units */ _n( '%d unidad', '%d unidades', $count, 'arriendo-facil' ), $count ) ); ?></span>
+				</a>
+			<?php endforeach; ?>
+		</nav>
 
 		<?php if ( $selected_building ) : ?>
-			<div class="af-kpi-grid">
-				<article class="af-kpi">
-					<div class="af-kpi__head"><span class="af-kpi__label"><?php esc_html_e( 'Alícuota total', 'arriendo-facil' ); ?></span></div>
+
+			<div class="af-kpi-grid af-buildings-kpis">
+				<article class="af-kpi af-kpi--accent">
+					<div class="af-kpi__head">
+						<span class="af-kpi__label"><?php esc_html_e( 'Alícuota total', 'arriendo-facil' ); ?></span>
+						<span class="af-kpi__icon" aria-hidden="true"><?php echo af_lucide( 'receipt', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+					</div>
 					<div class="af-kpi__value">$<?php echo esc_html( number_format_i18n( (float) $selected_building->monthly_hoa_total, 2 ) ); ?></div>
 					<div class="af-kpi__hint"><?php esc_html_e( 'Mensual, a prorratear', 'arriendo-facil' ); ?></div>
 				</article>
 
-				<article class="af-kpi">
-					<div class="af-kpi__head"><span class="af-kpi__label"><?php esc_html_e( 'Unidades', 'arriendo-facil' ); ?></span></div>
+				<article class="af-kpi af-kpi--info">
+					<div class="af-kpi__head">
+						<span class="af-kpi__label"><?php esc_html_e( 'Unidades', 'arriendo-facil' ); ?></span>
+						<span class="af-kpi__icon" aria-hidden="true"><?php echo af_lucide( 'layout-grid', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+					</div>
 					<div class="af-kpi__value"><?php echo esc_html( count( $units ) ); ?></div>
 					<div class="af-kpi__hint"><?php esc_html_e( 'Activas', 'arriendo-facil' ); ?></div>
 				</article>
 
 				<article class="af-kpi <?php echo abs( $coefficient_total - 100 ) > 0.01 ? 'af-kpi--attention' : 'af-kpi--success'; ?>">
-					<div class="af-kpi__head"><span class="af-kpi__label"><?php esc_html_e( 'Suma de coeficientes', 'arriendo-facil' ); ?></span></div>
+					<div class="af-kpi__head">
+						<span class="af-kpi__label"><?php esc_html_e( 'Suma de coeficientes', 'arriendo-facil' ); ?></span>
+						<span class="af-kpi__icon" aria-hidden="true"><?php echo af_lucide( 'trending-up', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+					</div>
 					<div class="af-kpi__value"><?php echo esc_html( number_format_i18n( $coefficient_total, 2 ) ); ?>%</div>
 					<div class="af-kpi__hint">
 						<?php
@@ -143,47 +181,54 @@ $accommodations = get_posts( $accommodation_args );
 				</article>
 			</div>
 
-			<div class="af-section" style="padding: var(--af-space-5); margin-bottom: var(--af-space-4);">
-				<h2 class="af-section__title" style="margin-top:0;"><?php esc_html_e( 'Agregar unidad', 'arriendo-facil' ); ?></h2>
+			<section class="af-section" style="margin-bottom: var(--af-space-5);">
+				<header class="af-section__header">
+					<div class="af-section__head">
+						<h2 class="af-section__title"><?php esc_html_e( 'Agregar unidad', 'arriendo-facil' ); ?></h2>
+						<p class="af-section__subtitle"><?php esc_html_e( 'Asigna el coeficiente de prorrateo y, si existe, vincula la unidad a una propiedad.', 'arriendo-facil' ); ?></p>
+					</div>
+				</header>
 				<p class="af-modal__status" id="af-unit-status"></p>
-				<form id="af-unit-form" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:12px; align-items:end;">
+				<form id="af-unit-form" class="af-buildings-form">
 					<input type="hidden" name="building_id" value="<?php echo esc_attr( $selected_id ); ?>" />
-					<label>
-						<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Código', 'arriendo-facil' ); ?> *</span>
-						<input type="text" name="unit_code" required placeholder="A-101" style="width:100%;" />
-					</label>
-					<label>
-						<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Coeficiente (%)', 'arriendo-facil' ); ?></span>
-						<input type="number" name="hoa_coefficient" step="0.0001" min="0" max="100" value="0" style="width:100%;" />
-					</label>
-					<label>
-						<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Área (m²)', 'arriendo-facil' ); ?></span>
-						<input type="number" name="area_m2" step="0.01" min="0" value="0" style="width:100%;" />
-					</label>
-					<label>
-						<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Vincular a propiedad', 'arriendo-facil' ); ?></span>
-						<select name="accommodation_id" style="width:100%;">
+					<div class="af-form-field">
+						<label class="af-form-field__label" for="af-unit-code"><?php esc_html_e( 'Código', 'arriendo-facil' ); ?> <span class="af-required" aria-hidden="true">*</span></label>
+						<input type="text" id="af-unit-code" name="unit_code" required placeholder="A-101" />
+					</div>
+					<div class="af-form-field">
+						<label class="af-form-field__label" for="af-unit-coef"><?php esc_html_e( 'Coeficiente (%)', 'arriendo-facil' ); ?></label>
+						<input type="number" id="af-unit-coef" name="hoa_coefficient" step="0.0001" min="0" max="100" value="0" />
+					</div>
+					<div class="af-form-field">
+						<label class="af-form-field__label" for="af-unit-area"><?php esc_html_e( 'Área (m²)', 'arriendo-facil' ); ?></label>
+						<input type="number" id="af-unit-area" name="area_m2" step="0.01" min="0" value="0" />
+					</div>
+					<div class="af-form-field">
+						<label class="af-form-field__label" for="af-unit-accommodation"><?php esc_html_e( 'Vincular a propiedad', 'arriendo-facil' ); ?></label>
+						<select id="af-unit-accommodation" name="accommodation_id">
 							<option value="0"><?php esc_html_e( '— Ninguna —', 'arriendo-facil' ); ?></option>
 							<?php foreach ( $accommodations as $accommodation ) : ?>
 								<option value="<?php echo esc_attr( (int) $accommodation->ID ); ?>"><?php echo esc_html( $accommodation->post_title ); ?></option>
 							<?php endforeach; ?>
 						</select>
-					</label>
+					</div>
 					<button type="submit" class="button af-btn af-btn--primary"><?php esc_html_e( 'Agregar unidad', 'arriendo-facil' ); ?></button>
 				</form>
-			</div>
+			</section>
 
 			<section class="af-section">
 				<header class="af-section__header">
-					<div>
+					<div class="af-section__head">
 						<h2 class="af-section__title"><?php esc_html_e( 'Unidades del edificio', 'arriendo-facil' ); ?></h2>
+						<p class="af-section__subtitle"><?php echo esc_html( $selected_building->name ); ?></p>
 					</div>
+					<span class="af-pill af-pill--info"><?php echo esc_html( sprintf( /* translators: %d: number of units */ _n( '%d unidad', '%d unidades', count( $units ), 'arriendo-facil' ), count( $units ) ) ); ?></span>
 				</header>
 
-				<table class="wp-list-table widefat fixed striped af-data-table">
+				<table class="wp-list-table widefat fixed striped af-data-table af-units-table">
 					<thead>
 						<tr>
-							<th><?php esc_html_e( 'Código', 'arriendo-facil' ); ?></th>
+							<th><?php esc_html_e( 'Unidad', 'arriendo-facil' ); ?></th>
 							<th><?php esc_html_e( 'Propiedad vinculada', 'arriendo-facil' ); ?></th>
 							<th><?php esc_html_e( 'Coeficiente', 'arriendo-facil' ); ?></th>
 							<th><?php esc_html_e( 'Área', 'arriendo-facil' ); ?></th>
@@ -192,26 +237,106 @@ $accommodations = get_posts( $accommodation_args );
 					</thead>
 					<tbody>
 						<?php if ( empty( $units ) ) : ?>
-							<tr><td colspan="5"><?php esc_html_e( 'Este edificio aún no tiene unidades.', 'arriendo-facil' ); ?></td></tr>
+							<tr>
+								<td colspan="5" class="no-items-cell">
+									<?php esc_html_e( 'Este edificio aún no tiene unidades. Añade la primera con el formulario de arriba.', 'arriendo-facil' ); ?>
+								</td>
+							</tr>
 						<?php else : ?>
-							<?php foreach ( $units as $unit ) : ?>
-								<?php
+							<?php
+							$coef_sum = 0.0;
+							$area_sum = 0.0;
+							$hoa_sum  = 0.0;
+							foreach ( $units as $unit ) :
 								$linked_title = $unit->accommodation_id ? get_the_title( (int) $unit->accommodation_id ) : '';
 								$unit_hoa     = Arriendo_Facil_Property_Structure::calculate_unit_hoa( (int) $unit->id );
+								$unit_coef    = (float) $unit->hoa_coefficient;
+								$coef_sum    += $unit_coef;
+								$area_sum    += (float) $unit->area_m2;
+								$hoa_sum     += $unit_hoa;
 								?>
 								<tr>
-									<td data-label="<?php esc_attr_e( 'Código', 'arriendo-facil' ); ?>"><strong><?php echo esc_html( $unit->unit_code ); ?></strong></td>
-									<td data-label="<?php esc_attr_e( 'Propiedad vinculada', 'arriendo-facil' ); ?>"><?php echo esc_html( $linked_title ? $linked_title : '—' ); ?></td>
-									<td data-label="<?php esc_attr_e( 'Coeficiente', 'arriendo-facil' ); ?>"><?php echo esc_html( number_format_i18n( (float) $unit->hoa_coefficient, 4 ) ); ?>%</td>
+									<td data-label="<?php esc_attr_e( 'Unidad', 'arriendo-facil' ); ?>">
+										<span class="af-unit-code">
+											<?php echo af_lucide( 'home', 15 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
+											<?php echo esc_html( $unit->unit_code ); ?>
+										</span>
+									</td>
+									<td data-label="<?php esc_attr_e( 'Propiedad vinculada', 'arriendo-facil' ); ?>">
+										<span class="af-unit-linked">
+											<?php echo $linked_title ? esc_html( $linked_title ) : esc_html__( 'Sin vincular', 'arriendo-facil' ); ?>
+										</span>
+										<?php if ( $linked_title ) : ?>
+											<?php echo af_pill( 'active', __( 'Vinculada', 'arriendo-facil' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped markup. ?>
+										<?php endif; ?>
+									</td>
+									<td data-label="<?php esc_attr_e( 'Coeficiente', 'arriendo-facil' ); ?>">
+										<span class="af-coef <?php echo $unit_coef > 100 ? 'is-over' : ''; ?>">
+											<strong><?php echo esc_html( number_format_i18n( $unit_coef, 4 ) ); ?>%</strong>
+											<span class="af-coef__bar" aria-hidden="true"><span style="width: <?php echo esc_attr( max( 0, min( 100, $unit_coef ) ) ); ?>%;"></span></span>
+										</span>
+									</td>
 									<td data-label="<?php esc_attr_e( 'Área', 'arriendo-facil' ); ?>"><?php echo esc_html( number_format_i18n( (float) $unit->area_m2, 2 ) ); ?> m²</td>
-									<td data-label="<?php esc_attr_e( 'Alícuota mensual', 'arriendo-facil' ); ?>">$<?php echo esc_html( number_format_i18n( $unit_hoa, 2 ) ); ?></td>
+									<td data-label="<?php esc_attr_e( 'Alícuota mensual', 'arriendo-facil' ); ?>"><span class="af-unit-hoa">$<?php echo esc_html( number_format_i18n( $unit_hoa, 2 ) ); ?></span></td>
 								</tr>
 							<?php endforeach; ?>
 						<?php endif; ?>
 					</tbody>
+					<?php if ( ! empty( $units ) ) : ?>
+						<tfoot>
+							<tr>
+								<td colspan="2"><span class="af-totals-label"><?php esc_html_e( 'Totales', 'arriendo-facil' ); ?></span></td>
+								<td data-label="<?php esc_attr_e( 'Coeficiente', 'arriendo-facil' ); ?>"><?php echo esc_html( number_format_i18n( $coef_sum, 4 ) ); ?>%</td>
+								<td data-label="<?php esc_attr_e( 'Área', 'arriendo-facil' ); ?>"><?php echo esc_html( number_format_i18n( $area_sum, 2 ) ); ?> m²</td>
+								<td data-label="<?php esc_attr_e( 'Alícuota mensual', 'arriendo-facil' ); ?>">$<?php echo esc_html( number_format_i18n( $hoa_sum, 2 ) ); ?></td>
+							</tr>
+						</tfoot>
+					<?php endif; ?>
 				</table>
 			</section>
+
 		<?php endif; ?>
+
+		<section class="af-section" style="margin-top: var(--af-space-5);">
+			<header class="af-section__header">
+				<div class="af-section__head">
+					<h2 class="af-section__title"><?php esc_html_e( 'Nuevo edificio', 'arriendo-facil' ); ?></h2>
+					<p class="af-section__subtitle"><?php esc_html_e( '¿Construyendo otra sede? Regístrale alícuota y unidades aquí.', 'arriendo-facil' ); ?></p>
+				</div>
+			</header>
+			<p class="af-modal__status" id="af-building-status"></p>
+			<form id="af-building-form" class="af-buildings-form">
+				<div class="af-form-field">
+					<label class="af-form-field__label" for="af-building-name"><?php esc_html_e( 'Nombre', 'arriendo-facil' ); ?> <span class="af-required" aria-hidden="true">*</span></label>
+					<input type="text" id="af-building-name" name="name" required class="regular-text" />
+				</div>
+				<div class="af-form-field">
+					<label class="af-form-field__label" for="af-building-address"><?php esc_html_e( 'Dirección', 'arriendo-facil' ); ?></label>
+					<input type="text" id="af-building-address" name="address" class="regular-text" />
+				</div>
+				<div class="af-form-field">
+					<label class="af-form-field__label" for="af-building-city"><?php esc_html_e( 'Ciudad', 'arriendo-facil' ); ?></label>
+					<input type="text" id="af-building-city" name="city" class="regular-text" />
+				</div>
+				<div class="af-form-field">
+					<label class="af-form-field__label" for="af-building-hoa"><?php esc_html_e( 'Alícuota mensual total (USD)', 'arriendo-facil' ); ?></label>
+					<input type="number" id="af-building-hoa" name="monthly_hoa_total" step="0.01" min="0" value="0.00" />
+				</div>
+				<?php if ( $is_super_admin && ! empty( $property_admins ) ) : ?>
+				<div class="af-form-field">
+					<label class="af-form-field__label" for="af-building-admin"><?php esc_html_e( 'Administrador de propiedades', 'arriendo-facil' ); ?></label>
+					<select id="af-building-admin" name="assigned_admin_id">
+						<option value=""><?php esc_html_e( '— Asignar a mí mismo —', 'arriendo-facil' ); ?></option>
+						<?php foreach ( $property_admins as $pa ) : ?>
+							<option value="<?php echo esc_attr( $pa->ID ); ?>"><?php echo esc_html( get_user_meta( $pa->ID, 'af_company_name', true ) ? get_user_meta( $pa->ID, 'af_company_name', true ) : $pa->display_name ); ?></option>
+						<?php endforeach; ?>
+					</select>
+				</div>
+				<?php endif; ?>
+				<button type="submit" class="button af-btn af-btn--primary"><?php esc_html_e( 'Crear edificio', 'arriendo-facil' ); ?></button>
+			</form>
+		</section>
+
 	<?php endif; ?>
 </div>
 

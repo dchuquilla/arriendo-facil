@@ -2423,6 +2423,17 @@ class Arriendo_Facil_Admin {
 			);
 		}
 
+		// Estilos del catálogo de inmuebles.
+		if ( 'arriendo-facil_page_af-catalog' === $hook ) {
+			$catalog_css_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-catalog.css';
+			wp_enqueue_style(
+				'af-catalog',
+				ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/af-catalog.css',
+				array( 'af-tokens', 'af-shell', 'af-admin-chrome' ),
+				file_exists( $catalog_css_path ) ? (string) filemtime( $catalog_css_path ) : ARRIENDO_FACIL_VERSION
+			);
+		}
+
 		$screen = get_current_screen();
 		if ( $screen && 'accommodation' === $screen->post_type && in_array( $hook, array( 'post.php', 'post-new.php' ), true ) ) {
 			wp_enqueue_media();

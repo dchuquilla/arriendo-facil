@@ -36,11 +36,11 @@ $statuses = array(
 );
 
 $property_types = array(
-	'apartment'  => array( 'label' => __( 'Apartamento', 'arriendo-facil' ), 'icon' => '&#x1F3E2;' ),
-	'house'      => array( 'label' => __( 'Casa', 'arriendo-facil' ), 'icon' => '&#x1F3E0;' ),
-	'office'     => array( 'label' => __( 'Oficina', 'arriendo-facil' ), 'icon' => '&#x1F3D7;' ),
-	'room'       => array( 'label' => __( 'Habitaci&oacute;n', 'arriendo-facil' ), 'icon' => '&#x1F6CF;' ),
-	'commercial' => array( 'label' => __( 'Comercial', 'arriendo-facil' ), 'icon' => '&#x1F3EA;' ),
+	'apartment'  => array( 'label' => __( 'Apartamento', 'arriendo-facil' ), 'icon' => 'building' ),
+	'house'      => array( 'label' => __( 'Casa', 'arriendo-facil' ), 'icon' => 'home' ),
+	'office'     => array( 'label' => __( 'Oficina', 'arriendo-facil' ), 'icon' => 'building-2' ),
+	'room'       => array( 'label' => __( 'Habitaci&oacute;n', 'arriendo-facil' ), 'icon' => 'bed' ),
+	'commercial' => array( 'label' => __( 'Comercial', 'arriendo-facil' ), 'icon' => 'store' ),
 );
 
 $search   = isset( $_GET['s'] ) ? sanitize_text_field( wp_unslash( $_GET['s'] ) ) : '';
@@ -127,7 +127,7 @@ foreach ( $accommodation_ids as $post_id ) {
 	}
 }
 ?>
-<div class="wrap af-shell">
+<div class="wrap af-shell af-catalog-page">
 
 	<?php
 	af_page_header(
@@ -151,13 +151,16 @@ foreach ( $accommodation_ids as $post_id ) {
 	);
 	?>
 
-	<section class="af-section">
+	<section class="af-section af-catalog-filters">
 		<form method="get" class="af-filter-bar">
 			<input type="hidden" name="page" value="af-catalog" />
 			<div class="af-form-field">
 				<label class="af-form-field__label" for="af-cat-search"><?php esc_html_e( 'Buscar', 'arriendo-facil' ); ?></label>
-				<input type="search" id="af-cat-search" name="s" value="<?php echo esc_attr( $search ); ?>"
-					placeholder="<?php esc_attr_e( 'Título o dirección…', 'arriendo-facil' ); ?>" />
+				<div class="af-input-with-icon">
+					<span class="af-input-with-icon__svg" aria-hidden="true"><?php echo af_lucide( 'search', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+					<input type="search" id="af-cat-search" name="s" value="<?php echo esc_attr( $search ); ?>"
+						placeholder="<?php esc_attr_e( 'Título o dirección…', 'arriendo-facil' ); ?>" />
+				</div>
 			</div>
 			<div class="af-form-field">
 				<label class="af-form-field__label" for="af-cat-status"><?php esc_html_e( 'Estado', 'arriendo-facil' ); ?></label>
@@ -198,8 +201,11 @@ foreach ( $accommodation_ids as $post_id ) {
 	</section>
 
 	<?php if ( empty( $accommodation_ids ) ) : ?>
-		<div class="af-section" style="padding: var(--af-space-5);">
-			<p><?php esc_html_e( 'No se encontraron propiedades con los filtros aplicados.', 'arriendo-facil' ); ?></p>
+		<div class="af-empty">
+			<span class="af-empty__icon" aria-hidden="true"><?php echo af_lucide( 'building', 28 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+			<h3 class="af-empty__title"><?php esc_html_e( 'No se encontraron propiedades', 'arriendo-facil' ); ?></h3>
+			<p class="af-empty__text"><?php esc_html_e( 'Ajusta o limpia los filtros para ver más resultados.', 'arriendo-facil' ); ?></p>
+			<a class="button af-btn af-btn--ghost" href="<?php echo esc_url( admin_url( 'admin.php?page=af-catalog' ) ); ?>"><?php esc_html_e( 'Limpiar filtros', 'arriendo-facil' ); ?></a>
 		</div>
 	<?php else : ?>
 		<div class="af-property-grid">
@@ -218,7 +224,7 @@ foreach ( $accommodation_ids as $post_id ) {
 					'maintenance' => __( 'En mantenimiento', 'arriendo-facil' ),
 					'inactive'    => __( 'Inactivo', 'arriendo-facil' ),
 				);
-				$type_icon   = isset( $property_types[ $type ]['icon'] ) ? $property_types[ $type ]['icon'] : '&#x1F3E2;';
+				$type_icon   = isset( $property_types[ $type ]['icon'] ) ? $property_types[ $type ]['icon'] : 'building';
 				$type_label  = isset( $property_types[ $type ]['label'] ) ? $property_types[ $type ]['label'] : ucfirst( $type );
 				?>
 				<a class="af-property-card" href="<?php echo esc_url( get_edit_post_link( $prop_id ) ); ?>">
@@ -227,7 +233,7 @@ foreach ( $accommodation_ids as $post_id ) {
 							<img src="<?php echo esc_url( $thumb ); ?>" alt="<?php echo esc_attr( get_the_title( $prop_id ) ); ?>" loading="lazy" />
 						<?php else : ?>
 							<div class="af-property-card__placeholder" aria-hidden="true">
-								<svg width="42" height="42" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 11l9-8 9 8v10a1 1 0 01-1 1h-5v-6H10v6H4a1 1 0 01-1-1V11z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+								<?php echo af_lucide( 'building', 40 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
 							</div>
 						<?php endif; ?>
 						<div class="af-property-card__badges">
@@ -236,38 +242,49 @@ foreach ( $accommodation_ids as $post_id ) {
 					</div>
 					<div class="af-property-card__body">
 						<div class="af-catalog-card__type">
-							<span class="af-catalog-card__type-icon" aria-hidden="true"><?php echo $type_icon; // phpcs:ignore WordPress.Security.EscapeOutput ?></span>
+							<span class="af-catalog-card__type-icon" aria-hidden="true"><?php echo af_lucide( $type_icon, 14 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
 							<?php echo esc_html( $type_label ); ?>
 						</div>
 						<h3 class="af-property-card__title"><?php echo esc_html( get_the_title( $prop_id ) ); ?></h3>
-						<p class="af-property-card__meta">
-							<?php if ( $prop->address ) : ?>
-								<?php echo esc_html( $prop->address ); ?>
-							<?php endif; ?>
-							<?php if ( $prop->city ) : ?>
-								<?php echo esc_html( ', ' . $prop->city ); ?>
-							<?php endif; ?>
-						</p>
+						<?php if ( $prop->address || $prop->city ) : ?>
+							<p class="af-catalog-card__address">
+								<span class="af-catalog-card__address-icon" aria-hidden="true"><?php echo af_lucide( 'map-pin', 13 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+								<span class="af-catalog-card__address-text"><?php echo esc_html( trim( trim( (string) $prop->address ) . ( $prop->city ? ', ' . $prop->city : '' ) ) ); ?></span>
+							</p>
+						<?php endif; ?>
 						<p class="af-catalog-card__specs">
 							<?php if ( (int) $prop->bedrooms ) : ?>
-								<span><?php echo esc_html( sprintf( /* translators: %d: bedrooms */ _n( '%d dorm.', '%d dorm.', (int) $prop->bedrooms, 'arriendo-facil' ), (int) $prop->bedrooms ) ); ?></span>
+								<span class="af-catalog-card__spec">
+									<span class="af-catalog-card__spec-icon" aria-hidden="true"><?php echo af_lucide( 'bed', 13 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+									<?php echo esc_html( sprintf( /* translators: %d: bedrooms */ _n( '%d dorm.', '%d dorm.', (int) $prop->bedrooms, 'arriendo-facil' ), (int) $prop->bedrooms ) ); ?>
+								</span>
 							<?php endif; ?>
 							<?php if ( (int) $prop->bathrooms ) : ?>
-								<span><?php echo esc_html( sprintf( /* translators: %d: bathrooms */ _n( '%d baño', '%d baños', (int) $prop->bathrooms, 'arriendo-facil' ), (int) $prop->bathrooms ) ); ?></span>
+								<span class="af-catalog-card__spec">
+									<span class="af-catalog-card__spec-icon" aria-hidden="true"><?php echo af_lucide( 'bath', 13 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+									<?php echo esc_html( sprintf( /* translators: %d: bathrooms */ _n( '%d baño', '%d baños', (int) $prop->bathrooms, 'arriendo-facil' ), (int) $prop->bathrooms ) ); ?>
+								</span>
 							<?php endif; ?>
 							<?php if ( $owner ) : ?>
-								<span class="af-catalog-card__owner"><?php echo esc_html( $owner ); ?></span>
+								<span class="af-catalog-card__spec af-catalog-card__owner">
+									<span class="af-catalog-card__spec-icon" aria-hidden="true"><?php echo af_lucide( 'user', 13 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+									<?php echo esc_html( $owner ); ?>
+								</span>
 							<?php endif; ?>
 						</p>
 						<div class="af-property-card__footer">
 							<span class="af-property-card__price">
 								<?php if ( $rent > 0 ) : ?>
 									$<?php echo esc_html( number_format_i18n( $rent, 2 ) ); ?>
+									<small><?php esc_html_e( '/ mes', 'arriendo-facil' ); ?></small>
 								<?php else : ?>
 									—
 								<?php endif; ?>
 							</span>
-							<span class="af-catalog-card__hint"><?php esc_html_e( 'Gestionar', 'arriendo-facil' ); ?> &#8594;</span>
+							<span class="af-catalog-card__hint">
+								<?php esc_html_e( 'Gestionar', 'arriendo-facil' ); ?>
+								<span class="af-catalog-card__hint-arrow" aria-hidden="true">→</span>
+							</span>
 						</div>
 					</div>
 				</a>

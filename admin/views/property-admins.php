@@ -156,7 +156,7 @@ $totals_platform = array(
 			data: {
 				labels: data.labels,
 				datasets: [
-					{ label: '<?php echo esc_js( __( 'Cobrado', 'arriendo-facil' ) ); ?>', data: data.collected, backgroundColor: '#0F9D58' },
+					{ label: '<?php echo esc_js( __( 'Cobrado', 'arriendo-facil' ) ); ?>', data: data.collected, backgroundColor: '#00A884' },
 					{ label: '<?php echo esc_js( __( 'Pendiente', 'arriendo-facil' ) ); ?>', data: data.pending, backgroundColor: '#F59E0B' }
 				]
 			},

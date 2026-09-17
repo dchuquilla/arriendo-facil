@@ -932,7 +932,7 @@ $recent_reviews        = (array) $wpdb->get_results(
 					labels: [ '<?php echo esc_js( __( 'Disponibles', 'arriendo-facil' ) ); ?>', '<?php echo esc_js( __( 'Ocupadas', 'arriendo-facil' ) ); ?>', '<?php echo esc_js( __( 'Mantenimiento', 'arriendo-facil' ) ); ?>' ],
 					datasets: [ {
 						data: [ data.occupancy.available, data.occupancy.occupied, data.occupancy.maintenance ],
-						backgroundColor: [ '#0F9D58', '#2563EB', '#F59E0B' ],
+						backgroundColor: [ '#CBD5E1', '#00A884', '#F59E0B' ],
 						borderWidth: 0
 					} ]
 				},
@@ -954,8 +954,8 @@ $recent_reviews        = (array) $wpdb->get_results(
 					datasets: [ {
 						label: '<?php echo esc_js( __( 'Cobrado', 'arriendo-facil' ) ); ?>',
 						data: data.revenue.values,
-						borderColor: '#2563EB',
-						backgroundColor: 'rgba(37,99,235,0.12)',
+						borderColor: '#00A884',
+						backgroundColor: 'rgba(0,168,132,0.12)',
 						fill: true,
 						tension: 0.35,
 						pointRadius: 3

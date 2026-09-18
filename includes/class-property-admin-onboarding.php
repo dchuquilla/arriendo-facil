@@ -79,17 +79,60 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 	/**
 	 * Registers the "Mi perfil" page for property admins.
 	 *
+	 * Access fallback: the page is gated by `af_manage_properties`, but if a
+	 * logged-in property admin still lacks that capability (stale role
+	 * definition or `wp_capabilities` user meta — e.g. accounts created
+	 * before the cap existed), the page is registered under `edit_posts`
+	 * (always present on the role) so the onboarding/profile screen is never
+	 * unreachable for them. `render_profile_page()` still enforces the
+	 * role-based guard, so opening the page is only a render — never a data
+	 * leak.
+	 *
 	 * @return void
 	 */
 	public function register_profile_menu() {
+		$cap = Arriendo_Facil_Tenancy::CAP;
+
+		$user = wp_get_current_user();
+		if ( $user instanceof WP_User && $user->exists() ) {
+			$roles = isset( $user->roles ) && is_array( $user->roles ) ? $user->roles : array();
+			if ( in_array( 'af_property_admin', $roles, true ) && ! user_can( $user, $cap ) ) {
+				$cap = 'edit_posts';
+			}
+		}
+
 		add_submenu_page(
 			'arriendo-facil',
 			__( 'Mi perfil', 'arriendo-facil' ),
 			__( 'Mi perfil', 'arriendo-facil' ),
-			Arriendo_Facil_Tenancy::CAP,
+			$cap,
 			self::PAGE_SLUG,
 			array( $this, 'render_profile_page' )
 		);
+	}
+
+	/**
+	 * Whether the current user may manage their own profile/onboarding.
+	 *
+	 * Property admins always can (it's their own data). WP administrators
+	 * (super admins) can as well.
+	 *
+	 * @param int $user_id Optional user ID (defaults to current user).
+	 * @return bool
+	 */
+	private function can_manage_own_profile( $user_id = 0 ) {
+		$user = $user_id ? get_user_by( 'id', absint( $user_id ) ) : wp_get_current_user();
+		if ( ! $user instanceof WP_User || ! $user->exists() ) {
+			return false;
+		}
+
+		if ( user_can( $user, 'manage_options' ) ) {
+			return true;
+		}
+
+		$roles = isset( $user->roles ) && is_array( $user->roles ) ? $user->roles : array();
+
+		return in_array( 'af_property_admin', $roles, true );
 	}
 
 	/**
@@ -98,7 +141,7 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 	 * @return void
 	 */
 	public function render_profile_page() {
-		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
+		if ( ! $this->can_manage_own_profile() ) {
 			wp_die( esc_html__( 'Permiso denegado.', 'arriendo-facil' ) );
 		}
 
@@ -149,130 +192,288 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 				++$done_count;
 			}
 		}
-		$total = count( $steps );
+		$total   = count( $steps );
+		$percent = $total > 0 ? (int) round( ( $done_count / $total ) * 100 ) : 0;
 		?>
-		<div class="wrap">
-			<h1><?php echo esc_html__( 'Mi perfil', 'arriendo-facil' ); ?></h1>
+		<div class="wrap af-shell af-profile-page">
+			<?php
+			$current_user = wp_get_current_user();
+			$email_text   = $current_user instanceof WP_User ? (string) $current_user->user_email : '';
+			$display_name = $current_user instanceof WP_User ? (string) $current_user->display_name : '';
+			$signup_source = (string) get_user_meta( $user_id, 'af_signup_source', true );
+			$profile_url  = get_edit_profile_url( $user_id );
+			$avatar_html  = get_avatar( $user_id, 96 );
+			$resend_nonce = wp_create_nonce( 'af_admin_signup_frontend_nonce' );
 
-			<div id="af-profile-alert" class="notice" style="display:none;"></div>
+			$doc_badges = array(
+				'pendiente'   => array( 'af-pill--warning', __( 'Pendiente', 'arriendo-facil' ) ),
+				'en_revision' => array( 'af-pill--info', __( 'En revisión', 'arriendo-facil' ) ),
+				'verificado'  => array( 'af-pill--success', __( 'Verificado', 'arriendo-facil' ) ),
+				'rechazado'   => array( 'af-pill--danger', __( 'Rechazado', 'arriendo-facil' ) ),
+			);
+			$doc_status = $doc_status ? $doc_status : 'pendiente';
+			$doc_badge  = isset( $doc_badges[ $doc_status ] ) ? $doc_badges[ $doc_status ] : $doc_badges['pendiente'];
 
-			<div class="af-profile">
-				<div class="af-profile__checklist">
-					<h2><?php echo esc_html__( 'Tu camino de activacion', 'arriendo-facil' ); ?></h2>
-					<p>
-						<?php
-						printf(
-							/* translators: %1$d: done steps, %2$d: total steps */
-							esc_html__( 'Completaste %1$d de %2$d pasos.', 'arriendo-facil' ),
-							esc_html( (string) $done_count ),
-							esc_html( (string) $total )
-						);
-						?>
-					</p>
-					<ol class="af-profile__steps">
-						<?php foreach ( $steps as $key => $step ) : ?>
-							<li class="af-profile__step <?php echo $status_map[ $key ] ? 'is-complete' : ''; ?>">
-								<span class="af-profile__step-label"><?php echo esc_html( $step['label'] ); ?></span>
-								<span class="af-profile__step-hint"><?php echo esc_html( $step['hint'] ); ?></span>
+			af_page_header(
+				array(
+					'eyebrow'  => __( 'Arriendo Fácil', 'arriendo-facil' ),
+					'title'    => __( 'Mi perfil', 'arriendo-facil' ),
+					'subtitle' => __( 'Revisa el estado de tu cuenta y completa los datos de tu empresa para activar tu espacio de administración.', 'arriendo-facil' ),
+					'actions'  => array(
+						array(
+							'label'   => __( 'Nombre, foto y contraseña', 'arriendo-facil' ),
+							'url'     => $profile_url,
+							'variant' => 'ghost',
+							'icon'    => af_lucide( 'user' ),
+						),
+					),
+				)
+			);
+			?>
+
+			<div id="af-profile-alert" class="af-profile-alert" role="status" aria-live="polite" hidden></div>
+
+			<div class="af-kpi-grid af-profile__status" role="list">
+				<?php foreach ( $steps as $key => $step ) : ?>
+					<?php $done = $status_map[ $key ]; ?>
+					<div class="af-kpi <?php echo $done ? 'af-kpi--success' : 'af-kpi--attention'; ?>" role="listitem">
+						<div class="af-kpi__head">
+							<span class="af-kpi__label"><?php echo esc_html( $step['label'] ); ?></span>
+							<span class="af-kpi__icon" aria-hidden="true"><?php echo af_lucide( $done ? 'check' : 'circle-alert' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
+						</div>
+						<div class="af-kpi__value"><?php echo esc_html( $done ? __( 'Listo', 'arriendo-facil' ) : __( 'Pendiente', 'arriendo-facil' ) ); ?></div>
+						<div class="af-kpi__hint"><?php echo esc_html( $step['hint'] ); ?></div>
+					</div>
+				<?php endforeach; ?>
+			</div>
+
+			<div class="af-profile af-profile-layout">
+				<div class="af-profile-layout__main">
+					<form data-af-profile-form class="af-profile__form">
+						<input type="hidden" name="nonce" value="<?php echo esc_attr( $nonce ); ?>" />
+
+						<section class="af-section">
+							<div class="af-section__header">
+								<div>
+									<h2 class="af-section__title"><?php esc_html_e( 'Datos de la empresa', 'arriendo-facil' ); ?></h2>
+									<p class="af-section__subtitle"><?php esc_html_e( 'Información que usa el equipo de la plataforma para contactarte y validar tu operación.', 'arriendo-facil' ); ?></p>
+								</div>
+							</div>
+							<div class="af-form-grid">
+								<div class="af-form-field af-form-field--full">
+									<label class="af-form-field__label" for="af-company-name"><?php esc_html_e( 'Nombre de la empresa', 'arriendo-facil' ); ?> <span class="af-required">*</span></label>
+									<input id="af-company-name" class="regular-text" type="text" name="company_name" maxlength="190" value="<?php echo esc_attr( $company_name ); ?>" required />
+								</div>
+								<div class="af-form-field">
+									<label class="af-form-field__label" for="af-contact-name"><?php esc_html_e( 'Responsable', 'arriendo-facil' ); ?> <span class="af-required">*</span></label>
+									<input id="af-contact-name" class="regular-text" type="text" name="contact_name" maxlength="190" value="<?php echo esc_attr( $contact_name ); ?>" required />
+								</div>
+								<div class="af-form-field">
+									<label class="af-form-field__label" for="af-contact-phone"><?php esc_html_e( 'Teléfono de contacto', 'arriendo-facil' ); ?> <span class="af-required">*</span></label>
+									<input id="af-contact-phone" class="regular-text" type="tel" name="phone" maxlength="20" value="<?php echo esc_attr( $phone ); ?>" required />
+								</div>
+							</div>
+						</section>
+
+						<section class="af-section">
+							<div class="af-section__header">
+								<div>
+									<h2 class="af-section__title"><?php esc_html_e( 'Identidad del responsable', 'arriendo-facil' ); ?></h2>
+									<p class="af-section__subtitle"><?php esc_html_e( 'Se valida automáticamente y se guarda cifrada.', 'arriendo-facil' ); ?></p>
+								</div>
+								<span class="af-pill <?php echo esc_attr( $doc_badge[0] ); ?>"><?php echo esc_html( $doc_badge[1] ); ?></span>
+							</div>
+							<div class="af-form-grid">
+								<div class="af-form-field">
+									<label class="af-form-field__label" for="af-id-type"><?php esc_html_e( 'Tipo de identificación', 'arriendo-facil' ); ?></label>
+									<select id="af-id-type" class="regular-text" name="id_type">
+										<option value=""><?php esc_html_e( 'Selecciona', 'arriendo-facil' ); ?></option>
+										<option value="cedula" <?php selected( $id_type, 'cedula' ); ?>><?php esc_html_e( 'Cédula', 'arriendo-facil' ); ?></option>
+										<option value="ruc" <?php selected( $id_type, 'ruc' ); ?>><?php esc_html_e( 'RUC', 'arriendo-facil' ); ?></option>
+									</select>
+								</div>
+								<div class="af-form-field">
+									<label class="af-form-field__label" for="af-id-number"><?php esc_html_e( 'Número de identificación', 'arriendo-facil' ); ?></label>
+									<input id="af-id-number" class="regular-text" type="text" name="id_number" maxlength="20"
+										value=""
+										placeholder="<?php echo $id_enc ? esc_attr__( 'Conservar número actual', 'arriendo-facil' ) : esc_attr__( 'ej. 1834567890', 'arriendo-facil' ); ?>"
+										<?php echo $id_enc ? 'data-preserve-id="1"' : 'required'; ?> />
+									<?php if ( $id_enc ) : ?>
+										<span class="af-form-field__hint"><?php esc_html_e( 'Ya está guardado de forma segura. Déjalo en blanco para conservarlo o ingresa uno nuevo.', 'arriendo-facil' ); ?></span>
+									<?php endif; ?>
+								</div>
+								<div class="af-form-field">
+									<label class="af-form-field__label" for="af-nationality"><?php esc_html_e( 'Nacionalidad', 'arriendo-facil' ); ?></label>
+									<input id="af-nationality" class="regular-text" type="text" name="nationality" maxlength="100" value="<?php echo esc_attr( $nationality ); ?>" />
+								</div>
+								<div class="af-form-field">
+									<label class="af-form-field__label" for="af-birth-city"><?php esc_html_e( 'Ciudad de nacimiento', 'arriendo-facil' ); ?></label>
+									<input id="af-birth-city" class="regular-text" type="text" name="birth_city" maxlength="150" value="<?php echo esc_attr( $birth_city ); ?>" />
+								</div>
+							</div>
+						</section>
+
+						<div class="af-profile__submit">
+							<button type="submit" class="button button-primary af-btn af-btn--primary"><?php esc_html_e( 'Guardar cambios', 'arriendo-facil' ); ?></button>
+						</div>
+					</form>
+
+					<section class="af-section">
+						<div class="af-section__header">
+							<div>
+								<h2 class="af-section__title"><?php esc_html_e( 'Documentos de soporte', 'arriendo-facil' ); ?></h2>
+								<p class="af-section__subtitle"><?php esc_html_e( 'Cédula o papeleta de votación, certificado laboral y certificado bancario en PDF. Se guardan de forma privada.', 'arriendo-facil' ); ?></p>
+							</div>
+						</div>
+						<form data-af-doc-form>
+							<input type="hidden" name="nonce" value="<?php echo esc_attr( $nonce ); ?>" />
+							<?php foreach ( self::DOC_TYPES as $doc_type ) : ?>
+								<?php $doc = isset( $documents[ $doc_type ] ) ? $documents[ $doc_type ] : null; ?>
+								<div class="af-profile__doc-row">
+									<div class="af-profile__doc-meta">
+										<span class="af-profile__doc-label"><?php echo esc_html( $this->doc_type_label( $doc_type ) ); ?></span>
+										<span class="af-form-field__hint"><?php esc_html_e( 'PDF', 'arriendo-facil' ); ?></span>
+									</div>
+									<div class="af-profile__doc-controls">
+										<?php echo af_pill( $doc ? 'active' : 'pending', $doc ? __( 'Subido', 'arriendo-facil' ) : __( 'Pendiente', 'arriendo-facil' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+										<label class="button af-btn af-btn--ghost af-profile__file-btn">
+											<?php echo af_lucide( 'upload', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+											<span><?php echo $doc ? esc_html__( 'Reemplazar', 'arriendo-facil' ) : esc_html__( 'Subir', 'arriendo-facil' ); ?></span>
+											<input type="file" name="document_pdf" accept="application/pdf" class="af-profile__file" data-doc-type="<?php echo esc_attr( $doc_type ); ?>" />
+										</label>
+									</div>
+								</div>
+							<?php endforeach; ?>
+							<div class="af-profile__doc-actions">
+								<button type="submit" class="button button-primary af-btn af-btn--primary"><?php esc_html_e( 'Subir documento', 'arriendo-facil' ); ?></button>
+							</div>
+						</form>
+					</section>
+				</div>
+
+				<aside class="af-profile-layout__side">
+					<section class="af-section">
+						<div class="af-section__header">
+							<div>
+								<h2 class="af-section__title"><?php esc_html_e( 'Mi cuenta', 'arriendo-facil' ); ?></h2>
+								<p class="af-section__subtitle"><?php esc_html_e( 'Tu acceso a la plataforma.', 'arriendo-facil' ); ?></p>
+							</div>
+						</div>
+						<div class="af-account">
+							<div class="af-account__avatar"><?php echo wp_kses_post( $avatar_html ); ?></div>
+							<div class="af-account__meta">
+								<span class="af-account__name"><?php echo esc_html( $display_name ); ?></span>
+								<span class="af-account__email"><?php echo esc_html( $email_text ); ?></span>
+							</div>
+							<span class="af-pill <?php echo $email_ok ? 'af-pill--success' : 'af-pill--warning'; ?>"><?php echo esc_html( $email_ok ? __( 'Verificado', 'arriendo-facil' ) : __( 'Pendiente', 'arriendo-facil' ) ); ?></span>
+						</div>
+						<?php if ( ! $email_ok && 'manual' !== $signup_source ) : ?>
+							<p class="af-account__hint"><?php esc_html_e( 'Necesitas verificar tu correo para operar. Te enviamos un enlace al registrarte.', 'arriendo-facil' ); ?></p>
+							<button type="button" class="button af-btn af-btn--ghost" data-af-resend-email>
+								<?php echo af_lucide( 'refresh-cw', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+								<?php esc_html_e( 'Reenviar correo de verificación', 'arriendo-facil' ); ?>
+							</button>
+						<?php elseif ( ! $email_ok ) : ?>
+							<p class="af-account__hint"><?php esc_html_e( 'Tu cuenta fue creada por un administrador. El correo figurará como verificado una vez actives la cuenta.', 'arriendo-facil' ); ?></p>
+						<?php endif; ?>
+						<ul class="af-account__links">
+							<li>
+								<a href="<?php echo esc_url( $profile_url ); ?>"><?php echo af_lucide( 'user', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?><span><?php esc_html_e( 'Editar nombre, foto y contraseña', 'arriendo-facil' ); ?></span></a>
 							</li>
-						<?php endforeach; ?>
-					</ol>
+							<li>
+								<a href="<?php echo esc_url( wp_logout_url( admin_url( 'admin.php?page=' . self::PAGE_SLUG ) ) ); ?>"><?php echo af_lucide( 'log-out', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?><span><?php esc_html_e( 'Cerrar sesión', 'arriendo-facil' ); ?></span></a>
+							</li>
+						</ul>
+					</section>
+
+					<section class="af-section">
+						<div class="af-section__header">
+							<div>
+								<h2 class="af-section__title"><?php esc_html_e( 'Tu camino de activación', 'arriendo-facil' ); ?></h2>
+								<p class="af-section__subtitle">
+									<?php
+									printf(
+										/* translators: %1$d: done steps, %2$d: total steps */
+										esc_html__( 'Completaste %1$d de %2$d pasos.', 'arriendo-facil' ),
+										esc_html( (string) $done_count ),
+										esc_html( (string) $total )
+									);
+									?>
+								</p>
+							</div>
+						</div>
+						<div class="af-progress" role="progressbar" aria-valuemin="0" aria-valuemax="<?php echo esc_attr( (string) $total ); ?>" aria-valuenow="<?php echo esc_attr( (string) $done_count ); ?>">
+							<div class="af-progress__track"><span class="af-progress__bar" style="width:<?php echo esc_attr( (string) $percent ); ?>%;"></span></div>
+							<span class="af-progress__value"><?php echo esc_html( (string) $percent ); ?>%</span>
+						</div>
+						<ul class="af-checklist">
+							<?php foreach ( $steps as $key => $step ) : ?>
+								<li class="af-checklist__item <?php echo $status_map[ $key ] ? 'is-done' : 'is-pending'; ?>">
+									<span class="af-checklist__dot" aria-hidden="true"><?php echo af_lucide( $status_map[ $key ] ? 'check' : 'circle-alert', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
+									<span class="af-checklist__text">
+										<span class="af-checklist__label"><?php echo esc_html( $step['label'] ); ?></span>
+										<span class="af-checklist__hint"><?php echo esc_html( $step['hint'] ); ?></span>
+									</span>
+								</li>
+							<?php endforeach; ?>
+						</ul>
+					</section>
 
 					<?php if ( $demo_seeded ) : ?>
-						<div class="af-profile__demo-note">
-							<strong><?php echo esc_html__( 'Estas viendo datos de ejemplo.', 'arriendo-facil' ); ?></strong>
-							<p><?php echo esc_html__( 'La demo incluye un edificio, unidades, un contrato y cobros ficticios. Puedes limpiarlos cuando quieras para empezar con tus datos reales.', 'arriendo-facil' ); ?></p>
-							<button type="button" class="button" data-af-purge-demo><?php echo esc_html__( 'Limpiar datos de ejemplo', 'arriendo-facil' ); ?></button>
-						</div>
-					<?php endif; ?>
-				</div>
-
-				<form data-af-profile-form class="af-profile__form">
-					<h2><?php echo esc_html__( 'Datos de la empresa', 'arriendo-facil' ); ?></h2>
-					<label>
-						<span><?php echo esc_html__( 'Nombre de la empresa', 'arriendo-facil' ); ?></span>
-						<input type="text" name="company_name" maxlength="190" value="<?php echo esc_attr( $company_name ); ?>" required class="regular-text" />
-					</label>
-					<label>
-						<span><?php echo esc_html__( 'Responsable', 'arriendo-facil' ); ?></span>
-						<input type="text" name="contact_name" maxlength="190" value="<?php echo esc_attr( $contact_name ); ?>" required class="regular-text" />
-					</label>
-					<label>
-						<span><?php echo esc_html__( 'Telefono de contacto', 'arriendo-facil' ); ?></span>
-						<input type="text" name="phone" maxlength="20" value="<?php echo esc_attr( $phone ); ?>" required class="regular-text" />
-					</label>
-
-					<h2><?php echo esc_html__( 'Identidad del responsable', 'arriendo-facil' ); ?></h2>
-					<label>
-						<span><?php echo esc_html__( 'Tipo de identificacion', 'arriendo-facil' ); ?></span>
-						<select name="id_type" class="regular-text">
-							<option value=""><?php echo esc_html__( 'Selecciona', 'arriendo-facil' ); ?></option>
-							<option value="cedula" <?php selected( $id_type, 'cedula' ); ?>><?php echo esc_html__( 'Cedula', 'arriendo-facil' ); ?></option>
-							<option value="ruc" <?php selected( $id_type, 'ruc' ); ?>><?php echo esc_html__( 'RUC', 'arriendo-facil' ); ?></option>
-						</select>
-					</label>
-					<label>
-						<span><?php echo esc_html__( 'Numero de identificacion', 'arriendo-facil' ); ?></span>
-						<input type="text" name="id_number" maxlength="20" value="<?php echo $id_enc ? esc_attr__( '(guardado)', 'arriendo-facil' ) : ''; ?>" placeholder="<?php echo esc_attr__( '1834567890', 'arriendo-facil' ); ?>" class="regular-text" <?php echo $id_enc ? 'data-preserve-id="1"' : 'required'; ?> />
-						<?php if ( $id_enc ) : ?>
-							<small><?php echo esc_html__( 'El numero ya esta guardado de forma segura. Dejalo en blanco para conservarlo o ingresa uno nuevo para reemplazarlo.', 'arriendo-facil' ); ?></small>
-						<?php endif; ?>
-					</label>
-					<label>
-						<span><?php echo esc_html__( 'Nacionalidad', 'arriendo-facil' ); ?></span>
-						<input type="text" name="nationality" maxlength="100" value="<?php echo esc_attr( $nationality ); ?>" class="regular-text" />
-					</label>
-					<label>
-						<span><?php echo esc_html__( 'Ciudad de nacimiento', 'arriendo-facil' ); ?></span>
-						<input type="text" name="birth_city" maxlength="150" value="<?php echo esc_attr( $birth_city ); ?>" class="regular-text" />
-					</label>
-
-					<button type="submit" class="button button-primary"><?php echo esc_html__( 'Guardar perfil', 'arriendo-facil' ); ?></button>
-				</form>
-
-				<div class="af-profile__documents">
-					<h2><?php echo esc_html__( 'Documentos de soporte', 'arriendo-facil' ); ?></h2>
-					<p class="description"><?php echo esc_html__( 'Sube en PDF: tu cedula o papeleta de votacion, un certificado laboral y un certificado bancario. Se guardan de forma privada y solo el equipo supervisor puede revisarlos.', 'arriendo-facil' ); ?></p>
-					<form data-af-doc-form>
-						<input type="hidden" name="nonce" value="<?php echo esc_attr( $nonce ); ?>" />
-						<?php foreach ( self::DOC_TYPES as $doc_type ) : ?>
-							<?php
-							$doc = isset( $documents[ $doc_type ] ) ? $documents[ $doc_type ] : null;
-							?>
-							<div class="af-profile__doc-row">
-								<label>
-									<span><?php echo esc_html( $this->doc_type_label( $doc_type ) ); ?></span>
-									<input type="file" name="document_pdf" accept="application/pdf" class="af-profile__file" data-doc-type="<?php echo esc_attr( $doc_type ); ?>" />
-								</label>
-								<?php if ( $doc ) : ?>
-									<span class="af-profile__doc-ok"><?php echo esc_html__( 'Subido', 'arriendo-facil' ); ?></span>
-								<?php else : ?>
-									<span class="af-profile__doc-missing"><?php echo esc_html__( 'Pendiente', 'arriendo-facil' ); ?></span>
-								<?php endif; ?>
+						<section class="af-section af-profile__demo">
+							<div class="af-section__header">
+								<div>
+									<h2 class="af-section__title"><?php esc_html_e( 'Estás viendo datos de ejemplo', 'arriendo-facil' ); ?></h2>
+								</div>
 							</div>
-						<?php endforeach; ?>
-						<button type="submit" class="button"><?php echo esc_html__( 'Subir documento', 'arriendo-facil' ); ?></button>
-					</form>
-				</div>
+							<p class="af-section__subtitle"><?php esc_html_e( 'La demo incluye un edificio, unidades, un contrato y cobros ficticios. Puedes limpiarlos cuando quieras para empezar con tus datos reales.', 'arriendo-facil' ); ?></p>
+							<p><button type="button" class="button af-btn af-btn--danger" data-af-purge-demo><?php esc_html_e( 'Limpiar datos de ejemplo', 'arriendo-facil' ); ?></button></p>
+						</section>
+					<?php endif; ?>
+				</aside>
 			</div>
 		</div>
 
 		<style>
-			.af-profile { display: flex; flex-wrap: wrap; gap: 24px; margin-top: 16px; }
-			.af-profile > div, .af-profile > form { background: #fff; border: 1px solid #dcdcde; border-radius: 8px; padding: 18px; flex: 1 1 340px; max-width: 100%; }
-			.af-profile h2 { margin-top: 0; }
-			.af-profile label { display: block; margin: 0 0 12px; }
-			.af-profile label > span { display: block; font-weight: 600; margin-bottom: 4px; }
-			.af-profile__steps { margin: 12px 0 0 18px; padding: 0; }
-			.af-profile__step { margin-bottom: 8px; }
-			.af-profile__step-label { font-weight: 600; }
-			.af-profile__step-hint { display: block; color: #646970; font-size: 12px; }
-			.af-profile__step.is-complete .af-profile__step-label { color: #2271b1; }
-			.af-profile__step.is-complete .af-profile__step-label::after { content: ' \2713'; color: #00a32a; font-weight: 700; }
-			.af-profile__demo-note { border: 1px dashed #b32d2e; background: #fcf0f1; padding: 12px; border-radius: 6px; margin-top: 16px; }
-			.af-profile__doc-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
-			.af-profile__doc-ok { color: #00a32a; font-weight: 600; }
-			.af-profile__doc-missing { color: #b32d2e; }
+			.af-profile-page { max-width: var(--af-page-max); }
+			.af-profile__status { margin-bottom: var(--af-space-6); }
+			.af-profile-alert { margin-bottom: var(--af-space-4); padding: var(--af-space-3) var(--af-space-4); border-radius: var(--af-radius-md); border-left: 4px solid var(--af-gray-300); background: var(--af-gray-50); color: var(--af-gray-700); font-weight: 600; box-shadow: var(--af-shadow-xs); }
+			.af-profile-alert.is-success { border-left-color: var(--af-success-500); background: var(--af-success-50); color: var(--af-success-700); }
+			.af-profile-alert.is-error { border-left-color: var(--af-danger-500); background: var(--af-danger-50); color: var(--af-danger-700); }
+			.af-profile-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: var(--af-space-6); align-items: start; }
+			@media (max-width: 1200px) { .af-profile-layout { grid-template-columns: 1fr; } }
+			.af-profile__submit { margin-bottom: var(--af-space-6); }
+			.af-account { display: flex; align-items: center; gap: var(--af-space-3); flex-wrap: wrap; }
+			.af-account__avatar img { border-radius: var(--af-radius-full); display: block; }
+			.af-account__meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
+			.af-account__name { font-weight: 700; color: var(--af-gray-900); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+			.af-account__email { color: var(--af-gray-500); font-size: var(--af-text-xs); }
+			.af-account__hint { color: var(--af-gray-500); font-size: var(--af-text-xs); margin: var(--af-space-3) 0; }
+			.af-account__links { list-style: none; margin: var(--af-space-4) 0 0; padding: var(--af-space-4) 0 0; border-top: 1px solid var(--af-gray-200); }
+			.af-account__links li { margin: 0 0 var(--af-space-2); }
+			.af-account__links a { display: inline-flex; align-items: center; gap: var(--af-space-2); text-decoration: none; font-weight: 600; font-size: var(--af-text-sm); }
+			.af-account__links .af-icon { color: var(--af-gray-400); }
+			.af-progress { display: flex; align-items: center; gap: var(--af-space-3); margin-bottom: var(--af-space-5); }
+			.af-progress__track { flex: 1; height: 8px; border-radius: var(--af-radius-full); background: var(--af-gray-100); overflow: hidden; }
+			.af-progress__bar { display: block; height: 100%; border-radius: var(--af-radius-full); background: linear-gradient(90deg, var(--af-primary-500), var(--af-primary-400)); transition: width var(--af-motion-base); }
+			.af-progress__value { font-family: var(--af-font-numeric); font-weight: 700; font-size: var(--af-text-sm); color: var(--af-primary-700); }
+			.af-checklist { list-style: none; margin: 0; padding: 0; }
+			.af-checklist__item { display: flex; gap: var(--af-space-3); align-items: flex-start; padding: var(--af-space-2) 0; }
+			.af-checklist__dot { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: var(--af-radius-full); flex-shrink: 0; }
+			.af-checklist__item.is-done .af-checklist__dot { background: var(--af-success-50); color: var(--af-success-700); }
+			.af-checklist__item.is-pending .af-checklist__dot { background: var(--af-warning-50); color: var(--af-warning-700); }
+			.af-checklist__text { display: flex; flex-direction: column; gap: 2px; }
+			.af-checklist__label { font-weight: 600; color: var(--af-gray-900); }
+			.af-checklist__hint { color: var(--af-gray-500); font-size: var(--af-text-xs); }
+			.af-profile__doc-row { display: flex; align-items: center; justify-content: space-between; gap: var(--af-space-4); padding: var(--af-space-3) 0; border-bottom: 1px solid var(--af-gray-100); }
+			.af-profile__doc-row:last-of-type { border-bottom: 0; }
+			.af-profile__doc-meta { display: flex; flex-direction: column; gap: 2px; }
+			.af-profile__doc-label { font-weight: 600; color: var(--af-gray-900); }
+			.af-profile__doc-controls { display: flex; align-items: center; gap: var(--af-space-3); }
+			.af-profile__file-btn { position: relative; overflow: hidden; height: 36px; cursor: pointer; }
+			.af-profile__file-btn input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; font-size: 100px; }
+			.af-profile__doc-actions { margin-top: var(--af-space-4); }
+			.af-profile__demo { border: 1px dashed var(--af-warning-100); background: var(--af-warning-50); }
 		</style>
 
 		<script>
@@ -282,12 +483,16 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 
 			var ajaxUrl = <?php echo wp_json_encode( $ajax_url ); ?>;
 			var nonce = <?php echo wp_json_encode( $nonce ); ?>;
+			var resendNonce = <?php echo wp_json_encode( $resend_nonce ); ?>;
+			var resendEmail = <?php echo wp_json_encode( $email_text ); ?>;
 			var alertBox = document.getElementById('af-profile-alert');
 
 			function showAlert(message, type){
-				alertBox.style.display = 'block';
+				alertBox.hidden = false;
 				alertBox.textContent = String(message || '');
-				alertBox.className = 'notice ' + (type === 'success' ? 'notice-success' : 'notice-error');
+				alertBox.classList.remove('is-success', 'is-error');
+				alertBox.classList.add(type === 'success' ? 'is-success' : 'is-error');
+				alertBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 			}
 
 			var profileForm = wrap.querySelector('[data-af-profile-form]');
@@ -352,10 +557,31 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 				});
 			}
 
+			var resendBtn = wrap.querySelector('[data-af-resend-email]');
+			if(resendBtn){
+				resendBtn.addEventListener('click', async function(){
+					resendBtn.disabled = true;
+					var data = new URLSearchParams();
+					data.set('action', 'af_resend_admin_verification_email');
+					data.set('nonce', resendNonce);
+					data.set('email', resendEmail);
+					try {
+						var res = await fetch(ajaxUrl, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }, body: data.toString() });
+						var json = await res.json();
+						var msg = (json && json.data && json.data.message) ? json.data.message : <?php echo wp_json_encode( __( 'No se pudo reenviar el correo.', 'arriendo-facil' ) ); ?>;
+						showAlert(msg, json && json.success ? 'success' : 'error');
+					} catch (err) {
+						showAlert(<?php echo wp_json_encode( __( 'No se pudo conectar con el servidor.', 'arriendo-facil' ) ); ?>, 'error');
+					} finally {
+						resendBtn.disabled = false;
+					}
+				});
+			}
+
 			var purgeBtn = wrap.querySelector('[data-af-purge-demo]');
 			if(purgeBtn){
 				purgeBtn.addEventListener('click', async function(){
-					if(!window.confirm(<?php echo wp_json_encode( __( 'Se eliminaran los datos de ejemplo de tu demo. Continuar?', 'arriendo-facil' ) ); ?>)){ return; }
+					if(!window.confirm(<?php echo wp_json_encode( __( 'Se eliminarán los datos de ejemplo de tu demo. Continuar?', 'arriendo-facil' ) ); ?>)){ return; }
 					purgeBtn.disabled = true;
 					var data = new URLSearchParams();
 					data.set('action', 'af_admin_purge_demo');
@@ -384,7 +610,7 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 	public function ajax_update_profile() {
 		check_ajax_referer( self::PROFILE_NONCE, 'nonce' );
 
-		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
+		if ( ! $this->can_manage_own_profile() ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
@@ -453,7 +679,7 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 	public function ajax_upload_document() {
 		check_ajax_referer( self::PROFILE_NONCE, 'nonce' );
 
-		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
+		if ( ! $this->can_manage_own_profile() ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
@@ -563,7 +789,7 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 	public function ajax_purge_demo() {
 		check_ajax_referer( self::PROFILE_NONCE, 'nonce' );
 
-		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
+		if ( ! $this->can_manage_own_profile() ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 

@@ -80,11 +80,11 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 	 * Registers the "Mi perfil" page for property admins.
 	 *
 	 * Access fallback: the page is gated by `af_manage_properties`, but if a
-	 * logged-in property admin still lacks that capability (stale role
-	 * definition or `wp_capabilities` user meta — e.g. accounts created
-	 * before the cap existed), the page is registered under `edit_posts`
-	 * (always present on the role) so the onboarding/profile screen is never
-	 * unreachable for them. `render_profile_page()` still enforces the
+	 * logged-in operator (property admin or WP administrator/super admin)
+	 * still lacks that capability (stale role definition or `wp_capabilities`
+	 * user meta — e.g. databases seeded before the cap existed), the page is
+	 * registered under `edit_posts` (always present) so the profile screen is
+	 * never unreachable for them. `render_profile_page()` still enforces the
 	 * role-based guard, so opening the page is only a render — never a data
 	 * leak.
 	 *
@@ -94,11 +94,13 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 		$cap = Arriendo_Facil_Tenancy::CAP;
 
 		$user = wp_get_current_user();
-		if ( $user instanceof WP_User && $user->exists() ) {
-			$roles = isset( $user->roles ) && is_array( $user->roles ) ? $user->roles : array();
-			if ( in_array( 'af_property_admin', $roles, true ) && ! user_can( $user, $cap ) ) {
-				$cap = 'edit_posts';
-			}
+		if (
+			$user instanceof WP_User
+			&& $user->exists()
+			&& $this->can_manage_own_profile( $user->ID )
+			&& ! user_can( $user, $cap )
+		) {
+			$cap = 'edit_posts';
 		}
 
 		add_submenu_page(

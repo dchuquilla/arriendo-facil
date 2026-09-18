@@ -1,0 +1,335 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   ARRIENDO FÁCIL — Facturación electrónica (hub)
+   Comprobantes + Configuración SRI como un solo módulo con tabs.
+   Construido sobre los tokens de af-tokens.css y los primitivos de
+   af-shell.css / af-forms.css / af-admin-chrome.css.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ─────────────────────────────────────────────────────────────────────
+   1. Tabs del hub (CSS-only radio switcher, ids af-tab-billing-*)
+   ───────────────────────────────────────────────────────────────────── */
+
+#af-tab-billing-comprobantes:checked ~ .af-tabs__nav > label[for="af-tab-billing-comprobantes"],
+#af-tab-billing-sri:checked ~ .af-tabs__nav > label[for="af-tab-billing-sri"] {
+	background: var(--af-gray-0, #fff);
+	color: var(--af-gray-900);
+	box-shadow: var(--af-shadow-sm);
+}
+
+#af-tab-billing-comprobantes:checked ~ .af-tabs__panels > .af-tabs__panel--comprobantes,
+#af-tab-billing-sri:checked ~ .af-tabs__panels > .af-tabs__panel--sri {
+	display: block;
+}
+
+.af-tabs__radio:focus-visible + .af-tabs__radio + .af-tabs__nav > label[for="af-tab-billing-comprobantes"],
+.af-tabs__radio + .af-tabs__radio:focus-visible + .af-tabs__nav > label[for="af-tab-billing-sri"] {
+	box-shadow: var(--af-focus-ring);
+}
+
+#af-tab-billing-sri:checked ~ .af-tabs__nav .af-tabs__badge {
+	background: var(--af-gray-200);
+	color: var(--af-gray-700);
+	box-shadow: none;
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   2. Comprobantes — lista / tabla
+   ───────────────────────────────────────────────────────────────────── */
+
+.af-billing-kpis { margin-top: var(--af-space-5); }
+
+.af-invoice-list { margin-top: var(--af-space-5); }
+
+/* Segmented control de estados */
+.af-invoice-tabs {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	padding: 4px;
+	background: var(--af-gray-100);
+	border: 1px solid var(--af-gray-200);
+	border-radius: var(--af-radius-lg);
+	margin-bottom: var(--af-space-4);
+}
+.af-invoice-tab {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 9px 16px;
+	border: none;
+	border-radius: var(--af-radius-md);
+	background: transparent;
+	font-family: inherit;
+	font-size: var(--af-text-sm);
+	font-weight: 600;
+	color: var(--af-gray-600);
+	cursor: pointer;
+	transition: color var(--af-motion-fast), background var(--af-motion-fast), box-shadow var(--af-motion-fast);
+}
+.af-invoice-tab:hover { color: var(--af-gray-900); }
+.af-invoice-tab.is-active {
+	background: var(--af-gray-0, #fff);
+	color: var(--af-gray-900);
+	box-shadow: var(--af-shadow-sm);
+}
+.af-invoice-tab__icon { display: inline-flex; }
+.af-invoice-count {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 22px;
+	height: 22px;
+	padding: 0 8px;
+	border-radius: 999px;
+	background: var(--af-gray-200);
+	color: var(--af-gray-700);
+	font-size: 11px;
+	font-weight: 700;
+	line-height: 1;
+}
+.af-invoice-tab[data-tab="autorizadas"] .af-invoice-count { background: var(--af-success-100); color: var(--af-success-700); }
+.af-invoice-tab[data-tab="en_proceso"] .af-invoice-count { background: var(--af-info-100); color: var(--af-info-700); }
+.af-invoice-tab[data-tab="error"] .af-invoice-count { background: var(--af-danger-100); color: var(--af-danger-700); }
+
+/* Toolbar: búsqueda + refresh + last update */
+.af-invoice-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px 14px;
+	padding: 10px 14px;
+	margin-bottom: var(--af-space-4);
+	background: var(--af-gray-50);
+	border: 1px solid var(--af-gray-200);
+	border-radius: var(--af-radius-md);
+}
+.af-invoice-search {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 0;
+}
+.af-invoice-toolbar__spacer { flex: 1 1 auto; }
+.af-invoice-toolbar__meta {
+	color: var(--af-gray-500);
+	font-size: var(--af-text-xs);
+	text-align: right;
+}
+.af-invoice-refresh {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	border: none;
+	background: none;
+	color: var(--af-primary-600, #007058);
+	font-weight: 600;
+	font-size: var(--af-text-sm);
+	cursor: pointer;
+	padding: 6px 10px;
+	border-radius: var(--af-radius-md);
+}
+.af-invoice-refresh:hover { background: var(--af-primary-50, #E6F7F3); }
+
+/* Chips de estado en la tabla */
+.af-status-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	padding: 5px 11px;
+	border-radius: 999px;
+	font-size: var(--af-text-xs);
+	font-weight: 600;
+	line-height: 1;
+	white-space: nowrap;
+}
+.af-status-chip__dot { width: 7px; height: 7px; border-radius: 999px; background: currentColor; }
+.af-status-chip--autorizadas { background: var(--af-success-50); color: var(--af-success-700); }
+.af-status-chip--en_proceso { background: var(--af-info-50); color: var(--af-info-700); }
+.af-status-chip--error { background: var(--af-danger-50); color: var(--af-danger-700); }
+.af-status-chip--otro { background: var(--af-gray-100); color: var(--af-gray-600); }
+
+/* Montos / metadatos de celdas */
+.af-money {
+	font-family: var(--af-font-numeric, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+	font-variant-numeric: tabular-nums;
+	font-weight: 700;
+	color: var(--af-success-700);
+	white-space: nowrap;
+	text-align: right;
+}
+.af-td-meta {
+	color: var(--af-gray-500);
+	font-size: var(--af-text-xs);
+	word-break: break-all;
+}
+.af-invoice-no { font-weight: 700; }
+
+/* Fila desplegable de error */
+.af-error-details { background: var(--af-danger-50); }
+.af-error-details td {
+	border-left: 4px solid var(--af-danger-500);
+}
+.af-error-details__msg {
+	color: var(--af-danger-700);
+	font-size: var(--af-text-xs);
+	margin: 0;
+	white-space: pre-wrap;
+}
+.af-error-details__head {
+	font-weight: 700;
+	font-size: var(--af-text-xs);
+	text-transform: uppercase;
+	letter-spacing: .04em;
+	color: var(--af-danger-700);
+	margin-bottom: 4px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   3. Comprobantes — emisión manual
+   ───────────────────────────────────────────────────────────────────── */
+
+.af-issue-form { display: grid; gap: var(--af-space-4); margin-top: var(--af-space-4); }
+.af-lease-search__row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; }
+.af-issue-form__lease-label {
+	color: var(--af-gray-500);
+	font-size: var(--af-text-xs);
+	padding-bottom: 8px;
+}
+.af-issue-form__actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	gap: 12px;
+}
+.af-issue-form__actions .af-form-field { flex: 0 0 140px; }
+.af-lease-search__list {
+	list-style: none;
+	margin: 6px 0 0;
+	padding: 0;
+	border: 1px solid var(--af-gray-200);
+	border-radius: var(--af-radius-md);
+	background: var(--af-gray-0, #fff);
+	box-shadow: var(--af-shadow-sm);
+	overflow: hidden;
+	max-width: 560px;
+}
+.af-lease-search__list a {
+	display: block;
+	padding: 10px 14px;
+	color: var(--af-gray-800);
+	text-decoration: none;
+	font-size: var(--af-text-sm);
+	border-bottom: 1px solid var(--af-gray-100);
+}
+.af-lease-search__list a:last-child { border-bottom: none; }
+.af-lease-search__list a:hover,
+.af-lease-search__list a:focus { background: var(--af-primary-50, #E6F7F3); }
+
+/* ─────────────────────────────────────────────────────────────────────
+   4. Configuración SRI — override de af-sri-* (admin.css global)
+   ───────────────────────────────────────────────────────────────────── */
+
+.af-sri-hero {
+	background: linear-gradient(135deg, var(--af-gray-0, #fff) 0%, var(--af-primary-50, #E6F7F3) 100%);
+	border-color: var(--af-primary-100, #B3E9DC);
+	box-shadow: var(--af-shadow-sm);
+}
+.af-sri-hero__eyebrow { color: var(--af-primary-700, #007058); }
+
+.af-sri-status-card {
+	border-color: var(--af-gray-200);
+	background: var(--af-gray-0, #fff);
+	box-shadow: var(--af-shadow-xs);
+}
+.af-sri-status-card.is-ready {
+	border-color: var(--af-success-100);
+	background: var(--af-success-50);
+}
+.af-sri-status-card.is-pending { background: var(--af-warning-50); border-color: var(--af-warning-100); }
+.af-sri-status-card__label { color: var(--af-gray-500); }
+.af-sri-status-card__value { color: var(--af-gray-900); }
+.af-sri-status-card__hint { color: var(--af-gray-500); }
+
+.af-sri-section {
+	border-color: var(--af-gray-200);
+	background: var(--af-gray-0, #fff);
+	box-shadow: var(--af-shadow-xs);
+	padding: 20px 22px;
+	border-radius: var(--af-radius-lg, 14px);
+}
+.af-sri-section__pill { background: var(--af-primary-50, #E6F7F3); color: var(--af-primary-700, #007058); }
+
+.af-sri-connect-card--ok { border-color: var(--af-success-100); background: var(--af-success-50); }
+.af-sri-connect-card--error { border-color: var(--af-warning-100); background: var(--af-warning-50); }
+
+/* ─────────────────────────────────────────────────────────────────────
+   5. Configuración SRI — formulario
+   ───────────────────────────────────────────────────────────────────── */
+
+.af-sri-form { margin-top: var(--af-space-1); }
+.af-sri-form__title { margin: 0 0 6px; }
+.af-sri-form__desc { margin: 0 0 var(--af-space-4); }
+.af-sri-form__actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px;
+	margin-top: 4px;
+}
+
+.af-input-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+.af-radio-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 18px;
+	align-items: center;
+	padding: 10px 0;
+}
+.af-radio-row label {
+	font-weight: 400;
+	color: var(--af-gray-800);
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	cursor: pointer;
+	margin: 0;
+}
+.af-radio-row input[type="radio"] { margin: 0; }
+
+/* Estado del certificado digital */
+.af-cert-status {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	margin: 0 0 var(--af-space-4);
+}
+.af-cert-status__item {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 12px;
+	border-radius: var(--af-radius-md);
+	border: 1px solid var(--af-gray-200);
+	background: var(--af-gray-0, #fff);
+	font-size: var(--af-text-sm);
+	font-weight: 600;
+	color: var(--af-gray-700);
+}
+.af-cert-status__item.is-ok { border-color: var(--af-success-100); background: var(--af-success-50); color: var(--af-success-700); }
+.af-cert-status__item.is-warn { border-color: var(--af-warning-100); background: var(--af-warning-50); color: var(--af-warning-700); }
+
+/* ─────────────────────────────────────────────────────────────────────
+   6. Responsive
+   ───────────────────────────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+	.af-invoice-toolbar__meta { text-align: left; width: 100%; }
+	.af-issue-form__actions { align-items: stretch; }
+	.af-issue-form__actions .af-form-field { flex: 1 1 100%; }
+}
+
+@media (max-width: 600px) {
+	.af-invoice-tabs { width: 100%; }
+	.af-invoice-tab { flex: 1 1 auto; justify-content: center; padding: 9px 10px; }
+}

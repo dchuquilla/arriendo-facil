@@ -239,6 +239,11 @@ class Arriendo_Facil_Admin {
 			array( $this, 'render_billing_settings' )
 		);
 
+		// La configuración SRI vive dentro del hub de facturación (tabs internos).
+		// La subpágina se conserva registrada para mantener el hook de assets,
+		// pero no aparece en el menú.
+		remove_submenu_page( 'arriendo-facil', 'af-billing-settings' );
+
 		if ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) {
 			add_submenu_page(
 				'arriendo-facil',
@@ -778,18 +783,9 @@ class Arriendo_Facil_Admin {
 			),
 			array(
 				'slug'  => 'af-billing',
-				'label' => __( 'Facturación electrónica', 'arriendo-facil' ),
+				'label' => __( 'Facturación', 'arriendo-facil' ),
 				'url'   => admin_url( 'admin.php?page=af-billing' ),
 				'icon'  => 'receipt',
-				'group' => 'facturacion',
-				'cap'   => $billing_cap,
-				'gate'  => true,
-			),
-			array(
-				'slug'  => 'af-billing-settings',
-				'label' => __( 'Config. SRI', 'arriendo-facil' ),
-				'url'   => admin_url( 'admin.php?page=af-billing-settings' ),
-				'icon'  => 'settings',
 				'group' => 'facturacion',
 				'cap'   => $billing_cap,
 				'gate'  => true,
@@ -2453,6 +2449,17 @@ class Arriendo_Facil_Admin {
 			);
 		}
 
+		// Estilos del hub de Facturación Electrónica (comprobantes + config SRI).
+		if ( in_array( $hook, array( 'arriendo-facil_page_af-billing', 'arriendo-facil_page_af-billing-settings' ), true ) ) {
+			$billing_css_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-billing.css';
+			wp_enqueue_style(
+				'af-billing',
+				ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/af-billing.css',
+				array( 'af-tokens', 'af-shell', 'af-forms', 'af-admin-chrome' ),
+				file_exists( $billing_css_path ) ? (string) filemtime( $billing_css_path ) : ARRIENDO_FACIL_VERSION
+			);
+		}
+
 		$screen = get_current_screen();
 		if ( $screen && 'accommodation' === $screen->post_type && in_array( $hook, array( 'post.php', 'post-new.php' ), true ) ) {
 			wp_enqueue_media();
@@ -2641,9 +2648,14 @@ class Arriendo_Facil_Admin {
 
 	/**
 	 * Renders the SRI configuration page.
+	 *
+	 * La configuración vive ahora dentro del hub de facturación (tab "sri").
+	 * Mantiene la subpágina registrada para preservar el enqueue de assets,
+	 * pero cualquier acceso directo redirige al hub.
 	 */
 	public function render_billing_settings() {
-		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/billing-settings.php';
+		wp_safe_redirect( admin_url( 'admin.php?page=af-billing&tab=sri' ) );
+		exit;
 	}
 
 	/**

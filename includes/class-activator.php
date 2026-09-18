@@ -119,33 +119,80 @@ class Arriendo_Facil_Activator {
 	 * caps (e.g. `af_manage_properties`) after the user's own capability
 	 * cache (`wp_capabilities` user meta) was already populated.
 	 *
+	 * This is the layered fix for the "Sorry, you are not allowed to access
+	 * this page." error on the plugin's own screens (Mi perfil, Panel,
+	 * Facturación…) even when the stored role (`wp_user_roles`) or the
+	 * per-user meta (`wp_capabilities`) is stale:
+	 *
+	 *   1. Re-hydrates the `af_property_admin` role definition with the plugin
+	 *      caps (idempotent) so `current_user_can()` can derive them from the
+	 *      role, regardless of what a previous DB snapshot contained.
+	 *   2. Refreshes the current user's capability tables from the roles and
+	 *      then adds the plugin caps explicitly as a hard guarantee.
+	 *
 	 * Must run on `init` (or later) — never from `plugins_loaded`, since
 	 * `is_user_logged_in()`/`wp_get_current_user()` are not reliable that
 	 * early (the auth cookie hasn't been validated into `$current_user`
 	 * yet), which silently made this no-op on every request.
 	 *
+	 * @param int $user_id Optional user ID to heal (defaults to current user).
 	 * @return void
 	 */
-	public static function heal_current_user_capabilities() {
-		if ( ! function_exists( 'wp_get_current_user' ) || ! is_user_logged_in() ) {
+	public static function heal_current_user_capabilities( $user_id = 0 ) {
+		if ( ! function_exists( 'wp_get_current_user' ) ) {
 			return;
 		}
 
-		$current_user = wp_get_current_user();
-		if ( ! ( $current_user instanceof WP_User ) || ! $current_user->exists() ) {
+		$user = $user_id ? get_user_by( 'id', absint( $user_id ) ) : wp_get_current_user();
+		if ( ! ( $user instanceof WP_User ) || ! $user->exists() ) {
 			return;
 		}
 
-		$roles = (array) $current_user->roles;
-		if ( ! in_array( 'af_property_admin', $roles, true ) && ! in_array( 'administrator', $roles, true ) ) {
+		if ( ! self::is_platform_operator( $user ) ) {
 			return;
 		}
 
-		foreach ( array( 'af_view_billing', Arriendo_Facil_Tenancy::CAP ) as $cap ) {
-			if ( ! $current_user->has_cap( $cap ) ) {
-				$current_user->add_cap( $cap );
+		// 1) Re-hydrate the role definition. Cheap: only writes when a cap is
+		//    actually missing, and covers stale `wp_user_roles` snapshots.
+		$role = get_role( 'af_property_admin' );
+		if ( $role instanceof WP_Role ) {
+			foreach ( array( 'af_view_billing', Arriendo_Facil_Tenancy::CAP ) as $cap ) {
+				if ( ! $role->has_cap( $cap ) ) {
+					$role->add_cap( $cap );
+				}
 			}
 		}
+
+		// 2) Re-derive the per-user caps from the (now fresh) role definition
+		//    and then hard-grant the plugin caps on the user object as well.
+		$user->for_site();
+		foreach ( array( 'af_view_billing', Arriendo_Facil_Tenancy::CAP ) as $cap ) {
+			if ( ! $user->has_cap( $cap ) ) {
+				$user->add_cap( $cap );
+			}
+		}
+	}
+
+	/**
+	 * Whether the given user is a property admin or a WP administrator
+	 * (super admin) — i.e. someone who should hold the platform capabilities.
+	 *
+	 * Falls back to the persisted `wp_capabilities` meta when the in-memory
+	 * role list is not initialised yet on this request.
+	 *
+	 * @param WP_User $user User object.
+	 * @return bool
+	 */
+	private static function is_platform_operator( WP_User $user ) {
+		$roles = isset( $user->roles ) && is_array( $user->roles ) ? $user->roles : array();
+		if ( in_array( 'af_property_admin', $roles, true ) || in_array( 'administrator', $roles, true ) ) {
+			return true;
+		}
+
+		global $wpdb;
+		$stored = (array) get_user_meta( $user->ID, $wpdb->get_blog_prefix() . 'capabilities', true );
+
+		return isset( $stored['af_property_admin'] ) || isset( $stored['administrator'] );
 	}
 
 	/**

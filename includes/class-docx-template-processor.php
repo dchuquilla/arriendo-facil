@@ -611,6 +611,18 @@ class Arriendo_Facil_DOCX_Template_Processor {
 	private function determine_value_from_context( $before, $before_short, $after, array $vals, array &$state ) {
 		$after_close = mb_substr( $after, 0, 25 );
 
+		// Narrow window immediately preceding the blank. Rules that identify a
+		// specific label (cédula, dirección) must only fire when the label is
+		// right next to the blank; a wide 55-char window lets one clause's
+		// context bleed into the following blank (e.g. address → city, cédula → name).
+		$before_close = mb_substr( (string) $before_short, -25 );
+
+		// Widened lookahead used only by the GUARANTEE rule, which additionally
+		// requires the rent clause to already be in progress ($state['rent_state']).
+		// Together they accept "… ___ DÓLARES (…$___) como garantía" without letting
+		// the wide window bleed backward into the rent blank.
+		$after_guarantee = mb_substr( $after, 0, 40 );
+
 		// ── BLANKS TO SKIP (no data available) ──
 
 		if ( $this->ctx_matches( $before_short, array( 'estado civil' ) ) ) {
@@ -628,7 +640,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 
 		// ── CEDULA / ID ──
 
-		if ( $this->ctx_matches( $before_short, array( 'cédula', 'cedula', 'c.c.', 'c.i.', 'identidad no', 'c.c. no' ) ) ) {
+		if ( $this->ctx_matches( $before_close, array( 'cédula', 'cedula', 'c.c.', 'c.i.', 'identidad no', 'c.c. no' ) ) ) {
 			if ( ! $state['arrendador_id_placed'] ) {
 				$state['arrendador_id_placed'] = true;
 				return $vals['owner_id_number'] ?: null;
@@ -667,7 +679,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 
 		// ── ADDRESS ──
 
-		if ( $this->ctx_matches( $before_short, array( 'dirección exacta', 'direccion exacta' ) ) || $this->ctx_matches( $before, array( 'dirección exacta en:', 'con dirección exacta en:' ) ) ) {
+		if ( $this->ctx_matches( $before_close, array( 'dirección exacta', 'direccion exacta' ) ) || $this->ctx_matches( $before, array( 'dirección exacta en:', 'con dirección exacta en:' ) ) ) {
 			return $vals['address'] ?: null;
 		}
 
@@ -745,7 +757,7 @@ class Arriendo_Facil_DOCX_Template_Processor {
 
 		// ── GUARANTEE — "la suma de ___ DÓLARES ($___,00)" ──
 
-		if ( 0 === $state['guarantee_state'] && $this->ctx_matches( $after, array( 'dólares', 'dolares' ) ) && $this->ctx_matches( $before, array( 'garantía', 'garantia', 'depósito', 'deposito', 'fianza', 'equivalente a' ) ) ) {
+		if ( 0 === $state['guarantee_state'] && $state['rent_state'] >= 1 && $this->ctx_matches( $after, array( 'dólares', 'dolares' ) ) && ( $this->ctx_matches( $before, array( 'garantía', 'garantia', 'depósito', 'deposito', 'fianza', 'equivalente a' ) ) || $this->ctx_matches( $after_guarantee, array( 'garantía', 'garantia', 'depósito', 'deposito', 'fianza' ) ) ) ) {
 			$state['guarantee_state'] = 1;
 			return $vals['guarantee_words'] ?: null;
 		}
@@ -793,8 +805,9 @@ class Arriendo_Facil_DOCX_Template_Processor {
 	}
 
 	private function ctx_matches( $text, array $keywords ) {
+		$text = $this->normalize_context_text( $text );
 		foreach ( $keywords as $kw ) {
-			if ( false !== mb_strpos( $text, $kw ) ) {
+			if ( false !== mb_strpos( $text, $this->normalize_context_text( (string) $kw ) ) ) {
 				return true;
 			}
 		}

@@ -282,10 +282,51 @@ function arriendo_facil_heal_current_user_capabilities_on_init() {
 add_action( 'init', 'arriendo_facil_heal_current_user_capabilities_on_init', 5 );
 
 /**
+ * Detects drift on the lease table that would otherwise be hidden once the
+ * stored schema version matches the target. Each check is cheap and the
+ * activator migration is idempotent (CREATE IF NOT EXISTS + column-existence
+ * checks), so re-running it is always safe.
+ *
+ * @return bool True when the lease table is missing columns the code needs.
+ */
+function arriendo_facil_has_lease_schema_drift() {
+	if ( ! class_exists( 'Arriendo_Facil_Activator' ) ) {
+		return false;
+	}
+
+	global $wpdb;
+	$leases_table = $wpdb->prefix . 'af_leases';
+	$required     = array( 'template_attachment_id', 'payment_due_day' );
+
+	foreach ( $required as $column_name ) {
+		$found = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				 FROM INFORMATION_SCHEMA.COLUMNS
+				 WHERE TABLE_SCHEMA = %s
+				   AND TABLE_NAME = %s
+				   AND COLUMN_NAME = %s",
+				DB_NAME,
+				$leases_table,
+				$column_name
+			)
+		);
+		if ( ! (int) $found ) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/**
  * Runs one-time schema upgrades for ZIP-based plugin updates.
  *
  * This ensures new tables/columns are created even when the plugin is updated
- * from ZIP without triggering activation hooks.
+ * from ZIP without triggering activation hooks. It also re-runs the
+ * idempotent migration when the leases table is missing columns required by
+ * the contracts module, so environments that copied the schema version option
+ * before running the ALTERs (schema drift) self-heal on the next admin visit.
  */
 function arriendo_facil_maybe_upgrade_schema() {
 	if ( ! is_admin() || ! current_user_can( 'manage_options' ) ) {
@@ -295,7 +336,7 @@ function arriendo_facil_maybe_upgrade_schema() {
 	$target_schema_version = '2026-09-pms-operations-v1';
 	$current_schema_version = (string) get_option( 'af_db_schema_version', '' );
 
-	if ( $current_schema_version === $target_schema_version ) {
+	if ( $current_schema_version === $target_schema_version && ! arriendo_facil_has_lease_schema_drift() ) {
 		return;
 	}
 

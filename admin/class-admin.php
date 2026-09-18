@@ -764,6 +764,15 @@ class Arriendo_Facil_Admin {
 				'gate'  => true,
 			),
 			array(
+				'slug'  => 'af-owner-settlements',
+				'label' => __( 'Liquidaciones', 'arriendo-facil' ),
+				'url'   => admin_url( 'admin.php?page=af-owner-settlements' ),
+				'icon'  => 'wallet',
+				'group' => 'pagos',
+				'cap'   => Arriendo_Facil_Tenancy::CAP,
+				'gate'  => true,
+			),
+			array(
 				'slug'  => 'af-maintenance',
 				'label' => __( 'Mantenimiento', 'arriendo-facil' ),
 				'url'   => admin_url( 'admin.php?page=af-maintenance' ),

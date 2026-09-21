@@ -86,9 +86,25 @@ class Arriendo_Facil_Identity_Validator {
 	}
 
 	/**
+	 * Validates a passport number used by foreign residents.
+	 *
+	 * Clear limits: 6 to 12 alphanumeric characters (letters and digits),
+	 * no spaces. Dashes/hyphens are ignored before validation so formats
+	 * like "A1 234567" or "AB-123456" are accepted and normalized.
+	 *
+	 * @param string $number Raw passport number.
+	 * @return bool
+	 */
+	public static function validate_pasaporte( $number ) {
+		$number = strtoupper( preg_replace( '/[\s\-\.]/', '', (string) $number ) );
+
+		return (bool) preg_match( '/^[A-Z0-9]{6,12}$/', $number );
+	}
+
+	/**
 	 * Validates a document number against its declared type.
 	 *
-	 * @param string $type   'cedula' or 'ruc'.
+	 * @param string $type   'cedula', 'ruc', or 'pasaporte'.
 	 * @param string $number Raw document number.
 	 * @return bool
 	 */
@@ -97,6 +113,10 @@ class Arriendo_Facil_Identity_Validator {
 
 		if ( 'ruc' === $type ) {
 			return self::validate_ruc( $number );
+		}
+
+		if ( 'pasaporte' === $type ) {
+			return self::validate_pasaporte( $number );
 		}
 
 		return self::validate_cedula( $number );

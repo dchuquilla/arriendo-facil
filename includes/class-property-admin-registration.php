@@ -110,11 +110,13 @@ class Arriendo_Facil_Property_Admin_Registration {
 							<option value=""><?php echo esc_html__( 'Selecciona', 'arriendo-facil' ); ?></option>
 							<option value="cedula"><?php echo esc_html__( 'Cedula', 'arriendo-facil' ); ?></option>
 							<option value="ruc"><?php echo esc_html__( 'RUC', 'arriendo-facil' ); ?></option>
+							<option value="pasaporte"><?php echo esc_html__( 'Pasaporte', 'arriendo-facil' ); ?></option>
 						</select>
 					</label>
 					<label class="af-admin-signup__field">
 						<span class="af-admin-signup__label"><?php echo esc_html__( 'Numero de identificacion', 'arriendo-facil' ); ?></span>
 						<input type="text" name="id_number" required maxlength="20" pattern="[A-Za-z0-9-]{5,20}" class="af-admin-signup__input" />
+						<span class="af-admin-signup__hint" style="display:block;font-size:12px;line-height:1.4;color:#64748b;margin-top:4px;"><?php echo esc_html__( 'Cedula (10 digitos), RUC (13 digitos) o Pasaporte (6 a 12 caracteres alfanumericos).', 'arriendo-facil' ); ?></span>
 					</label>
 					<label class="af-admin-signup__field">
 						<span class="af-admin-signup__label"><?php echo esc_html__( 'Nacionalidad', 'arriendo-facil' ); ?></span>
@@ -331,6 +333,9 @@ class Arriendo_Facil_Property_Admin_Registration {
 		$phone            = isset( $_POST['phone'] ) ? sanitize_text_field( wp_unslash( $_POST['phone'] ) ) : '';
 		$id_type          = isset( $_POST['id_type'] ) ? sanitize_key( wp_unslash( $_POST['id_type'] ) ) : '';
 		$id_number        = isset( $_POST['id_number'] ) ? sanitize_text_field( wp_unslash( $_POST['id_number'] ) ) : '';
+		if ( class_exists( 'AF_Text_Normalizer' ) && in_array( $id_type, array( 'cedula', 'ruc', 'pasaporte' ), true ) ) {
+			$id_number = AF_Text_Normalizer::document( $id_type, $id_number );
+		}
 		$nationality      = isset( $_POST['nationality'] ) ? sanitize_text_field( wp_unslash( $_POST['nationality'] ) ) : '';
 		$birth_city       = isset( $_POST['birth_city'] ) ? sanitize_text_field( wp_unslash( $_POST['birth_city'] ) ) : '';
 		$password         = isset( $_POST['password'] ) ? (string) wp_unslash( $_POST['password'] ) : '';
@@ -358,7 +363,7 @@ class Arriendo_Facil_Property_Admin_Registration {
 			wp_send_json_error( array( 'message' => __( 'Correo electronico invalido.', 'arriendo-facil' ) ), 400 );
 		}
 
-		if ( ! in_array( $id_type, array( 'cedula', 'ruc' ), true ) ) {
+		if ( ! in_array( $id_type, array( 'cedula', 'ruc', 'pasaporte' ), true ) ) {
 			wp_send_json_error( array( 'message' => __( 'Tipo de identificacion invalido.', 'arriendo-facil' ) ), 400 );
 		}
 

@@ -61,6 +61,13 @@ foreach ( $property_admins as $admin_user ) {
 	$verified_by          = (int) get_user_meta( $user_id, 'af_admin_doc_verified_by', true );
 	$verified_at          = get_user_meta( $user_id, 'af_admin_doc_verified_at', true );
 
+	$doc_count   = count( array_filter( $admin_documents ) );
+	$has_identity = '' !== (string) get_user_meta( $user_id, 'af_admin_id_number_enc', true );
+	$needs_review = 'self' === $signup_source
+		|| $doc_count > 0
+		|| $has_identity
+		|| in_array( (string) $doc_status, array( 'en_revision', 'verificado', 'rechazado' ), true );
+
 	$rows[] = array(
 		'user'             => $admin_user,
 		'company'          => get_user_meta( $user_id, 'af_company_name', true ),
@@ -74,7 +81,8 @@ foreach ( $property_admins as $admin_user ) {
 		'signup_source'    => $signup_source ? $signup_source : 'manual',
 		'doc_status'       => $doc_status ? $doc_status : 'pendiente',
 		'identity_match'   => $identity_match ? $identity_match : 'not_checked',
-		'doc_count'        => count( array_filter( $admin_documents ) ),
+		'doc_count'        => $doc_count,
+		'needs_review'     => $needs_review,
 		'doc_notes'        => get_user_meta( $user_id, 'af_admin_doc_notes', true ),
 		'verified_by'      => $verified_by,
 		'verified_at'      => $verified_at,
@@ -224,6 +232,7 @@ $totals_platform = array(
 						$admin_user = $row['user'];
 						$is_active  = 'active' === $row['license_status'];
 						$is_self    = 'self' === $row['signup_source'];
+						$needs_review = $row['needs_review'];
 
 						$doc_badges = array(
 							'pendiente'   => array( 'af-pill--warning', __( 'Pendiente', 'arriendo-facil' ) ),
@@ -262,11 +271,11 @@ $totals_platform = array(
 										$is_self ? esc_html__( 'Auto-registro', 'arriendo-facil' ) : esc_html__( 'Manual', 'arriendo-facil' )
 									);
 									?>
-									<?php if ( $is_self ) : ?>
+									<?php if ( $needs_review ) : ?>
 										&middot; <?php echo esc_html( number_format_i18n( $row['doc_count'] ) . '/3 ' . __( 'docs', 'arriendo-facil' ) ); ?>
 									<?php endif; ?>
 								</span>
-								<?php if ( $is_self && '' !== $row['doc_notes'] ) : ?>
+								<?php if ( $needs_review && '' !== $row['doc_notes'] ) : ?>
 									<div style="color:#8a6d1c; font-size:12px; margin-top:4px;"><?php echo esc_html( $row['doc_notes'] ); ?></div>
 								<?php endif; ?>
 							</td>
@@ -274,7 +283,7 @@ $totals_platform = array(
 								<button type="button" class="button af-toggle-license" data-user-id="<?php echo esc_attr( $admin_user->ID ); ?>" data-next-status="<?php echo $is_active ? 'suspended' : 'active'; ?>">
 									<?php echo $is_active ? esc_html__( 'Suspender', 'arriendo-facil' ) : esc_html__( 'Activar', 'arriendo-facil' ); ?>
 								</button>
-								<?php if ( $is_self ) : ?>
+								<?php if ( $needs_review ) : ?>
 									<button type="button" class="button af-review-admin" data-user-id="<?php echo esc_attr( $admin_user->ID ); ?>" data-user-name="<?php echo esc_attr( $row['company'] ? $row['company'] : $admin_user->display_name ); ?>">
 										<?php esc_html_e( 'Revisar', 'arriendo-facil' ); ?>
 									</button>

@@ -167,9 +167,18 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 		$doc_status   = (string) get_user_meta( $user_id, 'af_admin_doc_status', true );
 		$documents    = (array) get_user_meta( $user_id, 'af_admin_documents', true );
 
+		$id_last4 = '';
+		if ( '' !== $id_enc ) {
+			$id_plain = $this->decrypt_sensitive_value( $id_enc );
+			if ( '' !== $id_plain ) {
+				$id_digits = preg_replace( '/\D/', '', $id_plain );
+				$id_last4  = strlen( $id_digits ) >= 4 ? '••••' . substr( $id_digits, -4 ) : '••••';
+			}
+		}
+
 		$email_ok   = 1 === (int) get_user_meta( $user_id, 'af_admin_email_verified', true );
 		$company_ok = '' !== $company_name && '' !== $contact_name && '' !== $phone;
-		$identity_ok = in_array( $id_type, array( 'cedula', 'ruc' ), true ) && '' !== $id_enc;
+		$identity_ok = in_array( $id_type, array( 'cedula', 'ruc', 'pasaporte' ), true ) && '' !== $id_enc;
 		$docs_ok     = true;
 		foreach ( self::DOC_TYPES as $doc_type ) {
 			if ( empty( $documents[ $doc_type ] ) ) {
@@ -212,15 +221,6 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 			$profile_url  = get_edit_profile_url( $user_id );
 			$avatar_html  = get_avatar( $user_id, 96 );
 			$resend_nonce = wp_create_nonce( 'af_admin_signup_frontend_nonce' );
-
-			$doc_badges = array(
-				'pendiente'   => array( 'af-pill--warning', __( 'Pendiente', 'arriendo-facil' ) ),
-				'en_revision' => array( 'af-pill--info', __( 'En revisión', 'arriendo-facil' ) ),
-				'verificado'  => array( 'af-pill--success', __( 'Verificado', 'arriendo-facil' ) ),
-				'rechazado'   => array( 'af-pill--danger', __( 'Rechazado', 'arriendo-facil' ) ),
-			);
-			$doc_status = $doc_status ? $doc_status : 'pendiente';
-			$doc_badge  = isset( $doc_badges[ $doc_status ] ) ? $doc_badges[ $doc_status ] : $doc_badges['pendiente'];
 
 			af_page_header(
 				array(
@@ -289,7 +289,11 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 									<h2 class="af-section__title"><?php esc_html_e( 'Identidad del responsable', 'arriendo-facil' ); ?></h2>
 									<p class="af-section__subtitle"><?php esc_html_e( 'Se valida automáticamente y se guarda cifrada.', 'arriendo-facil' ); ?></p>
 								</div>
-								<span class="af-pill <?php echo esc_attr( $doc_badge[0] ); ?>"><?php echo esc_html( $doc_badge[1] ); ?></span>
+								<?php if ( $identity_ok ) : ?>
+									<span class="af-pill af-pill--success"><?php esc_html_e( 'Guardado', 'arriendo-facil' ); ?></span>
+								<?php else : ?>
+									<span class="af-pill af-pill--warning"><?php esc_html_e( 'Pendiente', 'arriendo-facil' ); ?></span>
+								<?php endif; ?>
 							</div>
 							<div class="af-form-grid">
 								<div class="af-form-field">
@@ -298,16 +302,18 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 										<option value=""><?php esc_html_e( 'Selecciona', 'arriendo-facil' ); ?></option>
 										<option value="cedula" <?php selected( $id_type, 'cedula' ); ?>><?php esc_html_e( 'Cédula', 'arriendo-facil' ); ?></option>
 										<option value="ruc" <?php selected( $id_type, 'ruc' ); ?>><?php esc_html_e( 'RUC', 'arriendo-facil' ); ?></option>
+										<option value="pasaporte" <?php selected( $id_type, 'pasaporte' ); ?>><?php esc_html_e( 'Pasaporte', 'arriendo-facil' ); ?></option>
 									</select>
+									<span id="af-id-limit-hint" class="af-form-field__hint"></span>
 								</div>
 								<div class="af-form-field">
 									<label class="af-form-field__label" for="af-id-number"><?php esc_html_e( 'Número de identificación', 'arriendo-facil' ); ?></label>
 									<input id="af-id-number" class="regular-text" type="text" name="id_number" maxlength="20"
-										value=""
-										placeholder="<?php echo $id_enc ? esc_attr__( 'Conservar número actual', 'arriendo-facil' ) : esc_attr__( 'ej. 1834567890', 'arriendo-facil' ); ?>"
-										<?php echo $id_enc ? 'data-preserve-id="1"' : 'required'; ?> />
+									value=""
+									placeholder="<?php echo $id_last4 ? esc_attr( sprintf( /* translators: %s: masked identity number */ __( '%s (ya guardado)', 'arriendo-facil' ), $id_last4 ) ) : esc_attr__( 'ej. 1834567890', 'arriendo-facil' ); ?>"
+									<?php echo $id_enc ? 'data-preserve-id="1"' : 'required'; ?> />
 									<?php if ( $id_enc ) : ?>
-										<span class="af-form-field__hint"><?php esc_html_e( 'Ya está guardado de forma segura. Déjalo en blanco para conservarlo o ingresa uno nuevo.', 'arriendo-facil' ); ?></span>
+									<span class="af-form-field__hint"><?php echo esc_html( sprintf( /* translators: %s: masked identity number */ __( 'Número actual %1$s. Déjalo en blanco para conservarlo o ingresa uno nuevo.', 'arriendo-facil' ), $id_last4 ) ); ?></span>
 									<?php endif; ?>
 								</div>
 								<div class="af-form-field">
@@ -503,6 +509,25 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 				alertBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 			}
 
+			var idTypeSelect  = document.getElementById('af-id-type');
+			var idNumberInput = document.getElementById('af-id-number');
+			var idLimitHint   = document.getElementById('af-id-limit-hint');
+			var idLimits      = {
+				cedula:    { max: 10, text: 'Cedula: 10 digitos.' },
+				ruc:       { max: 13, text: 'RUC: 13 digitos.' },
+				pasaporte: { max: 12, text: 'Pasaporte: 6 a 12 caracteres alfanumericos (letras y numeros, sin espacios).' }
+			};
+			function updateIdHint(){
+				var t = idTypeSelect ? idTypeSelect.value : '';
+				var lim = idLimits[t] || null;
+				if(idNumberInput){ idNumberInput.maxLength = lim ? lim.max : 20; }
+				if(idLimitHint){ idLimitHint.textContent = lim ? lim.text : ''; }
+			}
+			if(idTypeSelect){
+				idTypeSelect.addEventListener('change', updateIdHint);
+				updateIdHint();
+			}
+
 			var profileForm = wrap.querySelector('[data-af-profile-form]');
 			if(profileForm){
 				profileForm.addEventListener('submit', async function(e){
@@ -633,13 +658,16 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 		$phone        = isset( $_POST['phone'] ) ? sanitize_text_field( wp_unslash( $_POST['phone'] ) ) : '';
 		$id_type      = isset( $_POST['id_type'] ) ? sanitize_key( wp_unslash( $_POST['id_type'] ) ) : '';
 		$id_number    = isset( $_POST['id_number'] ) ? sanitize_text_field( wp_unslash( $_POST['id_number'] ) ) : '';
+		if ( class_exists( 'AF_Text_Normalizer' ) && in_array( $id_type, array( 'cedula', 'ruc', 'pasaporte' ), true ) ) {
+			$id_number = AF_Text_Normalizer::document( $id_type, $id_number );
+		}
 		$nationality  = isset( $_POST['nationality'] ) ? sanitize_text_field( wp_unslash( $_POST['nationality'] ) ) : '';
 		$birth_city   = isset( $_POST['birth_city'] ) ? sanitize_text_field( wp_unslash( $_POST['birth_city'] ) ) : '';
 
 		$current_id_enc = (string) get_user_meta( $user_id, 'af_admin_id_number_enc', true );
 		$current_id_type = (string) get_user_meta( $user_id, 'af_admin_id_type', true );
 
-		if ( in_array( $id_type, array( 'cedula', 'ruc' ), true ) && '' !== $id_number ) {
+		if ( in_array( $id_type, array( 'cedula', 'ruc', 'pasaporte' ), true ) && '' !== $id_number ) {
 			if ( ! class_exists( 'Arriendo_Facil_Identity_Validator' )
 				|| ! Arriendo_Facil_Identity_Validator::validate( $id_type, $id_number ) ) {
 				wp_send_json_error( array( 'message' => __( 'El numero de identificacion no es valido para el tipo seleccionado.', 'arriendo-facil' ) ), 400 );
@@ -655,7 +683,7 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 		}
 
 		if ( '' === $current_id_enc ) {
-			if ( ! in_array( $id_type, array( 'cedula', 'ruc' ), true ) ) {
+			if ( ! in_array( $id_type, array( 'cedula', 'ruc', 'pasaporte' ), true ) ) {
 				wp_send_json_error( array( 'message' => __( 'Selecciona un tipo de identificacion.', 'arriendo-facil' ) ), 400 );
 			}
 			wp_send_json_error( array( 'message' => __( 'Ingresa un numero de identificacion valido.', 'arriendo-facil' ) ), 400 );
@@ -1026,7 +1054,7 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 		$id_enc       = (string) get_user_meta( $user_id, 'af_admin_id_number_enc', true );
 		$id_type      = (string) get_user_meta( $user_id, 'af_admin_id_type', true );
 		$documents    = (array) get_user_meta( $user_id, 'af_admin_documents', true );
-		$identity_ok  = in_array( $id_type, array( 'cedula', 'ruc' ), true ) && '' !== $id_enc;
+		$identity_ok  = in_array( $id_type, array( 'cedula', 'ruc', 'pasaporte' ), true ) && '' !== $id_enc;
 
 		if ( ! $identity_ok ) {
 			return 'pendiente';
@@ -1039,6 +1067,48 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 		}
 
 		return 'en_revision';
+	}
+
+	/**
+	 * Decrypts sensitive admin data previously encrypted with
+	 * encrypt_sensitive_value() (sodium secretbox, 'v1:' payload).
+	 *
+	 * Returns '' whenever the value cannot be decrypted (invalid format,
+	 * missing sodium extension, or corrupted payload). Never throws.
+	 *
+	 * @param string $encrypted Encrypted value.
+	 * @return string
+	 */
+	private function decrypt_sensitive_value( $encrypted ) {
+		$encrypted = (string) $encrypted;
+		if ( '' === $encrypted || 0 !== strpos( $encrypted, 'v1:' ) ) {
+			return '';
+		}
+
+		if ( ! function_exists( 'sodium_crypto_secretbox_open' ) || ! function_exists( 'base64_decode' ) ) {
+			return '';
+		}
+
+		try {
+			$key_material = hash( 'sha256', wp_salt( 'auth' ) . wp_salt( 'secure_auth' ) . 'af_admin_sensitive_v1', true );
+			if ( ! is_string( $key_material ) || 32 !== strlen( $key_material ) ) {
+				return '';
+			}
+
+			$payload = base64_decode( substr( $encrypted, 3 ), true );
+			if ( false === $payload || strlen( $payload ) <= SODIUM_CRYPTO_SECRETBOX_NONCEBYTES ) {
+				return '';
+			}
+
+			$nonce      = substr( $payload, 0, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES );
+			$ciphertext = substr( $payload, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES );
+
+			$plain = sodium_crypto_secretbox_open( $ciphertext, $nonce, $key_material );
+			return false !== $plain ? (string) $plain : '';
+		} catch ( Exception $exception ) {
+			error_log( '[AF Security] admin sensitive decryption failure: ' . $exception->getMessage() );
+			return '';
+		}
 	}
 
 	/**

@@ -62,11 +62,8 @@ foreach ( $property_admins as $admin_user ) {
 	$verified_at          = get_user_meta( $user_id, 'af_admin_doc_verified_at', true );
 
 	$doc_count   = count( array_filter( $admin_documents ) );
-	$has_identity = '' !== (string) get_user_meta( $user_id, 'af_admin_id_number_enc', true );
-	$needs_review = 'self' === $signup_source
-		|| $doc_count > 0
-		|| $has_identity
-		|| in_array( (string) $doc_status, array( 'en_revision', 'verificado', 'rechazado' ), true );
+	$doc_status_effective = $doc_status ? (string) $doc_status : 'pendiente';
+	$needs_review = 'verificado' !== $doc_status_effective;
 
 	$rows[] = array(
 		'user'             => $admin_user,
@@ -313,6 +310,7 @@ $totals_platform = array(
 			<button type="button" class="button button-primary" data-review-action="approve"><?php esc_html_e( 'Aprobar', 'arriendo-facil' ); ?></button>
 			<button type="button" class="button" data-review-action="reject"><?php esc_html_e( 'Rechazar', 'arriendo-facil' ); ?></button>
 			<button type="button" class="button" data-review-action="reset"><?php esc_html_e( 'Reiniciar', 'arriendo-facil' ); ?></button>
+			<button type="button" class="button" data-recompute-status><?php esc_html_e( 'Recomputar estado', 'arriendo-facil' ); ?></button>
 			<button type="button" class="button" data-review-close style="margin-left:auto;"><?php esc_html_e( 'Cerrar', 'arriendo-facil' ); ?></button>
 		</div>
 	</div>
@@ -487,6 +485,20 @@ $totals_platform = array(
 
 	document.querySelector('[data-review-close]').addEventListener('click', closeReview);
 	document.getElementById('af-admin-review-backdrop').addEventListener('click', closeReview);
+
+	document.querySelector('[data-recompute-status]').addEventListener('click', function () {
+		if (!reviewUserId) { return; }
+		const btn = document.querySelector('[data-recompute-status]');
+		btn.disabled = true;
+		post('af_admin_recompute_status', { user_id: reviewUserId }).then((res) => {
+			if (res && res.success) {
+				window.location.reload();
+			} else {
+				btn.disabled = false;
+				alert((res && res.data && res.data.message) ? res.data.message : 'Error');
+			}
+		});
+	});
 
 	document.querySelectorAll('[data-review-action]').forEach(function (btn) {
 		btn.addEventListener('click', function () {

@@ -77,6 +77,7 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 		add_action( 'wp_ajax_af_admin_purge_demo', array( $this, 'ajax_purge_demo' ) );
 		add_action( 'wp_ajax_af_review_admin_verification', array( $this, 'ajax_review_verification' ) );
 		add_action( 'wp_ajax_af_admin_review_detail', array( $this, 'ajax_review_detail' ) );
+		add_action( 'wp_ajax_af_admin_recompute_status', array( $this, 'ajax_recompute_status' ) );
 
 		add_action( 'admin_notices', array( $this, 'render_demo_banner' ) );
 
@@ -843,6 +844,45 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 		}
 
 		wp_send_json_success( array( 'message' => __( 'Documento subido correctamente.', 'arriendo-facil' ) ) );
+	}
+
+	/**
+	 * AJAX: recomputes an admin's verification status from the stored
+	 * identity and documents (super admin only). Fixes accounts where the
+	 * af_admin_doc_status meta went stale even though the data exists.
+	 *
+	 * @return void
+	 */
+	public function ajax_recompute_status() {
+		check_ajax_referer( self::REVIEW_NONCE, 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$user_id = isset( $_POST['user_id'] ) ? absint( wp_unslash( $_POST['user_id'] ) ) : 0;
+		if ( ! $user_id ) {
+			wp_send_json_error( array( 'message' => __( 'Usuario invalido.', 'arriendo-facil' ) ), 400 );
+		}
+
+		$user = get_userdata( $user_id );
+		if ( ! $user || ! in_array( 'af_property_admin', (array) $user->roles, true ) ) {
+			wp_send_json_error( array( 'message' => __( 'Administrador no encontrado.', 'arriendo-facil' ) ), 404 );
+		}
+
+		$status = $this->next_doc_status( $user_id );
+		update_user_meta( $user_id, 'af_admin_doc_status', $status );
+
+		if ( '' === get_user_meta( $user_id, 'af_admin_identity_match_status', true ) ) {
+			update_user_meta( $user_id, 'af_admin_identity_match_status', 'not_checked' );
+		}
+
+		wp_send_json_success(
+			array(
+				'message'    => __( 'Estado de verificacion recalculado.', 'arriendo-facil' ),
+				'doc_status' => $status,
+			)
+		);
 	}
 
 	/**

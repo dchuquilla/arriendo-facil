@@ -345,7 +345,8 @@ class Arriendo_Facil_Activator {
 
 			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_meter_readings (
 				id                     BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
-				unit_id                BIGINT(20) UNSIGNED NOT NULL,
+				unit_id                BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+				accommodation_id       BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
 				service                VARCHAR(30) NOT NULL COMMENT 'agua, luz, gas',
 				period                 CHAR(7) NOT NULL COMMENT 'YYYY-MM',
 				previous_reading       DECIMAL(12,3) NOT NULL DEFAULT 0.000,
@@ -356,8 +357,9 @@ class Arriendo_Facil_Activator {
 				recorded_by            BIGINT(20) UNSIGNED DEFAULT NULL,
 				created_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 				PRIMARY KEY (id),
-				UNIQUE KEY uniq_unit_service_period (unit_id, service, period),
+				UNIQUE KEY uniq_unit_accommodation_service_period (unit_id, accommodation_id, service, period),
 				KEY unit_id (unit_id),
+				KEY accommodation_id (accommodation_id),
 				KEY period (period)
 			) $charset_collate;",
 
@@ -835,6 +837,76 @@ class Arriendo_Facil_Activator {
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		foreach ( $tables as $sql ) {
 			dbDelta( $sql );
+		}
+
+		$meter_readings_table = $wpdb->prefix . 'af_meter_readings';
+
+		// Meter readings may target an independent accommodation (no building
+		// unit). Add the column on installs that predate that support.
+		$meter_readings_acc_col = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				 FROM INFORMATION_SCHEMA.COLUMNS
+				 WHERE TABLE_SCHEMA = %s
+				   AND TABLE_NAME = %s
+				   AND COLUMN_NAME = %s",
+				DB_NAME,
+				$meter_readings_table,
+				'accommodation_id'
+			)
+		);
+		if ( ! (int) $meter_readings_acc_col ) {
+			$wpdb->query( "ALTER TABLE {$meter_readings_table} ADD COLUMN accommodation_id BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 AFTER unit_id" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		}
+
+		// Replace the old per-unit unique key so independent accommodations
+		// (unit_id = 0) get their own period slot, and index the new column.
+		$meter_readings_old_key = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				 FROM INFORMATION_SCHEMA.STATISTICS
+				 WHERE TABLE_SCHEMA = %s
+				   AND TABLE_NAME = %s
+				   AND INDEX_NAME = %s",
+				DB_NAME,
+				$meter_readings_table,
+				'uniq_unit_service_period'
+			)
+		);
+		if ( (int) $meter_readings_old_key ) {
+			$wpdb->query( "ALTER TABLE {$meter_readings_table} DROP INDEX uniq_unit_service_period" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		}
+
+		$meter_readings_new_key = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				 FROM INFORMATION_SCHEMA.STATISTICS
+				 WHERE TABLE_SCHEMA = %s
+				   AND TABLE_NAME = %s
+				   AND INDEX_NAME = %s",
+				DB_NAME,
+				$meter_readings_table,
+				'uniq_unit_accommodation_service_period'
+			)
+		);
+		if ( ! (int) $meter_readings_new_key ) {
+			$wpdb->query( "ALTER TABLE {$meter_readings_table} ADD UNIQUE KEY uniq_unit_accommodation_service_period (unit_id, accommodation_id, service, period)" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		}
+
+		$meter_readings_acc_idx = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				 FROM INFORMATION_SCHEMA.STATISTICS
+				 WHERE TABLE_SCHEMA = %s
+				   AND TABLE_NAME = %s
+				   AND INDEX_NAME = %s",
+				DB_NAME,
+				$meter_readings_table,
+				'accommodation_id'
+			)
+		);
+		if ( ! (int) $meter_readings_acc_idx ) {
+			$wpdb->query( "ALTER TABLE {$meter_readings_table} ADD KEY accommodation_id (accommodation_id)" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		}
 
 		$review_groups_table = $wpdb->prefix . 'af_review_groups';

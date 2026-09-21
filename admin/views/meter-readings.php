@@ -26,16 +26,49 @@ $buildings = (array) $wpdb->get_results(
 	'SELECT id, name FROM ' . Arriendo_Facil_Property_Structure::buildings_table() . " WHERE status = 'active'{$building_scope_clause} ORDER BY name ASC" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 );
 
-$reading_scope_clause = null === $accessible_building_ids ? '' : ' AND b.id IN (' . Arriendo_Facil_Tenancy::ids_in_clause( $accessible_building_ids ) . ')';
+// Stand-alone accommodations: properties not linked to any building unit.
+$units_table = Arriendo_Facil_Property_Structure::units_table();
+$acc_where   = "post_type = %s AND post_status IN (%s,%s,%s) AND ID NOT IN (SELECT accommodation_id FROM {$units_table} WHERE accommodation_id IS NOT NULL AND accommodation_id > 0)"; // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+$acc_args    = array( 'accommodation', 'publish', 'private', 'draft' );
+
+if ( null !== $accessible_building_ids ) {
+	$acc_where .= ' AND ID IN ( SELECT post_id FROM ' . $wpdb->postmeta . ' WHERE meta_key = %s AND meta_value = %s )';
+	$acc_args[] = '_af_owner_id';
+	$acc_args[] = (string) get_current_user_id();
+}
+
+$standalone_accommodations = $wpdb->get_results(
+	$wpdb->prepare(
+		"SELECT ID, post_title FROM {$wpdb->posts} WHERE {$acc_where} ORDER BY post_title ASC", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$acc_args
+	)
+);
+
+$reading_scope_clause = '';
+if ( null !== $accessible_building_ids ) {
+	$accessible_accommodation_ids = array_map(
+		'absint',
+		(array) $wpdb->get_col(
+			$wpdb->prepare(
+				"SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = %s AND meta_value = %s",
+				'_af_owner_id',
+				(string) get_current_user_id()
+			)
+		)
+	);
+	$acc_clause                   = empty( $accessible_accommodation_ids ) ? '0' : implode( ',', $accessible_accommodation_ids );
+	$reading_scope_clause         = ' AND ( b.id IN (' . Arriendo_Facil_Tenancy::ids_in_clause( $accessible_building_ids ) . ') OR r.accommodation_id IN (' . $acc_clause . ') )'; // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+}
 
 $readings = $wpdb->get_results(
 	$wpdb->prepare(
-		"SELECT r.*, u.unit_code, b.name AS building_name
+		"SELECT r.*, u.unit_code, b.name AS building_name, p.post_title AS accommodation_title
 		 FROM {$readings_table} r
-		 LEFT JOIN " . Arriendo_Facil_Property_Structure::units_table() . ' u ON u.id = r.unit_id
-		 LEFT JOIN ' . Arriendo_Facil_Property_Structure::buildings_table() . " b ON b.id = u.building_id
+		 LEFT JOIN {$units_table} u ON u.id = r.unit_id
+		 LEFT JOIN " . Arriendo_Facil_Property_Structure::buildings_table() . " b ON b.id = u.building_id
+		 LEFT JOIN {$wpdb->posts} p ON p.ID = r.accommodation_id
 		 WHERE r.period = %s{$reading_scope_clause}
-		 ORDER BY b.name ASC, u.unit_code ASC, r.service ASC", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		 ORDER BY b.name ASC, u.unit_code ASC, p.post_title ASC, r.service ASC", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		$period_filter
 	)
 );
@@ -52,18 +85,18 @@ foreach ( (array) $readings as $reading ) {
 		array(
 			'eyebrow'  => __( 'Servicios básicos', 'arriendo-facil' ),
 			'title'    => __( 'Lecturas de medidor', 'arriendo-facil' ),
-			'subtitle' => __( 'Registra el consumo de agua, luz y gas por unidad. El cargo al inquilino se genera automáticamente.', 'arriendo-facil' ),
+			'subtitle' => __( 'Registra el consumo de agua, luz y gas por unidad o por inmueble independiente. El cargo al inquilino se genera automáticamente.', 'arriendo-facil' ),
 		)
 	);
 	?>
 
-	<?php if ( empty( $buildings ) ) : ?>
+	<?php if ( empty( $buildings ) && empty( $standalone_accommodations ) ) : ?>
 		<div class="af-section" style="padding: var(--af-space-5);">
 			<p>
 				<?php
 				printf(
 					/* translators: %s: link to the buildings page */
-					esc_html__( 'Primero registra un edificio y sus unidades en %s.', 'arriendo-facil' ),
+					esc_html__( 'Primero registra un edificio y sus unidades en %s, o crea un inmueble en el catálogo para asignarle medidores.', 'arriendo-facil' ),
 					'<a href="' . esc_url( admin_url( 'admin.php?page=af-buildings' ) ) . '">' . esc_html__( 'Edificios y unidades', 'arriendo-facil' ) . '</a>'
 				);
 				?>
@@ -79,9 +112,10 @@ foreach ( (array) $readings as $reading ) {
 			<p class="af-modal__status" id="af-reading-status"></p>
 
 			<form id="af-reading-form" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap:14px; align-items:end;">
+				<?php if ( ! empty( $buildings ) ) : ?>
 				<label>
-					<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Unidad', 'arriendo-facil' ); ?> *</span>
-					<select name="unit_id" required style="width:100%;">
+					<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Unidad (edificio)', 'arriendo-facil' ); ?></span>
+					<select name="unit_id" style="width:100%;">
 						<option value=""><?php esc_html_e( '— Seleccionar —', 'arriendo-facil' ); ?></option>
 						<?php foreach ( $buildings as $building ) : ?>
 							<optgroup label="<?php echo esc_attr( $building->name ); ?>">
@@ -92,6 +126,19 @@ foreach ( (array) $readings as $reading ) {
 						<?php endforeach; ?>
 					</select>
 				</label>
+				<?php endif; ?>
+
+				<?php if ( ! empty( $standalone_accommodations ) ) : ?>
+				<label>
+					<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Inmueble independiente', 'arriendo-facil' ); ?></span>
+					<select name="accommodation_id" style="width:100%;">
+						<option value=""><?php esc_html_e( '— Seleccionar —', 'arriendo-facil' ); ?></option>
+						<?php foreach ( $standalone_accommodations as $accommodation_obj ) : ?>
+							<option value="<?php echo esc_attr( (int) $accommodation_obj->ID ); ?>"><?php echo esc_html( $accommodation_obj->post_title ); ?></option>
+						<?php endforeach; ?>
+					</select>
+				</label>
+				<?php endif; ?>
 
 				<label>
 					<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Servicio', 'arriendo-facil' ); ?> *</span>
@@ -166,8 +213,8 @@ foreach ( (array) $readings as $reading ) {
 						<?php foreach ( $readings as $reading ) : ?>
 							<tr>
 								<td data-label="<?php esc_attr_e( 'Unidad', 'arriendo-facil' ); ?>">
-									<strong><?php echo esc_html( $reading->unit_code ); ?></strong>
-									<span class="af-td-meta"><?php echo esc_html( $reading->building_name ); ?></span>
+									<strong><?php echo esc_html( $reading->unit_code ? $reading->unit_code : ( $reading->accommodation_title ? $reading->accommodation_title : __( 'Inmueble', 'arriendo-facil' ) ) ); ?></strong>
+									<span class="af-td-meta"><?php echo esc_html( $reading->unit_code ? $reading->building_name : __( 'Propiedad independiente', 'arriendo-facil' ) ); ?></span>
 								</td>
 								<td data-label="<?php esc_attr_e( 'Servicio', 'arriendo-facil' ); ?>"><?php echo esc_html( $services[ $reading->service ] ?? $reading->service ); ?></td>
 								<td data-label="<?php esc_attr_e( 'Anterior', 'arriendo-facil' ); ?>"><?php echo esc_html( number_format_i18n( (float) $reading->previous_reading, 3 ) ); ?></td>
@@ -190,11 +237,31 @@ foreach ( (array) $readings as $reading ) {
 	const status = document.getElementById('af-reading-status');
 	if (!form) { return; }
 
+	const unitSelect = form.querySelector('select[name="unit_id"]');
+	const accommodationSelect = form.querySelector('select[name="accommodation_id"]');
+
+	if (unitSelect && accommodationSelect) {
+		unitSelect.addEventListener('change', function () {
+			if (this.value) { accommodationSelect.value = ''; }
+		});
+		accommodationSelect.addEventListener('change', function () {
+			if (this.value) { unitSelect.value = ''; }
+		});
+	}
+
 	const ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
 	const nonce = <?php echo wp_json_encode( wp_create_nonce( 'af_ledger_nonce' ) ); ?>;
 
 	form.addEventListener('submit', function (e) {
 		e.preventDefault();
+		const unitValue = unitSelect ? unitSelect.value : '';
+		const accommodationValue = accommodationSelect ? accommodationSelect.value : '';
+		if (!unitValue && !accommodationValue) {
+			status.textContent = <?php echo wp_json_encode( __( 'Selecciona una unidad o un inmueble.', 'arriendo-facil' ) ); ?>;
+			status.className = 'af-modal__status is-error';
+			return;
+		}
+
 		const btn = form.querySelector('button[type="submit"]');
 		btn.disabled = true;
 		status.textContent = '';

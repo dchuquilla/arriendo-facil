@@ -67,7 +67,7 @@ if ( ! empty( $buildings ) ) {
 		array(
 			'eyebrow'  => __( 'Estructura', 'arriendo-facil' ),
 			'title'    => __( 'Edificios y unidades', 'arriendo-facil' ),
-			'subtitle' => __( 'Define el edificio, su alícuota mensual total y el coeficiente de prorrateo de cada unidad.', 'arriendo-facil' ),
+			'subtitle' => __( 'Sirve para propiedades que están dentro de un edificio: departamentos, oficinas o locales. Aquí registras el edificio y sus unidades para repartir entre ellos los gastos comunes (mantenimiento, guardianía, etc.).', 'arriendo-facil' ),
 		)
 	);
 	?>
@@ -77,14 +77,14 @@ if ( ! empty( $buildings ) ) {
 		<div class="af-empty" style="margin-bottom: var(--af-space-5);">
 			<span class="af-empty__icon" aria-hidden="true"><?php echo af_lucide( 'building-2', 28 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
 			<h3 class="af-empty__title"><?php esc_html_e( 'Aún no hay edificios registrados', 'arriendo-facil' ); ?></h3>
-			<p class="af-empty__text"><?php esc_html_e( 'Crea el primero para empezar a prorratear alícuotas entre sus unidades.', 'arriendo-facil' ); ?></p>
+			<p class="af-empty__text"><?php esc_html_e( 'Aquí organizas los edificios con varios arriendos adentro (por ejemplo, un edificio con departamentos). Si tus propiedades son casas o locales sueltos, no necesitas usar esta sección.', 'arriendo-facil' ); ?></p>
 		</div>
 
 		<section class="af-section">
 			<header class="af-section__header">
 				<div class="af-section__head">
 					<h2 class="af-section__title"><?php esc_html_e( 'Nuevo edificio', 'arriendo-facil' ); ?></h2>
-					<p class="af-section__subtitle"><?php esc_html_e( 'Registra el edificio con su alícuota mensual total. Luego añade las unidades y sus coeficientes.', 'arriendo-facil' ); ?></p>
+					<p class="af-section__subtitle"><?php esc_html_e( 'Pon el nombre del edificio y cuánto se gasta por mes en mantenerlo. Después añades cada departamento y cuánto le toca pagar.', 'arriendo-facil' ); ?></p>
 				</div>
 			</header>
 			<p class="af-modal__status" id="af-building-status"></p>
@@ -102,8 +102,9 @@ if ( ! empty( $buildings ) ) {
 					<input type="text" id="af-building-city" name="city" class="regular-text" />
 				</div>
 				<div class="af-form-field">
-					<label class="af-form-field__label" for="af-building-hoa"><?php esc_html_e( 'Alícuota mensual total (USD)', 'arriendo-facil' ); ?></label>
+					<label class="af-form-field__label" for="af-building-hoa"><?php esc_html_e( 'Gastos comunes mensuales (USD)', 'arriendo-facil' ); ?></label>
 					<input type="number" id="af-building-hoa" name="monthly_hoa_total" step="0.01" min="0" value="0.00" />
+					<p class="af-form-field__hint"><?php esc_html_e( 'Cuánto cuesta al mes mantener el edificio entre todos: mantenimiento, guardianía, agua del edificio, etc. El sistema lo reparte entre las unidades.', 'arriendo-facil' ); ?></p>
 				</div>
 				<?php if ( $is_super_admin && ! empty( $property_admins ) ) : ?>
 				<div class="af-form-field">
@@ -147,11 +148,11 @@ if ( ! empty( $buildings ) ) {
 			<div class="af-kpi-grid af-buildings-kpis">
 				<article class="af-kpi af-kpi--accent">
 					<div class="af-kpi__head">
-						<span class="af-kpi__label"><?php esc_html_e( 'Alícuota total', 'arriendo-facil' ); ?></span>
+						<span class="af-kpi__label"><?php esc_html_e( 'Gastos comunes', 'arriendo-facil' ); ?></span>
 						<span class="af-kpi__icon" aria-hidden="true"><?php echo af_lucide( 'receipt', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
 					</div>
 					<div class="af-kpi__value">$<?php echo esc_html( number_format_i18n( (float) $selected_building->monthly_hoa_total, 2 ) ); ?></div>
-					<div class="af-kpi__hint"><?php esc_html_e( 'Mensual, a prorratear', 'arriendo-facil' ); ?></div>
+					<div class="af-kpi__hint"><?php esc_html_e( 'Por mes, se reparte entre las unidades', 'arriendo-facil' ); ?></div>
 				</article>
 
 				<article class="af-kpi af-kpi--info">
@@ -165,7 +166,7 @@ if ( ! empty( $buildings ) ) {
 
 				<article class="af-kpi <?php echo abs( $coefficient_total - 100 ) > 0.01 ? 'af-kpi--attention' : 'af-kpi--success'; ?>">
 					<div class="af-kpi__head">
-						<span class="af-kpi__label"><?php esc_html_e( 'Suma de coeficientes', 'arriendo-facil' ); ?></span>
+						<span class="af-kpi__label"><?php esc_html_e( 'Suma de porcentajes', 'arriendo-facil' ); ?></span>
 						<span class="af-kpi__icon" aria-hidden="true"><?php echo af_lucide( 'trending-up', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
 					</div>
 					<div class="af-kpi__value"><?php echo esc_html( number_format_i18n( $coefficient_total, 2 ) ); ?>%</div>
@@ -173,8 +174,8 @@ if ( ! empty( $buildings ) ) {
 						<?php
 						echo esc_html(
 							abs( $coefficient_total - 100 ) > 0.01
-								? __( 'Debe sumar 100% para prorratear bien', 'arriendo-facil' )
-								: __( 'Configuración correcta', 'arriendo-facil' )
+								? __( 'Todas deben sumar 100% para repartir bien los gastos', 'arriendo-facil' )
+								: __( 'Reparto correcto', 'arriendo-facil' )
 						);
 						?>
 					</div>
@@ -185,7 +186,7 @@ if ( ! empty( $buildings ) ) {
 				<header class="af-section__header">
 					<div class="af-section__head">
 						<h2 class="af-section__title"><?php esc_html_e( 'Agregar unidad', 'arriendo-facil' ); ?></h2>
-						<p class="af-section__subtitle"><?php esc_html_e( 'Asigna el coeficiente de prorrateo y, si existe, vincula la unidad a una propiedad.', 'arriendo-facil' ); ?></p>
+						<p class="af-section__subtitle"><?php esc_html_e( 'Una unidad es un departamento, local u oficina dentro del edificio. Dile cómo se identifica (por ejemplo A-101) y qué parte de los gastos comunes le corresponde.', 'arriendo-facil' ); ?></p>
 					</div>
 				</header>
 				<p class="af-modal__status" id="af-unit-status"></p>
@@ -196,8 +197,9 @@ if ( ! empty( $buildings ) ) {
 						<input type="text" id="af-unit-code" name="unit_code" required placeholder="A-101" />
 					</div>
 					<div class="af-form-field">
-						<label class="af-form-field__label" for="af-unit-coef"><?php esc_html_e( 'Coeficiente (%)', 'arriendo-facil' ); ?></label>
+						<label class="af-form-field__label" for="af-unit-coef"><?php esc_html_e( 'Porción de los gastos comunes (%)', 'arriendo-facil' ); ?></label>
 						<input type="number" id="af-unit-coef" name="hoa_coefficient" step="0.0001" min="0" max="100" value="0" />
+						<p class="af-form-field__hint"><?php esc_html_e( 'Cuánto le toca de los gastos comunes a esta unidad. Entre todas las unidades debe sumar 100%.', 'arriendo-facil' ); ?></p>
 					</div>
 					<div class="af-form-field">
 						<label class="af-form-field__label" for="af-unit-area"><?php esc_html_e( 'Área (m²)', 'arriendo-facil' ); ?></label>
@@ -211,6 +213,7 @@ if ( ! empty( $buildings ) ) {
 								<option value="<?php echo esc_attr( (int) $accommodation->ID ); ?>"><?php echo esc_html( $accommodation->post_title ); ?></option>
 							<?php endforeach; ?>
 						</select>
+						<p class="af-form-field__hint"><?php esc_html_e( 'Si este departamento ya está registrado en el Catálogo de propiedades, elígela aquí para que los dos queden unidos.', 'arriendo-facil' ); ?></p>
 					</div>
 					<button type="submit" class="button af-btn af-btn--primary"><?php esc_html_e( 'Agregar unidad', 'arriendo-facil' ); ?></button>
 				</form>
@@ -230,9 +233,9 @@ if ( ! empty( $buildings ) ) {
 						<tr>
 							<th><?php esc_html_e( 'Unidad', 'arriendo-facil' ); ?></th>
 							<th><?php esc_html_e( 'Propiedad vinculada', 'arriendo-facil' ); ?></th>
-							<th><?php esc_html_e( 'Coeficiente', 'arriendo-facil' ); ?></th>
+							<th><?php esc_html_e( 'Gastos comunes %', 'arriendo-facil' ); ?></th>
 							<th><?php esc_html_e( 'Área', 'arriendo-facil' ); ?></th>
-							<th><?php esc_html_e( 'Alícuota mensual', 'arriendo-facil' ); ?></th>
+							<th><?php esc_html_e( 'Le toca por mes', 'arriendo-facil' ); ?></th>
 						</tr>
 					</thead>
 					<tbody>
@@ -270,14 +273,14 @@ if ( ! empty( $buildings ) ) {
 											<?php echo af_pill( 'active', __( 'Vinculada', 'arriendo-facil' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped markup. ?>
 										<?php endif; ?>
 									</td>
-									<td data-label="<?php esc_attr_e( 'Coeficiente', 'arriendo-facil' ); ?>">
-										<span class="af-coef <?php echo $unit_coef > 100 ? 'is-over' : ''; ?>">
-											<strong><?php echo esc_html( number_format_i18n( $unit_coef, 4 ) ); ?>%</strong>
-											<span class="af-coef__bar" aria-hidden="true"><span style="width: <?php echo esc_attr( max( 0, min( 100, $unit_coef ) ) ); ?>%;"></span></span>
-										</span>
-									</td>
-									<td data-label="<?php esc_attr_e( 'Área', 'arriendo-facil' ); ?>"><?php echo esc_html( number_format_i18n( (float) $unit->area_m2, 2 ) ); ?> m²</td>
-									<td data-label="<?php esc_attr_e( 'Alícuota mensual', 'arriendo-facil' ); ?>"><span class="af-unit-hoa">$<?php echo esc_html( number_format_i18n( $unit_hoa, 2 ) ); ?></span></td>
+<td data-label="<?php esc_attr_e( 'Gastos comunes %', 'arriendo-facil' ); ?>">
+						<span class="af-coef <?php echo $unit_coef > 100 ? 'is-over' : ''; ?>">
+							<strong><?php echo esc_html( number_format_i18n( $unit_coef, 4 ) ); ?>%</strong>
+							<span class="af-coef__bar" aria-hidden="true"><span style="width: <?php echo esc_attr( max( 0, min( 100, $unit_coef ) ) ); ?>%;"></span></span>
+						</span>
+					</td>
+					<td data-label="<?php esc_attr_e( 'Área', 'arriendo-facil' ); ?>"><?php echo esc_html( number_format_i18n( (float) $unit->area_m2, 2 ) ); ?> m²</td>
+					<td data-label="<?php esc_attr_e( 'Le toca por mes', 'arriendo-facil' ); ?>"><span class="af-unit-hoa">$<?php echo esc_html( number_format_i18n( $unit_hoa, 2 ) ); ?></span></td>
 								</tr>
 							<?php endforeach; ?>
 						<?php endif; ?>
@@ -286,9 +289,9 @@ if ( ! empty( $buildings ) ) {
 						<tfoot>
 							<tr>
 								<td colspan="2"><span class="af-totals-label"><?php esc_html_e( 'Totales', 'arriendo-facil' ); ?></span></td>
-								<td data-label="<?php esc_attr_e( 'Coeficiente', 'arriendo-facil' ); ?>"><?php echo esc_html( number_format_i18n( $coef_sum, 4 ) ); ?>%</td>
+								<td data-label="<?php esc_attr_e( 'Gastos comunes %', 'arriendo-facil' ); ?>"><?php echo esc_html( number_format_i18n( $coef_sum, 4 ) ); ?>%</td>
 								<td data-label="<?php esc_attr_e( 'Área', 'arriendo-facil' ); ?>"><?php echo esc_html( number_format_i18n( $area_sum, 2 ) ); ?> m²</td>
-								<td data-label="<?php esc_attr_e( 'Alícuota mensual', 'arriendo-facil' ); ?>">$<?php echo esc_html( number_format_i18n( $hoa_sum, 2 ) ); ?></td>
+								<td data-label="<?php esc_attr_e( 'Le toca por mes', 'arriendo-facil' ); ?>">$<?php echo esc_html( number_format_i18n( $hoa_sum, 2 ) ); ?></td>
 							</tr>
 						</tfoot>
 					<?php endif; ?>
@@ -301,7 +304,7 @@ if ( ! empty( $buildings ) ) {
 			<header class="af-section__header">
 				<div class="af-section__head">
 					<h2 class="af-section__title"><?php esc_html_e( 'Nuevo edificio', 'arriendo-facil' ); ?></h2>
-					<p class="af-section__subtitle"><?php esc_html_e( '¿Construyendo otra sede? Regístrale alícuota y unidades aquí.', 'arriendo-facil' ); ?></p>
+					<p class="af-section__subtitle"><?php esc_html_e( '¿Tienes otro edificio? Regístralo de la misma manera: datos, gastos comunes y después sus unidades.', 'arriendo-facil' ); ?></p>
 				</div>
 			</header>
 			<p class="af-modal__status" id="af-building-status"></p>
@@ -319,8 +322,9 @@ if ( ! empty( $buildings ) ) {
 					<input type="text" id="af-building-city" name="city" class="regular-text" />
 				</div>
 				<div class="af-form-field">
-					<label class="af-form-field__label" for="af-building-hoa"><?php esc_html_e( 'Alícuota mensual total (USD)', 'arriendo-facil' ); ?></label>
+					<label class="af-form-field__label" for="af-building-hoa"><?php esc_html_e( 'Gastos comunes mensuales (USD)', 'arriendo-facil' ); ?></label>
 					<input type="number" id="af-building-hoa" name="monthly_hoa_total" step="0.01" min="0" value="0.00" />
+					<p class="af-form-field__hint"><?php esc_html_e( 'Cuánto cuesta al mes mantener el edificio entre todos: mantenimiento, guardianía, agua del edificio, etc. El sistema lo reparte entre las unidades.', 'arriendo-facil' ); ?></p>
 				</div>
 				<?php if ( $is_super_admin && ! empty( $property_admins ) ) : ?>
 				<div class="af-form-field">

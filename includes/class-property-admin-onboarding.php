@@ -61,7 +61,13 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 	 * Hooks the onboarding feature.
 	 */
 	public function __construct() {
-		add_action( 'admin_menu', array( $this, 'register_profile_menu' ) );
+		// Register at a later priority than Arriendo_Facil_Admin::add_menu()
+		// (priority 10) so the top-level `arriendo-facil` page exists when the
+		// submenu hookname is computed. Registering earlier makes WP compute a
+		// different hookname (`admin_page_*` vs `arriendo-facil_page_*`), the
+		// page lands in $_registered_pages under the wrong key and access is
+		// denied with a 403 regardless of capability.
+		add_action( 'admin_menu', array( $this, 'register_profile_menu' ), 20 );
 		add_action( 'admin_menu', array( $this, 'hide_operational_menus_for_unverified' ), 99 );
 
 		add_action( 'admin_init', array( $this, 'enforce_verification_gate' ) );

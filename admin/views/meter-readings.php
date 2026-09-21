@@ -85,7 +85,7 @@ foreach ( (array) $readings as $reading ) {
 		array(
 			'eyebrow'  => __( 'Servicios básicos', 'arriendo-facil' ),
 			'title'    => __( 'Lecturas de medidor', 'arriendo-facil' ),
-			'subtitle' => __( 'Registra el consumo de agua, luz y gas por unidad o por inmueble independiente. El cargo al inquilino se genera automáticamente.', 'arriendo-facil' ),
+			'subtitle' => __( 'Aquí anotas, una vez al mes, lo que marca el medidor (contador) de agua, luz o gas de cada propiedad. El sistema calcula cuánto se consumió y se lo cobra al inquilino automáticamente.', 'arriendo-facil' ),
 		)
 	);
 	?>
@@ -96,7 +96,7 @@ foreach ( (array) $readings as $reading ) {
 				<?php
 				printf(
 					/* translators: %s: link to the buildings page */
-					esc_html__( 'Primero registra un edificio y sus unidades en %s, o crea un inmueble en el catálogo para asignarle medidores.', 'arriendo-facil' ),
+					esc_html__( 'Esta sección sirve para cobrar el agua, la luz o el gas según lo que cada propiedad consume. Para empezar, registra un edificio con sus unidades en %s o crea una propiedad en el catálogo.', 'arriendo-facil' ),
 					'<a href="' . esc_url( admin_url( 'admin.php?page=af-buildings' ) ) . '">' . esc_html__( 'Edificios y unidades', 'arriendo-facil' ) . '</a>'
 				);
 				?>
@@ -107,14 +107,14 @@ foreach ( (array) $readings as $reading ) {
 		<div class="af-section" style="padding: var(--af-space-5); margin-bottom: var(--af-space-4);">
 			<h2 class="af-section__title" style="margin-top:0;"><?php esc_html_e( 'Registrar lectura', 'arriendo-facil' ); ?></h2>
 			<p class="af-modal__hint" style="margin:0 0 14px;">
-				<?php esc_html_e( 'La lectura anterior se toma automáticamente del último periodo registrado.', 'arriendo-facil' ); ?>
+				<?php esc_html_e( 'Cómo funciona: al final de cada mes, mira cada medidor y anota aquí el número que marca. El sistema compara con el mes anterior para saber cuánto se consumió, y el número que le pongas en "precio por unidad" es lo que cuesta cada unidad de consumo.', 'arriendo-facil' ); ?>
 			</p>
 			<p class="af-modal__status" id="af-reading-status"></p>
 
 			<form id="af-reading-form" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap:14px; align-items:end;">
 				<?php if ( ! empty( $buildings ) ) : ?>
 				<label>
-					<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Unidad (edificio)', 'arriendo-facil' ); ?></span>
+					<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Departamento u oficina de un edificio', 'arriendo-facil' ); ?></span>
 					<select name="unit_id" style="width:100%;">
 						<option value=""><?php esc_html_e( '— Seleccionar —', 'arriendo-facil' ); ?></option>
 						<?php foreach ( $buildings as $building ) : ?>
@@ -130,7 +130,7 @@ foreach ( (array) $readings as $reading ) {
 
 				<?php if ( ! empty( $standalone_accommodations ) ) : ?>
 				<label>
-					<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Inmueble independiente', 'arriendo-facil' ); ?></span>
+					<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Casa o propiedad suelta', 'arriendo-facil' ); ?></span>
 					<select name="accommodation_id" style="width:100%;">
 						<option value=""><?php esc_html_e( '— Seleccionar —', 'arriendo-facil' ); ?></option>
 						<?php foreach ( $standalone_accommodations as $accommodation_obj ) : ?>
@@ -147,6 +147,7 @@ foreach ( (array) $readings as $reading ) {
 							<option value="<?php echo esc_attr( $service_key ); ?>"><?php echo esc_html( $service_label ); ?></option>
 						<?php endforeach; ?>
 					</select>
+					<span style="display:block; color:var(--af-text-muted); font-size:0.85em; margin-top:2px;"><?php esc_html_e( '¿Agua, luz o gas?', 'arriendo-facil' ); ?></span>
 				</label>
 
 				<label>
@@ -156,15 +157,17 @@ foreach ( (array) $readings as $reading ) {
 
 				<label>
 					<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Lectura actual', 'arriendo-facil' ); ?> *</span>
-					<input type="number" name="current_reading" step="0.001" min="0" required style="width:100%;" />
+					<input type="number" name="current_reading" step="0.001" min="0" required style="width:100%;" placeholder="0.000" />
+					<span style="display:block; color:var(--af-text-muted); font-size:0.85em; margin-top:2px;"><?php esc_html_e( 'El número que marca el medidor hoy.', 'arriendo-facil' ); ?></span>
 				</label>
 
 				<label>
-					<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Tarifa por unidad', 'arriendo-facil' ); ?> *</span>
+					<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Precio por unidad', 'arriendo-facil' ); ?> *</span>
 					<input type="number" name="unit_rate" step="0.0001" min="0" required style="width:100%;" placeholder="0.0000" />
+					<span style="display:block; color:var(--af-text-muted); font-size:0.85em; margin-top:2px;"><?php esc_html_e( 'Lo que cobras por cada unidad de consumo (p. ej. el precio del m³ de agua o del kWh de luz).', 'arriendo-facil' ); ?></span>
 				</label>
 
-				<button type="submit" class="button button-primary"><?php esc_html_e( 'Guardar y facturar', 'arriendo-facil' ); ?></button>
+				<button type="submit" class="button button-primary"><?php esc_html_e( 'Guardar y cobrar', 'arriendo-facil' ); ?></button>
 			</form>
 		</div>
 
@@ -179,7 +182,7 @@ foreach ( (array) $readings as $reading ) {
 				echo esc_html(
 					sprintf(
 						/* translators: %s: total billed for the period */
-						__( 'Total facturado: $%s', 'arriendo-facil' ),
+						__( 'Total cobrado: $%s', 'arriendo-facil' ),
 						number_format_i18n( $period_total, 2 )
 					)
 				);
@@ -197,22 +200,22 @@ foreach ( (array) $readings as $reading ) {
 			<table class="wp-list-table widefat fixed striped af-data-table">
 				<thead>
 					<tr>
-						<th><?php esc_html_e( 'Unidad', 'arriendo-facil' ); ?></th>
+						<th><?php esc_html_e( 'Quién consume', 'arriendo-facil' ); ?></th>
 						<th><?php esc_html_e( 'Servicio', 'arriendo-facil' ); ?></th>
 						<th><?php esc_html_e( 'Anterior', 'arriendo-facil' ); ?></th>
 						<th><?php esc_html_e( 'Actual', 'arriendo-facil' ); ?></th>
 						<th><?php esc_html_e( 'Consumo', 'arriendo-facil' ); ?></th>
-						<th><?php esc_html_e( 'Tarifa', 'arriendo-facil' ); ?></th>
+						<th><?php esc_html_e( 'Precio', 'arriendo-facil' ); ?></th>
 						<th><?php esc_html_e( 'Importe', 'arriendo-facil' ); ?></th>
 					</tr>
 				</thead>
 				<tbody>
 					<?php if ( empty( $readings ) ) : ?>
-						<tr><td colspan="7"><?php esc_html_e( 'No hay lecturas registradas en este periodo.', 'arriendo-facil' ); ?></td></tr>
+						<tr><td colspan="7"><?php esc_html_e( 'Aún no hay lecturas en este mes. Registra las primeras con el formulario de arriba.', 'arriendo-facil' ); ?></td></tr>
 					<?php else : ?>
 						<?php foreach ( $readings as $reading ) : ?>
 							<tr>
-								<td data-label="<?php esc_attr_e( 'Unidad', 'arriendo-facil' ); ?>">
+								<td data-label="<?php esc_attr_e( 'Quién consume', 'arriendo-facil' ); ?>">
 									<strong><?php echo esc_html( $reading->unit_code ? $reading->unit_code : ( $reading->accommodation_title ? $reading->accommodation_title : __( 'Inmueble', 'arriendo-facil' ) ) ); ?></strong>
 									<span class="af-td-meta"><?php echo esc_html( $reading->unit_code ? $reading->building_name : __( 'Propiedad independiente', 'arriendo-facil' ) ); ?></span>
 								</td>

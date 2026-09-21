@@ -136,7 +136,7 @@ foreach ( $accommodation_ids as $post_id ) {
 			'title'    => __( 'Catálogo de propiedades', 'arriendo-facil' ),
 			'subtitle' => sprintf(
 				/* translators: %d: number of properties */
-				__( 'Todas tus propiedades en un vistazo (%d).', 'arriendo-facil' ),
+				__( 'Aquí ves todas tus propiedades para arriendo, una por una (%d). Pulsa "Nueva propiedad" para registrar otra.', 'arriendo-facil' ),
 				$total_count
 			),
 			'actions'  => array(
@@ -204,7 +204,7 @@ foreach ( $accommodation_ids as $post_id ) {
 		<div class="af-empty">
 			<span class="af-empty__icon" aria-hidden="true"><?php echo af_lucide( 'building', 28 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
 			<h3 class="af-empty__title"><?php esc_html_e( 'No se encontraron propiedades', 'arriendo-facil' ); ?></h3>
-			<p class="af-empty__text"><?php esc_html_e( 'Ajusta o limpia los filtros para ver más resultados.', 'arriendo-facil' ); ?></p>
+			<p class="af-empty__text"><?php esc_html_e( 'Revisa o limpia los filtros para ver más resultados, o registra una propiedad nueva con el botón "Nueva propiedad".', 'arriendo-facil' ); ?></p>
 			<a class="button af-btn af-btn--ghost" href="<?php echo esc_url( admin_url( 'admin.php?page=af-catalog' ) ); ?>"><?php esc_html_e( 'Limpiar filtros', 'arriendo-facil' ); ?></a>
 		</div>
 	<?php else : ?>

@@ -53,14 +53,23 @@ class Arriendo_Facil_Billing_Ledger {
 	public static function record_meter_reading( array $data ) {
 		global $wpdb;
 
-		$unit_id = isset( $data['unit_id'] ) ? absint( $data['unit_id'] ) : 0;
-		$service = isset( $data['service'] ) ? sanitize_key( (string) $data['service'] ) : '';
-		$period  = isset( $data['period'] ) ? sanitize_text_field( (string) $data['period'] ) : '';
-		$current = isset( $data['current_reading'] ) ? (float) $data['current_reading'] : 0.0;
-		$rate    = isset( $data['unit_rate'] ) ? (float) $data['unit_rate'] : 0.0;
+		$unit_id          = isset( $data['unit_id'] ) ? absint( $data['unit_id'] ) : 0;
+		$accommodation_id = isset( $data['accommodation_id'] ) ? absint( $data['accommodation_id'] ) : 0;
+		$service          = isset( $data['service'] ) ? sanitize_key( (string) $data['service'] ) : '';
+		$period           = isset( $data['period'] ) ? sanitize_text_field( (string) $data['period'] ) : '';
+		$current          = isset( $data['current_reading'] ) ? (float) $data['current_reading'] : 0.0;
+		$rate             = isset( $data['unit_rate'] ) ? (float) $data['unit_rate'] : 0.0;
 
-		if ( ! $unit_id || ! array_key_exists( $service, self::metered_services() ) ) {
-			return new WP_Error( 'af_reading_invalid', __( 'Unidad o servicio invalido.', 'arriendo-facil' ) );
+		if ( ! $unit_id && ! $accommodation_id ) {
+			return new WP_Error( 'af_reading_invalid', __( 'Selecciona una unidad o un inmueble.', 'arriendo-facil' ) );
+		}
+
+		if ( $unit_id && $accommodation_id ) {
+			return new WP_Error( 'af_reading_invalid', __( 'La lectura se registra contra una unidad o un inmueble, no ambos.', 'arriendo-facil' ) );
+		}
+
+		if ( ! array_key_exists( $service, self::metered_services() ) ) {
+			return new WP_Error( 'af_reading_invalid', __( 'Servicio invalido.', 'arriendo-facil' ) );
 		}
 
 		if ( ! preg_match( '/^\d{4}-\d{2}$/', $period ) ) {
@@ -74,9 +83,10 @@ class Arriendo_Facil_Billing_Ledger {
 		$previous = (float) $wpdb->get_var(
 			$wpdb->prepare(
 				'SELECT current_reading FROM ' . self::readings_table() . '
-				 WHERE unit_id = %d AND service = %s AND period < %s
+				 WHERE unit_id = %d AND accommodation_id = %d AND service = %s AND period < %s
 				 ORDER BY period DESC LIMIT 1',
 				$unit_id,
+				$accommodation_id,
 				$service,
 				$period
 			)
@@ -100,6 +110,7 @@ class Arriendo_Facil_Billing_Ledger {
 			self::readings_table(),
 			array(
 				'unit_id'           => $unit_id,
+				'accommodation_id'  => $accommodation_id,
 				'service'           => $service,
 				'period'            => $period,
 				'previous_reading'  => $previous,
@@ -109,23 +120,24 @@ class Arriendo_Facil_Billing_Ledger {
 				'calculated_amount' => $amount,
 				'recorded_by'       => get_current_user_id(),
 			),
-			array( '%d', '%s', '%s', '%f', '%f', '%f', '%f', '%f', '%d' )
+			array( '%d', '%d', '%s', '%s', '%f', '%f', '%f', '%f', '%f', '%d' )
 		);
 
 		if ( ! $inserted ) {
-			return new WP_Error( 'af_reading_duplicate', __( 'Ya existe una lectura de ese servicio para esta unidad y periodo.', 'arriendo-facil' ) );
+			return new WP_Error( 'af_reading_duplicate', __( 'Ya existe una lectura de ese servicio para esta unidad o inmueble y periodo.', 'arriendo-facil' ) );
 		}
 
 		$reading_id = (int) $wpdb->insert_id;
 		$charge_id  = 0;
 
-		// Bill the consumption to the active lease of the unit, when there is one.
-		$lease = self::get_active_lease_for_unit( $unit_id );
+		// Bill the consumption to the active lease of the unit or stand-alone
+		// accommodation, when there is one.
+		$lease = $unit_id ? self::get_active_lease_for_unit( $unit_id ) : self::get_active_lease_for_accommodation( $accommodation_id );
 		if ( $lease && $amount > 0 ) {
 			$charge = self::create_charge(
 				array(
 					'lease_id'    => (int) $lease->id,
-					'unit_id'     => $unit_id,
+					'unit_id'     => $unit_id ? (int) $unit_id : null,
 					'guest_id'    => (int) $lease->guest_id,
 					'charge_type' => $service,
 					'period'      => $period,
@@ -180,6 +192,31 @@ class Arriendo_Facil_Billing_Ledger {
 	}
 
 	/**
+	 * Finds the active lease tied to an accommodation directly (used for
+	 * meter readings of stand-alone properties that are not in a building).
+	 *
+	 * @param int $accommodation_id Accommodation post ID.
+	 * @return object|null
+	 */
+	public static function get_active_lease_for_accommodation( $accommodation_id ) {
+		global $wpdb;
+
+		$accommodation_id = absint( $accommodation_id );
+		if ( ! $accommodation_id ) {
+			return null;
+		}
+
+		return $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT id, guest_id FROM {$wpdb->prefix}af_leases
+				 WHERE accommodation_id = %d AND status = 'active' AND deleted_at IS NULL
+				 ORDER BY id DESC LIMIT 1",
+				$accommodation_id
+			)
+		);
+	}
+
+	/**
 	 * AJAX: records a meter reading.
 	 *
 	 * @return void
@@ -191,18 +228,29 @@ class Arriendo_Facil_Billing_Ledger {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
-		$unit_id = isset( $_POST['unit_id'] ) ? absint( wp_unslash( $_POST['unit_id'] ) ) : 0;
-		if ( ! Arriendo_Facil_Tenancy::can_access_unit( $unit_id ) ) {
-			wp_send_json_error( array( 'message' => __( 'No tienes acceso a esta unidad.', 'arriendo-facil' ) ), 403 );
+		$unit_id          = isset( $_POST['unit_id'] ) ? absint( wp_unslash( $_POST['unit_id'] ) ) : 0;
+		$accommodation_id = isset( $_POST['accommodation_id'] ) ? absint( wp_unslash( $_POST['accommodation_id'] ) ) : 0;
+
+		if ( $unit_id ) {
+			if ( ! Arriendo_Facil_Tenancy::can_access_unit( $unit_id ) ) {
+				wp_send_json_error( array( 'message' => __( 'No tienes acceso a esta unidad.', 'arriendo-facil' ) ), 403 );
+			}
+		} elseif ( $accommodation_id ) {
+			if ( ! Arriendo_Facil_Tenancy::can_access_accommodation( $accommodation_id ) ) {
+				wp_send_json_error( array( 'message' => __( 'No tienes acceso a este inmueble.', 'arriendo-facil' ) ), 403 );
+			}
+		} else {
+			wp_send_json_error( array( 'message' => __( 'Selecciona una unidad o un inmueble.', 'arriendo-facil' ) ), 400 );
 		}
 
 		$result = self::record_meter_reading(
 			array(
-				'unit_id'         => $unit_id,
-				'service'         => isset( $_POST['service'] ) ? sanitize_key( wp_unslash( $_POST['service'] ) ) : '',
-				'period'          => isset( $_POST['period'] ) ? sanitize_text_field( wp_unslash( $_POST['period'] ) ) : '',
-				'current_reading' => isset( $_POST['current_reading'] ) ? (float) wp_unslash( $_POST['current_reading'] ) : 0,
-				'unit_rate'       => isset( $_POST['unit_rate'] ) ? (float) wp_unslash( $_POST['unit_rate'] ) : 0,
+				'unit_id'          => $unit_id,
+				'accommodation_id' => $accommodation_id,
+				'service'          => isset( $_POST['service'] ) ? sanitize_key( wp_unslash( $_POST['service'] ) ) : '',
+				'period'           => isset( $_POST['period'] ) ? sanitize_text_field( wp_unslash( $_POST['period'] ) ) : '',
+				'current_reading'  => isset( $_POST['current_reading'] ) ? (float) wp_unslash( $_POST['current_reading'] ) : 0,
+				'unit_rate'        => isset( $_POST['unit_rate'] ) ? (float) wp_unslash( $_POST['unit_rate'] ) : 0,
 			)
 		);
 
@@ -218,7 +266,7 @@ class Arriendo_Facil_Billing_Ledger {
 						__( 'Lectura guardada y cargo de $%s generado.', 'arriendo-facil' ),
 						number_format_i18n( $result['amount'], 2 )
 					)
-					: __( 'Lectura guardada. No hay contrato activo en la unidad, no se genero cargo.', 'arriendo-facil' ),
+					: __( 'Lectura guardada. No hay contrato activo, no se genero cargo.', 'arriendo-facil' ),
 			)
 		);
 	}

@@ -293,6 +293,9 @@ $totals_platform = array(
 	<div style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:9991; background:#fff; border-radius:12px; padding:24px; width:min(480px, 92vw); box-shadow:0 20px 50px rgba(0,0,0,.3);">
 		<h2 style="margin-top:0;" id="af-admin-review-title"><?php esc_html_e( 'Revisar verificación', 'arriendo-facil' ); ?></h2>
 		<p class="description"><?php esc_html_e( 'Revisa la documentación del administrador y aprueba, rechaza o reinicia su verificación.', 'arriendo-facil' ); ?></p>
+		<div id="af-admin-review-body" style="max-height:50vh; overflow:auto; margin-bottom:12px; border:1px solid #e5e7eb; border-radius:8px; padding:12px;">
+			<p class="description" style="margin:0;"><?php esc_html_e( 'Cargando información...', 'arriendo-facil' ); ?></p>
+		</div>
 		<label style="display:block; margin-bottom:12px;">
 			<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Observaciones (se envían al usuario)', 'arriendo-facil' ); ?></span>
 			<textarea id="af-admin-review-notes" rows="3" class="large-text" maxlength="1000" placeholder="<?php esc_attr_e( 'Comentarios opcionales para el administrador...', 'arriendo-facil' ); ?>"></textarea>
@@ -304,6 +307,18 @@ $totals_platform = array(
 			<button type="button" class="button" data-review-close style="margin-left:auto;"><?php esc_html_e( 'Cerrar', 'arriendo-facil' ); ?></button>
 		</div>
 	</div>
+<style>
+		#af-admin-review-body h3 { margin: 14px 0 8px; font-size: 14px; }
+		.af-review-info { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; }
+		.af-review-info__row { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; border-bottom: 1px solid #f3f4f6; padding: 4px 0; }
+		.af-review-info__label { color: #6b7280; flex: 0 0 auto; }
+		.af-review-info__value { font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+		.af-review-doc { display: flex; align-items: center; gap: 10px; font-size: 13px; padding: 8px 0; border-bottom: 1px solid #f3f4f6; flex-wrap: wrap; }
+		.af-review-doc.is-missing { opacity: .7; }
+		.af-review-doc__label { font-weight: 600; }
+		.af-review-doc__meta { color: #6b7280; font-size: 12px; }
+		.af-review-notes { margin-top: 10px; padding: 8px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; font-size: 13px; color: #8a6d1c; }
+	</style>
 </div>
 
 <script>
@@ -368,8 +383,75 @@ $totals_platform = array(
 	const reviewModal = document.getElementById('af-admin-review-modal');
 	const reviewNotes = document.getElementById('af-admin-review-notes');
 	const reviewTitle = document.getElementById('af-admin-review-title');
+	const reviewBody = document.getElementById('af-admin-review-body');
 	let reviewUserId = 0;
 
+	function escHtml(s) {
+		return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+			return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+		});
+	}
+	function fmtSize(bytes) {
+		const kb = Math.round((parseInt(bytes, 10) || 0) / 1024);
+		return kb < 1024 ? kb + ' KB' : (kb / 1024).toFixed(1).replace('.', ',') + ' MB';
+	}
+	function renderReviewDetail(d) {
+		const idLabels = { cedula: 'Cédula', ruc: 'RUC', pasaporte: 'Pasaporte' };
+		const matchLabels = { coincide: 'Coincide', no_coincide: 'No coincide', not_checked: 'Sin comprobar' };
+		const docStatusLabels = { pendiente: 'Pendiente', en_revision: 'En revisión', verificado: 'Verificado', rechazado: 'Rechazado' };
+		const licenseLabels = { active: 'Activa', suspended: 'Suspendida' };
+		const sourceLabels = { self: 'Auto-registro', manual: 'Manual' };
+
+		const rows = [
+			['Empresa / Marca', d.company],
+			['Nombre de contacto', d.contact_name],
+			['Teléfono', d.phone],
+			['Correo', d.email],
+			['Nacionalidad', d.nationality],
+			['Ciudad de nacimiento', d.birth_city],
+			['Identificación', (idLabels[d.id_type] || d.id_type || '') + (d.id_masked ? ' ' + d.id_masked : '')],
+			['Origen', sourceLabels[d.signup_source] || d.signup_source],
+			['Licencia', licenseLabels[d.license_status] || d.license_status],
+			['Estado de documentación', docStatusLabels[d.doc_status] || d.doc_status],
+			['Coincidencia de identidad', matchLabels[d.identity_match] || d.identity_match]
+		];
+		if (d.verified_by) {
+			rows.push(['Verificado por', d.verified_by + (d.verified_at ? ' · ' + d.verified_at.replace('T', ' ') : '')]);
+		}
+
+		let html = '<div class="af-review-info">';
+		rows.forEach(function (r) {
+			html += '<div class="af-review-info__row"><span class="af-review-info__label">' + escHtml(r[0]) + '</span><span class="af-review-info__value">' + escHtml(r[1] || '—') + '</span></div>';
+		});
+		html += '</div>';
+
+		html += '<h3><?php echo esc_js( __( 'Documentos de soporte', 'arriendo-facil' ) ); ?></h3><div>';
+		(d.documents || []).forEach(function (doc) {
+			html += '<div class="af-review-doc' + (doc.present ? '' : ' is-missing') + '">';
+			html += '<span class="af-review-doc__label">' + escHtml(doc.label) + '</span>';
+			if (doc.present) {
+				html += '<span class="af-pill af-pill--success">Subido</span>';
+				let meta = fmtSize(doc.file_size);
+				if (doc.uploaded_at) { meta += ' · ' + escHtml(doc.uploaded_at); }
+				html += '<span class="af-review-doc__meta">' + meta + '</span>';
+				if (doc.download_url) {
+					html += '<a class="button af-btn af-btn--ghost" href="' + escHtml(doc.download_url) + '" target="_blank" rel="noopener noreferrer"><?php echo esc_js( __( 'Ver PDF', 'arriendo-facil' ) ); ?></a>';
+				} else {
+					html += '<span class="af-review-doc__meta"><?php echo esc_js( __( 'Sin enlace disponible', 'arriendo-facil' ) ); ?></span>';
+				}
+			} else {
+				html += '<span class="af-pill af-pill--warning">Pendiente</span>';
+			}
+			html += '</div>';
+		});
+		html += '</div>';
+
+		if (d.doc_notes) {
+			html += '<div class="af-review-notes"><strong><?php echo esc_js( __( 'Observaciones actuales:', 'arriendo-facil' ) ); ?></strong> ' + escHtml(d.doc_notes) + '</div>';
+		}
+
+		return html;
+	}
 	function closeReview() { reviewModal.style.display = 'none'; }
 
 	document.querySelectorAll('.af-review-admin').forEach(function (btn) {
@@ -377,7 +459,20 @@ $totals_platform = array(
 			reviewUserId = parseInt(btn.dataset.userId, 10) || 0;
 			reviewTitle.textContent = '<?php echo esc_js( __( 'Revisar verificación de', 'arriendo-facil' ) ); ?> ' + (btn.dataset.userName || '');
 			reviewNotes.value = '';
+			if (reviewBody) {
+				reviewBody.innerHTML = '<p class="description" style="margin:0;"><?php echo esc_js( __( 'Cargando información...', 'arriendo-facil' ) ); ?></p>';
+			}
 			reviewModal.style.display = 'block';
+			if (reviewUserId) {
+				post('af_admin_review_detail', { user_id: reviewUserId }).then(function (res) {
+					if (!reviewBody) { return; }
+					if (res && res.success) {
+						reviewBody.innerHTML = renderReviewDetail(res.data);
+					} else {
+						reviewBody.innerHTML = '<p style="color:#b45309;">' + escHtml((res && res.data && res.data.message) ? res.data.message : '<?php echo esc_js( __( 'Error al cargar la información.', 'arriendo-facil' ) ); ?>') + '</p>';
+					}
+				});
+			}
 		});
 	});
 

@@ -347,6 +347,7 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 									<div class="af-profile__doc-meta">
 										<span class="af-profile__doc-label"><?php echo esc_html( $this->doc_type_label( $doc_type ) ); ?></span>
 										<span class="af-form-field__hint"><?php esc_html_e( 'PDF', 'arriendo-facil' ); ?></span>
+										<span class="af-profile__doc-pick" data-af-doc-pick></span>
 									</div>
 									<div class="af-profile__doc-controls">
 										<?php echo af_pill( $doc ? 'active' : 'pending', $doc ? __( 'Subido', 'arriendo-facil' ) : __( 'Pendiente', 'arriendo-facil' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
@@ -355,12 +356,12 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 											<span><?php echo $doc ? esc_html__( 'Reemplazar', 'arriendo-facil' ) : esc_html__( 'Subir', 'arriendo-facil' ); ?></span>
 											<input type="file" name="document_pdf" accept="application/pdf" class="af-profile__file" data-doc-type="<?php echo esc_attr( $doc_type ); ?>" />
 										</label>
+										<button type="button" class="button af-btn af-btn--primary af-profile__doc-confirm" data-af-doc-confirm hidden>
+											<?php esc_html_e( 'Confirmar subida', 'arriendo-facil' ); ?>
+										</button>
 									</div>
 								</div>
 							<?php endforeach; ?>
-							<div class="af-profile__doc-actions">
-								<button type="submit" class="button button-primary af-btn af-btn--primary"><?php esc_html_e( 'Subir documento', 'arriendo-facil' ); ?></button>
-							</div>
 						</form>
 					</section>
 				</div>
@@ -483,10 +484,11 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 			.af-profile__doc-row:last-of-type { border-bottom: 0; }
 			.af-profile__doc-meta { display: flex; flex-direction: column; gap: 2px; }
 			.af-profile__doc-label { font-weight: 600; color: var(--af-gray-900); }
-			.af-profile__doc-controls { display: flex; align-items: center; gap: var(--af-space-3); }
+			.af-profile__doc-controls { display: flex; align-items: center; gap: var(--af-space-3); flex-wrap: wrap; }
+			.af-profile__doc-pick { display: block; font-size: 12px; line-height: 1.4; color: var(--af-gray-500); max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+			.af-profile__doc-confirm { height: 36px; }
 			.af-profile__file-btn { position: relative; overflow: hidden; height: 36px; cursor: pointer; }
 			.af-profile__file-btn input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; font-size: 100px; }
-			.af-profile__doc-actions { margin-top: var(--af-space-4); }
 			.af-profile__demo { border: 1px dashed var(--af-warning-100); background: var(--af-warning-50); }
 		</style>
 
@@ -556,37 +558,62 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 
 			var docForm = wrap.querySelector('[data-af-doc-form]');
 			if(docForm){
-				docForm.addEventListener('submit', async function(e){
-					e.preventDefault();
-					var selected = null;
-					docForm.querySelectorAll('.af-profile__file').forEach(function(input){
-						if(input.files && input.files.length > 0){ selected = input; }
+				var docInputs = docForm.querySelectorAll('.af-profile__file');
+				function fmtSize(bytes){
+					if(!bytes){ return '0 KB'; }
+					var kb = Math.round(bytes / 1024);
+					return kb < 1024 ? kb + ' KB' : (kb / 1024).toFixed(1).replace('.', ',') + ' MB';
+				}
+				function resetDocPick(input){
+					var row = input.closest('.af-profile__doc-row');
+					if(!row){ return; }
+					var pick = row.querySelector('[data-af-doc-pick]');
+					var confirmBtn = row.querySelector('[data-af-doc-confirm]');
+					if(pick){ pick.textContent = ''; }
+					if(confirmBtn){ confirmBtn.hidden = true; }
+				}
+				docInputs.forEach(function(input){
+					input.addEventListener('change', function(){
+						docInputs.forEach(resetDocPick);
+						if(!input.files || !input.files.length){ return; }
+						var row = input.closest('.af-profile__doc-row');
+						var pick = row.querySelector('[data-af-doc-pick]');
+						var confirmBtn = row.querySelector('[data-af-doc-confirm]');
+						var f = input.files[0];
+						if(pick){ pick.textContent = <?php echo wp_json_encode( __( 'Seleccionado:', 'arriendo-facil' ) ); ?> + ' ' + f.name + ' (' + fmtSize(f.size) + ')'; }
+						if(confirmBtn){ confirmBtn.hidden = false; }
 					});
-					if(!selected){
-						showAlert(<?php echo wp_json_encode( __( 'Selecciona un PDF para subir.', 'arriendo-facil' ) ); ?>, 'error');
-						return;
-					}
-					var data = new FormData();
-					data.set('action', 'af_admin_upload_document');
-					data.set('nonce', nonce);
-					data.set('doc_type', selected.getAttribute('data-doc-type'));
-					data.set('document_pdf', selected.files[0]);
-					var btn = docForm.querySelector('button[type="submit"]');
-					btn.disabled = true;
-					try {
-						var res = await fetch(ajaxUrl, { method: 'POST', body: data });
-						var json = await res.json();
-						if(!json || !json.success){
-							showAlert((json && json.data && json.data.message) ? json.data.message : <?php echo wp_json_encode( __( 'No se pudo subir el documento.', 'arriendo-facil' ) ); ?>, 'error');
+				});
+				docForm.querySelectorAll('[data-af-doc-confirm]').forEach(function(confirmBtn){
+					confirmBtn.addEventListener('click', async function(){
+						if(confirmBtn.disabled){ return; }
+						var row = confirmBtn.closest('.af-profile__doc-row');
+						var input = row.querySelector('.af-profile__file');
+						if(!input || !input.files || !input.files.length){
+							showAlert(<?php echo wp_json_encode( __( 'Selecciona un PDF para subir.', 'arriendo-facil' ) ); ?>, 'error');
 							return;
 						}
-						showAlert((json.data && json.data.message) ? json.data.message : <?php echo wp_json_encode( __( 'Documento subido.', 'arriendo-facil' ) ); ?>, 'success');
-						setTimeout(function(){ window.location.reload(); }, 800);
-					} catch (err) {
-						showAlert(<?php echo wp_json_encode( __( 'No se pudo conectar con el servidor.', 'arriendo-facil' ) ); ?>, 'error');
-					} finally {
-						btn.disabled = false;
-					}
+						var data = new FormData();
+						data.set('action', 'af_admin_upload_document');
+						data.set('nonce', nonce);
+						data.set('doc_type', input.getAttribute('data-doc-type'));
+						data.set('document_pdf', input.files[0]);
+						confirmBtn.disabled = true;
+						try {
+							var res = await fetch(ajaxUrl, { method: 'POST', body: data });
+							var json = await res.json();
+							if(!json || !json.success){
+								showAlert((json && json.data && json.data.message) ? json.data.message : <?php echo wp_json_encode( __( 'No se pudo subir el documento.', 'arriendo-facil' ) ); ?>, 'error');
+								return;
+							}
+							showAlert((json.data && json.data.message) ? json.data.message : <?php echo wp_json_encode( __( 'Documento subido.', 'arriendo-facil' ) ); ?>, 'success');
+							setTimeout(function(){ window.location.reload(); }, 800);
+						} catch (err) {
+							showAlert(<?php echo wp_json_encode( __( 'No se pudo conectar con el servidor.', 'arriendo-facil' ) ); ?>, 'error');
+						} finally {
+							confirmBtn.disabled = false;
+						}
+					});
 				});
 			}
 

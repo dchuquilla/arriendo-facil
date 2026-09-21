@@ -76,6 +76,7 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 		add_action( 'wp_ajax_af_admin_upload_document', array( $this, 'ajax_upload_document' ) );
 		add_action( 'wp_ajax_af_admin_purge_demo', array( $this, 'ajax_purge_demo' ) );
 		add_action( 'wp_ajax_af_review_admin_verification', array( $this, 'ajax_review_verification' ) );
+		add_action( 'wp_ajax_af_admin_review_detail', array( $this, 'ajax_review_detail' ) );
 
 		add_action( 'admin_notices', array( $this, 'render_demo_banner' ) );
 
@@ -916,6 +917,119 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 		update_user_meta( $user_id, 'af_admin_onboarding_step', 'documents' );
 
 		wp_send_json_success( array( 'message' => __( 'Revision reiniciada. La documentacion vuelve a estar pendiente.', 'arriendo-facil' ) ) );
+	}
+
+	/**
+	 * AJAX: super-admin detail view for a self-registered admin verification.
+	 *
+	 * Returns the profile data plus each uploaded support document (with a
+	 * short-lived download URL when present) so the reviewer can check that
+	 * the information is correct before approving/rejecting.
+	 *
+	 * @return void
+	 */
+	public function ajax_review_detail() {
+		check_ajax_referer( self::REVIEW_NONCE, 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$user_id = isset( $_POST['user_id'] ) ? absint( wp_unslash( $_POST['user_id'] ) ) : 0;
+		if ( ! $user_id ) {
+			wp_send_json_error( array( 'message' => __( 'Usuario invalido.', 'arriendo-facil' ) ), 400 );
+		}
+
+		$user = get_userdata( $user_id );
+		if ( ! $user || ! in_array( 'af_property_admin', (array) $user->roles, true ) ) {
+			wp_send_json_error( array( 'message' => __( 'Administrador no encontrado.', 'arriendo-facil' ) ), 404 );
+		}
+
+		$id_enc    = (string) get_user_meta( $user_id, 'af_admin_id_number_enc', true );
+		$id_type   = (string) get_user_meta( $user_id, 'af_admin_id_type', true );
+		$id_masked = '';
+
+		if ( '' !== $id_enc ) {
+			$id_plain = $this->decrypt_sensitive_value( $id_enc );
+			if ( '' !== $id_plain ) {
+				$id_plain  = preg_replace( '/[^A-Za-z0-9]/', '', $id_plain );
+				$id_masked = strlen( $id_plain ) >= 4 ? '••••' . substr( $id_plain, -4 ) : '••••';
+			}
+		}
+
+		$documents = (array) get_user_meta( $user_id, 'af_admin_documents', true );
+		$docs_out  = array();
+
+		foreach ( self::DOC_TYPES as $doc_type ) {
+			$item = array(
+				'doc_type'    => $doc_type,
+				'label'       => $this->doc_type_label( $doc_type ),
+				'present'     => false,
+				'storage'     => '',
+				'file_size'   => 0,
+				'uploaded_at' => '',
+				'download_url'=> '',
+			);
+
+			if ( ! empty( $documents[ $doc_type ] ) && is_array( $documents[ $doc_type ] ) ) {
+				$doc = $documents[ $doc_type ];
+
+				$item['present']     = true;
+				$item['storage']     = isset( $doc['storage'] ) ? (string) $doc['storage'] : 'local';
+				$item['file_size']   = isset( $doc['file_size'] ) ? (int) $doc['file_size'] : 0;
+				$item['uploaded_at'] = isset( $doc['uploaded_at'] ) ? (string) $doc['uploaded_at'] : '';
+
+				$object_key = isset( $doc['object_key'] ) ? (string) $doc['object_key'] : '';
+				if ( 'r2' === $item['storage'] && '' !== $object_key && class_exists( 'Arriendo_Facil_Private_Storage' ) ) {
+					$signed = Arriendo_Facil_Private_Storage::presigned_get_url( $object_key, 600 );
+					if ( is_string( $signed ) && '' !== $signed ) {
+						$item['download_url'] = $signed;
+					}
+				} elseif ( 'local' === $item['storage'] && '' !== $object_key ) {
+					$attachment_url = wp_get_attachment_url( (int) $object_key );
+					if ( is_string( $attachment_url ) && '' !== $attachment_url ) {
+						$item['download_url'] = $attachment_url;
+					}
+				}
+			}
+
+			$docs_out[] = $item;
+		}
+
+		$verified_by = (int) get_user_meta( $user_id, 'af_admin_doc_verified_by', true );
+		$verified_at = (string) get_user_meta( $user_id, 'af_admin_doc_verified_at', true );
+		$verified_by_name = '';
+		if ( $verified_by ) {
+			$verified_user = get_userdata( $verified_by );
+			$verified_by_name = $verified_user ? $verified_user->display_name : (string) $verified_by;
+		}
+
+		$signup_source = (string) get_user_meta( $user_id, 'af_signup_source', true );
+		$doc_status    = (string) get_user_meta( $user_id, 'af_admin_doc_status', true );
+		$identity_match = (string) get_user_meta( $user_id, 'af_admin_identity_match_status', true );
+
+		wp_send_json_success(
+			array(
+				'user_id'        => $user_id,
+				'display_name'   => $user->display_name,
+				'company'        => (string) get_user_meta( $user_id, 'af_company_name', true ),
+				'contact_name'   => (string) get_user_meta( $user_id, 'af_contact_name', true ),
+				'phone'          => (string) get_user_meta( $user_id, 'af_contact_phone', true ),
+				'email'          => $user->user_email,
+				'nationality'    => (string) get_user_meta( $user_id, 'af_admin_nationality', true ),
+				'birth_city'     => (string) get_user_meta( $user_id, 'af_admin_birth_city', true ),
+				'id_type'        => $id_type,
+				'id_masked'      => $id_masked,
+				'license_status' => (string) get_user_meta( $user_id, 'af_license_status', true ),
+				'signup_source'  => $signup_source ? $signup_source : 'manual',
+				'doc_status'     => $doc_status ? $doc_status : 'pendiente',
+				'identity_match' => $identity_match ? $identity_match : 'not_checked',
+				'doc_notes'      => (string) get_user_meta( $user_id, 'af_admin_doc_notes', true ),
+				'verified_by'    => $verified_by_name,
+				'verified_at'    => $verified_at,
+				'documents'      => $docs_out,
+			)
+		);
 	}
 
 	/**

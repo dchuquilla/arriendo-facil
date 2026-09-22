@@ -54,6 +54,7 @@ class Arriendo_Facil_Admin {
 		add_action( 'wp_ajax_af_create_property_admin', array( $this, 'ajax_create_property_admin' ) );
 		add_action( 'wp_ajax_af_set_property_admin_status', array( $this, 'ajax_set_property_admin_status' ) );
 		add_action( 'wp_ajax_af_save_dashboard_hero_video', array( $this, 'ajax_save_dashboard_hero_video' ) );
+		add_action( 'wp_ajax_af_toggle_buildings_module', array( $this, 'ajax_toggle_buildings_module' ) );
 		add_filter( 'wp_authenticate_user', array( $this, 'block_suspended_property_admin_login' ), 10, 2 );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
 		add_action( 'admin_notices', array( $this, 'pandoc_notice' ) );
@@ -2806,6 +2807,35 @@ array(
 		update_option( 'af_dashboard_hero_video_url', $url );
 
 		wp_send_json_success( array( 'message' => __( 'Video guardado.', 'arriendo-facil' ) ) );
+	}
+
+	/**
+	 * AJAX: enables or disables the buildings module (gastos comunes entre
+	 * unidades dentro de un mismo edificio). Hides the section from the
+	 * sidebar when it is not needed, keeping the property flow simple.
+	 *
+	 * @return void
+	 */
+	public function ajax_toggle_buildings_module() {
+		check_ajax_referer( 'af_buildings_module_nonce', 'nonce' );
+
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$enabled = isset( $_POST['enabled'] ) ? ( '1' === sanitize_key( wp_unslash( $_POST['enabled'] ) ) ) : false;
+
+		update_option( 'af_use_buildings', $enabled ? '1' : '0' );
+
+		wp_send_json_success(
+			array(
+				'message'  => $enabled
+					? __( 'Sección "Edificios y unidades" activada. Ya puedes organizar departamentos dentro de un edificio.', 'arriendo-facil' )
+					: __( 'Sección oculta. Puedes reactivarla cuando la necesites.', 'arriendo-facil' ),
+				'enabled'  => $enabled,
+				'show_menu' => Arriendo_Facil_Property_Structure::module_enabled(),
+			)
+		);
 	}
 
 	/**

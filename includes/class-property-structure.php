@@ -48,6 +48,33 @@ class Arriendo_Facil_Property_Structure {
 	}
 
 	/**
+	 * Whether at least one active building exists.
+	 *
+	 * @return bool
+	 */
+	public static function has_active_buildings() {
+		global $wpdb;
+
+		$count = $wpdb->get_var( 'SELECT COUNT(*) FROM ' . self::buildings_table() . " WHERE status = 'active'" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+
+		return absint( $count ) > 0;
+	}
+
+	/**
+	 * Whether the buildings module is enabled.
+	 *
+	 * The section is optional: it is only used to split shared building
+	 * expenses (gastos comunes) and shared meters between units inside the
+	 * same building. The admin can enable or disable it from the section
+	 * itself; disabling it never deletes data.
+	 *
+	 * @return bool
+	 */
+	public static function module_enabled() {
+		return '1' === (string) get_option( 'af_use_buildings', '0' );
+	}
+
+	/**
 	 * Creates a building.
 	 *
 	 * @param array<string,mixed> $data Building data.

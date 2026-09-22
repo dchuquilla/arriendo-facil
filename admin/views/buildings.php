@@ -67,12 +67,56 @@ if ( ! empty( $buildings ) ) {
 		array(
 			'eyebrow'  => __( 'Estructura', 'arriendo-facil' ),
 			'title'    => __( 'Edificios y unidades', 'arriendo-facil' ),
-			'subtitle' => __( 'Sirve para propiedades que están dentro de un edificio: departamentos, oficinas o locales. Aquí registras el edificio y sus unidades para repartir entre ellos los gastos comunes (mantenimiento, guardianía, etc.).', 'arriendo-facil' ),
+			'subtitle' => __( 'Opcional. Sirve para propiedades que están dentro de un edificio: departamentos, oficinas o locales. Aquí registras el edificio y sus unidades para repartir entre ellos los gastos comunes (mantenimiento, guardianía, etc.).', 'arriendo-facil' ),
 		)
 	);
 	?>
 
-	<?php if ( empty( $buildings ) ) : ?>
+	<section class="af-section" style="display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding: var(--af-space-4) var(--af-space-5); margin-bottom: var(--af-space-4);">
+		<span class="af-section__icon af-section__icon--slate" aria-hidden="true"><?php echo af_lucide( 'building', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+		<div style="flex:1; min-width:220px;">
+			<h2 class="af-section__title" style="margin:0;">
+				<?php if ( Arriendo_Facil_Property_Structure::module_enabled() ) : ?>
+					<?php esc_html_e( 'Sección activa', 'arriendo-facil' ); ?> <span class="af-pill af-pill--success"><?php esc_html_e( 'Elegiste usarla', 'arriendo-facil' ); ?></span>
+				<?php else : ?>
+					<?php esc_html_e( 'Sección opcional', 'arriendo-facil' ); ?> <span class="af-pill af-pill--info"><?php esc_html_e( 'No elegida todavía', 'arriendo-facil' ); ?></span>
+				<?php endif; ?>
+			</h2>
+			<p class="af-section__subtitle" style="margin:2px 0 0;">
+				<?php
+				if ( Arriendo_Facil_Property_Structure::module_enabled() ) {
+					esc_html_e( 'La usas para repartir los gastos comunes de un edificio entre sus departamentos u oficinas. Puedes desactivarla cuando quieras y seguir igual con casas o propiedades sueltas.', 'arriendo-facil' );
+				} else {
+					esc_html_e( 'Solo elígela si arriendas varias propiedades dentro de un mismo edificio y necesitas repartir entre ellas los gastos comunes (mantenimiento, guardianía, agua del edificio, etc.). Si solo tienes casas o locales sueltos, no la necesitas: puedes ignorarla.', 'arriendo-facil' );
+				}
+				?>
+			</p>
+			<?php if ( ! Arriendo_Facil_Property_Structure::module_enabled() && Arriendo_Facil_Property_Structure::has_active_buildings() ) : ?>
+				<p class="af-section__subtitle" style="margin:4px 0 0; font-weight:600;">
+					<?php esc_html_e( 'Nota: ya tienes edificios guardados. No se borran; los volverás a ver al activar la sección.', 'arriendo-facil' ); ?>
+				</p>
+			<?php endif; ?>
+			<p class="af-modal__status" id="af-buildings-module-status" style="margin:6px 0 0;"></p>
+		</div>
+		<button
+			type="button"
+			id="af-buildings-module-toggle"
+			class="button af-btn <?php echo Arriendo_Facil_Property_Structure::module_enabled() ? 'af-btn--ghost' : 'af-btn--primary'; ?>"
+			data-enable="<?php echo Arriendo_Facil_Property_Structure::module_enabled() ? '0' : '1'; ?>"
+		>
+			<?php echo Arriendo_Facil_Property_Structure::module_enabled() ? esc_html_e( 'Apagar (no la uso)', 'arriendo-facil' ) : esc_html_e( 'Activar sección', 'arriendo-facil' ); ?>
+		</button>
+	</section>
+
+	<?php if ( ! Arriendo_Facil_Property_Structure::module_enabled() ) : ?>
+
+		<div class="af-empty">
+			<span class="af-empty__icon" aria-hidden="true"><?php echo af_lucide( 'building-2', 28 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+			<h3 class="af-empty__title"><?php esc_html_e( 'Esta sección no está activada', 'arriendo-facil' ); ?></h3>
+			<p class="af-empty__text"><?php esc_html_e( 'Pulsa el botón "Activar sección" de arriba si quieres usarla para organizar departamentos dentro de un edificio y repartir los gastos comunes.', 'arriendo-facil' ); ?></p>
+		</div>
+
+	<?php elseif ( empty( $buildings ) ) : ?>
 
 		<div class="af-empty" style="margin-bottom: var(--af-space-5);">
 			<span class="af-empty__icon" aria-hidden="true"><?php echo af_lucide( 'building-2', 28 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
@@ -389,5 +433,36 @@ if ( ! empty( $buildings ) ) {
 
 	bind('af-building-form', 'af_create_building', 'af-building-status');
 	bind('af-unit-form', 'af_create_unit', 'af-unit-status');
+}());
+</script>
+
+<script>
+(function () {
+	const btn = document.getElementById('af-buildings-module-toggle');
+	if (!btn) { return; }
+	const status = document.getElementById('af-buildings-module-status');
+	const ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
+	const nonce = <?php echo wp_json_encode( wp_create_nonce( 'af_buildings_module_nonce' ) ); ?>;
+
+	btn.addEventListener('click', function () {
+		btn.disabled = true;
+		const body = new URLSearchParams();
+		body.append('action', 'af_toggle_buildings_module');
+		body.append('nonce', nonce);
+		body.append('enabled', btn.getAttribute('data-enable') === '1' ? '1' : '0');
+		fetch(ajaxUrl, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+			body: body
+		}).then(function (r) { return r.json(); }).then(function (json) {
+			if (status) {
+				status.textContent = (json && json.success && json.data && json.data.message) ? json.data.message : 'Error';
+			}
+			window.location.reload();
+		}).catch(function () {
+			btn.disabled = false;
+			if (status) { status.textContent = 'Error'; }
+		});
+	});
 }());
 </script>

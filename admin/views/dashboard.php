@@ -544,6 +544,22 @@ $recent_reviews        = (array) $wpdb->get_results(
 		</div>
 	</header>
 
+	<?php if (
+		! $is_owner
+		&& current_user_can( Arriendo_Facil_Tenancy::CAP )
+		&& ! Arriendo_Facil_Property_Structure::module_enabled()
+	) : ?>
+		<section class="af-section" style="display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding: var(--af-space-4) var(--af-space-5); margin-bottom: var(--af-space-4);">
+			<span class="af-section__icon af-section__icon--slate" aria-hidden="true"><?php echo af_lucide( 'building', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+			<div style="flex:1; min-width:220px;">
+				<h2 class="af-section__title" style="margin:0;"><?php esc_html_e( '¿Varias propiedades dentro de un mismo edificio?', 'arriendo-facil' ); ?></h2>
+				<p class="af-section__subtitle" style="margin:2px 0 0;"><?php esc_html_e( 'En el menú encontrarás la opción "Edificios y unidades" (en Propiedades). Es opcional: úsala para repartir los gastos comunes (mantenimiento, guardianía, etc.) y los medidores compartidos entre departamentos u oficinas. Puedes dejarla sin activar y tus propiedades sueltas funcionan perfectamente sin ella.', 'arriendo-facil' ); ?></p>
+				<p class="af-modal__status" id="af-buildings-toggle-status" style="margin:6px 0 0;"></p>
+			</div>
+			<button type="button" class="button af-btn af-btn--primary" id="af-enable-buildings"><?php esc_html_e( 'Activar sección', 'arriendo-facil' ); ?></button>
+		</section>
+	<?php endif; ?>
+
 	<?php if ( '' !== $hero_video_url ) : ?>
 		<section class="af-hero-media" aria-label="<?php esc_attr_e( 'Video de bienvenida', 'arriendo-facil' ); ?>">
 			<div class="af-hero-media__frame">
@@ -1399,6 +1415,37 @@ $recent_reviews        = (array) $wpdb->get_results(
 	</div>
 
 </div>
+
+<script>
+(function () {
+	const btn = document.getElementById('af-enable-buildings');
+	if (!btn) { return; }
+	const status = document.getElementById('af-buildings-toggle-status');
+	const ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
+	const nonce = <?php echo wp_json_encode( wp_create_nonce( 'af_buildings_module_nonce' ) ); ?>;
+
+	btn.addEventListener('click', function () {
+		btn.disabled = true;
+		const body = new URLSearchParams();
+		body.append('action', 'af_toggle_buildings_module');
+		body.append('nonce', nonce);
+		body.append('enabled', '1');
+		fetch(ajaxUrl, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+			body: body
+		}).then(function (r) { return r.json(); }).then(function (json) {
+			if (status) {
+				status.textContent = (json && json.success && json.data && json.data.message) ? json.data.message : 'Error';
+			}
+			window.location.reload();
+		}).catch(function () {
+			btn.disabled = false;
+			if (status) { status.textContent = 'Error'; }
+		});
+	});
+}());
+</script>
 
 <?php if ( current_user_can( 'manage_options' ) ) : ?>
 <script>

@@ -287,7 +287,15 @@ foreach ( (array) $readings as $reading ) {
 			}
 			status.textContent = json.data.message;
 			status.className = 'af-modal__status is-success';
-			setTimeout(function () { window.location.reload(); }, 1200);
+			const periodInput = form.querySelector('input[name="period"]');
+			const savedPeriod = periodInput ? periodInput.value : '';
+			const listUrl = new URL(window.location.href);
+			listUrl.search = '';
+			listUrl.searchParams.set('page', 'af-meter-readings');
+			if (savedPeriod) {
+				listUrl.searchParams.set('period', savedPeriod);
+			}
+			setTimeout(function () { window.location.href = listUrl.toString(); }, 1200);
 		});
 	});
 }());

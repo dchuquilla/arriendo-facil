@@ -1,0 +1,391 @@
+/* ── Alertas operativas ─────────────────────────────────────────────────────
+   Bell dropdown (top bar) + "Centro de alertas" page.
+
+   Colors follow the af-tokens scale (info/warning/danger map to the shell's
+   semantic palette) so the component matches the rest of the app shell.
+*/
+
+/* Position context: the .af-alerts wrapper sits inside the fixed top bar. */
+.af-app-topbar .af-alerts {
+	position: relative;
+}
+
+/* The bell becomes a real <button>; reset default UA styles. */
+.af-app-topbar__bell {
+	border: 0;
+	cursor: pointer;
+	font: inherit;
+	background: var(--af-gray-50, #f7f7f5);
+	position: relative;
+}
+
+.af-app-topbar__bell:focus-visible {
+	outline: 2px solid var(--af-primary-500, #00a87f);
+	outline-offset: 2px;
+}
+
+.af-alerts-badge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 17px;
+	height: 17px;
+	padding: 0 4px;
+	position: absolute;
+	top: -4px;
+	right: -4px;
+	border-radius: 999px;
+	background: var(--af-danger-600, #d0342c);
+	color: #fff;
+	font-size: 10px;
+	font-weight: 700;
+	line-height: 1;
+	box-shadow: 0 0 0 2px var(--af-gray-0, #fff);
+}
+
+.af-alerts-badge[hidden] {
+	display: none;
+}
+
+/* ── Dropdown panel ──────────────────────────────────────────────────────── */
+
+.af-alerts-panel {
+	position: absolute;
+	top: calc(100% + 10px);
+	right: 0;
+	z-index: 100060;
+	width: 380px;
+	max-width: calc(100vw - 24px);
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	background: var(--af-gray-0, #fff);
+	border: 1px solid var(--af-gray-200, #e2e1db);
+	border-radius: 14px;
+	box-shadow: 0 18px 40px -12px rgba(15, 23, 42, 0.28);
+	font-family: var(--af-font-family, inherit);
+}
+
+.af-alerts-panel[hidden] {
+	display: none;
+}
+
+.af-alerts-panel__head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--af-space-3);
+	padding: 14px 16px 12px;
+	border-bottom: 1px solid var(--af-gray-100, #efeee9);
+}
+
+.af-alerts-panel__title {
+	font-size: var(--af-text-sm, 13px);
+	font-weight: 700;
+	color: var(--af-gray-900, #1b1a16);
+}
+
+.af-alerts-panel__mark-all {
+	border: 0;
+	background: transparent;
+	color: var(--af-primary-600, #00926f);
+	font-size: 12px;
+	font-weight: 600;
+	cursor: pointer;
+	padding: 2px 4px;
+	border-radius: 6px;
+}
+
+.af-alerts-panel__mark-all:hover {
+	background: var(--af-primary-50, #eff6ff);
+}
+
+.af-alerts-panel__mark-all:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+/* List */
+
+.af-alerts-list {
+	margin: 0;
+	padding: 6px;
+	list-style: none;
+	overflow-y: auto;
+	max-height: min(340px, 55vh);
+}
+
+.af-alerts-item {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	padding: 10px 10px;
+	border-radius: 10px;
+	border-left: 3px solid var(--af-gray-300, #dbd9d2);
+	transition: background var(--af-motion-base, 160ms ease);
+}
+
+.af-alerts-item--info {
+	border-left-color: var(--af-info-500, #2563eb);
+}
+
+.af-alerts-item--warning {
+	border-left-color: var(--af-warning-500, #d97706);
+}
+
+.af-alerts-item--danger {
+	border-left-color: var(--af-danger-500, #dc2626);
+}
+
+.af-alerts-item:hover {
+	background: var(--af-gray-50, #f7f7f5);
+}
+
+.af-alerts-item + .af-alerts-item {
+	margin-top: 2px;
+}
+
+.af-alerts-item__icon {
+	flex-shrink: 0;
+	display: inline-flex;
+	margin-top: 1px;
+}
+
+.af-alerts-item--info .af-alerts-item__icon {
+	color: var(--af-info-500, #2563eb);
+}
+
+.af-alerts-item--warning .af-alerts-item__icon {
+	color: var(--af-warning-500, #d97706);
+}
+
+.af-alerts-item--danger .af-alerts-item__icon {
+	color: var(--af-danger-500, #dc2626);
+}
+
+.af-alerts-item__body {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.af-alerts-item__title {
+	display: block;
+	font-size: var(--af-text-sm, 13px);
+	font-weight: 600;
+	color: var(--af-gray-900, #1b1a16);
+	line-height: 1.35;
+}
+
+.af-alerts-item__message {
+	display: block;
+	margin-top: 2px;
+	font-size: 12px;
+	color: var(--af-gray-600, #5b594f);
+	line-height: 1.45;
+}
+
+.af-alerts-item__open {
+	flex-shrink: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	margin-top: 1px;
+	width: 22px;
+	height: 22px;
+	border-radius: 6px;
+	color: var(--af-gray-500, #7a7870);
+	text-decoration: none;
+}
+
+.af-alerts-item__open:hover {
+	background: var(--af-gray-200, #e2e1db);
+	color: var(--af-gray-900, #1b1a16);
+}
+
+.af-alerts-empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	padding: 26px 12px;
+	color: var(--af-gray-500, #7a7870);
+	font-size: 13px;
+	text-align: center;
+}
+
+.af-alerts-panel__notice {
+	margin: 6px 12px 0;
+	padding: 8px 10px;
+	border-radius: 8px;
+	font-size: 12px;
+	font-weight: 600;
+	border: 1px solid transparent;
+}
+
+.af-alerts-panel__notice.is-success {
+	background: #ecfdf3;
+	border-color: #a6f4c5;
+	color: var(--af-success-700, #067647);
+}
+
+.af-alerts-panel__notice.is-error {
+	background: #fef3f2;
+	border-color: #fecdca;
+	color: #b42318;
+}
+
+.af-alerts-panel__footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--af-space-2);
+	padding: 12px 16px;
+	border-top: 1px solid var(--af-gray-100, #efeee9);
+	color: var(--af-primary-600, #00926f);
+	font-size: 13px;
+	font-weight: 600;
+	text-decoration: none;
+}
+
+.af-alerts-panel__footer:hover {
+	background: var(--af-primary-50, #eff6ff);
+}
+
+@media (max-width: 782px) {
+	.af-alerts-panel {
+		right: -8px;
+	}
+}
+
+/* ── Centro de alertas ───────────────────────────────────────────────────── */
+
+.af-alerts-center__grid {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 360px;
+	gap: var(--af-space-4);
+	align-items: start;
+}
+
+@media (max-width: 1100px) {
+	.af-alerts-center__grid {
+		grid-template-columns: 1fr;
+	}
+}
+
+.af-alerts-center__list {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.af-alerts-center__item {
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	padding: 14px 16px;
+	border-left: 3px solid var(--af-gray-300, #dbd9d2);
+	border-radius: 0 10px 10px 0;
+	background: var(--af-gray-0, #fff);
+}
+
+.af-alerts-center__item + .af-alerts-center__item {
+	margin-top: 8px;
+}
+
+.af-alerts-center__item.is-read {
+	opacity: 0.72;
+}
+
+.af-alerts-center__item.is-read .af-alerts-center__title {
+	color: var(--af-gray-600, #5b594f);
+}
+
+.af-alerts-center__item--info { border-left-color: var(--af-info-500, #2563eb); }
+.af-alerts-center__item--warning { border-left-color: var(--af-warning-500, #d97706); }
+.af-alerts-center__item--danger { border-left-color: var(--af-danger-500, #dc2626); }
+
+.af-alerts-center__icon {
+	flex-shrink: 0;
+	margin-top: 2px;
+	width: 20px;
+	height: 20px;
+}
+
+.af-alerts-center__item--info .af-alerts-center__icon { color: var(--af-info-500, #2563eb); }
+.af-alerts-center__item--warning .af-alerts-center__icon { color: var(--af-warning-500, #d97706); }
+.af-alerts-center__item--danger .af-alerts-center__icon { color: var(--af-danger-500, #dc2626); }
+
+.af-alerts-center__body {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.af-alerts-center__title {
+	display: block;
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--af-gray-900, #1b1a16);
+}
+
+.af-alerts-center__message {
+	display: block;
+	margin-top: 3px;
+	font-size: 13px;
+	color: var(--af-gray-600, #5b594f);
+	line-height: 1.5;
+}
+
+.af-alerts-center__meta {
+	display: block;
+	margin-top: 8px;
+	font-size: 11px;
+	color: var(--af-gray-400, #94a3b8);
+}
+
+.af-alerts-center__actions {
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.af-alerts-center__empty {
+	padding: 30px 16px;
+	text-align: center;
+	color: var(--af-gray-500, #7a7870);
+	font-size: 13px;
+}
+
+.af-alerts-center__status {
+	margin-top: 10px;
+	min-height: 20px;
+	font-size: 13px;
+}
+
+.af-alerts-center__status.is-success { color: var(--af-success-700, #067647); }
+.af-alerts-center__status.is-error { color: var(--af-danger-600, #d0342c); }
+
+.af-alerts-center__settings-list {
+	display: grid;
+	gap: 14px;
+}
+
+.af-alerts-center__settings-list label {
+	display: block;
+}
+
+.af-alerts-center__settings-list .af-field-hint {
+	display: block;
+	margin-top: 4px;
+	font-size: 12px;
+	color: var(--af-gray-500, #7a7870);
+}
+
+.af-alerts-center__toggle {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	font-size: 13px;
+	color: var(--af-gray-700, #44413a);
+}

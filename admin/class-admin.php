@@ -155,6 +155,15 @@ class Arriendo_Facil_Admin {
 
 		add_submenu_page(
 			'arriendo-facil',
+			__( 'Alertas operativas', 'arriendo-facil' ),
+			__( 'Alertas', 'arriendo-facil' ),
+			'edit_posts',
+			'af-alerts-center',
+			array( $this, 'render_alerts' )
+		);
+
+		add_submenu_page(
+			'arriendo-facil',
 			__( 'Liquidación al propietario', 'arriendo-facil' ),
 			__( 'Liquidaciones', 'arriendo-facil' ),
 			Arriendo_Facil_Tenancy::CAP,
@@ -828,6 +837,15 @@ array(
 				'gate'  => false,
 			),
 			array(
+				'slug'  => 'af-alerts-center',
+				'label' => __( 'Alertas', 'arriendo-facil' ),
+				'url'   => admin_url( 'admin.php?page=af-alerts-center' ),
+				'icon'  => 'bell',
+				'group' => 'config',
+				'cap'   => 'edit_posts',
+				'gate'  => false,
+			),
+			array(
 				'slug'  => 'af-property-admins',
 				'label' => __( 'Administradores', 'arriendo-facil' ),
 				'url'   => admin_url( 'admin.php?page=af-property-admins' ),
@@ -1021,17 +1039,60 @@ array(
 				<?php echo af_lucide( 'search', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
 				<input type="search" name="s" placeholder="<?php esc_attr_e( 'Buscar propiedades, contratos…', 'arriendo-facil' ); ?>" aria-label="<?php esc_attr_e( 'Buscar', 'arriendo-facil' ); ?>" />
 			</form>
-			<div class="af-app-topbar__actions">
-				<a class="af-app-topbar__bell" href="<?php echo esc_url( admin_url( 'admin.php?page=arriendo-facil#af-alerts' ) ); ?>" aria-label="<?php esc_attr_e( 'Alertas operativas', 'arriendo-facil' ); ?>">
+<div class="af-app-topbar__actions">
+			<?php
+			$af_alerts_unread = class_exists( 'Arriendo_Facil_Alerts' ) ? Arriendo_Facil_Alerts::count_unread( get_current_user_id() ) : 0;
+			$af_alerts_recent = class_exists( 'Arriendo_Facil_Alerts' ) ? Arriendo_Facil_Alerts::get_for_user( get_current_user_id(), 6, true ) : array();
+			$af_alerts_has_new = (int) $af_alerts_unread > 0;
+			?>
+			<div class="af-alerts" id="af-alerts">
+				<button type="button" class="af-app-topbar__bell af-alerts-toggle" id="af-alerts-toggle" aria-expanded="false" aria-haspopup="true" aria-controls="af-alerts-panel" aria-label="<?php esc_attr_e( 'Alertas operativas', 'arriendo-facil' ); ?>">
 					<?php echo af_lucide( 'bell', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
-				</a>
-				<a class="af-app-topbar__user" href="<?php echo esc_url( admin_url( 'admin.php?page=af-admin-profile' ) ); ?>">
-					<?php echo get_avatar( $current_user->ID, 28 ); ?>
-					<span class="af-app-topbar__user-name"><?php echo esc_html( $current_user->display_name ); ?></span>
-					<?php echo af_lucide( 'chevron-down', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
-				</a>
+					<span class="af-alerts-badge"<?php echo $af_alerts_has_new ? '' : ' hidden'; ?> data-af-alerts-count><?php echo esc_html( number_format_i18n( $af_alerts_unread ) ); ?></span>
+				</button>
+				<div class="af-alerts-panel" id="af-alerts-panel" hidden>
+					<div class="af-alerts-panel__head">
+						<span class="af-alerts-panel__title"><?php esc_html_e( 'Alertas operativas', 'arriendo-facil' ); ?></span>
+						<button type="button" class="af-alerts-panel__mark-all" data-af-alerts-mark-all><?php esc_html_e( 'Leer todas', 'arriendo-facil' ); ?></button>
+					</div>
+					<ul class="af-alerts-list" id="af-alerts-list" data-af-alerts-list>
+						<?php if ( empty( $af_alerts_recent ) ) : ?>
+							<li class="af-alerts-empty" data-af-alerts-empty>
+								<?php echo af_lucide( 'bell-off', 20 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
+								<span><?php esc_html_e( 'No tienes alertas pendientes.', 'arriendo-facil' ); ?></span>
+							</li>
+						<?php else : ?>
+							<?php foreach ( $af_alerts_recent as $af_alert ) : ?>
+								<?php $af_alert_severity = isset( $af_alert->severity ) ? (string) $af_alert->severity : 'info'; ?>
+								<li class="af-alerts-item af-alerts-item--<?php echo esc_attr( $af_alert_severity ); ?>" data-af-alert-id="<?php echo esc_attr( (int) $af_alert->id ); ?>">
+									<span class="af-alerts-item__icon"><?php echo af_lucide( 'circle-alert', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+									<div class="af-alerts-item__body">
+										<span class="af-alerts-item__title"><?php echo esc_html( (string) $af_alert->title ); ?></span>
+										<?php if ( ! empty( $af_alert->message ) ) : ?>
+											<span class="af-alerts-item__message"><?php echo esc_html( (string) $af_alert->message ); ?></span>
+										<?php endif; ?>
+									</div>
+									<a class="af-alerts-item__open" href="<?php echo esc_url( ! empty( $af_alert->url ) ? (string) $af_alert->url : admin_url( 'admin.php?page=af-alerts-center' ) ); ?>" aria-label="<?php esc_attr_e( 'Abrir alerta', 'arriendo-facil' ); ?>">
+										<?php echo af_lucide( 'chevron-right', 14 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
+									</a>
+								</li>
+							<?php endforeach; ?>
+						<?php endif; ?>
+					</ul>
+					<div class="af-alerts-panel__notice" id="af-alerts-panel-notice" hidden aria-live="polite"></div>
+					<a class="af-alerts-panel__footer" href="<?php echo esc_url( admin_url( 'admin.php?page=af-alerts-center' ) ); ?>">
+						<span><?php esc_html_e( 'Ver todas y configurar recordatorios', 'arriendo-facil' ); ?></span>
+						<?php echo af_lucide( 'arrow-right', 14 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
+					</a>
+				</div>
 			</div>
+			<a class="af-app-topbar__user" href="<?php echo esc_url( admin_url( 'admin.php?page=af-admin-profile' ) ); ?>">
+				<?php echo get_avatar( $current_user->ID, 28 ); ?>
+				<span class="af-app-topbar__user-name"><?php echo esc_html( $current_user->display_name ); ?></span>
+				<?php echo af_lucide( 'chevron-down', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
+			</a>
 		</div>
+	</div>
 		<?php
 	}
 
@@ -2372,6 +2433,8 @@ array(
 		if ( $this->should_use_custom_shell() ) {
 			$shell_nav_css_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-admin-shell-nav.css';
 			$shell_nav_js_path  = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/af-admin-shell-nav.js';
+			$alerts_css_path    = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-admin-alerts.css';
+			$alerts_js_path     = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/af-admin-alerts.js';
 
 			wp_enqueue_style(
 				'af-admin-shell-nav',
@@ -2386,6 +2449,30 @@ array(
 				array(),
 				file_exists( $shell_nav_js_path ) ? (string) filemtime( $shell_nav_js_path ) : ARRIENDO_FACIL_VERSION,
 				true
+			);
+
+			wp_enqueue_style(
+				'af-admin-alerts',
+				ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/af-admin-alerts.css',
+				array( 'af-admin-shell-nav' ),
+				file_exists( $alerts_css_path ) ? (string) filemtime( $alerts_css_path ) : ARRIENDO_FACIL_VERSION
+			);
+
+			wp_enqueue_script(
+				'af-admin-alerts',
+				ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/af-admin-alerts.js',
+				array(),
+				file_exists( $alerts_js_path ) ? (string) filemtime( $alerts_js_path ) : ARRIENDO_FACIL_VERSION,
+				true
+			);
+
+			wp_localize_script(
+				'af-admin-alerts',
+				'afAlerts',
+				array(
+					'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+					'nonce'   => wp_create_nonce( class_exists( 'Arriendo_Facil_Alerts' ) ? Arriendo_Facil_Alerts::NONCE : 'af_alerts_nonce' ),
+				)
 			);
 		}
 
@@ -2611,6 +2698,13 @@ array(
 	 */
 	public function render_meter_readings() {
 		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/meter-readings.php';
+	}
+
+	/**
+	 * Renders the alerts center page (history + account configuration).
+	 */
+	public function render_alerts() {
+		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/alerts.php';
 	}
 
 	/**

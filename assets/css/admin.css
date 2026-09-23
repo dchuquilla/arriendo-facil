@@ -1855,3 +1855,151 @@ body.post-type-accommodation #titlediv {
 	background: #f0f6fc;
 	border-color: #2271b1;
 }
+
+/* ── Lista compacta de contratos (rediseño) ─────────────────────────────────
+   Se apila sobre .af-leases-table sin reescribir sus reglas base. Hace la
+   fila más densa y colapsa las acciones en un menú desplegable <details>.
+   NOTA: .af-table-scroll usa overflow-x:auto, por lo que el menú expande la
+   fila en flujo (no overlay) para no quedar recortado.
+*/
+.af-leases-table--compact {
+	table-layout: auto !important;
+}
+
+.af-leases-table--compact thead th,
+.af-leases-table--compact td {
+	padding: 8px 10px;
+	vertical-align: middle;
+}
+
+.af-leases-table--compact thead th {
+	padding-top: 10px;
+	padding-bottom: 10px;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: #6b7280;
+	white-space: nowrap;
+}
+
+.af-leases-table--compact tbody tr.af-lease-row td {
+	padding: 9px 10px;
+	border-bottom: 1px solid #efeee9;
+}
+
+.af-leases-table--compact td:nth-child(1) {
+	color: #94a3b8;
+	font-size: 11px;
+}
+
+.af-leases-table--compact td:nth-child(2) {
+	font-weight: 600;
+	min-width: 150px;
+}
+
+.af-leases-table--compact td:nth-child(3),
+.af-leases-table--compact td:nth-child(5),
+.af-leases-table--compact td:nth-child(6),
+.af-leases-table--compact td:nth-child(7),
+.af-leases-table--compact td:nth-child(8) {
+	white-space: nowrap;
+	font-size: 12px;
+}
+
+.af-leases-table--compact .af-lease-status-cell .af-pill {
+	font-size: 11px;
+}
+
+.af-leases-table--compact .af-lease-version-meta {
+	margin-top: 2px;
+	font-size: 11px;
+	line-height: 1.4;
+	-webkit-line-clamp: 1;
+}
+
+.af-leases-table--compact .af-lease-empty-document {
+	font-size: 12px;
+}
+
+.af-leases-table--compact .af-lease-actions-cell {
+	min-width: 0;
+}
+
+/* Menú de acciones plegado (ahorra espacio en la fila). */
+.af-lease-actions-menu {
+	display: inline-block;
+	vertical-align: top;
+}
+
+.af-lease-actions-menu summary {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	padding: 5px 12px;
+	border: 1px solid #e2e1db;
+	border-radius: 999px;
+	background: #fff;
+	font-size: 12px;
+	font-weight: 600;
+	color: #1b1a16;
+	cursor: pointer;
+	list-style: none;
+	-webkit-user-select: none;
+	user-select: none;
+	transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.af-lease-actions-menu summary::-webkit-details-marker {
+	display: none;
+}
+
+.af-lease-actions-menu summary:hover {
+	background: #f7fbff;
+	border-color: #bbd7ec;
+}
+
+.af-lease-actions-menu[open] summary {
+	border-color: #00926f;
+	color: #00926f;
+}
+
+.af-lease-actions-dropdown {
+	margin-top: 8px;
+	padding: 8px;
+	display: grid;
+	gap: 6px;
+	background: #f8fafc;
+	border: 1px solid #e6e8ef;
+	border-radius: 12px;
+	min-width: 250px;
+}
+
+.af-lease-actions-dropdown .button {
+	width: 100%;
+	justify-content: center;
+	white-space: normal;
+	min-height: 30px;
+	font-size: 12px;
+	padding: 4px 10px;
+}
+
+.af-lease-actions-dropdown .af-review-test-link-output {
+	margin-top: 2px;
+}
+
+@media (max-width: 1400px) {
+	.af-leases-table--compact td:nth-child(3),
+	.af-leases-table--compact td:nth-child(5),
+	.af-leases-table--compact td:nth-child(6),
+	.af-leases-table--compact td:nth-child(7),
+	.af-leases-table--compact td:nth-child(8) {
+		white-space: normal;
+	}
+}
+
+@media (max-width: 900px) {
+	.af-leases-table--compact .af-lease-actions-dropdown {
+		min-width: 0;
+	}
+}

@@ -49,6 +49,7 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-cleaning-service.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-docx-template-processor.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-lease.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-lease-operations.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-alerts.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-rental-workflow.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-owner-contact.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-owner-register-api.php';
@@ -193,6 +194,11 @@ function arriendo_facil_register_cron_jobs() {
 	if ( ! wp_next_scheduled( 'af_admin_profile_reminders_cron' ) ) {
 		wp_schedule_event( time() + 35 * MINUTE_IN_SECONDS, 'daily', 'af_admin_profile_reminders_cron' );
 	}
+
+	// Daily digest of pending operational alerts.
+	if ( ! wp_next_scheduled( 'af_alerts_email_cron' ) ) {
+		wp_schedule_event( time() + 40 * MINUTE_IN_SECONDS, 'daily', 'af_alerts_email_cron' );
+	}
 }
 
 /**
@@ -242,6 +248,7 @@ function arriendo_facil_init() {
 		'Arriendo_Facil_Document_Verification',
 		'Arriendo_Facil_Review',
 		'Arriendo_Facil_Billing_API',
+		'Arriendo_Facil_Alerts',
 		'Arriendo_Facil_Admin',
 	);
 
@@ -333,7 +340,7 @@ function arriendo_facil_maybe_upgrade_schema() {
 		return;
 	}
 
-	$target_schema_version = '2026-09-meter-readings-v2';
+	$target_schema_version = '2026-09-alerts-v1';
 	$current_schema_version = (string) get_option( 'af_db_schema_version', '' );
 
 	if ( $current_schema_version === $target_schema_version && ! arriendo_facil_has_lease_schema_drift() ) {

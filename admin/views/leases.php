@@ -397,7 +397,7 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 		</div>
 
 	<div class="af-table-scroll">
-	<table class="wp-list-table widefat fixed striped af-leases-table af-data-table">
+	<table class="wp-list-table widefat fixed striped af-leases-table af-leases-table--compact af-data-table">
 		<thead>
 			<tr>
 				<th><?php esc_html_e( 'ID', 'arriendo-facil' ); ?></th>
@@ -485,7 +485,7 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 								$<?php echo esc_html( number_format_i18n( $lease_balance, 2 ) ); ?>
 							</a>
 						</td>
-						<td data-label="<?php esc_attr_e( 'Estado', 'arriendo-facil' ); ?>"><?php echo af_pill( (string) $lease->status ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></td>					<?php
+						<td class="af-lease-status-cell" data-label="<?php esc_attr_e( 'Estado', 'arriendo-facil' ); ?>"><?php echo af_pill( (string) $lease->status ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></td>					<?php
 					$binfo  = isset( $billing_status_map[ (int) $lease->id ] ) ? $billing_status_map[ (int) $lease->id ] : null;
 					$estado_colores = array(
 						'autorizada'          => array( 'label' => 'Autorizada', 'color' => '#2e7d32' ),
@@ -552,8 +552,13 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 							<?php endif; ?>
 						</td>
 						<td class="af-lease-actions-cell af-td-actions" data-label="<?php esc_attr_e( 'Acciones', 'arriendo-facil' ); ?>">
-							<div class="af-lease-actions-stack">
-								<button type="button" class="button button-secondary af-open-upload-version-modal"
+						<details class="af-lease-actions-menu">
+							<summary>
+								<span><?php esc_html_e( 'Acciones', 'arriendo-facil' ); ?></span>
+								<svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true" style="flex-shrink:0;"><path d="M5 7.5 10 12.5 15 7.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+							</summary>
+							<div class="af-lease-actions-dropdown">
+							<button type="button" class="button button-secondary af-open-upload-version-modal"
 									data-lease-id="<?php echo esc_attr( $lease->id ); ?>"
 									data-next-version="<?php echo esc_attr( $next_version ); ?>">
 									<?php echo esc_html( sprintf( __( 'Subir v%d', 'arriendo-facil' ), $next_version ) ); ?>
@@ -594,6 +599,7 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 							</button>
 							<div class="af-review-test-link-output" data-lease-id="<?php echo esc_attr( $lease->id ); ?>" style="display:none;margin-top:8px;padding:8px;border:1px solid #dbeafe;background:#eff6ff;border-radius:6px;font-size:12px;line-height:1.4;"></div>
 							</div>
+						</details>
 						</td>
 					</tr>
 				<?php endforeach; ?>
@@ -831,10 +837,9 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 					if ( res && res.success ) {
 						// Update the status cell in the row.
 						if ( activeLease.row ) {
-							var cells = activeLease.row.querySelectorAll( 'td' );
-							// Status column is index 6 (0-based).
-							if ( cells[6] ) {
-								cells[6].innerHTML = '<strong style="color:#b91c1c;">terminated</strong>';
+							var statusCell = activeLease.row.querySelector( '.af-lease-status-cell' );
+							if ( statusCell ) {
+								statusCell.innerHTML = '<?php echo esc_js( af_pill( 'terminated' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- pill is trusted markup. ?>';
 							}
 							// Hide the terminate button.
 							var terminateBtn = activeLease.row.querySelector( '.af-early-terminate-lease-btn' );

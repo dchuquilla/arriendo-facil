@@ -596,6 +596,24 @@ class Arriendo_Facil_Activator {
 				KEY delivery_status (delivery_status)
 			) $charset_collate;",
 
+			// ── Alertas operativas por cuenta ───────────────────────────────
+			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_alerts (
+				id          BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+				user_id     BIGINT(20) UNSIGNED NOT NULL,
+				type        VARCHAR(40) NOT NULL DEFAULT 'operational' COMMENT 'lease_ending, lease_expired, charge_overdue, reading_missing, system, example',
+				severity    VARCHAR(10) NOT NULL DEFAULT 'info' COMMENT 'info, warning, danger',
+				title       VARCHAR(190) NOT NULL,
+				message     TEXT DEFAULT NULL,
+				url         VARCHAR(500) DEFAULT NULL,
+				source_key  VARCHAR(190) DEFAULT NULL COMMENT 'Clave de idempotencia por usuario',
+				is_read     TINYINT(1) NOT NULL DEFAULT 0,
+				email_sent  TINYINT(1) NOT NULL DEFAULT 0,
+				created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				UNIQUE KEY uniq_alert_source (user_id, source_key),
+				KEY user_read_created (user_id, is_read, created_at)
+			) $charset_collate;",
+
 			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_guest_onboarding_tokens (
 				id                BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
 				selector          VARCHAR(64) NOT NULL,
@@ -1577,6 +1595,7 @@ class Arriendo_Facil_Activator {
 			wp_clear_scheduled_hook( 'af_review_dispatch_cron' );
 			wp_clear_scheduled_hook( 'af_guest_reminders_cron' );
 			wp_clear_scheduled_hook( 'af_admin_profile_reminders_cron' );
+			wp_clear_scheduled_hook( 'af_alerts_email_cron' );
 		}
 		flush_rewrite_rules();
 	}

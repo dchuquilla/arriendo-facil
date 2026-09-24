@@ -388,6 +388,652 @@
 	background: var(--af-warning-50, #FFFBEB);
 }
 
+/* ═══════════════════════════════════════════════════════════════════════
+   COBRANZA (hub: Cobranza + Estructura)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Tabs del hub (CSS-only radio switcher, ids af-tab-cobranza/estructura) ── */
+
+#af-tab-cobranza:checked ~ .af-tabs__nav > label[for="af-tab-cobranza"],
+#af-tab-estructura:checked ~ .af-tabs__nav > label[for="af-tab-estructura"] {
+	background: var(--af-gray-0, #fff);
+	color: var(--af-gray-900);
+	box-shadow: var(--af-shadow-sm);
+}
+
+#af-tab-cobranza:checked ~ .af-tabs__panels > .af-tabs__panel--cobranza,
+#af-tab-estructura:checked ~ .af-tabs__panels > .af-tabs__panel--estructura {
+	display: block;
+}
+
+.af-tabs__radio:focus-visible + .af-tabs__radio + .af-tabs__nav > label[for="af-tab-cobranza"],
+.af-tabs__radio + .af-tabs__radio:focus-visible + .af-tabs__nav > label[for="af-tab-estructura"] {
+	box-shadow: var(--af-focus-ring);
+}
+
+#af-tab-estructura:checked ~ .af-tabs__nav .af-tabs__badge {
+	background: var(--af-gray-200);
+	color: var(--af-gray-700);
+	box-shadow: none;
+}
+
+.af-buildings-page .af-tabs__panel--cobranza {
+	padding-top: var(--af-space-2);
+}
+
+/* ── Franja de alertas (resumen de cobranza) ───────────────────────────── */
+
+.af-cobranza-alerts {
+	display: grid;
+	gap: var(--af-space-3);
+	margin: 0 0 var(--af-space-5);
+}
+
+.af-cobranza-alert {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--af-space-3);
+	padding: var(--af-space-4) var(--af-space-5);
+	border-radius: var(--af-radius-lg);
+	border: 1px solid var(--af-gray-200);
+	background: var(--af-gray-0, #fff);
+}
+
+.af-cobranza-alert__icon {
+	display: inline-flex;
+	flex: 0 0 auto;
+	width: 36px;
+	height: 36px;
+	align-items: center;
+	justify-content: center;
+	border-radius: var(--af-radius-md);
+}
+
+.af-cobranza-alert__body {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.af-cobranza-alert__body strong {
+	font-size: 14px;
+	color: var(--af-gray-900);
+	line-height: 1.35;
+}
+
+.af-cobranza-alert__body span {
+	font-size: var(--af-text-xs, 12px);
+	color: var(--af-gray-600, #475569);
+	line-height: var(--af-leading-relaxed, 1.6);
+}
+
+.af-cobranza-alert--danger {
+	border-color: color-mix(in srgb, var(--af-danger-500, #E5484D) 30%, transparent);
+	background: var(--af-danger-50, #FFF5F5);
+}
+
+.af-cobranza-alert--danger .af-cobranza-alert__icon {
+	background: var(--af-danger-500, #E5484D);
+	color: #fff;
+}
+
+.af-cobranza-alert--warning {
+	border-color: color-mix(in srgb, var(--af-warning-500, #F59E0B) 30%, transparent);
+	background: var(--af-warning-50, #FFFBEB);
+}
+
+.af-cobranza-alert--warning .af-cobranza-alert__icon {
+	background: var(--af-warning-500, #F59E0B);
+	color: #fff;
+}
+
+.af-cobranza-alert--ok .af-cobranza-alert__icon {
+	background: var(--af-success-100, #DCFCE7);
+	color: var(--af-success-700, #15803D);
+}
+
+/* ── Tarjetas cobranza (estilo catálogo) ───────────────────────────────── */
+
+.af-buildings-page .af-property-grid.af-cobranza-grid {
+	grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+	gap: var(--af-space-5);
+}
+
+.af-cobranza-card {
+	cursor: pointer;
+	transition: transform var(--af-motion-base), box-shadow var(--af-motion-base), border-color var(--af-motion-fast);
+}
+
+.af-cobranza-card:hover {
+	border-color: var(--af-primary-200, #8FDBCA);
+	box-shadow: 0 12px 28px -10px rgba(0, 168, 132, 0.22);
+}
+
+.af-cobranza-card.is-overdue {
+	border-color: color-mix(in srgb, var(--af-danger-500, #E5484D) 45%, transparent);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--af-danger-500, #E5484D) 12%, transparent);
+}
+
+.af-cobranza-card.is-overdue:hover {
+	border-color: var(--af-danger-500, #E5484D);
+	box-shadow: 0 12px 28px -10px rgba(229, 72, 77, 0.28);
+}
+
+.af-cobranza-card.is-soon {
+	border-color: color-mix(in srgb, var(--af-warning-500, #F59E0B) 45%, transparent);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--af-warning-500, #F59E0B) 12%, transparent);
+}
+
+.af-cobranza-card.is-soon:hover {
+	border-color: var(--af-warning-500, #F59E0B);
+	box-shadow: 0 12px 28px -10px rgba(245, 158, 11, 0.28);
+}
+
+.af-buildings-page .af-property-card__media::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(180deg, rgba(15, 23, 42, 0) 55%, rgba(15, 23, 42, 0.32) 100%);
+	pointer-events: none;
+}
+
+.af-buildings-page .af-property-card__badges {
+	top: auto;
+	bottom: var(--af-space-3);
+	left: var(--af-space-3);
+	right: var(--af-space-3);
+}
+
+.af-buildings-page .af-property-card__placeholder {
+	background: linear-gradient(135deg, var(--af-primary-50, #E6F7F3), var(--af-gray-50, #F8FAFC));
+	color: var(--af-primary-600, #00926F);
+}
+
+.af-buildings-page .af-catalog-card__type {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	align-self: flex-start;
+	white-space: nowrap;
+	padding: 3px 10px;
+	border-radius: var(--af-radius-full);
+	background: var(--af-primary-50, #E6F7F3);
+	color: var(--af-primary-700, #007058);
+	font-size: 11px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+
+.af-buildings-page .af-property-card__title {
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+	min-height: calc(var(--af-text-base, 16px) * 1.35 * 2);
+}
+
+.af-buildings-page .af-property-card__body {
+	flex: 1;
+}
+
+.af-buildings-page .af-catalog-card__address {
+	display: flex;
+	align-items: flex-start;
+	gap: 6px;
+	margin: 0;
+	font-size: var(--af-text-xs);
+	color: var(--af-gray-500, #64748B);
+}
+
+.af-buildings-page .af-catalog-card__address-text {
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+	min-width: 0;
+}
+
+.af-buildings-page .af-catalog-card__address-icon {
+	display: inline-flex;
+	flex: 0 0 auto;
+	margin-top: 1px;
+	color: var(--af-gray-400, #94A3B8);
+}
+
+.af-buildings-page .af-catalog-card__spec-icon {
+	display: inline-flex;
+	flex: 0 0 auto;
+	color: var(--af-gray-400, #94A3B8);
+}
+
+.af-cobranza-card__amount {
+	display: inline-flex;
+	flex-direction: column;
+	font-family: var(--af-font-numeric, ui-monospace, SFMono-Regular, Menlo, monospace);
+	font-variant-numeric: tabular-nums;
+	font-size: var(--af-text-lg, 18px);
+	font-weight: 800;
+	line-height: 1.1;
+	color: var(--af-gray-900, #0F172A);
+}
+
+.af-cobranza-card__amount small {
+	font-family: var(--af-font-base, inherit);
+	font-size: var(--af-text-xs, 12px);
+	font-weight: 600;
+	color: var(--af-gray-500, #64748B);
+}
+
+.af-cobranza-card__amount.is-danger {
+	color: var(--af-danger-600, #D93036);
+}
+
+.af-cobranza-card__amount.is-warning {
+	color: var(--af-warning-700, #B45309);
+}
+
+.af-cobranza-card__due {
+	font-size: var(--af-text-xs, 12px);
+	font-weight: 700;
+	color: var(--af-gray-500, #64748B);
+	text-align: right;
+}
+
+.af-cobranza-card__due.is-danger {
+	color: var(--af-danger-600, #D93036);
+}
+
+.af-cobranza-card__due.is-warning {
+	color: var(--af-warning-700, #B45309);
+}
+
+.af-buildings-page .af-catalog-card__hint {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 5px 10px;
+	border-radius: var(--af-radius-full);
+	background: var(--af-primary-50, #E6F7F3);
+	color: var(--af-primary-700, #007058);
+	font-size: var(--af-text-xs);
+	font-weight: 700;
+	transition: background var(--af-motion-fast), color var(--af-motion-fast);
+	white-space: nowrap;
+}
+
+.af-buildings-page .af-cobranza-card:hover .af-catalog-card__hint {
+	background: var(--af-primary-500, #00A884);
+	color: #fff;
+}
+
+.af-buildings-page .af-catalog-card__hint-arrow {
+	display: inline-block;
+	transition: transform var(--af-motion-fast);
+}
+
+.af-buildings-page .af-cobranza-card:hover .af-catalog-card__hint-arrow {
+	transform: translateX(2px);
+}
+
+/* ── Modal: calendario de cobros del mes ───────────────────────────────── */
+
+.af-cobranza-modal__dialog {
+	width: min(720px, 100%);
+}
+
+.af-cobranza-modal__dialog .af-modal__body {
+	padding-top: var(--af-space-3);
+}
+
+.af-cobranza-cal__nav {
+	display: grid;
+	grid-template-columns: 40px 1fr 40px;
+	align-items: center;
+	gap: var(--af-space-3);
+	margin-bottom: var(--af-space-2);
+}
+
+.af-cobranza-cal__nav-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 40px;
+	height: 40px;
+	padding: 0;
+	font-size: 16px;
+	line-height: 1;
+}
+
+.af-cobranza-cal__period {
+	margin: 0;
+	text-align: center;
+	font-size: 15px;
+	font-weight: 800;
+	color: var(--af-gray-900, #0F172A);
+	text-transform: capitalize;
+}
+
+.af-cobranza-cal__today-row {
+	display: flex;
+	justify-content: flex-end;
+	margin-bottom: var(--af-space-3);
+}
+
+.af-cobranza-cal__today {
+	min-height: 30px;
+	padding: 4px 14px;
+	font-size: var(--af-text-xs, 12px);
+}
+
+/* Grilla del calendario: paren semanas completas del mes. */
+
+.af-calendar-mini {
+	display: grid;
+	grid-template-columns: repeat(7, 1fr);
+	gap: 6px;
+	margin-bottom: var(--af-space-4);
+}
+
+.af-calendar-mini__wd {
+	padding: 4px 0;
+	text-align: center;
+	font-size: 11px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--af-gray-400, #94A3B8);
+}
+
+.af-calendar-mini__day {
+	position: relative;
+	min-height: 52px;
+	border: 1px solid var(--af-gray-200, #E2E8F0);
+	border-radius: var(--af-radius-md, 10px);
+	background: var(--af-gray-0, #fff);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 4px;
+	padding: 6px 4px;
+}
+
+.af-calendar-mini__day.is-outside {
+	opacity: 0.32;
+	pointer-events: none;
+}
+
+.af-calendar-mini__day.is-today {
+	border-color: var(--af-primary-500, #00A884);
+	box-shadow: 0 0 0 2px var(--af-primary-100, #D5F3E9);
+}
+
+.af-calendar-mini__day-num {
+	font-size: 12.5px;
+	font-weight: 700;
+	color: var(--af-gray-700, #334155);
+	line-height: 1;
+}
+
+.af-calendar-mini__day-dot {
+	display: block;
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	background: var(--af-gray-200, #E2E8F0);
+}
+
+.af-calendar-mini__dots {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 3px;
+}
+
+.af-calendar-mini__day-dot.is-paid {
+	background: var(--af-success-500, #22C55E);
+}
+
+.af-calendar-mini__day-dot.is-pending {
+	background: var(--af-info-500, #3B82F6);
+}
+
+.af-calendar-mini__day-dot.is-overdue {
+	background: var(--af-danger-500, #E5484D);
+}
+
+.af-calendar-mini__day-dot.is-payday {
+	background: var(--af-primary-500, #00A884);
+	outline: 2px solid var(--af-primary-100, #D5F3E9);
+	outline-offset: 1px;
+}
+
+/* Leyenda del calendario. */
+
+.af-calendar-mini__legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 16px;
+	margin-bottom: var(--af-space-4);
+	padding: var(--af-space-3) var(--af-space-4);
+	border-radius: var(--af-radius-md);
+	background: var(--af-gray-50, #F8FAFC);
+	font-size: var(--af-text-xs, 12px);
+	color: var(--af-gray-600, #475569);
+}
+
+.af-calendar-mini__legend span {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.af-calendar-mini__legend i {
+	display: inline-block;
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	font-style: normal;
+	vertical-align: middle;
+	background: var(--af-gray-200, #E2E8F0);
+}
+
+.af-calendar-mini__legend i.is-paid {
+	background: var(--af-success-500, #22C55E);
+}
+
+.af-calendar-mini__legend i.is-pending {
+	background: var(--af-info-500, #3B82F6);
+}
+
+.af-calendar-mini__legend i.is-overdue {
+	background: var(--af-danger-500, #E5484D);
+}
+
+.af-calendar-mini__legend i.is-payday {
+	background: var(--af-primary-500, #00A884);
+}
+
+/* Lista de cargos del mes. */
+
+.af-cobranza-charges__title {
+	margin: 0 0 var(--af-space-2);
+	font-size: 13px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--af-gray-500, #64748B);
+}
+
+.af-cobranza-charges {
+	display: grid;
+	gap: var(--af-space-2);
+	margin: 0 0 var(--af-space-4);
+	padding: 0;
+	list-style: none;
+}
+
+.af-cobranza-charge {
+	display: flex;
+	align-items: center;
+	gap: var(--af-space-3);
+	padding: var(--af-space-3) var(--af-space-4);
+	border: 1px solid var(--af-gray-200, #E2E8F0);
+	border-radius: var(--af-radius-md, 10px);
+	background: var(--af-gray-0, #fff);
+}
+
+.af-cobranza-charge.is-paid {
+	opacity: 0.68;
+	background: var(--af-gray-50, #F8FAFC);
+}
+
+.af-cobranza-charge__icon {
+	display: inline-flex;
+	flex: 0 0 auto;
+	width: 34px;
+	height: 34px;
+	align-items: center;
+	justify-content: center;
+	border-radius: var(--af-radius-md, 10px);
+	background: var(--af-gray-100, #F1F5F9);
+	color: var(--af-gray-600, #475569);
+}
+
+.af-cobranza-charge.is-paid .af-cobranza-charge__icon {
+	background: var(--af-success-50, #F0FDF4);
+	color: var(--af-success-600, #16A34A);
+}
+
+.af-cobranza-charge__body {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.af-cobranza-charge__label {
+	font-size: 13.5px;
+	font-weight: 700;
+	color: var(--af-gray-900, #0F172A);
+	line-height: 1.3;
+}
+
+.af-cobranza-charge__label small {
+	font-weight: 500;
+	color: var(--af-gray-500, #64748B);
+}
+
+.af-cobranza-charge__meta {
+	font-size: var(--af-text-xs, 12px);
+	color: var(--af-gray-500, #64748B);
+}
+
+.af-cobranza-charge__amount {
+	text-align: right;
+	flex: 0 0 auto;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	align-items: flex-end;
+}
+
+.af-cobranza-charge__value {
+	font-family: var(--af-font-numeric, ui-monospace, SFMono-Regular, Menlo, monospace);
+	font-variant-numeric: tabular-nums;
+	font-size: 14px;
+	font-weight: 800;
+	color: var(--af-gray-900, #0F172A);
+	white-space: nowrap;
+}
+
+.af-cobranza-charge__balance {
+	font-family: var(--af-font-numeric, ui-monospace, SFMono-Regular, Menlo, monospace);
+	font-variant-numeric: tabular-nums;
+	font-size: var(--af-text-xs, 12px);
+	font-weight: 700;
+	color: var(--af-warning-700, #B45309);
+}
+
+.af-cobranza-charge.is-paid .af-cobranza-charge__balance {
+	color: var(--af-success-700, #15803D);
+}
+
+.af-cobranza-charge__actions {
+	flex: 0 0 auto;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.af-cobranza-charge__actions .af-btn {
+	padding: 4px 10px;
+	font-size: 12px;
+	line-height: 1.6;
+}
+
+.af-cobranza-empty {
+	margin: 0 0 var(--af-space-4);
+	padding: var(--af-space-5);
+	border: 1px dashed var(--af-gray-300, #CBD5E1);
+	border-radius: var(--af-radius-md, 10px);
+	text-align: center;
+	font-size: var(--af-text-sm, 14px);
+	color: var(--af-gray-500, #64748B);
+}
+
+/* Panel "Anotar pago". */
+
+.af-cobranza-pay {
+	margin: var(--af-space-4) 0 0;
+	padding: var(--af-space-4);
+	border: 1px solid var(--af-primary-200, #8FDBCA);
+	border-radius: var(--af-radius-lg, 14px);
+	background: var(--af-primary-50, #E6F7F3);
+}
+
+.af-cobranza-pay__title {
+	margin: 0 0 var(--af-space-2);
+	font-size: 14px;
+	font-weight: 800;
+	color: var(--af-primary-800, #005A44);
+}
+
+.af-cobranza-pay__meta {
+	margin-bottom: var(--af-space-3);
+	font-size: var(--af-text-xs, 12px);
+	color: var(--af-gray-600, #475569);
+}
+
+.af-cobranza-pay .af-modal__field {
+	gap: 6px;
+}
+
+.af-cobranza-pay__actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: var(--af-space-2);
+	margin-top: var(--af-space-3);
+}
+
+.af-cobranza-pay__actions .button {
+	margin-top: 0;
+}
+
+.af-cobranza-modal__dialog .af-modal__footer {
+	padding-top: var(--af-space-3);
+}
+
+/* ── Disponibles (sin contrato) ────────────────────────────────────────── */
+
+.af-cobranza-avail .af-collapse__summary {
+	font-weight: 700;
+	font-size: 15px;
+	color: var(--af-gray-800, #1E293B);
+}
+
 /* ── Responsive ─────────────────────────────────────────────────────────── */
 
 @media (max-width: 782px) {
@@ -409,5 +1055,20 @@
 
 	.af-units-cobranza td:last-child {
 		text-align: left;
+	}
+
+	.af-cobranza-charge {
+		flex-wrap: wrap;
+	}
+
+	.af-cobranza-charge__amount {
+		flex: 1 1 100%;
+		flex-direction: row;
+		align-items: baseline;
+		justify-content: space-between;
+	}
+
+	.af-cobranza-charge__actions {
+		flex: 1 1 100%;
 	}
 }

@@ -25,6 +25,7 @@ class Arriendo_Facil_Billing_Ledger {
 		add_action( 'wp_ajax_af_create_charge', array( $this, 'ajax_create_charge' ) );
 		add_action( 'wp_ajax_af_generate_period_charges', array( $this, 'ajax_generate_period_charges' ) );
 		add_action( 'wp_ajax_af_record_meter_reading', array( $this, 'ajax_record_meter_reading' ) );
+		add_action( 'wp_ajax_af_delete_meter_reading', array( $this, 'ajax_delete_meter_reading' ) );
 		add_action( 'wp_ajax_af_void_charge', array( $this, 'ajax_void_charge' ) );
 		add_action( 'af_generate_monthly_charges', array( __CLASS__, 'generate_monthly_charges' ) );
 		add_action( 'af_flag_overdue_charges', array( __CLASS__, 'flag_overdue_charges' ) );
@@ -164,6 +165,65 @@ class Arriendo_Facil_Billing_Ledger {
 	}
 
 	/**
+	 * Deletes a meter reading. When the reading generated a service charge it
+	 * is voided too (only if it has no payments), so the billing ledger stays
+	 * consistent with the recorded readings.
+	 *
+	 * @param int $reading_id Reading row ID.
+	 * @return true|WP_Error
+	 */
+	public static function delete_meter_reading( $reading_id ) {
+		global $wpdb;
+
+		$reading_id = absint( $reading_id );
+		$reading    = $wpdb->get_row(
+			$wpdb->prepare(
+				'SELECT * FROM ' . self::readings_table() . ' WHERE id = %d',
+				$reading_id
+			)
+		);
+
+		if ( ! $reading ) {
+			return new WP_Error( 'af_reading_not_found', __( 'Lectura no encontrada.', 'arriendo-facil' ) );
+		}
+
+		$charge_id = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT id FROM " . self::charges_table() . "
+				 WHERE charge_type = %s AND period = %s AND status <> 'void'
+				   AND ( ( unit_id > 0 AND unit_id = %d )
+				         OR ( ( unit_id IS NULL OR unit_id = 0 ) AND lease_id IN ( SELECT id FROM {$wpdb->prefix}af_leases WHERE accommodation_id = %d ) ) )
+				   AND description LIKE %s
+				 ORDER BY id DESC LIMIT 1",
+				$reading->service,
+				$reading->period,
+				(int) $reading->unit_id,
+				(int) $reading->accommodation_id,
+				'Consumo%'
+			)
+		);
+
+		if ( $charge_id ) {
+			$voided = self::void_charge( $charge_id );
+			if ( is_wp_error( $voided ) ) {
+				return $voided;
+			}
+		}
+
+		$deleted = $wpdb->delete(
+			self::readings_table(),
+			array( 'id' => $reading_id ),
+			array( '%d' )
+		);
+
+		if ( false === $deleted ) {
+			return new WP_Error( 'af_reading_delete_failed', __( 'No se pudo borrar la lectura.', 'arriendo-facil' ) );
+		}
+
+		return true;
+	}
+
+	/**
 	 * Finds the active lease tied to a unit through its linked accommodation.
 	 *
 	 * @param int $unit_id Unit ID.
@@ -269,6 +329,50 @@ class Arriendo_Facil_Billing_Ledger {
 					: __( 'Lectura guardada. No hay contrato activo, no se genero cargo.', 'arriendo-facil' ),
 			)
 		);
+	}
+
+	/**
+	 * AJAX: deletes a meter reading (voiding its auto-generated charge when it
+	 * has no payments yet).
+	 *
+	 * @return void
+	 */
+	public function ajax_delete_meter_reading() {
+		check_ajax_referer( 'af_ledger_nonce', 'nonce' );
+
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		global $wpdb;
+
+		$reading_id = isset( $_POST['reading_id'] ) ? absint( wp_unslash( $_POST['reading_id'] ) ) : 0;
+
+		$reading = $wpdb->get_row( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching
+			$wpdb->prepare(
+				'SELECT * FROM ' . self::readings_table() . ' WHERE id = %d',
+				$reading_id
+			)
+		);
+		if ( ! $reading ) {
+			wp_send_json_error( array( 'message' => __( 'Lectura no encontrada.', 'arriendo-facil' ) ), 400 );
+		}
+
+		if ( ! empty( $reading->unit_id ) ) {
+			if ( ! Arriendo_Facil_Tenancy::can_access_unit( (int) $reading->unit_id ) ) {
+				wp_send_json_error( array( 'message' => __( 'No tienes acceso a esta unidad.', 'arriendo-facil' ) ), 403 );
+			}
+		} elseif ( ! Arriendo_Facil_Tenancy::can_access_accommodation( (int) $reading->accommodation_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes acceso a este inmueble.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$result = self::delete_meter_reading( $reading_id );
+
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ), 400 );
+		}
+
+		wp_send_json_success( array( 'message' => __( 'Lectura borrada y cargo asociado anulado.', 'arriendo-facil' ) ) );
 	}
 
 	/**

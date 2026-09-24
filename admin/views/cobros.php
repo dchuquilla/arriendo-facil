@@ -2,9 +2,10 @@
 /**
  * Cobros y Servicios hub: recordatorios de "qué cobrar y cuándo".
  *
- * No registra transacciones: agrega los cargos pendientes, la renta mensual
- * aún no cargada y las lecturas pendientes en una sola lista priorizada,
- * con accionables (enviar aviso de cobro, registrar pago, registrar lectura).
+ * No registra pagos: agrega los cargos pendientes, la renta mensual aún no
+ * cargada y las lecturas pendientes en una sola lista priorizada, con
+ * accionables (enviar aviso de cobro, registrar pago) y la captura directa de
+ * las lecturas de medidor que faltan.
  *
  * @package Arriendo_Facil
  */
@@ -34,20 +35,21 @@ $charge_type_labels = array(
 
 // 1) Cargos pendientes/vencidos (transacciones ya generadas).
 $upcoming_charges = (array) $wpdb->get_results(
-	"SELECT c.id, c.lease_id, c.accommodation_id, c.guest_id, c.charge_type, c.description,
-	        c.amount, c.amount_paid, c.due_date, c.status,
-	        p.post_title AS accommodation_title,
-	        CONCAT(g.first_name, ' ', g.last_name) AS guest_name
-	 FROM {$wpdb->prefix}af_charges c
-	 LEFT JOIN {$wpdb->prefix}af_leases l ON l.id = c.lease_id
-	 LEFT JOIN {$wpdb->prefix}af_guests g ON g.id = COALESCE(c.guest_id, l.guest_id)
-	 LEFT JOIN {$wpdb->posts} p ON p.ID = c.accommodation_id
-	 WHERE c.status IN ('pending','partial','overdue')
-	   AND c.due_date <= %s{$cobros_scope_clause}
-	 ORDER BY c.due_date ASC
-	 LIMIT 120" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-	,
-	array_merge( array( $next_window ) )
+	$wpdb->prepare(
+		"SELECT c.id, c.lease_id, c.accommodation_id, c.guest_id, c.charge_type, c.description,
+		        c.amount, c.amount_paid, c.due_date, c.status,
+		        p.post_title AS accommodation_title,
+		        CONCAT(g.first_name, ' ', g.last_name) AS guest_name
+		 FROM {$wpdb->prefix}af_charges c
+		 LEFT JOIN {$wpdb->prefix}af_leases l ON l.id = c.lease_id
+		 LEFT JOIN {$wpdb->prefix}af_guests g ON g.id = COALESCE(c.guest_id, l.guest_id)
+		 LEFT JOIN {$wpdb->posts} p ON p.ID = c.accommodation_id
+		 WHERE c.status IN ('pending','partial','overdue')
+		   AND c.due_date <= %s{$cobros_scope_clause}
+		 ORDER BY c.due_date ASC
+		 LIMIT 120", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		array_merge( array( $next_window ) )
+	)
 );
 
 // 2) Renta mensual aún no cargada para contratos activos.
@@ -111,13 +113,14 @@ $pending_meters = array();
 if ( '' === $cobros_scope_clause || ! empty( $cobros_scope_ids ) ) {
 	$scope_sql = null === $cobros_scope_ids ? '' : ' AND accommodation_id IN (' . Arriendo_Facil_Tenancy::ids_in_clause( $cobros_scope_ids ) . ')';
 	$meter_groups = (array) $wpdb->get_results(
-		"SELECT accommodation_id, service
-		 FROM {$wpdb->prefix}af_meter_readings
-		 WHERE 1=1{$scope_sql}
-		 GROUP BY accommodation_id, service
-		 HAVING MAX(period) < %s" // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		,
-		array( $current_period )
+		$wpdb->prepare(
+			"SELECT accommodation_id, service
+			 FROM {$wpdb->prefix}af_meter_readings
+			 WHERE 1=1{$scope_sql}
+			 GROUP BY accommodation_id, service
+			 HAVING MAX(period) < %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			array( $current_period )
+		)
 	);
 
 	foreach ( $meter_groups as $mg ) {
@@ -195,7 +198,7 @@ usort(
 		array(
 			'eyebrow'  => __( 'Cobranza', 'arriendo-facil' ),
 			'title'    => __( 'Cobros y Servicios', 'arriendo-facil' ),
-			'subtitle' => __( 'Recordatorios de qué cobrar y cuándo, enlazados a tus inquilinos. Registra pagos y lecturas desde sus páginas.', 'arriendo-facil' ),
+			'subtitle' => __( 'Recordatorios de qué cobrar y cuándo, enlazados a tus inquilinos. Registra aquí las lecturas de medidor pendientes y gestiona los pagos desde Control de pagos.', 'arriendo-facil' ),
 		)
 	);
 	?>
@@ -244,7 +247,7 @@ usort(
 			</div>
 			<div class="af-section__actions" style="display:flex; gap:8px;">
 				<a class="button af-btn af-btn--ghost" href="<?php echo esc_url( admin_url( 'admin.php?page=af-collections' ) ); ?>"><?php esc_html_e( 'Control de pagos', 'arriendo-facil' ); ?></a>
-				<a class="button af-btn af-btn--ghost" href="<?php echo esc_url( admin_url( 'admin.php?page=af-meter-readings' ) ); ?>"><?php esc_html_e( 'Lecturas', 'arriendo-facil' ); ?></a>
+				<a class="button af-btn af-btn--ghost" href="<?php echo esc_url( admin_url( 'admin.php?page=af-meter-readings' ) ); ?>"><?php esc_html_e( 'Ver alertas de lecturas', 'arriendo-facil' ); ?></a>
 				<a class="button af-btn af-btn--ghost" href="<?php echo esc_url( admin_url( 'admin.php?page=af-buildings' ) ); ?>"><?php esc_html_e( 'Edificios y unidades', 'arriendo-facil' ); ?></a>
 			</div>
 		</header>
@@ -326,7 +329,7 @@ usort(
 		<header class="af-section__header">
 			<div>
 				<h2 class="af-section__title"><?php esc_html_e( 'Lecturas del mes pendientes', 'arriendo-facil' ); ?></h2>
-				<p class="af-section__subtitle"><?php esc_html_e( 'Medidores con historial que aún no tienen lectura para el período actual.', 'arriendo-facil' ); ?></p>
+				<p class="af-section__subtitle"><?php esc_html_e( 'Medidores con historial que aún no tienen lectura para el período actual. Anota el número que marca cada medidor y el precio de la unidad de consumo: se genera el cargo para el inquilino.', 'arriendo-facil' ); ?></p>
 			</div>
 		</header>
 		<table class="wp-list-table widefat fixed striped af-data-table">
@@ -334,16 +337,26 @@ usort(
 				<tr>
 					<th><?php esc_html_e( 'Inmueble', 'arriendo-facil' ); ?></th>
 					<th><?php esc_html_e( 'Servicio', 'arriendo-facil' ); ?></th>
-					<th><?php esc_html_e( 'Acción', 'arriendo-facil' ); ?></th>
+					<th><?php esc_html_e( 'Lectura actual', 'arriendo-facil' ); ?> *</th>
+					<th><?php esc_html_e( 'Precio por unidad', 'arriendo-facil' ); ?> *</th>
+					<th style="text-align:right;"><?php esc_html_e( 'Registrar', 'arriendo-facil' ); ?></th>
 				</tr>
 			</thead>
 			<tbody>
 				<?php foreach ( $pending_meters as $meter ) : ?>
 					<tr>
-						<td><?php echo esc_html( $meter['title'] ? $meter['title'] : ( '#' . $meter['accommodation_id'] ) ); ?></td>
-						<td><span class="af-pill af-pill--neutral"><?php echo esc_html( ucfirst( $meter['service'] ) ); ?></span></td>
-						<td>
-							<a class="button button-small" href="<?php echo esc_url( admin_url( 'admin.php?page=af-meter-readings&accommodation_id=' . $meter['accommodation_id'] ) ); ?>"><?php esc_html_e( 'Registrar lectura', 'arriendo-facil' ); ?></a>
+						<td data-label="<?php esc_attr_e( 'Inmueble', 'arriendo-facil' ); ?>"><strong><?php echo esc_html( $meter['title'] ? $meter['title'] : ( '#' . $meter['accommodation_id'] ) ); ?></strong></td>
+						<td data-label="<?php esc_attr_e( 'Servicio', 'arriendo-facil' ); ?>"><span class="af-pill af-pill--neutral"><?php echo esc_html( ucfirst( $meter['service'] ) ); ?></span></td>
+						<td colspan="3">
+							<form class="af-cobros-reading" data-status-target="af-cobros-reading-status-<?php echo esc_attr( (int) $meter['accommodation_id'] . '-' . $meter['service'] ); ?>" style="display:flex; gap:10px; align-items:flex-start; flex-wrap:wrap;">
+								<input type="hidden" name="accommodation_id" value="<?php echo esc_attr( (int) $meter['accommodation_id'] ); ?>" />
+								<input type="hidden" name="service" value="<?php echo esc_attr( $meter['service'] ); ?>" />
+								<input type="hidden" name="period" value="<?php echo esc_attr( $current_period ); ?>" />
+								<input type="number" name="current_reading" required step="0.001" min="0" placeholder="0.000" style="min-height:30px; max-width:130px;" aria-label="Lectura actual" />
+								<input type="number" name="unit_rate" required step="0.0001" min="0" placeholder="0.0000" style="min-height:30px; max-width:130px;" aria-label="Precio por unidad" />
+								<button type="submit" class="button button-small"><?php esc_html_e( 'Guardar y cobrar', 'arriendo-facil' ); ?></button>
+								<span id="af-cobros-reading-status-<?php echo esc_attr( (int) $meter['accommodation_id'] . '-' . $meter['service'] ); ?>" class="af-td-meta"></span>
+							</form>
 						</td>
 					</tr>
 				<?php endforeach; ?>
@@ -352,3 +365,40 @@ usort(
 	</section>
 	<?php endif; ?>
 </div>
+
+<script>
+(function () {
+	const ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
+	const nonce = <?php echo wp_json_encode( wp_create_nonce( 'af_ledger_nonce' ) ); ?>;
+
+	document.querySelectorAll('.af-cobros-reading').forEach(function (form) {
+		const status = document.getElementById(form.getAttribute('data-status-target'));
+		form.addEventListener('submit', function (e) {
+			e.preventDefault();
+			const btn = form.querySelector('button[type="submit"]');
+			btn.disabled = true;
+			if (status) { status.textContent = ''; }
+
+			const body = new URLSearchParams(new FormData(form));
+			body.append('action', 'af_record_meter_reading');
+			body.append('nonce', nonce);
+
+			fetch(ajaxUrl, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+				body: body
+			}).then((r) => r.json()).then(function (json) {
+				btn.disabled = false;
+				if (!json || !json.success) {
+					if (status) { status.textContent = (json && json.data && json.data.message) || 'Error'; }
+					return;
+				}
+				window.location.reload();
+			}).catch(function () {
+				btn.disabled = false;
+				if (status) { status.textContent = 'Error'; }
+			});
+		});
+	});
+}());
+</script>

@@ -102,6 +102,37 @@ if ( $is_management_model ) {
 		 LIMIT 100" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 	);
 }
+
+// Evaluación del super-admin hacia los administradores de propiedades.
+$admin_evaluations = array();
+$admins            = array();
+$my_evaluation     = null;
+if ( function_exists( 'current_user_can' ) && current_user_can( 'manage_options' ) ) {
+	$admins = class_exists( 'Arriendo_Facil_Tenancy' ) ? Arriendo_Facil_Tenancy::get_property_admins() : array();
+
+	foreach ( (array) $admins as $af_admin ) {
+		$af_row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT id, stars, criteria_scores, comment_text, reviewer_user_id, updated_at
+				 FROM {$wpdb->prefix}af_admin_reviews
+				 WHERE admin_user_id = %d
+				 LIMIT 1",
+				(int) $af_admin->ID
+			)
+		);
+		$admin_evaluations[ (int) $af_admin->ID ] = $af_row;
+	}
+} elseif ( class_exists( 'Arriendo_Facil_Tenancy' ) && in_array( 'af_property_admin', (array) wp_get_current_user()->roles, true ) ) {
+	$my_evaluation = $wpdb->get_row(
+		$wpdb->prepare(
+			"SELECT id, stars, criteria_scores, comment_text, reviewer_user_id, updated_at
+			 FROM {$wpdb->prefix}af_admin_reviews
+			 WHERE admin_user_id = %d
+			 LIMIT 1",
+			get_current_user_id()
+		)
+	);
+}
 ?>
 <div class="wrap af-shell">
 
@@ -177,6 +208,104 @@ if ( $is_management_model ) {
 					<?php endforeach; ?>
 				</tbody>
 			</table>
+		</section>
+	<?php endif; ?>
+
+	<?php if ( $is_management_model && current_user_can( 'manage_options' ) && ! empty( $admins ) ) : ?>
+		<section class="af-section" style="margin-bottom: var(--af-space-4);">
+			<header class="af-section__header">
+				<div>
+					<h2 class="af-section__title"><?php esc_html_e( 'Evaluación de administradores', 'arriendo-facil' ); ?></h2>
+					<p class="af-section__subtitle"><?php esc_html_e( 'El super-admin califica la gestión de cada administrador de propiedades.', 'arriendo-facil' ); ?></p>
+				</div>
+			</header>
+
+			<table class="wp-list-table widefat fixed striped af-data-table">
+				<thead>
+					<tr>
+						<th><?php esc_html_e( 'Administrador', 'arriendo-facil' ); ?></th>
+						<th><?php esc_html_e( 'Inmuebles', 'arriendo-facil' ); ?></th>
+						<th><?php esc_html_e( 'Evaluación', 'arriendo-facil' ); ?></th>
+						<th><?php esc_html_e( 'Actualizada', 'arriendo-facil' ); ?></th>
+						<th><?php esc_html_e( 'Acción', 'arriendo-facil' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+					<?php foreach ( $admins as $af_admin ) : ?>
+						<?php
+						$af_review   = isset( $admin_evaluations[ (int) $af_admin->ID ] ) ? $admin_evaluations[ (int) $af_admin->ID ] : null;
+						$af_stars    = $af_review ? (float) $af_review->stars : 0.0;
+						$af_scores   = $af_review && ! empty( $af_review->criteria_scores ) ? json_decode( (string) $af_review->criteria_scores, true ) : array();
+						$af_prop_ids = class_exists( 'Arriendo_Facil_Accommodation' ) ? Arriendo_Facil_Accommodation::get_owner_accommodation_ids( (int) $af_admin->ID ) : array();
+						$af_pill     = 'af-pill--neutral';
+						if ( $af_stars >= 4 ) {
+							$af_pill = 'af-pill--success';
+						} elseif ( $af_stars >= 3 ) {
+							$af_pill = 'af-pill--warning';
+						} elseif ( $af_stars > 0 ) {
+							$af_pill = 'af-pill--danger';
+						}
+						?>
+						<tr>
+							<td data-label="<?php esc_attr_e( 'Administrador', 'arriendo-facil' ); ?>">
+								<strong><?php echo esc_html( $af_admin->display_name ? $af_admin->display_name : $af_admin->user_login ); ?></strong><br />
+								<span class="af-td-meta"><?php echo esc_html( $af_admin->user_email ); ?></span>
+							</td>
+							<td data-label="<?php esc_attr_e( 'Inmuebles', 'arriendo-facil' ); ?>">
+								<span class="af-pill af-pill--neutral"><?php echo esc_html( number_format_i18n( count( $af_prop_ids ) ) ); ?></span>
+							</td>
+							<td data-label="<?php esc_attr_e( 'Evaluación', 'arriendo-facil' ); ?>">
+								<?php if ( $af_review ) : ?>
+									<span class="af-pill <?php echo esc_attr( $af_pill ); ?>">★ <?php echo esc_html( number_format_i18n( $af_stars, 1 ) ); ?></span>
+									<?php if ( ! empty( $af_scores ) ) : ?>
+										<ul style="margin:6px 0 0;padding-left:16px;font-size:13px;color:var(--af-gray-600);">
+											<?php foreach ( Arriendo_Facil_Review::admin_criteria() as $af_key => $af_label ) : ?>
+												<?php if ( isset( $af_scores[ $af_key ] ) ) : ?>
+													<li><?php echo esc_html( $af_label ); ?>: <?php echo esc_html( (int) $af_scores[ $af_key ] ); ?>/5</li>
+												<?php endif; ?>
+											<?php endforeach; ?>
+										</ul>
+									<?php endif; ?>
+								<?php else : ?>
+									<span class="af-td-meta"><?php esc_html_e( 'Sin evaluar', 'arriendo-facil' ); ?></span>
+								<?php endif; ?>
+							</td>
+							<td data-label="<?php esc_attr_e( 'Actualizada', 'arriendo-facil' ); ?>">
+								<?php echo esc_html( $af_review && isset( $af_review->updated_at ) ? (string) $af_review->updated_at : '—' ); ?>
+							</td>
+							<td data-label="<?php esc_attr_e( 'Acción', 'arriendo-facil' ); ?>">
+								<button type="button" class="button button-primary af-rate-admin"
+									data-admin="<?php echo esc_attr( (int) $af_admin->ID ); ?>"
+									data-name="<?php echo esc_attr( $af_admin->display_name ? $af_admin->display_name : $af_admin->user_login ); ?>"
+									data-stars="<?php echo esc_attr( $af_review ? (float) $af_review->stars : 0 ); ?>"
+									data-scores="<?php echo esc_attr( wp_json_encode( $af_scores ) ); ?>"
+									data-comment="<?php echo esc_attr( $af_review && isset( $af_review->comment_text ) ? (string) $af_review->comment_text : '' ); ?>">
+									<?php echo $af_review ? esc_html__( 'Editar', 'arriendo-facil' ) : esc_html__( 'Calificar', 'arriendo-facil' ); ?>
+								</button>
+							</td>
+						</tr>
+					<?php endforeach; ?>
+				</tbody>
+			</table>
+		</section>
+	<?php elseif ( $my_evaluation ) : ?>
+		<section class="af-section" style="margin-bottom: var(--af-space-4);">
+			<header class="af-section__header">
+				<div>
+					<h2 class="af-section__title"><?php esc_html_e( 'Mi evaluación', 'arriendo-facil' ); ?></h2>
+					<p class="af-section__subtitle"><?php esc_html_e( 'Evaluación registrada por el super-admin.', 'arriendo-facil' ); ?></p>
+				</div>
+			</header>
+			<?php
+			$my_scores = ! empty( $my_evaluation->criteria_scores ) ? json_decode( (string) $my_evaluation->criteria_scores, true ) : array();
+			?>
+			<ul class="af-review-list__criteria" style="margin-top:0;">
+				<?php foreach ( Arriendo_Facil_Review::admin_criteria() as $mk => $ml ) : ?>
+					<?php if ( isset( $my_scores[ $mk ] ) ) : ?>
+						<li class="af-pill af-pill--neutral"><?php echo esc_html( $ml ); ?>: <?php echo esc_html( (int) $my_scores[ $mk ] ); ?>/5</li>
+					<?php endif; ?>
+				<?php endforeach; ?>
+			</ul>
 		</section>
 	<?php endif; ?>
 
@@ -466,6 +595,129 @@ if ( $is_management_model ) {
 
 		criteria.forEach(function (key) {
 			const checked = modal.querySelector('input[name="af_rate_' + key + '"]:checked');
+			body.append(key, checked ? checked.value : '0');
+		});
+
+		fetch(ajaxUrl, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+			body: body
+		}).then((r) => r.json()).then(function (json) {
+			confirm.disabled = false;
+			if (!json || !json.success) {
+				status.textContent = (json && json.data && json.data.message) || 'Error';
+				status.className = 'af-modal__status is-error';
+				return;
+			}
+			status.textContent = json.data.message;
+			status.className = 'af-modal__status is-success';
+			setTimeout(function () { window.location.reload(); }, 800);
+		});
+	});
+}());
+	</script>
+	<?php endif; ?>
+
+<?php if ( $is_management_model && current_user_can( 'manage_options' ) ) : ?>
+<div class="af-modal" id="af-modal-rate-admin" role="dialog" aria-modal="true" aria-labelledby="af-modal-rate-admin-title">
+	<div class="af-modal__backdrop" data-af-admin-modal-close></div>
+	<div class="af-modal__dialog">
+		<button type="button" class="af-modal__close" data-af-admin-modal-close aria-label="<?php esc_attr_e( 'Cerrar', 'arriendo-facil' ); ?>">&times;</button>
+		<div class="af-modal__header">
+			<h2 class="af-modal__title" id="af-modal-rate-admin-title"><?php esc_html_e( 'Evaluar administrador', 'arriendo-facil' ); ?></h2>
+			<p class="af-modal__subtitle" id="af-admin-rate-subtitle"></p>
+		</div>
+		<div class="af-modal__body">
+			<p class="af-modal__status" id="af-admin-rate-status"></p>
+
+			<?php foreach ( Arriendo_Facil_Review::admin_criteria() as $criterion_key => $criterion_label ) : ?>
+				<div class="af-modal__field">
+					<label><?php echo esc_html( $criterion_label ); ?></label>
+					<div style="display:flex; gap:12px; flex-wrap:wrap;">
+						<?php for ( $star = 1; $star <= 5; $star++ ) : ?>
+							<label style="display:flex; align-items:center; gap:5px;">
+								<input type="radio" name="af_admin_rate_<?php echo esc_attr( $criterion_key ); ?>" value="<?php echo esc_attr( $star ); ?>" />
+								<span><?php echo esc_html( $star ); ?>★</span>
+							</label>
+						<?php endfor; ?>
+					</div>
+				</div>
+			<?php endforeach; ?>
+
+			<div class="af-modal__field">
+				<label for="af-admin-rate-comment"><?php esc_html_e( 'Observaciones', 'arriendo-facil' ); ?></label>
+				<textarea id="af-admin-rate-comment" rows="3" placeholder="<?php esc_attr_e( 'Ej: gestiona la cobranza puntualmente y responde rápido.', 'arriendo-facil' ); ?>"></textarea>
+			</div>
+		</div>
+		<div class="af-modal__footer">
+			<button type="button" class="button" data-af-admin-modal-close><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
+			<button type="button" class="button button-primary" id="af-admin-rate-confirm"><?php esc_html_e( 'Guardar evaluación', 'arriendo-facil' ); ?></button>
+		</div>
+	</div>
+</div>
+
+<script>
+(function () {
+	const modal = document.getElementById('af-modal-rate-admin');
+	if (!modal) { return; }
+
+	const ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
+	const nonce = <?php echo wp_json_encode( wp_create_nonce( 'af_rate_admin_nonce' ) ); ?>;
+	const adminCriteria = <?php echo wp_json_encode( array_keys( Arriendo_Facil_Review::admin_criteria() ) ); ?>;
+
+	const status = document.getElementById('af-admin-rate-status');
+	const subtitle = document.getElementById('af-admin-rate-subtitle');
+	const comment = document.getElementById('af-admin-rate-comment');
+	const confirm = document.getElementById('af-admin-rate-confirm');
+	let adminUserId = 0;
+
+	modal.querySelectorAll('[data-af-admin-modal-close]').forEach(function (btn) {
+		btn.addEventListener('click', function () { modal.classList.remove('is-open'); });
+	});
+
+	document.addEventListener('keydown', function (e) {
+		if (e.key === 'Escape') { modal.classList.remove('is-open'); }
+	});
+
+	document.querySelectorAll('.af-rate-admin').forEach(function (btn) {
+		btn.addEventListener('click', function () {
+			adminUserId = parseInt(btn.getAttribute('data-admin'), 10) || 0;
+			subtitle.textContent = btn.getAttribute('data-name');
+			comment.value = btn.getAttribute('data-comment') || '';
+			status.textContent = '';
+			status.className = 'af-modal__status';
+
+			let scores = {};
+			try { scores = JSON.parse(btn.getAttribute('data-scores') || '{}'); } catch (e) { scores = {}; }
+
+			adminCriteria.forEach(function (key) {
+				const value = parseInt(scores[key], 10);
+				if (value >= 1 && value <= 5) {
+					const input = modal.querySelector('input[name="af_admin_rate_' + key + '"][value="' + value + '"]');
+					if (input) { input.checked = true; }
+				} else {
+					const input = modal.querySelector('input[name="af_admin_rate_' + key + '"]:checked');
+					if (input) { input.checked = false; }
+				}
+			});
+
+			modal.classList.add('is-open');
+		});
+	});
+
+	confirm.addEventListener('click', function () {
+		confirm.disabled = true;
+		status.textContent = '';
+		status.className = 'af-modal__status';
+
+		const body = new URLSearchParams();
+		body.append('action', 'af_rate_admin');
+		body.append('nonce', nonce);
+		body.append('admin_user_id', adminUserId);
+		body.append('comment', comment.value);
+
+		adminCriteria.forEach(function (key) {
+			const checked = modal.querySelector('input[name="af_admin_rate_' + key + '"]:checked');
 			body.append(key, checked ? checked.value : '0');
 		});
 

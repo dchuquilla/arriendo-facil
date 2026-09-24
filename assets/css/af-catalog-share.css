@@ -1,0 +1,259 @@
+/* Shareable catalog — public page + admin share card. */
+
+/* ── Public page ─────────────────────────────────────────────── */
+.af-cs-page {
+	max-width: 1120px;
+	margin: 0 auto;
+	padding: clamp(20px, 4vw, 48px) clamp(16px, 3vw, 32px);
+	box-sizing: border-box;
+}
+
+.af-cs-hero {
+	display: flex;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: 20px;
+	flex-wrap: wrap;
+	border-bottom: 2px solid #eceff3;
+	padding-bottom: 20px;
+	margin-bottom: 28px;
+}
+
+.af-cs-hero__title {
+	margin: 0 0 6px;
+	font-size: clamp(24px, 4vw, 32px);
+	line-height: 1.2;
+	color: #17202a;
+}
+
+.af-cs-hero__subtitle {
+	margin: 0;
+	color: #667085;
+	font-size: 15px;
+}
+
+.af-cs-toolbar {
+	display: flex;
+	gap: 10px;
+	align-items: center;
+}
+
+.af-cs-print {
+	appearance: none;
+	border: 1px solid #d0d5dd;
+	background: #fff;
+	color: #344054;
+	font: 600 14px/1.2 inherit;
+	padding: 10px 16px;
+	border-radius: 8px;
+	cursor: pointer;
+	transition: background .15s, border-color .15s;
+}
+
+.af-cs-print:hover {
+	background: #f2f4f7;
+	border-color: #98a2b3;
+}
+
+.af-cs-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+	gap: 20px;
+}
+
+.af-cs-card {
+	border: 1px solid #e4e7ec;
+	border-radius: 14px;
+	overflow: hidden;
+	background: #fff;
+	box-shadow: 0 1px 2px rgba(16, 24, 40, .04);
+	display: flex;
+	flex-direction: column;
+}
+
+.af-cs-card__media {
+	position: relative;
+	aspect-ratio: 4 / 3;
+	background: #f2f4f7;
+	overflow: hidden;
+}
+
+.af-cs-card__media img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+.af-cs-card__placeholder {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	height: 100%;
+	font-size: 42px;
+	opacity: .6;
+}
+
+.af-cs-card__badge {
+	position: absolute;
+	top: 10px;
+	left: 10px;
+	font: 600 12px/1.2 inherit;
+	padding: 5px 9px;
+	border-radius: 999px;
+	color: #fff;
+	background: #667085;
+}
+
+.af-cs-card__badge--available { background: #16a34a; }
+.af-cs-card__badge--rented { background: #2563eb; }
+.af-cs-card__badge--maintenance { background: #d97706; }
+.af-cs-card__badge--inactive { background: #667085; }
+
+.af-cs-card__body {
+	padding: 16px;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	flex: 1;
+}
+
+.af-cs-card__type {
+	font-size: 12px;
+	text-transform: uppercase;
+	letter-spacing: .6px;
+	color: #98a2b3;
+}
+
+.af-cs-card__title {
+	margin: 0;
+	font-size: 17px;
+	line-height: 1.25;
+	color: #17202a;
+}
+
+.af-cs-card__address {
+	margin: 0;
+	font-size: 13px;
+	color: #667085;
+}
+
+.af-cs-card__specs {
+	display: flex;
+	gap: 12px;
+	font-size: 13px;
+	color: #475467;
+	margin-top: 2px;
+}
+
+.af-cs-card__price {
+	margin-top: auto;
+	padding-top: 10px;
+	font-size: 18px;
+	font-weight: 700;
+	color: #17202a;
+}
+
+.af-cs-card__price small {
+	font-size: 12px;
+	font-weight: 500;
+	color: #667085;
+}
+
+.af-cs-empty {
+	text-align: center;
+	padding: 60px 20px;
+	color: #667085;
+}
+
+.af-cs-footer {
+	margin-top: 32px;
+	padding-top: 16px;
+	border-top: 1px solid #eceff3;
+	font-size: 12px;
+	color: #98a2b3;
+	text-align: center;
+}
+
+/* ── Admin share card inside catalog.php ─────────────────────── */
+.af-share-card {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 12px;
+}
+
+.af-share-card__url {
+	flex: 1 1 320px;
+	min-width: 0;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	background: #f9fafb;
+	border: 1px dashed #d0d5dd;
+	border-radius: 8px;
+	padding: 8px 12px;
+}
+
+.af-share-card__url input {
+	flex: 1;
+	min-width: 0;
+	border: 0;
+	background: transparent;
+	font: 13px/1.4 inherit;
+	color: #344054;
+	outline: none;
+}
+
+.af-share-card__url svg {
+	flex: 0 0 auto;
+	color: #98a2b3;
+}
+
+.af-share-card__actions {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.af-share-hint {
+	width: 100%;
+	margin: 0;
+	font-size: 12px;
+	color: #98a2b3;
+}
+
+.af-share-status {
+	width: 100%;
+	margin: 0;
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.af-share-status.is-success { color: #027a48; }
+.af-share-status.is-error { color: #b42318; }
+
+.af-share-card.is-hidden { display: none; }
+
+/* ── Print ───────────────────────────────────────────────────── */
+@media print {
+	.af-cs-toolbar,
+	.af-cs-hero__subtitle {
+		display: none !important;
+	}
+
+	.af-cs-page {
+		max-width: none;
+		padding: 0;
+	}
+
+	.af-cs-hero {
+		border-bottom-width: 1px;
+	}
+
+	.af-cs-card {
+		box-shadow: none;
+		break-inside: avoid;
+	}
+}

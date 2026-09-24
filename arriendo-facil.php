@@ -42,6 +42,7 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-owner-settlement.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-wizard.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-featured-admin.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-occupied-admin.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-catalog-share.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-list-admin.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-search-api.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-matching-engine.php';
@@ -50,6 +51,8 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-docx-template-processor
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-lease.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-lease-operations.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-alerts.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-aviso.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-calendar.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-rental-workflow.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-owner-contact.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-owner-register-api.php';
@@ -247,6 +250,9 @@ function arriendo_facil_init() {
 		'Arriendo_Facil_Property_Admin_Onboarding',
 		'Arriendo_Facil_Document_Verification',
 		'Arriendo_Facil_Review',
+		'Arriendo_Facil_Catalog_Share',
+		'Arriendo_Facil_Aviso',
+		'Arriendo_Facil_Calendar',
 		'Arriendo_Facil_Billing_API',
 		'Arriendo_Facil_Alerts',
 		'Arriendo_Facil_Admin',
@@ -340,7 +346,7 @@ function arriendo_facil_maybe_upgrade_schema() {
 		return;
 	}
 
-	$target_schema_version = '2026-09-alerts-v1';
+	$target_schema_version = '2026-09-calendario-v1';
 	$current_schema_version = (string) get_option( 'af_db_schema_version', '' );
 
 	if ( $current_schema_version === $target_schema_version && ! arriendo_facil_has_lease_schema_drift() ) {

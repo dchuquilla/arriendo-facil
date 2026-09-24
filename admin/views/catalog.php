@@ -101,10 +101,11 @@ if ( ! empty( $accommodation_ids ) ) {
 		 MAX(CASE WHEN pm.meta_key = '_af_bedrooms'         THEN pm.meta_value END) AS bedrooms,
 		 MAX(CASE WHEN pm.meta_key = '_af_bathrooms'        THEN pm.meta_value END) AS bathrooms,
 		 MAX(CASE WHEN pm.meta_key = '_af_owner_id'         THEN pm.meta_value END) AS owner_id,
+		 MAX(CASE WHEN pm.meta_key = '_af_is_occupied'      THEN pm.meta_value END) AS occupied,
 		 MAX(CASE WHEN pm.meta_key = '_thumbnail_id'        THEN pm.meta_value END) AS thumbnail_id
 		 FROM {$wpdb->posts} p
 		 LEFT JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID
-		  AND pm.meta_key IN ('_af_monthly_rent','_af_status','_af_property_type','_af_address','_af_city','_af_bedrooms','_af_bathrooms','_af_owner_id','_thumbnail_id')
+		  AND pm.meta_key IN ('_af_monthly_rent','_af_status','_af_property_type','_af_address','_af_city','_af_bedrooms','_af_bathrooms','_af_owner_id','_af_is_occupied','_thumbnail_id')
 		 WHERE p.ID IN ($ids_sql)
 		 GROUP BY p.ID
 		 ORDER BY p.post_title ASC"
@@ -151,8 +152,41 @@ foreach ( $accommodation_ids as $post_id ) {
 	);
 	?>
 
-	<section class="af-section af-catalog-filters">
-		<form method="get" class="af-filter-bar">
+	<section class="af-section af-catalog-filters"><?php
+/* PHP */
+$share_token = class_exists( 'Arriendo_Facil_Catalog_Share' ) ? Arriendo_Facil_Catalog_Share::token_for_user() : '';
+$share_url   = $share_token ? home_url( '/catalogo/' . $share_token . '/' ) : '';
+?>
+<section class="af-section" style="margin-bottom: var(--af-space-4);">
+	<header class="af-section__header">
+		<div>
+			<h2 class="af-section__title"><?php esc_html_e( 'Compartir catálogo', 'arriendo-facil' ); ?></h2>
+			<p class="af-section__subtitle"><?php esc_html_e( 'Difunde un enlace público con tus propiedades en arriendo; puedes imprimirlo o guardarlo como PDF.', 'arriendo-facil' ); ?></p>
+		</div>
+	</header>
+
+	<div class="af-share-card" id="af-share-card">
+		<div class="af-share-card__url">
+			<input type="text" id="af-share-url" value="<?php echo esc_attr( $share_url ); ?>" readonly
+				placeholder="<?php esc_attr_e( 'Aún no hay enlace…', 'arriendo-facil' ); ?>" />
+		</div>
+		<div class="af-share-card__actions" id="af-share-actions" <?php echo $share_url ? '' : 'hidden'; ?>>
+			<button type="button" class="button af-btn af-btn--ghost" id="af-share-copy"><?php esc_html_e( 'Copiar', 'arriendo-facil' ); ?></button>
+			<button type="button" class="button af-btn af-btn--ghost" id="af-share-preview"><?php esc_html_e( 'Previsualizar', 'arriendo-facil' ); ?></button>
+			<button type="button" class="button af-btn af-btn--ghost" id="af-share-rotate"><?php esc_html_e( 'Regenerar', 'arriendo-facil' ); ?></button>
+			<button type="button" class="button af-btn" id="af-share-revoke" style="color:#b42318;"><?php esc_html_e( 'Desactivar', 'arriendo-facil' ); ?></button>
+		</div>
+		<p class="af-share-hint" id="af-share-hint" <?php echo $share_url ? '' : 'hidden'; ?>>
+			<?php esc_html_e( 'Este enlace muestra las propiedades publicadas al alcance de tu cuenta. Es válido hasta que lo desactives o regeneres.', 'arriendo-facil' ); ?>
+		</p>
+		<p class="af-share-hint" id="af-share-empty" <?php echo $share_url ? 'hidden' : ''; ?>>
+			<?php esc_html_e( 'Genera un enlace único para compartir tu catálogo con posibles arrendatarios.', 'arriendo-facil' ); ?>
+		</p>
+		<p class="af-share-status" id="af-share-status" aria-live="polite"></p>
+	</div>
+</section>
+
+	<form method="get" class="af-filter-bar">
 			<input type="hidden" name="page" value="af-catalog" />
 			<div class="af-form-field">
 				<label class="af-form-field__label" for="af-cat-search"><?php esc_html_e( 'Buscar', 'arriendo-facil' ); ?></label>
@@ -217,6 +251,10 @@ foreach ( $accommodation_ids as $post_id ) {
 				$type   = $prop->property_type ? (string) $prop->property_type : '';
 				$rent   = $prop->monthly_rent ? (float) $prop->monthly_rent : 0;
 				$owner  = isset( $owner_names[ (int) $prop->owner_id ] ) ? $owner_names[ (int) $prop->owner_id ] : '';
+				$occupied_switch = '';
+				if ( class_exists( 'Arriendo_Facil_Accommodation_Occupied_Admin' ) ) {
+					$occupied_switch = Arriendo_Facil_Accommodation_Occupied_Admin::render_switch( (int) $prop_id );
+				}
 
 				$status_lbls = array(
 					'available'   => __( 'Disponible', 'arriendo-facil' ),
@@ -272,20 +310,23 @@ foreach ( $accommodation_ids as $post_id ) {
 								</span>
 							<?php endif; ?>
 						</p>
-						<div class="af-property-card__footer">
-							<span class="af-property-card__price">
-								<?php if ( $rent > 0 ) : ?>
-									$<?php echo esc_html( number_format_i18n( $rent, 2 ) ); ?>
-									<small><?php esc_html_e( '/ mes', 'arriendo-facil' ); ?></small>
-								<?php else : ?>
-									—
-								<?php endif; ?>
-							</span>
-							<span class="af-catalog-card__hint">
-								<?php esc_html_e( 'Gestionar', 'arriendo-facil' ); ?>
-								<span class="af-catalog-card__hint-arrow" aria-hidden="true">→</span>
-							</span>
-						</div>
+<div class="af-property-card__footer">
+						<?php if ( $occupied_switch ) : // phpcs:ignore Squiz.PHP.CommentedOutCode ?>
+							<span class="af-catalog-card__occ"><?php echo $occupied_switch; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static markup from render_switch(). ?></span>
+						<?php endif; ?>
+						<span class="af-property-card__price">
+							<?php if ( $rent > 0 ) : ?>
+								$<?php echo esc_html( number_format_i18n( $rent, 2 ) ); ?>
+								<small><?php esc_html_e( '/ mes', 'arriendo-facil' ); ?></small>
+							<?php else : ?>
+								—
+							<?php endif; ?>
+						</span>
+						<span class="af-catalog-card__hint">
+							<?php esc_html_e( 'Gestionar', 'arriendo-facil' ); ?>
+							<span class="af-catalog-card__hint-arrow" aria-hidden="true">→</span>
+						</span>
+					</div>
 					</div>
 				</a>
 			<?php endforeach; ?>

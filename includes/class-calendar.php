@@ -47,18 +47,25 @@ class Arriendo_Facil_Calendar {
 	}
 
 	/**
-	 * Enqueues the interactive calendar assets only on the Panel screen.
+	 * Enqueues the interactive calendar assets on the Panel and the
+	 * standalone "Calendario" page.
 	 *
 	 * @param string $hook Current admin screen hook.
 	 * @return void
 	 */
 	public function enqueue_dashboard_assets( $hook ) {
-		if ( 'toplevel_page_arriendo-facil' !== $hook ) {
+		if ( ! in_array( $hook, array( 'toplevel_page_arriendo-facil', 'arriendo-facil_page_af-calendar' ), true ) ) {
 			return;
 		}
 
+		$is_dashboard = ( 'toplevel_page_arriendo-facil' === $hook );
+
 		$css_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-dashboard-calendar.css';
 		$js_path  = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/af-dashboard-calendar.js';
+
+		if ( ! $is_dashboard ) {
+			wp_enqueue_style( 'af-dashboard' );
+		}
 
 		wp_enqueue_style(
 			'af-dashboard-calendar',

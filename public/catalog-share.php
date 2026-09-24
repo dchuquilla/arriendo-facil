@@ -210,5 +210,13 @@ get_header();
 	</footer>
 </main>
 
+<script>
+	(function () {
+		if ('<?php echo isset( $_GET['print'] ) ? (int) $_GET['print'] : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended ?>' === '1') {
+			window.addEventListener('load', function () { window.print(); });
+		}
+	}());
+</script>
+
 <?php
 get_footer();

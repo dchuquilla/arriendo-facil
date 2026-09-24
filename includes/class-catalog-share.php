@@ -160,11 +160,13 @@ class Arriendo_Facil_Catalog_Share {
 
 		$token = self::token_for_user( $user_id );
 		if ( '' === $token || $rotate ) {
-			$token = strtolower( wp_generate_password( 32, false, false ) );
-			while ( ! preg_match( '/^[a-f0-9]{64}$/', $token ) ) {
-				$token .= md5( $token . wp_salt( 'auth' ) . microtime() );
+			$token = '';
+			if ( function_exists( 'random_bytes' ) ) {
+				$token = bin2hex( random_bytes( 32 ) );
 			}
-			$token = substr( $token, -64 );
+			if ( ! preg_match( '/^[a-f0-9]{64}$/', $token ) ) {
+				$token = md5( wp_salt( 'auth' ) . uniqid( (string) $user_id, true ) ) . md5( microtime() . wp_salt( 'secure_auth' ) );
+			}
 			update_user_meta( $user_id, self::META_KEY, $token );
 		}
 

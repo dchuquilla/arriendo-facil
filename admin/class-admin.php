@@ -101,6 +101,15 @@ class Arriendo_Facil_Admin {
 
 		add_submenu_page(
 			'arriendo-facil',
+			__( 'Calendario', 'arriendo-facil' ),
+			__( 'Calendario', 'arriendo-facil' ),
+			Arriendo_Facil_Tenancy::CAP,
+			'af-calendar',
+			array( $this, 'render_calendar' )
+		);
+
+		add_submenu_page(
+			'arriendo-facil',
 			__( 'Contratos', 'arriendo-facil' ),
 			__( 'Contratos', 'arriendo-facil' ),
 			'edit_posts',
@@ -736,6 +745,15 @@ class Arriendo_Facil_Admin {
 				'group' => 'panel',
 				'cap'   => 'edit_posts',
 				'gate'  => false,
+			),
+			array(
+				'slug'  => 'af-calendar',
+				'label' => __( 'Calendario', 'arriendo-facil' ),
+				'url'   => admin_url( 'admin.php?page=af-calendar' ),
+				'icon'  => 'calendar',
+				'group' => 'panel',
+				'cap'   => Arriendo_Facil_Tenancy::CAP,
+				'gate'  => true,
 			),
 			array(
 				'slug'  => 'edit-accommodation',
@@ -2676,6 +2694,13 @@ array(
 	 */
 	public function render_catalog() {
 		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/catalog.php';
+	}
+
+	/**
+	 * Renders the standalone interactive calendar page.
+	 */
+	public function render_calendar() {
+		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/calendar.php';
 	}
 
 	public function render_leases() {

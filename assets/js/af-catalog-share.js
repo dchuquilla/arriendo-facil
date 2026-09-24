@@ -12,6 +12,7 @@
 
 	var urlInput = document.getElementById('af-share-url');
 	var actions = document.getElementById('af-share-actions');
+	var generateWrap = document.getElementById('af-share-generate-wrap');
 	var emptyState = document.getElementById('af-share-empty');
 	var hint = document.getElementById('af-share-hint');
 	var status = document.getElementById('af-share-status');
@@ -50,6 +51,7 @@
 			urlInput.value = url;
 			card.classList.remove('is-hidden');
 			if (actions) { actions.hidden = false; }
+			if (generateWrap) { generateWrap.hidden = true; }
 			if (emptyState) { emptyState.hidden = true; }
 			if (hint) { hint.hidden = false; }
 		}
@@ -59,18 +61,21 @@
 		card.classList.remove('is-hidden');
 		if (urlInput) { urlInput.value = ''; }
 		if (actions) { actions.hidden = true; }
+		if (generateWrap) { generateWrap.hidden = false; }
 		if (emptyState) { emptyState.hidden = false; }
 		if (hint) { hint.hidden = true; }
 	}
 
+	var generateBtn = document.getElementById('af-share-generate');
+	if (!generateBtn) { return; }
 	if (urlInput && !urlInput.value.trim()) {
 		showEmpty();
 	}
 
-	document.getElementById('af-share-generate').addEventListener('click', function (btn) {
-		btn.disabled = true;
+	generateBtn.addEventListener('click', function () {
+		generateBtn.disabled = true;
 		post('af_catalog_share_generate', { rotate: '0' }).then(function (json) {
-			btn.disabled = false;
+			generateBtn.disabled = false;
 			if (!json || !json.success) {
 				flash((json && json.data && json.data.message) || 'Error', true);
 				return;
@@ -80,11 +85,12 @@
 		});
 	});
 
-	document.getElementById('af-share-rotate').addEventListener('click', function (btn) {
+	var rotateBtn = document.getElementById('af-share-rotate');
+	if (rotateBtn) rotateBtn.addEventListener('click', function () {
 		if (!window.confirm('¿Regenerar el enlace? El enlace actual dejará de funcionar.')) { return; }
-		btn.disabled = true;
+		rotateBtn.disabled = true;
 		post('af_catalog_share_generate', { rotate: '1' }).then(function (json) {
-			btn.disabled = false;
+			rotateBtn.disabled = false;
 			if (!json || !json.success) {
 				flash((json && json.data && json.data.message) || 'Error', true);
 				return;
@@ -94,7 +100,8 @@
 		});
 	});
 
-	document.getElementById('af-share-copy').addEventListener('click', function () {
+	var copyBtn = document.getElementById('af-share-copy');
+	if (copyBtn) copyBtn.addEventListener('click', function () {
 		if (!urlInput || !urlInput.value) { return; }
 		var value = urlInput.value;
 
@@ -118,11 +125,12 @@
 		}
 	});
 
-	document.getElementById('af-share-revoke').addEventListener('click', function (btn) {
+	var revokeBtn = document.getElementById('af-share-revoke');
+	if (revokeBtn) revokeBtn.addEventListener('click', function () {
 		if (!window.confirm('¿Desactivar el enlace compartido? Dejará de ser accesible.')) { return; }
-		btn.disabled = true;
+		revokeBtn.disabled = true;
 		post('af_catalog_share_revoke', {}).then(function (json) {
-			btn.disabled = false;
+			revokeBtn.disabled = false;
 			if (!json || !json.success) {
 				flash((json && json.data && json.data.message) || 'Error', true);
 				return;
@@ -136,6 +144,14 @@
 		document.getElementById('af-share-preview').addEventListener('click', function () {
 			if (urlInput && urlInput.value) {
 				window.open(urlInput.value, '_blank', 'noopener');
+			}
+		});
+	}
+
+	if (document.getElementById('af-share-pdf')) {
+		document.getElementById('af-share-pdf').addEventListener('click', function () {
+			if (urlInput && urlInput.value) {
+				window.open(urlInput.value + (urlInput.value.indexOf('?') === -1 ? '?' : '&') + 'print=1', '_blank', 'noopener');
 			}
 		});
 	}

@@ -152,29 +152,33 @@ foreach ( $accommodation_ids as $post_id ) {
 	);
 	?>
 
-	<section class="af-section af-catalog-filters"><?php
-/* PHP */
+	<?php
 $share_token = class_exists( 'Arriendo_Facil_Catalog_Share' ) ? Arriendo_Facil_Catalog_Share::token_for_user() : '';
 $share_url   = $share_token ? home_url( '/catalogo/' . $share_token . '/' ) : '';
 ?>
-<section class="af-section" style="margin-bottom: var(--af-space-4);">
+<section class="af-section">
 	<header class="af-section__header">
 		<div>
 			<h2 class="af-section__title"><?php esc_html_e( 'Compartir catálogo', 'arriendo-facil' ); ?></h2>
-			<p class="af-section__subtitle"><?php esc_html_e( 'Difunde un enlace público con tus propiedades en arriendo; puedes imprimirlo o guardarlo como PDF.', 'arriendo-facil' ); ?></p>
+			<p class="af-section__subtitle"><?php esc_html_e( 'Difunde un enlace público con tus propiedades en arriendo; imprime la vista pública o guárdala como PDF.', 'arriendo-facil' ); ?></p>
 		</div>
 	</header>
 
 	<div class="af-share-card" id="af-share-card">
 		<div class="af-share-card__url">
+			<label class="screen-reader-text" for="af-share-url"><?php esc_html_e( 'Enlace del catálogo', 'arriendo-facil' ); ?></label>
 			<input type="text" id="af-share-url" value="<?php echo esc_attr( $share_url ); ?>" readonly
 				placeholder="<?php esc_attr_e( 'Aún no hay enlace…', 'arriendo-facil' ); ?>" />
 		</div>
 		<div class="af-share-card__actions" id="af-share-actions" <?php echo $share_url ? '' : 'hidden'; ?>>
 			<button type="button" class="button af-btn af-btn--ghost" id="af-share-copy"><?php esc_html_e( 'Copiar', 'arriendo-facil' ); ?></button>
 			<button type="button" class="button af-btn af-btn--ghost" id="af-share-preview"><?php esc_html_e( 'Previsualizar', 'arriendo-facil' ); ?></button>
+			<button type="button" class="button af-btn af-btn--ghost" id="af-share-pdf"><?php esc_html_e( 'Imprimir / PDF', 'arriendo-facil' ); ?></button>
 			<button type="button" class="button af-btn af-btn--ghost" id="af-share-rotate"><?php esc_html_e( 'Regenerar', 'arriendo-facil' ); ?></button>
 			<button type="button" class="button af-btn" id="af-share-revoke" style="color:#b42318;"><?php esc_html_e( 'Desactivar', 'arriendo-facil' ); ?></button>
+		</div>
+		<div class="af-share-card__actions" id="af-share-generate-wrap" <?php echo $share_url ? 'hidden' : ''; ?>>
+			<button type="button" class="button af-btn af-btn--primary" id="af-share-generate"><?php esc_html_e( 'Generar enlace', 'arriendo-facil' ); ?></button>
 		</div>
 		<p class="af-share-hint" id="af-share-hint" <?php echo $share_url ? '' : 'hidden'; ?>>
 			<?php esc_html_e( 'Este enlace muestra las propiedades publicadas al alcance de tu cuenta. Es válido hasta que lo desactives o regeneres.', 'arriendo-facil' ); ?>
@@ -186,6 +190,12 @@ $share_url   = $share_token ? home_url( '/catalogo/' . $share_token . '/' ) : ''
 	</div>
 </section>
 
+<section class="af-section af-catalog-filters">
+	<header class="af-section__header">
+		<div>
+			<h2 class="af-section__title"><?php esc_html_e( 'Filtrar propiedades', 'arriendo-facil' ); ?></h2>
+		</div>
+	</header>
 	<form method="get" class="af-filter-bar">
 			<input type="hidden" name="page" value="af-catalog" />
 			<div class="af-form-field">

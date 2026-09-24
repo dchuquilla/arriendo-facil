@@ -505,7 +505,53 @@ class Arriendo_Facil_Alerts {
 			$created++;
 		}
 
-		// 4) Meter readings missing for the current period (only for services
+		// 4) Charges due in the next few days (upcoming within 5 days).
+		$due_soon = (array) $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT c.id AS charge_id, c.amount, c.amount_paid, c.due_date, c.period,
+				        l.id AS lease_id, COALESCE(p.post_title, l.accommodation_id) AS accommodation_title
+				 FROM {$wpdb->prefix}af_charges c
+				 INNER JOIN {$wpdb->prefix}af_leases l ON l.id = c.lease_id
+				 LEFT JOIN {$wpdb->posts} p ON p.ID = l.accommodation_id
+				 WHERE c.status IN ('pending', 'partial')
+				   AND c.amount > c.amount_paid
+				   AND c.due_date >= CURDATE()
+				   AND c.due_date <= DATE_ADD(CURDATE(), INTERVAL %d DAY)
+				   AND l.deleted_at IS NULL{$scope_sql}
+				   AND l.accommodation_id > 0
+				 ORDER BY c.due_date ASC
+				 LIMIT 20",
+				(int) apply_filters( 'af_charge_due_soon_days', 5 )
+			)
+		);
+
+		foreach ( $due_soon as $charge ) {
+			$days_left = max( 0, (int) ceil( ( strtotime( (string) $charge->due_date ) - current_time( 'timestamp' ) ) / DAY_IN_SECONDS ) );
+			$due       = (float) ( $charge->amount - $charge->amount_paid );
+			self::add(
+				$user_id,
+				'charge_due_soon',
+				'warning',
+				sprintf(
+					/* translators: %s: accommodation title */
+					__( 'Cargo por vencer en %1$s', 'arriendo-facil' ),
+					$charge->accommodation_title
+				),
+				sprintf(
+					/* translators: 1: amount, 2: period, 3: days, 4: due date */
+					__( 'Quedan USD %1$s por cobrar del período %2$s. Vence en %3$d día(s), el %4$s.', 'arriendo-facil' ),
+					number_format_i18n( $due, 2 ),
+					$charge->period,
+					$days_left,
+					date_i18n( get_option( 'date_format' ), strtotime( (string) $charge->due_date ) )
+				),
+				admin_url( 'admin.php?page=af-buildings' ),
+				'charge-due-soon-' . (int) $charge->lease_id
+			);
+			$created++;
+		}
+
+		// 5) Meter readings missing for the current period (only for services
 		//    the property has read before, to avoid noise on new setups).
 		if ( class_exists( 'Arriendo_Facil_Billing_Ledger' ) ) {
 			$readings_table = Arriendo_Facil_Billing_Ledger::readings_table();

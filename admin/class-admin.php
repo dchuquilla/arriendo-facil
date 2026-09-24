@@ -2609,6 +2609,24 @@ array(
 				array( 'af-tokens', 'af-shell', 'af-forms', 'af-admin-chrome' ),
 				file_exists( $buildings_css_path ) ? (string) filemtime( $buildings_css_path ) : ARRIENDO_FACIL_VERSION
 			);
+
+			// Cobranza: modal con calendario de cobros del mes y anotación de pagos.
+			$cobranza_js_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/af-buildings-cobranza.js';
+			wp_enqueue_script(
+				'af-buildings-cobranza',
+				ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/af-buildings-cobranza.js',
+				array(),
+				file_exists( $cobranza_js_path ) ? (string) filemtime( $cobranza_js_path ) : ARRIENDO_FACIL_VERSION,
+				true
+			);
+			wp_localize_script(
+				'af-buildings-cobranza',
+				'afCobranza',
+				array(
+					'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+					'nonce'   => wp_create_nonce( 'af_ledger_nonce' ),
+				)
+			);
 		}
 
 		// Estilos del hub de Facturación Electrónica (comprobantes + config SRI).

@@ -154,18 +154,535 @@ foreach ( $units as $unit ) {
 		'badge'   => $badge,
 	);
 }
-?>
-<div class="wrap af-shell af-buildings-page">
+// ---------------------------------------------------------------------
+// Cobranza: snapshot por inmueble (qué cobrar y cuándo) del tab "Cobranza".
+// ---------------------------------------------------------------------
+$cob_today   = current_time( 'Y-m-d' );
+$cob_scope   = Arriendo_Facil_Tenancy::accessible_accommodation_ids();
+$cob_prev_pe = gmdate( 'Y-m', strtotime( $current_period . '-01 -1 month' ) );
+$cob_last_pe = gmdate( 'Y-m', strtotime( $current_period . '-01 +4 months' ) );
 
+$cob_args = array(
+	'post_type'      => 'accommodation',
+	'post_status'    => array( 'publish', 'draft', 'private' ),
+	'posts_per_page' => 500,
+	'orderby'        => 'title',
+	'order'          => 'ASC',
+	'fields'         => 'ids',
+);
+if ( null !== $cob_scope ) {
+	$cob_args['post__in'] = ! empty( $cob_scope ) ? array_map( 'absint', $cob_scope ) : array( 0 );
+}
+$cob_acc_ids = (array) get_posts( $cob_args );
+
+$cob_meta = array();
+if ( ! empty( $cob_acc_ids ) ) {
+	$cob_ids_sql = Arriendo_Facil_Tenancy::ids_in_clause( $cob_acc_ids );
+	// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery
+	$cob_rows = (array) $wpdb->get_results(
+		"SELECT p.ID,
+		 MAX(CASE WHEN pm.meta_key = '_af_monthly_rent'  THEN pm.meta_value END) AS monthly_rent,
+		 MAX(CASE WHEN pm.meta_key = '_af_property_type' THEN pm.meta_value END) AS property_type,
+		 MAX(CASE WHEN pm.meta_key = '_af_address'       THEN pm.meta_value END) AS address,
+		 MAX(CASE WHEN pm.meta_key = '_af_city'          THEN pm.meta_value END) AS city,
+		 MAX(CASE WHEN pm.meta_key = '_af_bedrooms'      THEN pm.meta_value END) AS bedrooms,
+		 MAX(CASE WHEN pm.meta_key = '_af_bathrooms'     THEN pm.meta_value END) AS bathrooms,
+		 MAX(CASE WHEN pm.meta_key = '_thumbnail_id'     THEN pm.meta_value END) AS thumbnail_id
+		 FROM {$wpdb->posts} p
+		 LEFT JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID
+		  AND pm.meta_key IN ('_af_monthly_rent','_af_property_type','_af_address','_af_city','_af_bedrooms','_af_bathrooms','_thumbnail_id')
+		 WHERE p.ID IN ({$cob_ids_sql})
+		 GROUP BY p.ID
+		 ORDER BY p.post_title ASC"
+	);
+	// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery
+	foreach ( $cob_rows as $row ) {
+		$cob_meta[ (int) $row->ID ] = $row;
+	}
+}
+
+$cob_units = array();
+if ( ! empty( $cob_acc_ids ) ) {
+	$cob_units_ph = implode( ',', array_fill( 0, count( $cob_acc_ids ), '%d' ) );
+	$cob_units_rs = (array) $wpdb->get_results(
+		$wpdb->prepare(
+			"SELECT u.accommodation_id, u.unit_code, b.name AS building_name
+			 FROM {$wpdb->prefix}af_units u
+			 LEFT JOIN {$wpdb->prefix}af_buildings b ON b.id = u.building_id
+			 WHERE u.accommodation_id IN ({$cob_units_ph}) AND u.status = 'active'",
+			$cob_acc_ids
+		) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- placeholder list built safely.
+	);
+	foreach ( $cob_units_rs as $row ) {
+		$cob_units[ (int) $row->accommodation_id ] = $row;
+	}
+}
+
+$cob_leases      = array();
+$cob_lease_ids   = array();
+$cob_charges_acc = array();
+if ( ! empty( $cob_acc_ids ) ) {
+	$cob_ids_ph = implode( ',', array_fill( 0, count( $cob_acc_ids ), '%d' ) );
+	$cob_lrows  = (array) $wpdb->get_results(
+		$wpdb->prepare(
+			"SELECT l.id, l.accommodation_id, l.guest_id, l.monthly_rent, l.payment_due_day, l.end_date,
+			        CONCAT(g.first_name, ' ', g.last_name) AS guest_name
+			 FROM {$wpdb->prefix}af_leases l
+			 LEFT JOIN {$wpdb->prefix}af_guests g ON g.id = l.guest_id
+			 WHERE l.status = 'active' AND l.deleted_at IS NULL AND l.accommodation_id IN ({$cob_ids_ph})
+			 ORDER BY l.start_date DESC",
+			$cob_acc_ids
+		) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- placeholder list built safely.
+	);
+	foreach ( $cob_lrows as $row ) {
+		if ( ! isset( $cob_leases[ (int) $row->accommodation_id ] ) ) {
+			$cob_leases[ (int) $row->accommodation_id ] = $row;
+		}
+		$cob_lease_ids[] = (int) $row->id;
+	}
+
+	if ( ! empty( $cob_lease_ids ) ) {
+		$cob_lph     = implode( ',', array_fill( 0, count( $cob_lease_ids ), '%d' ) );
+		$cob_chr_rows = (array) $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT c.id, c.lease_id, c.charge_type, c.description, c.amount, c.amount_paid, c.due_date, c.status, c.period, l.accommodation_id
+				 FROM {$wpdb->prefix}af_charges c
+				 INNER JOIN {$wpdb->prefix}af_leases l ON l.id = c.lease_id
+				 WHERE c.lease_id IN ({$cob_lph}) AND c.period BETWEEN %s AND %s AND c.status <> 'void'
+				 ORDER BY c.period ASC, c.due_date ASC, c.id ASC",
+				array_merge( $cob_lease_ids, array( $cob_prev_pe, $cob_last_pe ) )
+			) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- placeholder list built safely.
+		);
+		foreach ( $cob_chr_rows as $row ) {
+			$cob_charges_acc[ (int) $row->accommodation_id ][] = $row;
+		}
+	}
+}
+
+$cob_types = array(
+	'apartment'  => array( 'label' => __( 'Apartamento', 'arriendo-facil' ), 'icon' => 'building' ),
+	'house'      => array( 'label' => __( 'Casa', 'arriendo-facil' ), 'icon' => 'home' ),
+	'office'     => array( 'label' => __( 'Oficina', 'arriendo-facil' ), 'icon' => 'building-2' ),
+	'room'       => array( 'label' => __( 'Habitación', 'arriendo-facil' ), 'icon' => 'bed' ),
+	'commercial' => array( 'label' => __( 'Comercial', 'arriendo-facil' ), 'icon' => 'store' ),
+);
+
+$cob_charge_labels = array(
+	'canon'     => __( 'Canon', 'arriendo-facil' ),
+	'alicuota'  => __( 'Alícuota', 'arriendo-facil' ),
+	'agua'      => __( 'Agua', 'arriendo-facil' ),
+	'luz'       => __( 'Luz', 'arriendo-facil' ),
+	'gas'       => __( 'Gas', 'arriendo-facil' ),
+	'internet'  => __( 'Internet', 'arriendo-facil' ),
+	'multa'     => __( 'Multa', 'arriendo-facil' ),
+	'otro'      => __( 'Otro', 'arriendo-facil' ),
+);
+
+$cob_props = array();
+foreach ( $cob_acc_ids as $acc_id ) {
+	$acc_id   = (int) $acc_id;
+	$meta     = isset( $cob_meta[ $acc_id ] ) ? $cob_meta[ $acc_id ] : null;
+	$type     = $meta ? (string) $meta->property_type : '';
+	$unit     = isset( $cob_units[ $acc_id ] ) ? $cob_units[ $acc_id ] : null;
+	$lease    = isset( $cob_leases[ $acc_id ] ) ? $cob_leases[ $acc_id ] : null;
+	$has_ls   = null !== $lease;
+	$pay_day  = $has_ls ? (int) $lease->payment_due_day : 0;
+	$pay_day  = $pay_day >= 1 && $pay_day <= 28 ? $pay_day : 5;
+	$charges  = isset( $cob_charges_acc[ $acc_id ] ) ? $cob_charges_acc[ $acc_id ] : array();
+
+	$unpaid       = array();
+	$cur_charges  = array();
+	$cur_pending  = 0.0;
+	foreach ( $charges as $c ) {
+		if ( (string) $c->period === $current_period ) {
+			$cur_charges[] = $c;
+		}
+		$bal = (float) $c->amount - (float) $c->amount_paid;
+		if ( in_array( (string) $c->status, array( 'pending', 'partial' ), true ) && $bal > 0.01 ) {
+			$unpaid[] = array( 'balance' => $bal, 'due' => (string) $c->due_date );
+			if ( (string) $c->period === $current_period ) {
+				$cur_pending += $bal;
+			}
+		}
+	}
+
+	$overdue_total = 0.0;
+	$next_due      = '';
+	foreach ( $unpaid as $item ) {
+		if ( $item['due'] < $cob_today ) {
+			$overdue_total += $item['balance'];
+		}
+		if ( '' === $next_due || $item['due'] < $next_due ) {
+			$next_due = $item['due'];
+		}
+	}
+	$pending_total = 0.0;
+	foreach ( $unpaid as $item ) {
+		$pending_total += $item['balance'];
+	}
+
+	if ( ! $has_ls && empty( $cur_charges ) ) {
+		$status = 'available';
+	} elseif ( $overdue_total > 0.01 || ( '' !== $next_due && $next_due < $cob_today ) ) {
+		$status = 'vencido';
+	} elseif ( $next_due === $cob_today ) {
+		$status = 'vence_hoy';
+	} elseif ( '' !== $next_due && $next_due > $cob_today && strtotime( $next_due ) <= strtotime( $cob_today . ' +5 days' ) ) {
+		$status = 'vence_proximo';
+	} elseif ( $has_ls && empty( $cur_charges ) ) {
+		$status = 'sin_cargo';
+	} elseif ( $pending_total > 0.01 ) {
+		$status = 'por_cobrar';
+	} else {
+		$status = 'aldia';
+	}
+
+	$cob_props[ $acc_id ] = array(
+		'id'              => $acc_id,
+		'title'           => get_the_title( $acc_id ),
+		'address'         => $meta ? (string) $meta->address : '',
+		'city'            => $meta ? (string) $meta->city : '',
+		'type'            => $type,
+		'type_icon'       => isset( $cob_types[ $type ] ) ? $cob_types[ $type ]['icon'] : 'building',
+		'type_label'      => isset( $cob_types[ $type ] ) ? $cob_types[ $type ]['label'] : ucfirst( $type ),
+		'bedrooms'        => $meta ? (int) $meta->bedrooms : 0,
+		'bathrooms'       => $meta ? (int) $meta->bathrooms : 0,
+		'thumb'           => $meta && $meta->thumbnail_id ? wp_get_attachment_image_url( (int) $meta->thumbnail_id, 'medium_large' ) : get_the_post_thumbnail_url( $acc_id, 'medium_large' ),
+		'unit_code'       => $unit ? (string) $unit->unit_code : '',
+		'building_name'   => $unit ? (string) $unit->building_name : '',
+		'guest'           => $has_ls ? trim( (string) $lease->guest_name ) : '',
+		'monthly_rent'    => $has_ls ? (float) $lease->monthly_rent : ( $meta && $meta->monthly_rent ? (float) $meta->monthly_rent : 0.0 ),
+		'payment_due_day' => $pay_day,
+		'lease_id'        => $has_ls ? (int) $lease->id : 0,
+		'lease_end'       => $has_ls ? (string) $lease->end_date : '',
+		'has_lease'       => $has_ls,
+		'status'          => $status,
+		'pending_total'   => $pending_total,
+		'pending_month'   => $cur_pending,
+		'overdue_total'   => $overdue_total,
+		'next_due'        => $next_due,
+	);
+}
+
+$cob_json_props = array();
+foreach ( $cob_props as $acc_id => $prop ) {
+	$per = array();
+	foreach ( ( isset( $cob_charges_acc[ $acc_id ] ) ? $cob_charges_acc[ $acc_id ] : array() ) as $c ) {
+		$per[ (string) $c->period ][] = array(
+			'id'      => (int) $c->id,
+			'type'    => (string) $c->charge_type,
+			'label'   => isset( $cob_charge_labels[ (string) $c->charge_type ] ) ? $cob_charge_labels[ (string) $c->charge_type ] : (string) $c->charge_type,
+			'desc'    => (string) $c->description,
+			'amount'  => (float) $c->amount,
+			'paid'    => (float) $c->amount_paid,
+			'dueDate' => (string) $c->due_date,
+			'status'  => (string) $c->status,
+		);
+	}
+	$cob_json_props[ $acc_id ] = array(
+		'id'              => $prop['id'],
+		'title'           => $prop['title'],
+		'guest'           => $prop['guest'],
+		'unit_code'       => $prop['unit_code'],
+		'building_name'   => $prop['building_name'],
+		'payment_due_day' => $prop['payment_due_day'],
+		'has_lease'       => $prop['has_lease'],
+		'status'          => $prop['status'],
+		'charges'         => $per,
+	);
+}
+
+$cob_statuses_order = array(
+	'vencido'       => 0,
+	'vence_hoy'     => 1,
+	'vence_proximo' => 2,
+	'por_cobrar'    => 3,
+	'sin_cargo'     => 4,
+	'aldia'         => 5,
+	'available'     => 6,
+);
+usort(
+	$cob_props,
+	static function ( $a, $b ) use ( $cob_statuses_order ) {
+		$sa = isset( $cob_statuses_order[ $a['status'] ] ) ? $cob_statuses_order[ $a['status'] ] : 9;
+		$sb = isset( $cob_statuses_order[ $b['status'] ] ) ? $cob_statuses_order[ $b['status'] ] : 9;
+		if ( $sa !== $sb ) {
+			return $sa <=> $sb;
+		}
+		$da = $a['next_due'] ? strtotime( $a['next_due'] ) : PHP_INT_MAX;
+		$db = $b['next_due'] ? strtotime( $b['next_due'] ) : PHP_INT_MAX;
+		return $da <=> $db;
+	}
+);
+
+$cob_summary = array(
+	'vencido_count'  => 0,
+	'vencido_total'  => 0.0,
+	'proximo_count'  => 0,
+	'proximo_total'  => 0.0,
+	'pending_month'  => 0.0,
+	'aldia_count'    => 0,
+	'disponibles'    => 0,
+);
+foreach ( $cob_props as $prop ) {
+	if ( 'vencido' === $prop['status'] ) {
+		$cob_summary['vencido_count']++;
+		$cob_summary['vencido_total'] += $prop['pending_total'];
+	} elseif ( in_array( $prop['status'], array( 'vence_hoy', 'vence_proximo' ), true ) ) {
+		$cob_summary['proximo_count']++;
+		$cob_summary['proximo_total'] += $prop['pending_total'];
+	} elseif ( 'aldia' === $prop['status'] ) {
+		$cob_summary['aldia_count']++;
+	} elseif ( 'available' === $prop['status'] ) {
+		$cob_summary['disponibles']++;
+	}
+	$cob_summary['pending_month'] += $prop['pending_month'];
+}
+
+$cob_status_meta = array(
+	'vencido'       => array( 'pill' => 'danger',  'ring' => 'is-overdue', 'label' => __( 'Vencido', 'arriendo-facil' ) ),
+	'vence_hoy'     => array( 'pill' => 'danger',  'ring' => 'is-overdue', 'label' => __( 'Vence hoy', 'arriendo-facil' ) ),
+	'vence_proximo' => array( 'pill' => 'warning', 'ring' => 'is-soon',    'label' => __( 'Vence pronto', 'arriendo-facil' ) ),
+	'por_cobrar'    => array( 'pill' => 'info',    'ring' => '',           'label' => __( 'Por cobrar', 'arriendo-facil' ) ),
+	'sin_cargo'     => array( 'pill' => 'neutral', 'ring' => '',           'label' => __( 'Sin cargo generado', 'arriendo-facil' ) ),
+	'aldia'         => array( 'pill' => 'success', 'ring' => '',           'label' => __( 'Al día', 'arriendo-facil' ) ),
+	'available'     => array( 'pill' => 'neutral', 'ring' => '',           'label' => __( 'Disponible', 'arriendo-facil' ) ),
+);
+?>
+
+<div class="wrap af-shell af-buildings-page">
 	<?php
 	af_page_header(
 		array(
 			'eyebrow'  => __( 'Cobranza', 'arriendo-facil' ),
 			'title'    => __( 'Edificios y unidades', 'arriendo-facil' ),
-			'subtitle' => __( 'Cada unidad de un edificio es un arriendo a cobrar: canon + alícuota de gastos comunes + servicios. Aquí ves quién vive en cada una, cuánto le toca pagar este mes y qué falta por cobrar.', 'arriendo-facil' ),
+			'subtitle' => __( 'Tus inmuebles a cobrar, por tarjeta: cuánto falta por cobrar y cuándo vence. Pulsa una tarjeta para abrir el calendario de cobros del mes. La gestión de edificios y unidades vive en la pestaña "Estructura".', 'arriendo-facil' ),
 		)
 	);
 	?>
+
+	<div class="af-tabs af-buildings-tabs">
+		<input type="radio" class="af-tabs__radio" id="af-tab-cobranza" name="af-buildings-tabs" checked />
+		<input type="radio" class="af-tabs__radio" id="af-tab-estructura" name="af-buildings-tabs" />
+		<div class="af-tabs__nav" role="tablist" aria-label="<?php esc_attr_e( 'Sección de edificios y unidades', 'arriendo-facil' ); ?>">
+			<label class="af-tabs__tab" for="af-tab-cobranza" role="tab" aria-selected="true">
+				<span class="af-tabs__icon" aria-hidden="true"><?php echo af_lucide( 'wallet', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+				<span class="af-tabs__label"><?php esc_html_e( 'Cobranza', 'arriendo-facil' ); ?></span>
+				<?php if ( $cob_summary['vencido_count'] + $cob_summary['proximo_count'] > 0 ) : ?>
+					<span class="af-tabs__badge af-tabs__badge--attention"><?php echo esc_html( number_format_i18n( $cob_summary['vencido_count'] + $cob_summary['proximo_count'] ) ); ?></span>
+				<?php endif; ?>
+			</label>
+			<label class="af-tabs__tab" for="af-tab-estructura" role="tab" aria-selected="false">
+				<span class="af-tabs__icon" aria-hidden="true"><?php echo af_lucide( 'building-2', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+				<span class="af-tabs__label"><?php esc_html_e( 'Estructura', 'arriendo-facil' ); ?></span>
+			</label>
+		</div>
+		<div class="af-tabs__panels">
+			<section class="af-tabs__panel af-tabs__panel--cobranza" role="tabpanel" aria-labelledby="af-tab-cobranza">
+				<?php if ( empty( $cob_props ) && 0 === $cob_summary['disponibles'] ) : ?>
+					<div class="af-empty">
+						<span class="af-empty__icon" aria-hidden="true"><?php echo af_lucide( 'building', 28 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+						<h3 class="af-empty__title"><?php esc_html_e( 'Aún no tienes inmuebles registrados', 'arriendo-facil' ); ?></h3>
+						<p class="af-empty__text"><?php esc_html_e( 'Registra tus propiedades en el Catálogo de inmuebles para que aparezcan aquí, con su canon y sus fechas de cobro.', 'arriendo-facil' ); ?></p>
+						<a class="button af-btn af-btn--primary" href="<?php echo esc_url( admin_url( 'admin.php?page=af-catalog' ) ); ?>"><?php esc_html_e( 'Ir al catálogo', 'arriendo-facil' ); ?></a>
+					</div>
+				<?php else : ?>
+					<section class="af-cobranza-alerts">
+						<?php if ( $cob_summary['vencido_count'] > 0 ) : ?>
+							<div class="af-cobranza-alert af-cobranza-alert--danger">
+								<span class="af-cobranza-alert__icon" aria-hidden="true"><?php echo af_lucide( 'triangle-alert', 20 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+								<div class="af-cobranza-alert__body">
+									<strong><?php echo esc_html( sprintf( /* translators: %d: number of properties */ _n( '%d inmueble con cobros vencidos', '%d inmuebles con cobros vencidos', $cob_summary['vencido_count'], 'arriendo-facil' ), $cob_summary['vencido_count'] ) ); ?></strong>
+									<span><?php echo esc_html( sprintf( /* translators: %s: amount */ __( '%s por cobrar. Revisa las tarjetas en rojo.', 'arriendo-facil' ), '$' . number_format_i18n( $cob_summary['vencido_total'], 2 ) ) ); ?></span>
+								</div>
+							</div>
+						<?php endif; ?>
+
+						<?php if ( $cob_summary['proximo_count'] > 0 ) : ?>
+							<div class="af-cobranza-alert af-cobranza-alert--warning">
+								<span class="af-cobranza-alert__icon" aria-hidden="true"><?php echo af_lucide( 'clock', 20 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+								<div class="af-cobranza-alert__body">
+									<strong><?php echo esc_html( sprintf( /* translators: %d: number of properties */ _n( '%d inmueble vence en los próximos días', '%d inmuebles vencen en los próximos días', $cob_summary['proximo_count'], 'arriendo-facil' ), $cob_summary['proximo_count'] ) ); ?></strong>
+									<span><?php echo esc_html( sprintf( /* translators: %s: amount */ __( '%s por cobrar. Prepara la cobranza.', 'arriendo-facil' ), '$' . number_format_i18n( $cob_summary['proximo_total'], 2 ) ) ); ?></span>
+								</div>
+							</div>
+						<?php endif; ?>
+
+						<div class="af-cobranza-alert af-cobranza-alert--ok">
+							<span class="af-cobranza-alert__icon" aria-hidden="true"><?php echo af_lucide( 'calendar', 20 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+							<div class="af-cobranza-alert__body">
+								<strong><?php echo esc_html( sprintf( /* translators: 1: amount, 2: period */ __( 'Total a cobrar este mes: %1$s (%2$s)', 'arriendo-facil' ), '$' . number_format_i18n( $cob_summary['pending_month'], 2 ), $current_period ) ); ?></strong>
+								<span>
+									<?php
+									if ( $cob_summary['vencido_count'] > 0 || $cob_summary['proximo_count'] > 0 ) {
+										echo esc_html( sprintf( /* translators: %d: number of properties */ _n( '%d inmueble al día', '%d inmuebles al día', $cob_summary['aldia_count'], 'arriendo-facil' ), $cob_summary['aldia_count'] ) );
+									} else {
+										echo esc_html__( 'Sin vencidos ni cobros próximos. Todo al día.', 'arriendo-facil' );
+									}
+									?>
+								</span>
+							</div>
+						</div>
+					</section>
+
+					<div class="af-property-grid af-cobranza-grid">
+						<?php foreach ( $cob_props as $acc_id => $prop ) : ?>
+							<?php
+							$csm       = $cob_status_meta[ $prop['status'] ];
+							$address   = trim( trim( (string) $prop['address'] ) . ( $prop['city'] ? ', ' . $prop['city'] : '' ) );
+							$due_hint  = '';
+							$due_class = '';
+							if ( 'vencido' === $prop['status'] && $prop['next_due'] ) {
+								$due_hint  = sprintf(
+									/* translators: %s: formatted date */
+									__( 'Vencido desde el %s', 'arriendo-facil' ),
+									date_i18n( 'j M', strtotime( $prop['next_due'] ) )
+								);
+								$due_class = 'is-danger';
+							} elseif ( 'vence_hoy' === $prop['status'] ) {
+								$due_hint  = __( 'Vence hoy', 'arriendo-facil' );
+								$due_class = 'is-danger';
+							} elseif ( 'vence_proximo' === $prop['status'] && $prop['next_due'] ) {
+								$days      = (int) ceil( ( strtotime( $prop['next_due'] ) - strtotime( $cob_today ) ) / DAY_IN_SECONDS );
+								$rel       = 1 === $days ? __( 'mañana', 'arriendo-facil' ) : sprintf( /* translators: %d: days */ _n( 'en %d día', 'en %d días', $days, 'arriendo-facil' ), $days );
+								$due_hint  = sprintf(
+									/* translators: 1: relative time, 2: formatted date */
+									__( 'Vence %1$s (%2$s)', 'arriendo-facil' ),
+									$rel,
+									date_i18n( 'j M', strtotime( $prop['next_due'] ) )
+								);
+								$due_class = 'is-warning';
+							} elseif ( 'por_cobrar' === $prop['status'] && $prop['next_due'] ) {
+								$due_hint = sprintf(
+									/* translators: %s: formatted date */
+									__( 'Vence el %s', 'arriendo-facil' ),
+									date_i18n( 'j M', strtotime( $prop['next_due'] ) )
+								);
+							} elseif ( 'sin_cargo' === $prop['status'] ) {
+								$due_hint = sprintf(
+									/* translators: %d: due day of month */
+									__( 'Día de pago: %d de cada mes', 'arriendo-facil' ),
+									$prop['payment_due_day']
+								);
+							} elseif ( 'aldia' === $prop['status'] ) {
+								$due_hint = __( 'Todo al día', 'arriendo-facil' );
+							} else {
+								$due_hint = __( 'Sin contrato activo', 'arriendo-facil' );
+							}
+
+							$amounttotal = $prop['pending_total'] > 0.01 ? $prop['pending_total'] : $prop['monthly_rent'];
+							$amount_lbl  = $prop['pending_total'] > 0.01 ? __( 'por cobrar', 'arriendo-facil' ) : __( '/ mes', 'arriendo-facil' );
+							?>
+							<article
+								class="af-property-card af-cobranza-card <?php echo esc_attr( $csm['ring'] ); ?>"
+								data-prop="<?php echo esc_attr( $acc_id ); ?>"
+								role="button"
+								tabindex="0"
+								aria-label="<?php echo esc_attr( sprintf( /* translators: %s: property title */ __( 'Ver cobranza de %s', 'arriendo-facil' ), $prop['title'] ) ); ?>"
+							>
+								<div class="af-property-card__media">
+									<?php if ( $prop['thumb'] ) : ?>
+										<img src="<?php echo esc_url( $prop['thumb'] ); ?>" alt="<?php echo esc_attr( $prop['title'] ); ?>" loading="lazy" />
+									<?php else : ?>
+										<div class="af-property-card__placeholder" aria-hidden="true"><?php echo af_lucide( 'building', 40 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></div>
+									<?php endif; ?>
+									<div class="af-property-card__badges">
+										<span class="af-pill af-pill--<?php echo esc_attr( $csm['pill'] ); ?>"><?php echo esc_html( $csm['label'] ); ?></span>
+									</div>
+								</div>
+								<div class="af-property-card__body">
+									<div class="af-catalog-card__type">
+										<span class="af-catalog-card__type-icon" aria-hidden="true"><?php echo af_lucide( $prop['type_icon'], 14 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+										<?php echo esc_html( $prop['type_label'] ); ?>
+									</div>
+									<h3 class="af-property-card__title"><?php echo esc_html( $prop['title'] ); ?></h3>
+									<?php if ( $prop['unit_code'] ) : ?>
+										<p class="af-catalog-card__address">
+											<span class="af-catalog-card__address-icon" aria-hidden="true"><?php echo af_lucide( 'home', 13 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+											<span class="af-catalog-card__address-text"><?php echo esc_html( $prop['unit_code'] . ( $prop['building_name'] ? ' · ' . $prop['building_name'] : '' ) ); ?></span>
+										</p>
+									<?php endif; ?>
+									<?php if ( $address ) : ?>
+										<p class="af-catalog-card__address">
+											<span class="af-catalog-card__address-icon" aria-hidden="true"><?php echo af_lucide( 'map-pin', 13 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+											<span class="af-catalog-card__address-text"><?php echo esc_html( $address ); ?></span>
+										</p>
+									<?php endif; ?>
+									<p class="af-catalog-card__specs">
+										<?php if ( $prop['guest'] ) : ?>
+											<span class="af-catalog-card__spec">
+												<span class="af-catalog-card__spec-icon" aria-hidden="true"><?php echo af_lucide( 'user', 13 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+												<?php echo esc_html( $prop['guest'] ); ?>
+											</span>
+										<?php endif; ?>
+										<?php if ( $prop['bedrooms'] ) : ?>
+											<span class="af-catalog-card__spec">
+												<span class="af-catalog-card__spec-icon" aria-hidden="true"><?php echo af_lucide( 'bed', 13 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+												<?php echo esc_html( sprintf( /* translators: %d: bedrooms */ _n( '%d dorm.', '%d dorm.', $prop['bedrooms'], 'arriendo-facil' ), $prop['bedrooms'] ) ); ?>
+											</span>
+										<?php endif; ?>
+										<?php if ( $prop['lease_end'] ) : ?>
+											<span class="af-catalog-card__spec">
+												<span class="af-catalog-card__spec-icon" aria-hidden="true"><?php echo af_lucide( 'calendar', 13 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+												<?php echo esc_html( sprintf( /* translators: %s: formatted date */ __( 'Contrato hasta %s', 'arriendo-facil' ), date_i18n( 'j M Y', strtotime( $prop['lease_end'] ) ) ) ); ?>
+											</span>
+										<?php endif; ?>
+									</p>
+								</div>
+								<div class="af-property-card__footer">
+									<span class="af-cobranza-card__amount <?php echo esc_attr( $due_class ); ?>">
+										$<?php echo esc_html( number_format_i18n( $amounttotal, 2 ) ); ?>
+										<small><?php echo esc_html( $amount_lbl ); ?></small>
+									</span>
+									<span class="af-cobranza-card__due <?php echo esc_attr( $due_class ); ?>"><?php echo esc_html( $due_hint ); ?></span>
+									<span class="af-catalog-card__hint">
+										<?php esc_html_e( 'Ver cobranza', 'arriendo-facil' ); ?>
+										<span class="af-catalog-card__hint-arrow" aria-hidden="true">→</span>
+									</span>
+								</div>
+							</article>
+						<?php endforeach; ?>
+					</div>
+
+					<?php if ( $cob_summary['disponibles'] > 0 ) : ?>
+						<?php $disponibles = array_filter( $cob_props, static function ( $p ) { return 'available' === $p['status']; } ); ?>
+						<details class="af-collapse af-section af-cobranza-avail" style="margin-top: var(--af-space-5);">
+							<summary class="af-collapse__summary">
+								<span class="af-section__icon af-section__icon--slate" aria-hidden="true"><?php echo af_lucide( 'building', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+								<span class="af-collapse__label"><?php echo esc_html( sprintf( /* translators: %d: number of properties */ _n( '%d inmueble disponible (sin contrato)', '%d inmuebles disponibles (sin contrato)', $cob_summary['disponibles'], 'arriendo-facil' ), $cob_summary['disponibles'] ) ); ?></span>
+								<span class="af-collapse__chevron" aria-hidden="true"><?php echo af_lucide( 'chevron-down', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+							</summary>
+							<div class="af-collapse__body">
+								<div class="af-property-grid">
+									<?php foreach ( $disponibles as $acc_id => $prop ) : ?>
+										<?php $csm = $cob_status_meta[ $prop['status'] ]; ?>
+										<article class="af-property-card af-cobranza-card" data-prop="<?php echo esc_attr( $acc_id ); ?>" role="button" tabindex="0" aria-label="<?php echo esc_attr( sprintf( /* translators: %s: property title */ __( 'Ver cobranza de %s', 'arriendo-facil' ), $prop['title'] ) ); ?>">
+											<div class="af-property-card__media">
+												<?php if ( $prop['thumb'] ) : ?>
+													<img src="<?php echo esc_url( $prop['thumb'] ); ?>" alt="<?php echo esc_attr( $prop['title'] ); ?>" loading="lazy" />
+												<?php else : ?>
+													<div class="af-property-card__placeholder" aria-hidden="true"><?php echo af_lucide( 'building', 40 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></div>
+												<?php endif; ?>
+												<div class="af-property-card__badges"><span class="af-pill af-pill--<?php echo esc_attr( $csm['pill'] ); ?>"><?php echo esc_html( $csm['label'] ); ?></span></div>
+											</div>
+											<div class="af-property-card__body">
+												<div class="af-catalog-card__type">
+													<span class="af-catalog-card__type-icon" aria-hidden="true"><?php echo af_lucide( $prop['type_icon'], 14 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+													<?php echo esc_html( $prop['type_label'] ); ?>
+												</div>
+												<h3 class="af-property-card__title"><?php echo esc_html( $prop['title'] ); ?></h3>
+												<p class="af-catalog-card__address"><span class="af-cobranza-card__due"><?php esc_html_e( 'Sin contrato activo: no genera cobros este mes.', 'arriendo-facil' ); ?></span></p>
+											</div>
+										</article>
+									<?php endforeach; ?>
+								</div>
+							</div>
+						</details>
+					<?php endif; ?>
+				<?php endif; ?>
+			</section>
+
+			<section class="af-tabs__panel af-tabs__panel--estructura" role="tabpanel" aria-labelledby="af-tab-estructura">
 
 	<section class="af-section" style="display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding: var(--af-space-4) var(--af-space-5); margin-bottom: var(--af-space-4);">
 		<span class="af-section__icon af-section__icon--slate" aria-hidden="true"><?php echo af_lucide( 'building', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
@@ -631,7 +1148,81 @@ foreach ( $units as $unit ) {
 		<?php endif; ?>
 
 	<?php endif; ?>
+			</section>
+
+		</div><!-- .af-tabs__panels -->
+	</div><!-- .af-tabs .af-buildings-tabs -->
 </div>
+
+<!-- Modal: cobranza del inmueble (calendario de cobros del mes) -->
+<div class="af-modal" id="af-cobranza-modal" role="dialog" aria-modal="true" aria-labelledby="af-cobranza-modal-title">
+	<div class="af-modal__backdrop" data-af-modal-close></div>
+	<div class="af-modal__dialog af-cobranza-modal__dialog">
+		<button type="button" class="af-modal__close" data-af-modal-close aria-label="<?php esc_attr_e( 'Cerrar', 'arriendo-facil' ); ?>">&times;</button>
+		<div class="af-modal__header">
+			<h2 class="af-modal__title" id="af-cobranza-modal-title"></h2>
+			<p class="af-modal__subtitle" id="af-cobranza-modal-subtitle"></p>
+		</div>
+		<div class="af-modal__body">
+			<p class="af-modal__status" id="af-cobranza-status" style="display:none;"></p>
+
+			<div class="af-cobranza-cal__nav">
+				<button type="button" class="button af-cobranza-cal__nav-btn" data-cal="prev" aria-label="<?php esc_attr_e( 'Mes anterior', 'arriendo-facil' ); ?>">&larr;</button>
+				<h3 class="af-cobranza-cal__period" id="af-cobranza-period"></h3>
+				<button type="button" class="button af-cobranza-cal__nav-btn" data-cal="next" aria-label="<?php esc_attr_e( 'Mes siguiente', 'arriendo-facil' ); ?>">&rarr;</button>
+			</div>
+			<div class="af-cobranza-cal__today-row">
+				<button type="button" class="button af-cobranza-cal__today" data-cal="today"><?php esc_html_e( 'Hoy', 'arriendo-facil' ); ?></button>
+			</div>
+
+			<div class="af-calendar-mini" id="af-cobranza-calendar" aria-label="<?php esc_attr_e( 'Calendario de cobros', 'arriendo-facil' ); ?>"></div>
+
+			<div class="af-calendar-mini__legend" id="af-cobranza-legend"></div>
+
+			<h4 class="af-cobranza-charges__title"><?php esc_html_e( 'Cargos del mes', 'arriendo-facil' ); ?></h4>
+			<ul class="af-cobranza-charges" id="af-cobranza-charges"></ul>
+
+			<div class="af-cobranza-pay" id="af-cobranza-pay" hidden>
+				<h4 class="af-cobranza-pay__title"><?php esc_html_e( 'Anotar pago', 'arriendo-facil' ); ?></h4>
+				<p class="af-modal__status" id="af-cobranza-pay-status" style="display:none;"></p>
+				<input type="hidden" id="af-cobranza-pay-charge-id" />
+				<div class="af-modal__field">
+					<label for="af-cobranza-pay-amount"><?php esc_html_e( 'Monto recibido (USD)', 'arriendo-facil' ); ?></label>
+					<input type="number" id="af-cobranza-pay-amount" step="0.01" min="0.01" />
+					<p class="af-modal__hint" id="af-cobranza-pay-outstanding"></p>
+				</div>
+				<div class="af-modal__field">
+					<label for="af-cobranza-pay-date"><?php esc_html_e( 'Fecha de pago', 'arriendo-facil' ); ?></label>
+					<input type="date" id="af-cobranza-pay-date" value="<?php echo esc_attr( current_time( 'Y-m-d' ) ); ?>" />
+				</div>
+				<div class="af-modal__field">
+					<label for="af-cobranza-pay-method"><?php esc_html_e( 'Método', 'arriendo-facil' ); ?></label>
+					<select id="af-cobranza-pay-method">
+						<?php foreach ( Arriendo_Facil_Billing_Ledger::payment_methods() as $method_key => $method_label ) : ?>
+							<option value="<?php echo esc_attr( $method_key ); ?>"><?php echo esc_html( $method_label ); ?></option>
+						<?php endforeach; ?>
+					</select>
+				</div>
+				<div class="af-modal__field">
+					<label for="af-cobranza-pay-reference"><?php esc_html_e( 'Referencia / comprobante', 'arriendo-facil' ); ?></label>
+					<input type="text" id="af-cobranza-pay-reference" placeholder="<?php esc_attr_e( 'Ej: transferencia #01234', 'arriendo-facil' ); ?>" />
+				</div>
+				<div class="af-cobranza-pay__actions">
+					<button type="button" class="button" id="af-cobranza-pay-cancel"><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
+					<button type="button" class="button button-primary" id="af-cobranza-pay-confirm"><?php esc_html_e( 'Registrar pago', 'arriendo-facil' ); ?></button>
+				</div>
+			</div>
+		</div>
+		<div class="af-modal__footer">
+			<button type="button" class="button" data-af-modal-close><?php esc_html_e( 'Cerrar', 'arriendo-facil' ); ?></button>
+		</div>
+	</div>
+</div>
+
+<script>
+	window.afBuildingsCobranza = <?php echo wp_json_encode( $cob_json_props ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Datos JSON para el JS del calendario. ?>;
+	window.afBuildingsCobranzaToday = <?php echo wp_json_encode( $cob_today ); ?>;
+</script>
 
 <script>
 (function () {

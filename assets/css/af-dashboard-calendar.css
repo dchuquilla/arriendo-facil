@@ -1,0 +1,335 @@
+/* Interactive host calendar (Panel) -------------------------------------- */
+.af-cal {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 320px;
+	gap: var(--af-space-5);
+	margin-top: var(--af-space-4);
+}
+
+@media (max-width: 1080px) {
+	.af-cal {
+		grid-template-columns: 1fr;
+	}
+}
+
+.af-cal__grid-wrap {
+	min-width: 0;
+}
+
+.af-cal__toolbar {
+	display: flex;
+	align-items: center;
+	gap: var(--af-space-3);
+	margin-bottom: var(--af-space-3);
+	flex-wrap: wrap;
+}
+
+.af-cal__title {
+	font-size: 15px;
+	font-weight: 650;
+	margin: 0;
+}
+
+.af-cal__nav {
+	display: inline-flex;
+	gap: 6px;
+}
+
+.af-cal__nav button,
+.af-cal__today {
+	appearance: none;
+	border: 1px solid #d0d5dd;
+	background: #fff;
+	border-radius: 8px;
+	height: 30px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	font-weight: 600;
+	color: #344054;
+	transition: border-color .15s, background .15s;
+}
+
+.af-cal__nav button {
+	width: 30px;
+}
+
+.af-cal__nav button:hover,
+.af-cal__today:hover {
+	background: #f9fafb;
+}
+
+.af-cal__today {
+	padding: 0 10px;
+	font-size: 13px;
+}
+
+.af-cal__legend {
+	display: flex;
+	gap: 12px;
+	align-items: center;
+	flex-wrap: wrap;
+	margin-left: auto;
+	font-size: 12px;
+	color: #475467;
+}
+
+.af-cal__legend span {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	white-space: nowrap;
+}
+
+.af-cal__legend i {
+	width: 10px;
+	height: 10px;
+	border-radius: 3px;
+	display: inline-block;
+	flex: 0 0 auto;
+}
+
+.af-cal__week {
+	display: grid;
+	grid-template-columns: repeat(7, 1fr);
+	gap: 6px;
+	margin-bottom: 6px;
+}
+
+.af-cal__week span {
+	text-align: center;
+	font-size: 12px;
+	font-weight: 650;
+	text-transform: uppercase;
+	letter-spacing: .4px;
+	color: #98a2b3;
+	padding: 4px 0;
+}
+
+.af-cal__grid {
+	display: grid;
+	grid-template-columns: repeat(7, 1fr);
+	gap: 6px;
+}
+
+.af-cal__day {
+	position: relative;
+	min-height: 86px;
+	border: 1px solid #eaecf0;
+	border-radius: 10px;
+	background: #fff;
+	padding: 6px;
+	cursor: pointer;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	transition: border-color .15s, box-shadow .15s, background .15s;
+	text-align: left;
+}
+
+.af-cal__day:hover {
+	border-color: var(--af-color-primary, #2d6cdf);
+	box-shadow: 0 2px 8px rgba(16, 24, 40, .06);
+	background: #fbfcff;
+}
+
+.af-cal__day.is-outside {
+	opacity: .38;
+}
+
+.af-cal__day.is-today {
+	border-color: var(--af-color-primary, #2d6cdf);
+	background: #f5f8ff;
+}
+
+.af-cal__day.is-selected {
+	box-shadow: 0 0 0 2px var(--af-color-primary, #2d6cdf);
+}
+
+.af-cal__day-num {
+	font-size: 13px;
+	font-weight: 700;
+	color: #344054;
+	line-height: 1;
+}
+
+.af-cal__day.is-today .af-cal__day-num {
+	color: var(--af-color-primary, #2d6cdf);
+}
+
+.af-cal__chips {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	margin-top: 2px;
+}
+
+.af-cal__chip {
+	font-size: 10.5px;
+	font-weight: 650;
+	line-height: 1.2;
+	padding: 3px 6px;
+	border-radius: 6px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.af-cal__chip--visit {
+	background: #eef4ff;
+	color: #1849a9;
+}
+
+.af-cal__chip--checkin {
+	background: #e7f6ec;
+	color: #027a48;
+}
+
+.af-cal__chip--checkout {
+	background: #fff4ed;
+	color: #b42318;
+}
+
+.af-cal__chip--block {
+	background: #f2f4f7;
+	color: #475467;
+	text-decoration: line-through;
+}
+
+.af-cal__chip--more {
+	background: transparent;
+	color: #475467;
+	font-size: 10.5px;
+	font-weight: 650;
+}
+
+/* Day drawer ------------------------------------------------------------ */
+.af-cal__drawer {
+	border: 1px solid #eaecf0;
+	border-radius: 12px;
+	background: #fff;
+	display: flex;
+	flex-direction: column;
+	max-height: 560px;
+}
+
+.af-cal__drawer-head {
+	padding: 14px 16px;
+	border-bottom: 1px solid #f2f4f7;
+}
+
+.af-cal__drawer-date {
+	font-size: 13px;
+	font-weight: 650;
+	color: #667085;
+}
+
+.af-cal__drawer-title {
+	font-size: 16px;
+	font-weight: 700;
+	margin: 2px 0 0;
+	color: #101828;
+}
+
+.af-cal__drawer-body {
+	padding: 12px 16px;
+	overflow: auto;
+	flex: 1;
+}
+
+.af-cal__drawer-empty {
+	font-size: 13px;
+	color: #667085;
+}
+
+.af-cal__drawer-actions {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 8px;
+	padding: 14px 16px;
+	border-top: 1px solid #f2f4f7;
+}
+
+.af-cal__drawer-actions .button {
+	width: 100%;
+}
+
+.af-cal__drawer-actions .button--danger {
+	border-color: #f04438;
+	color: #b42318;
+}
+
+/* Event list in drawer --------------------------------------------------- */
+.af-cal__event {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	padding: 10px;
+	border: 1px solid #f2f4f7;
+	border-radius: 10px;
+	margin-bottom: 8px;
+}
+
+.af-cal__event:last-child {
+	margin-bottom: 0;
+}
+
+.af-cal__event-icon {
+	width: 30px;
+	height: 30px;
+	border-radius: 8px;
+	flex: 0 0 auto;
+	display: grid;
+	place-items: center;
+	font-size: 14px;
+	background: #f2f4f7;
+}
+
+.af-cal__event.is-visit .af-cal__event-icon { background: #eef4ff; }
+.af-cal__event.is-checkin .af-cal__event-icon { background: #e7f6ec; }
+.af-cal__event.is-checkout .af-cal__event-icon { background: #fff4ed; }
+.af-cal__event.is-block .af-cal__event-icon { background: #f2f4f7; }
+
+.af-cal__event-main {
+	flex: 1;
+	min-width: 0;
+}
+
+.af-cal__event-title {
+	font-size: 13.5px;
+	font-weight: 700;
+	color: #101828;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.af-cal__event-meta {
+	font-size: 12px;
+	color: #667085;
+	margin-top: 2px;
+}
+
+.af-cal__event-remove {
+	appearance: none;
+	border: 0;
+	background: transparent;
+	color: #667085;
+	cursor: pointer;
+	font-size: 13px;
+	padding: 4px;
+	border-radius: 6px;
+	line-height: 1;
+}
+
+.af-cal__event-remove:hover {
+	color: #b42318;
+	background: #fff4ed;
+}
+
+/* Status in modal -------------------------------------------------------- */
+.af-cal__status { margin: 0 0 14px; }
+
+.af-cal__status.is-error { color: #b42318; }
+.af-cal__status.is-success { color: #027a48; }

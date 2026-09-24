@@ -30,6 +30,7 @@ class Arriendo_Facil_Review {
 		add_action( 'wp_ajax_af_tenant_request_review_link', array( $this, 'ajax_tenant_request_review_link' ) );
 		add_action( 'wp_ajax_af_generate_review_test_link', array( $this, 'ajax_generate_review_test_link' ) );
 		add_action( 'wp_ajax_af_rate_tenant', array( $this, 'ajax_rate_tenant' ) );
+		add_action( 'wp_ajax_af_rate_admin', array( $this, 'ajax_rate_admin' ) );
 		add_shortcode( 'af_review_form', array( $this, 'render_review_form_shortcode' ) );
 
 		// Estadisticas publicas de la propiedad: solo aplican al catalogo del marketplace.
@@ -75,6 +76,63 @@ class Arriendo_Facil_Review {
 	}
 
 	/**
+	 * AJAX: records or updates the super-admin's evaluation of a property
+	 * administrator (superadmin_to_admin direction).
+	 *
+	 * @return void
+	 */
+	public function ajax_rate_admin() {
+		check_ajax_referer( 'af_rate_admin_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$admin_user_id = isset( $_POST['admin_user_id'] ) ? absint( wp_unslash( $_POST['admin_user_id'] ) ) : 0;
+
+		if ( ! $admin_user_id || ! in_array( 'af_property_admin', (array) get_userdata( $admin_user_id )->roles, true ) ) {
+			wp_send_json_error( array( 'message' => __( 'Administrador inválido.', 'arriendo-facil' ) ), 400 );
+		}
+
+		$comment = isset( $_POST['comment'] ) ? sanitize_textarea_field( wp_unslash( $_POST['comment'] ) ) : '';
+
+		$scores = array();
+		foreach ( array_keys( self::admin_criteria() ) as $criterion ) {
+			$scores[ $criterion ] = isset( $_POST[ $criterion ] ) ? absint( wp_unslash( $_POST[ $criterion ] ) ) : 0;
+		}
+
+		$stars = 0;
+		$count = count( $scores );
+		foreach ( $scores as $value ) {
+			$stars += max( 1, min( 5, (int) $value ) );
+		}
+		$stars = $count > 0 ? (int) round( $stars / $count ) : 0;
+
+		global $wpdb;
+
+		$wpdb->replace(
+			self::admin_reviews_table(),
+			array(
+				'admin_user_id'    => $admin_user_id,
+				'reviewer_user_id' => get_current_user_id(),
+				'stars'            => $stars,
+				'criteria_scores'  => wp_json_encode( $scores ),
+				'comment_text'     => $comment,
+				'created_at'       => current_time( 'mysql' ),
+				'updated_at'       => current_time( 'mysql' ),
+			),
+			array( '%d', '%d', '%d', '%s', '%s', '%s', '%s' )
+		);
+
+		wp_send_json_success(
+			array(
+				'message' => __( 'Evaluación guardada.', 'arriendo-facil' ),
+				'stars'   => $stars,
+			)
+		);
+	}
+
+	/**
 	 * Returns the review groups table name.
 	 *
 	 * @return string
@@ -105,6 +163,17 @@ class Arriendo_Facil_Review {
 		global $wpdb;
 
 		return $wpdb->prefix . 'af_review_tokens';
+	}
+
+	/**
+	 * Returns the admin reviews table name.
+	 *
+	 * @return string
+	 */
+	public static function admin_reviews_table() {
+		global $wpdb;
+
+		return $wpdb->prefix . 'af_admin_reviews';
 	}
 	/**
 	 * Returns the supported review directions.
@@ -143,6 +212,21 @@ class Arriendo_Facil_Review {
 			'cuidado_inmueble' => __( 'Cuidado del inmueble', 'arriendo-facil' ),
 			'convivencia'      => __( 'Convivencia / comportamiento', 'arriendo-facil' ),
 			'comunicacion'     => __( 'Comunicación', 'arriendo-facil' ),
+		);
+	}
+
+	/**
+	 * Returns the structured criteria used by the super-admin to evaluate a
+	 * property administrator (superadmin_to_admin direction).
+	 *
+	 * @return array<string,string>
+	 */
+	public static function admin_criteria() {
+		return array(
+			'organizacion'      => __( 'Organización y documentación', 'arriendo-facil' ),
+			'proactividad'      => __( 'Proactividad y comunicación', 'arriendo-facil' ),
+			'gestion_cobranza'  => __( 'Gestión de cobranza y pagos', 'arriendo-facil' ),
+			'atencion_inmueble' => __( 'Atención del inmueble', 'arriendo-facil' ),
 		);
 	}
 

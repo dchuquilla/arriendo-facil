@@ -21,6 +21,7 @@ class Arriendo_Facil_Accommodation_Occupied_Admin {
 		add_filter( 'manage_accommodation_posts_columns', array( $this, 'add_column' ) );
 		add_action( 'manage_accommodation_posts_custom_column', array( $this, 'render_column' ), 10, 2 );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue' ) );
+		add_action( 'admin_enqueue_scripts', array( $this, 'widget_enqueue' ) );
 		add_action( 'wp_ajax_' . self::AJAX_ACTION, array( $this, 'handle_toggle' ) );
 	}
 
@@ -83,6 +84,98 @@ class Arriendo_Facil_Accommodation_Occupied_Admin {
 	 */
 	public static function is_occupied( $post_id ) {
 		return '1' === (string) get_post_meta( $post_id, self::META_KEY, true );
+	}
+
+	/**
+	 * Renders the reusable Disponible/Ocupada switch for plugin admin pages
+	 * (catalog, leases, dashboard). All instances on the page are handled by
+	 * the shared `af-occupied-widget` script.
+	 *
+	 * @param int $post_id Accommodation post ID.
+	 * @return string
+	 */
+	public static function render_switch( $post_id ) {
+		if ( ! absint( $post_id ) || 'accommodation' !== get_post_type( $post_id ) ) {
+			return '';
+		}
+
+		if ( ! current_user_can( 'manage_options' ) && ! current_user_can( 'edit_posts' ) ) {
+			return '';
+		}
+
+		$occupied = self::is_occupied( $post_id );
+
+		return sprintf(
+			'<span class="af-occupied-widget%4$s" data-af-occupied="%1$d" data-state="%2$s" title="%5$s">
+				<button type="button" class="af-occupied-widget__btn" aria-pressed="%2$s">
+					<span class="af-occupied-widget__dot" aria-hidden="true"></span>
+					<span class="af-occupied-widget__label">%3$s</span>
+				</button>
+			</span>',
+			(int) $post_id,
+			$occupied ? 'true' : 'false',
+			$occupied ? esc_html__( 'Ocupada', 'arriendo-facil' ) : esc_html__( 'Disponible', 'arriendo-facil' ),
+			$occupied ? ' is-occupied' : '',
+			esc_attr__( 'Marcar/Quitar como ocupada', 'arriendo-facil' )
+		);
+	}
+
+	/**
+	 * Enqueues the shared Disponible/Ocupada widget on plugin admin pages that
+	 * render self::render_switch().
+	 *
+	 * @param string $hook Current admin page hook.
+	 */
+	public function widget_enqueue( $hook ) {
+		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only.
+		$widget_pages = array( 'af-catalog', 'af-leases' );
+
+		if ( 'toplevel_page_arriendo-facil' !== $hook && ! in_array( $page, $widget_pages, true ) ) {
+			return;
+		}
+		if ( ! current_user_can( 'manage_options' ) && ! current_user_can( 'edit_posts' ) ) {
+			return;
+		}
+
+		$css_path   = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-occupied-widget.css';
+		$js_path    = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/af-occupied-widget.js';
+
+		wp_enqueue_style(
+			'af-occupied-widget',
+			ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/af-occupied-widget.css',
+			array( 'af-tokens', 'af-shell', 'af-admin-chrome' ),
+			file_exists( $css_path ) ? (string) filemtime( $css_path ) : ARRIENDO_FACIL_VERSION
+		);
+		wp_enqueue_script(
+			'af-occupied-widget',
+			ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/af-occupied-widget.js',
+			array(),
+			file_exists( $js_path ) ? (string) filemtime( $js_path ) : ARRIENDO_FACIL_VERSION,
+			true
+		);
+
+		wp_localize_script(
+			'af-occupied-widget',
+			'afOccupiedCfg',
+			array(
+				'ajaxUrl'   => admin_url( 'admin-ajax.php' ),
+				'action'    => self::AJAX_ACTION,
+				'nonce'     => wp_create_nonce( self::NONCE_ACTION ),
+				'leaseNonce' => wp_create_nonce( 'af_lease_nonce' ),
+				'i18n'      => array(
+					'available'        => __( 'Disponible', 'arriendo-facil' ),
+					'occupied'         => __( 'Ocupada', 'arriendo-facil' ),
+					'error'            => __( 'No se pudo actualizar. Intenta nuevamente.', 'arriendo-facil' ),
+					'unoccupyTitle'    => __( 'Liberar propiedad', 'arriendo-facil' ),
+					'unoccupyWarning'  => __( 'Si existe un contrato activo, será terminado anticipadamente y el inmueble quedará disponible.', 'arriendo-facil' ),
+					'reasonLabel'      => __( 'Motivo (obligatorio si hay contrato activo):', 'arriendo-facil' ),
+					'reasonPlaceholder'=> __( 'Ej: Acuerdo mutuo, venta del inmueble, otro...', 'arriendo-facil' ),
+					'btnCancel'        => __( 'Cancelar', 'arriendo-facil' ),
+					'btnConfirm'       => __( 'Confirmar', 'arriendo-facil' ),
+					'processing'       => __( 'Procesando…', 'arriendo-facil' ),
+				),
+			)
+		);
 	}
 
 	/**

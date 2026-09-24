@@ -693,6 +693,61 @@ class Arriendo_Facil_Activator {
 				KEY stars (stars)
 			) $charset_collate;",
 
+			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_admin_reviews (
+				id                BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+				admin_user_id     BIGINT(20) UNSIGNED NOT NULL,
+				reviewer_user_id  BIGINT(20) UNSIGNED NOT NULL,
+				stars             TINYINT(2) UNSIGNED NOT NULL DEFAULT 0,
+				criteria_scores   TEXT DEFAULT NULL,
+				comment_text      TEXT DEFAULT NULL,
+				created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				UNIQUE KEY uniq_admin_reviewed (admin_user_id),
+				KEY reviewer_user_id (reviewer_user_id),
+				KEY stars (stars)
+			) $charset_collate;",
+
+			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_notification_messages (
+				id                BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+				accommodation_id  BIGINT(20) UNSIGNED NOT NULL,
+				lease_id          BIGINT(20) UNSIGNED DEFAULT NULL,
+				guest_id          BIGINT(20) UNSIGNED DEFAULT NULL,
+				type              VARCHAR(20) NOT NULL DEFAULT 'aviso' COMMENT 'cobro, servicios, aviso',
+				subject           VARCHAR(190) NOT NULL,
+				body              TEXT DEFAULT NULL,
+				status            VARCHAR(20) NOT NULL DEFAULT 'sent' COMMENT 'pending, sent, read',
+				recipient_email   VARCHAR(190) NOT NULL,
+				sent_to_user_id   BIGINT(20) UNSIGNED DEFAULT NULL,
+				selector          VARCHAR(64) NOT NULL,
+				token_hash        VARCHAR(255) NOT NULL,
+				read_at           DATETIME DEFAULT NULL,
+				read_ip           VARCHAR(45) DEFAULT NULL,
+				created_by        BIGINT(20) UNSIGNED DEFAULT NULL,
+				created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				UNIQUE KEY selector (selector),
+				KEY accommodation_id (accommodation_id),
+				KEY lease_id (lease_id),
+				KEY guest_id (guest_id),
+				KEY status (status),
+				KEY recipient_email (recipient_email)
+			) $charset_collate;",
+
+			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_calendar_blocks (
+				id               BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+				accommodation_id BIGINT(20) UNSIGNED NOT NULL,
+				block_date       DATE NOT NULL,
+				reason           VARCHAR(190) NOT NULL DEFAULT '',
+				created_by       BIGINT(20) UNSIGNED DEFAULT NULL,
+				created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				UNIQUE KEY uniq_calendar_block (accommodation_id, block_date),
+				KEY accommodation_id (accommodation_id),
+				KEY block_date (block_date)
+			) $charset_collate;",
+
 			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_review_tokens (
 				id                BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
 				review_group_id   BIGINT(20) UNSIGNED NOT NULL,

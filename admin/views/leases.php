@@ -469,7 +469,14 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 					?>
 					<tr class="af-lease-row" data-tab-group="<?php echo esc_attr( $row_tab_group ); ?>">
 						<td data-label="<?php esc_attr_e( 'ID', 'arriendo-facil' ); ?>"><?php echo esc_html( $lease->id ); ?></td>
-							<td data-label="<?php esc_attr_e( 'Inmueble', 'arriendo-facil' ); ?>"><?php echo esc_html( ( isset( $lease->accommodation_title ) ? $lease->accommodation_title : null ) ?: ( isset( $lease->accommodation_id ) ? get_the_title( (int) $lease->accommodation_id ) : '' ) ?: $lease->accommodation_id ); ?></td>
+							<td data-label="<?php esc_attr_e( 'Inmueble', 'arriendo-facil' ); ?>">
+								<strong><?php echo esc_html( ( isset( $lease->accommodation_title ) ? $lease->accommodation_title : null ) ?: ( isset( $lease->accommodation_id ) ? get_the_title( (int) $lease->accommodation_id ) : '' ) ?: $lease->accommodation_id ); ?></strong>
+								<?php
+								if ( class_exists( 'Arriendo_Facil_Accommodation_Occupied_Admin' ) && ! empty( $lease->accommodation_id ) ) {
+									echo '<br />' . Arriendo_Facil_Accommodation_Occupied_Admin::render_switch( (int) $lease->accommodation_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static markup from render_switch().
+								}
+								?>
+							</td>
 						<td data-label="<?php esc_attr_e( 'Unidad', 'arriendo-facil' ); ?>">
 							<?php echo esc_html( $lease_unit_map[ (int) $lease->accommodation_id ] ?? '—' ); ?>
 						</td>

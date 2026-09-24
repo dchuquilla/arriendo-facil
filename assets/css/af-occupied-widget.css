@@ -1,0 +1,134 @@
+/* Disponible / Ocupada switch (widget) — plantillas del plugin */
+
+.af-occupied-widget {
+	display: inline-flex;
+	align-items: center;
+}
+
+.af-occupied-widget__btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 3px 10px;
+	border: 1px solid #d3dbe3;
+	border-radius: 999px;
+	background: #f0f4f8;
+	color: #52606d;
+	font-size: 12px;
+	font-weight: 600;
+	line-height: 1.5;
+	cursor: pointer;
+	transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+
+.af-occupied-widget__btn:hover {
+	border-color: #b8c4d0;
+}
+
+.af-occupied-widget__dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: #2f9e44;
+	flex: 0 0 auto;
+}
+
+.af-occupied-widget.is-occupied .af-occupied-widget__dot {
+	background: #c0392b;
+}
+
+.af-occupied-widget.is-occupied .af-occupied-widget__btn {
+	border-color: #f0c9c4;
+	background: #fdecea;
+	color: #b03a2e;
+}
+
+.af-occupied-widget.is-busy {
+	opacity: .55;
+	pointer-events: none;
+}
+
+/* Modal de liberación (terminación anticipada) */
+.af-occupied-modal {
+	position: fixed;
+	inset: 0;
+	z-index: 200000;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 16px;
+}
+
+.af-occupied-modal.is-hidden {
+	display: none;
+}
+
+.af-occupied-modal__backdrop {
+	position: absolute;
+	inset: 0;
+	background: rgba(0, 0, 0, .55);
+}
+
+.af-occupied-modal__box {
+	position: relative;
+	width: 440px;
+	max-width: 94%;
+	background: #fff;
+	border-radius: 12px;
+	padding: 24px 24px 18px;
+	box-shadow: 0 8px 32px rgba(0, 0, 0, .22);
+}
+
+.af-occupied-modal__box h2 {
+	margin: 0 0 8px;
+	font-size: 17px;
+	color: #b03a2e;
+}
+
+.af-occupied-modal__warning {
+	margin: 0 0 14px;
+	font-size: 13px;
+	color: #374151;
+	line-height: 1.5;
+}
+
+.af-occupied-modal__label {
+	display: block;
+	font-weight: 600;
+	font-size: 13px;
+	margin-bottom: 5px;
+	color: #1f2d3d;
+}
+
+.af-occupied-modal__box textarea {
+	width: 100%;
+	box-sizing: border-box;
+	padding: 8px 10px;
+	border: 1px solid #d1d5db;
+	border-radius: 6px;
+	font-size: 13px;
+	resize: vertical;
+}
+
+.af-occupied-modal__feedback {
+	margin: 6px 0 0;
+	font-size: 12px;
+	color: #b03a2e;
+}
+
+.af-occupied-modal__actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 10px;
+	margin-top: 16px;
+}
+
+.af-occupied-modal__confirm {
+	background: #b03a2e;
+	border-color: #942f25;
+	color: #fff;
+}
+
+.af-occupied-modal__confirm:disabled {
+	opacity: .7;
+}

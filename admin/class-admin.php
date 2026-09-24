@@ -128,6 +128,15 @@ class Arriendo_Facil_Admin {
 
 		add_submenu_page(
 			'arriendo-facil',
+			__( 'Cobros y Servicios', 'arriendo-facil' ),
+			__( 'Cobros y Servicios', 'arriendo-facil' ),
+			Arriendo_Facil_Tenancy::CAP,
+			'af-cobros',
+			array( $this, 'render_cobros' )
+		);
+
+		add_submenu_page(
+			'arriendo-facil',
 			__( 'Edificios y unidades', 'arriendo-facil' ),
 			__( 'Edificios y unidades', 'arriendo-facil' ),
 			Arriendo_Facil_Tenancy::CAP,
@@ -160,6 +169,15 @@ class Arriendo_Facil_Admin {
 			'edit_posts',
 			'af-alerts-center',
 			array( $this, 'render_alerts' )
+		);
+
+		add_submenu_page(
+			'arriendo-facil',
+			__( 'Comunicaciones con inquilinos', 'arriendo-facil' ),
+			__( 'Comunicaciones', 'arriendo-facil' ),
+			Arriendo_Facil_Tenancy::CAP,
+			'af-avisos',
+			array( $this, 'render_avisos' )
 		);
 
 		add_submenu_page(
@@ -2705,6 +2723,20 @@ array(
 	 */
 	public function render_alerts() {
 		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/alerts.php';
+	}
+
+	/**
+	 * Renders the tenant communications (avisos) admin page.
+	 */
+	public function render_avisos() {
+		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/avisos.php';
+	}
+
+	/**
+	 * Renders the collections & services hub (cobros) admin page.
+	 */
+	public function render_cobros() {
+		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/cobros.php';
 	}
 
 	/**

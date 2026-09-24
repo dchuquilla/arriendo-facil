@@ -704,7 +704,7 @@ class Arriendo_Facil_Admin {
 				'icon'  => 'users',
 			),
 			'pagos'       => array(
-				'label' => __( 'Pagos y dispersión', 'arriendo-facil' ),
+				'label' => __( 'Cobranza y pagos', 'arriendo-facil' ),
 				'icon'  => 'credit-card',
 			),
 			'reviews'     => array(
@@ -818,6 +818,15 @@ array(
 			'cap'   => Arriendo_Facil_Tenancy::CAP,
 			'gate'  => true,
 		),
+			array(
+				'slug'  => 'af-cobros',
+				'label' => __( 'Cobros y Servicios', 'arriendo-facil' ),
+				'url'   => admin_url( 'admin.php?page=af-cobros' ),
+				'icon'  => 'circle-alert',
+				'group' => 'pagos',
+				'cap'   => Arriendo_Facil_Tenancy::CAP,
+				'gate'  => true,
+			),
 			array(
 				'slug'  => 'af-collections',
 				'label' => __( 'Pagos y dispersión', 'arriendo-facil' ),
@@ -2568,7 +2577,9 @@ array(
 		}
 
 		// Estilos del Panel (hero de cobranza, tarjetas de estado y métricas operativas).
-		if ( 'toplevel_page_arriendo-facil' === $hook ) {
+		// Se cargan también en el Calendario porque comparte el mismo diseño y
+		// desbloquea af-dashboard-calendar.css (depende de este handle).
+		if ( in_array( $hook, array( 'toplevel_page_arriendo-facil', 'arriendo-facil_page_af-calendar' ), true ) ) {
 			$dashboard_css_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-dashboard.css';
 			wp_enqueue_style(
 				'af-dashboard',

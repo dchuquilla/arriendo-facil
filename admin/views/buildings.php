@@ -434,7 +434,7 @@ foreach ( $units as $unit ) {
 				</table>
 			</section>
 
-			<details class="af-collapse af-section" style="margin-bottom: var(--af-space-5);">
+			<details class="af-collapse af-section" style="margin-bottom: var(--af-space-5);" open>
 				<summary class="af-collapse__summary">
 					<span class="af-section__icon af-section__icon--slate" aria-hidden="true"><?php echo af_lucide( 'settings', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
 					<span class="af-collapse__label"><?php esc_html_e( 'Administrar la estructura del edificio', 'arriendo-facil' ); ?></span>

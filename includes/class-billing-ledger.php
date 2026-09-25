@@ -22,6 +22,7 @@ class Arriendo_Facil_Billing_Ledger {
 	 */
 	public function __construct() {
 		add_action( 'wp_ajax_af_record_payment', array( $this, 'ajax_record_payment' ) );
+		add_action( 'wp_ajax_af_cobranza_snapshot', array( $this, 'ajax_cobranza_snapshot' ) );
 		add_action( 'wp_ajax_af_create_charge', array( $this, 'ajax_create_charge' ) );
 		add_action( 'wp_ajax_af_generate_period_charges', array( $this, 'ajax_generate_period_charges' ) );
 		add_action( 'wp_ajax_af_record_meter_reading', array( $this, 'ajax_record_meter_reading' ) );
@@ -940,6 +941,510 @@ class Arriendo_Facil_Billing_Ledger {
 		}
 
 		wp_send_json_success( array( 'message' => __( 'Cargo anulado correctamente.', 'arriendo-facil' ) ) );
+	}
+
+	/**
+	 * Human labels for the charge types.
+	 *
+	 * @return array<string,string>
+	 */
+	public static function charge_labels() {
+		return array(
+			'canon'     => __( 'Canon', 'arriendo-facil' ),
+			'alicuota'  => __( 'Alícuota', 'arriendo-facil' ),
+			'agua'      => __( 'Agua', 'arriendo-facil' ),
+			'luz'       => __( 'Luz', 'arriendo-facil' ),
+			'gas'       => __( 'Gas', 'arriendo-facil' ),
+			'internet'  => __( 'Internet', 'arriendo-facil' ),
+			'multa'     => __( 'Multa', 'arriendo-facil' ),
+			'otro'      => __( 'Otro', 'arriendo-facil' ),
+		);
+	}
+
+	/**
+	 * Presentation metadata for the per-property collection status.
+	 *
+	 * `card` is the CSS modifier that colours the card, `pill` the badge tone.
+	 *
+	 * @return array<string,array<string,string>>
+	 */
+	public static function cobranza_statuses() {
+		return array(
+			'vencido'       => array( 'pill' => 'danger',  'card' => 'is-danger',    'label' => __( 'Vencido', 'arriendo-facil' ) ),
+			'vence_hoy'     => array( 'pill' => 'danger',  'card' => 'is-danger',    'label' => __( 'Vence hoy', 'arriendo-facil' ) ),
+			'vence_proximo' => array( 'pill' => 'warning', 'card' => 'is-warning',   'label' => __( 'Vence pronto', 'arriendo-facil' ) ),
+			'por_cobrar'    => array( 'pill' => 'info',    'card' => 'is-info',      'label' => __( 'Por cobrar', 'arriendo-facil' ) ),
+			'sin_cargo'     => array( 'pill' => 'neutral', 'card' => 'is-muted',     'label' => __( 'Sin cargo generado', 'arriendo-facil' ) ),
+			'aldia'         => array( 'pill' => 'success', 'card' => 'is-ok',        'label' => __( 'Al día', 'arriendo-facil' ) ),
+			'available'     => array( 'pill' => 'neutral', 'card' => 'is-available', 'label' => __( 'Disponible', 'arriendo-facil' ) ),
+		);
+	}
+
+	/**
+	 * Property types with their label and icon key.
+	 *
+	 * @return array<string,array<string,string>>
+	 */
+	public static function accommodation_types() {
+		return array(
+			'apartment'  => array( 'label' => __( 'Apartamento', 'arriendo-facil' ), 'icon' => 'building' ),
+			'house'      => array( 'label' => __( 'Casa', 'arriendo-facil' ), 'icon' => 'home' ),
+			'office'     => array( 'label' => __( 'Oficina', 'arriendo-facil' ), 'icon' => 'building-2' ),
+			'room'       => array( 'label' => __( 'Habitación', 'arriendo-facil' ), 'icon' => 'bed' ),
+			'commercial' => array( 'label' => __( 'Comercial', 'arriendo-facil' ), 'icon' => 'store' ),
+		);
+	}
+
+	/**
+	 * Builds the per-property collection snapshot used by the "Cobranza por
+	 * inmueble" hub: what to charge, how much is still owed and when it is due.
+	 *
+	 * Shared by the admin view and by the af_cobranza_snapshot endpoint, so the
+	 * page can refresh itself after a payment is recorded.
+	 *
+	 * @param string|null $period Billing period (Y-m). Defaults to the current one.
+	 * @return array{period:string,today:string,props:array,summary:array,statuses:array}
+	 */
+	public static function cobranza_snapshot( $period = null ) {
+		global $wpdb;
+
+		$current_period = $period ? (string) $period : current_time( 'Y-m' );
+		$today          = current_time( 'Y-m-d' );
+		$prev_pe        = gmdate( 'Y-m', strtotime( $current_period . '-01 -1 month' ) );
+		$last_pe        = gmdate( 'Y-m', strtotime( $current_period . '-01 +4 months' ) );
+
+		$scope   = Arriendo_Facil_Tenancy::accessible_accommodation_ids();
+		$acc_ids = array();
+
+		$args = array(
+			'post_type'      => 'accommodation',
+			'post_status'    => array( 'publish', 'draft', 'private' ),
+			'posts_per_page' => 500,
+			'orderby'        => 'title',
+			'order'          => 'ASC',
+			'fields'         => 'ids',
+		);
+		if ( null !== $scope ) {
+			$args['post__in'] = ! empty( $scope ) ? array_map( 'absint', $scope ) : array( 0 );
+		}
+		$acc_ids = (array) get_posts( $args );
+
+		$meta = array();
+		if ( ! empty( $acc_ids ) ) {
+			$ids_sql = Arriendo_Facil_Tenancy::ids_in_clause( $acc_ids );
+			// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery
+			$rows = (array) $wpdb->get_results(
+				"SELECT p.ID,
+				 MAX(CASE WHEN pm.meta_key = '_af_monthly_rent'  THEN pm.meta_value END) AS monthly_rent,
+				 MAX(CASE WHEN pm.meta_key = '_af_property_type' THEN pm.meta_value END) AS property_type,
+				 MAX(CASE WHEN pm.meta_key = '_af_address'       THEN pm.meta_value END) AS address,
+				 MAX(CASE WHEN pm.meta_key = '_af_city'          THEN pm.meta_value END) AS city,
+				 MAX(CASE WHEN pm.meta_key = '_af_bedrooms'      THEN pm.meta_value END) AS bedrooms,
+				 MAX(CASE WHEN pm.meta_key = '_af_thumbnail_id'  THEN pm.meta_value END) AS thumbnail_id
+				 FROM {$wpdb->posts} p
+				 LEFT JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID
+				  AND pm.meta_key IN ('_af_monthly_rent','_af_property_type','_af_address','_af_city','_af_bedrooms','_af_thumbnail_id')
+				 WHERE p.ID IN ({$ids_sql})
+				 GROUP BY p.ID
+				 ORDER BY p.post_title ASC"
+			);
+			// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery
+			foreach ( $rows as $row ) {
+				$meta[ (int) $row->ID ] = $row;
+			}
+		}
+
+		$units = array();
+		if ( ! empty( $acc_ids ) ) {
+			$ph = implode( ',', array_fill( 0, count( $acc_ids ), '%d' ) );
+			$urows = (array) $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT u.accommodation_id, u.unit_code, b.name AS building_name
+					 FROM {$wpdb->prefix}af_units u
+					 LEFT JOIN {$wpdb->prefix}af_buildings b ON b.id = u.building_id
+					 WHERE u.accommodation_id IN ({$ph}) AND u.status = 'active'",
+					$acc_ids
+				) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- placeholder list built safely.
+			);
+			foreach ( $urows as $row ) {
+				$units[ (int) $row->accommodation_id ] = $row;
+			}
+		}
+
+		$leases      = array();
+		$lease_ids   = array();
+		$by_acc      = array();
+		if ( ! empty( $acc_ids ) ) {
+			$ph = implode( ',', array_fill( 0, count( $acc_ids ), '%d' ) );
+			$lrows = (array) $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT l.id, l.accommodation_id, l.guest_id, l.monthly_rent, l.payment_due_day, l.end_date,
+					        CONCAT(g.first_name, ' ', g.last_name) AS guest_name
+					 FROM {$wpdb->prefix}af_leases l
+					 LEFT JOIN {$wpdb->prefix}af_guests g ON g.id = l.guest_id
+					 WHERE l.status = 'active' AND l.deleted_at IS NULL AND l.accommodation_id IN ({$ph})
+					 ORDER BY l.start_date DESC",
+					$acc_ids
+				) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- placeholder list built safely.
+			);
+			foreach ( $lrows as $row ) {
+				if ( ! isset( $leases[ (int) $row->accommodation_id ] ) ) {
+					$leases[ (int) $row->accommodation_id ] = $row;
+				}
+				$lease_ids[] = (int) $row->id;
+			}
+
+			if ( ! empty( $lease_ids ) ) {
+				$cph = implode( ',', array_fill( 0, count( $lease_ids ), '%d' ) );
+				$crows = (array) $wpdb->get_results(
+					$wpdb->prepare(
+						"SELECT c.id, c.lease_id, c.charge_type, c.description, c.amount, c.amount_paid, c.due_date, c.status, c.period,
+						        l.accommodation_id
+						 FROM {$wpdb->prefix}af_charges c
+						 INNER JOIN {$wpdb->prefix}af_leases l ON l.id = c.lease_id
+						 WHERE c.lease_id IN ({$cph}) AND c.period BETWEEN %s AND %s AND c.status <> 'void'
+						 ORDER BY c.period ASC, c.due_date ASC, c.id ASC",
+						array_merge( $lease_ids, array( $prev_pe, $last_pe ) )
+					) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- placeholder list built safely.
+				);
+				foreach ( $crows as $row ) {
+					$by_acc[ (int) $row->accommodation_id ][] = $row;
+				}
+			}
+		}
+
+		$types  = self::accommodation_types();
+		$labels = self::charge_labels();
+
+		$props = array();
+		foreach ( $acc_ids as $acc_id ) {
+			$acc_id = (int) $acc_id;
+			$m      = isset( $meta[ $acc_id ] ) ? $meta[ $acc_id ] : null;
+			$type   = $m ? (string) $m->property_type : '';
+			$unit   = isset( $units[ $acc_id ] ) ? $units[ $acc_id ] : null;
+			$lease  = isset( $leases[ $acc_id ] ) ? $leases[ $acc_id ] : null;
+			$has_ls = null !== $lease;
+			$pay_day = $has_ls ? (int) $lease->payment_due_day : 0;
+			$pay_day = ( $pay_day >= 1 && $pay_day <= 28 ) ? $pay_day : 5;
+			$rows   = isset( $by_acc[ $acc_id ] ) ? $by_acc[ $acc_id ] : array();
+
+			$unpaid       = array();
+			$cur_charges  = array();
+			$cur_pending  = 0.0;
+			$periods      = array();
+
+			foreach ( $rows as $c ) {
+				$ctype = (string) $c->charge_type;
+				$per   = (string) $c->period;
+				$bal   = (float) $c->amount - (float) $c->amount_paid;
+
+				$periods[ $per ][] = array(
+					'id'      => (int) $c->id,
+					'type'    => $ctype,
+					'label'   => isset( $labels[ $ctype ] ) ? $labels[ $ctype ] : $ctype,
+					'desc'    => (string) $c->description,
+					'amount'  => (float) $c->amount,
+					'paid'    => (float) $c->amount_paid,
+					'dueDate' => (string) $c->due_date,
+					'status'  => (string) $c->status,
+				);
+
+				if ( $per === $current_period ) {
+					$cur_charges[] = $c;
+				}
+				if ( in_array( (string) $c->status, array( 'pending', 'partial' ), true ) && $bal > 0.01 ) {
+					$unpaid[] = array( 'balance' => $bal, 'due' => (string) $c->due_date );
+					if ( $per === $current_period ) {
+						$cur_pending += $bal;
+					}
+				}
+			}
+
+			$overdue_total = 0.0;
+			$next_due      = '';
+			$pending_total = 0.0;
+			foreach ( $unpaid as $item ) {
+				$pending_total += $item['balance'];
+				if ( $item['due'] < $today ) {
+					$overdue_total += $item['balance'];
+				}
+				if ( '' === $next_due || $item['due'] < $next_due ) {
+					$next_due = $item['due'];
+				}
+			}
+
+			if ( ! $has_ls && empty( $cur_charges ) ) {
+				$status = 'available';
+			} elseif ( $overdue_total > 0.01 || ( '' !== $next_due && $next_due < $today ) ) {
+				$status = 'vencido';
+			} elseif ( $next_due === $today ) {
+				$status = 'vence_hoy';
+			} elseif ( '' !== $next_due && $next_due > $today && strtotime( $next_due ) <= strtotime( $today . ' +5 days' ) ) {
+				$status = 'vence_proximo';
+			} elseif ( $has_ls && empty( $cur_charges ) ) {
+				$status = 'sin_cargo';
+			} elseif ( $pending_total > 0.01 ) {
+				$status = 'por_cobrar';
+			} else {
+				$status = 'aldia';
+			}
+
+			$props[ $acc_id ] = array(
+				'id'              => $acc_id,
+				'title'           => get_the_title( $acc_id ),
+				'address'         => $m ? (string) $m->address : '',
+				'city'            => $m ? (string) $m->city : '',
+				'type'            => $type,
+				'type_icon'       => isset( $types[ $type ] ) ? $types[ $type ]['icon'] : 'building',
+				'type_label'      => isset( $types[ $type ] ) ? $types[ $type ]['label'] : ucfirst( $type ),
+				'bedrooms'        => $m ? (int) $m->bedrooms : 0,
+				'thumb'           => $m && $m->thumbnail_id ? wp_get_attachment_image_url( (int) $m->thumbnail_id, 'medium_large' ) : get_the_post_thumbnail_url( $acc_id, 'medium_large' ),
+				'unit_code'       => $unit ? (string) $unit->unit_code : '',
+				'building_name'   => $unit ? (string) $unit->building_name : '',
+				'guest'           => $has_ls ? trim( (string) $lease->guest_name ) : '',
+				'monthly_rent'    => $has_ls ? (float) $lease->monthly_rent : ( $m && $m->monthly_rent ? (float) $m->monthly_rent : 0.0 ),
+				'payment_due_day' => $pay_day,
+				'lease_end'       => $has_ls ? (string) $lease->end_date : '',
+				'has_lease'       => $has_ls,
+				'status'          => $status,
+				'pending_total'   => $pending_total,
+				'pending_month'   => $cur_pending,
+				'overdue_total'   => $overdue_total,
+				'next_due'        => $next_due,
+				'charges'         => $periods,
+			);
+		}
+
+		$statuses = self::cobranza_statuses();
+		foreach ( $props as $pid => $prop ) {
+			$props[ $pid ]['due_hint']  = self::cobranza_due_hint( $prop, $today );
+			$props[ $pid ]['due_class'] = self::cobranza_due_class( $prop['status'] );
+			$has_pending              = $prop['pending_total'] > 0.01;
+			$props[ $pid ]['amount_total'] = $has_pending ? $prop['pending_total'] : $prop['monthly_rent'];
+			$props[ $pid ]['amount_label'] = $has_pending
+				/* translators: label under the pending amount on a property card. */
+				? __( 'por cobrar', 'arriendo-facil' )
+				/* translators: suffix when the property has nothing pending. */
+				: __( '/ mes', 'arriendo-facil' );
+		}
+
+		$order = array(
+			'vencido'       => 0,
+			'vence_hoy'     => 1,
+			'vence_proximo' => 2,
+			'por_cobrar'    => 3,
+			'sin_cargo'     => 4,
+			'aldia'         => 5,
+			'available'     => 6,
+		);
+		uasort(
+			$props,
+			static function ( $a, $b ) use ( $order ) {
+				$sa = isset( $order[ $a['status'] ] ) ? $order[ $a['status'] ] : 9;
+				$sb = isset( $order[ $b['status'] ] ) ? $order[ $b['status'] ] : 9;
+				if ( $sa !== $sb ) {
+					return $sa <=> $sb;
+				}
+				$da = $a['next_due'] ? strtotime( $a['next_due'] ) : PHP_INT_MAX;
+				$db = $b['next_due'] ? strtotime( $b['next_due'] ) : PHP_INT_MAX;
+				return $da <=> $db;
+			}
+		);
+
+		$summary = array(
+			'vencido_count' => 0,
+			'vencido_total' => 0.0,
+			'proximo_count' => 0,
+			'proximo_total' => 0.0,
+			'pending_month' => 0.0,
+			'aldia_count'   => 0,
+			'disponibles'   => 0,
+		);
+		foreach ( $props as $prop ) {
+			if ( 'vencido' === $prop['status'] ) {
+				$summary['vencido_count']++;
+				$summary['vencido_total'] += $prop['pending_total'];
+			} elseif ( in_array( $prop['status'], array( 'vence_hoy', 'vence_proximo' ), true ) ) {
+				$summary['proximo_count']++;
+				$summary['proximo_total'] += $prop['pending_total'];
+			} elseif ( 'aldia' === $prop['status'] ) {
+				$summary['aldia_count']++;
+			} elseif ( 'available' === $prop['status'] ) {
+				$summary['disponibles']++;
+			}
+			$summary['pending_month'] += $prop['pending_month'];
+		}
+
+		return array(
+			'period'   => $current_period,
+			'today'    => $today,
+			'props'    => $props,
+			'summary'  => $summary,
+			'statuses' => $statuses,
+			'display'  => self::cobranza_alert_strings( $summary, $current_period ),
+		);
+	}
+
+	/**
+	 * Tone applied to the date/amount text of a property card.
+	 *
+	 * @param string $status Collection status.
+	 * @return string
+	 */
+	private static function cobranza_due_class( $status ) {
+		if ( in_array( $status, array( 'vencido', 'vence_hoy' ), true ) ) {
+			return 'is-danger';
+		}
+		if ( 'vence_proximo' === $status ) {
+			return 'is-warning';
+		}
+		return '';
+	}
+
+	/**
+	 * Human sentence describing when the property is due.
+	 *
+	 * @param array  $prop  Property row from cobranza_snapshot().
+	 * @param string $today Current date (Y-m-d).
+	 * @return string
+	 */
+	private static function cobranza_due_hint( $prop, $today ) {
+		$status = $prop['status'];
+		$due    = $prop['next_due'];
+
+		if ( 'vencido' === $status && $due ) {
+			return sprintf(
+				/* translators: %s: formatted date. */
+				__( 'Vencido desde el %s', 'arriendo-facil' ),
+				date_i18n( 'j M', strtotime( $due ) )
+			);
+		}
+		if ( 'vence_hoy' === $status ) {
+			return __( 'Vence hoy', 'arriendo-facil' );
+		}
+		if ( 'vence_proximo' === $status && $due ) {
+			$days = (int) ceil( ( strtotime( $due ) - strtotime( $today ) ) / DAY_IN_SECONDS );
+			$rel  = 1 === $days
+				? __( 'mañana', 'arriendo-facil' )
+				/* translators: %d: number of days. */
+				: sprintf( _n( 'en %d día', 'en %d días', $days, 'arriendo-facil' ), $days );
+			return sprintf(
+				/* translators: 1: relative time, 2: formatted date. */
+				__( 'Vence %1$s (%2$s)', 'arriendo-facil' ),
+				$rel,
+				date_i18n( 'j M', strtotime( $due ) )
+			);
+		}
+		if ( 'por_cobrar' === $status && $due ) {
+			return sprintf(
+				/* translators: %s: formatted date. */
+				__( 'Vence el %s', 'arriendo-facil' ),
+				date_i18n( 'j M', strtotime( $due ) )
+			);
+		}
+		if ( 'sin_cargo' === $status ) {
+			return sprintf(
+				/* translators: %d: day of the month the rent is due. */
+				__( 'Día de pago: %d de cada mes', 'arriendo-facil' ),
+				(int) $prop['payment_due_day']
+			);
+		}
+		if ( 'aldia' === $status ) {
+			return __( 'Todo al día', 'arriendo-facil' );
+		}
+		return __( 'Sin contrato activo', 'arriendo-facil' );
+	}
+
+	/**
+	 * Ready-to-render strings for the alert strip at the top of the hub.
+	 *
+	 * They are produced here (server side) so the initial render and the
+	 * in-place AJAX refresh can never disagree, and so pluralisation and
+	 * translations stay in PHP.
+	 *
+	 * @param array  $summary Summary counters.
+	 * @param string $period  Billing period (Y-m).
+	 * @return array<string,array|null>
+	 */
+	private static function cobranza_alert_strings( $summary, $period ) {
+		$vencido = null;
+		if ( $summary['vencido_count'] > 0 ) {
+			$vencido = array(
+				'title' => sprintf(
+					/* translators: %d: number of properties. */
+					_n( '%d inmueble con cobros vencidos', '%d inmuebles con cobros vencidos', (int) $summary['vencido_count'], 'arriendo-facil' ),
+					(int) $summary['vencido_count']
+				),
+				'text' => sprintf(
+					/* translators: %s: amount. */
+					__( '%s por cobrar. Revisa las tarjetas en rojo.', 'arriendo-facil' ),
+					'$' . number_format_i18n( (float) $summary['vencido_total'], 2 )
+				),
+			);
+		}
+
+		$proximo = null;
+		if ( $summary['proximo_count'] > 0 ) {
+			$proximo = array(
+				'title' => sprintf(
+					/* translators: %d: number of properties. */
+					_n( '%d inmueble vence en los próximos días', '%d inmuebles vencen en los próximos días', (int) $summary['proximo_count'], 'arriendo-facil' ),
+					(int) $summary['proximo_count']
+				),
+				'text' => sprintf(
+					/* translators: %s: amount. */
+					__( '%s por cobrar. Prepara la cobranza.', 'arriendo-facil' ),
+					'$' . number_format_i18n( (float) $summary['proximo_total'], 2 )
+				),
+			);
+		}
+
+		if ( $summary['vencido_count'] > 0 || $summary['proximo_count'] > 0 ) {
+			$mes_text = sprintf(
+				/* translators: %d: number of properties. */
+				_n( '%d inmueble al día', '%d inmuebles al día', (int) $summary['aldia_count'], 'arriendo-facil' ),
+				(int) $summary['aldia_count']
+			);
+		} else {
+			$mes_text = __( 'Sin vencidos ni cobros próximos. Todo al día.', 'arriendo-facil' );
+		}
+
+		$mes = array(
+			'title' => sprintf(
+				/* translators: 1: amount, 2: billing period. */
+				__( 'Total a cobrar este mes: %1$s (%2$s)', 'arriendo-facil' ),
+				'$' . number_format_i18n( (float) $summary['pending_month'], 2 ),
+				$period
+			),
+			'text'  => $mes_text,
+		);
+
+		return array(
+			'vencido' => $vencido,
+			'proximo' => $proximo,
+			'mes'     => $mes,
+		);
+	}
+
+	/**
+	 * AJAX: fresh collection snapshot, so the hub can refresh itself in place
+	 * after a payment is recorded instead of reloading the page.
+	 *
+	 * @return void
+	 */
+	public function ajax_cobranza_snapshot() {
+		check_ajax_referer( 'af_ledger_nonce', 'nonce' );
+
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$period = isset( $_POST['period'] ) ? sanitize_text_field( wp_unslash( $_POST['period'] ) ) : '';
+		if ( ! preg_match( '/^\d{4}-\d{2}$/', $period ) ) {
+			$period = '';
+		}
+
+		wp_send_json_success( Arriendo_Facil_Billing_Ledger::cobranza_snapshot( $period ? $period : null ) );
 	}
 
 	/**

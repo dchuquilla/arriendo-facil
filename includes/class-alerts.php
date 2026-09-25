@@ -641,6 +641,22 @@ class Arriendo_Facil_Alerts {
 	}
 
 	/**
+	 * Severity rank used to order the digest: the actionable items first.
+	 *
+	 * @param string $severity Alert severity.
+	 * @return int Lower means more urgent.
+	 */
+	private static function severity_rank( $severity ) {
+		$ranks = array(
+			'danger'  => 0,
+			'warning' => 1,
+			'info'    => 2,
+		);
+
+		return isset( $ranks[ $severity ] ) ? $ranks[ $severity ] : 3;
+	}
+
+	/**
 	 * Builds and sends the digest email for a user. Sends at most once per day
 	 * unless $force is true (AJAX "Enviar recordatorio ahora").
 	 *
@@ -668,6 +684,25 @@ class Arriendo_Facil_Alerts {
 		if ( empty( $alerts ) ) {
 			return array( 'sent' => 0, 'message' => __( 'No hay alertas pendientes por enviar.', 'arriendo-facil' ) );
 		}
+
+		// Lo que exige acción va primero: vencidos (danger), luego atención
+		// (warning) y por último lo informativo. A igual severidad se respeta
+		// el orden de creación (usort es estable en PHP 8; el índice ata el
+		// orden en versiones anteriores).
+		$indexed = array();
+		foreach ( array_values( $alerts ) as $i => $alert ) {
+			$indexed[] = array( 'rank' => self::severity_rank( isset( $alert->severity ) ? $alert->severity : 'info' ), 'i' => $i, 'alert' => $alert );
+		}
+		usort(
+			$indexed,
+			static function ( $a, $b ) {
+				if ( $a['rank'] === $b['rank'] ) {
+					return $a['i'] <=> $b['i'];
+				}
+				return $a['rank'] <=> $b['rank'];
+			}
+		);
+		$alerts = array_column( $indexed, 'alert' );
 
 		$daily_key = 'af_alerts_sent_at_' . $user_id;
 		if ( ! $force && ( (int) get_option( $daily_key, 0 ) > strtotime( 'today' ) ) ) {

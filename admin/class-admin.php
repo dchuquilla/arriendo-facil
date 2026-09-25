@@ -146,8 +146,8 @@ class Arriendo_Facil_Admin {
 
 		add_submenu_page(
 			'arriendo-facil',
-			__( 'Edificios y unidades', 'arriendo-facil' ),
-			__( 'Edificios y unidades', 'arriendo-facil' ),
+			__( 'Cobranza por inmueble', 'arriendo-facil' ),
+			__( 'Cobranza por inmueble', 'arriendo-facil' ),
 			Arriendo_Facil_Tenancy::CAP,
 			'af-buildings',
 			array( $this, 'render_buildings' )
@@ -784,7 +784,7 @@ class Arriendo_Facil_Admin {
 			),
 array(
 			'slug'  => 'af-buildings',
-			'label' => __( 'Edificios y unidades', 'arriendo-facil' ),
+			'label' => __( 'Cobranza por inmueble', 'arriendo-facil' ),
 			'url'   => admin_url( 'admin.php?page=af-buildings' ),
 			'icon'  => 'building',
 			'group' => 'propiedades',

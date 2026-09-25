@@ -53,7 +53,7 @@
 	flex: 1;
 	font-weight: 700;
 	font-size: 15px;
-	color: var(--af-gray-800, #1E293B);
+	color: var(--af-gray-900);
 }
 
 .af-collapse__chevron {
@@ -157,34 +157,72 @@
 	gap: var(--af-space-5);
 }
 
+/* Cada estado de cobranza se lee de un vistazo: barra lateral de color +
+   fondo teñido. El color nunca es la única señal: la pastilla de estado
+   siempre acompaña al texto. */
+
 .af-cobranza-card {
+	position: relative;
+	overflow: hidden;
+	border-left: 5px solid var(--af-gray-300, #CBD5E1);
 	cursor: pointer;
 	transition: transform var(--af-motion-base), box-shadow var(--af-motion-base), border-color var(--af-motion-fast);
 }
 
 .af-cobranza-card:hover {
-	border-color: var(--af-primary-200, #8FDBCA);
-	box-shadow: 0 12px 28px -10px rgba(0, 168, 132, 0.22);
+	box-shadow: 0 12px 28px -10px rgba(15, 23, 42, 0.18);
 }
 
-.af-cobranza-card.is-overdue {
-	border-color: color-mix(in srgb, var(--af-danger-500, #E5484D) 45%, transparent);
-	box-shadow: 0 0 0 3px color-mix(in srgb, var(--af-danger-500, #E5484D) 12%, transparent);
-}
+/* Vencido / vence hoy: exige atención. Borde fuerte y sombra roja. */
 
-.af-cobranza-card.is-overdue:hover {
+.af-cobranza-card.is-danger {
 	border-color: var(--af-danger-500, #E5484D);
-	box-shadow: 0 12px 28px -10px rgba(229, 72, 77, 0.28);
+	border-left-color: var(--af-danger-700);
+	background: var(--af-danger-50, #FFF5F5);
 }
 
-.af-cobranza-card.is-soon {
-	border-color: color-mix(in srgb, var(--af-warning-500, #F59E0B) 45%, transparent);
-	box-shadow: 0 0 0 3px color-mix(in srgb, var(--af-warning-500, #F59E0B) 12%, transparent);
+.af-cobranza-card.is-danger:hover {
+	box-shadow: 0 14px 30px -10px rgba(229, 72, 77, 0.32);
 }
 
-.af-cobranza-card.is-soon:hover {
+/* Vence pronto: atención preventiva. */
+
+.af-cobranza-card.is-warning {
 	border-color: var(--af-warning-500, #F59E0B);
-	box-shadow: 0 12px 28px -10px rgba(245, 158, 11, 0.28);
+	border-left-color: var(--af-warning-700);
+	background: var(--af-warning-50, #FFFBEB);
+}
+
+.af-cobranza-card.is-warning:hover {
+	box-shadow: 0 14px 30px -10px rgba(245, 158, 11, 0.3);
+}
+
+/* Por cobrar: saldo pendiente lejos de la fecha de vencimiento. */
+
+.af-cobranza-card.is-info {
+	border-left-color: var(--af-info-500, #3B82F6);
+	background: var(--af-info-50, #EFF6FF);
+}
+
+/* Al día: todo pagado. */
+
+.af-cobranza-card.is-ok {
+	border-left-color: var(--af-success-500, #22C55E);
+	background: var(--af-success-50, #F0FDF4);
+}
+
+/* Sin cargo generado / disponible: informativo, sin alarma. */
+
+.af-cobranza-card.is-muted,
+.af-cobranza-card.is-available {
+	border-left-color: var(--af-gray-300, #CBD5E1);
+	background: var(--af-gray-50, #F8FAFC);
+}
+
+/* La foto sigue mandando: el tinte no debe taparla. */
+
+.af-cobranza-card .af-property-card__media {
+	background: transparent;
 }
 
 .af-buildings-page .af-property-card__media::after {
@@ -277,14 +315,14 @@
 }
 
 .af-cobranza-card__amount small {
-	font-family: var(--af-font-base, inherit);
+	font-family: var(--af-font-family);
 	font-size: var(--af-text-xs, 12px);
 	font-weight: 600;
 	color: var(--af-gray-500, #64748B);
 }
 
 .af-cobranza-card__amount.is-danger {
-	color: var(--af-danger-600, #D93036);
+	color: var(--af-danger-700);
 }
 
 .af-cobranza-card__amount.is-warning {
@@ -299,7 +337,7 @@
 }
 
 .af-cobranza-card__due.is-danger {
-	color: var(--af-danger-600, #D93036);
+	color: var(--af-danger-700);
 }
 
 .af-cobranza-card__due.is-warning {
@@ -414,6 +452,13 @@
 	align-items: center;
 	gap: 4px;
 	padding: 6px 4px;
+	cursor: pointer;
+	transition: border-color var(--af-motion-fast), box-shadow var(--af-motion-fast), opacity var(--af-motion-fast);
+}
+
+.af-calendar-mini__day.has-charges:hover {
+	border-color: var(--af-primary-400);
+	box-shadow: 0 0 0 2px var(--af-primary-100, #D5F3E9);
 }
 
 .af-calendar-mini__day.is-outside {
@@ -424,6 +469,18 @@
 .af-calendar-mini__day.is-today {
 	border-color: var(--af-primary-500, #00A884);
 	box-shadow: 0 0 0 2px var(--af-primary-100, #D5F3E9);
+}
+
+/* Día filtrado desde la lista de cargos. */
+
+.af-calendar-mini__day.is-selected {
+	border-color: var(--af-primary-600, #00926F);
+	background: var(--af-primary-50, #E6F7F3);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--af-primary-500, #00A884) 28%, transparent);
+}
+
+.af-calendar-mini__day.is-dimmed {
+	opacity: 0.4;
 }
 
 .af-calendar-mini__day-num {
@@ -466,12 +523,12 @@
 	outline-offset: 1px;
 }
 
-/* Leyenda del calendario. */
+/* Leyenda del calendario. Los botones de estado filtran la lista. */
 
 .af-calendar-mini__legend {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 8px 16px;
+	gap: 8px 10px;
 	margin-bottom: var(--af-space-4);
 	padding: var(--af-space-3) var(--af-space-4);
 	border-radius: var(--af-radius-md);
@@ -480,7 +537,8 @@
 	color: var(--af-gray-600, #475569);
 }
 
-.af-calendar-mini__legend span {
+.af-calendar-mini__legend span,
+.af-calendar-mini__legend .af-calendar-mini__filter {
 	display: inline-flex;
 	align-items: center;
 	gap: 6px;
@@ -512,6 +570,139 @@
 	background: var(--af-primary-500, #00A884);
 }
 
+/* Filtro por estado: se atenúa y deja de ser pulsable visualmente. */
+
+.af-calendar-mini__filter {
+	margin: 0;
+	padding: 3px 9px;
+	border: 1px solid var(--af-gray-200, #E2E8F0);
+	border-radius: var(--af-radius-full);
+	background: var(--af-gray-0, #fff);
+	color: var(--af-gray-700, #334155);
+	font-size: var(--af-text-xs, 12px);
+	font-weight: 700;
+	cursor: pointer;
+	transition: opacity var(--af-motion-fast), border-color var(--af-motion-fast);
+}
+
+.af-calendar-mini__filter:hover {
+	border-color: var(--af-primary-400);
+}
+
+.af-calendar-mini__filter.is-off {
+	opacity: 0.42;
+	text-decoration: line-through;
+}
+
+.af-calendar-mini__filter:focus-visible {
+	outline: 2px solid var(--af-primary-500, #00A884);
+	outline-offset: 2px;
+}
+
+/* Resumen del mes. */
+
+.af-cobranza-summary {
+	margin: 0 0 var(--af-space-4);
+	padding: var(--af-space-4);
+	border: 1px solid var(--af-gray-200, #E2E8F0);
+	border-radius: var(--af-radius-lg, 14px);
+	background: var(--af-gray-0, #fff);
+}
+
+.af-cobranza-summary__row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--af-space-3) var(--af-space-5);
+	margin-bottom: var(--af-space-3);
+}
+
+.af-cobranza-summary__item {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.af-cobranza-summary__k {
+	font-size: 11px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--af-gray-500, #64748B);
+}
+
+.af-cobranza-summary__v {
+	font-family: var(--af-font-numeric, ui-monospace, SFMono-Regular, Menlo, monospace);
+	font-variant-numeric: tabular-nums;
+	font-size: var(--af-text-base, 16px);
+	font-weight: 800;
+	color: var(--af-gray-900, #0F172A);
+}
+
+.af-cobranza-summary__v.is-ok {
+	color: var(--af-success-700, #15803D);
+}
+
+.af-cobranza-summary__v.is-danger {
+	color: var(--af-danger-700);
+}
+
+.af-cobranza-summary__bar {
+	height: 8px;
+	border-radius: var(--af-radius-full);
+	background: var(--af-gray-200, #E2E8F0);
+	overflow: hidden;
+}
+
+.af-cobranza-summary__fill {
+	display: block;
+	height: 100%;
+	border-radius: var(--af-radius-full);
+	background: var(--af-success-500, #22C55E);
+	transition: width var(--af-motion-slow, 0.35s);
+}
+
+/* Chip del día filtrado. */
+
+.af-cobranza-dayfilter {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--af-space-3);
+	margin-bottom: var(--af-space-3);
+	padding: var(--af-space-2) var(--af-space-3) var(--af-space-2) var(--af-space-4);
+	border: 1px solid var(--af-primary-200, #8FDBCA);
+	border-radius: var(--af-radius-full);
+	background: var(--af-primary-50, #E6F7F3);
+}
+
+.af-cobranza-dayfilter__chip {
+	font-size: var(--af-text-xs, 12px);
+	font-weight: 700;
+	color: var(--af-primary-700);
+}
+
+.af-cobranza-dayfilter .af-btn {
+	padding: 3px 10px;
+	font-size: 12px;
+}
+
+/* Tooltip del calendario. */
+
+.af-cobranza-tip {
+	position: absolute;
+	z-index: 20;
+	max-width: 260px;
+	padding: 6px 10px;
+	border-radius: var(--af-radius-md, 10px);
+	background: var(--af-gray-900, #0F172A);
+	color: #fff;
+	font-size: 11.5px;
+	font-weight: 600;
+	line-height: 1.4;
+	pointer-events: none;
+	box-shadow: 0 8px 20px -6px rgba(15, 23, 42, 0.4);
+}
+
 /* Lista de cargos del mes. */
 
 .af-cobranza-charges__title {
@@ -535,11 +726,20 @@
 	display: flex;
 	align-items: center;
 	gap: var(--af-space-3);
-	padding: var(--af-space-3) var(--af-space-4);
+	padding: var(--af-space-3);
+	margin: 0 0 var(--af-space-2);
 	border: 1px solid var(--af-gray-200, #E2E8F0);
 	border-radius: var(--af-radius-md, 10px);
 	background: var(--af-gray-0, #fff);
+	cursor: pointer;
+	transition: border-color var(--af-motion-fast), box-shadow var(--af-motion-fast);
 }
+
+.af-cobranza-charge:hover {
+	border-color: var(--af-primary-400);
+	box-shadow: 0 1px 2px -1px rgba(15, 23, 42, 0.1);
+}
+
 
 .af-cobranza-charge.is-paid {
 	opacity: 0.68;
@@ -560,7 +760,18 @@
 
 .af-cobranza-charge.is-paid .af-cobranza-charge__icon {
 	background: var(--af-success-50, #F0FDF4);
-	color: var(--af-success-600, #16A34A);
+	color: var(--af-success-700);
+}
+
+/* Tono del borde según el estado del cargo. */
+
+.af-cobranza-charge.is-overdue {
+	border-color: color-mix(in srgb, var(--af-danger-500, #E5484D) 42%, transparent);
+}
+
+.af-cobranza-charge.is-overdue .af-cobranza-charge__icon {
+	background: var(--af-danger-50, #FFF5F5);
+	color: var(--af-danger-700);
 }
 
 .af-cobranza-charge__body {
@@ -655,7 +866,7 @@
 	margin: 0 0 var(--af-space-2);
 	font-size: 14px;
 	font-weight: 800;
-	color: var(--af-primary-800, #005A44);
+	color: var(--af-primary-700);
 }
 
 .af-cobranza-pay .af-modal__field {
@@ -686,7 +897,7 @@
 .af-cobranza-avail .af-collapse__summary {
 	font-weight: 700;
 	font-size: 15px;
-	color: var(--af-gray-800, #1E293B);
+	color: var(--af-gray-900);
 }
 
 /* ── Responsive ─────────────────────────────────────────────────────────── */

@@ -240,6 +240,17 @@ foreach ( $cob_props as $cob_acc_id => $cob_prop ) {
 					</section>
 
 					<div class="af-property-grid af-cobranza-grid" id="af-cobranza-grid">
+						<?php if ( empty( $cob_active_props ) ) : ?>
+							<p class="af-cobranza-grid__empty">
+								<?php
+								printf(
+									/* translators: %d: number of properties without an active lease. */
+									esc_html( _n( 'No hay inmuebles con contrato activo todavía. El %d inmueble disponible está en el bloque de abajo.', 'No hay inmuebles con contrato activo todavía. Los %d inmuebles disponibles están en el bloque de abajo.', count( $cob_available_props ), 'arriendo-facil' ) ),
+									esc_html( number_format_i18n( count( $cob_available_props ) ) )
+								);
+								?>
+							</p>
+						<?php endif; ?>
 						<?php foreach ( $cob_active_props as $acc_id => $prop ) : ?>
 							<?php
 							$csm       = $cob_statuses[ $prop['status'] ];

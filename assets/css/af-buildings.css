@@ -157,14 +157,12 @@
 	gap: var(--af-space-5);
 }
 
-/* Cada estado de cobranza se lee de un vistazo: barra lateral de color +
-   fondo teñido. El color nunca es la única señal: la pastilla de estado
+/* El estado de cobranza se marca pintando el marco de la tarjeta. El fondo
+   sigue siendo el blanco de .af-property-card: la tarjeta no se tiñe, solo se
+   pinta el borde. El color nunca es la única señal, la pastilla de estado
    siempre acompaña al texto. */
 
 .af-cobranza-card {
-	position: relative;
-	overflow: hidden;
-	border-left: 5px solid var(--af-gray-300, #CBD5E1);
 	cursor: pointer;
 	transition: transform var(--af-motion-base), box-shadow var(--af-motion-base), border-color var(--af-motion-fast);
 }
@@ -173,24 +171,20 @@
 	box-shadow: 0 12px 28px -10px rgba(15, 23, 42, 0.18);
 }
 
-/* Vencido / vence hoy: exige atención. Borde fuerte y sombra roja. */
+/* Vencido / vence hoy: exige atención. */
 
 .af-cobranza-card.is-danger {
-	border-color: var(--af-danger-500, #E5484D);
-	border-left-color: var(--af-danger-700);
-	background: var(--af-danger-50, #FFF5F5);
+	border-color: var(--af-danger-500);
 }
 
 .af-cobranza-card.is-danger:hover {
-	box-shadow: 0 14px 30px -10px rgba(229, 72, 77, 0.32);
+	box-shadow: 0 14px 30px -10px rgba(220, 38, 38, 0.32);
 }
 
 /* Vence pronto: atención preventiva. */
 
 .af-cobranza-card.is-warning {
-	border-color: var(--af-warning-500, #F59E0B);
-	border-left-color: var(--af-warning-700);
-	background: var(--af-warning-50, #FFFBEB);
+	border-color: var(--af-warning-500);
 }
 
 .af-cobranza-card.is-warning:hover {
@@ -200,29 +194,29 @@
 /* Por cobrar: saldo pendiente lejos de la fecha de vencimiento. */
 
 .af-cobranza-card.is-info {
-	border-left-color: var(--af-info-500, #3B82F6);
-	background: var(--af-info-50, #EFF6FF);
+	border-color: var(--af-info-500);
 }
 
 /* Al día: todo pagado. */
 
 .af-cobranza-card.is-ok {
-	border-left-color: var(--af-success-500, #22C55E);
-	background: var(--af-success-50, #F0FDF4);
+	border-color: var(--af-success-500);
 }
 
 /* Sin cargo generado / disponible: informativo, sin alarma. */
 
 .af-cobranza-card.is-muted,
 .af-cobranza-card.is-available {
-	border-left-color: var(--af-gray-300, #CBD5E1);
-	background: var(--af-gray-50, #F8FAFC);
+	border-color: var(--af-gray-300);
 }
 
-/* La foto sigue mandando: el tinte no debe taparla. */
-
-.af-cobranza-card .af-property-card__media {
-	background: transparent;
+.af-cobranza-card.is-danger,
+.af-cobranza-card.is-warning,
+.af-cobranza-card.is-info,
+.af-cobranza-card.is-ok,
+.af-cobranza-card.is-muted,
+.af-cobranza-card.is-available {
+	border-width: 2px;
 }
 
 .af-buildings-page .af-property-card__media::after {

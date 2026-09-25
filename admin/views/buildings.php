@@ -868,7 +868,9 @@ $cob_principal = array_filter(
 		payReference.value = '';
 		hidePayStatus();
 		payPanel.hidden = false;
-		payPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+		if (typeof payPanel.scrollIntoView === 'function') {
+			payPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+		}
 	}
 
 	payCancel.addEventListener('click', function () {

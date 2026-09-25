@@ -2,9 +2,14 @@
 /**
  * Buildings and units admin page view.
  *
- * Framed as a billing hub: each unit is a tenant to charge (canon + alicuota
- * + services) and the page shows who lives in each unit and what is pending
- * for the current period.
+ * Billing hub: every unit is a tenant to charge (canon + alicuota + services).
+ * Each property is a card with its pending amount and due date; clicking the
+ * card opens a modal with the month's charge calendar and lets you register a
+ * payment inline.
+ *
+ * The script and the data payload are inlined at the end of this file on
+ * purpose: this view is deployed as a single file, so the modal works without
+ * depending on a separately enqueued asset.
  *
  * @package Arriendo_Facil
  */
@@ -13,149 +18,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-$buildings_table = Arriendo_Facil_Property_Structure::buildings_table();
-
 global $wpdb;
 
-$accessible_building_ids = Arriendo_Facil_Tenancy::accessible_building_ids();
-$scope_clause            = null === $accessible_building_ids ? '' : ' AND id IN (' . Arriendo_Facil_Tenancy::ids_in_clause( $accessible_building_ids ) . ')';
-
-$buildings   = (array) $wpdb->get_results( "SELECT * FROM {$buildings_table} WHERE status = 'active'{$scope_clause} ORDER BY name ASC" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-$selected_id = isset( $_GET['building_id'] ) ? absint( wp_unslash( $_GET['building_id'] ) ) : 0;
-
-if ( $selected_id && ! Arriendo_Facil_Tenancy::can_access_building( $selected_id ) ) {
-	$selected_id = 0;
-}
-
-if ( ! $selected_id && ! empty( $buildings ) ) {
-	$selected_id = (int) $buildings[0]->id;
-}
-
-$selected_building = $selected_id ? Arriendo_Facil_Property_Structure::get_building( $selected_id ) : null;
-$units             = $selected_id ? Arriendo_Facil_Property_Structure::get_units_by_building( $selected_id ) : array();
-$coefficient_total = $selected_id ? Arriendo_Facil_Property_Structure::get_coefficient_total( $selected_id ) : 0.0;
-
-$is_super_admin  = Arriendo_Facil_Tenancy::can_manage_all();
-$property_admins = $is_super_admin ? Arriendo_Facil_Tenancy::get_property_admins() : array();
-
-$accommodation_args = array(
-	'post_type'      => 'accommodation',
-	'post_status'    => array( 'publish', 'draft', 'private' ),
-	'posts_per_page' => 200,
-	'orderby'        => 'title',
-	'order'          => 'ASC',
-);
-$accessible_accommodation_ids_for_dropdown = Arriendo_Facil_Tenancy::accessible_accommodation_ids();
-if ( null !== $accessible_accommodation_ids_for_dropdown ) {
-	$accommodation_args['post__in'] = ! empty( $accessible_accommodation_ids_for_dropdown ) ? $accessible_accommodation_ids_for_dropdown : array( 0 );
-}
-$accommodations = get_posts( $accommodation_args );
-
-// Unit count per building, used by the building switcher chips.
-$unit_counts = array();
-if ( ! empty( $buildings ) ) {
-	$building_ids = array_map( 'absint', wp_list_pluck( $buildings, 'id' ) );
-	$ids_sql      = Arriendo_Facil_Tenancy::ids_in_clause( $building_ids );
-	$unit_rows    = $wpdb->get_results(
-		'SELECT building_id, COUNT(*) AS total FROM ' . Arriendo_Facil_Property_Structure::units_table() . " WHERE building_id IN ({$ids_sql}) AND status = 'active' GROUP BY building_id" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-	);
-	foreach ( (array) $unit_rows as $row ) {
-		$unit_counts[ (int) $row->building_id ] = (int) $row->total;
-	}
-}
-
-// ---- Billing snapshot for the selected building --------------------------
-//
-// Active leases for the units' linked accommodations, the charges generated
-// for the current period and how much is still pending per unit.
 $current_period = current_time( 'Y-m' );
 
-$units_leases          = array();
-$charges_by_lease      = array();
-$active_lease_count    = 0;
-$pending_total_period  = 0.0;
-$alicuota_total        = 0.0;
-
-$linked_accommodation_ids = array_values(
-	array_unique(
-		array_filter(
-			array_map( 'absint', wp_list_pluck( $units, 'accommodation_id' ) )
-		)
-	)
-);
-
-if ( ! empty( $linked_accommodation_ids ) && ! empty( $units ) ) {
-	$acc_ph    = implode( ',', array_fill( 0, count( $linked_accommodation_ids ), '%d' ) );
-	$lease_rows = (array) $wpdb->get_results(
-		$wpdb->prepare(
-			"SELECT l.id, l.accommodation_id, l.guest_id, l.monthly_rent, l.start_date, l.end_date,
-			        CONCAT(g.first_name, ' ', g.last_name) AS guest_name
-			 FROM {$wpdb->prefix}af_leases l
-			 LEFT JOIN {$wpdb->prefix}af_guests g ON g.id = l.guest_id
-			 WHERE l.status = 'active' AND l.deleted_at IS NULL AND l.accommodation_id IN ({$acc_ph})",
-			$linked_accommodation_ids
-		) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- placeholder list built safely.
-	);
-
-	foreach ( $lease_rows as $lease_row ) {
-		$units_leases[ (int) $lease_row->accommodation_id ] = $lease_row;
-	}
-
-	$lease_ids = array_map( 'absint', wp_list_pluck( $lease_rows, 'id' ) );
-	if ( ! empty( $lease_ids ) ) {
-		$active_lease_count = count( $lease_ids );
-		$lease_ph           = implode( ',', array_fill( 0, count( $lease_ids ), '%d' ) );
-		$charge_rows        = (array) $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT lease_id, charge_type, amount, amount_paid, status
-				 FROM {$wpdb->prefix}af_charges
-				 WHERE lease_id IN ({$lease_ph}) AND period = %s",
-				array_merge( $lease_ids, array( $current_period ) )
-			) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- placeholder list built safely.
-		);
-
-		foreach ( $charge_rows as $charge_row ) {
-			$charges_by_lease[ (int) $charge_row->lease_id ][ (string) $charge_row->charge_type ] = $charge_row;
-		}
-	}
-}
-
-$units_meta = array();
-foreach ( $units as $unit ) {
-	$lease     = isset( $units_leases[ (int) $unit->accommodation_id ] ) ? $units_leases[ (int) $unit->accommodation_id ] : null;
-	$unit_hoa  = Arriendo_Facil_Property_Structure::calculate_unit_hoa( (int) $unit->id );
-	$alicuota_total += $unit_hoa;
-
-	$charges = array();
-	if ( $lease && isset( $charges_by_lease[ (int) $lease->id ] ) ) {
-		$charges = $charges_by_lease[ (int) $lease->id ];
-	}
-
-	$pending = 0.0;
-	foreach ( $charges as $charge ) {
-		if ( in_array( (string) $charge->status, array( 'pending', 'partial', 'overdue' ), true ) ) {
-			$pending += (float) $charge->amount - (float) $charge->amount_paid;
-		}
-	}
-	$pending_total_period += $pending;
-
-	if ( null === $lease ) {
-		$badge = empty( (int) $unit->accommodation_id ) ? 'unlinked' : 'available';
-	} elseif ( $pending > 0.01 ) {
-		$badge = 'pending';
-	} else {
-		$badge = 'aldia';
-	}
-
-	$units_meta[ (int) $unit->id ] = array(
-		'lease'   => $lease,
-		'hoa'     => $unit_hoa,
-		'pending' => $pending,
-		'badge'   => $badge,
-	);
-}
 // ---------------------------------------------------------------------
-// Cobranza: snapshot por inmueble (qué cobrar y cuándo) del tab "Cobranza".
+// Cobranza: snapshot por inmueble (qué cobrar y cuándo).
 // ---------------------------------------------------------------------
 $cob_today   = current_time( 'Y-m-d' );
 $cob_scope   = Arriendo_Facil_Tenancy::accessible_accommodation_ids();
@@ -290,9 +158,9 @@ foreach ( $cob_acc_ids as $acc_id ) {
 	$pay_day  = $pay_day >= 1 && $pay_day <= 28 ? $pay_day : 5;
 	$charges  = isset( $cob_charges_acc[ $acc_id ] ) ? $cob_charges_acc[ $acc_id ] : array();
 
-	$unpaid       = array();
-	$cur_charges  = array();
-	$cur_pending  = 0.0;
+	$unpaid      = array();
+	$cur_charges = array();
+	$cur_pending = 0.0;
 	foreach ( $charges as $c ) {
 		if ( (string) $c->period === $current_period ) {
 			$cur_charges[] = $c;
@@ -346,14 +214,12 @@ foreach ( $cob_acc_ids as $acc_id ) {
 		'type_icon'       => isset( $cob_types[ $type ] ) ? $cob_types[ $type ]['icon'] : 'building',
 		'type_label'      => isset( $cob_types[ $type ] ) ? $cob_types[ $type ]['label'] : ucfirst( $type ),
 		'bedrooms'        => $meta ? (int) $meta->bedrooms : 0,
-		'bathrooms'       => $meta ? (int) $meta->bathrooms : 0,
 		'thumb'           => $meta && $meta->thumbnail_id ? wp_get_attachment_image_url( (int) $meta->thumbnail_id, 'medium_large' ) : get_the_post_thumbnail_url( $acc_id, 'medium_large' ),
 		'unit_code'       => $unit ? (string) $unit->unit_code : '',
 		'building_name'   => $unit ? (string) $unit->building_name : '',
 		'guest'           => $has_ls ? trim( (string) $lease->guest_name ) : '',
 		'monthly_rent'    => $has_ls ? (float) $lease->monthly_rent : ( $meta && $meta->monthly_rent ? (float) $meta->monthly_rent : 0.0 ),
 		'payment_due_day' => $pay_day,
-		'lease_id'        => $has_ls ? (int) $lease->id : 0,
 		'lease_end'       => $has_ls ? (string) $lease->end_date : '',
 		'has_lease'       => $has_ls,
 		'status'          => $status,
@@ -401,7 +267,7 @@ $cob_statuses_order = array(
 	'aldia'         => 5,
 	'available'     => 6,
 );
-usort(
+uasort(
 	$cob_props,
 	static function ( $a, $b ) use ( $cob_statuses_order ) {
 		$sa = isset( $cob_statuses_order[ $a['status'] ] ) ? $cob_statuses_order[ $a['status'] ] : 9;
@@ -416,13 +282,13 @@ usort(
 );
 
 $cob_summary = array(
-	'vencido_count'  => 0,
-	'vencido_total'  => 0.0,
-	'proximo_count'  => 0,
-	'proximo_total'  => 0.0,
-	'pending_month'  => 0.0,
-	'aldia_count'    => 0,
-	'disponibles'    => 0,
+	'vencido_count' => 0,
+	'vencido_total' => 0.0,
+	'proximo_count' => 0,
+	'proximo_total' => 0.0,
+	'pending_month' => 0.0,
+	'aldia_count'   => 0,
+	'disponibles'   => 0,
 );
 foreach ( $cob_props as $prop ) {
 	if ( 'vencido' === $prop['status'] ) {
@@ -456,139 +322,196 @@ $cob_status_meta = array(
 		array(
 			'eyebrow'  => __( 'Cobranza', 'arriendo-facil' ),
 			'title'    => __( 'Edificios y unidades', 'arriendo-facil' ),
-			'subtitle' => __( 'Tus inmuebles a cobrar, por tarjeta: cuánto falta por cobrar y cuándo vence. Pulsa una tarjeta para abrir el calendario de cobros del mes. La gestión de edificios y unidades vive en la pestaña "Estructura".', 'arriendo-facil' ),
+			'subtitle' => __( 'Tus inmuebles a cobrar, por tarjeta: cuánto falta por cobrar y cuándo vence. Pulsa una tarjeta para abrir el calendario de cobros del mes.', 'arriendo-facil' ),
 		)
 	);
 	?>
 
-	<div class="af-tabs af-buildings-tabs">
-		<input type="radio" class="af-tabs__radio" id="af-tab-cobranza" name="af-buildings-tabs" checked />
-		<input type="radio" class="af-tabs__radio" id="af-tab-estructura" name="af-buildings-tabs" />
-		<div class="af-tabs__nav" role="tablist" aria-label="<?php esc_attr_e( 'Sección de edificios y unidades', 'arriendo-facil' ); ?>">
-			<label class="af-tabs__tab" for="af-tab-cobranza" role="tab" aria-selected="true">
-				<span class="af-tabs__icon" aria-hidden="true"><?php echo af_lucide( 'wallet', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-				<span class="af-tabs__label"><?php esc_html_e( 'Cobranza', 'arriendo-facil' ); ?></span>
-				<?php if ( $cob_summary['vencido_count'] + $cob_summary['proximo_count'] > 0 ) : ?>
-					<span class="af-tabs__badge af-tabs__badge--attention"><?php echo esc_html( number_format_i18n( $cob_summary['vencido_count'] + $cob_summary['proximo_count'] ) ); ?></span>
-				<?php endif; ?>
-			</label>
-			<label class="af-tabs__tab" for="af-tab-estructura" role="tab" aria-selected="false">
-				<span class="af-tabs__icon" aria-hidden="true"><?php echo af_lucide( 'building-2', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-				<span class="af-tabs__label"><?php esc_html_e( 'Estructura', 'arriendo-facil' ); ?></span>
-			</label>
+	<?php if ( empty( $cob_props ) && 0 === $cob_summary['disponibles'] ) : ?>
+		<div class="af-empty">
+			<span class="af-empty__icon" aria-hidden="true"><?php echo af_lucide( 'building', 28 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+			<h3 class="af-empty__title"><?php esc_html_e( 'Aún no tienes inmuebles registrados', 'arriendo-facil' ); ?></h3>
+			<p class="af-empty__text"><?php esc_html_e( 'Registra tus propiedades en el Catálogo de inmuebles para que aparezcan aquí, con su canon y sus fechas de cobro.', 'arriendo-facil' ); ?></p>
+			<a class="button af-btn af-btn--primary" href="<?php echo esc_url( admin_url( 'admin.php?page=af-catalog' ) ); ?>"><?php esc_html_e( 'Ir al catálogo', 'arriendo-facil' ); ?></a>
 		</div>
-		<div class="af-tabs__panels">
-			<section class="af-tabs__panel af-tabs__panel--cobranza" role="tabpanel" aria-labelledby="af-tab-cobranza">
-				<?php if ( empty( $cob_props ) && 0 === $cob_summary['disponibles'] ) : ?>
-					<div class="af-empty">
-						<span class="af-empty__icon" aria-hidden="true"><?php echo af_lucide( 'building', 28 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-						<h3 class="af-empty__title"><?php esc_html_e( 'Aún no tienes inmuebles registrados', 'arriendo-facil' ); ?></h3>
-						<p class="af-empty__text"><?php esc_html_e( 'Registra tus propiedades en el Catálogo de inmuebles para que aparezcan aquí, con su canon y sus fechas de cobro.', 'arriendo-facil' ); ?></p>
-						<a class="button af-btn af-btn--primary" href="<?php echo esc_url( admin_url( 'admin.php?page=af-catalog' ) ); ?>"><?php esc_html_e( 'Ir al catálogo', 'arriendo-facil' ); ?></a>
+	<?php else : ?>
+		<section class="af-cobranza-alerts">
+			<?php if ( $cob_summary['vencido_count'] > 0 ) : ?>
+				<div class="af-cobranza-alert af-cobranza-alert--danger">
+					<span class="af-cobranza-alert__icon" aria-hidden="true"><?php echo af_lucide( 'triangle-alert', 20 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+					<div class="af-cobranza-alert__body">
+						<strong><?php echo esc_html( sprintf( /* translators: %d: number of properties */ _n( '%d inmueble con cobros vencidos', '%d inmuebles con cobros vencidos', $cob_summary['vencido_count'], 'arriendo-facil' ), $cob_summary['vencido_count'] ) ); ?></strong>
+						<span><?php echo esc_html( sprintf( /* translators: %s: amount */ __( '%s por cobrar. Revisa las tarjetas en rojo.', 'arriendo-facil' ), '$' . number_format_i18n( $cob_summary['vencido_total'], 2 ) ) ); ?></span>
 					</div>
-				<?php else : ?>
-					<section class="af-cobranza-alerts">
-						<?php if ( $cob_summary['vencido_count'] > 0 ) : ?>
-							<div class="af-cobranza-alert af-cobranza-alert--danger">
-								<span class="af-cobranza-alert__icon" aria-hidden="true"><?php echo af_lucide( 'triangle-alert', 20 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-								<div class="af-cobranza-alert__body">
-									<strong><?php echo esc_html( sprintf( /* translators: %d: number of properties */ _n( '%d inmueble con cobros vencidos', '%d inmuebles con cobros vencidos', $cob_summary['vencido_count'], 'arriendo-facil' ), $cob_summary['vencido_count'] ) ); ?></strong>
-									<span><?php echo esc_html( sprintf( /* translators: %s: amount */ __( '%s por cobrar. Revisa las tarjetas en rojo.', 'arriendo-facil' ), '$' . number_format_i18n( $cob_summary['vencido_total'], 2 ) ) ); ?></span>
-								</div>
-							</div>
-						<?php endif; ?>
+				</div>
+			<?php endif; ?>
 
-						<?php if ( $cob_summary['proximo_count'] > 0 ) : ?>
-							<div class="af-cobranza-alert af-cobranza-alert--warning">
-								<span class="af-cobranza-alert__icon" aria-hidden="true"><?php echo af_lucide( 'clock', 20 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-								<div class="af-cobranza-alert__body">
-									<strong><?php echo esc_html( sprintf( /* translators: %d: number of properties */ _n( '%d inmueble vence en los próximos días', '%d inmuebles vencen en los próximos días', $cob_summary['proximo_count'], 'arriendo-facil' ), $cob_summary['proximo_count'] ) ); ?></strong>
-									<span><?php echo esc_html( sprintf( /* translators: %s: amount */ __( '%s por cobrar. Prepara la cobranza.', 'arriendo-facil' ), '$' . number_format_i18n( $cob_summary['proximo_total'], 2 ) ) ); ?></span>
-								</div>
-							</div>
-						<?php endif; ?>
+			<?php if ( $cob_summary['proximo_count'] > 0 ) : ?>
+				<div class="af-cobranza-alert af-cobranza-alert--warning">
+					<span class="af-cobranza-alert__icon" aria-hidden="true"><?php echo af_lucide( 'clock', 20 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+					<div class="af-cobranza-alert__body">
+						<strong><?php echo esc_html( sprintf( /* translators: %d: number of properties */ _n( '%d inmueble vence en los próximos días', '%d inmuebles vencen en los próximos días', $cob_summary['proximo_count'], 'arriendo-facil' ), $cob_summary['proximo_count'] ) ); ?></strong>
+						<span><?php echo esc_html( sprintf( /* translators: %s: amount */ __( '%s por cobrar. Prepara la cobranza.', 'arriendo-facil' ), '$' . number_format_i18n( $cob_summary['proximo_total'], 2 ) ) ); ?></span>
+					</div>
+				</div>
+			<?php endif; ?>
 
-						<div class="af-cobranza-alert af-cobranza-alert--ok">
-							<span class="af-cobranza-alert__icon" aria-hidden="true"><?php echo af_lucide( 'calendar', 20 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-							<div class="af-cobranza-alert__body">
-								<strong><?php echo esc_html( sprintf( /* translators: 1: amount, 2: period */ __( 'Total a cobrar este mes: %1$s (%2$s)', 'arriendo-facil' ), '$' . number_format_i18n( $cob_summary['pending_month'], 2 ), $current_period ) ); ?></strong>
-								<span>
-									<?php
-									if ( $cob_summary['vencido_count'] > 0 || $cob_summary['proximo_count'] > 0 ) {
-										echo esc_html( sprintf( /* translators: %d: number of properties */ _n( '%d inmueble al día', '%d inmuebles al día', $cob_summary['aldia_count'], 'arriendo-facil' ), $cob_summary['aldia_count'] ) );
-									} else {
-										echo esc_html__( 'Sin vencidos ni cobros próximos. Todo al día.', 'arriendo-facil' );
-									}
-									?>
-								</span>
-							</div>
+			<div class="af-cobranza-alert af-cobranza-alert--ok">
+				<span class="af-cobranza-alert__icon" aria-hidden="true"><?php echo af_lucide( 'calendar', 20 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+				<div class="af-cobranza-alert__body">
+					<strong><?php echo esc_html( sprintf( /* translators: 1: amount, 2: period */ __( 'Total a cobrar este mes: %1$s (%2$s)', 'arriendo-facil' ), '$' . number_format_i18n( $cob_summary['pending_month'], 2 ), $current_period ) ); ?></strong>
+					<span>
+						<?php
+						if ( $cob_summary['vencido_count'] > 0 || $cob_summary['proximo_count'] > 0 ) {
+							echo esc_html( sprintf( /* translators: %d: number of properties */ _n( '%d inmueble al día', '%d inmuebles al día', $cob_summary['aldia_count'], 'arriendo-facil' ), $cob_summary['aldia_count'] ) );
+						} else {
+							echo esc_html__( 'Sin vencidos ni cobros próximos. Todo al día.', 'arriendo-facil' );
+						}
+						?>
+					</span>
+				</div>
+			</div>
+		</section>
+
+		<div class="af-property-grid af-cobranza-grid">
+			<?php foreach ( $cob_props as $prop ) : ?>
+				<?php
+				$csm       = $cob_status_meta[ $prop['status'] ];
+				$address   = trim( trim( (string) $prop['address'] ) . ( $prop['city'] ? ', ' . $prop['city'] : '' ) );
+				$due_hint  = '';
+				$due_class = '';
+				if ( 'vencido' === $prop['status'] && $prop['next_due'] ) {
+					$due_hint  = sprintf(
+						/* translators: %s: formatted date */
+						__( 'Vencido desde el %s', 'arriendo-facil' ),
+						date_i18n( 'j M', strtotime( $prop['next_due'] ) )
+					);
+					$due_class = 'is-danger';
+				} elseif ( 'vence_hoy' === $prop['status'] ) {
+					$due_hint  = __( 'Vence hoy', 'arriendo-facil' );
+					$due_class = 'is-danger';
+				} elseif ( 'vence_proximo' === $prop['status'] && $prop['next_due'] ) {
+					$days      = (int) ceil( ( strtotime( $prop['next_due'] ) - strtotime( $cob_today ) ) / DAY_IN_SECONDS );
+					$rel       = 1 === $days ? __( 'mañana', 'arriendo-facil' ) : sprintf( /* translators: %d: days */ _n( 'en %d día', 'en %d días', $days, 'arriendo-facil' ), $days );
+					$due_hint  = sprintf(
+						/* translators: 1: relative time, 2: formatted date */
+						__( 'Vence %1$s (%2$s)', 'arriendo-facil' ),
+						$rel,
+						date_i18n( 'j M', strtotime( $prop['next_due'] ) )
+					);
+					$due_class = 'is-warning';
+				} elseif ( 'por_cobrar' === $prop['status'] && $prop['next_due'] ) {
+					$due_hint = sprintf(
+						/* translators: %s: formatted date */
+						__( 'Vence el %s', 'arriendo-facil' ),
+						date_i18n( 'j M', strtotime( $prop['next_due'] ) )
+					);
+				} elseif ( 'sin_cargo' === $prop['status'] ) {
+					$due_hint = sprintf(
+						/* translators: %d: due day of month */
+						__( 'Día de pago: %d de cada mes', 'arriendo-facil' ),
+						$prop['payment_due_day']
+					);
+				} elseif ( 'aldia' === $prop['status'] ) {
+					$due_hint = __( 'Todo al día', 'arriendo-facil' );
+				} else {
+					$due_hint = __( 'Sin contrato activo', 'arriendo-facil' );
+				}
+
+				$amounttotal = $prop['pending_total'] > 0.01 ? $prop['pending_total'] : $prop['monthly_rent'];
+				$amount_lbl  = $prop['pending_total'] > 0.01 ? __( 'por cobrar', 'arriendo-facil' ) : __( '/ mes', 'arriendo-facil' );
+				?>
+				<article
+					class="af-property-card af-cobranza-card <?php echo esc_attr( $csm['ring'] ); ?>"
+					data-prop="<?php echo esc_attr( $prop['id'] ); ?>"
+					role="button"
+					tabindex="0"
+					aria-label="<?php echo esc_attr( sprintf( /* translators: %s: property title */ __( 'Ver cobranza de %s', 'arriendo-facil' ), $prop['title'] ) ); ?>"
+				>
+					<div class="af-property-card__media">
+						<?php if ( $prop['thumb'] ) : ?>
+							<img src="<?php echo esc_url( $prop['thumb'] ); ?>" alt="<?php echo esc_attr( $prop['title'] ); ?>" loading="lazy" />
+						<?php else : ?>
+							<div class="af-property-card__placeholder" aria-hidden="true"><?php echo af_lucide( 'building', 40 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></div>
+						<?php endif; ?>
+						<div class="af-property-card__badges">
+							<span class="af-pill af-pill--<?php echo esc_attr( $csm['pill'] ); ?>"><?php echo esc_html( $csm['label'] ); ?></span>
 						</div>
-					</section>
+					</div>
+					<div class="af-property-card__body">
+						<div class="af-catalog-card__type">
+							<span class="af-catalog-card__type-icon" aria-hidden="true"><?php echo af_lucide( $prop['type_icon'], 14 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+							<?php echo esc_html( $prop['type_label'] ); ?>
+						</div>
+						<h3 class="af-property-card__title"><?php echo esc_html( $prop['title'] ); ?></h3>
+						<?php if ( $prop['unit_code'] ) : ?>
+							<p class="af-catalog-card__address">
+								<span class="af-catalog-card__address-icon" aria-hidden="true"><?php echo af_lucide( 'home', 13 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+								<span class="af-catalog-card__address-text"><?php echo esc_html( $prop['unit_code'] . ( $prop['building_name'] ? ' · ' . $prop['building_name'] : '' ) ); ?></span>
+							</p>
+						<?php endif; ?>
+						<?php if ( $address ) : ?>
+							<p class="af-catalog-card__address">
+								<span class="af-catalog-card__address-icon" aria-hidden="true"><?php echo af_lucide( 'map-pin', 13 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+								<span class="af-catalog-card__address-text"><?php echo esc_html( $address ); ?></span>
+							</p>
+						<?php endif; ?>
+						<p class="af-catalog-card__specs">
+							<?php if ( $prop['guest'] ) : ?>
+								<span class="af-catalog-card__spec">
+									<span class="af-catalog-card__spec-icon" aria-hidden="true"><?php echo af_lucide( 'user', 13 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+									<?php echo esc_html( $prop['guest'] ); ?>
+								</span>
+							<?php endif; ?>
+							<?php if ( $prop['bedrooms'] ) : ?>
+								<span class="af-catalog-card__spec">
+									<span class="af-catalog-card__spec-icon" aria-hidden="true"><?php echo af_lucide( 'bed', 13 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+									<?php echo esc_html( sprintf( /* translators: %d: bedrooms */ _n( '%d dorm.', '%d dorm.', $prop['bedrooms'], 'arriendo-facil' ), $prop['bedrooms'] ) ); ?>
+								</span>
+							<?php endif; ?>
+							<?php if ( $prop['lease_end'] ) : ?>
+								<span class="af-catalog-card__spec">
+									<span class="af-catalog-card__spec-icon" aria-hidden="true"><?php echo af_lucide( 'calendar', 13 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+									<?php echo esc_html( sprintf( /* translators: %s: formatted date */ __( 'Contrato hasta %s', 'arriendo-facil' ), date_i18n( 'j M Y', strtotime( $prop['lease_end'] ) ) ) ); ?>
+								</span>
+							<?php endif; ?>
+						</p>
+					</div>
+					<div class="af-property-card__footer">
+						<span class="af-cobranza-card__amount <?php echo esc_attr( $due_class ); ?>">
+							$<?php echo esc_html( number_format_i18n( $amounttotal, 2 ) ); ?>
+							<small><?php echo esc_html( $amount_lbl ); ?></small>
+						</span>
+						<span class="af-cobranza-card__due <?php echo esc_attr( $due_class ); ?>"><?php echo esc_html( $due_hint ); ?></span>
+						<span class="af-catalog-card__hint">
+							<?php esc_html_e( 'Ver cobranza', 'arriendo-facil' ); ?>
+							<span class="af-catalog-card__hint-arrow" aria-hidden="true">&rarr;</span>
+						</span>
+					</div>
+				</article>
+			<?php endforeach; ?>
+		</div>
 
-					<div class="af-property-grid af-cobranza-grid">
-						<?php foreach ( $cob_props as $acc_id => $prop ) : ?>
-							<?php
-							$csm       = $cob_status_meta[ $prop['status'] ];
-							$address   = trim( trim( (string) $prop['address'] ) . ( $prop['city'] ? ', ' . $prop['city'] : '' ) );
-							$due_hint  = '';
-							$due_class = '';
-							if ( 'vencido' === $prop['status'] && $prop['next_due'] ) {
-								$due_hint  = sprintf(
-									/* translators: %s: formatted date */
-									__( 'Vencido desde el %s', 'arriendo-facil' ),
-									date_i18n( 'j M', strtotime( $prop['next_due'] ) )
-								);
-								$due_class = 'is-danger';
-							} elseif ( 'vence_hoy' === $prop['status'] ) {
-								$due_hint  = __( 'Vence hoy', 'arriendo-facil' );
-								$due_class = 'is-danger';
-							} elseif ( 'vence_proximo' === $prop['status'] && $prop['next_due'] ) {
-								$days      = (int) ceil( ( strtotime( $prop['next_due'] ) - strtotime( $cob_today ) ) / DAY_IN_SECONDS );
-								$rel       = 1 === $days ? __( 'mañana', 'arriendo-facil' ) : sprintf( /* translators: %d: days */ _n( 'en %d día', 'en %d días', $days, 'arriendo-facil' ), $days );
-								$due_hint  = sprintf(
-									/* translators: 1: relative time, 2: formatted date */
-									__( 'Vence %1$s (%2$s)', 'arriendo-facil' ),
-									$rel,
-									date_i18n( 'j M', strtotime( $prop['next_due'] ) )
-								);
-								$due_class = 'is-warning';
-							} elseif ( 'por_cobrar' === $prop['status'] && $prop['next_due'] ) {
-								$due_hint = sprintf(
-									/* translators: %s: formatted date */
-									__( 'Vence el %s', 'arriendo-facil' ),
-									date_i18n( 'j M', strtotime( $prop['next_due'] ) )
-								);
-							} elseif ( 'sin_cargo' === $prop['status'] ) {
-								$due_hint = sprintf(
-									/* translators: %d: due day of month */
-									__( 'Día de pago: %d de cada mes', 'arriendo-facil' ),
-									$prop['payment_due_day']
-								);
-							} elseif ( 'aldia' === $prop['status'] ) {
-								$due_hint = __( 'Todo al día', 'arriendo-facil' );
-							} else {
-								$due_hint = __( 'Sin contrato activo', 'arriendo-facil' );
-							}
-
-							$amounttotal = $prop['pending_total'] > 0.01 ? $prop['pending_total'] : $prop['monthly_rent'];
-							$amount_lbl  = $prop['pending_total'] > 0.01 ? __( 'por cobrar', 'arriendo-facil' ) : __( '/ mes', 'arriendo-facil' );
-							?>
-							<article
-								class="af-property-card af-cobranza-card <?php echo esc_attr( $csm['ring'] ); ?>"
-								data-prop="<?php echo esc_attr( $acc_id ); ?>"
-								role="button"
-								tabindex="0"
-								aria-label="<?php echo esc_attr( sprintf( /* translators: %s: property title */ __( 'Ver cobranza de %s', 'arriendo-facil' ), $prop['title'] ) ); ?>"
-							>
+		<?php if ( $cob_summary['disponibles'] > 0 ) : ?>
+			<?php $disponibles = array_filter( $cob_props, static function ( $p ) { return 'available' === $p['status']; } ); ?>
+			<details class="af-collapse af-section af-cobranza-avail">
+				<summary class="af-collapse__summary">
+					<span class="af-section__icon af-section__icon--slate" aria-hidden="true"><?php echo af_lucide( 'building', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+					<span class="af-collapse__label"><?php echo esc_html( sprintf( /* translators: %d: number of properties */ _n( '%d inmueble disponible (sin contrato)', '%d inmuebles disponibles (sin contrato)', $cob_summary['disponibles'], 'arriendo-facil' ), $cob_summary['disponibles'] ) ); ?></span>
+					<span class="af-collapse__chevron" aria-hidden="true"><?php echo af_lucide( 'chevron-down', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+				</summary>
+				<div class="af-collapse__body">
+					<div class="af-property-grid">
+						<?php foreach ( $disponibles as $prop ) : ?>
+							<?php $csm = $cob_status_meta[ $prop['status'] ]; ?>
+							<article class="af-property-card af-cobranza-card" data-prop="<?php echo esc_attr( $prop['id'] ); ?>" role="button" tabindex="0" aria-label="<?php echo esc_attr( sprintf( /* translators: %s: property title */ __( 'Ver cobranza de %s', 'arriendo-facil' ), $prop['title'] ) ); ?>">
 								<div class="af-property-card__media">
 									<?php if ( $prop['thumb'] ) : ?>
 										<img src="<?php echo esc_url( $prop['thumb'] ); ?>" alt="<?php echo esc_attr( $prop['title'] ); ?>" loading="lazy" />
 									<?php else : ?>
 										<div class="af-property-card__placeholder" aria-hidden="true"><?php echo af_lucide( 'building', 40 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></div>
 									<?php endif; ?>
-									<div class="af-property-card__badges">
-										<span class="af-pill af-pill--<?php echo esc_attr( $csm['pill'] ); ?>"><?php echo esc_html( $csm['label'] ); ?></span>
-									</div>
+									<div class="af-property-card__badges"><span class="af-pill af-pill--<?php echo esc_attr( $csm['pill'] ); ?>"><?php echo esc_html( $csm['label'] ); ?></span></div>
 								</div>
 								<div class="af-property-card__body">
 									<div class="af-catalog-card__type">
@@ -596,563 +519,16 @@ $cob_status_meta = array(
 										<?php echo esc_html( $prop['type_label'] ); ?>
 									</div>
 									<h3 class="af-property-card__title"><?php echo esc_html( $prop['title'] ); ?></h3>
-									<?php if ( $prop['unit_code'] ) : ?>
-										<p class="af-catalog-card__address">
-											<span class="af-catalog-card__address-icon" aria-hidden="true"><?php echo af_lucide( 'home', 13 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-											<span class="af-catalog-card__address-text"><?php echo esc_html( $prop['unit_code'] . ( $prop['building_name'] ? ' · ' . $prop['building_name'] : '' ) ); ?></span>
-										</p>
-									<?php endif; ?>
-									<?php if ( $address ) : ?>
-										<p class="af-catalog-card__address">
-											<span class="af-catalog-card__address-icon" aria-hidden="true"><?php echo af_lucide( 'map-pin', 13 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-											<span class="af-catalog-card__address-text"><?php echo esc_html( $address ); ?></span>
-										</p>
-									<?php endif; ?>
-									<p class="af-catalog-card__specs">
-										<?php if ( $prop['guest'] ) : ?>
-											<span class="af-catalog-card__spec">
-												<span class="af-catalog-card__spec-icon" aria-hidden="true"><?php echo af_lucide( 'user', 13 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-												<?php echo esc_html( $prop['guest'] ); ?>
-											</span>
-										<?php endif; ?>
-										<?php if ( $prop['bedrooms'] ) : ?>
-											<span class="af-catalog-card__spec">
-												<span class="af-catalog-card__spec-icon" aria-hidden="true"><?php echo af_lucide( 'bed', 13 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-												<?php echo esc_html( sprintf( /* translators: %d: bedrooms */ _n( '%d dorm.', '%d dorm.', $prop['bedrooms'], 'arriendo-facil' ), $prop['bedrooms'] ) ); ?>
-											</span>
-										<?php endif; ?>
-										<?php if ( $prop['lease_end'] ) : ?>
-											<span class="af-catalog-card__spec">
-												<span class="af-catalog-card__spec-icon" aria-hidden="true"><?php echo af_lucide( 'calendar', 13 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-												<?php echo esc_html( sprintf( /* translators: %s: formatted date */ __( 'Contrato hasta %s', 'arriendo-facil' ), date_i18n( 'j M Y', strtotime( $prop['lease_end'] ) ) ) ); ?>
-											</span>
-										<?php endif; ?>
-									</p>
-								</div>
-								<div class="af-property-card__footer">
-									<span class="af-cobranza-card__amount <?php echo esc_attr( $due_class ); ?>">
-										$<?php echo esc_html( number_format_i18n( $amounttotal, 2 ) ); ?>
-										<small><?php echo esc_html( $amount_lbl ); ?></small>
-									</span>
-									<span class="af-cobranza-card__due <?php echo esc_attr( $due_class ); ?>"><?php echo esc_html( $due_hint ); ?></span>
-									<span class="af-catalog-card__hint">
-										<?php esc_html_e( 'Ver cobranza', 'arriendo-facil' ); ?>
-										<span class="af-catalog-card__hint-arrow" aria-hidden="true">→</span>
-									</span>
+									<p class="af-catalog-card__address"><span class="af-catalog-card__address-text"><?php esc_html_e( 'Sin contrato activo: no genera cobros este mes.', 'arriendo-facil' ); ?></span></p>
 								</div>
 							</article>
 						<?php endforeach; ?>
 					</div>
-
-					<?php if ( $cob_summary['disponibles'] > 0 ) : ?>
-						<?php $disponibles = array_filter( $cob_props, static function ( $p ) { return 'available' === $p['status']; } ); ?>
-						<details class="af-collapse af-section af-cobranza-avail" style="margin-top: var(--af-space-5);">
-							<summary class="af-collapse__summary">
-								<span class="af-section__icon af-section__icon--slate" aria-hidden="true"><?php echo af_lucide( 'building', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-								<span class="af-collapse__label"><?php echo esc_html( sprintf( /* translators: %d: number of properties */ _n( '%d inmueble disponible (sin contrato)', '%d inmuebles disponibles (sin contrato)', $cob_summary['disponibles'], 'arriendo-facil' ), $cob_summary['disponibles'] ) ); ?></span>
-								<span class="af-collapse__chevron" aria-hidden="true"><?php echo af_lucide( 'chevron-down', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-							</summary>
-							<div class="af-collapse__body">
-								<div class="af-property-grid">
-									<?php foreach ( $disponibles as $acc_id => $prop ) : ?>
-										<?php $csm = $cob_status_meta[ $prop['status'] ]; ?>
-										<article class="af-property-card af-cobranza-card" data-prop="<?php echo esc_attr( $acc_id ); ?>" role="button" tabindex="0" aria-label="<?php echo esc_attr( sprintf( /* translators: %s: property title */ __( 'Ver cobranza de %s', 'arriendo-facil' ), $prop['title'] ) ); ?>">
-											<div class="af-property-card__media">
-												<?php if ( $prop['thumb'] ) : ?>
-													<img src="<?php echo esc_url( $prop['thumb'] ); ?>" alt="<?php echo esc_attr( $prop['title'] ); ?>" loading="lazy" />
-												<?php else : ?>
-													<div class="af-property-card__placeholder" aria-hidden="true"><?php echo af_lucide( 'building', 40 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></div>
-												<?php endif; ?>
-												<div class="af-property-card__badges"><span class="af-pill af-pill--<?php echo esc_attr( $csm['pill'] ); ?>"><?php echo esc_html( $csm['label'] ); ?></span></div>
-											</div>
-											<div class="af-property-card__body">
-												<div class="af-catalog-card__type">
-													<span class="af-catalog-card__type-icon" aria-hidden="true"><?php echo af_lucide( $prop['type_icon'], 14 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-													<?php echo esc_html( $prop['type_label'] ); ?>
-												</div>
-												<h3 class="af-property-card__title"><?php echo esc_html( $prop['title'] ); ?></h3>
-												<p class="af-catalog-card__address"><span class="af-cobranza-card__due"><?php esc_html_e( 'Sin contrato activo: no genera cobros este mes.', 'arriendo-facil' ); ?></span></p>
-											</div>
-										</article>
-									<?php endforeach; ?>
-								</div>
-							</div>
-						</details>
-					<?php endif; ?>
-				<?php endif; ?>
-			</section>
-
-			<section class="af-tabs__panel af-tabs__panel--estructura" role="tabpanel" aria-labelledby="af-tab-estructura">
-
-	<section class="af-section" style="display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding: var(--af-space-4) var(--af-space-5); margin-bottom: var(--af-space-4);">
-		<span class="af-section__icon af-section__icon--slate" aria-hidden="true"><?php echo af_lucide( 'building', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-		<div style="flex:1; min-width:220px;">
-			<h2 class="af-section__title" style="margin:0;">
-				<?php if ( Arriendo_Facil_Property_Structure::module_enabled() ) : ?>
-					<?php esc_html_e( 'Sección activa', 'arriendo-facil' ); ?> <span class="af-pill af-pill--success"><?php esc_html_e( 'Elegiste usarla', 'arriendo-facil' ); ?></span>
-				<?php else : ?>
-					<?php esc_html_e( 'Sección opcional', 'arriendo-facil' ); ?> <span class="af-pill af-pill--info"><?php esc_html_e( 'No elegida todavía', 'arriendo-facil' ); ?></span>
-				<?php endif; ?>
-			</h2>
-			<p class="af-section__subtitle" style="margin:2px 0 0;">
-				<?php
-				if ( Arriendo_Facil_Property_Structure::module_enabled() ) {
-					esc_html_e( 'La usas para repartir los gastos comunes de un edificio entre sus departamentos u oficinas y cobrarlos junto con el canon. Puedes desactivarla cuando quieras y seguir igual con casas o propiedades sueltas.', 'arriendo-facil' );
-				} else {
-					esc_html_e( 'Solo elígela si arriendas varias propiedades dentro de un mismo edificio y necesitas repartir entre ellas los gastos comunes (mantenimiento, guardianía, agua del edificio, etc.). Si solo tienes casas o locales sueltos, no la necesitas: puedes ignorarla.', 'arriendo-facil' );
-				}
-				?>
-			</p>
-			<?php if ( ! Arriendo_Facil_Property_Structure::module_enabled() && Arriendo_Facil_Property_Structure::has_active_buildings() ) : ?>
-				<p class="af-section__subtitle" style="margin:4px 0 0; font-weight:600;">
-					<?php esc_html_e( 'Nota: ya tienes edificios guardados. No se borran; los volverás a ver al activar la sección.', 'arriendo-facil' ); ?>
-				</p>
-			<?php endif; ?>
-			<p class="af-modal__status" id="af-buildings-module-status" style="margin:6px 0 0;"></p>
-		</div>
-		<button
-			type="button"
-			id="af-buildings-module-toggle"
-			class="button af-btn <?php echo Arriendo_Facil_Property_Structure::module_enabled() ? 'af-btn--ghost' : 'af-btn--primary'; ?>"
-			data-enable="<?php echo Arriendo_Facil_Property_Structure::module_enabled() ? '0' : '1'; ?>"
-		>
-			<?php echo Arriendo_Facil_Property_Structure::module_enabled() ? esc_html_e( 'Apagar (no la uso)', 'arriendo-facil' ) : esc_html_e( 'Activar sección', 'arriendo-facil' ); ?>
-		</button>
-	</section>
-
-	<?php if ( ! Arriendo_Facil_Property_Structure::module_enabled() ) : ?>
-
-		<div class="af-empty">
-			<span class="af-empty__icon" aria-hidden="true"><?php echo af_lucide( 'building-2', 28 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-			<h3 class="af-empty__title"><?php esc_html_e( 'Esta sección no está activada', 'arriendo-facil' ); ?></h3>
-			<p class="af-empty__text"><?php esc_html_e( 'Pulsa el botón "Activar sección" de arriba si quieres organizar departamentos dentro de un edificio y repartir (y cobrar) los gastos comunes.', 'arriendo-facil' ); ?></p>
-		</div>
-
-	<?php elseif ( empty( $buildings ) ) : ?>
-
-		<div class="af-empty" style="margin-bottom: var(--af-space-5);">
-			<span class="af-empty__icon" aria-hidden="true"><?php echo af_lucide( 'building-2', 28 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-			<h3 class="af-empty__title"><?php esc_html_e( 'Aún no hay edificios registrados', 'arriendo-facil' ); ?></h3>
-			<p class="af-empty__text"><?php esc_html_e( 'Aquí organizas los edificios con varios arriendos adentro (por ejemplo, un edificio con departamentos) para cobrar canon y gastos comunes por unidad. Si tus propiedades son casas o locales sueltos, no necesitas usar esta sección.', 'arriendo-facil' ); ?></p>
-		</div>
-
-		<section class="af-section">
-			<header class="af-section__header">
-				<div class="af-section__head">
-					<h2 class="af-section__title"><?php esc_html_e( 'Nuevo edificio', 'arriendo-facil' ); ?></h2>
-					<p class="af-section__subtitle"><?php esc_html_e( 'Pon el nombre del edificio y cuánto se gasta por mes en mantenerlo. Después añades cada departamento y cuánto le toca pagar.', 'arriendo-facil' ); ?></p>
-				</div>
-			</header>
-			<p class="af-modal__status" id="af-building-status"></p>
-			<form id="af-building-form" class="af-buildings-form">
-				<div class="af-form-field">
-					<label class="af-form-field__label" for="af-building-name"><?php esc_html_e( 'Nombre', 'arriendo-facil' ); ?> <span class="af-required" aria-hidden="true">*</span></label>
-					<input type="text" id="af-building-name" name="name" required class="regular-text" />
-				</div>
-				<div class="af-form-field">
-					<label class="af-form-field__label" for="af-building-address"><?php esc_html_e( 'Dirección', 'arriendo-facil' ); ?></label>
-					<input type="text" id="af-building-address" name="address" class="regular-text" />
-				</div>
-				<div class="af-form-field">
-					<label class="af-form-field__label" for="af-building-city"><?php esc_html_e( 'Ciudad', 'arriendo-facil' ); ?></label>
-					<input type="text" id="af-building-city" name="city" class="regular-text" />
-				</div>
-				<div class="af-form-field">
-					<label class="af-form-field__label" for="af-building-hoa"><?php esc_html_e( 'Gastos comunes mensuales (USD)', 'arriendo-facil' ); ?></label>
-					<input type="number" id="af-building-hoa" name="monthly_hoa_total" step="0.01" min="0" value="0.00" />
-					<p class="af-form-field__hint"><?php esc_html_e( 'Cuánto cuesta al mes mantener el edificio entre todos: mantenimiento, guardianía, agua del edificio, etc. El sistema lo reparte entre las unidades.', 'arriendo-facil' ); ?></p>
-				</div>
-				<?php if ( $is_super_admin && ! empty( $property_admins ) ) : ?>
-				<div class="af-form-field">
-					<label class="af-form-field__label" for="af-building-admin"><?php esc_html_e( 'Administrador de propiedades', 'arriendo-facil' ); ?></label>
-					<select id="af-building-admin" name="assigned_admin_id">
-						<option value=""><?php esc_html_e( '— Asignar a mí mismo —', 'arriendo-facil' ); ?></option>
-						<?php foreach ( $property_admins as $pa ) : ?>
-							<option value="<?php echo esc_attr( $pa->ID ); ?>"><?php echo esc_html( get_user_meta( $pa->ID, 'af_company_name', true ) ? get_user_meta( $pa->ID, 'af_company_name', true ) : $pa->display_name ); ?></option>
-						<?php endforeach; ?>
-					</select>
-				</div>
-				<?php endif; ?>
-				<button type="submit" class="button af-btn af-btn--primary"><?php esc_html_e( 'Crear edificio', 'arriendo-facil' ); ?></button>
-			</form>
-		</section>
-
-	<?php else : ?>
-
-		<nav class="af-building-switcher" aria-label="<?php esc_attr_e( 'Seleccionar edificio', 'arriendo-facil' ); ?>">
-			<?php foreach ( $buildings as $building ) : ?>
-				<?php
-				$is_active = $selected_id === (int) $building->id;
-				$count     = isset( $unit_counts[ (int) $building->id ] ) ? $unit_counts[ (int) $building->id ] : 0;
-				$place     = trim( trim( (string) $building->address ) . ( ! empty( $building->city ) ? ', ' . $building->city : '' ) );
-				?>
-				<a class="af-building-chip <?php echo $is_active ? 'is-active' : ''; ?>" href="<?php echo esc_url( add_query_arg( array( 'page' => 'af-buildings', 'building_id' => (int) $building->id ), admin_url( 'admin.php' ) ) ); ?>">
-					<span class="af-building-chip__icon" aria-hidden="true"><?php echo af_lucide( 'building-2', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-					<span class="af-building-chip__body">
-						<span class="af-building-chip__name"><?php echo esc_html( $building->name ); ?></span>
-						<?php if ( '' !== $place ) : ?>
-							<span class="af-building-chip__meta"><?php echo esc_html( $place ); ?></span>
-						<?php endif; ?>
-					</span>
-					<span class="af-building-chip__count"><?php echo esc_html( sprintf( /* translators: %d: number of units */ _n( '%d unidad', '%d unidades', $count, 'arriendo-facil' ), $count ) ); ?></span>
-				</a>
-			<?php endforeach; ?>
-		</nav>
-
-		<?php if ( $selected_building ) : ?>
-
-			<div class="af-kpi-grid af-buildings-kpis">
-				<article class="af-kpi af-kpi--info">
-					<div class="af-kpi__head">
-						<span class="af-kpi__label"><?php esc_html_e( 'Unidades', 'arriendo-facil' ); ?></span>
-						<span class="af-kpi__icon" aria-hidden="true"><?php echo af_lucide( 'layout-grid', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-					</div>
-					<div class="af-kpi__value"><?php echo esc_html( count( $units ) ); ?></div>
-					<div class="af-kpi__hint"><?php esc_html_e( 'Activas en el edificio', 'arriendo-facil' ); ?></div>
-				</article>
-
-				<article class="af-kpi af-kpi--accent">
-					<div class="af-kpi__head">
-						<span class="af-kpi__label"><?php esc_html_e( 'Arrendadas', 'arriendo-facil' ); ?></span>
-						<span class="af-kpi__icon" aria-hidden="true"><?php echo af_lucide( 'bed', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-					</div>
-					<div class="af-kpi__value"><?php echo esc_html( $active_lease_count ); ?></div>
-					<div class="af-kpi__hint"><?php esc_html_e( 'Con contrato activo', 'arriendo-facil' ); ?></div>
-				</article>
-
-				<article class="af-kpi <?php echo $pending_total_period > 0.01 ? 'af-kpi--attention' : 'af-kpi--success'; ?>">
-					<div class="af-kpi__head">
-						<span class="af-kpi__label"><?php esc_html_e( 'Por cobrar este mes', 'arriendo-facil' ); ?></span>
-						<span class="af-kpi__icon" aria-hidden="true"><?php echo af_lucide( 'wallet', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-					</div>
-					<div class="af-kpi__value">$<?php echo esc_html( number_format_i18n( $pending_total_period, 2 ) ); ?></div>
-					<div class="af-kpi__hint"><?php echo esc_html( $current_period ); ?></div>
-				</article>
-
-				<article class="af-kpi af-kpi--info">
-					<div class="af-kpi__head">
-						<span class="af-kpi__label"><?php esc_html_e( 'Alícuota del edificio', 'arriendo-facil' ); ?></span>
-						<span class="af-kpi__icon" aria-hidden="true"><?php echo af_lucide( 'receipt', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-					</div>
-					<div class="af-kpi__value">$<?php echo esc_html( number_format_i18n( $alicuota_total, 2 ) ); ?></div>
-					<div class="af-kpi__hint"><?php esc_html_e( 'Gastos comunes por mes', 'arriendo-facil' ); ?></div>
-				</article>
-			</div>
-
-			<section class="af-section" style="margin-bottom: var(--af-space-5);">
-				<header class="af-section__header">
-					<div class="af-section__head">
-						<h2 class="af-section__title"><?php esc_html_e( 'Qué cobrar', 'arriendo-facil' ); ?></h2>
-						<p class="af-section__subtitle"><?php echo esc_html( sprintf( /* translators: 1: building name, 2: period */ __( '%1$s · periodo %2$s', 'arriendo-facil' ), $selected_building->name, $current_period ) ); ?></p>
-					</div>
-					<span class="af-pill af-pill--info"><?php echo esc_html( sprintf( /* translators: %d: number of units */ _n( '%d unidad', '%d unidades', count( $units ), 'arriendo-facil' ), count( $units ) ) ); ?></span>
-				</header>
-
-				<table class="wp-list-table widefat fixed striped af-data-table af-units-table af-units-cobranza">
-					<thead>
-						<tr>
-							<th><?php esc_html_e( 'Unidad', 'arriendo-facil' ); ?></th>
-							<th><?php esc_html_e( 'Quién paga', 'arriendo-facil' ); ?></th>
-							<th><?php esc_html_e( 'Estado', 'arriendo-facil' ); ?></th>
-							<th><?php esc_html_e( 'Canon', 'arriendo-facil' ); ?></th>
-							<th><?php esc_html_e( 'Alícuota', 'arriendo-facil' ); ?></th>
-							<th><?php esc_html_e( 'Por cobrar', 'arriendo-facil' ); ?></th>
-							<th class="af-actions-col"><?php esc_html_e( 'Acciones', 'arriendo-facil' ); ?></th>
-						</tr>
-					</thead>
-					<tbody>
-						<?php if ( empty( $units ) ) : ?>
-							<tr>
-								<td colspan="7" class="no-items-cell">
-									<?php esc_html_e( 'Este edificio aún no tiene unidades. Añade la primera en "Administrar la estructura" más abajo.', 'arriendo-facil' ); ?>
-								</td>
-							</tr>
-						<?php else : ?>
-							<?php
-							foreach ( $units as $unit ) :
-								$meta          = $units_meta[ (int) $unit->id ];
-								$lease         = $meta['lease'];
-								$linked_title  = $unit->accommodation_id ? get_the_title( (int) $unit->accommodation_id ) : '';
-								$canon         = $lease ? (float) $lease->monthly_rent : 0.0;
-								$tenant_name   = $lease ? trim( (string) $lease->guest_name ) : '';
-								$pending_text  = '$' . number_format_i18n( $meta['pending'], 2 );
-								?>
-								<tr>
-									<td data-label="<?php esc_attr_e( 'Unidad', 'arriendo-facil' ); ?>">
-										<span class="af-unit-code">
-											<?php echo af_lucide( 'home', 15 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
-											<?php echo esc_html( $unit->unit_code ); ?>
-										</span>
-									</td>
-									<td data-label="<?php esc_attr_e( 'Quién paga', 'arriendo-facil' ); ?>">
-										<span class="af-unit-linked">
-											<?php if ( $lease ) : ?>
-												<strong><?php echo esc_html( $tenant_name ? $tenant_name : __( 'Inquilino', 'arriendo-facil' ) ); ?></strong>
-											<?php else : ?>
-												<?php echo esc_html__( 'Sin contrato activo', 'arriendo-facil' ); ?>
-											<?php endif; ?>
-										</span>
-										<small class="af-unit-fine"><?php echo esc_html( $linked_title ? $linked_title : ( $unit->accommodation_id ? __( 'Propiedad vinculada', 'arriendo-facil' ) : __( 'Sin propiedad vinculada', 'arriendo-facil' ) ) ); ?></small>
-									</td>
-									<td data-label="<?php esc_attr_e( 'Estado', 'arriendo-facil' ); ?>">
-										<?php
-										switch ( $meta['badge'] ) {
-											case 'aldia':
-												echo af_pill( 'active', __( 'Al día', 'arriendo-facil' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped markup.
-												break;
-											case 'pending':
-												echo af_pill( 'pending', __( 'Por cobrar', 'arriendo-facil' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped markup.
-												break;
-											case 'available':
-												echo af_pill( 'available', __( 'Disponible', 'arriendo-facil' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped markup.
-												break;
-											default:
-												echo af_pill( 'inactive', __( 'Sin vínculo', 'arriendo-facil' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped markup.
-												break;
-										}
-										?>
-									</td>
-									<td data-label="<?php esc_attr_e( 'Canon', 'arriendo-facil' ); ?>">
-										<?php if ( $canon > 0 ) : ?>
-											<span class="af-unit-canon">$<?php echo esc_html( number_format_i18n( $canon, 2 ) ); ?></span>
-										<?php else : ?>
-											<span class="af-muted">—</span>
-										<?php endif; ?>
-									</td>
-									<td data-label="<?php esc_attr_e( 'Alícuota', 'arriendo-facil' ); ?>">
-										<span class="af-unit-hoa">$<?php echo esc_html( number_format_i18n( $meta['hoa'], 2 ) ); ?></span>
-									</td>
-									<td data-label="<?php esc_attr_e( 'Por cobrar', 'arriendo-facil' ); ?>">
-										<?php if ( ! $lease ) : ?>
-											<span class="af-muted"><?php esc_html_e( '—', 'arriendo-facil' ); ?></span>
-										<?php elseif ( $meta['pending'] > 0.01 ) : ?>
-											<span class="af-unit-pending"><?php echo esc_html( $pending_text ); ?></span>
-										<?php else : ?>
-											<span class="af-unit-paid">$0,00</span>
-										<?php endif; ?>
-									</td>
-									<td data-label="<?php esc_attr_e( 'Acciones', 'arriendo-facil' ); ?>">
-										<span class="af-unit-actions">
-											<?php if ( $lease ) : ?>
-												<a class="af-btn af-btn--ghost" href="<?php echo esc_url( admin_url( 'admin.php?page=af-collections' ) ); ?>"><?php esc_html_e( 'Pagos', 'arriendo-facil' ); ?></a>
-												<a class="af-btn af-btn--ghost" href="<?php echo esc_url( admin_url( 'admin.php?page=af-leases' ) ); ?>"><?php esc_html_e( 'Contrato', 'arriendo-facil' ); ?></a>
-											<?php elseif ( $unit->accommodation_id ) : ?>
-										<?php $edit_link = get_edit_post_link( (int) $unit->accommodation_id ); ?>
-										<?php if ( $edit_link ) : ?>
-											<a class="af-btn af-btn--ghost" href="<?php echo esc_url( $edit_link ); ?>"><?php esc_html_e( 'Propiedad', 'arriendo-facil' ); ?></a>
-										<?php endif; ?>
-									<?php endif; ?>
-										</span>
-									</td>
-								</tr>
-							<?php endforeach; ?>
-						<?php endif; ?>
-					</tbody>
-				</table>
-			</section>
-
-			<details class="af-collapse af-section" style="margin-bottom: var(--af-space-5);" open>
-				<summary class="af-collapse__summary">
-					<span class="af-section__icon af-section__icon--slate" aria-hidden="true"><?php echo af_lucide( 'settings', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-					<span class="af-collapse__label"><?php esc_html_e( 'Administrar la estructura del edificio', 'arriendo-facil' ); ?></span>
-					<span class="af-collapse__chevron" aria-hidden="true"><?php echo af_lucide( 'chevron-down', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-				</summary>
-				<div class="af-collapse__body">
-
-					<section class="af-section af-coefficient-card" style="margin-bottom: var(--af-space-5);">
-						<header class="af-section__header">
-							<div class="af-section__head">
-								<h2 class="af-section__title"><?php esc_html_e( 'Suma de porcentajes', 'arriendo-facil' ); ?></h2>
-								<p class="af-section__subtitle">
-									<?php
-									echo esc_html(
-										abs( $coefficient_total - 100 ) > 0.01
-											? __( 'Todas deben sumar 100% para repartir bien los gastos', 'arriendo-facil' )
-											: __( 'Reparto correcto', 'arriendo-facil' )
-									);
-									?>
-								</p>
-							</div>
-							<span class="af-coefficient-value <?php echo abs( $coefficient_total - 100 ) > 0.01 ? 'is-warning' : 'is-ok'; ?>"><?php echo esc_html( number_format_i18n( $coefficient_total, 2 ) ); ?>%</span>
-						</header>
-
-						<section class="af-section" style="margin-bottom: var(--af-space-5);">
-						<header class="af-section__header">
-							<div class="af-section__head">
-								<h2 class="af-section__title"><?php esc_html_e( 'Agregar unidad', 'arriendo-facil' ); ?></h2>
-								<p class="af-section__subtitle"><?php esc_html_e( 'Una unidad es un departamento, local u oficina dentro del edificio. Dile cómo se identifica (por ejemplo A-101) y qué parte de los gastos comunes le corresponde.', 'arriendo-facil' ); ?></p>
-							</div>
-						</header>
-						<p class="af-modal__status" id="af-unit-status"></p>
-						<form id="af-unit-form" class="af-buildings-form">
-							<input type="hidden" name="building_id" value="<?php echo esc_attr( $selected_id ); ?>" />
-							<div class="af-form-field">
-								<label class="af-form-field__label" for="af-unit-code"><?php esc_html_e( 'Código', 'arriendo-facil' ); ?> <span class="af-required" aria-hidden="true">*</span></label>
-								<input type="text" id="af-unit-code" name="unit_code" required placeholder="A-101" />
-							</div>
-							<div class="af-form-field">
-								<label class="af-form-field__label" for="af-unit-coef"><?php esc_html_e( 'Porción de los gastos comunes (%)', 'arriendo-facil' ); ?></label>
-								<input type="number" id="af-unit-coef" name="hoa_coefficient" step="0.0001" min="0" max="100" value="0" />
-								<p class="af-form-field__hint"><?php esc_html_e( 'Cuánto le toca de los gastos comunes a esta unidad. Entre todas las unidades debe sumar 100%.', 'arriendo-facil' ); ?></p>
-							</div>
-							<div class="af-form-field">
-								<label class="af-form-field__label" for="af-unit-area"><?php esc_html_e( 'Área (m²)', 'arriendo-facil' ); ?></label>
-								<input type="number" id="af-unit-area" name="area_m2" step="0.01" min="0" value="0" />
-							</div>
-							<div class="af-form-field">
-								<label class="af-form-field__label" for="af-unit-accommodation"><?php esc_html_e( 'Vincular a propiedad', 'arriendo-facil' ); ?></label>
-								<select id="af-unit-accommodation" name="accommodation_id">
-									<option value="0"><?php esc_html_e( '— Ninguna —', 'arriendo-facil' ); ?></option>
-									<?php foreach ( $accommodations as $accommodation ) : ?>
-										<option value="<?php echo esc_attr( (int) $accommodation->ID ); ?>"><?php echo esc_html( $accommodation->post_title ); ?></option>
-									<?php endforeach; ?>
-								</select>
-								<p class="af-form-field__hint"><?php esc_html_e( 'Si este departamento ya está registrado en el Catálogo de propiedades, elígela aquí para que los dos queden unidos.', 'arriendo-facil' ); ?></p>
-							</div>
-							<button type="submit" class="button af-btn af-btn--primary"><?php esc_html_e( 'Agregar unidad', 'arriendo-facil' ); ?></button>
-						</form>
-					</section>
-
-					<section class="af-section">
-						<header class="af-section__header">
-							<div class="af-section__head">
-								<h2 class="af-section__title"><?php esc_html_e( 'Unidades del edificio', 'arriendo-facil' ); ?></h2>
-								<p class="af-section__subtitle"><?php echo esc_html( $selected_building->name ); ?></p>
-							</div>
-							<span class="af-pill af-pill--info"><?php echo esc_html( sprintf( /* translators: %d: number of units */ _n( '%d unidad', '%d unidades', count( $units ), 'arriendo-facil' ), count( $units ) ) ); ?></span>
-						</header>
-
-						<table class="wp-list-table widefat fixed striped af-data-table af-units-table">
-							<thead>
-								<tr>
-									<th><?php esc_html_e( 'Unidad', 'arriendo-facil' ); ?></th>
-									<th><?php esc_html_e( 'Propiedad vinculada', 'arriendo-facil' ); ?></th>
-									<th><?php esc_html_e( 'Gastos comunes %', 'arriendo-facil' ); ?></th>
-									<th><?php esc_html_e( 'Área', 'arriendo-facil' ); ?></th>
-									<th><?php esc_html_e( 'Le toca por mes', 'arriendo-facil' ); ?></th>
-								</tr>
-							</thead>
-							<tbody>
-								<?php if ( empty( $units ) ) : ?>
-									<tr>
-										<td colspan="5" class="no-items-cell">
-											<?php esc_html_e( 'Este edificio aún no tiene unidades. Añade la primera con el formulario de arriba.', 'arriendo-facil' ); ?>
-										</td>
-									</tr>
-								<?php else : ?>
-									<?php
-									$coef_sum = 0.0;
-									$area_sum = 0.0;
-									$hoa_sum  = 0.0;
-									foreach ( $units as $unit ) :
-										$linked_title = $unit->accommodation_id ? get_the_title( (int) $unit->accommodation_id ) : '';
-										$unit_hoa     = $units_meta[ (int) $unit->id ]['hoa'];
-										$unit_coef    = (float) $unit->hoa_coefficient;
-										$coef_sum    += $unit_coef;
-										$area_sum    += (float) $unit->area_m2;
-										$hoa_sum     += $unit_hoa;
-										?>
-									<tr>
-										<td data-label="<?php esc_attr_e( 'Unidad', 'arriendo-facil' ); ?>">
-											<span class="af-unit-code">
-												<?php echo af_lucide( 'home', 15 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
-												<?php echo esc_html( $unit->unit_code ); ?>
-											</span>
-										</td>
-										<td data-label="<?php esc_attr_e( 'Propiedad vinculada', 'arriendo-facil' ); ?>">
-											<span class="af-unit-linked">
-												<?php echo $linked_title ? esc_html( $linked_title ) : esc_html__( 'Sin vincular', 'arriendo-facil' ); ?>
-											</span>
-											<?php if ( $linked_title ) : ?>
-												<?php echo af_pill( 'active', __( 'Vinculada', 'arriendo-facil' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped markup. ?>
-											<?php endif; ?>
-										</td>
-										<td data-label="<?php esc_attr_e( 'Gastos comunes %', 'arriendo-facil' ); ?>">
-											<span class="af-coef <?php echo $unit_coef > 100 ? 'is-over' : ''; ?>">
-												<strong><?php echo esc_html( number_format_i18n( $unit_coef, 4 ) ); ?>%</strong>
-												<span class="af-coef__bar" aria-hidden="true"><span style="width: <?php echo esc_attr( max( 0, min( 100, $unit_coef ) ) ); ?>%;"></span></span>
-											</span>
-										</td>
-										<td data-label="<?php esc_attr_e( 'Área', 'arriendo-facil' ); ?>"><?php echo esc_html( number_format_i18n( (float) $unit->area_m2, 2 ) ); ?> m²</td>
-										<td data-label="<?php esc_attr_e( 'Le toca por mes', 'arriendo-facil' ); ?>"><span class="af-unit-hoa">$<?php echo esc_html( number_format_i18n( $unit_hoa, 2 ) ); ?></span></td>
-									</tr>
-									<?php endforeach; ?>
-								<?php endif; ?>
-							</tbody>
-							<?php if ( ! empty( $units ) ) : ?>
-								<tfoot>
-									<tr>
-										<td colspan="2"><span class="af-totals-label"><?php esc_html_e( 'Totales', 'arriendo-facil' ); ?></span></td>
-										<td data-label="<?php esc_attr_e( 'Gastos comunes %', 'arriendo-facil' ); ?>"><?php echo esc_html( number_format_i18n( $coef_sum, 4 ) ); ?>%</td>
-										<td data-label="<?php esc_attr_e( 'Área', 'arriendo-facil' ); ?>"><?php echo esc_html( number_format_i18n( $area_sum, 2 ) ); ?> m²</td>
-										<td data-label="<?php esc_attr_e( 'Le toca por mes', 'arriendo-facil' ); ?>">$<?php echo esc_html( number_format_i18n( $hoa_sum, 2 ) ); ?></td>
-									</tr>
-								</tfoot>
-							<?php endif; ?>
-						</table>
-					</section>
-
-					</section>
-
 				</div>
 			</details>
-
-			<details class="af-collapse af-section">
-				<summary class="af-collapse__summary">
-					<span class="af-section__icon af-section__icon--slate" aria-hidden="true"><?php echo af_lucide( 'building-2', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-					<span class="af-collapse__label"><?php esc_html_e( 'Registrar otro edificio', 'arriendo-facil' ); ?></span>
-					<span class="af-collapse__chevron" aria-hidden="true"><?php echo af_lucide( 'chevron-down', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-				</summary>
-				<div class="af-collapse__body">
-					<header class="af-section__header">
-						<div class="af-section__head">
-							<h2 class="af-section__title"><?php esc_html_e( 'Nuevo edificio', 'arriendo-facil' ); ?></h2>
-							<p class="af-section__subtitle"><?php esc_html_e( '¿Tienes otro edificio? Regístralo de la misma manera: datos, gastos comunes y después sus unidades.', 'arriendo-facil' ); ?></p>
-						</div>
-					</header>
-					<p class="af-modal__status" id="af-building-status"></p>
-					<form id="af-building-form" class="af-buildings-form">
-						<div class="af-form-field">
-							<label class="af-form-field__label" for="af-building-name"><?php esc_html_e( 'Nombre', 'arriendo-facil' ); ?> <span class="af-required" aria-hidden="true">*</span></label>
-							<input type="text" id="af-building-name" name="name" required class="regular-text" />
-						</div>
-						<div class="af-form-field">
-							<label class="af-form-field__label" for="af-building-address"><?php esc_html_e( 'Dirección', 'arriendo-facil' ); ?></label>
-							<input type="text" id="af-building-address" name="address" class="regular-text" />
-						</div>
-						<div class="af-form-field">
-							<label class="af-form-field__label" for="af-building-city"><?php esc_html_e( 'Ciudad', 'arriendo-facil' ); ?></label>
-							<input type="text" id="af-building-city" name="city" class="regular-text" />
-						</div>
-						<div class="af-form-field">
-							<label class="af-form-field__label" for="af-building-hoa"><?php esc_html_e( 'Gastos comunes mensuales (USD)', 'arriendo-facil' ); ?></label>
-							<input type="number" id="af-building-hoa" name="monthly_hoa_total" step="0.01" min="0" value="0.00" />
-							<p class="af-form-field__hint"><?php esc_html_e( 'Cuánto cuesta al mes mantener el edificio entre todos: mantenimiento, guardianía, agua del edificio, etc. El sistema lo reparte entre las unidades.', 'arriendo-facil' ); ?></p>
-						</div>
-						<?php if ( $is_super_admin && ! empty( $property_admins ) ) : ?>
-						<div class="af-form-field">
-							<label class="af-form-field__label" for="af-building-admin"><?php esc_html_e( 'Administrador de propiedades', 'arriendo-facil' ); ?></label>
-							<select id="af-building-admin" name="assigned_admin_id">
-								<option value=""><?php esc_html_e( '— Asignar a mí mismo —', 'arriendo-facil' ); ?></option>
-								<?php foreach ( $property_admins as $pa ) : ?>
-									<option value="<?php echo esc_attr( $pa->ID ); ?>"><?php echo esc_html( get_user_meta( $pa->ID, 'af_company_name', true ) ? get_user_meta( $pa->ID, 'af_company_name', true ) : $pa->display_name ); ?></option>
-								<?php endforeach; ?>
-							</select>
-						</div>
-						<?php endif; ?>
-						<button type="submit" class="button af-btn af-btn--primary"><?php esc_html_e( 'Crear edificio', 'arriendo-facil' ); ?></button>
-					</form>
-				</div>
-			</details>
-
 		<?php endif; ?>
-
 	<?php endif; ?>
-			</section>
-
-		</div><!-- .af-tabs__panels -->
-	</div><!-- .af-tabs .af-buildings-tabs -->
-</div>
+</div><!-- .wrap -->
 
 <!-- Modal: cobranza del inmueble (calendario de cobros del mes) -->
 <div class="af-modal" id="af-cobranza-modal" role="dialog" aria-modal="true" aria-labelledby="af-cobranza-modal-title">
@@ -1193,7 +569,7 @@ $cob_status_meta = array(
 				</div>
 				<div class="af-modal__field">
 					<label for="af-cobranza-pay-date"><?php esc_html_e( 'Fecha de pago', 'arriendo-facil' ); ?></label>
-					<input type="date" id="af-cobranza-pay-date" value="<?php echo esc_attr( current_time( 'Y-m-d' ) ); ?>" />
+					<input type="date" id="af-cobranza-pay-date" value="<?php echo esc_attr( $cob_today ); ?>" />
 				</div>
 				<div class="af-modal__field">
 					<label for="af-cobranza-pay-method"><?php esc_html_e( 'Método', 'arriendo-facil' ); ?></label>
@@ -1220,84 +596,421 @@ $cob_status_meta = array(
 </div>
 
 <script>
-	window.afBuildingsCobranza = <?php echo wp_json_encode( $cob_json_props ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Datos JSON para el JS del calendario. ?>;
-	window.afBuildingsCobranzaToday = <?php echo wp_json_encode( $cob_today ); ?>;
-</script>
-
-<script>
+/* Cobranza: modal con calendario de cobros del mes y anotación de pagos
+   (af_record_payment). Va en línea en esta vista a propósito: la página se
+   despliega como un único archivo, así el clic funciona sin depender de un
+   asset encolado aparte. */
 (function () {
-	const ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
-	const nonce = <?php echo wp_json_encode( wp_create_nonce( 'af_structure_nonce' ) ); ?>;
+	'use strict';
 
-	function submitForm(form, action) {
-		const body = new URLSearchParams(new FormData(form));
-		body.append('action', action);
-		body.append('nonce', nonce);
+	var DATA   = <?php echo wp_json_encode( $cob_json_props ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Datos JSON para el JS del calendario. ?>;
+	var TODAY  = <?php echo wp_json_encode( $cob_today ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Fecha actual del sitio. ?>;
+	var CONFIG = {
+		ajaxUrl: <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- URL del AJAX de WordPress. ?>,
+		nonce: <?php echo wp_json_encode( wp_create_nonce( 'af_ledger_nonce' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Nonce del ledger. ?>
+	};
 
-		return fetch(ajaxUrl, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-			body: body
-		}).then((r) => r.json());
+	var LABELS = {
+		paid: <?php echo wp_json_encode( __( 'Pagado', 'arriendo-facil' ) ); ?>,
+		pending: <?php echo wp_json_encode( __( 'Pendiente', 'arriendo-facil' ) ); ?>,
+		overdue: <?php echo wp_json_encode( __( 'Vencido', 'arriendo-facil' ) ); ?>,
+		payday: <?php echo wp_json_encode( __( 'Día de pago', 'arriendo-facil' ) ); ?>,
+		partial: <?php echo wp_json_encode( __( 'Parcial', 'arriendo-facil' ) ); ?>,
+		noCharges: <?php echo wp_json_encode( __( 'Sin cargos para este periodo.', 'arriendo-facil' ) ); ?>,
+		tenant: <?php echo wp_json_encode( __( 'Arrendatario', 'arriendo-facil' ) ); ?>,
+		available: <?php echo wp_json_encode( __( 'Disponible', 'arriendo-facil' ) ); ?>,
+		previous: <?php echo wp_json_encode( __( 'Mes anterior', 'arriendo-facil' ) ); ?>,
+		next: <?php echo wp_json_encode( __( 'Mes siguiente', 'arriendo-facil' ) ); ?>,
+		balance: <?php echo wp_json_encode( __( 'Saldo del cargo', 'arriendo-facil' ) ); ?>,
+		outstanding: <?php echo wp_json_encode( __( 'puedes superarlo y el excedente quedará como saldo a favor.', 'arriendo-facil' ) ); ?>,
+		pay: <?php echo wp_json_encode( __( 'Anotar pago', 'arriendo-facil' ) ); ?>,
+		record: <?php echo wp_json_encode( __( 'Registrar pago', 'arriendo-facil' ) ); ?>,
+		amount: <?php echo wp_json_encode( __( 'Monto recibido (USD)', 'arriendo-facil' ) ); ?>,
+		paidOk: <?php echo wp_json_encode( __( 'Pago registrado correctamente.', 'arriendo-facil' ) ); ?>,
+		amountErr: <?php echo wp_json_encode( __( 'Ingresa un monto mayor a cero.', 'arriendo-facil' ) ); ?>,
+		genericErr: <?php echo wp_json_encode( __( 'Error al registrar el pago.', 'arriendo-facil' ) ); ?>,
+		networkErr: <?php echo wp_json_encode( __( 'Error de red al registrar el pago.', 'arriendo-facil' ) ); ?>
+	};
+
+	var WEEKDAYS = <?php echo wp_json_encode( array( __( 'lun', 'arriendo-facil' ), __( 'mar', 'arriendo-facil' ), __( 'mié', 'arriendo-facil' ), __( 'jue', 'arriendo-facil' ), __( 'vie', 'arriendo-facil' ), __( 'sáb', 'arriendo-facil' ), __( 'dom', 'arriendo-facil' ) ) ); ?>;
+
+	if (!DATA || !Object.keys(DATA).length) {
+		return;
 	}
 
-	function bind(formId, action, statusId) {
-		const form = document.getElementById(formId);
-		const status = document.getElementById(statusId);
-		if (!form || !status) { return; }
+	/* ── Helpers ─────────────────────────────────────────────────────────── */
 
-		form.addEventListener('submit', function (e) {
-			e.preventDefault();
-			const btn = form.querySelector('button[type="submit"]');
-			btn.disabled = true;
-			status.textContent = '';
-			status.className = 'af-modal__status';
+	function pad(n) {
+		return ('0' + n).slice(-2);
+	}
 
-			submitForm(form, action).then(function (json) {
-				btn.disabled = false;
-				if (!json || !json.success) {
-					status.textContent = (json && json.data && json.data.message) || 'Error';
-					status.className = 'af-modal__status is-error';
-					return;
-				}
-				status.textContent = json.data.message;
-				status.className = 'af-modal__status is-success';
-				setTimeout(function () { window.location.reload(); }, 800);
+	function periodString(d) {
+		return d.getFullYear() + '-' + pad(d.getMonth() + 1);
+	}
+
+	function parsePeriod(p) {
+		var parts = String(p).split('-');
+		return { y: parseInt(parts[0], 10), m: parseInt(parts[1], 10) };
+	}
+
+	function periodDate(p) {
+		var x = parsePeriod(p);
+		return new Date(x.y, x.m - 1, 1);
+	}
+
+	function addMonths(p, delta) {
+		var d = periodDate(p);
+		d.setMonth(d.getMonth() + delta);
+		return periodString(d);
+	}
+
+	var MONTH_FMT = new Intl.DateTimeFormat( <?php echo wp_json_encode( str_replace( '_', '-', determine_locale() ) ); ?>, { month: 'long', year: 'numeric' } );
+	function monthLabel(p) {
+		var s = MONTH_FMT.format(periodDate(p));
+		return s.charAt(0).toUpperCase() + s.slice(1);
+	}
+
+	function monthMoney(n) {
+		return Number(n || 0).toLocaleString( <?php echo wp_json_encode( str_replace( '_', '-', determine_locale() ) ); ?>, { minimumFractionDigits: 2, maximumFractionDigits: 2 } );
+	}
+
+	function dateLabel(ymd) {
+		if (!ymd) { return ''; }
+		var parts = String(ymd).split('-');
+		var d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+		return d.toLocaleDateString( <?php echo wp_json_encode( str_replace( '_', '-', determine_locale() ) ); ?>, { day: 'numeric', month: 'short', year: 'numeric' } );
+	}
+
+	/* ── Iconos (estilo lucide) ───────────────────────────────────────────── */
+
+	var ICONS = {
+		canon: '<svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>',
+		alicuota: '<svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17V7"/></svg>',
+		agua: '<svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></svg>',
+		luz: '<svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>',
+		gas: '<svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>',
+		internet: '<svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><path d="M12 20h.01"/></svg>',
+		multa: '<svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>',
+		otro: '<svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/></svg>'
+	};
+
+	function chargeIcon(type) {
+		return ICONS[type] || ICONS.otro;
+	}
+
+	/* ── Estado DOM ──────────────────────────────────────────────────────── */
+
+	var modal = document.getElementById('af-cobranza-modal');
+	if (!modal) { return; }
+
+	var periodLabel  = document.getElementById('af-cobranza-period');
+	var calendarEl   = document.getElementById('af-cobranza-calendar');
+	var legendEl     = document.getElementById('af-cobranza-legend');
+	var chargesEl    = document.getElementById('af-cobranza-charges');
+	var titleEl      = document.getElementById('af-cobranza-modal-title');
+	var subtitleEl   = document.getElementById('af-cobranza-modal-subtitle');
+	var statusEl     = document.getElementById('af-cobranza-status');
+	var payPanel     = document.getElementById('af-cobranza-pay');
+	var payChargeId  = document.getElementById('af-cobranza-pay-charge-id');
+	var payAmount    = document.getElementById('af-cobranza-pay-amount');
+	var payDate      = document.getElementById('af-cobranza-pay-date');
+	var payMethod    = document.getElementById('af-cobranza-pay-method');
+	var payReference = document.getElementById('af-cobranza-pay-reference');
+	var payOutstand  = document.getElementById('af-cobranza-pay-outstanding');
+	var payStatus    = document.getElementById('af-cobranza-pay-status');
+	var payCancel    = document.getElementById('af-cobranza-pay-cancel');
+	var payConfirm   = document.getElementById('af-cobranza-pay-confirm');
+
+	var state = { prop: null, period: '' };
+
+	function openModal() {
+		modal.classList.add('is-open');
+	}
+
+	function closeModal() {
+		modal.classList.remove('is-open');
+		payPanel.hidden = true;
+		hideStatus();
+	}
+
+	function showStatus(message, type) {
+		if (!statusEl) { return; }
+		statusEl.style.display = '';
+		statusEl.textContent = message;
+		statusEl.className = 'af-modal__status is-' + (type || 'success');
+	}
+
+	function hideStatus() {
+		if (!statusEl) { return; }
+		statusEl.textContent = '';
+		statusEl.style.display = 'none';
+		statusEl.className = 'af-modal__status';
+	}
+
+	modal.querySelectorAll('[data-af-modal-close]').forEach(function (btn) {
+		btn.addEventListener('click', closeModal);
+	});
+	document.addEventListener('keydown', function (e) {
+		if ('Escape' === e.key && modal.classList.contains('is-open')) {
+			closeModal();
+		}
+	});
+
+	/* ── Calendario ───────────────────────────────────────────────────────── */
+
+	function dotClassFor(charge) {
+		if ('paid' === charge.status) { return 'is-paid'; }
+		if ('overdue' === charge.status) { return 'is-overdue'; }
+		var due = charge.dueDate || '';
+		if (due && TODAY && due < TODAY) { return 'is-overdue'; }
+		return 'is-pending';
+	}
+
+	function renderCalendar() {
+		var p = state.period;
+		var x = parsePeriod(p);
+		var first = new Date(x.y, x.m - 1, 1);
+		var daysInMonth = new Date(x.y, x.m, 0).getDate();
+		var startWeekday = (first.getDay() + 6) % 7; // lunes = 0
+
+		var charges = (state.prop.charges && state.prop.charges[p]) || [];
+		var byDay = {};
+		charges.forEach(function (c) {
+			var d = String(c.dueDate || '').slice(-2).replace(/^0/, '');
+			if (!byDay[d]) { byDay[d] = []; }
+			byDay[d].push(c);
+		});
+
+		var todayKey = String(TODAY).slice(0, 10);
+		var weekDaysHtml = WEEKDAYS.map(function (w) {
+			return '<span class="af-calendar-mini__wd">' + w + '</span>';
+		}).join('');
+
+		var cells = '';
+		for (var i = 0; i < startWeekday; i++) {
+			cells += '<div class="af-calendar-mini__day is-outside"></div>';
+		}
+		for (var day = 1; day <= daysInMonth; day++) {
+			var dayStr = x.y + '-' + pad(x.m) + '-' + pad(day);
+			var cls = 'af-calendar-mini__day';
+			if (dayStr === todayKey) { cls += ' is-today'; }
+
+			var dots = '';
+			var dayCharges = byDay[String(day)] || [];
+			dayCharges.forEach(function (c) {
+				dots += '<i class="af-calendar-mini__day-dot ' + dotClassFor(c) + '"></i>';
 			});
+			if (state.prop.has_lease && state.prop.payment_due_day === day) {
+				dots = '<i class="af-calendar-mini__day-dot is-payday"></i>' + dots;
+			}
+
+			cells += '<div class="' + cls + '" data-day="' + dayStr + '">' +
+				'<span class="af-calendar-mini__day-num">' + day + '</span>' +
+				'<span class="af-calendar-mini__dots">' + dots + '</span>' +
+				'</div>';
+		}
+		var trailing = (7 - ((startWeekday + daysInMonth) % 7)) % 7;
+		for (var t = 0; t < trailing; t++) {
+			cells += '<div class="af-calendar-mini__day is-outside"></div>';
+		}
+
+		periodLabel.textContent = monthLabel(p);
+		calendarEl.innerHTML = weekDaysHtml + cells;
+		legendEl.innerHTML =
+			'<span><i class="is-paid"></i> ' + LABELS.paid + '</span>' +
+			'<span><i class="is-pending"></i> ' + LABELS.pending + '</span>' +
+			'<span><i class="is-overdue"></i> ' + LABELS.overdue + '</span>' +
+			(state.prop.has_lease ? '<span><i class="is-payday"></i> ' + LABELS.payday + '</span>' : '');
+	}
+
+	/* ── Lista de cargos del mes ─────────────────────────────────────────── */
+
+	function balanceOf(c) {
+		return (Number(c.amount) || 0) - (Number(c.paid) || 0);
+	}
+
+	function chargeStatusLabel(c) {
+		if ('paid' === c.status) { return LABELS.paid; }
+		if ('overdue' === c.status) { return LABELS.overdue; }
+		var bal = balanceOf(c);
+		if ('partial' === c.status && bal > 0.01) { return LABELS.partial; }
+		return LABELS.pending;
+	}
+
+	function renderCharges() {
+		var p = state.period;
+		var charges = (state.prop.charges && state.prop.charges[p]) || [];
+
+		chargesEl.innerHTML = '';
+		if (!charges.length) {
+			var empty = document.createElement('li');
+			empty.className = 'af-cobranza-empty';
+			empty.textContent = LABELS.noCharges;
+			chargesEl.appendChild(empty);
+			payPanel.hidden = true;
+			return;
+		}
+
+		charges.forEach(function (c) {
+			var paid = 'paid' === c.status;
+			var bal = balanceOf(c);
+			var li = document.createElement('li');
+			li.className = 'af-cobranza-charge ' + (paid ? 'is-paid' : '');
+
+			li.innerHTML =
+				'<span class="af-cobranza-charge__icon">' + chargeIcon(c.type) + '</span>' +
+				'<div class="af-cobranza-charge__body">' +
+				'<span class="af-cobranza-charge__label"></span>' +
+				'<span class="af-cobranza-charge__meta"></span>' +
+				'</div>' +
+				'<div class="af-cobranza-charge__amount">' +
+				'<span class="af-cobranza-charge__value">$' + monthMoney(c.amount) + '</span>' +
+				'<span class="af-cobranza-charge__balance"></span>' +
+				'</div>' +
+				'<div class="af-cobranza-charge__actions">' +
+				(paid || bal <= 0.01 ? '' : '<button type="button" class="button af-btn af-cobranza-pay-open" data-charge="' + c.id + '" data-outstanding="' + bal.toFixed(2) + '">' + LABELS.pay + '</button>') +
+				'</div>';
+
+			li.querySelector('.af-cobranza-charge__label').textContent = c.label + (c.desc ? ' · ' + c.desc : '');
+			li.querySelector('.af-cobranza-charge__meta').textContent =
+				(c.dueDate ? dateLabel(c.dueDate) + ' · ' : '') + chargeStatusLabel(c);
+			li.querySelector('.af-cobranza-charge__balance').textContent =
+				paid ? LABELS.paid : (LABELS.balance + ' $' + monthMoney(bal));
+
+			chargesEl.appendChild(li);
 		});
 	}
 
-	bind('af-building-form', 'af_create_building', 'af-building-status');
-	bind('af-unit-form', 'af_create_unit', 'af-unit-status');
-}());
-</script>
+	function render() {
+		renderCalendar();
+		renderCharges();
+	}
 
-<script>
-(function () {
-	const btn = document.getElementById('af-buildings-module-toggle');
-	if (!btn) { return; }
-	const status = document.getElementById('af-buildings-module-status');
-	const ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
-	const nonce = <?php echo wp_json_encode( wp_create_nonce( 'af_buildings_module_nonce' ) ); ?>;
+	/* ── Abrir modal desde tarjeta ───────────────────────────────────────── */
 
-	btn.addEventListener('click', function () {
-		btn.disabled = true;
-		const body = new URLSearchParams();
-		body.append('action', 'af_toggle_buildings_module');
-		body.append('nonce', nonce);
-		body.append('enabled', btn.getAttribute('data-enable') === '1' ? '1' : '0');
-		fetch(ajaxUrl, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-			body: body
-		}).then(function (r) { return r.json(); }).then(function (json) {
-			if (status) {
-				status.textContent = (json && json.success && json.data && json.data.message) ? json.data.message : 'Error';
+	function openForProp(prop) {
+		state.prop = prop;
+		state.period = periodString(new Date());
+
+		// Si el mes actual no tiene cargos, abre el primer mes con cargos.
+		if (!prop.charges || !prop.charges[state.period]) {
+			var keys = prop.charges ? Object.keys(prop.charges).sort() : [];
+			if (keys.length) {
+				state.period = keys[0];
 			}
-			window.location.reload();
+		}
+
+		titleEl.textContent = prop.title;
+		var sub = [];
+		if (prop.unit_code) { sub.push(prop.unit_code + (prop.building_name ? ' · ' + prop.building_name : '')); }
+		if (prop.guest) { sub.push(LABELS.tenant + ': ' + prop.guest); }
+		else if (!prop.has_lease) { sub.push(LABELS.available); }
+		subtitleEl.textContent = sub.join(' — ');
+
+		payPanel.hidden = true;
+		hideStatus();
+		render();
+		openModal();
+	}
+
+	document.addEventListener('click', function (e) {
+		var card = e.target.closest ? e.target.closest('.af-cobranza-card[data-prop]') : null;
+		if (!card) { return; }
+		var prop = DATA[card.getAttribute('data-prop')];
+		if (prop) { openForProp(prop); }
+	});
+
+	document.addEventListener('keydown', function (e) {
+		if ('Enter' !== e.key && ' ' !== e.key) { return; }
+		var card = e.target.closest ? e.target.closest('.af-cobranza-card[data-prop]') : null;
+		if (!card) { return; }
+		e.preventDefault();
+		card.click();
+	});
+
+	/* ── Navegación del calendario ───────────────────────────────────────── */
+
+	var todayPeriod = TODAY ? String(TODAY).slice(0, 7) : periodString(new Date());
+
+	document.querySelectorAll('[data-cal]').forEach(function (btn) {
+		btn.addEventListener('click', function () {
+			var dir = btn.getAttribute('data-cal');
+			if ('prev' === dir) { state.period = addMonths(state.period, -1); }
+			if ('next' === dir) { state.period = addMonths(state.period, 1); }
+			if ('today' === dir) { state.period = todayPeriod; }
+			render();
+		});
+	});
+
+	/* ── Anotar pago ─────────────────────────────────────────────────────── */
+
+	function setPayStatus(message, type) {
+		payStatus.style.display = '';
+		payStatus.textContent = message;
+		payStatus.className = 'af-modal__status is-' + (type || 'success');
+	}
+
+	function hidePayStatus() {
+		payStatus.textContent = '';
+		payStatus.style.display = 'none';
+		payStatus.className = 'af-modal__status';
+	}
+
+	chargesEl.addEventListener('click', function (e) {
+		var btn = e.target.closest('.af-cobranza-pay-open');
+		if (!btn) { return; }
+
+		payChargeId.value = btn.getAttribute('data-charge');
+		var outstanding = parseFloat(btn.getAttribute('data-outstanding')) || 0;
+		payAmount.value = outstanding.toFixed(2);
+		payDate.value = TODAY || '';
+		payOutstand.textContent = LABELS.balance + ': $' + monthMoney(outstanding) + ' — ' + LABELS.outstanding;
+		payReference.value = '';
+		hidePayStatus();
+		payPanel.hidden = false;
+		payPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+	});
+
+	payCancel.addEventListener('click', function () {
+		payPanel.hidden = true;
+		hidePayStatus();
+	});
+
+	payConfirm.addEventListener('click', function () {
+		var amount = parseFloat(payAmount.value);
+		if (!amount || amount <= 0) {
+			setPayStatus(LABELS.amountErr, 'error');
+			return;
+		}
+
+		payConfirm.disabled = true;
+		hidePayStatus();
+
+		var body = new URLSearchParams();
+		body.append('action', 'af_record_payment');
+		body.append('nonce', CONFIG.nonce);
+		body.append('charge_id', payChargeId.value);
+		body.append('amount', amount);
+		body.append('payment_date', payDate.value);
+		body.append('method', payMethod.value);
+		body.append('reference', payReference.value);
+
+		fetch(CONFIG.ajaxUrl, {
+			method: 'POST',
+			credentials: 'same-origin',
+			headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+			body: body.toString()
+		}).then(function (r) { return r.json(); }).then(function (json) {
+			payConfirm.disabled = false;
+			if (!json || !json.success) {
+				setPayStatus((json && json.data && json.data.message) || LABELS.genericErr, 'error');
+				return;
+			}
+			setPayStatus(json.data.message || LABELS.paidOk, 'success');
+			setTimeout(function () { window.location.reload(); }, 900);
 		}).catch(function () {
-			btn.disabled = false;
-			if (status) { status.textContent = 'Error'; }
+			payConfirm.disabled = false;
+			setPayStatus(LABELS.networkErr, 'error');
 		});
 	});
 }());

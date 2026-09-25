@@ -1,5 +1,5 @@
 /**
- * Arriendo Facil - Edificios y unidades polish layer.
+ * Arriendo Facil - Cobranza de inmuebles polish layer.
  *
  * Enqueued only on admin.php?page=af-buildings, after af-tokens + af-shell +
  * af-forms. Repaints the building/unit structure screens so the hierarchy
@@ -500,24 +500,49 @@
 	gap: var(--af-space-5);
 }
 
-/* El estado de cobranza se marca pintando el marco de la tarjeta. El fondo
-   sigue siendo el blanco de .af-property-card: la tarjeta no se tiñe, solo se
-   pinta el borde. El color nunca es la única señal, la pastilla de estado
-   siempre acompaña al texto. */
+/* El estado de cobranza se marca pintando el marco completo de la tarjeta:
+   borde grueso del color del estado + una barra de acento en el canto
+   superior. El fondo sigue siendo el blanco de .af-property-card: la tarjeta
+   no se tiñe, solo se pinta el marco. El color nunca es la única señal, la
+   pastilla de estado y el texto de vencimiento siempre lo acompañan.
+
+   rojo = vencido · naranja = vence pronto · azul = por cobrar ·
+   verde = al día · gris = sin contrato o sin cargo */
 
 .af-cobranza-card {
 	cursor: pointer;
+	border-width: 3px;
+	border-style: solid;
 	transition: transform var(--af-motion-base), box-shadow var(--af-motion-base), border-color var(--af-motion-fast);
+}
+
+.af-cobranza-card::before {
+	content: "";
+	position: absolute;
+	inset: 0 0 auto;
+	height: 6px;
+	z-index: 2;
+	background: var(--af-gray-300);
+	transition: background var(--af-motion-fast);
 }
 
 .af-cobranza-card:hover {
 	box-shadow: 0 12px 28px -10px rgba(15, 23, 42, 0.18);
 }
 
+.af-cobranza-card:focus-visible {
+	outline: 2px solid var(--af-primary-500, #00A884);
+	outline-offset: 3px;
+}
+
 /* Vencido / vence hoy: exige atención. */
 
 .af-cobranza-card.is-danger {
 	border-color: var(--af-danger-500);
+}
+
+.af-cobranza-card.is-danger::before {
+	background: var(--af-danger-500);
 }
 
 .af-cobranza-card.is-danger:hover {
@@ -530,6 +555,10 @@
 	border-color: var(--af-warning-500);
 }
 
+.af-cobranza-card.is-warning::before {
+	background: var(--af-warning-500);
+}
+
 .af-cobranza-card.is-warning:hover {
 	box-shadow: 0 14px 30px -10px rgba(245, 158, 11, 0.3);
 }
@@ -540,10 +569,18 @@
 	border-color: var(--af-info-500);
 }
 
+.af-cobranza-card.is-info::before {
+	background: var(--af-info-500);
+}
+
 /* Al día: todo pagado. */
 
 .af-cobranza-card.is-ok {
 	border-color: var(--af-success-500);
+}
+
+.af-cobranza-card.is-ok::before {
+	background: var(--af-success-500);
 }
 
 /* Sin cargo generado / disponible: informativo, sin alarma. */
@@ -553,13 +590,9 @@
 	border-color: var(--af-gray-300);
 }
 
-.af-cobranza-card.is-danger,
-.af-cobranza-card.is-warning,
-.af-cobranza-card.is-info,
-.af-cobranza-card.is-ok,
-.af-cobranza-card.is-muted,
-.af-cobranza-card.is-available {
-	border-width: 2px;
+.af-cobranza-card.is-muted::before,
+.af-cobranza-card.is-available::before {
+	background: var(--af-gray-300);
 }
 
 .af-buildings-page .af-property-card__media::after {
@@ -666,6 +699,14 @@
 	color: var(--af-warning-700, #B45309);
 }
 
+.af-cobranza-card__amount.is-info {
+	color: var(--af-info-700, #1D4ED8);
+}
+
+.af-cobranza-card__amount.is-ok {
+	color: var(--af-success-700, #15803D);
+}
+
 .af-cobranza-card__due {
 	font-size: var(--af-text-xs, 12px);
 	font-weight: 700;
@@ -679,6 +720,14 @@
 
 .af-cobranza-card__due.is-warning {
 	color: var(--af-warning-700, #B45309);
+}
+
+.af-cobranza-card__due.is-info {
+	color: var(--af-info-700, #1D4ED8);
+}
+
+.af-cobranza-card__due.is-ok {
+	color: var(--af-success-700, #15803D);
 }
 
 .af-buildings-page .af-catalog-card__hint {
@@ -739,12 +788,43 @@
 }
 
 .af-cobranza-cal__period {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
 	margin: 0;
 	text-align: center;
 	font-size: 15px;
 	font-weight: 800;
 	color: var(--af-gray-900, #0F172A);
 	text-transform: capitalize;
+}
+
+/* Indicador de carga mientras se pide el mes por AJAX. */
+
+.af-cobranza-cal__spinner {
+	width: 14px;
+	height: 14px;
+	border: 2px solid var(--af-gray-200, #E2E8F0);
+	border-top-color: var(--af-primary-500, #00A884);
+	border-radius: 50%;
+	animation: af-cobranza-spin 0.7s linear infinite;
+}
+
+@keyframes af-cobranza-spin {
+	to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.af-cobranza-cal__spinner {
+		animation-duration: 2.4s;
+	}
+}
+
+.af-cobranza-cal__nav-btn:disabled,
+.af-cobranza-cal__today:disabled {
+	opacity: 0.4;
+	cursor: not-allowed;
 }
 
 .af-cobranza-cal__today-row {
@@ -759,13 +839,22 @@
 	font-size: var(--af-text-xs, 12px);
 }
 
-/* Grilla del calendario: paren semanas completas del mes. */
+/* Grilla del calendario: paren semanas completas del mes. Cada día es un
+   botón, así que es pulsable con teclado y lector de pantalla sin código
+   extra. Los días sin cargos también son pulsables: filtrar un día vacío
+   es una forma rápida de limpiar la selección. */
 
 .af-calendar-mini {
 	display: grid;
 	grid-template-columns: repeat(7, 1fr);
 	gap: 6px;
 	margin-bottom: var(--af-space-4);
+	transition: opacity var(--af-motion-fast);
+}
+
+.af-calendar-mini.is-loading {
+	opacity: 0.45;
+	pointer-events: none;
 }
 
 .af-calendar-mini__wd {
@@ -780,22 +869,39 @@
 
 .af-calendar-mini__day {
 	position: relative;
-	min-height: 52px;
+	min-height: 58px;
 	border: 1px solid var(--af-gray-200, #E2E8F0);
 	border-radius: var(--af-radius-md, 10px);
 	background: var(--af-gray-0, #fff);
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	gap: 4px;
-	padding: 6px 4px;
+	justify-content: flex-start;
+	gap: 3px;
+	padding: 6px 3px;
+	font: inherit;
+	color: inherit;
+	text-align: center;
 	cursor: pointer;
-	transition: border-color var(--af-motion-fast), box-shadow var(--af-motion-fast), opacity var(--af-motion-fast);
+	transition: border-color var(--af-motion-fast), box-shadow var(--af-motion-fast), opacity var(--af-motion-fast), background var(--af-motion-fast);
 }
 
-.af-calendar-mini__day.has-charges:hover {
+.af-calendar-mini__day:hover {
 	border-color: var(--af-primary-400);
 	box-shadow: 0 0 0 2px var(--af-primary-100, #D5F3E9);
+}
+
+.af-calendar-mini__day:focus-visible {
+	outline: 2px solid var(--af-primary-500, #00A884);
+	outline-offset: 2px;
+	z-index: 1;
+}
+
+/* Días que tienen al menos un cargo este mes. */
+
+.af-calendar-mini__day.has-charges {
+	border-color: var(--af-gray-300, #CBD5E1);
+	background: var(--af-gray-50, #F8FAFC);
 }
 
 .af-calendar-mini__day.is-outside {
@@ -808,7 +914,16 @@
 	box-shadow: 0 0 0 2px var(--af-primary-100, #D5F3E9);
 }
 
-/* Día filtrado desde la lista de cargos. */
+.af-calendar-mini__day.is-payday::after {
+	content: "";
+	position: absolute;
+	inset: auto 0 0;
+	height: 3px;
+	border-radius: 0 0 var(--af-radius-md, 10px) var(--af-radius-md, 10px);
+	background: var(--af-primary-500, #00A884);
+}
+
+/* Día pulsado: la lista de cargos de abajo queda filtrada a ese día. */
 
 .af-calendar-mini__day.is-selected {
 	border-color: var(--af-primary-600, #00926F);
@@ -817,7 +932,7 @@
 }
 
 .af-calendar-mini__day.is-dimmed {
-	opacity: 0.4;
+	opacity: 0.42;
 }
 
 .af-calendar-mini__day-num {
@@ -825,6 +940,33 @@
 	font-weight: 700;
 	color: var(--af-gray-700, #334155);
 	line-height: 1;
+}
+
+.af-calendar-mini__day.is-today .af-calendar-mini__day-num {
+	color: var(--af-primary-700, #007058);
+}
+
+/* Saldo del día: el número que hace falta cobrar, o el total si está pagado. */
+
+.af-calendar-mini__day-amt {
+	font-family: var(--af-font-numeric, ui-monospace, SFMono-Regular, Menlo, monospace);
+	font-variant-numeric: tabular-nums;
+	font-size: 10px;
+	font-weight: 700;
+	line-height: 1.1;
+	color: var(--af-gray-500, #64748B);
+}
+
+.af-calendar-mini__day-amt.is-paid {
+	color: var(--af-success-700, #15803D);
+}
+
+.af-calendar-mini__day-amt.is-pending {
+	color: var(--af-warning-700, #B45309);
+}
+
+.af-calendar-mini__day-amt.is-overdue {
+	color: var(--af-danger-700);
 }
 
 .af-calendar-mini__day-dot {
@@ -840,6 +982,7 @@
 	flex-wrap: wrap;
 	justify-content: center;
 	gap: 3px;
+	max-width: 100%;
 }
 
 .af-calendar-mini__day-dot.is-paid {
@@ -881,6 +1024,10 @@
 	gap: 6px;
 }
 
+.af-calendar-mini__legend-item {
+	font-weight: 600;
+}
+
 .af-calendar-mini__legend i {
 	display: inline-block;
 	width: 10px;
@@ -907,7 +1054,8 @@
 	background: var(--af-primary-500, #00A884);
 }
 
-/* Filtro por estado: se atenúa y deja de ser pulsable visualmente. */
+/* Filtro por estado: al pulsarse, la lista de cargos se queda solo con los
+   cargos de ese estado y el propio botón queda resaltado. */
 
 .af-calendar-mini__filter {
 	margin: 0;
@@ -918,17 +1066,29 @@
 	color: var(--af-gray-700, #334155);
 	font-size: var(--af-text-xs, 12px);
 	font-weight: 700;
+	line-height: 1.6;
 	cursor: pointer;
-	transition: opacity var(--af-motion-fast), border-color var(--af-motion-fast);
+	transition: opacity var(--af-motion-fast), border-color var(--af-motion-fast), background var(--af-motion-fast), color var(--af-motion-fast);
 }
 
 .af-calendar-mini__filter:hover {
 	border-color: var(--af-primary-400);
 }
 
-.af-calendar-mini__filter.is-off {
-	opacity: 0.42;
-	text-decoration: line-through;
+.af-calendar-mini__filter.is-active {
+	border-color: var(--af-primary-500, #00A884);
+	background: var(--af-primary-500, #00A884);
+	color: #fff;
+}
+
+.af-calendar-mini__filter.is-active i {
+	background: #fff;
+}
+
+.af-calendar-mini__filter-n {
+	font-family: var(--af-font-numeric, ui-monospace, SFMono-Regular, Menlo, monospace);
+	font-variant-numeric: tabular-nums;
+	opacity: 0.72;
 }
 
 .af-calendar-mini__filter:focus-visible {
@@ -1043,11 +1203,28 @@
 /* Lista de cargos del mes. */
 
 .af-cobranza-charges__title {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--af-space-3);
 	margin: 0 0 var(--af-space-2);
 	font-size: 13px;
 	font-weight: 700;
 	text-transform: uppercase;
 	letter-spacing: 0.05em;
+	color: var(--af-gray-500, #64748B);
+}
+
+/* Totales de lo que la lista está mostrando ahora mismo (mes completo o el
+   día que esté filtrado). */
+
+.af-cobranza-charges__total {
+	font-family: var(--af-font-numeric, ui-monospace, SFMono-Regular, Menlo, monospace);
+	font-variant-numeric: tabular-nums;
+	font-size: var(--af-text-xs, 12px);
+	font-weight: 700;
+	letter-spacing: 0;
+	text-transform: none;
 	color: var(--af-gray-500, #64748B);
 }
 
@@ -1101,6 +1278,15 @@
 }
 
 /* Tono del borde según el estado del cargo. */
+
+.af-cobranza-charge.is-pending {
+	border-color: color-mix(in srgb, var(--af-info-500, #0EA5E9) 34%, transparent);
+}
+
+.af-cobranza-charge.is-pending .af-cobranza-charge__icon {
+	background: var(--af-info-50, #F0F9FF);
+	color: var(--af-info-700, #0369A1);
+}
 
 .af-cobranza-charge.is-overdue {
 	border-color: color-mix(in srgb, var(--af-danger-500, #E5484D) 42%, transparent);

@@ -146,8 +146,8 @@ class Arriendo_Facil_Admin {
 
 		add_submenu_page(
 			'arriendo-facil',
-			__( 'Cobranza por inmueble', 'arriendo-facil' ),
-			__( 'Cobranza por inmueble', 'arriendo-facil' ),
+			__( 'Cobranza de inmuebles', 'arriendo-facil' ),
+			__( 'Cobranza de inmuebles', 'arriendo-facil' ),
 			Arriendo_Facil_Tenancy::CAP,
 			'af-buildings',
 			array( $this, 'render_buildings' )
@@ -784,7 +784,7 @@ class Arriendo_Facil_Admin {
 			),
 array(
 			'slug'  => 'af-buildings',
-			'label' => __( 'Cobranza por inmueble', 'arriendo-facil' ),
+			'label' => __( 'Cobranza de inmuebles', 'arriendo-facil' ),
 			'url'   => admin_url( 'admin.php?page=af-buildings' ),
 			'icon'  => 'building',
 			'group' => 'propiedades',
@@ -2600,7 +2600,7 @@ array(
 			);
 		}
 
-		// Estilos de Edificios y unidades.
+		// Estilos de Cobranza de inmuebles.
 		if ( 'arriendo-facil_page_af-buildings' === $hook ) {
 			$buildings_css_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-buildings.css';
 			wp_enqueue_style(
@@ -2625,6 +2625,7 @@ array(
 				array(
 					'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 					'nonce'   => wp_create_nonce( 'af_ledger_nonce' ),
+					'i18n'    => self::cobranza_calendar_strings(),
 				)
 			);
 		}
@@ -3010,7 +3011,7 @@ array(
 		wp_send_json_success(
 			array(
 				'message'  => $enabled
-					? __( 'Sección "Edificios y unidades" activada. Ya puedes organizar departamentos dentro de un edificio.', 'arriendo-facil' )
+					? __( 'Sección de cobranza activada. Ya puedes organizar departamentos dentro de un edificio.', 'arriendo-facil' )
 					: __( 'Sección oculta. Puedes reactivarla cuando la necesites.', 'arriendo-facil' ),
 				'enabled'  => $enabled,
 				'show_menu' => Arriendo_Facil_Property_Structure::module_enabled(),
@@ -5846,6 +5847,61 @@ array(
 			wp_die( esc_html__( 'No tienes permisos para acceder a esta página.', 'arriendo-facil' ) );
 		}
 		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/ota-sync-dashboard.php';
+	}
+
+	/**
+	 * Translated strings for the interactive collection calendar.
+	 *
+	 * They travel to af-buildings-cobranza.js so month names, weekday
+	 * abbreviations, statuses and amounts stay localised and pluralised by
+	 * PHP instead of being hard-coded in Spanish inside the script.
+	 *
+	 * @return array<string,mixed>
+	 */
+	private static function cobranza_calendar_strings() {
+		$weekdays = array();
+		// 2024-01-01 fue un lunes: seis pasos dan los siete días en orden.
+		for ( $i = 0; $i < 7; $i++ ) {
+			$weekdays[] = wp_date( 'D', strtotime( '2024-01-01 +' . $i . ' day' ) );
+		}
+
+		$months = array();
+		for ( $m = 1; $m <= 12; $m++ ) {
+			$months[] = wp_date( 'M', mktime( 0, 0, 0, $m, 1, 2024 ) );
+		}
+
+		return array(
+			'weekdays'          => $weekdays,
+			'months'            => $months,
+			'paid'              => __( 'Pagado', 'arriendo-facil' ),
+			'pending'           => __( 'Pendiente', 'arriendo-facil' ),
+			'overdue'           => __( 'Vencido', 'arriendo-facil' ),
+			'partial'           => __( 'Parcial', 'arriendo-facil' ),
+			'payday'            => __( 'Día de pago', 'arriendo-facil' ),
+			'charged'           => __( 'Facturado', 'arriendo-facil' ),
+			'settled'           => __( 'Cancelado', 'arriendo-facil' ),
+			'noCharges'         => __( 'Sin cargos para este periodo.', 'arriendo-facil' ),
+			'noMatches'         => __( 'Ningún cargo coincide con el filtro.', 'arriendo-facil' ),
+			'tenant'            => __( 'Arrendatario:', 'arriendo-facil' ),
+			'recordPayment'     => __( 'Anotar pago', 'arriendo-facil' ),
+			'noActiveLease'     => __( 'Sin contrato activo: este inmueble no genera cobros.', 'arriendo-facil' ),
+			'balance'           => __( 'Saldo', 'arriendo-facil' ),
+			'showAll'           => __( 'Ver todos los días', 'arriendo-facil' ),
+			'clearFilters'      => __( 'Quitar filtros', 'arriendo-facil' ),
+			'dayCharges'        => __( 'Cargos del %s', 'arriendo-facil' ),
+			'outstanding'       => __( 'Saldo del cargo: %s', 'arriendo-facil' ),
+			'overpayHint'       => __( '— puedes superarlo y el excedente quedará como saldo a favor.', 'arriendo-facil' ),
+			'amountRequired'    => __( 'Ingresa un monto mayor a cero.', 'arriendo-facil' ),
+			'payFailed'         => __( 'Error de red al registrar el pago.', 'arriendo-facil' ),
+			'monthFailed'       => __( 'No se pudo cargar el mes solicitado.', 'arriendo-facil' ),
+			'monthNetFailed'    => __( 'Error de red al cargar el mes.', 'arriendo-facil' ),
+			'availOne'          => __( '%d inmueble disponible (sin contrato)', 'arriendo-facil' ),
+			'availMany'         => __( '%d inmuebles disponibles (sin contrato)', 'arriendo-facil' ),
+			/* translators: 1: day label with charges, 2: pending amount. */
+			'dayTotals'         => __( '%1$s facturados · %2$s pendientes', 'arriendo-facil' ),
+			/* translators: %d: day of the month the rent is due. */
+			'paydayOn'          => __( 'Día de pago: %d', 'arriendo-facil' ),
+		);
 	}
 
 	/**

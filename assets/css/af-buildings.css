@@ -392,29 +392,20 @@
    COBRANZA (hub: Cobranza + Estructura)
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* ── Tabs del hub (CSS-only radio switcher, ids af-tab-cobranza/estructura) ── */
+/* ── Tabs del hub (CSS-only radio switcher, id af-tab-cobranza) ── */
 
-#af-tab-cobranza:checked ~ .af-tabs__nav > label[for="af-tab-cobranza"],
-#af-tab-estructura:checked ~ .af-tabs__nav > label[for="af-tab-estructura"] {
+#af-tab-cobranza:checked ~ .af-tabs__nav > label[for="af-tab-cobranza"] {
 	background: var(--af-gray-0, #fff);
 	color: var(--af-gray-900);
 	box-shadow: var(--af-shadow-sm);
 }
 
-#af-tab-cobranza:checked ~ .af-tabs__panels > .af-tabs__panel--cobranza,
-#af-tab-estructura:checked ~ .af-tabs__panels > .af-tabs__panel--estructura {
+#af-tab-cobranza:checked ~ .af-tabs__panels > .af-tabs__panel--cobranza {
 	display: block;
 }
 
-.af-tabs__radio:focus-visible + .af-tabs__radio + .af-tabs__nav > label[for="af-tab-cobranza"],
-.af-tabs__radio + .af-tabs__radio:focus-visible + .af-tabs__nav > label[for="af-tab-estructura"] {
+.af-tabs__radio:focus-visible + .af-tabs__nav > label[for="af-tab-cobranza"] {
 	box-shadow: var(--af-focus-ring);
-}
-
-#af-tab-estructura:checked ~ .af-tabs__nav .af-tabs__badge {
-	background: var(--af-gray-200);
-	color: var(--af-gray-700);
-	box-shadow: none;
 }
 
 .af-buildings-page .af-tabs__panel--cobranza {

@@ -5895,8 +5895,6 @@ array(
 			'payFailed'         => __( 'Error de red al registrar el pago.', 'arriendo-facil' ),
 			'monthFailed'       => __( 'No se pudo cargar el mes solicitado.', 'arriendo-facil' ),
 			'monthNetFailed'    => __( 'Error de red al cargar el mes.', 'arriendo-facil' ),
-			'availOne'          => __( '%d inmueble disponible (sin contrato)', 'arriendo-facil' ),
-			'availMany'         => __( '%d inmuebles disponibles (sin contrato)', 'arriendo-facil' ),
 			/* translators: 1: day label with charges, 2: pending amount. */
 			'dayTotals'         => __( '%1$s facturados · %2$s pendientes', 'arriendo-facil' ),
 			/* translators: %d: day of the month the rent is due. */

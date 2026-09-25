@@ -169,17 +169,10 @@ $cob_summary  = $cob_snapshot['summary'];
 $cob_statuses = $cob_snapshot['statuses'];
 $cob_alerts   = $cob_snapshot['display'];
 
-// Los inmuebles sin contrato se listan aparte, en su propio bloque colapsable:
-// pintarlos también en la grilla principal los duplicaba.
-$cob_active_props    = array();
-$cob_available_props = array();
-foreach ( $cob_props as $cob_acc_id => $cob_prop ) {
-	if ( 'available' === $cob_prop['status'] ) {
-		$cob_available_props[ $cob_acc_id ] = $cob_prop;
-	} else {
-		$cob_active_props[ $cob_acc_id ] = $cob_prop;
-	}
-}
+// Una sola grilla con todos los inmuebles, tengan contrato o no: el estado
+// "available" viaja en su propia clase de borde, asi que no hace falta una
+// lista aparte. El snapshot ya los ordena por urgencia y deja los
+// disponibles al final, asi que la grilla no necesita reordenar nada.
 ?>
 
 <div class="wrap af-shell af-buildings-page">
@@ -205,7 +198,7 @@ foreach ( $cob_props as $cob_acc_id => $cob_prop ) {
 		</div>
 		<div class="af-tabs__panels">
 			<section class="af-tabs__panel af-tabs__panel--cobranza" role="tabpanel" aria-labelledby="af-tab-cobranza">
-				<?php if ( empty( $cob_active_props ) && empty( $cob_available_props ) ) : ?>
+				<?php if ( empty( $cob_props ) ) : ?>
 					<div class="af-empty">
 						<span class="af-empty__icon" aria-hidden="true"><?php echo af_lucide( 'building', 28 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
 						<h3 class="af-empty__title"><?php esc_html_e( 'Aún no tienes inmuebles registrados', 'arriendo-facil' ); ?></h3>
@@ -240,18 +233,7 @@ foreach ( $cob_props as $cob_acc_id => $cob_prop ) {
 					</section>
 
 					<div class="af-property-grid af-cobranza-grid" id="af-cobranza-grid">
-						<?php if ( empty( $cob_active_props ) ) : ?>
-							<p class="af-cobranza-grid__empty">
-								<?php
-								printf(
-									/* translators: %d: number of properties without an active lease. */
-									esc_html( _n( 'No hay inmuebles con contrato activo todavía. El %d inmueble disponible está en el bloque de abajo.', 'No hay inmuebles con contrato activo todavía. Los %d inmuebles disponibles están en el bloque de abajo.', count( $cob_available_props ), 'arriendo-facil' ) ),
-									esc_html( number_format_i18n( count( $cob_available_props ) ) )
-								);
-								?>
-							</p>
-						<?php endif; ?>
-						<?php foreach ( $cob_active_props as $acc_id => $prop ) : ?>
+						<?php foreach ( $cob_props as $acc_id => $prop ) : ?>
 							<?php
 							$csm       = $cob_statuses[ $prop['status'] ];
 							$address   = trim( trim( (string) $prop['address'] ) . ( $prop['city'] ? ', ' . $prop['city'] : '' ) );
@@ -329,40 +311,6 @@ foreach ( $cob_props as $cob_acc_id => $cob_prop ) {
 							</article>
 						<?php endforeach; ?>
 					</div>
-
-					<?php if ( ! empty( $cob_available_props ) ) : ?>
-						<details class="af-collapse af-section af-cobranza-avail" id="af-cobranza-avail" style="margin-top: var(--af-space-5);">
-							<summary class="af-collapse__summary">
-								<span class="af-section__icon af-section__icon--slate" aria-hidden="true"><?php echo af_lucide( 'building', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-								<span class="af-collapse__label" data-avail-count><?php echo esc_html( sprintf( /* translators: %d: number of properties */ _n( '%d inmueble disponible (sin contrato)', '%d inmuebles disponibles (sin contrato)', count( $cob_available_props ), 'arriendo-facil' ), count( $cob_available_props ) ) ); ?></span>
-								<span class="af-collapse__chevron" aria-hidden="true"><?php echo af_lucide( 'chevron-down', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-							</summary>
-							<div class="af-collapse__body">
-								<div class="af-property-grid" id="af-cobranza-avail-grid">
-									<?php foreach ( $cob_available_props as $acc_id => $prop ) : ?>
-										<?php $csm = $cob_statuses[ $prop['status'] ]; ?>
-										<article class="af-property-card af-cobranza-card <?php echo esc_attr( $csm['card'] ); ?>" data-prop="<?php echo esc_attr( $acc_id ); ?>" data-status="<?php echo esc_attr( $prop['status'] ); ?>" data-avail-card role="button" tabindex="0" aria-label="<?php echo esc_attr( sprintf( /* translators: %s: property title */ __( 'Ver cobranza de %s', 'arriendo-facil' ), $prop['title'] ) ); ?>">
-											<div class="af-property-card__media">
-												<?php if ( $prop['thumb'] ) : ?>
-													<img src="<?php echo esc_url( $prop['thumb'] ); ?>" alt="<?php echo esc_attr( $prop['title'] ); ?>" loading="lazy" />
-												<?php else : ?>
-													<div class="af-property-card__placeholder" aria-hidden="true"><?php echo af_lucide( 'building', 40 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></div>
-												<?php endif; ?>
-												<div class="af-property-card__badges"><span class="af-pill af-pill--<?php echo esc_attr( $csm['pill'] ); ?>" data-card-pill><?php echo esc_html( $csm['label'] ); ?></span></div>
-											</div>
-											<div class="af-property-card__body">
-												<div class="af-catalog-card__type">
-													<span class="af-catalog-card__type-icon" aria-hidden="true"><?php echo af_lucide( $prop['type_icon'], 14 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-													<?php echo esc_html( $prop['type_label'] ); ?>
-												</div>
-												<h3 class="af-property-card__title"><?php echo esc_html( $prop['title'] ); ?></h3>
-											</div>
-										</article>
-									<?php endforeach; ?>
-								</div>
-							</div>
-						</details>
-					<?php endif; ?>
 				<?php endif; ?>
 			</section>
 

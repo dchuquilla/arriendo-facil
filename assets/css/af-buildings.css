@@ -502,16 +502,6 @@
 
 /* Aviso cuando todavía no hay inmuebles con contrato: sin esto la grilla
    queda en blanco y parece que las tarjetas no cargaron. */
-.af-buildings-page .af-cobranza-grid__empty {
-	grid-column: 1 / -1;
-	margin: 0;
-	padding: var(--af-space-5);
-	border: 1px dashed var(--af-gray-300);
-	border-radius: var(--af-radius-lg);
-	background: var(--af-gray-50, #f8fafc);
-	color: var(--af-gray-600);
-	text-align: center;
-}
 
 /* El estado de cobranza se marca pintando el marco de la tarjeta con el
    color del estado. El fondo sigue siendo el blanco de .af-property-card: la
@@ -1395,12 +1385,6 @@
 }
 
 /* ── Disponibles (sin contrato) ────────────────────────────────────────── */
-
-.af-cobranza-avail .af-collapse__summary {
-	font-weight: 700;
-	font-size: 15px;
-	color: var(--af-gray-900);
-}
 
 /* ── Responsive ─────────────────────────────────────────────────────────── */
 

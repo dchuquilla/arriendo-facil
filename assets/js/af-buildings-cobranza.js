@@ -168,8 +168,6 @@
 	var payConfirm = document.getElementById('af-cobranza-pay-confirm');
 
 	var gridEl = document.getElementById('af-cobranza-grid');
-	var availBox = document.getElementById('af-cobranza-avail');
-	var availCountEl = document.querySelector('[data-avail-count]');
 	var attentionEl = document.querySelector('[data-cobranza-attention]');
 
 	/* Clases de marco que el snapshot puede asignar a una tarjeta. */
@@ -747,14 +745,10 @@
 				card.hidden = true;
 				return;
 			}
-			var isAvailCard = card.hasAttribute('data-avail-card');
-			var belongs = 'available' === prop.status;
-
-			// Cada tarjeta vive en una sola de las dos listas.
-			card.hidden = isAvailCard ? !belongs : belongs;
-			if (isAvailCard !== belongs) {
-				return; // La otra lista ya se encarga de pintar este inmueble.
-			}
+			// Todos los inmuebles viven en la misma grilla: si el snapshot ya no
+			// trae el inmueble se oculta, si no se repinta. El estado "available"
+			// no es un caso aparte, solo cambia el color del borde.
+			card.hidden = false;
 
 			var meta = state.statuses[prop.status] || {};
 			card.setAttribute('data-status', prop.status);
@@ -791,16 +785,6 @@
 			var card = gridEl.querySelector('.af-cobranza-card[data-prop="' + id + '"]');
 			if (card) { gridEl.appendChild(card); }
 		});
-
-		var availCards = availBox ? availBox.querySelectorAll('.af-cobranza-card[data-prop]') : [];
-		var availCount = 0;
-		Array.prototype.forEach.call(availCards, function (card) {
-			if (!card.hidden) { availCount += 1; }
-		});
-		if (availBox) { availBox.hidden = availCount === 0; }
-		if (availCountEl) {
-			availCountEl.textContent = plural(availCount, availCount === 1 ? 'availOne' : 'availMany');
-		}
 	}
 
 	/* ── Abrir el modal desde una tarjeta ────────────────────────────────── */

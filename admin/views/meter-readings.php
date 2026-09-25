@@ -212,7 +212,7 @@ $charge_status_map = array(
 				printf(
 					/* translators: %s: link to the buildings page */
 					esc_html__( 'Esta sección alerta lo que se cobra por agua, luz o gas según lo que cada propiedad consume. Para empezar, registra un edificio con sus unidades en %s o crea una propiedad en el catálogo.', 'arriendo-facil' ),
-					'<a href="' . esc_url( admin_url( 'admin.php?page=af-buildings' ) ) . '">' . esc_html__( 'Edificios y unidades', 'arriendo-facil' ) . '</a>'
+					'<a href="' . esc_url( admin_url( 'admin.php?page=af-buildings' ) ) . '">' . esc_html__( 'Cobranza por inmueble', 'arriendo-facil' ) . '</a>'
 				);
 				?>
 			</p>

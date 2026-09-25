@@ -248,7 +248,7 @@ usort(
 			<div class="af-section__actions" style="display:flex; gap:8px;">
 				<a class="button af-btn af-btn--ghost" href="<?php echo esc_url( admin_url( 'admin.php?page=af-collections' ) ); ?>"><?php esc_html_e( 'Control de pagos', 'arriendo-facil' ); ?></a>
 				<a class="button af-btn af-btn--ghost" href="<?php echo esc_url( admin_url( 'admin.php?page=af-meter-readings' ) ); ?>"><?php esc_html_e( 'Ver alertas de lecturas', 'arriendo-facil' ); ?></a>
-				<a class="button af-btn af-btn--ghost" href="<?php echo esc_url( admin_url( 'admin.php?page=af-buildings' ) ); ?>"><?php esc_html_e( 'Cobranza por inmueble', 'arriendo-facil' ); ?></a>
+				<a class="button af-btn af-btn--ghost" href="<?php echo esc_url( admin_url( 'admin.php?page=af-buildings' ) ); ?>"><?php esc_html_e( 'Cobranza de inmuebles', 'arriendo-facil' ); ?></a>
 			</div>
 		</header>
 

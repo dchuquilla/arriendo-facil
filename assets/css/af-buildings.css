@@ -11,6 +11,15 @@
 	margin-bottom: var(--af-space-5);
 }
 
+/* `hidden` debe ganar siempre a los `display` de componente. Varias reglas
+   fijan display:flex (af-cobranza-alert, af-cobranza-dayfilter y
+   af-property-card en af-shell.css) y sin esto los elementos que el JS oculta
+   se siguen pintando: se veían barras de alerta vacías y cards duplicadas al
+   mover un inmueble entre la grilla y el bloque de disponibles. */
+.af-buildings-page [hidden] {
+	display: none !important;
+}
+
 /* ── Building switcher ──────────────────────────────────────────────────── */
 
 .af-building-switcher {
@@ -491,99 +500,90 @@
 	gap: var(--af-space-5);
 }
 
-/* El estado de cobranza se marca pintando el marco completo de la tarjeta:
-   borde grueso del color del estado + una barra de acento en el canto
-   superior. El fondo sigue siendo el blanco de .af-property-card: la tarjeta
-   no se tiñe, solo se pinta el marco. El color nunca es la única señal, la
-   pastilla de estado y el texto de vencimiento siempre lo acompañan.
+/* Aviso cuando todavía no hay inmuebles con contrato: sin esto la grilla
+   queda en blanco y parece que las tarjetas no cargaron. */
+.af-buildings-page .af-cobranza-grid__empty {
+	grid-column: 1 / -1;
+	margin: 0;
+	padding: var(--af-space-5);
+	border: 1px dashed var(--af-gray-300);
+	border-radius: var(--af-radius-lg);
+	background: var(--af-gray-50, #f8fafc);
+	color: var(--af-gray-600);
+	text-align: center;
+}
+
+/* El estado de cobranza se marca pintando el marco de la tarjeta con el
+   color del estado. El fondo sigue siendo el blanco de .af-property-card: la
+   tarjeta no se tiñe, solo se pinta el borde. El color nunca es la única señal,
+   la pastilla de estado y el texto de vencimiento siempre lo acompañan.
 
    rojo = vencido · naranja = vence pronto · azul = por cobrar ·
    verde = al día · gris = sin contrato o sin cargo */
 
 .af-cobranza-card {
 	cursor: pointer;
-	border-width: 3px;
-	border-style: solid;
 	transition: transform var(--af-motion-base), box-shadow var(--af-motion-base), border-color var(--af-motion-fast);
 }
 
-.af-cobranza-card::before {
-	content: "";
-	position: absolute;
-	inset: 0 0 auto;
-	height: 6px;
-	z-index: 2;
-	background: var(--af-gray-300);
-	transition: background var(--af-motion-fast);
-}
-
 .af-cobranza-card:hover {
-	box-shadow: 0 12px 28px -10px rgba(15, 23, 42, 0.18);
+	border-color: var(--af-primary-200, #8FDBCA);
+	box-shadow: 0 12px 28px -10px rgba(0, 168, 132, 0.22);
 }
 
-.af-cobranza-card:focus-visible {
-	outline: 2px solid var(--af-primary-500, #00A884);
-	outline-offset: 3px;
-}
+/* El marco del estado va translucido con un halo suave; al pasar el cursor el
+   borde se vuelve solido y el halo se convierte en sombra. Mismo tratamiento
+   para los cinco estados, para que el color se lea siempre igual.
 
-/* Vencido / vence hoy: exige atención. */
+   rojo = vencido · naranja = vence pronto · azul = por cobrar ·
+   verde = al dia · gris = sin contrato o sin cargo */
 
 .af-cobranza-card.is-danger {
-	border-color: var(--af-danger-500);
-}
-
-.af-cobranza-card.is-danger::before {
-	background: var(--af-danger-500);
+	border-color: color-mix(in srgb, var(--af-danger-500, #DC2626) 45%, transparent);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--af-danger-500, #DC2626) 12%, transparent);
 }
 
 .af-cobranza-card.is-danger:hover {
-	box-shadow: 0 14px 30px -10px rgba(220, 38, 38, 0.32);
+	border-color: var(--af-danger-500, #DC2626);
+	box-shadow: 0 12px 28px -10px rgba(220, 38, 38, 0.28);
 }
-
-/* Vence pronto: atención preventiva. */
 
 .af-cobranza-card.is-warning {
-	border-color: var(--af-warning-500);
-}
-
-.af-cobranza-card.is-warning::before {
-	background: var(--af-warning-500);
+	border-color: color-mix(in srgb, var(--af-warning-500, #F59E0B) 45%, transparent);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--af-warning-500, #F59E0B) 12%, transparent);
 }
 
 .af-cobranza-card.is-warning:hover {
-	box-shadow: 0 14px 30px -10px rgba(245, 158, 11, 0.3);
+	border-color: var(--af-warning-500, #F59E0B);
+	box-shadow: 0 12px 28px -10px rgba(245, 158, 11, 0.28);
 }
-
-/* Por cobrar: saldo pendiente lejos de la fecha de vencimiento. */
 
 .af-cobranza-card.is-info {
-	border-color: var(--af-info-500);
+	border-color: color-mix(in srgb, var(--af-info-500, #0EA5E9) 45%, transparent);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--af-info-500, #0EA5E9) 12%, transparent);
 }
 
-.af-cobranza-card.is-info::before {
-	background: var(--af-info-500);
+.af-cobranza-card.is-info:hover {
+	border-color: var(--af-info-500, #0EA5E9);
+	box-shadow: 0 12px 28px -10px rgba(14, 165, 233, 0.28);
 }
-
-/* Al día: todo pagado. */
 
 .af-cobranza-card.is-ok {
-	border-color: var(--af-success-500);
+	border-color: color-mix(in srgb, var(--af-success-500, #0F9D58) 45%, transparent);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--af-success-500, #0F9D58) 12%, transparent);
 }
 
-.af-cobranza-card.is-ok::before {
-	background: var(--af-success-500);
+.af-cobranza-card.is-ok:hover {
+	border-color: var(--af-success-500, #0F9D58);
+	box-shadow: 0 12px 28px -10px rgba(15, 157, 88, 0.28);
 }
 
-/* Sin cargo generado / disponible: informativo, sin alarma. */
+/* Sin cargo generado / disponible: informativo, sin alarma ni halo. */
 
 .af-cobranza-card.is-muted,
 .af-cobranza-card.is-available {
 	border-color: var(--af-gray-300);
-}
-
-.af-cobranza-card.is-muted::before,
-.af-cobranza-card.is-available::before {
-	background: var(--af-gray-300);
+	box-shadow: none;
 }
 
 .af-buildings-page .af-property-card__media::after {
@@ -690,13 +690,7 @@
 	color: var(--af-warning-700, #B45309);
 }
 
-.af-cobranza-card__amount.is-info {
-	color: var(--af-info-700, #1D4ED8);
-}
 
-.af-cobranza-card__amount.is-ok {
-	color: var(--af-success-700, #15803D);
-}
 
 .af-cobranza-card__due {
 	font-size: var(--af-text-xs, 12px);
@@ -711,14 +705,6 @@
 
 .af-cobranza-card__due.is-warning {
 	color: var(--af-warning-700, #B45309);
-}
-
-.af-cobranza-card__due.is-info {
-	color: var(--af-info-700, #1D4ED8);
-}
-
-.af-cobranza-card__due.is-ok {
-	color: var(--af-success-700, #15803D);
 }
 
 .af-buildings-page .af-catalog-card__hint {

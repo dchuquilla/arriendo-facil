@@ -909,6 +909,9 @@ class Arriendo_Facil_Catalog_Share {
 				array(
 					'flipLabel'        => __( 'Ver detalles', 'arriendo-facil' ),
 					'backLabel'        => __( 'Volver', 'arriendo-facil' ),
+					'moreLabel'        => __( 'Leer más', 'arriendo-facil' ),
+					'lessLabel'        => __( 'Mostrar menos', 'arriendo-facil' ),
+					'chipsLessLabel'   => __( 'Mostrar menos', 'arriendo-facil' ),
 					'countLabel'       => __( 'propiedad', 'arriendo-facil' ),
 					'countLabelPlural' => __( 'propiedades', 'arriendo-facil' ),
 					'unitLabel'        => __( 'inmueble', 'arriendo-facil' ),

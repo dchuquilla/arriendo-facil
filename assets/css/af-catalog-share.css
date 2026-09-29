@@ -265,19 +265,25 @@
 }
 
 /*
- * Flip card. The inner element carries a 3D rotation while both faces are
- * absolutely positioned, so flipping never changes the grid row height.
+ * Flip card. Both faces are absolutely positioned so flipping never changes
+ * the grid row height, and the row is sized by the tallest face: min-height
+ * (not height) keeps the grid free to stretch every card in a row to the same
+ * size, which is what the script sets from the measured content height. The
+ * declared value is the no-JS fallback.
+ *
+ * The card is also the query container for its own back layout: the details
+ * side splits in two columns only when the card is wide enough for it.
  */
 .af-cs-card {
 	position: relative;
-	height: 440px;
+	min-height: 440px;
 	perspective: 1400px;
+	container: af-cs-card / inline-size;
 }
 
 .af-cs-card__inner {
-	position: relative;
-	width: 100%;
-	height: 100%;
+	position: absolute;
+	inset: 0;
 	transform-style: preserve-3d;
 	transition: transform .45s cubic-bezier(.4, .1, .2, 1);
 }
@@ -304,10 +310,15 @@
 	transform: rotateY(180deg);
 }
 
+/*
+ * The photo absorbs whatever height the row hands this card, so a card next
+ * to a taller listing shows a bigger picture instead of a white gap.
+ */
 .af-cs-card__media {
 	position: relative;
-	flex: 0 0 auto;
-	height: 190px;
+	flex: 1 1 auto;
+	min-height: 190px;
+	max-height: 340px;
 	background: var(--af-cs-bg);
 	overflow: hidden;
 }
@@ -441,22 +452,16 @@
  * so it repeats the price, keeps a labelled value grid instead of loose
  * paragraphs, and turns the amenity lists into chips.
  */
+/*
+ * The back is never a scroll container: the card is sized to fit this body
+ * exactly (see .af-cs-card above), so an inner scrollbar would only hide
+ * information the visitor came for.
+ */
 .af-cs-card__backbody {
 	flex: 1 1 auto;
 	padding: 16px 18px 4px;
-	overflow-y: auto;
+	overflow: hidden;
 	min-height: 0;
-	scrollbar-width: thin;
-	scrollbar-color: #cbd5e1 transparent;
-}
-
-.af-cs-card__backbody::-webkit-scrollbar {
-	width: 6px;
-}
-
-.af-cs-card__backbody::-webkit-scrollbar-thumb {
-	background: #cbd5e1;
-	border-radius: 999px;
 }
 
 .af-cs-card__backhead {
@@ -511,59 +516,175 @@
 	color: var(--af-cs-muted);
 }
 
+.af-cs-card__backgrid {
+	display: grid;
+	gap: 14px;
+	min-width: 0;
+}
+
+.af-cs-card__backcol {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	min-width: 0;
+}
+
+/*
+ * Only on genuinely wide cards does the prose get a column of its own and
+ * the chips move next to it, where they still fit several per row. Below
+ * that the two columns would be too narrow to read, so everything stacks.
+ * Browsers without container queries simply keep the single column.
+ */
+@container af-cs-card (min-width: 520px) {
+	.af-cs-card__backgrid {
+		grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+		align-items: start;
+		column-gap: 18px;
+	}
+}
+
+.af-cs-card__excerptwrap {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	min-width: 0;
+}
+
+/*
+ * The description is the one unbounded input, so it is clamped and the rest
+ * is one click away instead of turning the card into a scrollable panel.
+ * Roomier cards get a longer preview, but never the whole text.
+ */
 .af-cs-card__excerpt {
-	margin: 0 0 14px;
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 3;
+	line-clamp: 3;
+	overflow: hidden;
+	margin: 0;
 	padding-left: 11px;
 	border-left: 3px solid var(--af-cs-line);
 	font-size: 13.5px;
 	line-height: 1.55;
 	color: #475569;
+	overflow-wrap: anywhere;
 }
 
+.af-cs-card__excerpt.is-expanded {
+	display: block;
+	-webkit-line-clamp: unset;
+	line-clamp: unset;
+}
+
+@container af-cs-card (min-width: 340px) {
+	.af-cs-card__excerpt {
+		-webkit-line-clamp: 4;
+		line-clamp: 4;
+	}
+}
+
+.af-cs-card__more {
+	align-self: flex-start;
+	margin: 7px 0 0;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--af-cs-brand);
+	font: inherit;
+	font-size: 12.5px;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.af-cs-card__more[hidden] {
+	display: none;
+}
+
+/*
+ * A class selector beats the user-agent rule for [hidden], so a chip list
+ * that is display:flex stays visible unless the hidden state is restated.
+ */
+.af-cs-card__chips[hidden] {
+	display: none;
+}
+
+.af-cs-card__more:hover,
+.af-cs-card__more:focus {
+	text-decoration: underline;
+}
+
+/*
+ * Label and value share a line instead of stacking, which turns each fact
+ * into a single ~30px row: five of them fit in less space than three
+ * stacked ones did, and the block still reads like a spec sheet.
+ */
 .af-cs-card__facts {
 	display: grid;
-	grid-template-columns: repeat(2, minmax(0, 1fr));
+	grid-template-columns: minmax(0, 1fr);
 	gap: 1px;
-	margin: 0 0 14px;
+	margin: 0;
 	background: var(--af-cs-line);
 	border: 1px solid var(--af-cs-line);
 	border-radius: 10px;
 	overflow: hidden;
 }
 
-/*
- * A single fact may carry a long address, so it spans the full row instead
- * of squeezing into half the card.
- */
 .af-cs-card__fact {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
 	min-width: 0;
-	padding: 8px 10px;
+	padding: 6px 10px;
 	background: #fff;
 }
 
-.af-cs-card__fact:first-child {
-	grid-column: 1 / -1;
+/*
+ * Two facts per row as soon as the card can hold them, with the address
+ * always spanning the full width: it is the one value too long for a cell.
+ */
+@container af-cs-card (min-width: 300px) {
+	.af-cs-card__facts {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.af-cs-card__fact:first-child {
+		grid-column: 1 / -1;
+	}
 }
 
 .af-cs-card__factlabel {
-	margin: 0 0 1px;
-	font-size: 10.5px;
+	flex: 0 0 auto;
+	margin: 0;
+	font-size: 10px;
 	font-weight: 700;
-	letter-spacing: .07em;
+	letter-spacing: .06em;
 	text-transform: uppercase;
 	color: var(--af-cs-muted);
+	white-space: nowrap;
 }
 
 .af-cs-card__factvalue {
+	flex: 1 1 auto;
+	min-width: 0;
 	margin: 0;
-	font-size: 13.5px;
+	font-size: 12.5px;
 	font-weight: 600;
+	text-align: right;
 	color: var(--af-cs-ink);
 	overflow-wrap: anywhere;
 }
 
 .af-cs-card__block {
-	margin: 0 0 12px;
+	margin: 0;
+}
+
+/*
+ * A chip must never be cut in half by a column break when the two-column
+ * layout is active.
+ */
+.af-cs-card__block,
+.af-cs-card__chips {
+	break-inside: avoid;
 }
 
 .af-cs-card__blocktitle {
@@ -584,13 +705,21 @@
 	list-style: none;
 }
 
+/*
+ * The overflow list is a second row of chips, not a second list: it sits
+ * right under the first one with the same rhythm as everything else.
+ */
+.af-cs-card__chips--rest {
+	margin-top: 6px;
+}
+
 .af-cs-card__chip {
-	padding: 4px 10px;
+	padding: 3px 9px;
 	background: #f1f5f9;
 	border: 1px solid var(--af-cs-line);
 	border-radius: 999px;
-	font-size: 12px;
-	line-height: 1.35;
+	font-size: 11.5px;
+	line-height: 1.4;
 	color: #334155;
 	white-space: nowrap;
 }
@@ -609,11 +738,6 @@
 	padding: 12px 18px 16px;
 	border-top: 1px solid var(--af-cs-line);
 	background: #fff;
-	/*
-	 * The back scrolls when a listing has a long description or many
-	 * amenities; the upward shadow reads as "there is more above".
-	 */
-	box-shadow: 0 -10px 12px -10px rgba(15, 23, 42, .18);
 }
 
 /*
@@ -671,8 +795,10 @@
 		color: #000 !important;
 	}
 
+	/* The script writes an inline min-height; print has to win over it. */
 	.af-cs-card {
-		height: auto;
+		height: auto !important;
+		min-height: 0 !important;
 		page-break-inside: avoid;
 		break-inside: avoid;
 	}
@@ -713,7 +839,7 @@
 	}
 
 	.af-cs-card {
-		height: 420px;
+		min-height: 420px;
 	}
 }
 

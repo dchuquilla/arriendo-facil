@@ -149,6 +149,180 @@
 		apply();
 	}
 
+	/* ------------------------------------------------------------ Sizing */
+
+	/*
+	 * A flip card keeps both faces out of the flow, so nothing knows how tall
+	 * the details side really is. Rather than let it scroll inside a fixed
+	 * card, the tallest face is measured once and applied as a min-height:
+	 * the grid then stretches every card in the row to the same height and
+	 * the row never changes when a card is flipped.
+	 */
+	function initSizing( root ) {
+		var cards = root.querySelectorAll( '[data-af-cs-card]' );
+
+		if ( ! cards.length ) {
+			return;
+		}
+
+		/*
+		 * The description is clamped, so the button that unfolds it only makes
+		 * sense while there is something hidden behind the clamp.
+		 */
+		function refreshClamp( card ) {
+			var excerpt = card.querySelector( '[data-af-cs-excerpt]' );
+			var more = card.querySelector( '[data-af-cs-more]' );
+
+			if ( ! excerpt || ! more ) {
+				return;
+			}
+
+			if ( excerpt.classList.contains( 'is-expanded' ) ) {
+				more.hidden = false;
+				return;
+			}
+
+			more.hidden = excerpt.scrollHeight <= excerpt.clientHeight + 1;
+		}
+
+		function measure( card ) {
+			var front = card.querySelector( '.af-cs-card__face--front' );
+			var back = card.querySelector( '.af-cs-card__face--back' );
+
+			[ front, back ].forEach( function ( face ) {
+				if ( face ) {
+					face.style.position = 'static';
+				}
+			} );
+
+			// One read pass, so the batch of writes above costs a single reflow.
+			var needed = Math.max(
+				front ? front.offsetHeight : 0,
+				back ? back.offsetHeight : 0
+			);
+
+			[ front, back ].forEach( function ( face ) {
+				if ( face ) {
+					face.style.position = '';
+				}
+			} );
+
+			if ( needed > 0 ) {
+				card.style.minHeight = needed + 'px';
+			}
+
+			refreshClamp( card );
+		}
+
+		function sizeAll() {
+			var visible = [];
+
+			Array.prototype.forEach.call( cards, function ( card ) {
+				if ( ! card.hidden ) {
+					visible.push( card );
+				}
+			} );
+
+			visible.forEach( function ( card ) {
+				[ '.af-cs-card__face--front', '.af-cs-card__face--back' ].forEach( function ( selector ) {
+					var face = card.querySelector( selector );
+
+					if ( face ) {
+						face.style.position = 'static';
+					}
+				} );
+			} );
+
+			visible.forEach( measure );
+		}
+
+		function initExpanders() {
+			Array.prototype.forEach.call( cards, function ( card ) {
+				bindExpander(
+					card,
+					'[data-af-cs-more]',
+					'[data-af-cs-excerpt]',
+					'[data-af-cs-more-text]',
+					'moreLabel', 'Leer más',
+					'lessLabel', 'Mostrar menos',
+					true
+				);
+				bindExpander(
+					card,
+					'[data-af-cs-more-chips]',
+					'[data-af-cs-chips-rest]',
+					'[data-af-cs-more-chips-text]',
+					'chipsMoreLabel', '',
+					'chipsLessLabel', 'Mostrar menos',
+					false
+				);
+			} );
+		}
+
+		/*
+		 * Both expanders share the same contract: reveal something the card
+		 * was hiding, then let the card grow to fit it instead of scrolling.
+		 * An empty fallback means the server already wrote a better label
+		 * (the chip count, for instance) and it is left alone.
+		 */
+		function bindExpander( card, buttonSelector, targetSelector, textSelector, openKey, openFallback, closeKey, closeFallback, isClass ) {
+			var button = card.querySelector( buttonSelector );
+			var target = card.querySelector( targetSelector );
+
+			if ( ! button || ! target ) {
+				return;
+			}
+
+			var text = button.querySelector( textSelector );
+
+			// The server label wins when no translated one exists (chip count).
+			var original = text ? text.textContent : '';
+
+			button.addEventListener( 'click', function () {
+				var expanded;
+
+				if ( isClass ) {
+					expanded = target.classList.toggle( 'is-expanded' );
+				} else {
+					expanded = target.hasAttribute( 'hidden' );
+
+					if ( expanded ) {
+						target.removeAttribute( 'hidden' );
+					} else {
+						target.setAttribute( 'hidden', 'hidden' );
+					}
+				}
+
+				button.setAttribute( 'aria-expanded', expanded ? 'true' : 'false' );
+
+				if ( text ) {
+					// Expanded means the panel is open, so the label offers to close it.
+					text.textContent = expanded
+						? label( closeKey, closeFallback )
+						: label( openKey, openFallback ) || original;
+				}
+
+				measure( card );
+			} );
+		}
+
+		sizeAll();
+		initExpanders();
+
+		// Web fonts and images can still be settling on DOMContentLoaded.
+		window.addEventListener( 'load', sizeAll );
+
+		var timer = null;
+
+		window.addEventListener( 'resize', function () {
+			if ( timer ) {
+				clearTimeout( timer );
+			}
+
+			timer = setTimeout( sizeAll, 150 );
+		} );
+	}
+
 	/* -------------------------------------------------------------- Boot */
 
 	function boot() {
@@ -159,6 +333,7 @@
 		}
 
 		initFlip( root );
+		initSizing( root );
 		initFilters( root );
 
 		var print = root.querySelector( '.af-cs-print' );

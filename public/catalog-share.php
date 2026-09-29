@@ -283,6 +283,17 @@ get_header();
 						if ( ! empty( $af_card['condition'] ) ) {
 							$af_facts[ __( 'Conservación', 'arriendo-facil' ) ] = $af_card['condition'];
 						}
+
+						/*
+						 * Amenities and utilities are the other unbounded
+						 * input: a building can list twenty. The first few
+						 * carry the decision and the rest stay one click
+						 * away, so a full listing never stretches the card.
+						 */
+						$af_amenities       = array_slice( (array) $af_card['amenities'], 0, 6 );
+						$af_amenities_extra = array_slice( (array) $af_card['amenities'], 6 );
+						$af_utilities       = array_slice( (array) $af_card['utilities'], 0, 4 );
+						$af_utilities_extra = array_slice( (array) $af_card['utilities'], 4 );
 						?>
 						<article
 							class="af-cs-card"
@@ -387,46 +398,115 @@ get_header();
 											<?php endif; ?>
 										</div>
 
-										<?php if ( $af_card['excerpt'] ) : ?>
-											<p class="af-cs-card__excerpt"><?php echo esc_html( $af_card['excerpt'] ); ?></p>
-										<?php endif; ?>
-
-										<?php if ( $af_facts ) : ?>
-											<dl class="af-cs-card__facts">
-												<?php foreach ( $af_facts as $af_fact_label => $af_fact_value ) : ?>
-													<div class="af-cs-card__fact">
-														<dt class="af-cs-card__factlabel"><?php echo esc_html( $af_fact_label ); ?></dt>
-														<dd class="af-cs-card__factvalue"><?php echo esc_html( $af_fact_value ); ?></dd>
+										<div class="af-cs-card__backgrid">
+											<div class="af-cs-card__backcol">
+												<?php if ( $af_card['excerpt'] ) : ?>
+													<div class="af-cs-card__excerptwrap">
+														<p class="af-cs-card__excerpt" data-af-cs-excerpt><?php echo esc_html( $af_card['excerpt'] ); ?></p>
+														<button
+															type="button"
+															class="af-cs-card__more"
+															data-af-cs-more
+															aria-expanded="false"
+															hidden
+														>
+															<span data-af-cs-more-text><?php esc_html_e( 'Leer más', 'arriendo-facil' ); ?></span>
+														</button>
 													</div>
-												<?php endforeach; ?>
-											</dl>
-										<?php endif; ?>
+												<?php endif; ?>
 
-										<?php if ( ! empty( $af_card['amenities'] ) ) : ?>
-											<div class="af-cs-card__block">
-												<h5 class="af-cs-card__blocktitle">
-													<?php esc_html_e( 'Amenidades', 'arriendo-facil' ); ?>
-												</h5>
-												<ul class="af-cs-card__chips">
-													<?php foreach ( (array) $af_card['amenities'] as $af_amenity ) : ?>
-														<li class="af-cs-card__chip"><?php echo esc_html( $af_amenity ); ?></li>
-													<?php endforeach; ?>
-												</ul>
+												<?php if ( $af_facts ) : ?>
+													<dl class="af-cs-card__facts">
+														<?php foreach ( $af_facts as $af_fact_label => $af_fact_value ) : ?>
+															<div class="af-cs-card__fact">
+																<dt class="af-cs-card__factlabel"><?php echo esc_html( $af_fact_label ); ?></dt>
+																<dd class="af-cs-card__factvalue"><?php echo esc_html( $af_fact_value ); ?></dd>
+															</div>
+														<?php endforeach; ?>
+													</dl>
+												<?php endif; ?>
 											</div>
-										<?php endif; ?>
 
-										<?php if ( ! empty( $af_card['utilities'] ) ) : ?>
-											<div class="af-cs-card__block">
-												<h5 class="af-cs-card__blocktitle">
-													<?php esc_html_e( 'Servicios incluidos', 'arriendo-facil' ); ?>
-												</h5>
-												<ul class="af-cs-card__chips af-cs-card__chips--utilities">
-													<?php foreach ( (array) $af_card['utilities'] as $af_utility ) : ?>
-														<li class="af-cs-card__chip"><?php echo esc_html( $af_utility ); ?></li>
-													<?php endforeach; ?>
-												</ul>
-											</div>
-										<?php endif; ?>
+											<?php if ( ! empty( $af_card['amenities'] ) || ! empty( $af_card['utilities'] ) ) : ?>
+												<div class="af-cs-card__backcol">
+													<?php if ( ! empty( $af_card['amenities'] ) ) : ?>
+														<div class="af-cs-card__block">
+															<h5 class="af-cs-card__blocktitle">
+																<?php esc_html_e( 'Amenidades', 'arriendo-facil' ); ?>
+															</h5>
+															<ul class="af-cs-card__chips">
+																<?php foreach ( $af_amenities as $af_amenity ) : ?>
+																	<li class="af-cs-card__chip"><?php echo esc_html( $af_amenity ); ?></li>
+																<?php endforeach; ?>
+															</ul>
+															<?php if ( $af_amenities_extra ) : ?>
+																<ul class="af-cs-card__chips af-cs-card__chips--rest" data-af-cs-chips-rest hidden>
+																	<?php foreach ( $af_amenities_extra as $af_amenity ) : ?>
+																		<li class="af-cs-card__chip"><?php echo esc_html( $af_amenity ); ?></li>
+																	<?php endforeach; ?>
+																</ul>
+																<button
+																	type="button"
+																	class="af-cs-card__more"
+																	data-af-cs-more-chips
+																	aria-expanded="false"
+																>
+																	<span data-af-cs-more-chips-text>
+																		<?php
+																		echo esc_html(
+																			sprintf(
+																				/* translators: %d: number of hidden amenities */
+																				_n( '+%d más', '+%d más', count( $af_amenities_extra ), 'arriendo-facil' ),
+																				count( $af_amenities_extra )
+																			)
+																		);
+																		?>
+																	</span>
+																</button>
+															<?php endif; ?>
+														</div>
+													<?php endif; ?>
+
+													<?php if ( ! empty( $af_card['utilities'] ) ) : ?>
+														<div class="af-cs-card__block">
+															<h5 class="af-cs-card__blocktitle">
+																<?php esc_html_e( 'Servicios incluidos', 'arriendo-facil' ); ?>
+															</h5>
+															<ul class="af-cs-card__chips af-cs-card__chips--utilities">
+																<?php foreach ( $af_utilities as $af_utility ) : ?>
+																	<li class="af-cs-card__chip"><?php echo esc_html( $af_utility ); ?></li>
+																<?php endforeach; ?>
+															</ul>
+															<?php if ( $af_utilities_extra ) : ?>
+																<ul class="af-cs-card__chips af-cs-card__chips--rest" data-af-cs-chips-rest hidden>
+																	<?php foreach ( $af_utilities_extra as $af_utility ) : ?>
+																		<li class="af-cs-card__chip"><?php echo esc_html( $af_utility ); ?></li>
+																	<?php endforeach; ?>
+																</ul>
+																<button
+																	type="button"
+																	class="af-cs-card__more"
+																	data-af-cs-more-chips
+																	aria-expanded="false"
+																>
+																	<span data-af-cs-more-chips-text>
+																		<?php
+																		echo esc_html(
+																			sprintf(
+																				/* translators: %d: number of hidden utilities */
+																				_n( '+%d más', '+%d más', count( $af_utilities_extra ), 'arriendo-facil' ),
+																				count( $af_utilities_extra )
+																			)
+																		);
+																		?>
+																	</span>
+																</button>
+															<?php endif; ?>
+														</div>
+													<?php endif; ?>
+												</div>
+											<?php endif; ?>
+										</div>
 									</div>
 
 									<div class="af-cs-card__actions">

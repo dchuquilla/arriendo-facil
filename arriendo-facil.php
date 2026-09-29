@@ -42,6 +42,9 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-owner-settlement.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-wizard.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-featured-admin.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-occupied-admin.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-pdf.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-catalog-pdf.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-catalog-groups.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-catalog-share.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-list-admin.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-search-api.php';
@@ -250,6 +253,7 @@ function arriendo_facil_init() {
 		'Arriendo_Facil_Property_Admin_Onboarding',
 		'Arriendo_Facil_Document_Verification',
 		'Arriendo_Facil_Review',
+		'Arriendo_Facil_Catalog_Groups',
 		'Arriendo_Facil_Catalog_Share',
 		'Arriendo_Facil_Aviso',
 		'Arriendo_Facil_Calendar',
@@ -346,7 +350,7 @@ function arriendo_facil_maybe_upgrade_schema() {
 		return;
 	}
 
-	$target_schema_version = '2026-09-calendario-v1';
+	$target_schema_version = '2026-09-catalogo-v2';
 	$current_schema_version = (string) get_option( 'af_db_schema_version', '' );
 
 	if ( $current_schema_version === $target_schema_version && ! arriendo_facil_has_lease_schema_drift() ) {

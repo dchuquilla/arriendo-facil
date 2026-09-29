@@ -268,6 +268,20 @@ class Arriendo_Facil_Activator {
 		$charset_collate = $wpdb->get_charset_collate();
 
 		$tables = array(
+			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_catalog_groups (
+				id                     BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+				name                   VARCHAR(190) NOT NULL COMMENT 'Nombre del edificio o conjunto para agrupar el catalogo',
+				owner_id               BIGINT(20) UNSIGNED NOT NULL,
+				status                 VARCHAR(20) NOT NULL DEFAULT 'active',
+				sort_order             INT(11) NOT NULL DEFAULT 0,
+				created_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				UNIQUE KEY uniq_owner_name (owner_id, name(150)),
+				KEY owner_id (owner_id),
+				KEY status (status)
+			) $charset_collate;",
+
 			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_buildings (
 				id                     BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
 				name                   VARCHAR(190) NOT NULL,
@@ -1578,6 +1592,9 @@ class Arriendo_Facil_Activator {
 
 		// Performance indexes on wp_postmeta (conditional – safe to re-run).
 		self::maybe_add_performance_indexes();
+
+		// af_catalog_groups now exists, so the on-demand self-heal can stay idle.
+		update_option( 'af_catalog_groups_schema', '1', false );
 
 		flush_rewrite_rules();
 	}

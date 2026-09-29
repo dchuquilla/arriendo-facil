@@ -231,7 +231,7 @@ class Arriendo_Facil_Billing_Manager_Test_Double extends Arriendo_Facil_Billing_
 	public $logs = array();
 	public $last_estado = '';
 
-	protected function reserve_next_sequence() {
+	protected function reserve_next_sequence( int $owner_id = 0 ) {
 		return array(
 			'estab'      => '001',
 			'pto_emi'    => '001',

@@ -7,6 +7,13 @@
     <testsuites>
         <testsuite name="Arriendo Fácil Tests">
             <directory>tests</directory>
+            <!--
+                Requires the WordPress integration test suite (WP_UnitTestCase,
+                wp_insert_post, wp_create_nonce, ...), which the standalone
+                bootstrap in tests/bootstrap.php deliberately does not provide.
+                Run it separately in an environment with WP_TESTS_DIR set.
+            -->
+            <exclude>tests/OTA_ClientsTest.php</exclude>
         </testsuite>
     </testsuites>
 </phpunit>

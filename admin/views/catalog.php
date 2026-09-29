@@ -86,6 +86,19 @@ if ( ! empty( $meta_queries ) ) {
 $accommodation_ids = get_posts( $args );
 $total_count       = count( $accommodation_ids );
 
+/*
+ * Catalog grouping (edificios / conjuntos). The owner whose catalog is being
+ * edited drives both the group list and the per-property dropdown; a super
+ * admin viewing another administrator's catalog sees that owner's groups.
+ */
+$catalog_owner_id = $filter_admin_id ? $filter_admin_id : ( $is_owner ? get_current_user_id() : 0 );
+$catalog_groups   = ( $catalog_owner_id && class_exists( 'Arriendo_Facil_Catalog_Groups' ) )
+	? Arriendo_Facil_Catalog_Groups::get_for_owner( $catalog_owner_id )
+	: array();
+$catalog_group_counts = ( ! empty( $accommodation_ids ) && class_exists( 'Arriendo_Facil_Catalog_Groups' ) )
+	? Arriendo_Facil_Catalog_Groups::count_map( $accommodation_ids )
+	: array();
+
 // Cache-friendly one-shot fetch of all card meta.
 $fetched = array();
 if ( ! empty( $accommodation_ids ) ) {
@@ -155,12 +168,66 @@ foreach ( $accommodation_ids as $post_id ) {
 	<?php
 $share_token = class_exists( 'Arriendo_Facil_Catalog_Share' ) ? Arriendo_Facil_Catalog_Share::token_for_user() : '';
 $share_url   = $share_token ? home_url( '/catalogo/' . $share_token . '/' ) : '';
+$share_pdf   = $share_token ? add_query_arg( Arriendo_Facil_Catalog_Share::PDF_ARG, '1', $share_url ) : '';
 ?>
+<section class="af-section af-cs-groups">
+	<header class="af-section__header">
+		<div>
+			<h2 class="af-section__title"><?php esc_html_e( 'Edificios y conjuntos', 'arriendo-facil' ); ?></h2>
+			<p class="af-section__subtitle"><?php esc_html_e( 'Agrupa propiedades que comparten un mismo edificio o conjunto. El catálogo público los presenta en secciones con ese nombre.', 'arriendo-facil' ); ?></p>
+		</div>
+		<?php if ( $catalog_owner_id ) : ?>
+			<button type="button" class="button af-btn af-btn--primary" id="af-cs-group-new">
+				<?php esc_html_e( 'Nuevo edificio', 'arriendo-facil' ); ?>
+			</button>
+		<?php endif; ?>
+	</header>
+
+	<p class="af-share-hint">
+		<?php esc_html_e( 'Agrupa por nombre solamente: no hace falta crear direcciones ni unidades. Una propiedad sin grupo aparece al final, en "Otros inmuebles".', 'arriendo-facil' ); ?>
+	</p>
+
+	<ul class="af-cs-group-list" id="af-cs-group-list" data-owner-id="<?php echo esc_attr( (int) $catalog_owner_id ); ?>">
+		<?php if ( empty( $catalog_groups ) ) : ?>
+			<li class="af-cs-group-list__empty" id="af-cs-group-empty">
+				<?php esc_html_e( 'Todavía no has creado ningún edificio o conjunto.', 'arriendo-facil' ); ?>
+			</li>
+		<?php else : ?>
+			<?php foreach ( $catalog_groups as $af_group ) : ?>
+				<li class="af-cs-group-row" data-group-id="<?php echo esc_attr( (int) $af_group->id ); ?>">
+					<span class="af-cs-group-row__name"><?php echo esc_html( $af_group->name ); ?></span>
+					<span class="af-cs-group-row__count" data-group-count>
+						<?php
+						echo esc_html(
+							sprintf(
+								/* translators: %d: number of properties in the group */
+								_n( '%d inmueble', '%d inmuebles', isset( $catalog_group_counts[ $af_group->id ] ) ? (int) $catalog_group_counts[ $af_group->id ] : 0, 'arriendo-facil' ),
+								isset( $catalog_group_counts[ $af_group->id ] ) ? (int) $catalog_group_counts[ $af_group->id ] : 0
+							)
+						);
+						?>
+					</span>
+					<span class="af-cs-group-row__actions">
+						<button type="button" class="button-link af-cs-group-rename" data-group-id="<?php echo esc_attr( (int) $af_group->id ); ?>">
+							<?php esc_html_e( 'Renombrar', 'arriendo-facil' ); ?>
+						</button>
+						<button type="button" class="button-link af-cs-group-delete" data-group-id="<?php echo esc_attr( (int) $af_group->id ); ?>">
+							<?php esc_html_e( 'Eliminar', 'arriendo-facil' ); ?>
+						</button>
+					</span>
+				</li>
+			<?php endforeach; ?>
+		<?php endif; ?>
+	</ul>
+
+	<p class="af-share-status" id="af-cs-group-status" aria-live="polite"></p>
+</section>
+
 <section class="af-section">
 	<header class="af-section__header">
 		<div>
 			<h2 class="af-section__title"><?php esc_html_e( 'Compartir catálogo', 'arriendo-facil' ); ?></h2>
-			<p class="af-section__subtitle"><?php esc_html_e( 'Difunde un enlace público con tus propiedades en arriendo; imprime la vista pública o guárdala como PDF.', 'arriendo-facil' ); ?></p>
+			<p class="af-section__subtitle"><?php esc_html_e( 'Difunde un enlace público con tus propiedades en arriendo, agrupadas por edificio, y descárgalo como PDF para enviarlo o imprimirlo.', 'arriendo-facil' ); ?></p>
 		</div>
 	</header>
 
@@ -173,7 +240,9 @@ $share_url   = $share_token ? home_url( '/catalogo/' . $share_token . '/' ) : ''
 		<div class="af-share-card__actions" id="af-share-actions" <?php echo $share_url ? '' : 'hidden'; ?>>
 			<button type="button" class="button af-btn af-btn--ghost" id="af-share-copy"><?php esc_html_e( 'Copiar', 'arriendo-facil' ); ?></button>
 			<button type="button" class="button af-btn af-btn--ghost" id="af-share-preview"><?php esc_html_e( 'Previsualizar', 'arriendo-facil' ); ?></button>
-			<button type="button" class="button af-btn af-btn--ghost" id="af-share-pdf"><?php esc_html_e( 'Imprimir / PDF', 'arriendo-facil' ); ?></button>
+			<a class="button af-btn af-btn--ghost" id="af-share-pdf" href="<?php echo esc_url( $share_pdf ); ?>" target="_blank" rel="noopener">
+				<?php esc_html_e( 'Descargar PDF', 'arriendo-facil' ); ?>
+			</a>
 			<button type="button" class="button af-btn af-btn--ghost" id="af-share-rotate"><?php esc_html_e( 'Regenerar', 'arriendo-facil' ); ?></button>
 			<button type="button" class="button af-btn" id="af-share-revoke" style="color:#b42318;"><?php esc_html_e( 'Desactivar', 'arriendo-facil' ); ?></button>
 		</div>
@@ -274,8 +343,16 @@ $share_url   = $share_token ? home_url( '/catalogo/' . $share_token . '/' ) : ''
 				);
 				$type_icon   = isset( $property_types[ $type ]['icon'] ) ? $property_types[ $type ]['icon'] : 'building';
 				$type_label  = isset( $property_types[ $type ]['label'] ) ? $property_types[ $type ]['label'] : ucfirst( $type );
+
+				$group_id     = class_exists( 'Arriendo_Facil_Catalog_Groups' )
+					? Arriendo_Facil_Catalog_Groups::get_group_id_for_property( $prop_id )
+					: 0;
+				$in_catalog   = class_exists( 'Arriendo_Facil_Catalog_Groups' )
+					? Arriendo_Facil_Catalog_Groups::is_in_public_catalog( $prop_id )
+					: true;
 				?>
-				<a class="af-property-card" href="<?php echo esc_url( get_edit_post_link( $prop_id ) ); ?>">
+				<div class="af-property-card" data-af-cs-prop="<?php echo esc_attr( (int) $prop_id ); ?>">
+					<a class="af-property-card__link" href="<?php echo esc_url( get_edit_post_link( $prop_id ) ); ?>">
 					<div class="af-property-card__media">
 						<?php if ( $thumb ) : ?>
 							<img src="<?php echo esc_url( $thumb ); ?>" alt="<?php echo esc_attr( get_the_title( $prop_id ) ); ?>" loading="lazy" />
@@ -286,6 +363,9 @@ $share_url   = $share_token ? home_url( '/catalogo/' . $share_token . '/' ) : ''
 						<?php endif; ?>
 						<div class="af-property-card__badges">
 							<?php echo af_pill( $status, $status_lbls[ $status ] ?? null ); // phpcs:ignore WordPress.Security.EscapeOutput ?>
+							<?php if ( ! $in_catalog ) : ?>
+								<span class="af-pill af-pill--neutral"><?php esc_html_e( 'Fuera del catálogo', 'arriendo-facil' ); ?></span>
+							<?php endif; ?>
 						</div>
 					</div>
 					<div class="af-property-card__body">
@@ -332,13 +412,43 @@ $share_url   = $share_token ? home_url( '/catalogo/' . $share_token . '/' ) : ''
 								—
 							<?php endif; ?>
 						</span>
-						<span class="af-catalog-card__hint">
-							<?php esc_html_e( 'Gestionar', 'arriendo-facil' ); ?>
-							<span class="af-catalog-card__hint-arrow" aria-hidden="true">→</span>
-						</span>
+					<span class="af-catalog-card__hint">
+						<?php esc_html_e( 'Gestionar', 'arriendo-facil' ); ?>
+						<span class="af-catalog-card__hint-arrow" aria-hidden="true">→</span>
+					</span>
+				</div>
 					</div>
+					</a>
+
+					<div class="af-cs-prop-controls">
+						<label class="af-cs-prop-controls__label" for="af-cs-group-<?php echo esc_attr( (int) $prop_id ); ?>">
+							<?php esc_html_e( 'Edificio', 'arriendo-facil' ); ?>
+						</label>
+						<select
+							id="af-cs-group-<?php echo esc_attr( (int) $prop_id ); ?>"
+							class="af-cs-prop-controls__select"
+							data-af-cs-assign
+							data-property-id="<?php echo esc_attr( (int) $prop_id ); ?>"
+						>
+							<option value="0"><?php esc_html_e( '— Sin grupo —', 'arriendo-facil' ); ?></option>
+							<?php foreach ( $catalog_groups as $af_group ) : ?>
+								<option value="<?php echo esc_attr( (int) $af_group->id ); ?>" <?php selected( $group_id, (int) $af_group->id ); ?>>
+									<?php echo esc_html( $af_group->name ); ?>
+								</option>
+							<?php endforeach; ?>
+						</select>
+
+						<label class="af-cs-switch">
+							<input
+								type="checkbox"
+								data-af-cs-include
+								data-property-id="<?php echo esc_attr( (int) $prop_id ); ?>"
+								<?php checked( $in_catalog ); ?>
+							/>
+							<span><?php esc_html_e( 'En catálogo', 'arriendo-facil' ); ?></span>
+						</label>
 					</div>
-				</a>
+				</div>
 			<?php endforeach; ?>
 		</div>
 	<?php endif; ?>

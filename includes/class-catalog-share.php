@@ -1,11 +1,12 @@
 <?php
 /**
- * Shareable public catalog: tokenized URL + print/PDF export.
+ * Shareable public catalog: tokenized URL, building grouping and PDF export.
  *
  * Every property administrator can generate a public link
- * (https://site.tld/catalogo/<token>) that renders a clean grid of their
- * accommodations for sharing with prospective tenants. The link can be
- * rotated or revoked at any time.
+ * (https://site.tld/catalogo/<token>) that renders a clean, grouped grid of
+ * their own accommodations for sharing with prospective tenants. The link can
+ * be rotated or revoked at any time, and the exact same dataset powers the
+ * downloadable PDF so both can never drift apart.
  *
  * @package Arriendo_Facil
  */
@@ -19,9 +20,14 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class Arriendo_Facil_Catalog_Share {
 
-	const META_KEY      = '_af_catalog_share_token';
-	const QUERY_VAR     = 'af_catalog_share';
-	const REWRITE_SLUG  = 'catalogo';
+	const META_KEY     = '_af_catalog_share_token';
+	const QUERY_VAR    = 'af_catalog_share';
+	const REWRITE_SLUG = 'catalogo';
+
+	/**
+	 * Query argument that switches the shared URL into a PDF download.
+	 */
+	const PDF_ARG = 'pdf';
 
 	/**
 	 * Hooks into rewrites, AJAX and asset loading.
@@ -30,10 +36,12 @@ class Arriendo_Facil_Catalog_Share {
 		add_action( 'init', array( $this, 'register_routes' ) );
 		add_filter( 'query_vars', array( $this, 'add_query_var' ) );
 		add_filter( 'template_include', array( $this, 'load_public_template' ) );
+		add_action( 'template_redirect', array( $this, 'maybe_stream_pdf' ), 5 );
 		add_action( 'admin_init', array( $this, 'maybe_flush_rules' ) );
 
 		add_action( 'wp_ajax_af_catalog_share_generate', array( $this, 'ajax_generate' ) );
 		add_action( 'wp_ajax_af_catalog_share_revoke', array( $this, 'ajax_revoke' ) );
+		add_action( 'wp_ajax_af_catalog_share_stats', array( $this, 'ajax_stats' ) );
 
 		add_shortcode( 'af_catalog_share', array( $this, 'render_shortcode' ) );
 
@@ -41,12 +49,16 @@ class Arriendo_Facil_Catalog_Share {
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_public_assets' ) );
 	}
 
+	/* ---------------------------------------------------------------------
+	 * Routing
+	 * ------------------------------------------------------------------- */
+
 	/**
 	 * Rewrite route: /catalogo/<64-hex token>/ -> index.php?af_catalog_share=<token>
 	 */
 	public function register_routes() {
 		add_rewrite_rule(
-			'^catalogo/([a-f0-9]{64})/?$',
+			'^' . self::REWRITE_SLUG . '/([a-f0-9]{64})/?$',
 			'index.php?' . self::QUERY_VAR . '=$matches[1]',
 			'top'
 		);
@@ -90,27 +102,77 @@ class Arriendo_Facil_Catalog_Share {
 
 		$user = $this->user_for_token( $token );
 		if ( ! $user ) {
-			status_header( 404 );
-			$GLOBALS['af_catalog_share_user'] = null;
+			$GLOBALS['af_catalog_share_user']        = null;
+			$GLOBALS['af_catalog_share_not_found']   = true;
+			$GLOBALS['af_catalog_share_token']       = '';
 
-			return $this->public_template_path( true );
+			return $this->public_template_path();
 		}
 
-		$GLOBALS['af_catalog_share_user'] = $user;
+		$GLOBALS['af_catalog_share_user']      = $user;
+		$GLOBALS['af_catalog_share_not_found'] = false;
+		$GLOBALS['af_catalog_share_token']     = $token;
 
-		return $this->public_template_path( false );
+		return $this->public_template_path();
 	}
 
 	/**
-	 * @param bool $not_found Renders the invalid-token variant.
-	 * @return string
+	 * @return string Absolute path to the public template.
 	 */
-	private function public_template_path( $not_found ) {
-		global $af_catalog_share_not_found;
-
-		$af_catalog_share_not_found = $not_found;
-
+	private function public_template_path() {
 		return ARRIENDO_FACIL_PLUGIN_DIR . 'public/catalog-share.php';
+	}
+
+	/**
+	 * Streams a real, paginated PDF when the shared URL is requested with ?pdf=1.
+	 *
+	 * Runs on template_redirect so the document is produced before WordPress
+	 * starts rendering any theme output.
+	 */
+	public function maybe_stream_pdf() {
+		$token = sanitize_key( (string) get_query_var( self::QUERY_VAR ) );
+
+		if ( '' === $token ) {
+			return;
+		}
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only public download.
+		if ( ! isset( $_GET[ self::PDF_ARG ] ) || '1' !== sanitize_text_field( wp_unslash( $_GET[ self::PDF_ARG ] ) ) ) {
+			return;
+		}
+
+		$user = $this->user_for_token( $token );
+
+		if ( ! $user ) {
+			status_header( 404 );
+			nocache_headers();
+			header( 'Content-Type: text/plain; charset=utf-8' );
+			echo esc_html__( 'Este catálogo ya no está disponible.', 'arriendo-facil' );
+			exit;
+		}
+
+		$catalog = self::get_catalog( $user );
+		$pdf     = Arriendo_Facil_Catalog_Pdf::build( $catalog );
+
+		if ( is_wp_error( $pdf ) ) {
+			status_header( 500 );
+			nocache_headers();
+			header( 'Content-Type: text/plain; charset=utf-8' );
+			echo esc_html( $pdf->get_error_message() );
+			exit;
+		}
+
+		$slug = sanitize_title( $catalog['company'] );
+		$slug = $slug ? $slug : 'catalogo';
+
+		nocache_headers();
+		header( 'Content-Type: application/pdf' );
+		header( 'Content-Disposition: inline; filename="' . $slug . '-catalogo.pdf"' );
+		header( 'Content-Length: ' . strlen( $pdf ) );
+		header( 'X-Content-Type-Options: nosniff' );
+
+		echo $pdf; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- raw PDF bytes.
+		exit;
 	}
 
 	/**
@@ -125,6 +187,7 @@ class Arriendo_Facil_Catalog_Share {
 
 		$GLOBALS['af_catalog_share_user']      = wp_get_current_user();
 		$GLOBALS['af_catalog_share_not_found'] = false;
+		$GLOBALS['af_catalog_share_token']     = self::token_for_user( get_current_user_id() );
 
 		ob_start();
 		require ARRIENDO_FACIL_PLUGIN_DIR . 'public/catalog-share.php';
@@ -150,7 +213,7 @@ class Arriendo_Facil_Catalog_Share {
 	 *
 	 * @param int  $user_id User ID.
 	 * @param bool $rotate  Force a new token.
-	 * @return array{token:string,url:string}|null
+	 * @return array{token:string,url:string,pdf_url:string}|null
 	 */
 	public static function generate_token( $user_id, $rotate = false ) {
 		$user_id = absint( $user_id );
@@ -170,9 +233,12 @@ class Arriendo_Facil_Catalog_Share {
 			update_user_meta( $user_id, self::META_KEY, $token );
 		}
 
+		$base = home_url( '/' . self::REWRITE_SLUG . '/' . $token . '/' );
+
 		return array(
-			'token' => $token,
-			'url'   => home_url( '/' . self::REWRITE_SLUG . '/' . $token . '/' ),
+			'token'   => $token,
+			'url'     => $base,
+			'pdf_url' => add_query_arg( self::PDF_ARG, '1', $base ),
 		);
 	}
 
@@ -210,7 +276,401 @@ class Arriendo_Facil_Catalog_Share {
 	}
 
 	/* ---------------------------------------------------------------------
-	 * AJAX: generate/rotate and revoke from the catalog screen
+	 * Catalog data
+	 * ------------------------------------------------------------------- */
+
+	/**
+	 * Human labels for the accommodation status values.
+	 *
+	 * @return array<string,string>
+	 */
+	public static function status_labels() {
+		return array(
+			'available'   => __( 'Disponible', 'arriendo-facil' ),
+			'rented'      => __( 'Arrendado', 'arriendo-facil' ),
+			'maintenance' => __( 'En mantenimiento', 'arriendo-facil' ),
+			'inactive'    => __( 'Inactivo', 'arriendo-facil' ),
+		);
+	}
+
+	/**
+	 * Human labels for the accommodation type values.
+	 *
+	 * @return array<string,string>
+	 */
+	public static function type_labels() {
+		return array(
+			'apartment'  => __( 'Apartamento', 'arriendo-facil' ),
+			'house'      => __( 'Casa', 'arriendo-facil' ),
+			'office'     => __( 'Oficina', 'arriendo-facil' ),
+			'room'       => __( 'Habitación', 'arriendo-facil' ),
+			'commercial' => __( 'Comercial', 'arriendo-facil' ),
+		);
+	}
+
+	/**
+	 * Accent colour per status, used by the web cards and the PDF alike.
+	 *
+	 * @return array<string,array{label:string,fg:string,bg:string}>
+	 */
+	public static function status_styles() {
+		return array(
+			'available'   => array( 'label' => __( 'Disponible', 'arriendo-facil' ), 'fg' => '#ffffff', 'bg' => '#15803d' ),
+			'rented'      => array( 'label' => __( 'Arrendado', 'arriendo-facil' ), 'fg' => '#ffffff', 'bg' => '#1d4ed8' ),
+			'maintenance' => array( 'label' => __( 'En mantenimiento', 'arriendo-facil' ), 'fg' => '#ffffff', 'bg' => '#b45309' ),
+		);
+	}
+
+	/**
+	 * Builds the full public catalog payload for one owner.
+	 *
+	 * Ownership scoping is deliberately enforced three times, because this is
+	 * the only unauthenticated surface in the plugin: (1) a meta_query on
+	 * `_af_owner_id`, (2) an explicit `owner_id = ?` predicate inside the
+	 * pivot query, and (3) a per-post re-check in PHP. A shared link can only
+	 * ever expose properties owned by the token holder.
+	 *
+	 * @param WP_User $owner Token owner.
+	 * @return array{
+	 *   company:string, email:string, phone:string, whatsapp:string,
+	 *   groups:array<int,array{id:int,name:string,cards:array<int,array<string,mixed>>}>,
+	 *   total:int, available:int
+	 * }
+	 */
+	public static function get_catalog( WP_User $owner ) {
+		$owner_id = (int) $owner->ID;
+
+		$company = (string) get_user_meta( $owner_id, 'af_company_name', true );
+		if ( '' === trim( $company ) ) {
+			$company = $owner->display_name ? $owner->display_name : $owner->user_login;
+		}
+
+		$phone    = (string) get_user_meta( $owner_id, 'af_contact_phone', true );
+		$email    = (string) $owner->user_email;
+		$whatsapp = self::whatsapp_link( $phone );
+
+		$cards = self::get_cards( $owner_id );
+
+		$groups = self::group_cards( $cards, $owner_id );
+
+		$available = 0;
+		foreach ( $cards as $card ) {
+			if ( 'available' === $card['status'] ) {
+				$available++;
+			}
+		}
+
+		return array(
+			'company'   => $company,
+			'email'     => $email,
+			'phone'     => $phone,
+			'whatsapp'  => $whatsapp,
+			'groups'    => $groups,
+			'total'     => count( $cards ),
+			'available' => $available,
+		);
+	}
+
+	/**
+	 * Builds a wa.me deep link, normalising Ecuadorian local numbers.
+	 *
+	 * @param string $phone Raw phone number.
+	 * @return string
+	 */
+	private static function whatsapp_link( $phone ) {
+		$phone = preg_replace( '/[^0-9+]/', '', (string) $phone );
+
+		if ( ! $phone ) {
+			return '';
+		}
+
+		if ( 0 === strpos( $phone, '+' ) ) {
+			$digits = substr( $phone, 1 );
+		} elseif ( 0 === strpos( $phone, '0' ) ) {
+			// Local format: 09XXXXXXXX -> 5939XXXXXXXX.
+			$digits = '593' . substr( $phone, 1 );
+		} else {
+			$digits = '593' . $phone;
+		}
+
+		$digits = preg_replace( '/\D+/', '', $digits );
+
+		return ( $digits && strlen( $digits ) >= 10 ) ? 'https://wa.me/' . $digits : '';
+	}
+
+	/**
+	 * Fetches and normalises every property the public catalog may expose.
+	 *
+	 * @param int $owner_id Owner user ID.
+	 * @return array<int,array<string,mixed>>
+	 */
+	private static function get_cards( $owner_id ) {
+		global $wpdb;
+
+		$owner_id = absint( $owner_id );
+		if ( ! $owner_id ) {
+			return array();
+		}
+
+		// 1. Candidate set: published properties owned by this administrator.
+		$candidates = get_posts(
+			array(
+				'post_type'      => 'accommodation',
+				'post_status'    => 'publish',
+				'posts_per_page' => 500,
+				'orderby'        => 'title',
+				'order'          => 'ASC',
+				'fields'         => 'ids',
+				'meta_query'     => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+					array( 'key' => '_af_owner_id', 'value' => $owner_id ),
+				),
+			)
+		);
+
+		if ( empty( $candidates ) ) {
+			return array();
+		}
+
+		// 2. Pivot query, with ownership repeated as a hard SQL predicate.
+		$ids_sql = Arriendo_Facil_Tenancy::ids_in_clause( $candidates );
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT p.ID,
+				 MAX(CASE WHEN pm.meta_key = '_af_monthly_rent'     THEN pm.meta_value END) AS monthly_rent,
+				 MAX(CASE WHEN pm.meta_key = '_af_status'           THEN pm.meta_value END) AS status,
+				 MAX(CASE WHEN pm.meta_key = '_af_property_type'    THEN pm.meta_value END) AS property_type,
+				 MAX(CASE WHEN pm.meta_key = '_af_address'          THEN pm.meta_value END) AS address,
+				 MAX(CASE WHEN pm.meta_key = '_af_city'             THEN pm.meta_value END) AS city,
+				 MAX(CASE WHEN pm.meta_key = '_af_location_text'    THEN pm.meta_value END) AS location_text,
+				 MAX(CASE WHEN pm.meta_key = '_af_bedrooms'         THEN pm.meta_value END) AS bedrooms,
+				 MAX(CASE WHEN pm.meta_key = '_af_bathrooms'        THEN pm.meta_value END) AS bathrooms,
+				 MAX(CASE WHEN pm.meta_key = '_af_square_meters'    THEN pm.meta_value END) AS square_meters,
+				 MAX(CASE WHEN pm.meta_key = '_af_parking_spots'    THEN pm.meta_value END) AS parking_spots,
+				 MAX(CASE WHEN pm.meta_key = '_af_floor_number'     THEN pm.meta_value END) AS floor_number,
+				 MAX(CASE WHEN pm.meta_key = '_af_year_built'       THEN pm.meta_value END) AS year_built,
+				 MAX(CASE WHEN pm.meta_key = '_af_furnished'        THEN pm.meta_value END) AS furnished,
+				 MAX(CASE WHEN pm.meta_key = '_af_condition'        THEN pm.meta_value END) AS condition,
+				 MAX(CASE WHEN pm.meta_key = '_af_amenities'        THEN pm.meta_value END) AS amenities,
+				 MAX(CASE WHEN pm.meta_key = '_af_utilities_included' THEN pm.meta_value END) AS utilities,
+				 MAX(CASE WHEN pm.meta_key = '_af_owner_id'         THEN pm.meta_value END) AS owner_id,
+				 MAX(CASE WHEN pm.meta_key = '_thumbnail_id'        THEN pm.meta_value END) AS thumbnail_id
+				 FROM {$wpdb->posts} p
+				 INNER JOIN {$wpdb->postmeta} po ON po.post_id = p.ID
+				  AND po.meta_key = '_af_owner_id' AND po.meta_value = %d
+				 LEFT JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID
+				  AND pm.meta_key IN ('_af_monthly_rent','_af_status','_af_property_type','_af_address','_af_city','_af_location_text','_af_bedrooms','_af_bathrooms','_af_square_meters','_af_parking_spots','_af_floor_number','_af_year_built','_af_furnished','_af_condition','_af_amenities','_af_utilities_included','_af_owner_id','_thumbnail_id')
+				 WHERE p.ID IN ({$ids_sql})
+				   AND p.post_type = 'accommodation'
+				   AND p.post_status = 'publish'
+				 GROUP BY p.ID
+				 ORDER BY p.post_title ASC",
+				$owner_id
+			)
+		);
+		// phpcs:enable
+
+		$status_labels = self::status_labels();
+		$type_labels   = self::type_labels();
+
+		$amenity_labels = array(
+			'elevator'        => __( 'Ascensor', 'arriendo-facil' ),
+			'balcony'         => __( 'Balcón', 'arriendo-facil' ),
+			'terrace'         => __( 'Terraza', 'arriendo-facil' ),
+			'garden'          => __( 'Jardín', 'arriendo-facil' ),
+			'pool'            => __( 'Piscina', 'arriendo-facil' ),
+			'gym'             => __( 'Gimnasio', 'arriendo-facil' ),
+			'security'        => __( 'Seguridad 24/7', 'arriendo-facil' ),
+			'intercom'        => __( 'Intercomunicador', 'arriendo-facil' ),
+			'furnished'       => __( 'Amueblado', 'arriendo-facil' ),
+			'pet_friendly'    => __( 'Mascotas', 'arriendo-facil' ),
+			'washer'          => __( 'Lavadora', 'arriendo-facil' ),
+			'fridge'          => __( 'Refrigerador', 'arriendo-facil' ),
+			'wifi'            => __( 'Internet', 'arriendo-facil' ),
+			'parking'         => __( 'Parqueadero', 'arriendo-facil' ),
+			'doorman'         => __( 'Guardianía', 'arriendo-facil' ),
+			'garage'          => __( 'Garaje', 'arriendo-facil' ),
+			'water_heater'    => __( 'Calentador de agua', 'arriendo-facil' ),
+			'backyard'        => __( 'Patio', 'arriendo-facil' ),
+			'rooftop'         => __( 'Azotea', 'arriendo-facil' ),
+		);
+
+		$furnished_labels = array(
+			'unfurnished' => __( 'Sin amueblar', 'arriendo-facil' ),
+			'semi'        => __( 'Semi amueblado', 'arriendo-facil' ),
+			'furnished'   => __( 'Amueblado', 'arriendo-facil' ),
+		);
+
+		$condition_labels = array(
+			'new'          => __( 'Nuevo', 'arriendo-facil' ),
+			'very_good'    => __( 'Muy bueno', 'arriendo-facil' ),
+			'good'         => __( 'Bueno', 'arriendo-facil' ),
+			'needs_repair' => __( 'Necesita reparación', 'arriendo-facil' ),
+		);
+
+		$utility_labels = array(
+			'water'    => __( 'Agua', 'arriendo-facil' ),
+			'electric' => __( 'Luz', 'arriendo-facil' ),
+			'internet' => __( 'Internet', 'arriendo-facil' ),
+			'gas'      => __( 'Gas', 'arriendo-facil' ),
+		);
+
+		$cards = array();
+
+		foreach ( (array) $rows as $row ) {
+			$post_id = (int) $row->ID;
+
+			// 3. Final per-post ownership re-check.
+			if ( (int) $row->owner_id !== $owner_id ) {
+				continue;
+			}
+			if ( (int) get_post_meta( $post_id, '_af_owner_id', true ) !== $owner_id ) {
+				continue;
+			}
+
+			// Opt-out switch set from the admin catalog.
+			if ( ! Arriendo_Facil_Catalog_Groups::is_in_public_catalog( $post_id ) ) {
+				continue;
+			}
+
+			$status = $row->status ? (string) $row->status : 'available';
+			if ( 'inactive' === $status ) {
+				continue;
+			}
+
+			$type = $row->property_type ? (string) $row->property_type : '';
+
+			$thumbnail = $row->thumbnail_id
+				? wp_get_attachment_image_url( (int) $row->thumbnail_id, 'large' )
+				: get_the_post_thumbnail_url( $post_id, 'large' );
+
+			$address = trim( trim( (string) $row->address ) . ( $row->city ? ', ' . $row->city : '' ) );
+			if ( ! $address && $row->location_text ) {
+				$address = (string) $row->location_text;
+			}
+
+			$excerpt = has_excerpt( $post_id )
+				? get_the_excerpt( $post_id )
+				: wp_trim_words( wp_strip_all_tags( (string) get_post_field( 'post_content', $post_id ) ), 32 );
+
+			$cards[] = array(
+				'id'            => $post_id,
+				'title'         => get_the_title( $post_id ),
+				'thumb'         => $thumbnail ? $thumbnail : '',
+				'status'        => $status,
+				'status_lbl'    => isset( $status_labels[ $status ] ) ? $status_labels[ $status ] : $status,
+				'type'          => isset( $type_labels[ $type ] ) ? $type_labels[ $type ] : ( $type ? ucfirst( $type ) : '' ),
+				'address'       => $address,
+				'excerpt'       => $excerpt,
+				'bedrooms'      => (int) $row->bedrooms,
+				'bathrooms'     => (int) $row->bathrooms,
+				'square_meters' => (float) $row->square_meters,
+				'parking'       => (int) $row->parking_spots,
+				'floor'         => (int) $row->floor_number,
+				'year_built'    => (int) $row->year_built,
+				'furnished'     => isset( $furnished_labels[ $row->furnished ] ) ? $furnished_labels[ $row->furnished ] : '',
+				'condition'     => isset( $condition_labels[ $row->condition ] ) ? $condition_labels[ $row->condition ] : '',
+				'amenities'     => self::decode_list( $row->amenities, $amenity_labels ),
+				'utilities'     => self::decode_list( $row->utilities, $utility_labels ),
+				'monthly_rent'  => (float) $row->monthly_rent,
+				'group_id'      => Arriendo_Facil_Catalog_Groups::get_group_id_for_property( $post_id ),
+			);
+		}
+
+		return $cards;
+	}
+
+	/**
+	 * Decodes a stored list meta value into human labels.
+	 *
+	 * @param string|array|null $raw    Stored value.
+	 * @param array<string,string> $labels Label map.
+	 * @return string[]
+	 */
+	private static function decode_list( $raw, array $labels ) {
+		if ( empty( $raw ) ) {
+			return array();
+		}
+
+		if ( is_string( $raw ) ) {
+			$decoded = maybe_unserialize( $raw );
+			$raw     = is_array( $decoded ) ? $decoded : array_filter( array_map( 'trim', explode( ',', $raw ) ) );
+		}
+
+		if ( ! is_array( $raw ) ) {
+			return array();
+		}
+
+		$out = array();
+
+		foreach ( $raw as $key ) {
+			$key = is_array( $key ) ? '' : (string) $key;
+			$key = trim( $key );
+
+			if ( '' === $key ) {
+				continue;
+			}
+
+			$out[] = isset( $labels[ $key ] ) ? $labels[ $key ] : ucwords( str_replace( '_', ' ', $key ) );
+		}
+
+		return array_values( array_unique( $out ) );
+	}
+
+	/**
+	 * Buckets cards into their building groups, then a final bucket for the
+	 * properties that are not part of any building.
+	 *
+	 * @param array<int,array<string,mixed>> $cards   Flat card list.
+	 * @param int                           $owner_id Owner user ID.
+	 * @return array<int,array{id:int,name:string,cards:array<int,array<string,mixed>>}>
+	 */
+	public static function group_cards( array $cards, $owner_id ) {
+		$names = Arriendo_Facil_Catalog_Groups::get_name_map( $owner_id );
+
+		$groups = array();
+		$loose  = array();
+
+		foreach ( $cards as $card ) {
+			$group_id = isset( $card['group_id'] ) ? (int) $card['group_id'] : 0;
+
+			if ( $group_id && isset( $names[ $group_id ] ) ) {
+				if ( ! isset( $groups[ $group_id ] ) ) {
+					$groups[ $group_id ] = array(
+						'id'    => $group_id,
+						'name'  => $names[ $group_id ],
+						'cards' => array(),
+					);
+				}
+				$groups[ $group_id ]['cards'][] = $card;
+				continue;
+			}
+
+			// A stale group id (deleted group, or out of scope) is treated as
+			// "independent" rather than leaking another owner's grouping.
+			$loose[] = $card;
+		}
+
+		uasort(
+			$groups,
+			static function ( $a, $b ) {
+				return strcasecmp( $a['name'], $b['name'] );
+			}
+		);
+
+		if ( ! empty( $loose ) ) {
+			$groups[] = array(
+				'id'    => 0,
+				'name'  => __( 'Otros inmuebles', 'arriendo-facil' ),
+				'cards' => $loose,
+			);
+		}
+
+		return array_values( $groups );
+	}
+
+	/* ---------------------------------------------------------------------
+	 * AJAX
 	 * ------------------------------------------------------------------- */
 
 	/**
@@ -223,8 +683,8 @@ class Arriendo_Facil_Catalog_Share {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
-		$rotate = isset( $_POST['rotate'] ) ? rest_sanitize_boolean( wp_unslash( $_POST['rotate'] ) ) : false;
-		$result = self::generate_token( get_current_user_id(), $rotate );
+		$rotate  = isset( $_POST['rotate'] ) ? rest_sanitize_boolean( wp_unslash( $_POST['rotate'] ) ) : false;
+		$result  = self::generate_token( get_current_user_id(), $rotate );
 
 		if ( ! $result ) {
 			wp_send_json_error( array( 'message' => __( 'No se pudo generar el enlace.', 'arriendo-facil' ) ), 400 );
@@ -234,6 +694,7 @@ class Arriendo_Facil_Catalog_Share {
 			array(
 				'message' => $rotate ? __( 'Enlace regenerado.', 'arriendo-facil' ) : __( 'Enlace generado.', 'arriendo-facil' ),
 				'url'     => $result['url'],
+				'pdfUrl'  => $result['pdf_url'],
 			)
 		);
 	}
@@ -251,6 +712,53 @@ class Arriendo_Facil_Catalog_Share {
 		self::revoke_token( get_current_user_id() );
 
 		wp_send_json_success( array( 'message' => __( 'Enlace desactivado.', 'arriendo-facil' ) ) );
+	}
+
+	/**
+	 * Live counters for the share panel (how many properties will be shown).
+	 */
+	public function ajax_stats() {
+		check_ajax_referer( 'af_catalog_share_nonce', 'nonce' );
+
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$owner_id = get_current_user_id();
+
+		// A super admin may inspect another administrator's counters.
+		if ( ! empty( $_POST['owner_id'] ) ) {
+			$requested = absint( wp_unslash( $_POST['owner_id'] ) );
+
+			if ( $requested !== $owner_id && Arriendo_Facil_Tenancy::can_manage_all() ) {
+				$owner_id = $requested;
+			}
+		}
+
+		$owner = get_userdata( $owner_id );
+
+		if ( ! $owner instanceof WP_User ) {
+			wp_send_json_error( array( 'message' => __( 'Administrador no encontrado.', 'arriendo-facil' ) ), 404 );
+		}
+
+		$catalog = self::get_catalog( $owner );
+		$groups  = array();
+
+		foreach ( $catalog['groups'] as $group ) {
+			$groups[] = array(
+				'id'    => $group['id'],
+				'name'  => $group['name'],
+				'count' => count( $group['cards'] ),
+			);
+		}
+
+		wp_send_json_success(
+			array(
+				'total'     => $catalog['total'],
+				'available' => $catalog['available'],
+				'groups'    => $groups,
+			)
+		);
 	}
 
 	/* ---------------------------------------------------------------------
@@ -292,7 +800,16 @@ class Arriendo_Facil_Catalog_Share {
 					'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 					'nonce'   => wp_create_nonce( 'af_catalog_share_nonce' ),
 					'i18n'    => array(
-						'copied' => __( 'Enlace copiado.', 'arriendo-facil' ),
+						'copied'        => __( 'Enlace copiado.', 'arriendo-facil' ),
+						'groupPrompt'   => __( 'Escribe el nombre del edificio o conjunto.', 'arriendo-facil' ),
+						'renamePrompt'  => __( 'Escribe el nuevo nombre.', 'arriendo-facil' ),
+						'deleteConfirm' => __( '¿Eliminar este grupo? Sus propiedades quedarán como inmuebles independientes.', 'arriendo-facil' ),
+						'noGroups'      => __( 'Todavía no has creado ningún edificio o conjunto.', 'arriendo-facil' ),
+						'noGroup'       => __( '— Sin grupo —', 'arriendo-facil' ),
+						'rename'        => __( 'Renombrar', 'arriendo-facil' ),
+						'remove'        => __( 'Eliminar', 'arriendo-facil' ),
+						'unitLabel'     => __( 'inmueble', 'arriendo-facil' ),
+						'unitLabelPlural' => __( 'inmuebles', 'arriendo-facil' ),
 					),
 				)
 			);
@@ -314,6 +831,30 @@ class Arriendo_Facil_Catalog_Share {
 				ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/af-catalog-share.css',
 				array(),
 				filemtime( $css_path )
+			);
+		}
+
+		$js_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/af-catalog-share-public.js';
+		if ( file_exists( $js_path ) ) {
+			wp_enqueue_script(
+				'af-catalog-share-public',
+				ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/af-catalog-share-public.js',
+				array(),
+				filemtime( $js_path ),
+				true
+			);
+
+			wp_localize_script(
+				'af-catalog-share-public',
+				'afCatalogPublic',
+				array(
+					'flipLabel'        => __( 'Ver detalles', 'arriendo-facil' ),
+					'backLabel'        => __( 'Volver', 'arriendo-facil' ),
+					'countLabel'       => __( 'propiedad', 'arriendo-facil' ),
+					'countLabelPlural' => __( 'propiedades', 'arriendo-facil' ),
+					'unitLabel'        => __( 'inmueble', 'arriendo-facil' ),
+					'unitLabelPlural'  => __( 'inmuebles', 'arriendo-facil' ),
+				)
 			);
 		}
 	}

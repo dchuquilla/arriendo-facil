@@ -436,40 +436,198 @@
 	background: #eff6ff;
 }
 
+/*
+ * Back of the flip card. It is the face a prospect screenshots or forwards,
+ * so it repeats the price, keeps a labelled value grid instead of loose
+ * paragraphs, and turns the amenity lists into chips.
+ */
 .af-cs-card__backbody {
 	flex: 1 1 auto;
-	padding: 18px 18px 4px;
+	padding: 16px 18px 4px;
 	overflow-y: auto;
 	min-height: 0;
+	scrollbar-width: thin;
+	scrollbar-color: #cbd5e1 transparent;
+}
+
+.af-cs-card__backbody::-webkit-scrollbar {
+	width: 6px;
+}
+
+.af-cs-card__backbody::-webkit-scrollbar-thumb {
+	background: #cbd5e1;
+	border-radius: 999px;
+}
+
+.af-cs-card__backhead {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+	padding-bottom: 12px;
+	margin-bottom: 12px;
+	border-bottom: 1px solid var(--af-cs-line);
+}
+
+.af-cs-card__backhead-text {
+	min-width: 0;
+}
+
+.af-cs-card__backeyebrow {
+	display: block;
+	margin-bottom: 2px;
+	font-size: 10.5px;
+	font-weight: 700;
+	letter-spacing: .1em;
+	text-transform: uppercase;
+	color: var(--af-cs-muted);
 }
 
 .af-cs-card__backtitle {
-	margin: 0 0 10px;
-	font-size: 17px;
+	margin: 0;
+	font-size: 16px;
 	font-weight: 700;
+	line-height: 1.3;
 	overflow-wrap: anywhere;
+}
+
+.af-cs-card__backprice {
+	flex: 0 0 auto;
+	margin: 0;
+	text-align: right;
+	white-space: nowrap;
+}
+
+.af-cs-card__backamount {
+	display: block;
+	font-size: 17px;
+	font-weight: 800;
+	letter-spacing: -.02em;
+	color: var(--af-cs-brand-dark);
+}
+
+.af-cs-card__backprice small {
+	font-size: 11.5px;
+	color: var(--af-cs-muted);
 }
 
 .af-cs-card__excerpt {
-	margin: 0 0 12px;
+	margin: 0 0 14px;
+	padding-left: 11px;
+	border-left: 3px solid var(--af-cs-line);
 	font-size: 13.5px;
+	line-height: 1.55;
 	color: #475569;
 }
 
-.af-cs-card__backline {
-	margin: 0 0 8px;
-	font-size: 13px;
-	color: #475569;
+.af-cs-card__facts {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 1px;
+	margin: 0 0 14px;
+	background: var(--af-cs-line);
+	border: 1px solid var(--af-cs-line);
+	border-radius: 10px;
+	overflow: hidden;
+}
+
+/*
+ * A single fact may carry a long address, so it spans the full row instead
+ * of squeezing into half the card.
+ */
+.af-cs-card__fact {
+	min-width: 0;
+	padding: 8px 10px;
+	background: #fff;
+}
+
+.af-cs-card__fact:first-child {
+	grid-column: 1 / -1;
+}
+
+.af-cs-card__factlabel {
+	margin: 0 0 1px;
+	font-size: 10.5px;
+	font-weight: 700;
+	letter-spacing: .07em;
+	text-transform: uppercase;
+	color: var(--af-cs-muted);
+}
+
+.af-cs-card__factvalue {
+	margin: 0;
+	font-size: 13.5px;
+	font-weight: 600;
+	color: var(--af-cs-ink);
 	overflow-wrap: anywhere;
+}
+
+.af-cs-card__block {
+	margin: 0 0 12px;
+}
+
+.af-cs-card__blocktitle {
+	margin: 0 0 7px;
+	font-size: 10.5px;
+	font-weight: 700;
+	letter-spacing: .1em;
+	text-transform: uppercase;
+	color: var(--af-cs-muted);
+}
+
+.af-cs-card__chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.af-cs-card__chip {
+	padding: 4px 10px;
+	background: #f1f5f9;
+	border: 1px solid var(--af-cs-line);
+	border-radius: 999px;
+	font-size: 12px;
+	line-height: 1.35;
+	color: #334155;
+	white-space: nowrap;
+}
+
+.af-cs-card__chips--utilities .af-cs-card__chip {
+	background: #ecfdf5;
+	border-color: #bbf7d0;
+	color: #14532d;
 }
 
 .af-cs-card__actions {
 	flex: 0 0 auto;
 	display: flex;
-	flex-direction: column;
+	align-items: stretch;
 	gap: 8px;
-	padding: 14px 18px 18px;
+	padding: 12px 18px 16px;
 	border-top: 1px solid var(--af-cs-line);
+	background: #fff;
+	/*
+	 * The back scrolls when a listing has a long description or many
+	 * amenities; the upward shadow reads as "there is more above".
+	 */
+	box-shadow: 0 -10px 12px -10px rgba(15, 23, 42, .18);
+}
+
+/*
+ * The WhatsApp label is the flexible one: it absorbs the free width, and a
+ * translation that ever outgrows it wraps to a second line instead of
+ * pushing "Volver" out of the row.
+ */
+.af-cs-card__actions .af-cs-btn--whatsapp {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.af-cs-card__actions .af-cs-btn--ghost {
+	flex: 0 0 auto;
 }
 
 .af-cs-card__actions .af-cs-btn {

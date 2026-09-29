@@ -237,16 +237,52 @@ get_header();
 							implode( ' ', (array) $af_card['amenities'] )
 						);
 
+						/*
+						 * The business name is deliberately left out of the
+						 * message: the recipient is already talking to the
+						 * owner through this very catalog, and repeating the
+						 * account display name only adds noise.
+						 */
 						$af_ws_message = $catalog['whatsapp']
 							? rawurlencode(
 								sprintf(
-									/* translators: 1: property title, 2: company name */
-									__( 'Hola, me interesa el inmueble %1$s que vi en el catálogo de %2$s.', 'arriendo-facil' ),
-									$af_card['title'],
-									$catalog_share_company
+									/* translators: %s: property title */
+									__( 'Hola, me interesa el inmueble %s.', 'arriendo-facil' ),
+									$af_card['title']
 								)
 							)
 							: '';
+
+						/*
+						 * Label/value pairs for the back of the card, in the
+						 * order a prospect reads them. Built here so the
+						 * template only has to loop, never to branch.
+						 */
+						$af_facts = array();
+
+						if ( $af_card['address'] ) {
+							$af_facts[ __( 'Ubicación', 'arriendo-facil' ) ] = $af_card['address'];
+						}
+						if ( $af_card['floor'] ) {
+							$af_facts[ __( 'Piso', 'arriendo-facil' ) ] = sprintf(
+								/* translators: %d: floor number */
+								__( '%d', 'arriendo-facil' ),
+								$af_card['floor']
+							);
+						}
+						if ( $af_card['year_built'] ) {
+							$af_facts[ __( 'Año', 'arriendo-facil' ) ] = sprintf(
+								/* translators: %d: year of construction */
+								__( '%d', 'arriendo-facil' ),
+								$af_card['year_built']
+							);
+						}
+						if ( ! empty( $af_card['furnished'] ) ) {
+							$af_facts[ __( 'Amoblamiento', 'arriendo-facil' ) ] = $af_card['furnished'];
+						}
+						if ( ! empty( $af_card['condition'] ) ) {
+							$af_facts[ __( 'Conservación', 'arriendo-facil' ) ] = $af_card['condition'];
+						}
 						?>
 						<article
 							class="af-cs-card"
@@ -327,55 +363,69 @@ get_header();
 
 								<div class="af-cs-card__face af-cs-card__face--back">
 									<div class="af-cs-card__backbody">
-										<h4 class="af-cs-card__backtitle"><?php echo esc_html( $af_card['title'] ); ?></h4>
+										<div class="af-cs-card__backhead">
+											<div class="af-cs-card__backhead-text">
+												<span class="af-cs-card__backeyebrow">
+													<?php
+													echo esc_html(
+														$af_card['type']
+															? $af_card['type']
+															: __( 'Detalle del inmueble', 'arriendo-facil' )
+													);
+													?>
+												</span>
+												<h4 class="af-cs-card__backtitle"><?php echo esc_html( $af_card['title'] ); ?></h4>
+											</div>
+
+											<?php if ( $af_card['monthly_rent'] > 0 ) : ?>
+												<p class="af-cs-card__backprice">
+													<span class="af-cs-card__backamount">
+														$<?php echo esc_html( number_format_i18n( $af_card['monthly_rent'], 2 ) ); ?>
+													</span>
+													<small><?php esc_html_e( '/ mes', 'arriendo-facil' ); ?></small>
+												</p>
+											<?php endif; ?>
+										</div>
 
 										<?php if ( $af_card['excerpt'] ) : ?>
 											<p class="af-cs-card__excerpt"><?php echo esc_html( $af_card['excerpt'] ); ?></p>
 										<?php endif; ?>
 
-										<?php if ( $af_card['address'] ) : ?>
-											<p class="af-cs-card__backline">
-												<strong><?php esc_html_e( 'Ubicación:', 'arriendo-facil' ); ?></strong>
-												<?php echo esc_html( $af_card['address'] ); ?>
-											</p>
-										<?php endif; ?>
-
-										<?php if ( ! empty( $af_card['floor'] ) || $af_card['year_built'] ) : ?>
-											<p class="af-cs-card__backline">
-												<strong><?php esc_html_e( 'Datos:', 'arriendo-facil' ); ?></strong>
-												<?php
-												$af_extra = array();
-												if ( $af_card['floor'] ) {
-													$af_extra[] = sprintf(
-														/* translators: %d: floor number */
-														__( 'piso %d', 'arriendo-facil' ),
-														$af_card['floor']
-													);
-												}
-												if ( $af_card['year_built'] ) {
-													$af_extra[] = sprintf(
-														/* translators: %d: year */
-														__( 'año %d', 'arriendo-facil' ),
-														$af_card['year_built']
-													);
-												}
-												echo esc_html( implode( ' · ', $af_extra ) );
-												?>
-											</p>
+										<?php if ( $af_facts ) : ?>
+											<dl class="af-cs-card__facts">
+												<?php foreach ( $af_facts as $af_fact_label => $af_fact_value ) : ?>
+													<div class="af-cs-card__fact">
+														<dt class="af-cs-card__factlabel"><?php echo esc_html( $af_fact_label ); ?></dt>
+														<dd class="af-cs-card__factvalue"><?php echo esc_html( $af_fact_value ); ?></dd>
+													</div>
+												<?php endforeach; ?>
+											</dl>
 										<?php endif; ?>
 
 										<?php if ( ! empty( $af_card['amenities'] ) ) : ?>
-											<p class="af-cs-card__backline">
-												<strong><?php esc_html_e( 'Amenidades:', 'arriendo-facil' ); ?></strong>
-												<?php echo esc_html( implode( ' · ', $af_card['amenities'] ) ); ?>
-											</p>
+											<div class="af-cs-card__block">
+												<h5 class="af-cs-card__blocktitle">
+													<?php esc_html_e( 'Amenidades', 'arriendo-facil' ); ?>
+												</h5>
+												<ul class="af-cs-card__chips">
+													<?php foreach ( (array) $af_card['amenities'] as $af_amenity ) : ?>
+														<li class="af-cs-card__chip"><?php echo esc_html( $af_amenity ); ?></li>
+													<?php endforeach; ?>
+												</ul>
+											</div>
 										<?php endif; ?>
 
 										<?php if ( ! empty( $af_card['utilities'] ) ) : ?>
-											<p class="af-cs-card__backline">
-												<strong><?php esc_html_e( 'Servicios incluidos:', 'arriendo-facil' ); ?></strong>
-												<?php echo esc_html( implode( ' · ', $af_card['utilities'] ) ); ?>
-											</p>
+											<div class="af-cs-card__block">
+												<h5 class="af-cs-card__blocktitle">
+													<?php esc_html_e( 'Servicios incluidos', 'arriendo-facil' ); ?>
+												</h5>
+												<ul class="af-cs-card__chips af-cs-card__chips--utilities">
+													<?php foreach ( (array) $af_card['utilities'] as $af_utility ) : ?>
+														<li class="af-cs-card__chip"><?php echo esc_html( $af_utility ); ?></li>
+													<?php endforeach; ?>
+												</ul>
+											</div>
 										<?php endif; ?>
 									</div>
 

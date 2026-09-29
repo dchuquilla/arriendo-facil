@@ -450,7 +450,7 @@ class Arriendo_Facil_Catalog_Share {
 				 MAX(CASE WHEN pm.meta_key = '_af_floor_number'     THEN pm.meta_value END) AS floor_number,
 				 MAX(CASE WHEN pm.meta_key = '_af_year_built'       THEN pm.meta_value END) AS year_built,
 				 MAX(CASE WHEN pm.meta_key = '_af_furnished'        THEN pm.meta_value END) AS furnished,
-				 MAX(CASE WHEN pm.meta_key = '_af_condition'        THEN pm.meta_value END) AS condition,
+				 MAX(CASE WHEN pm.meta_key = '_af_condition'        THEN pm.meta_value END) AS `condition`,
 				 MAX(CASE WHEN pm.meta_key = '_af_amenities'        THEN pm.meta_value END) AS amenities,
 				 MAX(CASE WHEN pm.meta_key = '_af_utilities_included' THEN pm.meta_value END) AS utilities,
 				 MAX(CASE WHEN pm.meta_key = '_af_owner_id'         THEN pm.meta_value END) AS owner_id,

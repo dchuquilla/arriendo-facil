@@ -742,13 +742,28 @@ class Arriendo_Facil_Catalog_Share {
 		}
 
 		$catalog = self::get_catalog( $owner );
-		$groups  = array();
 
-		foreach ( $catalog['groups'] as $group ) {
+		/*
+		 * The group list is read straight from the groups table rather than
+		 * from $catalog['groups']: the public payload only carries groups
+		 * that already hold at least one property, so a freshly created
+		 * building would vanish from the panel and take the per-property
+		 * dropdowns down with it (they are repainted from this same list).
+		 * Counts are therefore resolved separately, and default to zero.
+		 */
+		$groups  = array();
+		$counts  = self::group_counts_for_owner( $owner_id );
+		$listed  = class_exists( 'Arriendo_Facil_Catalog_Groups' )
+			? Arriendo_Facil_Catalog_Groups::get_for_owner( $owner_id )
+			: array();
+
+		foreach ( (array) $listed as $group ) {
+			$group_id = (int) $group->id;
+
 			$groups[] = array(
-				'id'    => $group['id'],
-				'name'  => $group['name'],
-				'count' => count( $group['cards'] ),
+				'id'    => $group_id,
+				'name'  => (string) $group->name,
+				'count' => isset( $counts[ $group_id ] ) ? $counts[ $group_id ] : 0,
 			);
 		}
 
@@ -759,6 +774,50 @@ class Arriendo_Facil_Catalog_Share {
 				'groups'    => $groups,
 			)
 		);
+	}
+
+	/**
+	 * Counts the properties of one owner, bucketed by building group.
+	 *
+	 * Properties with no group (or a stale group id) are not counted here;
+	 * the panel only needs per-building totals.
+	 *
+	 * @param int $owner_id Owner user ID.
+	 * @return array<int,int> group_id => property count.
+	 */
+	private static function group_counts_for_owner( $owner_id ) {
+		global $wpdb;
+
+		$owner_id = absint( $owner_id );
+		if ( ! $owner_id ) {
+			return array();
+		}
+
+		$rows = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$wpdb->prepare(
+				"SELECT gm.meta_value AS group_id, COUNT(DISTINCT p.ID) AS total
+				 FROM {$wpdb->posts} p
+				 INNER JOIN {$wpdb->postmeta} om ON om.post_id = p.ID
+				  AND om.meta_key = '_af_owner_id' AND om.meta_value = %d
+				 INNER JOIN {$wpdb->postmeta} gm ON gm.post_id = p.ID
+				  AND gm.meta_key = %s AND gm.meta_value <> '0'
+				 WHERE p.post_type = 'accommodation'
+				   AND p.post_status = 'publish'
+				 GROUP BY gm.meta_value",
+				$owner_id,
+				Arriendo_Facil_Catalog_Groups::META_GROUP
+			)
+		);
+
+		$counts = array();
+		foreach ( (array) $rows as $row ) {
+			$group_id = absint( $row->group_id );
+			if ( $group_id ) {
+				$counts[ $group_id ] = absint( $row->total );
+			}
+		}
+
+		return $counts;
 	}
 
 	/* ---------------------------------------------------------------------

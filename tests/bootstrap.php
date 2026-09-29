@@ -221,3 +221,4 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-sri-ride.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-billing-manager.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-catalog-groups.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-catalog-share.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-security-hardening.php';

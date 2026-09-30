@@ -320,7 +320,7 @@ class Arriendo_Facil_Activator {
 				lease_id               BIGINT(20) UNSIGNED DEFAULT NULL,
 				unit_id                BIGINT(20) UNSIGNED DEFAULT NULL,
 				guest_id               BIGINT(20) UNSIGNED DEFAULT NULL,
-				charge_type            VARCHAR(30) NOT NULL COMMENT 'canon, alicuota, agua, luz, gas, internet, multa, otro',
+				charge_type            VARCHAR(30) NOT NULL COMMENT 'canon, alicuota, agua, luz, gas, internet, telefono, multa, otro',
 				period                 CHAR(7) NOT NULL COMMENT 'YYYY-MM',
 				description            VARCHAR(255) DEFAULT NULL,
 				amount                 DECIMAL(12,2) NOT NULL DEFAULT 0.00,
@@ -377,7 +377,28 @@ class Arriendo_Facil_Activator {
 				KEY period (period)
 			) $charset_collate;",
 
-			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_guest_documents (
+			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_service_schedules (
+			id                BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+			unit_id           BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+			accommodation_id  BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+			service           VARCHAR(30) NOT NULL COMMENT 'agua, luz, gas, internet, telefono',
+			due_day           TINYINT(3) UNSIGNED NOT NULL DEFAULT 5,
+			flat_amount       DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+			amount_mode       VARCHAR(20) NOT NULL DEFAULT 'auto' COMMENT 'auto (lectura o tarifa fija), fixed, metered',
+			notes             VARCHAR(255) DEFAULT NULL,
+			is_active         TINYINT(1) NOT NULL DEFAULT 1,
+			created_by        BIGINT(20) UNSIGNED DEFAULT NULL,
+			created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY uniq_scope_service (unit_id, accommodation_id, service),
+			KEY accommodation_id (accommodation_id),
+			KEY unit_id (unit_id),
+			KEY service (service),
+			KEY is_active (is_active)
+		) $charset_collate;",
+
+		"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_guest_documents (
 				id                BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
 				guest_id          BIGINT(20) UNSIGNED NOT NULL,
 				doc_type          VARCHAR(40) NOT NULL COMMENT 'garantia_alicuota, cedula_papeleta, certificado_bancario, certificado_laboral',

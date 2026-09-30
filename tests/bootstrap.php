@@ -13,6 +13,27 @@ define( 'ARRIENDO_FACIL_VERSION', '1.0.0' );
 define( 'ARRIENDO_FACIL_PLUGIN_DIR', __DIR__ . '/../' );
 define( 'ARRIENDO_FACIL_PLUGIN_URL', 'http://example.com/wp-content/plugins/arriendo-facil/' );
 
+// Time constants WordPress defines and the plugin relies on for date maths.
+defined( 'MINUTE_IN_SECONDS' ) || define( 'MINUTE_IN_SECONDS', 60 );
+defined( 'HOUR_IN_SECONDS' ) || define( 'HOUR_IN_SECONDS', 60 * MINUTE_IN_SECONDS );
+defined( 'DAY_IN_SECONDS' ) || define( 'DAY_IN_SECONDS', 24 * HOUR_IN_SECONDS );
+defined( 'WEEK_IN_SECONDS' ) || define( 'WEEK_IN_SECONDS', 7 * DAY_IN_SECONDS );
+defined( 'MONTH_IN_SECONDS' ) || define( 'MONTH_IN_SECONDS', 30 * DAY_IN_SECONDS );
+defined( 'YEAR_IN_SECONDS' ) || define( 'YEAR_IN_SECONDS', 365 * DAY_IN_SECONDS );
+
+// The acting user is shared by every test file. Stubs like this have to live
+// here rather than in an individual test file: whichever test file PHPUnit
+// happens to load first would otherwise win the function_exists() race and
+// silently change the behaviour of the others.
+if ( ! function_exists( 'get_current_user_id' ) ) {
+	/**
+	 * @return int
+	 */
+	function get_current_user_id() {
+		return isset( $GLOBALS['af_test_user_id'] ) ? (int) $GLOBALS['af_test_user_id'] : 5;
+	}
+}
+
 // ── Minimal WordPress function stubs ────────────────────────────────────────
 
 if ( ! function_exists( 'esc_url_raw' ) ) {
@@ -60,6 +81,25 @@ if ( ! function_exists( 'absint' ) ) {
 if ( ! function_exists( '__' ) ) {
 	function __( $text, $domain = 'default' ) {
 		return $text;
+	}
+}
+
+if ( ! function_exists( 'wp_parse_args' ) ) {
+	/**
+	 * Merges user arguments over defaults, filling missing keys.
+	 *
+	 * @param array|object $args     Provided arguments.
+	 * @param array        $defaults Default arguments.
+	 * @return array
+	 */
+	function wp_parse_args( $args, $defaults = array() ) {
+		if ( is_object( $args ) ) {
+			$args = get_object_vars( $args );
+		} elseif ( ! is_array( $args ) ) {
+			parse_str( (string) $args, $args );
+		}
+
+		return array_merge( (array) $defaults, (array) $args );
 	}
 }
 

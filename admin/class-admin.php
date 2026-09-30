@@ -164,8 +164,8 @@ class Arriendo_Facil_Admin {
 
 		add_submenu_page(
 			'arriendo-facil',
-			__( 'Lecturas de medidor', 'arriendo-facil' ),
-			__( 'Lecturas', 'arriendo-facil' ),
+			__( 'Pagos de servicios', 'arriendo-facil' ),
+			__( 'Pagos de servicios', 'arriendo-facil' ),
 			Arriendo_Facil_Tenancy::CAP,
 			'af-meter-readings',
 			array( $this, 'render_meter_readings' )
@@ -793,10 +793,10 @@ array(
 		),
 		array(
 			'slug'  => 'af-meter-readings',
-			'label' => __( 'Lecturas', 'arriendo-facil' ),
+			'label' => __( 'Pagos de servicios', 'arriendo-facil' ),
 			'url'   => admin_url( 'admin.php?page=af-meter-readings' ),
 			'icon'  => 'gauge',
-			'group' => 'propiedades',
+			'group' => 'pagos',
 			'cap'   => Arriendo_Facil_Tenancy::CAP,
 			'gate'  => true,
 		),
@@ -2638,6 +2638,18 @@ array(
 				ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/af-billing.css',
 				array( 'af-tokens', 'af-shell', 'af-forms', 'af-admin-chrome' ),
 				file_exists( $billing_css_path ) ? (string) filemtime( $billing_css_path ) : ARRIENDO_FACIL_VERSION
+			);
+		}
+
+		// Estilos del hub de Pagos de servicios (callout de vencimiento, filtros,
+		// chip de servicio y acentos de urgencia en la tabla de vencimientos).
+		if ( 'arriendo-facil_page_af-meter-readings' === $hook ) {
+			$service_payments_css_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-service-payments.css';
+			wp_enqueue_style(
+				'af-service-payments',
+				ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/af-service-payments.css',
+				array( 'af-tokens', 'af-shell', 'af-forms', 'af-admin-chrome' ),
+				file_exists( $service_payments_css_path ) ? (string) filemtime( $service_payments_css_path ) : ARRIENDO_FACIL_VERSION
 			);
 		}
 

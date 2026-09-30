@@ -615,6 +615,58 @@ class Arriendo_Facil_Alerts {
 			}
 		}
 
+		// 6) Service payment due dates: what is about to expire and what already
+		//    expired, coming from the configured due-date rules.
+		if ( class_exists( 'Arriendo_Facil_Billing_Ledger' ) ) {
+			$current_period = gmdate( 'Y-m' );
+			$due_rows       = Arriendo_Facil_Billing_Ledger::get_service_due_rows( $current_period, is_array( $scope ) ? $scope : null );
+
+			foreach ( $due_rows as $due_row ) {
+				if ( 'overdue' !== $due_row['status'] && 'due_soon' !== $due_row['status'] ) {
+					continue;
+				}
+
+				$is_overdue = 'overdue' === $due_row['status'];
+				$title_text = $due_row['accommodation_title'] ? $due_row['accommodation_title'] : __( 'Inmueble', 'arriendo-facil' );
+				$days       = $due_row['due_date'] ? (int) floor( ( strtotime( $due_row['due_date'] ) - current_time( 'timestamp' ) ) / DAY_IN_SECONDS ) : 0;
+				$amount     = $due_row['has_charge'] ? $due_row['outstanding'] : $due_row['expected_amount'];
+
+				self::add(
+					$user_id,
+					$is_overdue ? 'service_overdue' : 'service_due_soon',
+					$is_overdue ? 'danger' : 'warning',
+					sprintf(
+						/* translators: 1: service name, 2: property title */
+						__( '%1$s de %2$s sin pagar', 'arriendo-facil' ),
+						$due_row['service_label'],
+						$title_text
+					),
+					$is_overdue
+						? sprintf(
+							/* translators: 1: days, 2: formatted date, 3: amount */
+							__( 'Venció hace %1$d día(s), el %2$s. Saldo: %3$s USD.', 'arriendo-facil' ),
+							abs( $days ),
+							date_i18n( get_option( 'date_format' ), strtotime( (string) $due_row['due_date'] ) ),
+							number_format_i18n( $amount, 2 )
+						)
+						: sprintf(
+							/* translators: 1: service name, 2: formatted date, 3: amount */
+							__( '%1$s vence el %2$s por %3$s USD. Avisa al inquilino antes de la fecha.', 'arriendo-facil' ),
+							$due_row['service_label'],
+							date_i18n( get_option( 'date_format' ), strtotime( (string) $due_row['due_date'] ) ),
+							number_format_i18n( $amount, 2 )
+						),
+					admin_url( 'admin.php?page=af-meter-readings&period=' . $current_period ),
+					'service-due-' . ( $is_overdue ? 'overdue' : 'soon' ) . '-' . (int) $due_row['schedule_id'] . '-' . $current_period
+				);
+				$created++;
+
+				if ( $created > $limit ) {
+					return $limit;
+				}
+			}
+		}
+
 		if ( $created > $limit ) {
 			return $limit;
 		}

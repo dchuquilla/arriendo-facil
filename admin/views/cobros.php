@@ -22,28 +22,34 @@ $today               = current_time( 'Y-m-d' );
 $next_window         = gmdate( 'Y-m-d', strtotime( '+15 days' ) );
 $current_period      = current_time( 'Y-m' );
 
-$charge_type_labels = array(
-	'canon'    => __( 'Arriendo', 'arriendo-facil' ),
-	'alicuota' => __( 'Alícuota / HOA', 'arriendo-facil' ),
-	'agua'     => __( 'Agua', 'arriendo-facil' ),
-	'luz'      => __( 'Luz', 'arriendo-facil' ),
-	'gas'      => __( 'Gas', 'arriendo-facil' ),
-	'internet' => __( 'Internet', 'arriendo-facil' ),
-	'multa'    => __( 'Multa', 'arriendo-facil' ),
-	'otro'     => __( 'Otro', 'arriendo-facil' ),
-);
+// Canonical source of charge types. A local copy of this list is what let
+// "telefono" exist as a configurable service while the ledger rejected the
+// charge it produced, so the labels are read from the ledger instead.
+$charge_type_labels = class_exists( 'Arriendo_Facil_Billing_Ledger' )
+	? Arriendo_Facil_Billing_Ledger::charge_types()
+	: array(
+		'canon'    => __( 'Arriendo', 'arriendo-facil' ),
+		'alicuota' => __( 'Alícuota / HOA', 'arriendo-facil' ),
+		'agua'     => __( 'Agua', 'arriendo-facil' ),
+		'luz'      => __( 'Luz', 'arriendo-facil' ),
+		'gas'      => __( 'Gas', 'arriendo-facil' ),
+		'internet' => __( 'Internet', 'arriendo-facil' ),
+		'telefono' => __( 'Teléfono', 'arriendo-facil' ),
+		'multa'    => __( 'Multa', 'arriendo-facil' ),
+		'otro'     => __( 'Otro', 'arriendo-facil' ),
+	);
 
 // 1) Cargos pendientes/vencidos (transacciones ya generadas).
 $upcoming_charges = (array) $wpdb->get_results(
 	$wpdb->prepare(
-		"SELECT c.id, c.lease_id, c.accommodation_id, c.guest_id, c.charge_type, c.description,
+		"SELECT c.id, c.lease_id, l.accommodation_id, c.guest_id, c.charge_type, c.description,
 		        c.amount, c.amount_paid, c.due_date, c.status,
 		        p.post_title AS accommodation_title,
 		        CONCAT(g.first_name, ' ', g.last_name) AS guest_name
 		 FROM {$wpdb->prefix}af_charges c
 		 LEFT JOIN {$wpdb->prefix}af_leases l ON l.id = c.lease_id
 		 LEFT JOIN {$wpdb->prefix}af_guests g ON g.id = COALESCE(c.guest_id, l.guest_id)
-		 LEFT JOIN {$wpdb->posts} p ON p.ID = c.accommodation_id
+		 LEFT JOIN {$wpdb->posts} p ON p.ID = l.accommodation_id
 		 WHERE c.status IN ('pending','partial','overdue')
 		   AND c.due_date <= %s{$cobros_scope_clause}
 		 ORDER BY c.due_date ASC
@@ -247,7 +253,7 @@ usort(
 			</div>
 			<div class="af-section__actions" style="display:flex; gap:8px;">
 				<a class="button af-btn af-btn--ghost" href="<?php echo esc_url( admin_url( 'admin.php?page=af-collections' ) ); ?>"><?php esc_html_e( 'Control de pagos', 'arriendo-facil' ); ?></a>
-				<a class="button af-btn af-btn--ghost" href="<?php echo esc_url( admin_url( 'admin.php?page=af-meter-readings' ) ); ?>"><?php esc_html_e( 'Ver alertas de lecturas', 'arriendo-facil' ); ?></a>
+				<a class="button af-btn af-btn--ghost" href="<?php echo esc_url( admin_url( 'admin.php?page=af-meter-readings' ) ); ?>"><?php esc_html_e( 'Pagos de servicios', 'arriendo-facil' ); ?></a>
 				<a class="button af-btn af-btn--ghost" href="<?php echo esc_url( admin_url( 'admin.php?page=af-buildings' ) ); ?>"><?php esc_html_e( 'Cobranza de inmuebles', 'arriendo-facil' ); ?></a>
 			</div>
 		</header>

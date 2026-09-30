@@ -193,6 +193,14 @@ function arriendo_facil_register_cron_jobs() {
 		wp_schedule_event( time() + 30 * MINUTE_IN_SECONDS, 'daily', 'af_generate_monthly_charges_cron' );
 	}
 
+	// Vencimientos de servicios (agua, luz, gas, internet, teléfono): convierte las
+	// reglas por inmueble+servicio en cargos del período con la fecha correcta.
+	// Idempotente igual que el anterior: la clave única lease+tipo+periodo lo evita.
+	add_action( 'af_generate_service_charges_cron', array( 'Arriendo_Facil_Billing_Ledger', 'generate_service_charges' ) );
+	if ( ! wp_next_scheduled( 'af_generate_service_charges_cron' ) ) {
+		wp_schedule_event( time() + 32 * MINUTE_IN_SECONDS, 'daily', 'af_generate_service_charges_cron' );
+	}
+
 	// Automatic daily reminders: pending docs + lease renewal near end.
 	if ( ! wp_next_scheduled( 'af_guest_reminders_cron' ) ) {
 		wp_schedule_event( time() + 25 * MINUTE_IN_SECONDS, 'daily', 'af_guest_reminders_cron' );
@@ -353,7 +361,7 @@ function arriendo_facil_maybe_upgrade_schema() {
 		return;
 	}
 
-	$target_schema_version = '2026-10-occupancy-sync';
+	$target_schema_version = '2026-11-service-schedules';
 	$current_schema_version = (string) get_option( 'af_db_schema_version', '' );
 
 	if ( $current_schema_version === $target_schema_version && ! arriendo_facil_has_lease_schema_drift() ) {

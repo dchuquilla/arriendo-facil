@@ -1,0 +1,188 @@
+/**
+ * Pagos de servicios (af-meter-readings).
+ *
+ * Only the components this view introduces: the due-date callout, the filter
+ * bar, the service chip, the row action cluster and the table total. Everything
+ * else (af-kpi, af-pill, af-data-table, af-modal, af-empty) comes from
+ * af-shell.css.
+ */
+
+.af-service-callout {
+	display: flex;
+	gap: var(--af-space-4);
+	align-items: center;
+	flex-wrap: wrap;
+	padding: 16px 20px;
+	margin-bottom: var(--af-space-4);
+	border: 1px solid var(--af-warning-100, #fef0c7);
+	border-left: 4px solid var(--af-warning-500, #f79009);
+	border-radius: 12px;
+	background: linear-gradient(90deg, #fffaeb, #fffdf7);
+}
+
+.af-service-callout--warning .af-service-callout__icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 36px;
+	height: 36px;
+	flex: 0 0 36px;
+	border-radius: 50%;
+	color: #b54708;
+	background: #fef0c7;
+}
+
+.af-service-callout__body {
+	flex: 1 1 320px;
+	min-width: 0;
+}
+
+.af-service-callout__body strong {
+	display: block;
+	color: #7a2e0e;
+	font-size: 15px;
+	line-height: 1.4;
+}
+
+.af-service-callout__body p {
+	margin: 4px 0 0;
+	color: #93370d;
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+/* Filter bar */
+
+.af-service-filters {
+	display: block;
+}
+
+.af-service-filters__grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+	gap: var(--af-space-3);
+	align-items: end;
+}
+
+.af-service-filters__field {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	min-width: 0;
+}
+
+.af-service-filters__field label {
+	font-size: 12px;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+	color: #667085;
+}
+
+.af-service-filters__field input,
+.af-service-filters__field select {
+	width: 100%;
+	max-width: none;
+	margin: 0;
+}
+
+.af-service-filters__actions {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+
+.af-service-filters__summary {
+	display: flex;
+	gap: var(--af-space-3);
+	align-items: center;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	margin-top: var(--af-space-3);
+	padding-top: var(--af-space-3);
+	border-top: 1px solid var(--af-gray-100, #f2f4f7);
+}
+
+/* Service chip in the due table */
+
+.af-service-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 3px 10px;
+	border-radius: 999px;
+	font-size: 13px;
+	font-weight: 600;
+	color: #344054;
+	background: #f2f4f7;
+	border: 1px solid #e4e7ec;
+	white-space: nowrap;
+}
+
+.af-service-chip .af-icon {
+	color: #475467;
+	flex: 0 0 auto;
+}
+
+/* Row actions: allow wrapping without stretching the buttons */
+
+.af-service-actions {
+	display: flex;
+	gap: 6px;
+	flex-wrap: wrap;
+	align-items: center;
+}
+
+.af-service-actions .button {
+	flex: 0 0 auto;
+}
+
+.af-service-actions__done {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 12px;
+	font-weight: 600;
+	color: #027a48;
+	white-space: nowrap;
+}
+
+.af-service-actions__done .af-icon {
+	color: #12b76a;
+}
+
+/* Total row of the consumption table */
+
+.af-table-total td {
+	font-weight: 700;
+	background: #f9fafb;
+	border-top: 2px solid #e4e7ec;
+}
+
+/* The due table reads better with a left accent per urgency state */
+.af-service-payments .af-data-table tbody tr[data-status="overdue"] td:first-child {
+	box-shadow: inset 3px 0 0 #f04438;
+}
+
+.af-service-payments .af-data-table tbody tr[data-status="due_soon"] td:first-child {
+	box-shadow: inset 3px 0 0 #f79009;
+}
+
+.af-service-payments .af-data-table tbody tr[data-status="paid"] td:first-child {
+	box-shadow: inset 3px 0 0 #12b76a;
+}
+
+@media (max-width: 782px) {
+	.af-service-callout {
+		align-items: flex-start;
+	}
+
+	.af-service-filters__actions {
+		width: 100%;
+	}
+
+	.af-service-filters__actions .button {
+		flex: 1 1 auto;
+		justify-content: center;
+	}
+}

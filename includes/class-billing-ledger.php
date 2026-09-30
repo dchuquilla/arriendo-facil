@@ -18,6 +18,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Arriendo_Facil_Billing_Ledger {
 
 	/**
+	 * Days before the due date at which a service is flagged as "due soon".
+	 *
+	 * Shared with the alert hub so the badges, the KPI counters and the
+	 * dashboard alerts all use the same window instead of drifting apart.
+	 *
+	 * @var int
+	 */
+	const SERVICE_DUE_SOON_DAYS = 7;
+
+	/**
 	 * Hooks into WordPress.
 	 */
 	public function __construct() {
@@ -28,8 +38,12 @@ class Arriendo_Facil_Billing_Ledger {
 		add_action( 'wp_ajax_af_record_meter_reading', array( $this, 'ajax_record_meter_reading' ) );
 		add_action( 'wp_ajax_af_delete_meter_reading', array( $this, 'ajax_delete_meter_reading' ) );
 		add_action( 'wp_ajax_af_void_charge', array( $this, 'ajax_void_charge' ) );
+		add_action( 'wp_ajax_af_save_service_schedule', array( $this, 'ajax_save_service_schedule' ) );
+		add_action( 'wp_ajax_af_delete_service_schedule', array( $this, 'ajax_delete_service_schedule' ) );
+		add_action( 'wp_ajax_af_generate_service_charges', array( $this, 'ajax_generate_service_charges' ) );
 		add_action( 'af_generate_monthly_charges', array( __CLASS__, 'generate_monthly_charges' ) );
 		add_action( 'af_flag_overdue_charges', array( __CLASS__, 'flag_overdue_charges' ) );
+		add_action( 'af_generate_service_charges', array( __CLASS__, 'generate_service_charges' ) );
 	}
 
 	/**
@@ -40,9 +54,741 @@ class Arriendo_Facil_Billing_Ledger {
 	public static function metered_services() {
 		return array(
 			'agua' => __( 'Agua', 'arriendo-facil' ),
-			'luz'  => __( 'Luz', 'arriendo-facil' ),
-			'gas'  => __( 'Gas', 'arriendo-facil' ),
+			'luz'  => __( 'Luz',  'arriendo-facil' ),
+			'gas'  => __( 'Gas',  'arriendo-facil' ),
 		);
+	}
+
+	/**
+	 * Canonical catalog of billable services and their due-date rules.
+	 *
+	 * This is the single source of truth for the service domain: metered
+	 * services can be priced from a reading, while flat services always use the
+	 * configured fixed amount. `due_day` is only a fallback for installations
+	 * that have no schedule row yet.
+	 *
+	 * @return array<string,array{label:string,metered:bool,icon:string,due_day:int}>
+	 */
+	public static function service_catalog() {
+		return array(
+			'agua'     => array(
+				'label'   => __( 'Agua', 'arriendo-facil' ),
+				'metered' => true,
+				'icon'    => 'droplets',
+				'due_day' => 5,
+			),
+			'luz'      => array(
+				'label'   => __( 'Luz', 'arriendo-facil' ),
+				'metered' => true,
+				'icon'    => 'zap',
+				'due_day' => 5,
+			),
+			'gas'      => array(
+				'label'   => __( 'Gas', 'arriendo-facil' ),
+				'metered' => true,
+				'icon'    => 'trending-up',
+				'due_day' => 5,
+			),
+			'internet' => array(
+				'label'   => __( 'Internet', 'arriendo-facil' ),
+				'metered' => false,
+				'icon'    => 'wifi',
+				'due_day' => 5,
+			),
+			'telefono' => array(
+				'label'   => __( 'Teléfono', 'arriendo-facil' ),
+				'metered' => false,
+				'icon'    => 'phone',
+				'due_day' => 5,
+			),
+		);
+	}
+
+	/**
+	 * Human label for a service key, falling back to the raw key.
+	 *
+	 * @param string $service Service key.
+	 * @return string
+	 */
+	public static function service_label( $service ) {
+		$catalog = self::service_catalog();
+
+		return isset( $catalog[ $service ] ) ? $catalog[ $service ]['label'] : (string) $service;
+	}
+
+	/**
+	 * Validates a billing period.
+	 *
+	 * A plain /\d{4}-\d{2}/ match is not enough: "2026-13" passes it and would
+	 * write charges into a period that can never be displayed or reconciled.
+	 *
+	 * @param string $period Candidate period.
+	 * @return string The period when valid, '' otherwise.
+	 */
+	public static function validate_period( $period ) {
+		$period = (string) $period;
+
+		if ( ! preg_match( '/^(\d{4})-(\d{2})$/', $period, $m ) ) {
+			return '';
+		}
+
+		if ( (int) $m[2] < 1 || (int) $m[2] > 12 ) {
+			return '';
+		}
+
+		return $period;
+	}
+
+	/**
+	 * Resolves the due date for a service in a period.
+	 *
+	 * The day is clamped to the last day of the month so a "day 31" rule still
+	 * resolves in February instead of rolling over into March.
+	 *
+	 * @param string $period  Period in YYYY-MM format.
+	 * @param int    $due_day Configured day of month (1-31).
+	 * @return string Date in YYYY-MM-DD, or '' when the period is invalid.
+	 */
+	public static function resolve_due_date( $period, $due_day ) {
+		$period = self::validate_period( $period );
+
+		if ( '' === $period ) {
+			return '';
+		}
+
+		$year  = (int) substr( $period, 0, 4 );
+		$month = (int) substr( $period, 5, 2 );
+
+		$day = (int) $due_day;
+		if ( $day < 1 ) {
+			$day = 5;
+		}
+
+		$last_day = (int) gmdate( 't', gmmktime( 0, 0, 0, $month, 1, $year ) );
+		$day      = min( $day, $last_day );
+
+		return gmdate( 'Y-m-d', gmmktime( 0, 0, 0, $month, $day, $year ) );
+	}
+
+	/**
+	 * Returns the service schedules table name.
+	 *
+	 * @return string
+	 */
+	public static function schedules_table() {
+		global $wpdb;
+
+		return $wpdb->prefix . 'af_service_schedules';
+	}
+
+	/**
+	 * Fetches the due-date rules for a scope.
+	 *
+	 * @param array<string,mixed> $args {
+	 *     Optional query arguments.
+	 *
+	 *     @type int[]|null $accommodation_ids Restrict to these accommodations.
+	 *     @type string     $service           Restrict to one service key.
+	 *     @type bool       $active_only       Only rules still active.
+	 * }
+	 * @return array<int,object>
+	 */
+	public static function get_service_schedules( array $args = array() ) {
+		global $wpdb;
+
+		$args = wp_parse_args(
+			$args,
+			array(
+				'accommodation_ids' => null,
+				'service'           => '',
+				'active_only'       => true,
+			)
+		);
+
+		$where  = ' WHERE 1 = 1';
+		$params = array();
+		$join   = '';
+
+		if ( is_array( $args['accommodation_ids'] ) ) {
+			$ids = array_values( array_unique( array_filter( array_map( 'absint', $args['accommodation_ids'] ) ) ) );
+
+			if ( empty( $ids ) ) {
+				return array();
+			}
+
+			// A rule is unit-scoped (unit_id, accommodation_id = 0) or property-scoped
+			// (accommodation_id). The caller only knows accommodation post ids, so
+			// unit rules have to be resolved through their parent unit; matching
+			// unit_id against accommodation ids would cross tenant boundaries.
+			$units_table = Arriendo_Facil_Property_Structure::units_table();
+			$in          = implode( ',', $ids );
+
+			$join  = " LEFT JOIN {$units_table} s_u ON s_u.id = s.unit_id";
+			$where .= ' AND COALESCE( NULLIF( s.accommodation_id, 0 ), s_u.accommodation_id ) IN (' . $in . ')';
+		}
+
+		if ( $args['service'] ) {
+			$where   .= ' AND s.service = %s';
+			$params[] = sanitize_key( $args['service'] );
+		}
+
+		if ( $args['active_only'] ) {
+			$where .= ' AND s.is_active = 1';
+		}
+
+		$sql = 'SELECT s.* FROM ' . self::schedules_table() . ' s' . $join . $where . ' ORDER BY s.accommodation_id ASC, s.unit_id ASC, s.service ASC';
+
+		if ( $params ) {
+			$sql = $wpdb->prepare( $sql, $params ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		}
+
+		return (array) $wpdb->get_results( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	}
+
+	/**
+	 * Returns the due-date rule for one scope + service, if any.
+	 *
+	 * @param int    $unit_id          Unit ID, or 0 for standalone properties.
+	 * @param int    $accommodation_id Accommodation post ID, or 0 for unit-scoped rules.
+	 * @param string $service          Service key.
+	 * @return object|null
+	 */
+	public static function get_service_schedule( $unit_id, $accommodation_id, $service ) {
+		global $wpdb;
+
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				'SELECT * FROM ' . self::schedules_table() . ' WHERE unit_id = %d AND accommodation_id = %d AND service = %s',
+				absint( $unit_id ),
+				absint( $accommodation_id ),
+				sanitize_key( $service )
+			)
+		);
+
+		return $row ? $row : null;
+	}
+
+	/**
+	 * Creates or updates a due-date rule for a scope + service.
+	 *
+	 * @param array<string,mixed> $data Schedule data.
+	 * @return int|WP_Error Schedule ID.
+	 */
+	public static function upsert_service_schedule( array $data ) {
+		global $wpdb;
+
+		$unit_id          = isset( $data['unit_id'] ) ? absint( $data['unit_id'] ) : 0;
+		$accommodation_id = isset( $data['accommodation_id'] ) ? absint( $data['accommodation_id'] ) : 0;
+		$service          = isset( $data['service'] ) ? sanitize_key( (string) $data['service'] ) : '';
+		$catalog          = self::service_catalog();
+
+		// Exactly one scope, mirroring af_meter_readings: a unit-scoped rule
+		// covers the whole building, an accommodation-scoped rule a standalone
+		// property.
+		if ( ! $unit_id === ! $accommodation_id ) {
+			return new WP_Error( 'af_schedule_scope_invalid', __( 'Selecciona un inmueble.', 'arriendo-facil' ) );
+		}
+
+		if ( ! isset( $catalog[ $service ] ) ) {
+			return new WP_Error( 'af_schedule_service_invalid', __( 'Servicio no valido.', 'arriendo-facil' ) );
+		}
+
+		$due_day = isset( $data['due_day'] ) ? (int) $data['due_day'] : 5;
+		if ( $due_day < 1 || $due_day > 31 ) {
+			return new WP_Error( 'af_schedule_due_day_invalid', __( 'El dia de pago debe estar entre 1 y 31.', 'arriendo-facil' ) );
+		}
+
+		$amount_mode = isset( $data['amount_mode'] ) ? sanitize_key( (string) $data['amount_mode'] ) : 'auto';
+		if ( ! in_array( $amount_mode, array( 'auto', 'fixed', 'metered' ), true ) ) {
+			$amount_mode = 'auto';
+		}
+
+		$flat_amount = isset( $data['flat_amount'] ) ? round( (float) $data['flat_amount'], 2 ) : 0.0;
+		if ( $flat_amount < 0 ) {
+			return new WP_Error( 'af_schedule_amount_invalid', __( 'El monto no puede ser negativo.', 'arriendo-facil' ) );
+		}
+
+		$notes      = isset( $data['notes'] ) ? sanitize_text_field( (string) $data['notes'] ) : '';
+		$is_active  = ! empty( $data['is_active'] ) ? 1 : 0;
+		$row_format = array( '%d', '%d', '%s', '%d', '%f', '%s', '%s', '%d', '%d' );
+		$row        = array(
+			'unit_id'          => $unit_id,
+			'accommodation_id' => $accommodation_id,
+			'service'          => $service,
+			'due_day'          => $due_day,
+			'flat_amount'      => $flat_amount,
+			'amount_mode'      => $amount_mode,
+			'notes'            => $notes ? $notes : null,
+			'is_active'        => $is_active,
+			'created_by'       => get_current_user_id(),
+		);
+
+		$existing = self::get_service_schedule( $unit_id, $accommodation_id, $service );
+
+		if ( $existing ) {
+			unset( $row['created_by'] );
+			$row_format = array( '%d', '%d', '%s', '%d', '%f', '%s', '%s', '%d' );
+
+			$updated = $wpdb->update( self::schedules_table(), $row, array( 'id' => (int) $existing->id ), $row_format, array( '%d' ) );
+
+			if ( false === $updated ) {
+				return new WP_Error( 'af_schedule_update_failed', __( 'No se pudo guardar la regla de vencimiento.', 'arriendo-facil' ) );
+			}
+
+			return (int) $existing->id;
+		}
+
+		$inserted = $wpdb->insert( self::schedules_table(), $row, $row_format );
+
+		if ( ! $inserted ) {
+			return new WP_Error( 'af_schedule_insert_failed', __( 'No se pudo guardar la regla de vencimiento.', 'arriendo-facil' ) );
+		}
+
+		return (int) $wpdb->insert_id;
+	}
+
+	/**
+	 * Deactivates a due-date rule. Kept soft so the historical charges it
+	 * generated are never orphaned.
+	 *
+	 * @param int $schedule_id Schedule ID.
+	 * @return true|WP_Error
+	 */
+	public static function deactivate_service_schedule( $schedule_id ) {
+		global $wpdb;
+
+		$schedule_id = absint( $schedule_id );
+		$schedule    = $wpdb->get_row(
+			$wpdb->prepare( 'SELECT * FROM ' . self::schedules_table() . ' WHERE id = %d', $schedule_id )
+		);
+
+		if ( ! $schedule ) {
+			return new WP_Error( 'af_schedule_not_found', __( 'La regla de vencimiento no existe.', 'arriendo-facil' ) );
+		}
+
+		$updated = $wpdb->update(
+			self::schedules_table(),
+			array( 'is_active' => 0 ),
+			array( 'id' => $schedule_id ),
+			array( '%d' ),
+			array( '%d' )
+		);
+
+		if ( false === $updated ) {
+			return new WP_Error( 'af_schedule_deactivate_failed', __( 'No se pudo desactivar la regla.', 'arriendo-facil' ) );
+		}
+
+		return true;
+	}
+
+	/**
+	 * Materialises the due-date rules of a period as charges.
+	 *
+	 * Pricing is mixed: when a reading exists for the scope + service + period
+	 * the metered amount wins, otherwise the configured fixed amount is used.
+	 * Safe to re-run — the charges table rejects duplicates and an existing
+	 * charge is only re-priced while nothing has been paid against it.
+	 *
+	 * @param string     $period            Period in YYYY-MM format.
+	 * @param int[]|null $accommodation_ids Restrict generation to this scope. Null = all.
+	 * @return array{created:int,updated:int,skipped:int,no_lease:int}
+	 */
+	public static function generate_service_charges( $period = '', $accommodation_ids = null ) {
+		global $wpdb;
+
+		$period = $period ? sanitize_text_field( $period ) : gmdate( 'Y-m' );
+		$period = self::validate_period( $period );
+		if ( '' === $period ) {
+			return array(
+				'created'  => 0,
+				'updated'  => 0,
+				'skipped'  => 0,
+				'no_lease' => 0,
+			);
+		}
+
+		$schedules = self::get_service_schedules( array( 'accommodation_ids' => $accommodation_ids ) );
+
+		$created  = 0;
+		$updated  = 0;
+		$skipped  = 0;
+		$no_lease = 0;
+
+		foreach ( $schedules as $schedule ) {
+			$unit_id          = (int) $schedule->unit_id;
+			$accommodation_id = (int) $schedule->accommodation_id;
+			$service          = (string) $schedule->service;
+
+			$lease = $unit_id
+				? self::get_active_lease_for_unit( $unit_id )
+				: self::get_active_lease_for_accommodation( $accommodation_id );
+
+			if ( ! $lease ) {
+				++$no_lease;
+				continue;
+			}
+
+			$reading = $wpdb->get_row(
+				$wpdb->prepare(
+					'SELECT calculated_amount FROM ' . self::readings_table() . '
+					 WHERE unit_id = %d AND accommodation_id = %d AND service = %s AND period = %s',
+					$unit_id,
+					$accommodation_id,
+					$service,
+					$period
+				)
+			);
+
+			$reading_amount = $reading ? (float) $reading->calculated_amount : 0.0;
+			$flat_amount    = round( (float) $schedule->flat_amount, 2 );
+			$amount_mode    = (string) $schedule->amount_mode;
+
+			if ( 'fixed' === $amount_mode ) {
+				$amount = $flat_amount;
+			} elseif ( 'metered' === $amount_mode ) {
+				$amount = $reading_amount;
+			} else {
+				$amount = $reading_amount > 0 ? $reading_amount : $flat_amount;
+			}
+
+			$amount = round( $amount, 2 );
+
+			if ( $amount <= 0 ) {
+				// Nothing to charge yet: the reading is still pending or the
+				// rule has no fixed amount. The alert hub still surfaces it.
+				++$skipped;
+				continue;
+			}
+
+			$due_date = self::resolve_due_date( $period, (int) $schedule->due_day );
+			$existing = self::get_charge_for_period( (int) $lease->id, $service, $period );
+
+			if ( $existing ) {
+				// Only re-price while the charge is untouched. Once money moved
+				// the amount is financial history and a late reading must not
+				// silently rewrite it.
+				if ( 'void' !== $existing->status && 0.0 === (float) $existing->amount_paid
+					&& ( (float) $existing->amount !== $amount || (string) $existing->due_date !== $due_date ) ) {
+					$wpdb->update(
+						self::charges_table(),
+						array(
+							'amount'      => $amount,
+							'due_date'    => $due_date,
+							'description' => self::service_charge_description( $service, $reading_amount, $flat_amount, $amount_mode ),
+						),
+						array( 'id' => (int) $existing->id ),
+						array( '%f', '%s', '%s' ),
+						array( '%d' )
+					);
+					++$updated;
+				} else {
+					++$skipped;
+				}
+				continue;
+			}
+
+			$charge_id = self::create_charge(
+				array(
+					'lease_id'     => (int) $lease->id,
+					'unit_id'      => $unit_id ? $unit_id : 0,
+					'guest_id'     => (int) $lease->guest_id,
+					'charge_type'  => $service,
+					'period'       => $period,
+					'amount'       => $amount,
+					'due_date'     => $due_date,
+					'description'  => self::service_charge_description( $service, $reading_amount, $flat_amount, $amount_mode ),
+				)
+			);
+
+			if ( is_wp_error( $charge_id ) ) {
+				++$skipped;
+				continue;
+			}
+
+			++$created;
+		}
+
+		return array(
+			'created'  => $created,
+			'updated'  => $updated,
+			'skipped'  => $skipped,
+			'no_lease' => $no_lease,
+		);
+	}
+
+	/**
+	 * Describes where the amount of a service charge came from, so the operator
+	 * can tell a metered amount from a flat one at a glance.
+	 *
+	 * @param string $service       Service key.
+	 * @param float  $reading_amount Amount calculated from the reading.
+	 * @param float  $flat_amount   Configured fixed amount.
+	 * @param string $amount_mode   Rule pricing mode.
+	 * @return string
+	 */
+	private static function service_charge_description( $service, $reading_amount, $flat_amount, $amount_mode ) {
+		$label = self::service_label( $service );
+
+		if ( 'fixed' === $amount_mode ) {
+			return sprintf(
+				/* translators: 1: service name, 2: amount */
+				__( '%1$s (tarifa fija)', 'arriendo-facil' ),
+				$label,
+				number_format_i18n( $flat_amount, 2 )
+			);
+		}
+
+		if ( 'metered' === $amount_mode ) {
+			return sprintf(
+				/* translators: 1: service name, 2: amount */
+				__( '%1$s (consumo medido)', 'arriendo-facil' ),
+				$label,
+				number_format_i18n( $reading_amount, 2 )
+			);
+		}
+
+		if ( $reading_amount > 0 ) {
+			return sprintf(
+				/* translators: 1: service name, 2: amount */
+				__( '%1$s (consumo medido)', 'arriendo-facil' ),
+				$label,
+				number_format_i18n( $reading_amount, 2 )
+			);
+		}
+
+		return sprintf(
+			/* translators: 1: service name, 2: amount */
+			__( '%1$s (tarifa fija)', 'arriendo-facil' ),
+			$label,
+			number_format_i18n( $flat_amount, 2 )
+		);
+	}
+
+	/**
+	 * Returns the charge of a type for a lease and period, if it exists.
+	 *
+	 * @param int    $lease_id    Lease ID.
+	 * @param string $charge_type Charge type key.
+	 * @param string $period      Period in YYYY-MM format.
+	 * @return object|null
+	 */
+	public static function get_charge_for_period( $lease_id, $charge_type, $period ) {
+		global $wpdb;
+
+		$charge_id = $wpdb->get_var(
+			$wpdb->prepare(
+				'SELECT id FROM ' . self::charges_table() . '
+				 WHERE lease_id = %d AND charge_type = %s AND period = %s
+				 ORDER BY id DESC LIMIT 1',
+				absint( $lease_id ),
+				sanitize_key( $charge_type ),
+				sanitize_text_field( (string) $period )
+			)
+		);
+
+		return $charge_id ? self::get_charge( (int) $charge_id ) : null;
+	}
+
+	/**
+	 * Builds the alert rows of the service payment hub.
+	 *
+	 * The result merges the due-date rule, the reading of the period, the
+	 * materialised charge and the active lease, so a row can exist even before
+	 * anything has been charged (no reading yet, or no rule configured at all).
+	 *
+	 * @param string     $period            Period in YYYY-MM format.
+	 * @param int[]|null $accommodation_ids Restrict to this scope. Null = all.
+	 * @return array<int,array<string,mixed>>
+	 */
+	public static function get_service_due_rows( $period, $accommodation_ids = null ) {
+		global $wpdb;
+
+		$period = $period ? sanitize_text_field( $period ) : gmdate( 'Y-m' );
+		$period = self::validate_period( $period );
+		if ( '' === $period ) {
+			return array();
+		}
+
+		$scope  = '';
+		$params = array( $period, $period );
+
+		if ( is_array( $accommodation_ids ) ) {
+			$ids = array_values( array_unique( array_filter( array_map( 'absint', $accommodation_ids ) ) ) );
+
+			if ( empty( $ids ) ) {
+				return array();
+			}
+
+			$in     = implode( ',', $ids );
+			// Unit-scoped rules belong to the accommodation that owns the unit, so
+			// the filter has to resolve the same expression the joins use instead
+			// of matching unit ids against accommodation ids.
+			$scope  = ' AND COALESCE( NULLIF( s.accommodation_id, 0 ), u.accommodation_id ) IN (' . $in . ')';
+		}
+
+		$readings_table = self::readings_table();
+		$charges_table  = self::charges_table();
+		$leases_table   = $wpdb->prefix . 'af_leases';
+		$units_table    = Arriendo_Facil_Property_Structure::units_table();
+
+		// The active lease of an accommodation is resolved to the newest one so a
+		// duplicated active lease cannot multiply the rows.
+		$active_leases = "( SELECT l1.*
+			FROM {$leases_table} l1
+			WHERE l1.status = 'active' AND l1.deleted_at IS NULL
+			  AND l1.id = (
+			      SELECT MAX(l2.id) FROM {$leases_table} l2
+			      WHERE l2.accommodation_id = l1.accommodation_id
+			        AND l2.status = 'active' AND l2.deleted_at IS NULL
+			  ) )";
+
+		$sql = $wpdb->prepare(
+			"SELECT s.id AS schedule_id, s.unit_id, s.accommodation_id, s.service, s.due_day,
+			        s.flat_amount, s.amount_mode, s.is_active,
+			        l.id AS lease_id, l.guest_id,
+			        c.id AS charge_id, c.amount, c.amount_paid, c.due_date, c.status AS charge_status,
+			        r.id AS reading_id, r.calculated_amount, r.consumption, r.current_reading, r.previous_reading, r.unit_rate,
+			        u.unit_code,
+			        p.post_title AS accommodation_title,
+			        CONCAT(g.first_name, ' ', g.last_name) AS guest_name
+			 FROM " . self::schedules_table() . " s
+			 LEFT JOIN {$units_table} u ON u.id = s.unit_id
+			 LEFT JOIN {$active_leases} l
+			        ON l.accommodation_id = COALESCE( NULLIF( s.accommodation_id, 0 ), u.accommodation_id )
+			 LEFT JOIN {$wpdb->prefix}af_guests g ON g.id = l.guest_id
+			 LEFT JOIN {$wpdb->posts} p ON p.ID = COALESCE( NULLIF( s.accommodation_id, 0 ), u.accommodation_id )
+			 LEFT JOIN {$charges_table} c
+			        ON c.lease_id = l.id AND c.charge_type = s.service AND c.period = %s AND c.status <> 'void'
+			 LEFT JOIN {$readings_table} r
+			        ON r.unit_id = s.unit_id AND r.accommodation_id = s.accommodation_id
+			        AND r.service = s.service AND r.period = %s
+			 WHERE 1 = 1{$scope}
+			 ORDER BY s.due_day ASC, s.service ASC, p.post_title ASC, u.unit_code ASC", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$params
+		);
+
+		$rows = (array) $wpdb->get_results( $sql );
+		$out  = array();
+
+		// The reference date makes the status correct for the period being viewed:
+		// today for the current month, the end of the month for a past period (so
+		// unpaid rows read as overdue) and the first day for a future period (so
+		// nothing is overdue before it even happens).
+		$today = gmdate( 'Y-m-d' );
+		if ( $period > gmdate( 'Y-m' ) ) {
+			$reference = $period . '-01';
+		} elseif ( $period < gmdate( 'Y-m' ) ) {
+			$reference = self::resolve_due_date( $period, 31 );
+		} else {
+			$reference = $today;
+		}
+
+		foreach ( $rows as $row ) {
+			$reading_amount = null === $row->calculated_amount ? 0.0 : (float) $row->calculated_amount;
+			$has_reading     = (bool) ( $row->reading_id && null !== $row->calculated_amount );
+			$charge_amount   = null === $row->amount ? 0.0 : (float) $row->amount;
+			$amount_paid     = null === $row->amount_paid ? 0.0 : (float) $row->amount_paid;
+			$has_charge      = (bool) ( $row->charge_id && 'void' !== $row->charge_status );
+
+			// The due date shown is the charge date when the obligation already
+			// exists, otherwise the date the rule would produce.
+			$due_date = ( $has_charge && $row->due_date )
+				? (string) $row->due_date
+				: self::resolve_due_date( $period, (int) $row->due_day );
+
+			// Mixed pricing, mirroring generate_service_charges().
+			if ( 'fixed' === $row->amount_mode ) {
+				$expected = (float) $row->flat_amount;
+			} elseif ( 'metered' === $row->amount_mode ) {
+				$expected = $reading_amount;
+			} else {
+				$expected = $reading_amount > 0 ? $reading_amount : (float) $row->flat_amount;
+			}
+
+			$expected      = round( $expected, 2 );
+			$outstanding   = $has_charge ? round( $charge_amount - $amount_paid, 2 ) : 0.0;
+			$needs_charge  = $has_charge ? false : ( $expected > 0 );
+			$status        = self::status_key( $row, $has_charge, $reference );
+
+			$out[] = array(
+				'schedule_id'      => (int) $row->schedule_id,
+				'unit_id'          => (int) $row->unit_id,
+				'accommodation_id' => (int) $row->accommodation_id,
+				'service'          => (string) $row->service,
+				'service_label'    => self::service_label( $row->service ),
+				'due_day'          => (int) $row->due_day,
+				'flat_amount'      => (float) $row->flat_amount,
+				'notes'            => null === $row->notes ? '' : (string) $row->notes,
+				'due_date'         => $due_date,
+				'accommodation_title' => (string) $row->accommodation_title,
+				'unit_code'        => (string) $row->unit_code,
+				'lease_id'         => (int) $row->lease_id,
+				'guest_id'         => (int) $row->guest_id,
+				'guest_name'       => trim( (string) $row->guest_name ),
+				'charge_id'        => (int) $row->charge_id,
+				'has_charge'       => $has_charge,
+				'charge_amount'    => $charge_amount,
+				'amount_paid'      => $amount_paid,
+				'outstanding'      => $outstanding,
+				'expected_amount'  => $expected,
+				'needs_charge'     => $needs_charge,
+				'charge_status'    => (string) $row->charge_status,
+				'status'           => $status,
+				'has_reading'      => $has_reading,
+				'reading_amount'   => $reading_amount,
+				'consumption'      => null === $row->consumption ? 0.0 : (float) $row->consumption,
+				'current_reading'  => null === $row->current_reading ? 0.0 : (float) $row->current_reading,
+				'previous_reading' => null === $row->previous_reading ? 0.0 : (float) $row->previous_reading,
+				'unit_rate'        => null === $row->unit_rate ? 0.0 : (float) $row->unit_rate,
+				'is_active'        => (int) $row->is_active,
+			);
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Derives the alert status of a due row.
+	 *
+	 * @param object $row       Raw row from the due-rows query.
+	 * @param bool   $has_charge Whether a materialised charge exists.
+	 * @param string $reference  Date the due date is compared against (Y-m-d).
+	 * @return string One of paid, partial, overdue, due_soon, pending, no_charge, no_lease, inactive.
+	 */
+	private static function status_key( $row, $has_charge, $reference = '' ) {
+		if ( ! (int) $row->is_active ) {
+			return 'inactive';
+		}
+
+		if ( ! $row->lease_id ) {
+			return 'no_lease';
+		}
+
+		if ( $has_charge ) {
+			if ( 'paid' === $row->charge_status ) {
+				return 'paid';
+			}
+
+			if ( 'partial' === $row->charge_status ) {
+				return 'partial';
+			}
+
+			$due_date  = (string) $row->due_date;
+			$reference = $reference ? $reference : gmdate( 'Y-m-d' );
+
+			if ( $due_date && $due_date < $reference ) {
+				return 'overdue';
+			}
+
+			$days = (int) ( ( strtotime( $due_date ) - strtotime( $reference ) ) / DAY_IN_SECONDS );
+			if ( $days <= self::SERVICE_DUE_SOON_DAYS ) {
+				return 'due_soon';
+			}
+
+			return 'pending';
+		}
+
+		return 'no_charge';
 	}
 
 	/**
@@ -136,14 +882,20 @@ class Arriendo_Facil_Billing_Ledger {
 		// accommodation, when there is one.
 		$lease = $unit_id ? self::get_active_lease_for_unit( $unit_id ) : self::get_active_lease_for_accommodation( $accommodation_id );
 		if ( $lease && $amount > 0 ) {
+			// The charge created from a reading honours the configured due day
+			// of the scope, so the obligation does not silently fall back to the
+			// hardcoded day 5.
+			$schedule = self::get_service_schedule( $unit_id, $accommodation_id, $service );
+
 			$charge = self::create_charge(
 				array(
 					'lease_id'    => (int) $lease->id,
-					'unit_id'     => $unit_id ? (int) $unit_id : null,
+					'unit_id'     => $unit_id ? $unit_id : null,
 					'guest_id'    => (int) $lease->guest_id,
 					'charge_type' => $service,
 					'period'      => $period,
 					'amount'      => $amount,
+					'due_date'    => $schedule ? self::resolve_due_date( $period, (int) $schedule->due_day ) : '',
 					'description' => sprintf(
 						/* translators: 1: consumption, 2: unit rate */
 						__( 'Consumo %1$s x tarifa %2$s', 'arriendo-facil' ),
@@ -416,14 +1168,15 @@ class Arriendo_Facil_Billing_Ledger {
 	 */
 	public static function charge_types() {
 		return array(
-			'canon'    => __( 'Canon de arriendo', 'arriendo-facil' ),
-			'alicuota' => __( 'Alicuota', 'arriendo-facil' ),
-			'agua'     => __( 'Agua', 'arriendo-facil' ),
-			'luz'      => __( 'Luz', 'arriendo-facil' ),
-			'gas'      => __( 'Gas', 'arriendo-facil' ),
-			'internet' => __( 'Internet', 'arriendo-facil' ),
-			'multa'    => __( 'Multa', 'arriendo-facil' ),
-			'otro'     => __( 'Otro', 'arriendo-facil' ),
+			'canon'     => __( 'Canon de arriendo', 'arriendo-facil' ),
+			'alicuota'  => __( 'Alicuota', 'arriendo-facil' ),
+			'agua'      => __( 'Agua', 'arriendo-facil' ),
+			'luz'       => __( 'Luz', 'arriendo-facil' ),
+			'gas'       => __( 'Gas', 'arriendo-facil' ),
+			'internet'  => __( 'Internet', 'arriendo-facil' ),
+			'telefono'  => __( 'Teléfono', 'arriendo-facil' ),
+			'multa'     => __( 'Multa', 'arriendo-facil' ),
+			'otro'      => __( 'Otro', 'arriendo-facil' ),
 		);
 	}
 
@@ -1445,6 +2198,129 @@ class Arriendo_Facil_Billing_Ledger {
 		}
 
 		wp_send_json_success( Arriendo_Facil_Billing_Ledger::cobranza_snapshot( $period ? $period : null ) );
+	}
+
+	/**
+	 * AJAX: creates or updates a service due-date rule.
+	 *
+	 * @return void
+	 */
+	public function ajax_save_service_schedule() {
+		check_ajax_referer( 'af_ledger_nonce', 'nonce' );
+
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$unit_id          = isset( $_POST['unit_id'] ) ? absint( wp_unslash( $_POST['unit_id'] ) ) : 0;
+		$accommodation_id = isset( $_POST['accommodation_id'] ) ? absint( wp_unslash( $_POST['accommodation_id'] ) ) : 0;
+
+		if ( $unit_id ) {
+			if ( ! Arriendo_Facil_Tenancy::can_access_unit( $unit_id ) ) {
+				wp_send_json_error( array( 'message' => __( 'No tienes acceso a esa unidad.', 'arriendo-facil' ) ), 403 );
+			}
+		} elseif ( $accommodation_id ) {
+			if ( ! Arriendo_Facil_Tenancy::can_access_accommodation( $accommodation_id ) ) {
+				wp_send_json_error( array( 'message' => __( 'No tienes acceso a ese inmueble.', 'arriendo-facil' ) ), 403 );
+			}
+		} else {
+			wp_send_json_error( array( 'message' => __( 'Selecciona un inmueble.', 'arriendo-facil' ) ), 400 );
+		}
+
+		$result = self::upsert_service_schedule(
+			array(
+				'unit_id'          => $unit_id,
+				'accommodation_id' => $accommodation_id,
+				'service'          => isset( $_POST['service'] ) ? wp_unslash( $_POST['service'] ) : '',
+				'due_day'          => isset( $_POST['due_day'] ) ? absint( wp_unslash( $_POST['due_day'] ) ) : 5,
+				'flat_amount'      => isset( $_POST['flat_amount'] ) ? (float) wp_unslash( $_POST['flat_amount'] ) : 0,
+				'amount_mode'      => isset( $_POST['amount_mode'] ) ? wp_unslash( $_POST['amount_mode'] ) : 'auto',
+				'notes'            => isset( $_POST['notes'] ) ? wp_unslash( $_POST['notes'] ) : '',
+				'is_active'        => ! empty( $_POST['is_active'] ),
+			)
+		);
+
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ), 400 );
+		}
+
+		wp_send_json_success(
+			array(
+				'message'     => __( 'Regla de vencimiento guardada.', 'arriendo-facil' ),
+				'schedule_id' => $result,
+			)
+		);
+	}
+
+	/**
+	 * AJAX: deactivates a service due-date rule.
+	 *
+	 * @return void
+	 */
+	public function ajax_delete_service_schedule() {
+		global $wpdb;
+
+		check_ajax_referer( 'af_ledger_nonce', 'nonce' );
+
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$schedule_id = isset( $_POST['schedule_id'] ) ? absint( wp_unslash( $_POST['schedule_id'] ) ) : 0;
+		$schedule    = $wpdb->get_row(
+			$wpdb->prepare( 'SELECT * FROM ' . self::schedules_table() . ' WHERE id = %d', $schedule_id )
+		);
+
+		if ( ! $schedule ) {
+			wp_send_json_error( array( 'message' => __( 'La regla de vencimiento no existe.', 'arriendo-facil' ) ), 404 );
+		}
+
+		$allowed = $schedule->unit_id
+			? Arriendo_Facil_Tenancy::can_access_unit( (int) $schedule->unit_id )
+			: Arriendo_Facil_Tenancy::can_access_accommodation( (int) $schedule->accommodation_id );
+
+		if ( ! $allowed ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes acceso a ese inmueble.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$result = self::deactivate_service_schedule( $schedule_id );
+
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ), 400 );
+		}
+
+		wp_send_json_success( array( 'message' => __( 'Regla desactivada.', 'arriendo-facil' ) ) );
+	}
+
+	/**
+	 * AJAX: materialises the service due dates of a period as charges.
+	 *
+	 * @return void
+	 */
+	public function ajax_generate_service_charges() {
+		global $wpdb;
+
+		check_ajax_referer( 'af_ledger_nonce', 'nonce' );
+
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$period = isset( $_POST['period'] ) ? sanitize_text_field( wp_unslash( $_POST['period'] ) ) : '';
+		if ( '' === self::validate_period( $period ) ) {
+			wp_send_json_error( array( 'message' => __( 'Periodo invalido. Usa el formato YYYY-MM.', 'arriendo-facil' ) ), 400 );
+		}
+
+		$scope = Arriendo_Facil_Tenancy::accessible_accommodation_ids();
+		$stats = self::generate_service_charges( $period, $scope );
+
+		wp_send_json_success(
+			array(
+				/* translators: 1: created, 2: updated, 3: skipped, 4: without lease */
+				'message' => sprintf( __( 'Vencimientos generados: %1$d nuevos, %2$d actualizados, %3$d sin monto, %4$d sin inquilino.', 'arriendo-facil' ), $stats['created'], $stats['updated'], $stats['skipped'], $stats['no_lease'] ),
+				'stats'   => $stats,
+			)
+		);
 	}
 
 	/**

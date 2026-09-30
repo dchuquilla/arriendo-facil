@@ -359,9 +359,6 @@ class Arriendo_Facil_Accommodation_Search_API {
 	/**
 	 * Builds the accommodation data array from a JOIN result row.
 	 *
-	 * Replicates the logic of get_accommodation_data() but reads pre-fetched
-	 * column values instead of issuing individual get_post_meta() queries.
-	 *
 	 * @param stdClass $row JOIN result row from fetch_accommodations_with_meta().
 	 * @return array
 	 */
@@ -420,79 +417,6 @@ class Arriendo_Facil_Accommodation_Search_API {
 			'url'                   => get_permalink( (int) $row->ID ),
 			'amenities'             => $amenities,
 			'is_occupied'           => '1' === (string) ( $row->is_occupied ?? '' ),
-		);
-	}
-
-	/**
-	 * Retrieves formatted accommodation data.
-	 *
-	 * @param int $accommodation_id Post ID.
-	 * @return array|null
-	 */
-	private function get_accommodation_data( $accommodation_id ) {
-		$post = get_post( $accommodation_id );
-		if ( ! $post ) {
-			return null;
-		}
-
-		$location_text = get_post_meta( $accommodation_id, '_af_location_text', true );
-		$latitude      = floatval( get_post_meta( $accommodation_id, '_af_latitude', true ) );
-		$longitude     = floatval( get_post_meta( $accommodation_id, '_af_longitude', true ) );
-		$bedrooms      = absint( get_post_meta( $accommodation_id, '_af_bedrooms', true ) );
-		$bathrooms     = absint( get_post_meta( $accommodation_id, '_af_bathrooms', true ) );
-		$monthly_price = floatval( get_post_meta( $accommodation_id, '_af_monthly_rent', true ) );
-		$property_type = get_post_meta( $accommodation_id, '_af_property_type', true );
-		$amenities     = get_post_meta( $accommodation_id, '_af_amenities', true );
-		$status              = sanitize_key( (string) get_post_meta( $accommodation_id, '_af_status', true ) );
-		$commercial_status   = sanitize_key( (string) get_post_meta( $accommodation_id, '_af_commercial_status', true ) );
-		$commercial_state    = sanitize_key( (string) get_post_meta( $accommodation_id, '_af_commercial_state', true ) );
-		$commercial_visibility = sanitize_key( (string) get_post_meta( $accommodation_id, '_af_commercial_visibility', true ) );
-		if ( ! is_array( $amenities ) ) {
-			$amenities = array();
-		}
-
-		if ( '' === $commercial_status ) {
-			if ( 'private' === $commercial_visibility ) {
-				$commercial_status = 'private';
-			} elseif ( in_array( $commercial_state, array( 'available', 'reserved', 'rented' ), true ) ) {
-				$commercial_status = $commercial_state;
-			}
-		}
-
-		if ( '' === $commercial_status ) {
-			$commercial_status = ( 'rented' === $status ) ? 'rented' : 'available';
-		}
-
-		if ( '' === $commercial_state ) {
-			$commercial_state = in_array( $commercial_status, array( 'available', 'reserved', 'rented' ), true ) ? $commercial_status : 'available';
-		}
-
-		if ( '' === $commercial_visibility ) {
-			$commercial_visibility = ( 'private' === $commercial_status ) ? 'private' : 'public';
-		}
-
-		$image_url = '';
-		if ( has_post_thumbnail( $accommodation_id ) ) {
-			$image_url = get_the_post_thumbnail_url( $accommodation_id, 'large' );
-		}
-
-		return array(
-			'id'             => $accommodation_id,
-			'title'          => $post->post_title,
-			'location'       => $location_text,
-			'latitude'       => $latitude,
-			'longitude'      => $longitude,
-			'status'         => $status,
-			'commercial_status' => $commercial_status,
-			'commercial_state' => $commercial_state,
-			'commercial_visibility' => $commercial_visibility,
-			'price'          => $monthly_price,
-			'bedrooms'       => $bedrooms,
-			'bathrooms'      => $bathrooms,
-			'property_type'  => $property_type,
-			'image_url'      => $image_url,
-			'url'            => get_permalink( $accommodation_id ),
-			'amenities'      => $amenities,
 		);
 	}
 

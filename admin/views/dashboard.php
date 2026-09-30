@@ -265,6 +265,7 @@ if ( is_array( $scope_ids ) ) {
 	$calendar_properties_query['post__in'] = ! empty( $scope_ids ) ? $scope_ids : array( 0 );
 }
 $calendar_property_ids = get_posts( $calendar_properties_query );
+_prime_post_caches( array_map( 'absint', $calendar_property_ids ), false, false );
 
 // ── Resumen de mantenimientos por prioridad ───────────────────────────────
 $maintenance_priority = array( 'alta' => 0, 'media' => 0, 'baja' => 0 );
@@ -347,6 +348,10 @@ if ( $is_owner && '' !== $ids_sql ) {
 		 ORDER BY p.post_date DESC
 		 LIMIT 6"
 	);
+
+	$owner_property_ids = array_map( 'absint', wp_list_pluck( (array) $owner_properties, 'ID' ) );
+	_prime_post_caches( $owner_property_ids, false, true );
+	_prime_post_caches( array_filter( array_map( 'get_post_thumbnail_id', $owner_property_ids ) ), false, true );
 }
 
 // ── Greeting ──────────────────────────────────────────────────────────────
@@ -438,39 +443,49 @@ if ( $pending_queue > 0 && ! $is_management_model ) {
 }
 
 // ── Datos para gráficos (Resumen de ocupación + Ingresos por arriendos) ──
-$occupancy_chart = array( 'available' => 0, 'occupied' => 0, 'maintenance' => 0 );
-$occupancy_query = array(
-	'post_type'      => 'accommodation',
-	'post_status'    => array( 'publish', 'private' ),
-	'posts_per_page' => -1,
-	'fields'         => 'ids',
+$occupancy_chart       = array( 'available' => 0, 'occupied' => 0, 'maintenance' => 0 );
+$occupancy_scope_clause = is_array( $scope_ids ) ? ' AND p.ID IN (' . Arriendo_Facil_Tenancy::ids_in_clause( $scope_ids ) . ')' : '';
+$occupancy_rows         = (array) $wpdb->get_results(
+	"SELECT COALESCE(pm.meta_value, '') AS occ_status, COUNT(*) AS total
+	 FROM {$wpdb->posts} p
+	 LEFT JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID AND pm.meta_key = '_af_status'
+	 WHERE p.post_type = 'accommodation' AND p.post_status IN ('publish','private'){$occupancy_scope_clause}
+	 GROUP BY occ_status" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 );
-if ( is_array( $scope_ids ) ) {
-	$occupancy_query['post__in'] = ! empty( $scope_ids ) ? $scope_ids : array( 0 );
-}
-foreach ( get_posts( $occupancy_query ) as $occupancy_post_id ) {
-	$occ_status = (string) get_post_meta( $occupancy_post_id, '_af_status', true );
+foreach ( $occupancy_rows as $occupancy_row ) {
+	$occ_status = (string) $occupancy_row->occ_status;
 	if ( in_array( $occ_status, array( 'occupied', 'rented' ), true ) ) {
-		$occupancy_chart['occupied']++;
+		$occupancy_chart['occupied'] += (int) $occupancy_row->total;
 	} elseif ( 'maintenance' === $occ_status ) {
-		$occupancy_chart['maintenance']++;
+		$occupancy_chart['maintenance'] += (int) $occupancy_row->total;
 	} else {
-		$occupancy_chart['available']++;
+		$occupancy_chart['available'] += (int) $occupancy_row->total;
 	}
 }
 
 $revenue_chart = array( 'labels' => array(), 'values' => array() );
 if ( $has_ledger ) {
 	$revenue_scope_clause = null === $scope_ids ? '' : ' AND lease_id IN (SELECT id FROM ' . $wpdb->prefix . 'af_leases WHERE accommodation_id IN (' . Arriendo_Facil_Tenancy::ids_in_clause( $scope_ids ) . '))';
+	$chart_periods        = array();
 	for ( $months_ago = 5; $months_ago >= 0; $months_ago-- ) {
-		$chart_period            = gmdate( 'Y-m', strtotime( "-{$months_ago} months" ) );
+		$chart_periods[] = gmdate( 'Y-m', strtotime( "-{$months_ago} months" ) );
+	}
+	$revenue_by_period = array();
+	$revenue_rows      = (array) $wpdb->get_results(
+		$wpdb->prepare(
+			"SELECT period, COALESCE(SUM(amount_paid), 0) AS paid FROM {$charges_table}
+			 WHERE period BETWEEN %s AND %s{$revenue_scope_clause}
+			 GROUP BY period", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$chart_periods[0],
+			end( $chart_periods )
+		)
+	);
+	foreach ( $revenue_rows as $revenue_row ) {
+		$revenue_by_period[ (string) $revenue_row->period ] = (float) $revenue_row->paid;
+	}
+	foreach ( $chart_periods as $chart_period ) {
 		$revenue_chart['labels'][] = wp_date( 'M', strtotime( $chart_period . '-01' ) );
-		$revenue_chart['values'][] = (float) $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT COALESCE(SUM(amount_paid), 0) FROM {$charges_table} WHERE period = %s{$revenue_scope_clause}", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-				$chart_period
-			)
-		);
+		$revenue_chart['values'][] = isset( $revenue_by_period[ $chart_period ] ) ? $revenue_by_period[ $chart_period ] : 0.0;
 	}
 }
 

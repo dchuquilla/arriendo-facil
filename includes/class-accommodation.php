@@ -16,6 +16,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class Arriendo_Facil_Accommodation {
 
+	const CACHE_GROUP = 'arriendo_facil_accommodations';
+
 	/**
 	 * Constructor – hooks into WordPress.
 	 */
@@ -31,6 +33,11 @@ class Arriendo_Facil_Accommodation {
 		add_action( 'pre_get_posts', array( $this, 'force_home_queries_to_accommodations' ) );
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_frontend_styles' ) );
 		add_action( 'wp_ajax_af_estimate_rent', array( $this, 'ajax_estimate_rent' ) );
+
+		add_action( 'clean_post_cache', array( __CLASS__, 'flush_ownership_cache_for_post' ) );
+		foreach ( array( 'added_post_meta', 'updated_post_meta', 'deleted_post_meta' ) as $meta_hook ) {
+			add_action( $meta_hook, array( __CLASS__, 'flush_ownership_cache_for_meta' ), 10, 3 );
+		}
 
 		// Catalogo publico: solo aplica al modelo marketplace, no a la administracion interna.
 		if ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) {
@@ -1207,15 +1214,55 @@ class Arriendo_Facil_Accommodation {
 	 * @return int[]
 	 */
 	public static function get_owner_accommodation_ids( $user_id ) {
-		return get_posts( array(
-			'post_type'      => 'accommodation',
-			'post_status'    => 'any',
-			'posts_per_page' => 500,
-			'fields'         => 'ids',
-			'meta_query'     => array(
-				array( 'key' => '_af_owner_id', 'value' => absint( $user_id ) ),
-			),
-		) );
+		$user_id   = absint( $user_id );
+		$cache_key = 'owner_accommodation_ids:' . $user_id . ':' . wp_cache_get_last_changed( self::CACHE_GROUP );
+		$cached    = wp_cache_get( $cache_key, self::CACHE_GROUP );
+		if ( is_array( $cached ) ) {
+			return $cached;
+		}
+
+		$ids = array_map(
+			'absint',
+			get_posts(
+				array(
+					'post_type'      => 'accommodation',
+					'post_status'    => 'any',
+					'posts_per_page' => 500,
+					'fields'         => 'ids',
+					'meta_query'     => array(
+						array( 'key' => '_af_owner_id', 'value' => $user_id ),
+					),
+				)
+			)
+		);
+
+		wp_cache_set( $cache_key, $ids, self::CACHE_GROUP, HOUR_IN_SECONDS );
+
+		return $ids;
+	}
+
+	/**
+	 * Invalidates ownership caches when an accommodation or its owner changes.
+	 *
+	 * @param int $post_id Post ID.
+	 * @return void
+	 */
+	public static function flush_ownership_cache_for_post( $post_id ) {
+		if ( 'accommodation' === get_post_type( $post_id ) ) {
+			wp_cache_set_last_changed( self::CACHE_GROUP );
+		}
+	}
+
+	/**
+	 * @param int    $meta_id  Meta ID (or IDs on delete).
+	 * @param int    $post_id  Post ID.
+	 * @param string $meta_key Meta key.
+	 * @return void
+	 */
+	public static function flush_ownership_cache_for_meta( $meta_id, $post_id, $meta_key ) {
+		if ( '_af_owner_id' === $meta_key ) {
+			wp_cache_set_last_changed( self::CACHE_GROUP );
+		}
 	}
 
 	/**

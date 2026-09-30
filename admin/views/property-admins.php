@@ -19,37 +19,71 @@ global $wpdb;
 $property_admins = Arriendo_Facil_Tenancy::get_property_admins();
 $current_period  = gmdate( 'Y-m' );
 
+// Batch-load every per-admin metric (one query per metric, not per admin).
+$admin_ids           = array_map( 'absint', wp_list_pluck( $property_admins, 'ID' ) );
+$accommodation_count = array();
+$buildings_by_admin  = array();
+$leases_by_admin     = array();
+$totals_by_admin     = array();
+
+if ( ! empty( $admin_ids ) ) {
+	update_meta_cache( 'user', $admin_ids );
+
+	$admin_ids_sql = implode( ',', $admin_ids );
+	// meta_value is a string column: quote the IDs so the (meta_key, meta_value) index is usable.
+	$admin_meta_in = "'" . implode( "','", $admin_ids ) . "'";
+	// Same scope as Arriendo_Facil_Accommodation::get_owner_accommodation_ids() (post_status 'any').
+	$owned_join = static function ( $accommodation_column ) use ( $wpdb, $admin_meta_in ) {
+		return "INNER JOIN {$wpdb->postmeta} owner_pm ON owner_pm.post_id = {$accommodation_column} AND owner_pm.meta_key = '_af_owner_id' AND owner_pm.meta_value IN ({$admin_meta_in})
+		        INNER JOIN {$wpdb->posts} owner_p ON owner_p.ID = owner_pm.post_id AND owner_p.post_type = 'accommodation' AND owner_p.post_status NOT IN ('trash','auto-draft')";
+	};
+
+	// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared
+	foreach ( (array) $wpdb->get_results(
+		"SELECT owner_pm.meta_value AS owner_id, COUNT(DISTINCT owner_p.ID) AS total
+		 FROM {$wpdb->posts} acc " . $owned_join( 'acc.ID' ) . '
+		 GROUP BY owner_pm.meta_value'
+	) as $count_row ) {
+		$accommodation_count[ (int) $count_row->owner_id ] = (int) $count_row->total;
+	}
+
+	foreach ( (array) $wpdb->get_results( "SELECT owner_id, COUNT(*) AS total FROM {$wpdb->prefix}af_buildings WHERE owner_id IN ({$admin_ids_sql}) GROUP BY owner_id" ) as $count_row ) {
+		$buildings_by_admin[ (int) $count_row->owner_id ] = (int) $count_row->total;
+	}
+
+	foreach ( (array) $wpdb->get_results(
+		"SELECT owner_pm.meta_value AS owner_id, COUNT(DISTINCT l.id) AS total
+		 FROM {$wpdb->prefix}af_leases l " . $owned_join( 'l.accommodation_id' ) . "
+		 WHERE l.status = 'active' AND l.deleted_at IS NULL
+		 GROUP BY owner_pm.meta_value"
+	) as $count_row ) {
+		$leases_by_admin[ (int) $count_row->owner_id ] = (int) $count_row->total;
+	}
+
+	foreach ( (array) $wpdb->get_results(
+		$wpdb->prepare(
+			"SELECT owner_pm.meta_value AS owner_id,
+			        COALESCE(SUM(c.amount_paid), 0) AS paid,
+			        COALESCE(SUM(c.amount - c.amount_paid), 0) AS pending
+			 FROM {$wpdb->prefix}af_charges c
+			 INNER JOIN {$wpdb->prefix}af_leases l ON l.id = c.lease_id " . $owned_join( 'l.accommodation_id' ) . "
+			 WHERE c.period = %s AND c.status != 'void'
+			 GROUP BY owner_pm.meta_value",
+			$current_period
+		)
+	) as $total_row ) {
+		$totals_by_admin[ (int) $total_row->owner_id ] = $total_row;
+	}
+	// phpcs:enable
+}
+
 $rows = array();
 foreach ( $property_admins as $admin_user ) {
-	$user_id           = (int) $admin_user->ID;
-	$accommodation_ids = array_map( 'absint', Arriendo_Facil_Accommodation::get_owner_accommodation_ids( $user_id ) );
-	$ids_sql           = ! empty( $accommodation_ids ) ? implode( ',', $accommodation_ids ) : '';
-
-	$buildings_count = (int) $wpdb->get_var(
-		$wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}af_buildings WHERE owner_id = %d", $user_id )
-	);
-
-	$active_leases = 0;
-	$collected     = 0.0;
-	$pending       = 0.0;
-
-	if ( '' !== $ids_sql ) {
-		$active_leases = (int) $wpdb->get_var(
-			"SELECT COUNT(*) FROM {$wpdb->prefix}af_leases WHERE accommodation_id IN ($ids_sql) AND status = 'active' AND deleted_at IS NULL"
-		);
-
-		$totals = $wpdb->get_row(
-			$wpdb->prepare(
-				"SELECT COALESCE(SUM(amount_paid), 0) AS paid, COALESCE(SUM(amount - amount_paid), 0) AS pending
-				 FROM {$wpdb->prefix}af_charges
-				 WHERE period = %s AND status != 'void'
-				   AND lease_id IN (SELECT id FROM {$wpdb->prefix}af_leases WHERE accommodation_id IN ($ids_sql))",
-				$current_period
-			)
-		);
-		$collected = $totals ? (float) $totals->paid : 0.0;
-		$pending   = $totals ? (float) $totals->pending : 0.0;
-	}
+	$user_id         = (int) $admin_user->ID;
+	$buildings_count = isset( $buildings_by_admin[ $user_id ] ) ? $buildings_by_admin[ $user_id ] : 0;
+	$active_leases   = isset( $leases_by_admin[ $user_id ] ) ? $leases_by_admin[ $user_id ] : 0;
+	$collected       = isset( $totals_by_admin[ $user_id ] ) ? (float) $totals_by_admin[ $user_id ]->paid : 0.0;
+	$pending         = isset( $totals_by_admin[ $user_id ] ) ? (float) $totals_by_admin[ $user_id ]->pending : 0.0;
 
 	$license_status = get_user_meta( $user_id, 'af_license_status', true );
 	$license_status  = $license_status ? $license_status : 'active';
@@ -70,7 +104,7 @@ foreach ( $property_admins as $admin_user ) {
 		'company'          => get_user_meta( $user_id, 'af_company_name', true ),
 		'phone'             => get_user_meta( $user_id, 'af_contact_phone', true ),
 		'buildings'        => $buildings_count,
-		'accommodations'   => count( $accommodation_ids ),
+		'accommodations'   => isset( $accommodation_count[ $user_id ] ) ? $accommodation_count[ $user_id ] : 0,
 		'active_leases'    => $active_leases,
 		'collected_period' => $collected,
 		'pending_period'   => $pending,

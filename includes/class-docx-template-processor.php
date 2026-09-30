@@ -814,16 +814,6 @@ class Arriendo_Facil_DOCX_Template_Processor {
 		return false;
 	}
 
-	private function ctx_is_arrendador( $before, $after ) {
-		return $this->ctx_matches( $before, array( 'arrendador', 'propietario' ) )
-			|| $this->ctx_matches( $after, array( 'arrendador', 'propietario' ) );
-	}
-
-	private function ctx_is_arrendatario( $before, $after ) {
-		return $this->ctx_matches( $before, array( 'arrendatario', 'inquilino' ) )
-			|| $this->ctx_matches( $after, array( 'arrendatario', 'inquilino' ) );
-	}
-
 	/**
 	 * @param string $source_path Path to original DOCX template.
 	 * @param string $output_path Destination for filled contract.

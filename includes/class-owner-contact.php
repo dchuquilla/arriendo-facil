@@ -515,15 +515,15 @@ class Arriendo_Facil_Owner_Contact {
 		);
 		$selected_documents = 0;
 
-		$storage_provider = $this->get_storage_setting( 'AF_STORAGE_PROVIDER', 'af_storage_provider', 'cloudflare_r2' );
-		if ( 'cloudflare_r2' !== $storage_provider ) {
+		$storage_provider = Arriendo_Facil_Private_Storage::setting( 'AF_STORAGE_PROVIDER', 'af_storage_provider', Arriendo_Facil_Private_Storage::PROVIDER_R2 );
+		if ( Arriendo_Facil_Private_Storage::PROVIDER_R2 !== $storage_provider ) {
 			$this->last_upload_error = new WP_Error( 'af_r2_provider_invalid', __( 'El proveedor en la nube no esta configurado como Cloudflare R2.', 'arriendo-facil' ) );
 			return;
 		}
 
-		$r2_config = $this->get_r2_config();
-		if ( is_wp_error( $r2_config ) ) {
-			$this->last_upload_error = $r2_config;
+		$r2_config_check = Arriendo_Facil_Private_Storage::check_config();
+		if ( is_wp_error( $r2_config_check ) ) {
+			$this->last_upload_error = $r2_config_check;
 			return;
 		}
 
@@ -589,7 +589,7 @@ class Arriendo_Facil_Owner_Contact {
 			update_post_meta( (int) $attachment_id, '_af_owner_contact_id', (int) $contact_id );
 			update_post_meta( (int) $attachment_id, '_af_owner_user_id', (int) $user_id );
 
-			$r2_upload = $this->upload_attachment_to_r2( (int) $attachment_id, (int) $contact_id, (string) $doc_type, $r2_config );
+			$r2_upload = $this->upload_attachment_to_r2( (int) $attachment_id, (int) $contact_id, (string) $doc_type );
 			if ( is_wp_error( $r2_upload ) ) {
 				$this->last_upload_error = $r2_upload;
 				return;
@@ -685,7 +685,7 @@ class Arriendo_Facil_Owner_Contact {
 					}
 				}
 
-				$r2_upload = $this->upload_attachment_to_r2( (int) $attachment_id, (int) $contact_id, (string) $optional_contract_doc_type, $r2_config );
+				$r2_upload = $this->upload_attachment_to_r2( (int) $attachment_id, (int) $contact_id, (string) $optional_contract_doc_type );
 				if ( is_wp_error( $r2_upload ) ) {
 					$this->last_upload_error = $r2_upload;
 					return;
@@ -794,68 +794,14 @@ class Arriendo_Facil_Owner_Contact {
 	}
 
 	/**
-	 * Reads storage settings with constant priority.
-	 *
-	 * @param string $constant_name wp-config constant name.
-	 * @param string $option_name Option name.
-	 * @param string $default Default value.
-	 * @return string
-	 */
-	private function get_storage_setting( $constant_name, $option_name, $default = '' ) {
-		if ( defined( $constant_name ) ) {
-			$value = constant( $constant_name );
-			if ( is_string( $value ) && '' !== trim( $value ) ) {
-				return trim( $value );
-			}
-		}
-
-		return trim( (string) get_option( $option_name, $default ) );
-	}
-
-	/**
-	 * Loads and validates Cloudflare R2 credentials.
-	 *
-	 * @return array|WP_Error
-	 */
-	private function get_r2_config() {
-		$access_key = $this->get_storage_setting( 'AF_R2_ACCESS_KEY_ID', 'af_r2_access_key_id', '' );
-		$secret_key = $this->get_storage_setting( 'AF_R2_SECRET_ACCESS_KEY', 'af_r2_secret_access_key', '' );
-		$endpoint   = untrailingslashit( $this->get_storage_setting( 'AF_R2_ENDPOINT_URL', 'af_r2_endpoint_url', '' ) );
-		$bucket     = $this->get_storage_setting( 'AF_R2_BUCKET_NAME', 'af_r2_bucket_name', '' );
-
-		if ( '' === $access_key || '' === $secret_key || '' === $endpoint || '' === $bucket ) {
-			return new WP_Error( 'af_r2_missing_config', __( 'Faltan credenciales de Cloudflare R2. Revisa Ajustes > Proveedor en la nube.', 'arriendo-facil' ) );
-		}
-
-		$parsed = wp_parse_url( $endpoint );
-		$host   = isset( $parsed['host'] ) ? (string) $parsed['host'] : '';
-		$scheme = isset( $parsed['scheme'] ) ? (string) $parsed['scheme'] : '';
-
-		if ( '' === $host || '' === $scheme ) {
-			return new WP_Error( 'af_r2_invalid_endpoint', __( 'URL de endpoint de Cloudflare R2 invalida.', 'arriendo-facil' ) );
-		}
-
-		return array(
-			'access_key' => $access_key,
-			'secret_key' => $secret_key,
-			'endpoint'   => $scheme . '://' . $host,
-			'host'       => $host,
-			'bucket'     => $bucket,
-			'region'     => 'auto',
-			'service'    => 's3',
-		);
-	}
-
-	/**
 	 * Uploads an attachment to Cloudflare R2 using SigV4.
 	 *
 	 * @param int    $attachment_id Attachment ID.
 	 * @param int    $contact_id Contact ID.
 	 * @param string $doc_type Document type key.
-	 * @param array  $r2_config Parsed R2 config.
 	 * @return true|WP_Error
 	 */
-	private function upload_attachment_to_r2( $attachment_id, $contact_id, $doc_type, $r2_config ) {
+	private function upload_attachment_to_r2( $attachment_id, $contact_id, $doc_type ) {
 		$file_path = get_attached_file( $attachment_id );
 		if ( ! $file_path || ! file_exists( $file_path ) ) {
 			return new WP_Error( 'af_r2_file_missing', __( 'El archivo subido no existe en el servidor antes de la transferencia a R2.', 'arriendo-facil' ) );
@@ -875,94 +821,17 @@ class Arriendo_Facil_Owner_Contact {
 			$mime_type = 'application/pdf';
 		}
 
-		$amz_date       = gmdate( 'Ymd\\THis\\Z' );
-		$date_stamp     = gmdate( 'Ymd' );
-		$payload_hash   = hash( 'sha256', $contents );
-		$canonical_uri  = '/' . rawurlencode( $r2_config['bucket'] ) . '/' . str_replace( '%2F', '/', rawurlencode( $object_key ) );
-		$canonical_host = $r2_config['host'];
-
-		$canonical_headers =
-			'host:' . $canonical_host . "\n"
-			. 'x-amz-content-sha256:' . $payload_hash . "\n"
-			. 'x-amz-date:' . $amz_date . "\n";
-		$signed_headers = 'host;x-amz-content-sha256;x-amz-date';
-
-		$canonical_request =
-			"PUT\n"
-			. $canonical_uri . "\n"
-			. "\n"
-			. $canonical_headers . "\n"
-			. $signed_headers . "\n"
-			. $payload_hash;
-
-		$credential_scope = $date_stamp . '/' . $r2_config['region'] . '/' . $r2_config['service'] . '/aws4_request';
-		$string_to_sign   =
-			'AWS4-HMAC-SHA256' . "\n"
-			. $amz_date . "\n"
-			. $credential_scope . "\n"
-			. hash( 'sha256', $canonical_request );
-
-		$signing_key = $this->get_aws_v4_signing_key( $r2_config['secret_key'], $date_stamp, $r2_config['region'], $r2_config['service'] );
-		$signature   = hash_hmac( 'sha256', $string_to_sign, $signing_key );
-
-		$authorization =
-			'AWS4-HMAC-SHA256 '
-			. 'Credential=' . $r2_config['access_key'] . '/' . $credential_scope . ', '
-			. 'SignedHeaders=' . $signed_headers . ', '
-			. 'Signature=' . $signature;
-
-		$upload_url = $r2_config['endpoint'] . $canonical_uri;
-
-		$response = wp_remote_request(
-			$upload_url,
-			array(
-				'method'  => 'PUT',
-				'timeout' => 45,
-				'headers' => array(
-					'Host'                 => $canonical_host,
-					'Content-Type'         => $mime_type,
-					'x-amz-date'           => $amz_date,
-					'x-amz-content-sha256' => $payload_hash,
-					'Authorization'        => $authorization,
-				),
-				'body'    => $contents,
-			)
-		);
-
-		if ( is_wp_error( $response ) ) {
-			return new WP_Error( 'af_r2_upload_failed', $response->get_error_message() );
-		}
-
-		$status_code = (int) wp_remote_retrieve_response_code( $response );
-		if ( $status_code < 200 || $status_code >= 300 ) {
-			$response_body = (string) wp_remote_retrieve_body( $response );
-			$error_detail  = '' !== trim( $response_body ) ? ' ' . wp_strip_all_tags( $response_body ) : '';
-			return new WP_Error( 'af_r2_upload_failed', sprintf( '%s (HTTP %d).%s', __( 'Cloudflare R2 rechazo el archivo subido.', 'arriendo-facil' ), $status_code, $error_detail ) );
+		$upload = Arriendo_Facil_Private_Storage::upload( $contents, $object_key, $mime_type );
+		if ( is_wp_error( $upload ) ) {
+			return new WP_Error( 'af_r2_upload_failed', $upload->get_error_message() );
 		}
 
 		update_post_meta( (int) $attachment_id, '_af_r2_uploaded', '1' );
 		update_post_meta( (int) $attachment_id, '_af_r2_object_key', $object_key );
-		update_post_meta( (int) $attachment_id, '_af_r2_bucket', $r2_config['bucket'] );
+		update_post_meta( (int) $attachment_id, '_af_r2_bucket', Arriendo_Facil_Private_Storage::bucket() );
 		update_post_meta( (int) $attachment_id, '_af_r2_uploaded_at', current_time( 'mysql' ) );
 
 		return true;
-	}
-
-	/**
-	 * Builds AWS Signature V4 signing key.
-	 *
-	 * @param string $secret_key Secret key.
-	 * @param string $date_stamp Date stamp (Ymd).
-	 * @param string $region Region (auto for R2).
-	 * @param string $service Service (s3).
-	 * @return string
-	 */
-	private function get_aws_v4_signing_key( $secret_key, $date_stamp, $region, $service ) {
-		$k_date    = hash_hmac( 'sha256', $date_stamp, 'AWS4' . $secret_key, true );
-		$k_region  = hash_hmac( 'sha256', $region, $k_date, true );
-		$k_service = hash_hmac( 'sha256', $service, $k_region, true );
-
-		return hash_hmac( 'sha256', 'aws4_request', $k_service, true );
 	}
 
 	/**
@@ -1253,35 +1122,6 @@ class Arriendo_Facil_Owner_Contact {
 			'af_owner_email_failed',
 			__( 'No se pudo enviar el correo de activacion. Intenta nuevamente en unos segundos.', 'arriendo-facil' )
 		);
-	}
-
-	private function find_owner_email_by_document( $type, $value ) {
-		$meta_keys = array();
-
-		if ( 'cedula' === $type ) {
-			$meta_keys = array( 'cedula', 'id_number', 'af_cedula', 'document_id' );
-		} elseif ( 'ruc' === $type ) {
-			$meta_keys = array( 'ruc', 'tax_id', 'id_number', 'document_id' );
-		} elseif ( 'pasaporte' === $type ) {
-			$meta_keys = array( 'pasaporte', 'passport', 'document', 'document_id' );
-		}
-
-		foreach ( $meta_keys as $meta_key ) {
-			$users = get_users(
-				array(
-					'number'     => 1,
-					'fields'     => array( 'user_email' ),
-					'meta_key'   => $meta_key,
-					'meta_value' => $value,
-				)
-			);
-
-			if ( ! empty( $users ) && ! empty( $users[0]->user_email ) ) {
-				return sanitize_email( $users[0]->user_email );
-			}
-		}
-
-		return '';
 	}
 
 	private function is_valid_owner_document( $type, $value ) {

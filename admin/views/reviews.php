@@ -104,23 +104,38 @@ if ( $is_management_model ) {
 }
 
 // Evaluación del super-admin hacia los administradores de propiedades.
-$admin_evaluations = array();
-$admins            = array();
+$admin_evaluations     = array();
+$admin_property_counts = array();
+$admins                = array();
 $my_evaluation     = null;
 if ( function_exists( 'current_user_can' ) && current_user_can( 'manage_options' ) ) {
 	$admins = class_exists( 'Arriendo_Facil_Tenancy' ) ? Arriendo_Facil_Tenancy::get_property_admins() : array();
 
-	foreach ( (array) $admins as $af_admin ) {
-		$af_row = $wpdb->get_row(
-			$wpdb->prepare(
-				"SELECT id, stars, criteria_scores, comment_text, reviewer_user_id, updated_at
-				 FROM {$wpdb->prefix}af_admin_reviews
-				 WHERE admin_user_id = %d
-				 LIMIT 1",
-				(int) $af_admin->ID
-			)
+	$evaluated_admin_ids = array_map( 'absint', wp_list_pluck( (array) $admins, 'ID' ) );
+	foreach ( $evaluated_admin_ids as $evaluated_admin_id ) {
+		$admin_evaluations[ $evaluated_admin_id ] = null;
+	}
+	if ( ! empty( $evaluated_admin_ids ) ) {
+		$evaluation_rows = (array) $wpdb->get_results(
+			"SELECT id, admin_user_id, stars, criteria_scores, comment_text, reviewer_user_id, updated_at
+			 FROM {$wpdb->prefix}af_admin_reviews
+			 WHERE admin_user_id IN (" . implode( ',', $evaluated_admin_ids ) . ')' // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		);
-		$admin_evaluations[ (int) $af_admin->ID ] = $af_row;
+		foreach ( $evaluation_rows as $evaluation_row ) {
+			$admin_evaluations[ (int) $evaluation_row->admin_user_id ] = $evaluation_row;
+		}
+
+		$admin_meta_in = "'" . implode( "','", $evaluated_admin_ids ) . "'";
+		$property_count_rows = (array) $wpdb->get_results(
+			"SELECT pm.meta_value AS owner_id, COUNT(DISTINCT p.ID) AS total
+			 FROM {$wpdb->postmeta} pm
+			 INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id AND p.post_type = 'accommodation' AND p.post_status NOT IN ('trash','auto-draft')
+			 WHERE pm.meta_key = '_af_owner_id' AND pm.meta_value IN ({$admin_meta_in})
+			 GROUP BY pm.meta_value" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		);
+		foreach ( $property_count_rows as $property_count_row ) {
+			$admin_property_counts[ (int) $property_count_row->owner_id ] = (int) $property_count_row->total;
+		}
 	}
 } elseif ( class_exists( 'Arriendo_Facil_Tenancy' ) && in_array( 'af_property_admin', (array) wp_get_current_user()->roles, true ) ) {
 	$my_evaluation = $wpdb->get_row(
@@ -236,7 +251,7 @@ if ( function_exists( 'current_user_can' ) && current_user_can( 'manage_options'
 						$af_review   = isset( $admin_evaluations[ (int) $af_admin->ID ] ) ? $admin_evaluations[ (int) $af_admin->ID ] : null;
 						$af_stars    = $af_review ? (float) $af_review->stars : 0.0;
 						$af_scores   = $af_review && ! empty( $af_review->criteria_scores ) ? json_decode( (string) $af_review->criteria_scores, true ) : array();
-						$af_prop_ids = class_exists( 'Arriendo_Facil_Accommodation' ) ? Arriendo_Facil_Accommodation::get_owner_accommodation_ids( (int) $af_admin->ID ) : array();
+						$af_prop_count = isset( $admin_property_counts[ (int) $af_admin->ID ] ) ? $admin_property_counts[ (int) $af_admin->ID ] : 0;
 						$af_pill     = 'af-pill--neutral';
 						if ( $af_stars >= 4 ) {
 							$af_pill = 'af-pill--success';
@@ -252,7 +267,7 @@ if ( function_exists( 'current_user_can' ) && current_user_can( 'manage_options'
 								<span class="af-td-meta"><?php echo esc_html( $af_admin->user_email ); ?></span>
 							</td>
 							<td data-label="<?php esc_attr_e( 'Inmuebles', 'arriendo-facil' ); ?>">
-								<span class="af-pill af-pill--neutral"><?php echo esc_html( number_format_i18n( count( $af_prop_ids ) ) ); ?></span>
+								<span class="af-pill af-pill--neutral"><?php echo esc_html( number_format_i18n( $af_prop_count ) ); ?></span>
 							</td>
 							<td data-label="<?php esc_attr_e( 'Evaluación', 'arriendo-facil' ); ?>">
 								<?php if ( $af_review ) : ?>

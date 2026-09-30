@@ -398,10 +398,6 @@ class Arriendo_Facil_Owner_Register_API {
 		return true;
 	}
 
-	private function normalize_document( $type, $raw ) {
-		return AF_Text_Normalizer::document( (string) $type, (string) $raw );
-	}
-
 	private function is_valid_document( $type, $value ) {
 		if ( ! $value ) {
 			return false;

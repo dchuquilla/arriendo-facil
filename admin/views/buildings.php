@@ -123,7 +123,7 @@ if ( ! empty( $linked_accommodation_ids ) && ! empty( $units ) ) {
 $units_meta = array();
 foreach ( $units as $unit ) {
 	$lease     = isset( $units_leases[ (int) $unit->accommodation_id ] ) ? $units_leases[ (int) $unit->accommodation_id ] : null;
-	$unit_hoa  = Arriendo_Facil_Property_Structure::calculate_unit_hoa( (int) $unit->id );
+	$unit_hoa  = $selected_building ? Arriendo_Facil_Property_Structure::hoa_share( $selected_building, $unit ) : 0.0;
 	$alicuota_total += $unit_hoa;
 
 	$charges = array();

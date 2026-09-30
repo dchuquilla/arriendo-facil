@@ -75,6 +75,7 @@ class Arriendo_Facil_Owner_Settlement {
 		);
 
 		$owners = array();
+		cache_users( array_map( 'absint', wp_list_pluck( (array) $rows, 'owner_id' ) ) );
 		foreach ( $rows as $row ) {
 			$user = get_userdata( (int) $row->owner_id );
 			if ( ! $user ) {

@@ -135,11 +135,13 @@
 
 		el.grid.innerHTML = html;
 
-		// Bind day clicks.
+		// Bind day clicks. A day of an adjacent month (a "ghost" cell) moves
+		// the grid to that month, Airbnb/Google style, so everything is
+		// scheduled in context.
 		Array.prototype.forEach.call(el.grid.querySelectorAll('.af-cal__day'), function (node) {
 			node.addEventListener('click', function (e) {
 				e.preventDefault();
-				selectDay(node.getAttribute('data-date'));
+				dayClicked(node.getAttribute('data-date'));
 			});
 		});
 
@@ -148,7 +150,7 @@
 
 	function cell(dateStr, dayNum, outside, isToday) {
 		var evs = STATE.events[dateStr] || [];
-		var classes = 'af-cal__day' + (outside ? ' is-outside' : '') + (isToday ? ' is-today' : '');
+		var classes = 'af-cal__day' + (outside ? ' is-outside' : '') + (isToday ? ' is-today' : '') + (dateStr < todayStr ? ' is-past' : '');
 		if (SELECTED_DATE === dateStr) {
 			classes += ' is-selected';
 		}
@@ -197,6 +199,20 @@
 		refreshDrawerForSelected();
 	}
 
+	// When the clicked day belongs to an adjacent month, navigate to that
+	// month and select it there instead of keeping the current view.
+	function dayClicked(dateStr) {
+		var parts = dateStr.split('-');
+		var y = parseInt(parts[0], 10);
+		var m = parseInt(parts[1], 10);
+		if (y === STATE.year && m === STATE.month) {
+			selectDay(dateStr);
+			return;
+		}
+		SELECTED_DATE = dateStr;
+		reload(y, m);
+	}
+
 	function formatLongDate(dateStr) {
 		var parts = dateStr.split('-');
 		var d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
@@ -217,9 +233,13 @@
 		el.drawerDate.textContent = SELECTED_DATE;
 		el.drawerTitle.textContent = formatLongDate(SELECTED_DATE);
 
+		// Las fechas pasadas solo se pueden consultar, no programar.
+		var isPast = SELECTED_DATE < todayStr;
+		var pastNotice = isPast ? '<p class="af-cal__drawer-past">No se pueden programar visitas ni bloqueos en fechas pasadas.</p>' : '';
+
 		var evs = STATE.events[SELECTED_DATE] || [];
 		if (!evs.length) {
-			el.drawerBody.innerHTML = '<p class="af-cal__drawer-empty">Sin eventos programados para hoy.</p>';
+			el.drawerBody.innerHTML = '<p class="af-cal__drawer-empty">Sin eventos programados para hoy.</p>' + pastNotice;
 		} else {
 			var html = '';
 			evs.forEach(function (ev) {
@@ -237,14 +257,14 @@
 				}
 				html += '</div>';
 			});
-			el.drawerBody.innerHTML = html;
+			el.drawerBody.innerHTML = html + pastNotice;
 
 			Array.prototype.forEach.call(el.drawerBody.querySelectorAll('.af-cal__event-remove'), function (btn) {
 				btn.addEventListener('click', function () { removeEvent(btn.getAttribute('data-remove-type'), btn.getAttribute('data-remove-id')); });
 			});
 		}
 
-		el.drawerFooter.style.visibility = 'visible';
+		el.drawerFooter.style.visibility = isPast ? 'hidden' : 'visible';
 	}
 
 	function removeEvent(type, id) {
@@ -322,6 +342,20 @@
 		});
 	}
 
+	// After saving, bring the target day's month into view so the new event is
+	// visible immediately (e.g. a day that belongs to an adjacent month).
+	function gotoDate(dateStr) {
+		if (!dateStr) { reload(); return; }
+		var parts = dateStr.split('-');
+		var y = parseInt(parts[0], 10);
+		var m = parseInt(parts[1], 10);
+		if (y === STATE.year && m === STATE.month) {
+			reload();
+		} else {
+			reload(y, m);
+		}
+	}
+
 	// Modal: open on add actions ------------------------------------------------
 	function openModal(dateStr, type) {
 		SELECTED_DATE = dateStr;
@@ -381,6 +415,11 @@
 			var date = SELECTED_DATE || el.modalDate.getAttribute('data-date');
 			if (!date) { return; }
 
+			if (date < todayStr) {
+				setStatus('No se pueden programar eventos en fechas pasadas.', true);
+				return;
+			}
+
 			var type = el.modalType.value;
 			var acc = el.accSelect.value;
 
@@ -413,7 +452,7 @@
 					if (res && res.success) {
 						setStatus(res.data.message || 'Visita agendada.', false);
 						closeModal();
-						reload();
+						gotoDate(res.data.date);
 					} else {
 						setStatus((res && res.data && res.data.message) || 'No se pudo agendar la visita.', true);
 					}
@@ -430,7 +469,7 @@
 					if (res && res.success) {
 						setStatus(res.data.message || 'Día bloqueado.', false);
 						closeModal();
-						reload();
+						gotoDate(res.data.date);
 					} else {
 						setStatus((res && res.data && res.data.message) || 'No se pudo bloquear el día.', true);
 					}

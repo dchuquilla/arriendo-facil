@@ -130,7 +130,16 @@ if ( ! empty( $accommodation_ids ) ) {
 }
 
 // Build title + admin display mapping.
-$owner_names = array();
+$owner_names    = array();
+$catalog_owners = array();
+foreach ( $accommodation_ids as $post_id ) {
+	if ( ! empty( $fetched[ $post_id ]->owner_id ) ) {
+		$catalog_owners[] = (int) $fetched[ $post_id ]->owner_id;
+	}
+}
+if ( ! empty( $catalog_owners ) ) {
+	cache_users( array_unique( $catalog_owners ) );
+}
 foreach ( $accommodation_ids as $post_id ) {
 	$owner_id = isset( $fetched[ $post_id ]->owner_id ) ? (int) $fetched[ $post_id ]->owner_id : 0;
 	if ( $owner_id && ! isset( $owner_names[ $owner_id ] ) ) {

@@ -273,10 +273,18 @@ class Arriendo_Facil_Property_Structure {
 			return 0.0;
 		}
 
-		$coefficient = (float) $unit->hoa_coefficient;
-		$total       = (float) $building->monthly_hoa_total;
+		return self::hoa_share( $building, $unit );
+	}
 
-		return round( $total * ( $coefficient / 100 ), 2 );
+	/**
+	 * HOA share of an already-loaded unit (no queries).
+	 *
+	 * @param object $building Building row (monthly_hoa_total).
+	 * @param object $unit     Unit row (hoa_coefficient).
+	 * @return float
+	 */
+	public static function hoa_share( $building, $unit ) {
+		return round( (float) $building->monthly_hoa_total * ( (float) $unit->hoa_coefficient / 100 ), 2 );
 	}
 
 	/**

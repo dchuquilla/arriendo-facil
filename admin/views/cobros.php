@@ -72,16 +72,30 @@ $active_leases = (array) $wpdb->get_results(
 	 LIMIT 150" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 );
 
-foreach ( $active_leases as $rent_lease ) {
-	$has_canon = (bool) $wpdb->get_var(
+// Batch: which leases already have this period's canon, and each lease's last canon amount.
+$canon_by_lease = array();
+$active_lease_ids = array_map( 'absint', wp_list_pluck( $active_leases, 'id' ) );
+if ( ! empty( $active_lease_ids ) ) {
+	$lease_ids_sql = implode( ',', $active_lease_ids );
+	$canon_rows    = (array) $wpdb->get_results(
 		$wpdb->prepare(
-			"SELECT COUNT(*) FROM {$wpdb->prefix}af_charges
-			 WHERE lease_id = %d AND charge_type = 'canon' AND period = %s",
-			(int) $rent_lease->id,
+			"SELECT c.lease_id,
+			        MAX(c.period = %s) AS has_current,
+			        SUBSTRING_INDEX(GROUP_CONCAT(c.amount ORDER BY c.period DESC), ',', 1) AS last_amount
+			 FROM {$wpdb->prefix}af_charges c
+			 WHERE c.charge_type = 'canon' AND c.lease_id IN ({$lease_ids_sql})
+			 GROUP BY c.lease_id", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$current_period
 		)
 	);
-	if ( $has_canon ) {
+	foreach ( $canon_rows as $canon_row ) {
+		$canon_by_lease[ (int) $canon_row->lease_id ] = $canon_row;
+	}
+}
+
+foreach ( $active_leases as $rent_lease ) {
+	$canon_info = isset( $canon_by_lease[ (int) $rent_lease->id ] ) ? $canon_by_lease[ (int) $rent_lease->id ] : null;
+	if ( $canon_info && (int) $canon_info->has_current ) {
 		continue;
 	}
 
@@ -93,14 +107,7 @@ foreach ( $active_leases as $rent_lease ) {
 		continue;
 	}
 
-	$last_amount = (float) $wpdb->get_var(
-		$wpdb->prepare(
-			"SELECT amount FROM {$wpdb->prefix}af_charges
-			 WHERE lease_id = %d AND charge_type = 'canon'
-			 ORDER BY period DESC LIMIT 1",
-			(int) $rent_lease->id
-		)
-	);
+	$last_amount = $canon_info ? (float) $canon_info->last_amount : 0.0;
 
 	$rent_reminders[] = array(
 		'lease_id'            => (int) $rent_lease->id,
@@ -128,6 +135,8 @@ if ( '' === $cobros_scope_clause || ! empty( $cobros_scope_ids ) ) {
 			array( $current_period )
 		)
 	);
+
+	_prime_post_caches( array_filter( array_map( 'absint', wp_list_pluck( $meter_groups, 'accommodation_id' ) ) ), false, false );
 
 	foreach ( $meter_groups as $mg ) {
 		if ( ! (int) $mg->accommodation_id ) {

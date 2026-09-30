@@ -30,7 +30,9 @@ if ( file_exists( $af_composer_autoload ) ) {
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-activator.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-text-normalizer.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-identity-validator.php';
-require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-private-storage.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/storage/class-private-storage.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/contracts/class-contract-text-extractor.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/contracts/class-contract-file-store.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-idempotency.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-tenancy.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation.php';
@@ -361,7 +363,7 @@ function arriendo_facil_maybe_upgrade_schema() {
 		return;
 	}
 
-	$target_schema_version = '2026-11-service-schedules';
+	$target_schema_version = '2026-12-refactor-indexes';
 	$current_schema_version = (string) get_option( 'af_db_schema_version', '' );
 
 	if ( $current_schema_version === $target_schema_version && ! arriendo_facil_has_lease_schema_drift() ) {

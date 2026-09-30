@@ -6,10 +6,10 @@
  * Soluciona problemas de "FIRMA INVALIDA" causados por P12 en formato antiguo
  *
  * USO:
- *   php CONVERTIDOR_P12_VALIDO.php <ruta_p12> <contraseña>
+ *   php bin/convertidor-p12.php <ruta_p12> <contraseña>
  *
  * EJEMPLO:
- *   php CONVERTIDOR_P12_VALIDO.php ./cert.p12 "MiContraseña123"
+ *   php bin/convertidor-p12.php ./cert.p12 "MiContraseña123"
  */
 
 if ( php_sapi_name() !== 'cli' ) {
@@ -24,10 +24,10 @@ if ( count( $args ) < 2 ) {
 	echo "║  CONVERTIDOR P12 → XADES-BES COMPATIBLE                           ║\n";
 	echo "╚════════════════════════════════════════════════════════════════════╝\n\n";
 
-	echo "Uso: php CONVERTIDOR_P12_VALIDO.php <ruta_p12> <contraseña>\n\n";
+	echo "Uso: php bin/convertidor-p12.php <ruta_p12> <contraseña>\n\n";
 
 	echo "Ejemplo:\n";
-	echo "  php CONVERTIDOR_P12_VALIDO.php ./cert.p12 \"MiContraseña\"\n\n";
+	echo "  php bin/convertidor-p12.php ./cert.p12 \"MiContraseña\"\n\n";
 
 	echo "Este script:\n";
 	echo "  1. Valida el P12 original\n";

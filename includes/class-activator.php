@@ -1659,6 +1659,34 @@ class Arriendo_Facil_Activator {
 				'name'  => 'idx_af_leases_status_created',
 				'sql'   => "ALTER TABLE {$leases_table} ADD INDEX idx_af_leases_status_created (status, created_at DESC)",
 			),
+			// Tenancy scope: accommodation_id IN (...) AND status = ? AND deleted_at IS NULL.
+			array(
+				'table' => $leases_table,
+				'name'  => 'idx_af_leases_acc_status_deleted',
+				'sql'   => "ALTER TABLE {$leases_table} ADD INDEX idx_af_leases_acc_status_deleted (accommodation_id, status, deleted_at)",
+			),
+			// Active contracts ordered/filtered by end_date ("por vencer").
+			array(
+				'table' => $leases_table,
+				'name'  => 'idx_af_leases_status_deleted_end',
+				'sql'   => "ALTER TABLE {$leases_table} ADD INDEX idx_af_leases_status_deleted_end (status, deleted_at, end_date)",
+			),
+			// Period KPIs: SUM(amount_paid) WHERE period = ? AND status != 'void'.
+			array(
+				'table' => $wpdb->prefix . 'af_charges',
+				'name'  => 'idx_af_charges_period_status',
+				'sql'   => "ALTER TABLE {$wpdb->prefix}af_charges ADD INDEX idx_af_charges_period_status (period, status)",
+			),
+			array(
+				'table' => $wpdb->prefix . 'af_guests',
+				'name'  => 'idx_af_guests_doc_status',
+				'sql'   => "ALTER TABLE {$wpdb->prefix}af_guests ADD INDEX idx_af_guests_doc_status (doc_status)",
+			),
+			array(
+				'table' => $wpdb->prefix . 'af_notification_messages',
+				'name'  => 'idx_af_notifications_status',
+				'sql'   => "ALTER TABLE {$wpdb->prefix}af_notification_messages ADD INDEX idx_af_notifications_status (status)",
+			),
 		);
 
 		foreach ( $indexes as $index ) {

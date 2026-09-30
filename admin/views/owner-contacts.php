@@ -28,6 +28,7 @@ if ( $contacts ) {
     $owner_user_ids = array_values( array_unique( array_filter( $owner_user_ids ) ) );
 
     if ( ! empty( $owner_user_ids ) ) {
+        cache_users( $owner_user_ids );
         $placeholders = implode( ',', array_fill( 0, count( $owner_user_ids ), '%d' ) );
         $query        = $wpdb->prepare(
             "SELECT CAST(pm.meta_value AS UNSIGNED) AS owner_user_id, p.post_title

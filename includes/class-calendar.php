@@ -283,6 +283,9 @@ class Arriendo_Facil_Calendar {
 		if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) ) {
 			wp_send_json_error( array( 'message' => __( 'Fecha inválida.', 'arriendo-facil' ) ) );
 		}
+		if ( $date < wp_date( 'Y-m-d' ) ) {
+			wp_send_json_error( array( 'message' => __( 'No se pueden programar visitas en fechas pasadas.', 'arriendo-facil' ) ) );
+		}
 		if ( ! preg_match( '/^\d{2}:\d{2}$/', $time ) ) {
 			wp_send_json_error( array( 'message' => __( 'Hora inválida.', 'arriendo-facil' ) ) );
 		}
@@ -416,6 +419,9 @@ class Arriendo_Facil_Calendar {
 		}
 		if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) ) {
 			wp_send_json_error( array( 'message' => __( 'Fecha inválida.', 'arriendo-facil' ) ) );
+		}
+		if ( $date < wp_date( 'Y-m-d' ) ) {
+			wp_send_json_error( array( 'message' => __( 'No se pueden bloquear días en fechas pasadas.', 'arriendo-facil' ) ) );
 		}
 
 		$existing = $wpdb->get_var(

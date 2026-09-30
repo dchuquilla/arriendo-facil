@@ -179,6 +179,10 @@ class Arriendo_Facil_Rental_Workflow {
 			wp_send_json_error( array( 'message' => __( 'Rango de fecha u hora invalido.', 'arriendo-facil' ) ), 400 );
 		}
 
+		if ( (string) $visit_date < wp_date( 'Y-m-d' ) ) {
+			wp_send_json_error( array( 'message' => __( 'No se pueden crear cupos de visita en fechas pasadas.', 'arriendo-facil' ) ), 400 );
+		}
+
 		global $wpdb;
 		$table = $wpdb->prefix . 'af_visit_slots';
 
@@ -304,6 +308,10 @@ class Arriendo_Facil_Rental_Workflow {
 			wp_send_json_error( array( 'message' => __( 'Este cupo ya no esta disponible.', 'arriendo-facil' ), 'code' => 409 ), 409 );
 		}
 
+		if ( (string) $slot->visit_date < wp_date( 'Y-m-d' ) ) {
+			wp_send_json_error( array( 'message' => __( 'No se pueden reservar visitas en fechas pasadas.', 'arriendo-facil' ), 'code' => 400 ), 400 );
+		}
+
 		$inserted_booking = $wpdb->insert(
 			$bookings_table,
 			array(
@@ -393,6 +401,10 @@ class Arriendo_Facil_Rental_Workflow {
 
 			if ( ! $slot || (int) $slot->accommodation_id !== $accommodation_id || 'open' !== (string) $slot->status ) {
 				wp_send_json_error( array( 'message' => __( 'El cupo seleccionado ya no esta disponible.', 'arriendo-facil' ), 'code' => 409 ), 409 );
+			}
+
+			if ( (string) $slot->visit_date < wp_date( 'Y-m-d' ) ) {
+				wp_send_json_error( array( 'message' => __( 'No se pueden reservar visitas en fechas pasadas.', 'arriendo-facil' ), 'code' => 400 ), 400 );
 			}
 
 			$inserted_booking = $wpdb->insert(

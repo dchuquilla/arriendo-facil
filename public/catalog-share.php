@@ -134,7 +134,7 @@ get_header();
 	<?php if ( $catalog_share_not_found ) : ?>
 
 		<div class="af-cs-empty">
-			<p><?php esc_html_e( 'Pide a tu administrador un enlace actualizado para ver el catálogo.', 'arriendo-facil' ); ?></p>
+			<p><?php esc_html_e( 'Pide a tu gestor de propiedades un enlace actualizado para ver el catálogo.', 'arriendo-facil' ); ?></p>
 		</div>
 
 	<?php elseif ( empty( $catalog_share_groups ) ) : ?>

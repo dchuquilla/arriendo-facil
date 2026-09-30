@@ -91,7 +91,7 @@ class Arriendo_Facil_Review {
 		$admin_user_id = isset( $_POST['admin_user_id'] ) ? absint( wp_unslash( $_POST['admin_user_id'] ) ) : 0;
 
 		if ( ! $admin_user_id || ! in_array( 'af_property_admin', (array) get_userdata( $admin_user_id )->roles, true ) ) {
-			wp_send_json_error( array( 'message' => __( 'Administrador inválido.', 'arriendo-facil' ) ), 400 );
+			wp_send_json_error( array( 'message' => __( 'Gestor inválido.', 'arriendo-facil' ) ), 400 );
 		}
 
 		$comment = isset( $_POST['comment'] ) ? sanitize_textarea_field( wp_unslash( $_POST['comment'] ) ) : '';

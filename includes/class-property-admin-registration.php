@@ -81,7 +81,7 @@ class Arriendo_Facil_Property_Admin_Registration {
 		<div id="<?php echo esc_attr( $instance_id ); ?>" class="af-admin-signup">
 			<div>
 				<h3 class="af-admin-signup__title"><?php echo esc_html__( 'Crea tu cuenta y comienza a gestionar', 'arriendo-facil' ); ?></h3>
-				<p class="af-admin-signup__subtitle"><?php echo esc_html__( 'Crea tu cuenta como administrador de propiedades. Verifica tu correo y empieza hoy con datos de ejemplo: cobros, contratos, mantenimiento e inquilinos.', 'arriendo-facil' ); ?></p>
+				<p class="af-admin-signup__subtitle"><?php echo esc_html__( 'Crea tu cuenta como gestor de propiedades. Verifica tu correo y empieza hoy con datos de ejemplo: cobros, contratos, mantenimiento e inquilinos.', 'arriendo-facil' ); ?></p>
 			</div>
 
 			<div data-af-admin-alert class="af-admin-signup__alert"></div>
@@ -781,7 +781,7 @@ class Arriendo_Facil_Property_Admin_Registration {
 		$message .= '<h2 style="margin:0;font-size:20px;line-height:1.3;">' . esc_html__( 'Verifica tu correo para activar tu demo', 'arriendo-facil' ) . '</h2>';
 		$message .= '</div>';
 		$message .= '<div style="padding:22px;">';
-		$message .= '<p style="margin:0 0 12px;line-height:1.6;">' . sprintf( esc_html__( 'Hola %s, recibimos tu solicitud de demo como administrador de propiedades.', 'arriendo-facil' ), esc_html( '' !== $display ? $display : __( 'administrador', 'arriendo-facil' ) ) ) . '</p>';
+		$message .= '<p style="margin:0 0 12px;line-height:1.6;">' . sprintf( esc_html__( 'Hola %s, recibimos tu solicitud de demo como gestor de propiedades.', 'arriendo-facil' ), esc_html( '' !== $display ? $display : __( 'gestor', 'arriendo-facil' ) ) ) . '</p>';
 		$message .= '<p style="margin:0 0 16px;line-height:1.6;color:#334155;">' . esc_html__( 'Por seguridad, confirma que este correo te pertenece para activar tu cuenta y preparar tu area de demostracion.', 'arriendo-facil' ) . '</p>';
 		$message .= '<p style="margin:0 0 16px;">';
 		$message .= '<a href="' . esc_url( $verify_url ) . '" style="display:inline-block;padding:11px 16px;background:#1d4ed8;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;">' . esc_html__( 'Verificar mi correo', 'arriendo-facil' ) . '</a>';
@@ -818,8 +818,8 @@ class Arriendo_Facil_Property_Admin_Registration {
 		$admin_url = admin_url( 'admin.php?page=af-property-admins' );
 		$subject   = __( '[Arriendo Facil] Nuevo registro: ' . sanitize_text_field( $email ), 'arriendo-facil' );
 
-		$message = '<p style="margin:0 0 12px;line-height:1.6;">' . esc_html__( 'Se registro una nueva cuenta de administrador de propiedades:', 'arriendo-facil' ) . '</p>';
-		$message .= '<p style="margin:0 0 16px;"><a href="' . esc_url( $admin_url ) . '" style="display:inline-block;padding:10px 16px;background:#1d4ed8;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;">' . esc_html__( 'Revisar administradores', 'arriendo-facil' ) . '</a></p>';
+		$message = '<p style="margin:0 0 12px;line-height:1.6;">' . esc_html__( 'Se registro una nueva cuenta de gestor de propiedades:', 'arriendo-facil' ) . '</p>';
+		$message .= '<p style="margin:0 0 16px;"><a href="' . esc_url( $admin_url ) . '" style="display:inline-block;padding:10px 16px;background:#1d4ed8;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;">' . esc_html__( 'Revisar gestores', 'arriendo-facil' ) . '</a></p>';
 
 		foreach ( array_unique( array_filter( $admins ) ) as $admin_email ) {
 			wp_mail( sanitize_email( $admin_email ), $subject, $message, array( 'Content-Type: text/html; charset=UTF-8' ) );
@@ -888,9 +888,9 @@ class Arriendo_Facil_Property_Admin_Registration {
 			return;
 		}
 
-		$subject = __( '[Arriendo Facil] Documentos de administradores pendientes de revision', 'arriendo-facil' );
+		$subject = __( '[Arriendo Facil] Documentos de gestores pendientes de revision', 'arriendo-facil' );
 		$message = '<p style="margin:0 0 12px;line-height:1.6;">' . esc_html__( 'Hay cuentas auto-registradas que estan esperando que su documentacion sea revisada.', 'arriendo-facil' ) . '</p>';
-		$message .= '<p style="margin:0 0 16px;"><a href="' . esc_url( admin_url( 'admin.php?page=af-property-admins' ) ) . '">' . esc_html__( 'Ir a Administradores', 'arriendo-facil' ) . '</a></p>';
+		$message .= '<p style="margin:0 0 16px;"><a href="' . esc_url( admin_url( 'admin.php?page=af-property-admins' ) ) . '">' . esc_html__( 'Ir a Gestores', 'arriendo-facil' ) . '</a></p>';
 
 		foreach ( array_unique( array_filter( $admins ) ) as $admin_email ) {
 			wp_mail( sanitize_email( $admin_email ), $subject, $message, array( 'Content-Type: text/html; charset=UTF-8' ) );

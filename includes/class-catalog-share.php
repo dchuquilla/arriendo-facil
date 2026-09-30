@@ -738,7 +738,7 @@ class Arriendo_Facil_Catalog_Share {
 		$owner = get_userdata( $owner_id );
 
 		if ( ! $owner instanceof WP_User ) {
-			wp_send_json_error( array( 'message' => __( 'Administrador no encontrado.', 'arriendo-facil' ) ), 404 );
+			wp_send_json_error( array( 'message' => __( 'Gestor no encontrado.', 'arriendo-facil' ) ), 404 );
 		}
 
 		$catalog = self::get_catalog( $owner );

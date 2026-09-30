@@ -35,8 +35,8 @@ $selected_building = $selected_id ? Arriendo_Facil_Property_Structure::get_build
 $units             = $selected_id ? Arriendo_Facil_Property_Structure::get_units_by_building( $selected_id ) : array();
 $coefficient_total = $selected_id ? Arriendo_Facil_Property_Structure::get_coefficient_total( $selected_id ) : 0.0;
 
-$is_super_admin  = Arriendo_Facil_Tenancy::can_manage_all();
-$property_admins = $is_super_admin ? Arriendo_Facil_Tenancy::get_property_admins() : array();
+$is_platform_admin = Arriendo_Facil_Tenancy::is_platform_admin();
+$property_admins   = $is_platform_admin ? Arriendo_Facil_Tenancy::get_property_admins() : array();
 
 $accommodation_args = array(
 	'post_type'      => 'accommodation',

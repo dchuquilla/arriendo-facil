@@ -133,8 +133,8 @@ $totals_platform = array(
 	af_page_header(
 		array(
 			'eyebrow'  => __( 'Panel maestro', 'arriendo-facil' ),
-			'title'    => __( 'Administradores de Propiedades', 'arriendo-facil' ),
-			'subtitle' => __( 'Cuentas licenciadas de administradores de propiedades (subadmins) y sus métricas agregadas. Solo visible para el super admin.', 'arriendo-facil' ),
+			'title'    => __( 'Gestores de Propiedades', 'arriendo-facil' ),
+			'subtitle' => __( 'Cuentas licenciadas de gestores de propiedades y sus métricas agregadas. Solo visible para el administrador de la plataforma.', 'arriendo-facil' ),
 		)
 	);
 	?>
@@ -162,12 +162,12 @@ $totals_platform = array(
 	<section class="af-section" aria-labelledby="af-chart-admins-title">
 		<header class="af-section__header">
 			<div>
-				<h2 class="af-section__title" id="af-chart-admins-title"><?php esc_html_e( 'Cobranza por administrador (este mes)', 'arriendo-facil' ); ?></h2>
+				<h2 class="af-section__title" id="af-chart-admins-title"><?php esc_html_e( 'Cobranza por gestor (este mes)', 'arriendo-facil' ); ?></h2>
 				<p class="af-section__subtitle"><?php esc_html_e( 'Comparativo de lo cobrado vs. lo pendiente por cada licencia.', 'arriendo-facil' ); ?></p>
 			</div>
 		</header>
 		<div class="af-chart-canvas">
-			<canvas id="af-chart-admins" role="img" aria-label="<?php esc_attr_e( 'Gráfico de cobranza por administrador', 'arriendo-facil' ); ?>"></canvas>
+			<canvas id="af-chart-admins" role="img" aria-label="<?php esc_attr_e( 'Gráfico de cobranza por gestor', 'arriendo-facil' ); ?>"></canvas>
 		</div>
 	</section>
 	<script type="application/json" id="af-admins-chart-data"><?php
@@ -210,7 +210,7 @@ $totals_platform = array(
 	<?php endif; ?>
 
 	<div class="af-section" style="padding: var(--af-space-5); margin: var(--af-space-4) 0;">
-		<h2 class="af-section__title" style="margin-top:0;"><?php esc_html_e( 'Nueva licencia (administrador de propiedades)', 'arriendo-facil' ); ?></h2>
+		<h2 class="af-section__title" style="margin-top:0;"><?php esc_html_e( 'Nueva licencia (gestor de propiedades)', 'arriendo-facil' ); ?></h2>
 		<p class="af-modal__status" id="af-property-admin-status"></p>
 		<form id="af-property-admin-form" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px; align-items:end;">
 			<label>
@@ -244,7 +244,7 @@ $totals_platform = array(
 		<table class="wp-list-table widefat fixed striped af-data-table">
 			<thead>
 				<tr>
-					<th><?php esc_html_e( 'Administrador', 'arriendo-facil' ); ?></th>
+					<th><?php esc_html_e( 'Gestor', 'arriendo-facil' ); ?></th>
 					<th><?php esc_html_e( 'Edificios', 'arriendo-facil' ); ?></th>
 					<th><?php esc_html_e( 'Inmuebles', 'arriendo-facil' ); ?></th>
 					<th><?php esc_html_e( 'Contratos activos', 'arriendo-facil' ); ?></th>
@@ -256,7 +256,7 @@ $totals_platform = array(
 			</thead>
 			<tbody>
 				<?php if ( empty( $rows ) ) : ?>
-					<tr><td colspan="8"><?php esc_html_e( 'Aún no hay administradores de propiedades licenciados.', 'arriendo-facil' ); ?></td></tr>
+					<tr><td colspan="8"><?php esc_html_e( 'Aún no hay gestores de propiedades licenciados.', 'arriendo-facil' ); ?></td></tr>
 				<?php else : ?>
 					<?php foreach ( $rows as $row ) : ?>
 						<?php
@@ -275,7 +275,7 @@ $totals_platform = array(
 						$badge = isset( $doc_badges[ $row['doc_status'] ] ) ? $doc_badges[ $row['doc_status'] ] : $doc_badges['pendiente'];
 						?>
 						<tr>
-							<td data-label="<?php esc_attr_e( 'Administrador', 'arriendo-facil' ); ?>">
+							<td data-label="<?php esc_attr_e( 'Gestor', 'arriendo-facil' ); ?>">
 								<strong><?php echo esc_html( $row['company'] ? $row['company'] : $admin_user->display_name ); ?></strong><br />
 								<span style="color:#666;"><?php echo esc_html( $admin_user->user_email ); ?></span>
 							</td>
@@ -332,13 +332,13 @@ $totals_platform = array(
 	<div id="af-admin-review-backdrop" style="position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:9990;"></div>
 	<div style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:9991; background:#fff; border-radius:12px; padding:24px; width:min(480px, 92vw); box-shadow:0 20px 50px rgba(0,0,0,.3);">
 		<h2 style="margin-top:0;" id="af-admin-review-title"><?php esc_html_e( 'Revisar verificación', 'arriendo-facil' ); ?></h2>
-		<p class="description"><?php esc_html_e( 'Revisa la documentación del administrador y aprueba, rechaza o reinicia su verificación.', 'arriendo-facil' ); ?></p>
+		<p class="description"><?php esc_html_e( 'Revisa la documentación del gestor y aprueba, rechaza o reinicia su verificación.', 'arriendo-facil' ); ?></p>
 		<div id="af-admin-review-body" style="max-height:50vh; overflow:auto; margin-bottom:12px; border:1px solid #e5e7eb; border-radius:8px; padding:12px;">
 			<p class="description" style="margin:0;"><?php esc_html_e( 'Cargando información...', 'arriendo-facil' ); ?></p>
 		</div>
 		<label style="display:block; margin-bottom:12px;">
 			<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Observaciones (se envían al usuario)', 'arriendo-facil' ); ?></span>
-			<textarea id="af-admin-review-notes" rows="3" class="large-text" maxlength="1000" placeholder="<?php esc_attr_e( 'Comentarios opcionales para el administrador...', 'arriendo-facil' ); ?>"></textarea>
+			<textarea id="af-admin-review-notes" rows="3" class="large-text" maxlength="1000" placeholder="<?php esc_attr_e( 'Comentarios opcionales para el gestor...', 'arriendo-facil' ); ?>"></textarea>
 		</label>
 		<div style="display:flex; gap:8px; flex-wrap:wrap;">
 			<button type="button" class="button button-primary" data-review-action="approve"><?php esc_html_e( 'Aprobar', 'arriendo-facil' ); ?></button>
@@ -538,7 +538,7 @@ $totals_platform = array(
 		btn.addEventListener('click', function () {
 			if (!reviewUserId) { return; }
 			if (btn.dataset.reviewAction === 'approve'
-				&& !window.confirm('<?php echo esc_js( __( 'Aprobar la verificación de este administrador? Se habilitará para usar datos reales.', 'arriendo-facil' ) ); ?>')) {
+				&& !window.confirm('<?php echo esc_js( __( 'Aprobar la verificación de este gestor? Se habilitará para usar datos reales.', 'arriendo-facil' ) ); ?>')) {
 				return;
 			}
 			btn.disabled = true;

@@ -230,15 +230,15 @@ if ( function_exists( 'current_user_can' ) && current_user_can( 'manage_options'
 		<section class="af-section" style="margin-bottom: var(--af-space-4);">
 			<header class="af-section__header">
 				<div>
-					<h2 class="af-section__title"><?php esc_html_e( 'Evaluación de administradores', 'arriendo-facil' ); ?></h2>
-					<p class="af-section__subtitle"><?php esc_html_e( 'El super-admin califica la gestión de cada administrador de propiedades.', 'arriendo-facil' ); ?></p>
+					<h2 class="af-section__title"><?php esc_html_e( 'Evaluación de gestores', 'arriendo-facil' ); ?></h2>
+					<p class="af-section__subtitle"><?php esc_html_e( 'El administrador de la plataforma califica la gestión de cada gestor de propiedades.', 'arriendo-facil' ); ?></p>
 				</div>
 			</header>
 
 			<table class="wp-list-table widefat fixed striped af-data-table">
 				<thead>
 					<tr>
-						<th><?php esc_html_e( 'Administrador', 'arriendo-facil' ); ?></th>
+						<th><?php esc_html_e( 'Gestor', 'arriendo-facil' ); ?></th>
 						<th><?php esc_html_e( 'Inmuebles', 'arriendo-facil' ); ?></th>
 						<th><?php esc_html_e( 'Evaluación', 'arriendo-facil' ); ?></th>
 						<th><?php esc_html_e( 'Actualizada', 'arriendo-facil' ); ?></th>
@@ -262,7 +262,7 @@ if ( function_exists( 'current_user_can' ) && current_user_can( 'manage_options'
 						}
 						?>
 						<tr>
-							<td data-label="<?php esc_attr_e( 'Administrador', 'arriendo-facil' ); ?>">
+							<td data-label="<?php esc_attr_e( 'Gestor', 'arriendo-facil' ); ?>">
 								<strong><?php echo esc_html( $af_admin->display_name ? $af_admin->display_name : $af_admin->user_login ); ?></strong><br />
 								<span class="af-td-meta"><?php echo esc_html( $af_admin->user_email ); ?></span>
 							</td>
@@ -308,7 +308,7 @@ if ( function_exists( 'current_user_can' ) && current_user_can( 'manage_options'
 			<header class="af-section__header">
 				<div>
 					<h2 class="af-section__title"><?php esc_html_e( 'Mi evaluación', 'arriendo-facil' ); ?></h2>
-					<p class="af-section__subtitle"><?php esc_html_e( 'Evaluación registrada por el super-admin.', 'arriendo-facil' ); ?></p>
+					<p class="af-section__subtitle"><?php esc_html_e( 'Evaluación registrada por el administrador de la plataforma.', 'arriendo-facil' ); ?></p>
 				</div>
 			</header>
 			<?php
@@ -639,7 +639,7 @@ if ( function_exists( 'current_user_can' ) && current_user_can( 'manage_options'
 	<div class="af-modal__dialog">
 		<button type="button" class="af-modal__close" data-af-admin-modal-close aria-label="<?php esc_attr_e( 'Cerrar', 'arriendo-facil' ); ?>">&times;</button>
 		<div class="af-modal__header">
-			<h2 class="af-modal__title" id="af-modal-rate-admin-title"><?php esc_html_e( 'Evaluar administrador', 'arriendo-facil' ); ?></h2>
+			<h2 class="af-modal__title" id="af-modal-rate-admin-title"><?php esc_html_e( 'Evaluar gestor', 'arriendo-facil' ); ?></h2>
 			<p class="af-modal__subtitle" id="af-admin-rate-subtitle"></p>
 		</div>
 		<div class="af-modal__body">

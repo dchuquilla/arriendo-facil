@@ -26,6 +26,9 @@ class Arriendo_Facil_Tenancy {
 	 */
 	const CAP = 'af_manage_properties';
 
+	// Slug kept for compatibility with stored user capabilities; displayed as "Gestor de Propiedades".
+	const PROPERTY_MANAGER_ROLE = 'af_property_admin';
+
 	/**
 	 * Whether the given (or current) user can see/operate across all tenants.
 	 *
@@ -36,6 +39,28 @@ class Arriendo_Facil_Tenancy {
 		$user_id = $user_id ? absint( $user_id ) : get_current_user_id();
 
 		return user_can( $user_id, 'manage_options' );
+	}
+
+	/**
+	 * Platform administrator ("Administrador"): runs the whole system.
+	 *
+	 * @param int $user_id User ID. Defaults to current user.
+	 * @return bool
+	 */
+	public static function is_platform_admin( $user_id = 0 ) {
+		return self::can_manage_all( $user_id );
+	}
+
+	/**
+	 * Property manager ("Gestor de Propiedades", role slug af_property_admin): a licensed client.
+	 *
+	 * @param int $user_id User ID. Defaults to current user.
+	 * @return bool
+	 */
+	public static function is_property_manager( $user_id = 0 ) {
+		$user = get_userdata( $user_id ? absint( $user_id ) : get_current_user_id() );
+
+		return $user instanceof WP_User && in_array( self::PROPERTY_MANAGER_ROLE, (array) $user->roles, true );
 	}
 
 	/**

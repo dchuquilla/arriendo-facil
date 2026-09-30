@@ -436,7 +436,7 @@ class Arriendo_Facil_Catalog_Groups {
 			// attach an administrator's property to somebody else's building
 			// and leak that building name into the other catalog.
 			if ( $property_owner && (int) $group->owner_id !== $property_owner ) {
-				return new WP_Error( 'af_group_owner_mismatch', __( 'Ese edificio pertenece a otro administrador.', 'arriendo-facil' ) );
+				return new WP_Error( 'af_group_owner_mismatch', __( 'Ese edificio pertenece a otro gestor.', 'arriendo-facil' ) );
 			}
 		}
 

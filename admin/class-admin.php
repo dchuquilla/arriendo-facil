@@ -106,8 +106,8 @@ class Arriendo_Facil_Admin {
 
 		add_submenu_page(
 			'arriendo-facil',
-			__( 'Administradores de Propiedades', 'arriendo-facil' ),
-			__( 'Administradores', 'arriendo-facil' ),
+			__( 'Gestores de Propiedades', 'arriendo-facil' ),
+			__( 'Gestores', 'arriendo-facil' ),
 			'manage_options',
 			'af-property-admins',
 			array( $this, 'render_property_admins' )
@@ -234,16 +234,14 @@ class Arriendo_Facil_Admin {
 			array( $this, 'render_reviews' )
 		);
 
-		if ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) {
-			add_submenu_page(
-				'arriendo-facil',
-				__( 'Ajustes de IA', 'arriendo-facil' ),
-				__( 'Ajustes de IA', 'arriendo-facil' ),
-				'manage_options',
-				'af-ai-settings',
-				array( $this, 'render_ai_settings' )
-			);
-		}
+		add_submenu_page(
+			'arriendo-facil',
+			__( 'Ajustes de IA', 'arriendo-facil' ),
+			__( 'Ajustes de IA', 'arriendo-facil' ),
+			'manage_options',
+			'af-ai-settings',
+			array( $this, 'render_ai_settings' )
+		);
 
 		add_submenu_page(
 			'arriendo-facil',
@@ -869,9 +867,18 @@ array(
 			),
 			array(
 				'slug'  => 'af-property-admins',
-				'label' => __( 'Administradores', 'arriendo-facil' ),
+				'label' => __( 'Gestores', 'arriendo-facil' ),
 				'url'   => admin_url( 'admin.php?page=af-property-admins' ),
 				'icon'  => 'user-check',
+				'group' => 'config',
+				'cap'   => 'manage_options',
+				'gate'  => false,
+			),
+			array(
+				'slug'  => 'af-ai-settings',
+				'label' => __( 'Ajustes de IA', 'arriendo-facil' ),
+				'url'   => admin_url( 'admin.php?page=af-ai-settings' ),
+				'icon'  => 'sparkles',
 				'group' => 'config',
 				'cap'   => 'manage_options',
 				'gate'  => false,

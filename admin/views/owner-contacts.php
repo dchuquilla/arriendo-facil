@@ -274,7 +274,7 @@ $current_user_id = (int) get_current_user_id();
                     if ( ! empty( $contact->wp_user_id ) ) {
                         $row_user = get_user_by( 'id', (int) $contact->wp_user_id );
                         if ( $row_user instanceof WP_User ) {
-                            $is_protected_admin_row = ( function_exists( 'is_super_admin' ) && is_super_admin( (int) $row_user->ID ) ) || user_can( $row_user, 'manage_options' );
+                            $is_protected_admin_row = Arriendo_Facil_Tenancy::is_platform_admin( (int) $row_user->ID );
                         }
 
                         $account_status = (string) get_user_meta( (int) $contact->wp_user_id, 'af_owner_account_status', true );

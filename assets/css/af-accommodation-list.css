@@ -335,29 +335,15 @@ body.af-native-inmuebles .wp-list-table thead th .screen-reader-text {
 	border: 0;
 }
 
-body.af-native-inmuebles .wp-list-table thead th .sorting-indicator {
-	width: 0;
-	height: 0;
-	display: inline-block;
-	flex: 0 0 auto;
-	border-left: 4px solid transparent;
-	border-right: 4px solid transparent;
-	border-top: 5px solid var(--af-gray-300, #CBD5E1);
-}
-
-body.af-native-inmuebles .wp-list-table thead th.sorted .sorting-indicator {
-	border-top-color: var(--af-primary-600, #00926F);
-}
-
-body.af-native-inmuebles .wp-list-table thead th.sorted.asc .sorting-indicator {
-	border-top: 0;
-	border-bottom: 5px solid var(--af-primary-600, #00926F);
-}
-
 /*
- * The sortable label and its caret stay together so the column title never
- * splits from the arrow and never wraps onto its neighbors.
+ * A single caret replaces WordPress' double-headed sorting indicator (two
+ * stacked triangles) so the header keeps one crisp, aligned arrow. The label
+ * and the caret stay together and never wrap onto their neighbors.
  */
+body.af-native-inmuebles .wp-list-table thead th .sorting-indicators {
+	display: none;
+}
+
 body.af-native-inmuebles .wp-list-table thead th a {
 	display: inline-flex;
 	align-items: center;
@@ -366,6 +352,28 @@ body.af-native-inmuebles .wp-list-table thead th a {
 
 body.af-native-inmuebles .wp-list-table thead th a > span:first-child {
 	white-space: nowrap;
+}
+
+/* Chevron pointing down; the sorted column shows a colored caret, flipped
+ * up when the order is ascending. */
+body.af-native-inmuebles .wp-list-table thead th a::after {
+	content: "";
+	flex: 0 0 auto;
+	width: 5px;
+	height: 5px;
+	border-right: 2px solid var(--af-gray-300, #CBD5E1);
+	border-bottom: 2px solid var(--af-gray-300, #CBD5E1);
+	transform: rotate(45deg);
+	margin-top: -2px;
+}
+
+body.af-native-inmuebles .wp-list-table thead th.sorted a::after {
+	border-color: var(--af-primary-600, #00926F);
+}
+
+body.af-native-inmuebles .wp-list-table thead th.sorted.asc a::after {
+	transform: rotate(-135deg);
+	margin-top: 3px;
 }
 
 body.af-native-inmuebles .wp-list-table thead th.sorted a,

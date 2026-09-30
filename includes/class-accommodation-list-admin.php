@@ -3,9 +3,9 @@
  * Enriches the native accommodation list table (edit.php?post_type=accommodation).
  *
  * Adds a thumbnail, a semantic status pill and a monthly-rent column, plus
- * status/type filters and price sorting. This keeps the WordPress list table
- * (bulk actions, quick edit, search, pagination) fully functional while making
- * the screen consistent with the plugin's green/slate design system.
+ * price sorting. The screen is read-only browsing: search, the status tabs and
+ * quick edit stay, while the checkbox column and the bulk/filter furniture are
+ * dropped so the table reads as a list instead of a form.
  *
  * @package Arriendo_Facil
  */
@@ -24,7 +24,6 @@ class Arriendo_Facil_Accommodation_List_Admin {
 		// (registered at the default 10) are appended after the title column.
 		add_filter( 'manage_accommodation_posts_columns', array( $this, 'add_columns' ), 9 );
 		add_action( 'manage_accommodation_posts_custom_column', array( $this, 'render_column' ), 10, 2 );
-		add_action( 'restrict_manage_posts', array( $this, 'render_filters' ) );
 		add_filter( 'manage_edit-accommodation_sortable_columns', array( $this, 'sortable_columns' ) );
 		add_action( 'pre_get_posts', array( $this, 'apply_query_filters' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue' ) );
@@ -67,10 +66,16 @@ class Arriendo_Facil_Accommodation_List_Admin {
 	 * Ocupada, appended by their own admin classes) → Tipo y ubicación →
 	 * Renta mensual → Estado → Fecha.
 	 *
+	 * The checkbox column is dropped: without it WordPress prints a second row
+	 * of bulk-action furniture (Bulk actions, Apply) for a screen that is only
+	 * ever browsed, filtered by the status tabs and quick-edited.
+	 *
 	 * @param array $columns Existing columns.
 	 * @return array
 	 */
 	public function add_columns( $columns ) {
+		unset( $columns['cb'] );
+
 		$new = array();
 		foreach ( $columns as $key => $label ) {
 			if ( 'title' === $key ) {
@@ -232,50 +237,11 @@ class Arriendo_Facil_Accommodation_List_Admin {
 	}
 
 	/**
-	 * Renders the status/type filter dropdowns in the table navigation.
+	 * Applies the price ordering to the list query.
 	 *
-	 * @param string $post_type Current post type.
-	 */
-	public function render_filters( $post_type ) {
-		if ( 'accommodation' !== $post_type ) {
-			return;
-		}
-
-		$current_status = isset( $_GET['af_status'] ) ? sanitize_key( wp_unslash( $_GET['af_status'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		$current_type   = isset( $_GET['af_type'] ) ? sanitize_key( wp_unslash( $_GET['af_type'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-
-		$statuses = $this->get_status_labels();
-		$types    = $this->get_type_labels();
-
-		echo '<label class="screen-reader-text" for="af-filter-status">' . esc_html__( 'Filtrar por estado', 'arriendo-facil' ) . '</label>';
-		echo '<select name="af_status" id="af-filter-status">';
-		echo '<option value="">' . esc_html__( 'Todos los estados', 'arriendo-facil' ) . '</option>';
-		foreach ( $statuses as $value => $label ) {
-			printf(
-				'<option value="%1$s" %2$s>%3$s</option>',
-				esc_attr( $value ),
-				selected( $current_status, $value, false ),
-				esc_html( $label )
-			);
-		}
-		echo '</select>';
-
-		echo '<label class="screen-reader-text" for="af-filter-type">' . esc_html__( 'Filtrar por tipo', 'arriendo-facil' ) . '</label>';
-		echo '<select name="af_type" id="af-filter-type">';
-		echo '<option value="">' . esc_html__( 'Todos los tipos', 'arriendo-facil' ) . '</option>';
-		foreach ( $types as $value => $label ) {
-			printf(
-				'<option value="%1$s" %2$s>%3$s</option>',
-				esc_attr( $value ),
-				selected( $current_type, $value, false ),
-				esc_html( $label )
-			);
-		}
-		echo '</select>';
-	}
-
-	/**
-	 * Applies the status/type filters and the price ordering to the list query.
+	 * The status/type meta filters are no longer offered as dropdowns, but the
+	 * query keeps honouring them so a link such as
+	 * edit.php?post_type=accommodation&af_status=rented still resolves.
 	 *
 	 * @param WP_Query $query Current query.
 	 */
@@ -333,7 +299,7 @@ class Arriendo_Facil_Accommodation_List_Admin {
 	}
 
 	/**
-	 * Enqueues the list-screen stylesheet.
+	 * Enqueues the list-screen stylesheet and the column-label mirror.
 	 *
 	 * @param string $hook Current admin page hook.
 	 */
@@ -348,11 +314,20 @@ class Arriendo_Facil_Accommodation_List_Admin {
 		}
 
 		$css_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-accommodation-list.css';
+		$js_path  = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/af-accommodation-list.js';
+
 		wp_enqueue_style(
 			'af-accommodation-list',
 			ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/af-accommodation-list.css',
 			array( 'af-tokens', 'af-shell', 'af-admin-chrome' ),
 			file_exists( $css_path ) ? (string) filemtime( $css_path ) : ARRIENDO_FACIL_VERSION
+		);
+		wp_enqueue_script(
+			'af-accommodation-list',
+			ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/af-accommodation-list.js',
+			array(),
+			file_exists( $js_path ) ? (string) filemtime( $js_path ) : ARRIENDO_FACIL_VERSION,
+			true
 		);
 	}
 }

@@ -51,7 +51,7 @@ class Arriendo_Facil_Alerts {
 		add_action( 'wp_ajax_af_alerts_send_reminder', array( $this, 'ajax_send_reminder' ) );
 
 		// Daily digest of pending alerts (registered in arriendo-facil.php).
-		add_action( 'af_alerts_email_cron', array( $this, 'dispatch_alert_emails' ) );
+		add_action( 'af_alerts_email_cron', Arriendo_Facil_Job_Lock::guard( 'af_alerts_email_cron', array( $this, 'dispatch_alert_emails' ) ) );
 
 		// Auto-configure the account + (re)generate operational alerts once per
 		// throttle window on the operator's own admin screen.

@@ -251,9 +251,8 @@ Extiende lo ya existente (`af_license_status` en usermeta, hoy solo
 ## 10. Preguntas abiertas para el usuario (bloquean implementación)
 
 - Números exactos de la matriz de límites (§3).
-- Pasarela de pago a usar para cobros recurrentes de la licencia (no del
-  dispersión a propietarios, que es un flujo distinto ya documentado en
-  `docs/payments/`).
+- Pasarela de pago a usar para cobros recurrentes de la licencia (la
+  dispersión a propietarios del modelo marketplace quedó descartada).
 - ~~Si el auto-registro público reemplaza o coexiste con el alta manual del
   super admin~~ → **RESUELTO (2026-09): coexisten** vía `af_signup_source`
   (`self`/`manual`), ver §6.

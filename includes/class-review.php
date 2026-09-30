@@ -20,7 +20,7 @@ class Arriendo_Facil_Review {
 	 */
 	public function __construct() {
 		add_action( 'af_lease_activated', array( $this, 'initialize_reviews_for_lease' ), 20, 1 );
-		add_action( 'af_review_dispatch_cron', array( $this, 'dispatch_pending_reviews' ) );
+		add_action( 'af_review_dispatch_cron', Arriendo_Facil_Job_Lock::guard( 'af_review_dispatch_cron', array( $this, 'dispatch_pending_reviews' ) ) );
 		add_action( 'wp_ajax_af_validate_review_token', array( $this, 'ajax_validate_review_token' ) );
 		add_action( 'wp_ajax_nopriv_af_validate_review_token', array( $this, 'ajax_validate_review_token' ) );
 		add_action( 'wp_ajax_af_submit_review_by_token', array( $this, 'ajax_submit_review_by_token' ) );

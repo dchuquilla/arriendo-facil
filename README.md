@@ -2,7 +2,7 @@
 
 A WordPress plugin that manages accommodations and provides a complete rental-management platform including:
 
-> 📚 **[Ver Documentación Completa →](docs/INDEX.md)** | Pagos | Facturación | OTA Integration | Templates
+> 📚 **[Ver Documentación Completa →](docs/INDEX.md)** | Arquitectura | Facturación SRI | Templates
 
 ---
 
@@ -34,13 +34,10 @@ All documentation is organized in the `/docs/` folder:
 
 | Tema | Descripción |
 |------|------------|
-| **[/docs/payments/](docs/payments/)** ⭐ **NUEVO** | 💳 Integración Deuna + Banco Pichincha - Comienza con [WORDPRESS_COMPATIBILITY_SUMMARY.md](docs/payments/WORDPRESS_COMPATIBILITY_SUMMARY.md) |
-| **[/docs/architecture/](docs/architecture/)** | Diseño técnico general, flujos, diagramas |
+| **[/docs/architecture/](docs/architecture/)** | Modelo de administración interna, suscripción de administradores |
+| **[/docs/design/](docs/design/)** | Rediseño UI/UX del panel interno |
 | **[/docs/billing/](docs/billing/)** | Facturación SRI (Ecuador), certificados, firmas |
-| **[/docs/templates/](docs/templates/)** | Procesamiento de documentos DOCX |
-| **[/docs/ota/](docs/ota/)** | Integración Booking.com + Airbnb |
-| **[/docs/implementation/](docs/implementation/)** | Guías de implementación, checklists |
-| **[/docs/troubleshooting/](docs/troubleshooting/)** | Solución de problemas |
+| **[/docs/templates/](docs/templates/)** | Plantillas DOCX de contratos |
 
 👉 **Ver índice completo:** [docs/INDEX.md](docs/INDEX.md)
 

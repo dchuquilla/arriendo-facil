@@ -3,7 +3,7 @@
  * Regression test for V3 (OWASP A10 SSRF hardening) — see plan
  * delightful-bouncing-bird.md.
  *
- * Covers Arriendo_Facil_Admin::is_url_safe_for_short_resolve() to ensure:
+ * Covers Arriendo_Facil_Admin_Settings_Controller::is_url_safe_for_short_resolve() to ensure:
  *   • Only allow-listed Google Maps hosts pass.
  *   • Non-http(s) schemes are rejected.
  *   • Hosts resolving to loopback / private / link-local / reserved IPs
@@ -16,7 +16,7 @@
  */
 
 // Minimal WordPress stubs (declared in the GLOBAL namespace so
-// Arriendo_Facil_Admin's constructor can call them).
+// Arriendo_Facil_Admin_Settings_Controller's constructor can call them).
 namespace {
 	if ( ! function_exists( 'add_action' ) ) {
 		function add_action() { return true; }
@@ -34,7 +34,7 @@ namespace {
 		function get_current_user_id() { return 0; }
 	}
 
-	require_once ARRIENDO_FACIL_PLUGIN_DIR . 'admin/class-admin.php';
+	require_once ARRIENDO_FACIL_PLUGIN_DIR . 'admin/controllers/class-admin-settings-controller.php';
 }
 
 namespace ArriendoFacil\Tests\Security {
@@ -45,7 +45,7 @@ namespace ArriendoFacil\Tests\Security {
 	class ShortUrlSsrfTest extends TestCase {
 
 		private function invoke_is_safe( $url ) {
-			$admin  = new \Arriendo_Facil_Admin();
+			$admin  = new \Arriendo_Facil_Admin_Settings_Controller();
 			$refl   = new ReflectionClass( $admin );
 			$method = $refl->getMethod( 'is_url_safe_for_short_resolve' );
 			if ( \PHP_VERSION_ID < 80100 ) {

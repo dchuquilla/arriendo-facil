@@ -67,6 +67,7 @@ if ( ! function_exists( 'add_action' ) ) {
 require_once __DIR__ . '/../includes/class-property-structure.php';
 require_once __DIR__ . '/../includes/class-tenancy.php';
 require_once __DIR__ . '/../includes/class-billing-ledger.php';
+require_once __DIR__ . '/../includes/billing-ledger/class-billing-ledger-controller.php';
 
 // wp_send_json_success() / wp_send_json_error() and check_ajax_referer() are
 // intentionally NOT stubbed here: tests/security/GuestUpdateTest.php already
@@ -1095,7 +1096,7 @@ class ServiceDueDatesTest extends TestCase {
 	 * The AJAX surface must refuse a schedule outside the operator's scope.
 	 */
 	public function test_ajax_save_requires_capability() {
-		$ledger = new Arriendo_Facil_Billing_Ledger();
+		$ledger = new Arriendo_Facil_Billing_Ledger_Controller();
 
 		$_POST = array(
 			'accommodation_id' => 77,

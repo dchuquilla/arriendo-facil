@@ -1,6 +1,6 @@
 <?php
 /**
- * Tests for Arriendo_Facil_Guest::ajax_update_guest — the admin endpoint that
+ * Tests for Arriendo_Facil_Guest_Admin_Controller::ajax_update_guest — the admin endpoint that
  * corrects a tenant's record from the profile page.
  *
  * Covers the rules that are easy to get wrong and expensive in production:
@@ -204,6 +204,7 @@ namespace {
 	require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-tenancy.php';
 	require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-identity-validator.php';
 	require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-guest.php';
+	require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-guest-admin-controller.php';
 }
 
 namespace ArriendoFacil\Tests\Security {
@@ -221,7 +222,7 @@ namespace ArriendoFacil\Tests\Security {
 		const VALID_CEDULA = '1700000001';
 
 		/**
-		 * @var Arriendo_Facil_Guest
+		 * @var Arriendo_Facil_Guest_Admin_Controller
 		 */
 		private $guest;
 
@@ -268,7 +269,7 @@ namespace ArriendoFacil\Tests\Security {
 			}
 			$GLOBALS['af_meta'][77]['_af_owner_id'] = 5;
 
-			$this->guest = new \Arriendo_Facil_Guest();
+			$this->guest = new \Arriendo_Facil_Guest_Admin_Controller();
 		}
 
 		/**

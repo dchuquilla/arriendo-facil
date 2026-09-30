@@ -634,7 +634,7 @@ class Arriendo_Facil_Billing_Ledger {
 
 		$sql = $wpdb->prepare(
 			"SELECT s.id AS schedule_id, s.unit_id, s.accommodation_id, s.service, s.due_day,
-			        s.flat_amount, s.amount_mode, s.is_active,
+			        s.flat_amount, s.amount_mode, s.is_active, s.notes,
 			        l.id AS lease_id, l.guest_id,
 			        c.id AS charge_id, c.amount, c.amount_paid, c.due_date, c.status AS charge_status,
 			        r.id AS reading_id, r.calculated_amount, r.consumption, r.current_reading, r.previous_reading, r.unit_rate,
@@ -708,6 +708,7 @@ class Arriendo_Facil_Billing_Ledger {
 				'service_label'    => self::service_label( $row->service ),
 				'due_day'          => (int) $row->due_day,
 				'flat_amount'      => (float) $row->flat_amount,
+				'amount_mode'      => (string) $row->amount_mode,
 				'notes'            => null === $row->notes ? '' : (string) $row->notes,
 				'due_date'         => $due_date,
 				'accommodation_title' => (string) $row->accommodation_title,

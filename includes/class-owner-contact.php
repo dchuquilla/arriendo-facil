@@ -1064,13 +1064,7 @@ class Arriendo_Facil_Owner_Contact {
 			return false;
 		}
 
-		$user_id = (int) $user->ID;
-
-		if ( function_exists( 'is_super_admin' ) && is_super_admin( $user_id ) ) {
-			return true;
-		}
-
-		return user_can( $user, 'manage_options' );
+		return Arriendo_Facil_Tenancy::is_platform_admin( (int) $user->ID );
 	}
 
 	/**

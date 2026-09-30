@@ -67,7 +67,7 @@ class Arriendo_Facil_Activator {
 		if ( ! $role ) {
 			$role = add_role(
 				'af_property_admin',
-				__( 'Administrador de Propiedades', 'arriendo-facil' ),
+				__( 'Gestor de Propiedades', 'arriendo-facil' ),
 				array(
 					'read'                 => true,
 					'upload_files'         => true,
@@ -96,6 +96,8 @@ class Arriendo_Facil_Activator {
 					$role->add_cap( $cap );
 				}
 			}
+
+			self::sync_role_label( 'af_property_admin', __( 'Gestor de Propiedades', 'arriendo-facil' ) );
 		}
 
 		$admin_role = get_role( 'administrator' );
@@ -110,6 +112,26 @@ class Arriendo_Facil_Activator {
 		self::sync_existing_owner_users_to_role();
 		self::migrate_legacy_af_owner_role();
 		self::heal_current_user_capabilities();
+	}
+
+	/**
+	 * Updates only the display name of an existing role (slug and capabilities untouched).
+	 *
+	 * @param string $slug  Role slug.
+	 * @param string $label Display name.
+	 * @return void
+	 */
+	private static function sync_role_label( $slug, $label ) {
+		$roles = wp_roles();
+		if ( ! isset( $roles->roles[ $slug ] ) || $label === $roles->roles[ $slug ]['name'] ) {
+			return;
+		}
+
+		$roles->roles[ $slug ]['name'] = $label;
+		$roles->role_names[ $slug ]    = $label;
+		if ( $roles->use_db ) {
+			update_option( $roles->role_key, $roles->roles );
+		}
 	}
 
 	/**

@@ -304,7 +304,7 @@ $share_pdf   = $share_token ? add_query_arg( Arriendo_Facil_Catalog_Share::PDF_A
 			</div>
 			<?php if ( $can_all && ! empty( $filter_admins ) ) : ?>
 				<div class="af-form-field">
-					<label class="af-form-field__label" for="af-cat-admin"><?php esc_html_e( 'Administrador', 'arriendo-facil' ); ?></label>
+					<label class="af-form-field__label" for="af-cat-admin"><?php esc_html_e( 'Gestor', 'arriendo-facil' ); ?></label>
 					<select id="af-cat-admin" name="af_admin_id">
 						<option value=""><?php esc_html_e( 'Todos', 'arriendo-facil' ); ?></option>
 						<?php foreach ( $filter_admins as $pa ) : ?>

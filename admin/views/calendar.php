@@ -154,7 +154,7 @@ $calendar_month_anchor = $calendar_from;
 				</label>
 				<?php if ( ! empty( $filter_admins ) ) : ?>
 					<label class="af-calendar-filters__field">
-						<span><?php esc_html_e( 'Administrador', 'arriendo-facil' ); ?></span>
+						<span><?php esc_html_e( 'Gestor', 'arriendo-facil' ); ?></span>
 						<select name="af_admin_id">
 							<option value="0"><?php esc_html_e( 'Todos', 'arriendo-facil' ); ?></option>
 							<?php foreach ( $filter_admins as $admin_user ) : ?>

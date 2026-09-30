@@ -82,7 +82,7 @@ class Arriendo_Facil_Property_Admins_Controller {
 
 		wp_send_json_success(
 			array(
-				'message'  => __( 'Administrador de propiedades creado. Comparte estas credenciales por un canal seguro (no se envía correo).', 'arriendo-facil' ),
+				'message'  => __( 'Gestor de propiedades creado. Comparte estas credenciales por un canal seguro (no se envía correo).', 'arriendo-facil' ),
 				'user_id'  => $user_id,
 				'username' => $user_login,
 				'password' => $temp_password,
@@ -111,7 +111,7 @@ class Arriendo_Facil_Property_Admins_Controller {
 
 		$user = get_userdata( $user_id );
 		if ( ! $user || ! in_array( 'af_property_admin', (array) $user->roles, true ) ) {
-			wp_send_json_error( array( 'message' => __( 'Administrador no encontrado.', 'arriendo-facil' ) ), 404 );
+			wp_send_json_error( array( 'message' => __( 'Gestor no encontrado.', 'arriendo-facil' ) ), 404 );
 		}
 
 		update_user_meta( $user_id, 'af_license_status', $status );

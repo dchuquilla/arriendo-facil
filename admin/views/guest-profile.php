@@ -494,7 +494,7 @@ if ( $can_manage ) {
 		<?php else : ?>
 			<div class="af-info-strip">
 				<strong><?php esc_html_e( 'Solo lectura', 'arriendo-facil' ); ?></strong>
-				<span><?php esc_html_e( 'Necesitas permiso de administrador de propiedades para editar esta ficha.', 'arriendo-facil' ); ?></span>
+				<span><?php esc_html_e( 'Necesitas permiso de gestor de propiedades para editar esta ficha.', 'arriendo-facil' ); ?></span>
 			</div>
 		<?php endif; ?>
 	</section>
@@ -657,7 +657,7 @@ if ( $can_manage ) {
 		<aside class="af-section" aria-labelledby="af-profile-reviews">
 			<header class="af-section__header">
 				<div>
-					<h2 class="af-section__title" id="af-profile-reviews"><?php esc_html_e( 'Evaluaciones del administrador', 'arriendo-facil' ); ?></h2>
+					<h2 class="af-section__title" id="af-profile-reviews"><?php esc_html_e( 'Evaluaciones del gestor', 'arriendo-facil' ); ?></h2>
 				</div>
 			</header>
 			<?php if ( empty( $reviews ) ) : ?>

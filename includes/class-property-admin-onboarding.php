@@ -392,7 +392,7 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 								<?php esc_html_e( 'Reenviar correo de verificación', 'arriendo-facil' ); ?>
 							</button>
 						<?php elseif ( ! $email_ok ) : ?>
-							<p class="af-account__hint"><?php esc_html_e( 'Tu cuenta fue creada por un administrador. El correo figurará como verificado una vez actives la cuenta.', 'arriendo-facil' ); ?></p>
+							<p class="af-account__hint"><?php esc_html_e( 'Tu cuenta fue creada por el administrador de la plataforma. El correo figurará como verificado una vez actives la cuenta.', 'arriendo-facil' ); ?></p>
 						<?php endif; ?>
 						<ul class="af-account__links">
 							<li>
@@ -868,7 +868,7 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 
 		$user = get_userdata( $user_id );
 		if ( ! $user || ! in_array( 'af_property_admin', (array) $user->roles, true ) ) {
-			wp_send_json_error( array( 'message' => __( 'Administrador no encontrado.', 'arriendo-facil' ) ), 404 );
+			wp_send_json_error( array( 'message' => __( 'Gestor no encontrado.', 'arriendo-facil' ) ), 404 );
 		}
 
 		$status = $this->next_doc_status( $user_id );
@@ -928,7 +928,7 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 
 		$user = get_userdata( $user_id );
 		if ( ! $user || ! in_array( 'af_property_admin', (array) $user->roles, true ) ) {
-			wp_send_json_error( array( 'message' => __( 'Administrador no encontrado.', 'arriendo-facil' ) ), 404 );
+			wp_send_json_error( array( 'message' => __( 'Gestor no encontrado.', 'arriendo-facil' ) ), 404 );
 		}
 
 		if ( 'approve' === $action ) {
@@ -939,7 +939,7 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 			update_user_meta( $user_id, 'af_admin_doc_notes', $notes );
 			update_user_meta( $user_id, 'af_admin_onboarding_step', 'ready' );
 			$this->send_verification_result_email( $user_id, 'approved', $notes );
-			wp_send_json_success( array( 'message' => __( 'Administrador verificado. Cuenta habilitada para datos reales.', 'arriendo-facil' ) ) );
+			wp_send_json_success( array( 'message' => __( 'Gestor verificado. Cuenta habilitada para datos reales.', 'arriendo-facil' ) ) );
 		}
 
 		if ( 'reject' === $action ) {
@@ -948,7 +948,7 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 			update_user_meta( $user_id, 'af_admin_doc_notes', $notes );
 			update_user_meta( $user_id, 'af_admin_onboarding_step', 'documents' );
 			$this->send_verification_result_email( $user_id, 'rejected', $notes );
-			wp_send_json_success( array( 'message' => __( 'Administrador marcado como rechazado. Se aviso al usuario.', 'arriendo-facil' ) ) );
+			wp_send_json_success( array( 'message' => __( 'Gestor marcado como rechazado. Se aviso al usuario.', 'arriendo-facil' ) ) );
 		}
 
 		// reset.
@@ -983,7 +983,7 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 
 		$user = get_userdata( $user_id );
 		if ( ! $user || ! in_array( 'af_property_admin', (array) $user->roles, true ) ) {
-			wp_send_json_error( array( 'message' => __( 'Administrador no encontrado.', 'arriendo-facil' ) ), 404 );
+			wp_send_json_error( array( 'message' => __( 'Gestor no encontrado.', 'arriendo-facil' ) ), 404 );
 		}
 
 		$id_enc    = (string) get_user_meta( $user_id, 'af_admin_id_number_enc', true );

@@ -500,71 +500,95 @@
 	gap: var(--af-space-5);
 }
 
-/* Aviso cuando todavía no hay inmuebles con contrato: sin esto la grilla
-   queda en blanco y parece que las tarjetas no cargaron. */
+/* El estado de cobranza se marca pintando el marco de la tarjeta y una
+   franja superior con el color del estado; el fondo sigue siendo el blanco
+   de .af-property-card. El color nunca es la única señal: la pastilla de
+   estado y el texto de vencimiento siempre lo acompañan.
 
-/* El estado de cobranza se marca pintando el marco de la tarjeta con el
-   color del estado. El fondo sigue siendo el blanco de .af-property-card: la
-   tarjeta no se tiñe, solo se pinta el borde. El color nunca es la única señal,
-   la pastilla de estado y el texto de vencimiento siempre lo acompañan.
-
-   rojo = vencido · naranja = vence pronto · azul = por cobrar ·
-   verde = al día · gris = sin contrato o sin cargo */
+   verde = al día · rojo = vencido · amarillo = vence pronto ·
+   azul = por cobrar · gris = sin contrato o sin cargo */
 
 .af-cobranza-card {
 	cursor: pointer;
-	transition: transform var(--af-motion-base), box-shadow var(--af-motion-base), border-color var(--af-motion-fast);
+	border-width: 2px;
+	transition: transform var(--af-motion-base), box-shadow var(--af-motion-base), border-color var(--af-motion-fast), background var(--af-motion-fast);
+}
+
+/* Franja de estado superior: se lee aunque la imagen no cargue o la pastilla
+   quede oculta bajo el contenido. */
+
+.af-cobranza-card::before {
+	content: "";
+	position: absolute;
+	top: 0;
+	right: 0;
+	left: 0;
+	height: var(--af-space-1);
+	background: var(--af-gray-300, #CBD5E1);
+	z-index: 1;
 }
 
 .af-cobranza-card:hover {
-	border-color: var(--af-primary-200, #8FDBCA);
-	box-shadow: 0 12px 28px -10px rgba(0, 168, 132, 0.22);
+	box-shadow: 0 12px 28px -10px rgba(15, 23, 42, 0.22);
 }
 
-/* El marco del estado va translucido con un halo suave; al pasar el cursor el
-   borde se vuelve solido y el halo se convierte en sombra. Mismo tratamiento
-   para los cinco estados, para que el color se lea siempre igual.
-
-   rojo = vencido · naranja = vence pronto · azul = por cobrar ·
-   verde = al dia · gris = sin contrato o sin cargo */
+/* Borde sólido del estado con su halo; al pasar el cursor el borde se vuelve
+   más intenso y el halo se convierte en sombra. Mismo tratamiento para los
+   cinco estados para que el color se lea siempre igual. */
 
 .af-cobranza-card.is-danger {
-	border-color: color-mix(in srgb, var(--af-danger-500, #DC2626) 45%, transparent);
-	box-shadow: 0 0 0 3px color-mix(in srgb, var(--af-danger-500, #DC2626) 12%, transparent);
+	border-color: var(--af-danger-500, #DC2626);
+	box-shadow: 0 0 0 3px var(--af-danger-100, #FBD1D1);
+}
+
+.af-cobranza-card.is-danger::before {
+	background: var(--af-danger-500, #DC2626);
 }
 
 .af-cobranza-card.is-danger:hover {
-	border-color: var(--af-danger-500, #DC2626);
-	box-shadow: 0 12px 28px -10px rgba(220, 38, 38, 0.28);
+	border-color: var(--af-danger-600, #B91C1C);
+	box-shadow: 0 12px 28px -10px rgba(220, 38, 38, 0.30);
 }
 
 .af-cobranza-card.is-warning {
-	border-color: color-mix(in srgb, var(--af-warning-500, #F59E0B) 45%, transparent);
-	box-shadow: 0 0 0 3px color-mix(in srgb, var(--af-warning-500, #F59E0B) 12%, transparent);
+	border-color: var(--af-warning-500, #F59E0B);
+	box-shadow: 0 0 0 3px var(--af-warning-100, #FBE6B8);
+}
+
+.af-cobranza-card.is-warning::before {
+	background: var(--af-warning-500, #F59E0B);
 }
 
 .af-cobranza-card.is-warning:hover {
-	border-color: var(--af-warning-500, #F59E0B);
-	box-shadow: 0 12px 28px -10px rgba(245, 158, 11, 0.28);
+	border-color: var(--af-warning-600, #D97706);
+	box-shadow: 0 12px 28px -10px rgba(245, 158, 11, 0.30);
 }
 
 .af-cobranza-card.is-info {
-	border-color: color-mix(in srgb, var(--af-info-500, #0EA5E9) 45%, transparent);
-	box-shadow: 0 0 0 3px color-mix(in srgb, var(--af-info-500, #0EA5E9) 12%, transparent);
+	border-color: var(--af-info-500, #0EA5E9);
+	box-shadow: 0 0 0 3px var(--af-info-100, #BEE7FB);
+}
+
+.af-cobranza-card.is-info::before {
+	background: var(--af-info-500, #0EA5E9);
 }
 
 .af-cobranza-card.is-info:hover {
-	border-color: var(--af-info-500, #0EA5E9);
-	box-shadow: 0 12px 28px -10px rgba(14, 165, 233, 0.28);
+	border-color: var(--af-info-600, #0284C7);
+	box-shadow: 0 12px 28px -10px rgba(14, 165, 233, 0.30);
 }
 
 .af-cobranza-card.is-ok {
-	border-color: color-mix(in srgb, var(--af-success-500, #0F9D58) 45%, transparent);
-	box-shadow: 0 0 0 3px color-mix(in srgb, var(--af-success-500, #0F9D58) 12%, transparent);
+	border-color: var(--af-success-500, #0F9D58);
+	box-shadow: 0 0 0 3px var(--af-success-100, #C6ECD6);
+}
+
+.af-cobranza-card.is-ok::before {
+	background: var(--af-success-500, #0F9D58);
 }
 
 .af-cobranza-card.is-ok:hover {
-	border-color: var(--af-success-500, #0F9D58);
+	border-color: var(--af-success-600, #0B7A44);
 	box-shadow: 0 12px 28px -10px rgba(15, 157, 88, 0.28);
 }
 
@@ -572,8 +596,13 @@
 
 .af-cobranza-card.is-muted,
 .af-cobranza-card.is-available {
-	border-color: var(--af-gray-300);
+	border-color: var(--af-gray-300, #CBD5E1);
 	box-shadow: none;
+}
+
+.af-cobranza-card.is-muted::before,
+.af-cobranza-card.is-available::before {
+	background: var(--af-gray-300, #CBD5E1);
 }
 
 .af-buildings-page .af-property-card__media::after {
@@ -657,11 +686,15 @@
 .af-cobranza-card__amount {
 	display: inline-flex;
 	flex-direction: column;
+	padding: calc(var(--af-space-1) + 1px) var(--af-space-3);
+	border: 1px solid var(--af-gray-200, #E2E8F0);
+	border-radius: var(--af-radius-md, 10px);
+	background: var(--af-gray-50, #F8FAFC);
 	font-family: var(--af-font-numeric, ui-monospace, SFMono-Regular, Menlo, monospace);
 	font-variant-numeric: tabular-nums;
 	font-size: var(--af-text-lg, 18px);
 	font-weight: 800;
-	line-height: 1.1;
+	line-height: 1.2;
 	color: var(--af-gray-900, #0F172A);
 }
 
@@ -669,20 +702,27 @@
 	font-family: var(--af-font-family);
 	font-size: var(--af-text-xs, 12px);
 	font-weight: 600;
-	color: var(--af-gray-500, #64748B);
+	color: inherit;
+	opacity: 0.75;
 }
 
 .af-cobranza-card__amount.is-danger {
-	color: var(--af-danger-700);
+	border-color: var(--af-danger-100, #FBD1D1);
+	background: var(--af-danger-50, #FEECEC);
+	color: var(--af-danger-700, #971818);
 }
 
 .af-cobranza-card__amount.is-warning {
-	color: var(--af-warning-700, #B45309);
+	border-color: var(--af-warning-100, #FBE6B8);
+	background: var(--af-warning-50, #FEF6E6);
+	color: var(--af-warning-700, #A26708);
 }
 
-
-
 .af-cobranza-card__due {
+	display: inline-flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: calc(var(--af-space-1) + 1px);
 	font-size: var(--af-text-xs, 12px);
 	font-weight: 700;
 	color: var(--af-gray-500, #64748B);
@@ -690,11 +730,21 @@
 }
 
 .af-cobranza-card__due.is-danger {
-	color: var(--af-danger-700);
+	color: var(--af-danger-700, #971818);
 }
 
 .af-cobranza-card__due.is-warning {
-	color: var(--af-warning-700, #B45309);
+	color: var(--af-warning-700, #A26708);
+}
+
+.af-cobranza-card__due.is-danger::before,
+.af-cobranza-card__due.is-warning::before {
+	content: "";
+	width: 6px;
+	height: 6px;
+	flex: 0 0 auto;
+	border-radius: 50%;
+	background: currentColor;
 }
 
 .af-buildings-page .af-catalog-card__hint {
@@ -1393,6 +1443,10 @@
 		min-width: 200px;
 	}
 
+	.af-buildings-page .af-cobranza-grid {
+		grid-template-columns: 1fr;
+	}
+
 	.af-buildings-form {
 		grid-template-columns: 1fr;
 	}
@@ -1422,5 +1476,16 @@
 
 	.af-cobranza-charge__actions {
 		flex: 1 1 100%;
+	}
+}
+
+@media (max-width: 600px) {
+	.af-buildings-page .af-property-card__footer {
+		flex-wrap: wrap;
+		gap: var(--af-space-2) 0;
+	}
+
+	.af-buildings-page .af-cobranza-card__due {
+		justify-content: flex-start;
 	}
 }

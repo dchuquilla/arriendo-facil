@@ -1364,14 +1364,11 @@ class Arriendo_Facil_Rental_Workflow {
 		$guest_email      = sanitize_email( (string) $guest_email );
 		$guest_phone      = sanitize_text_field( (string) $guest_phone );
 
-		if ( ! $accommodation_id || ! $visit_booking_id || ! is_email( $guest_email ) || ! class_exists( 'Arriendo_Facil_Guest' ) ) {
+		if ( ! $accommodation_id || ! $visit_booking_id || ! is_email( $guest_email ) || ! class_exists( 'Arriendo_Facil_Guest_Onboarding' ) ) {
 			return;
 		}
 
-		$guest_service = new Arriendo_Facil_Guest();
-		if ( ! method_exists( $guest_service, 'send_guest_profile_link_for_booking' ) ) {
-			return;
-		}
+		$guest_service = new Arriendo_Facil_Guest_Onboarding();
 
 		$result = $guest_service->send_guest_profile_link_for_booking(
 			$accommodation_id,

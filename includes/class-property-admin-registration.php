@@ -56,7 +56,7 @@ class Arriendo_Facil_Property_Admin_Registration {
 		add_action( 'login_init', array( $this, 'handle_email_verification_request' ) );
 		add_filter( 'authenticate', array( $this, 'enforce_email_verification_on_login' ), 30, 3 );
 
-		add_action( self::CRON_HOOK, array( $this, 'dispatch_profile_reminders' ) );
+		add_action( self::CRON_HOOK, Arriendo_Facil_Job_Lock::guard( self::CRON_HOOK, array( $this, 'dispatch_profile_reminders' ) ) );
 	}
 
 	/**

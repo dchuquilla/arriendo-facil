@@ -130,8 +130,8 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['af_queue_action'], 
 					);
 
 					// Send legal-profile form link to the approved guest.
-					if ( '' !== $selected_email && class_exists( 'Arriendo_Facil_Guest' ) ) {
-						$guest_service      = new Arriendo_Facil_Guest();
+					if ( '' !== $selected_email && class_exists( 'Arriendo_Facil_Guest_Onboarding' ) ) {
+						$guest_service      = new Arriendo_Facil_Guest_Onboarding();
 						$approved_name      = isset( $request_row->name ) ? sanitize_text_field( (string) $request_row->name ) : '';
 						$approved_phone     = isset( $request_row->phone ) ? sanitize_text_field( (string) $request_row->phone ) : '';
 						$approved_acc_id    = absint( $request_row->accommodation_id );

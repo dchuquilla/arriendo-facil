@@ -30,14 +30,17 @@ if ( file_exists( $af_composer_autoload ) ) {
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-activator.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-text-normalizer.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-identity-validator.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/support/class-job-lock.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/storage/class-private-storage.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/contracts/class-contract-text-extractor.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/contracts/class-contract-file-store.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/contracts/class-contract-generator.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-idempotency.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-tenancy.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-property-structure.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-billing-ledger.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing-ledger/class-billing-ledger-controller.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-document-verification.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-maintenance.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-owner-settlement.php';
@@ -64,6 +67,10 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-rental-workflow.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-owner-contact.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-owner-register-api.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-guest.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-tenant-signup.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-guest-onboarding.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-guest-onboarding-controller.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-guest-admin-controller.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-property-admin-registration.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-property-admin-demo.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-property-admin-onboarding.php';
@@ -87,6 +94,10 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/apisaits/class-apisaits-seria
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/apisaits/class-apisaits-client.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/apisaits/class-apisaits-module.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'admin/class-admin.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'admin/class-tenant-portal.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'admin/controllers/class-admin-settings-controller.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'admin/controllers/class-property-admins-controller.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'admin/controllers/class-legacy-ai-controller.php';
 
 // Registrar el modulo APISaits (Google Search Integration).
 APISaits_Module::register();
@@ -190,7 +201,7 @@ function arriendo_facil_register_cron_jobs() {
 	// Automatic monthly billing: canon + alícuota + servicios ya cargados por lectura.
 	// Se ejecuta a diario porque generate_monthly_charges() es idempotente (clave única
 	// lease+tipo+periodo), así que basta con que corra una vez al mes real sin lógica de fechas.
-	add_action( 'af_generate_monthly_charges_cron', array( 'Arriendo_Facil_Billing_Ledger', 'generate_monthly_charges' ) );
+	add_action( 'af_generate_monthly_charges_cron', Arriendo_Facil_Job_Lock::guard( 'af_generate_monthly_charges_cron', array( 'Arriendo_Facil_Billing_Ledger', 'generate_monthly_charges' ) ) );
 	if ( ! wp_next_scheduled( 'af_generate_monthly_charges_cron' ) ) {
 		wp_schedule_event( time() + 30 * MINUTE_IN_SECONDS, 'daily', 'af_generate_monthly_charges_cron' );
 	}
@@ -198,7 +209,7 @@ function arriendo_facil_register_cron_jobs() {
 	// Vencimientos de servicios (agua, luz, gas, internet, teléfono): convierte las
 	// reglas por inmueble+servicio en cargos del período con la fecha correcta.
 	// Idempotente igual que el anterior: la clave única lease+tipo+periodo lo evita.
-	add_action( 'af_generate_service_charges_cron', array( 'Arriendo_Facil_Billing_Ledger', 'generate_service_charges' ) );
+	add_action( 'af_generate_service_charges_cron', Arriendo_Facil_Job_Lock::guard( 'af_generate_service_charges_cron', array( 'Arriendo_Facil_Billing_Ledger', 'generate_service_charges' ) ) );
 	if ( ! wp_next_scheduled( 'af_generate_service_charges_cron' ) ) {
 		wp_schedule_event( time() + 32 * MINUTE_IN_SECONDS, 'daily', 'af_generate_service_charges_cron' );
 	}
@@ -255,12 +266,17 @@ function arriendo_facil_init() {
 		'Arriendo_Facil_Cleaning_Service',
 		'Arriendo_Facil_Maintenance',
 		'Arriendo_Facil_Lease',
+		'Arriendo_Facil_Contract_Generator',
 		'Arriendo_Facil_Lease_Operations',
 		'Arriendo_Facil_Billing_Ledger',
+		'Arriendo_Facil_Billing_Ledger_Controller',
 		'Arriendo_Facil_Rental_Workflow',
 		'Arriendo_Facil_Owner_Contact',
 		'Arriendo_Facil_Owner_Settlement',
 		'Arriendo_Facil_Guest',
+		'Arriendo_Facil_Tenant_Signup',
+		'Arriendo_Facil_Guest_Onboarding_Controller',
+		'Arriendo_Facil_Guest_Admin_Controller',
 		'Arriendo_Facil_Property_Admin_Registration',
 		'Arriendo_Facil_Property_Admin_Onboarding',
 		'Arriendo_Facil_Document_Verification',
@@ -273,6 +289,9 @@ function arriendo_facil_init() {
 		'Arriendo_Facil_Billing_API',
 		'Arriendo_Facil_Alerts',
 		'Arriendo_Facil_Admin',
+		'Arriendo_Facil_Tenant_Portal',
+		'Arriendo_Facil_Admin_Settings_Controller',
+		'Arriendo_Facil_Property_Admins_Controller',
 	);
 
 	// Captación/marketplace: sin catálogo público ni OTAs en el modelo de administración.
@@ -282,6 +301,7 @@ function arriendo_facil_init() {
 		$components[] = 'Arriendo_Facil_OTA_Webhook_Handler';
 		$components[] = 'Arriendo_Facil_OTA_Notifications';
 		$components[] = 'Arriendo_Facil_OTA_AJAX_Handlers';
+		$components[] = 'Arriendo_Facil_Legacy_AI_Controller';
 	}
 
 	foreach ( $components as $component_class ) {
@@ -419,7 +439,7 @@ add_action( 'wp_enqueue_scripts', 'arriendo_facil_remove_rentabilizar_cta', 30 )
 /**
  * WP-Cron callback: processes pending AI queue tasks in the background.
  */
-add_action( 'af_process_ai_queue', array( 'Arriendo_Facil_AI_Service', 'process_queued_ai_tasks' ) );
+add_action( 'af_process_ai_queue', Arriendo_Facil_Job_Lock::guard( 'af_process_ai_queue', array( 'Arriendo_Facil_AI_Service', 'process_queued_ai_tasks' ) ) );
 
 /**
  * REST endpoint: returns the status of a queued AI task.

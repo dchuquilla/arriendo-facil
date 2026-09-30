@@ -69,9 +69,10 @@ class Arriendo_Facil_Contract_File_Store {
 						'provider'   => Arriendo_Facil_Private_Storage::PROVIDER_R2,
 						'object_key' => $object_key,
 						'file_name'  => $file_name,
-						'local_url'  => $local_url,
+						'local_url'  => '',
 						'mime_type'  => $mime_type,
 					);
+					self::discard_local_copy( $file_path );
 				}
 			}
 		}
@@ -81,6 +82,19 @@ class Arriendo_Facil_Contract_File_Store {
 		}
 
 		return $document_url;
+	}
+
+	/**
+	 * Removes the node-local copy once the file lives in shared private storage,
+	 * so no contract remains on (or is served from) a single web node's disk.
+	 *
+	 * @param string $file_path Absolute local path.
+	 * @return void
+	 */
+	public static function discard_local_copy( $file_path ) {
+		if ( '' !== (string) $file_path && file_exists( $file_path ) ) {
+			wp_delete_file( $file_path );
+		}
 	}
 
 	/**

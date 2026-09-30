@@ -218,9 +218,10 @@ class Arriendo_Facil_Lease {
 						'provider'   => Arriendo_Facil_Private_Storage::PROVIDER_R2,
 						'object_key' => $object_key,
 						'file_name'  => $safe_name,
-						'local_url'  => $file_url,
+						'local_url'  => '',
 						'mime_type'  => $contract_mime,
 					);
+					Arriendo_Facil_Contract_File_Store::discard_local_copy( $file_path );
 				}
 			}
 		}
@@ -362,6 +363,7 @@ class Arriendo_Facil_Lease {
 		} else {
 			update_post_meta( $accommodation_id, '_af_is_occupied', '1' );
 		}
+		Arriendo_Facil_Contract_Generator::schedule( $new_id );
 		return array( 'id' => $new_id );
 	}
 
@@ -494,415 +496,25 @@ class Arriendo_Facil_Lease {
 	}
 
 	/**
-	 * Ensures a lease has a downloadable document URL.
-	 *
-	 * Creates a simple fallback contract text file if no version/document exists.
+	 * Ensures a lease has a document, generating it synchronously if missing.
+	 * Screens should call Arriendo_Facil_Contract_Generator::schedule() instead.
 	 *
 	 * @param int $lease_id Lease ID.
 	 * @return bool
 	 */
 	public function ensure_lease_document_available( $lease_id ) {
 		$lease_id = absint( $lease_id );
-		if ( ! $lease_id ) {
+		if ( ! $lease_id || ! $this->get_lease( $lease_id ) ) {
 			return false;
 		}
 
-		$versions_data = $this->get_contract_versions( $lease_id );
-		$has_versions  = isset( $versions_data['versions'] ) && is_array( $versions_data['versions'] ) && ! empty( $versions_data['versions'] );
-		if ( $has_versions ) {
+		$generator = new Arriendo_Facil_Contract_Generator();
+		if ( $generator->lease_has_document( $lease_id ) ) {
 			return true;
 		}
 
-		$lease = $this->get_lease( $lease_id );
-		if ( ! $lease ) {
-			return false;
-		}
-
-		$current_document_url = isset( $lease->document_url ) ? esc_url_raw( (string) $lease->document_url ) : '';
-		if ( '' !== $current_document_url ) {
-			return true;
-		}
-
-		// Priority rule: when an owner template exists for this accommodation,
-		// generate and attach that document before any auto-fallback file.
-		if ( $this->try_attach_owner_template_document( $lease ) ) {
-			return true;
-		}
-
-		$owner_template_url = $this->get_owner_template_url_for_lease( $lease );
-		if ( '' !== $owner_template_url ) {
-			return $this->attach_document( $lease_id, $owner_template_url );
-		}
-
-		$fallback_text = $this->build_minimal_fallback_contract_text( $lease );
-
-		$uploads = wp_upload_dir();
-		if ( ! empty( $uploads['error'] ) || empty( $uploads['basedir'] ) || empty( $uploads['baseurl'] ) ) {
-			return false;
-		}
-
-		$contracts_dir = trailingslashit( $uploads['basedir'] ) . 'arriendo-facil/contracts';
-		if ( ! wp_mkdir_p( $contracts_dir ) ) {
-			return false;
-		}
-
-		$file_name = sprintf( 'lease-%d-autofallback-%s.docx', $lease_id, gmdate( 'Ymd-His' ) );
-		$file_path = trailingslashit( $contracts_dir ) . $file_name;
-
-		if ( ! $this->write_fallback_contract_docx( $file_path, $fallback_text ) ) {
-			return false;
-		}
-
-		$file_url = esc_url_raw( trailingslashit( $uploads['baseurl'] ) . 'arriendo-facil/contracts/' . rawurlencode( $file_name ) );
-		return $this->attach_document( $lease_id, $file_url );
-	}
-
-	/**
-	 * Attempts to generate and attach lease document from owner DOCX template.
-	 *
-	 * @param object $lease Lease row object.
-	 * @return bool
-	 */
-	private function try_attach_owner_template_document( $lease ) {
-		if ( ! $lease || ! class_exists( 'Arriendo_Facil_Guest' ) ) {
-			return false;
-		}
-
-		$lease_id         = isset( $lease->id ) ? absint( $lease->id ) : 0;
-		$accommodation_id = isset( $lease->accommodation_id ) ? absint( $lease->accommodation_id ) : 0;
-		$guest_id         = isset( $lease->guest_id ) ? absint( $lease->guest_id ) : 0;
-		$template_attachment_id = isset( $lease->template_attachment_id ) ? absint( $lease->template_attachment_id ) : 0;
-
-		if ( ! $lease_id || ! $accommodation_id ) {
-			return false;
-		}
-
-		try {
-			$guest_service = new Arriendo_Facil_Guest();
-
-			$ref_get_context = new ReflectionMethod( 'Arriendo_Facil_Guest', 'get_owner_contract_example_context' );
-			$ref_get_context->setAccessible( true );
-			$owner_template = $ref_get_context->invoke( $guest_service, $accommodation_id, $template_attachment_id );
-
-			if ( ! is_array( $owner_template ) || empty( $owner_template['attachment_id'] ) ) {
-				return false;
-			}
-
-			global $wpdb;
-			$guest_row = null;
-			if ( $guest_id ) {
-				$guest_row = $wpdb->get_row(
-					$wpdb->prepare(
-						"SELECT * FROM {$wpdb->prefix}af_guests WHERE id = %d LIMIT 1",
-						$guest_id
-					)
-				);
-			}
-
-			$owner_id_number = '';
-			$owner_user_id   = isset( $owner_template['owner_user_id'] ) ? absint( $owner_template['owner_user_id'] ) : 0;
-			if ( $owner_user_id ) {
-				$owner_id_number = (string) $wpdb->get_var(
-					$wpdb->prepare(
-						"SELECT owner_id FROM {$wpdb->prefix}af_owner_contacts WHERE wp_user_id = %d ORDER BY id DESC LIMIT 1",
-						$owner_user_id
-					)
-				);
-			}
-
-			$payload = array(
-				'owner_name'            => isset( $owner_template['owner_name'] ) ? sanitize_text_field( (string) $owner_template['owner_name'] ) : '',
-				'owner_email'           => isset( $owner_template['owner_email'] ) ? sanitize_email( (string) $owner_template['owner_email'] ) : '',
-				'owner_id_number'       => sanitize_text_field( $owner_id_number ),
-				'guest_name'            => $guest_row ? sanitize_text_field( trim( (string) $guest_row->first_name . ' ' . (string) $guest_row->last_name ) ) : 'INQUILINO',
-				'guest_email'           => $guest_row ? sanitize_email( (string) $guest_row->email ) : '',
-				'guest_phone'           => $guest_row ? sanitize_text_field( (string) $guest_row->phone ) : '',
-				'guest_id_number'       => $guest_row ? sanitize_text_field( (string) $guest_row->id_number ) : '',
-				'accommodation_title'   => sanitize_text_field( (string) get_the_title( $accommodation_id ) ),
-				'accommodation_address' => sanitize_text_field( (string) get_post_meta( $accommodation_id, '_af_address', true ) ),
-				'start_date'            => isset( $lease->start_date ) ? sanitize_text_field( (string) $lease->start_date ) : '',
-				'end_date'              => isset( $lease->end_date ) ? sanitize_text_field( (string) $lease->end_date ) : '',
-				'monthly_rent'          => isset( $lease->monthly_rent ) ? (float) $lease->monthly_rent : 0.0,
-				'desired_price'         => '',
-				'guarantee_text'        => ( $guest_row && isset( $guest_row->guarantee_text ) ) ? sanitize_text_field( (string) $guest_row->guarantee_text ) : '',
-				'template_available'    => true,
-				'template_text'         => isset( $owner_template['template_text'] ) ? (string) $owner_template['template_text'] : '',
-			);
-
-			$ref_create = new ReflectionMethod( 'Arriendo_Facil_Guest', 'create_filled_contract_from_owner_template' );
-			$ref_create->setAccessible( true );
-			$document_url = (string) $ref_create->invoke( $guest_service, $lease_id, $owner_template, $payload );
-
-			if ( '' === $document_url ) {
-				return false;
-			}
-
-			$ref_attach = new ReflectionMethod( 'Arriendo_Facil_Guest', 'force_attach_lease_document' );
-			$ref_attach->setAccessible( true );
-			$ref_attach->invoke( $guest_service, $lease_id, $document_url );
-
-			$lease_after = $this->get_lease( $lease_id );
-			$attached_url = $lease_after && isset( $lease_after->document_url ) ? esc_url_raw( (string) $lease_after->document_url ) : '';
-			return '' !== $attached_url;
-		} catch ( Throwable $throwable ) {
-			error_log( 'Arriendo Facil owner-template auto-attach failed: ' . $throwable->getMessage() );
-			return false;
-		}
-	}
-
-	/**
-	 * Returns the owner template URL for this lease when available.
-	 *
-	 * @param object $lease Lease row object.
-	 * @return string
-	 */
-	private function get_owner_template_url_for_lease( $lease ) {
-		if ( ! $lease || ! class_exists( 'Arriendo_Facil_Guest' ) ) {
-			return '';
-		}
-
-		$accommodation_id = isset( $lease->accommodation_id ) ? absint( $lease->accommodation_id ) : 0;
-		if ( ! $accommodation_id ) {
-			return '';
-		}
-
-		try {
-			$guest_service = new Arriendo_Facil_Guest();
-			$ref_get_context = new ReflectionMethod( 'Arriendo_Facil_Guest', 'get_owner_contract_example_context' );
-			$ref_get_context->setAccessible( true );
-			$owner_template = $ref_get_context->invoke( $guest_service, $accommodation_id );
-			if ( is_array( $owner_template ) && isset( $owner_template['url'] ) && is_string( $owner_template['url'] ) ) {
-				return esc_url_raw( (string) $owner_template['url'] );
-			}
-		} catch ( Throwable $throwable ) {
-			error_log( 'Arriendo Facil owner-template URL lookup failed: ' . $throwable->getMessage() );
-		}
-
-		return '';
-	}
-
-	/**
-	 * Builds a minimal fallback contract body for visibility when generation fails.
-	 *
-	 * @param object $lease Lease row.
-	 * @return string
-	 */
-	private function build_minimal_fallback_contract_text( $lease ) {
-		$accommodation_id = isset( $lease->accommodation_id ) ? absint( $lease->accommodation_id ) : 0;
-		$guest_id         = isset( $lease->guest_id ) ? absint( $lease->guest_id ) : 0;
-		$start_date       = isset( $lease->start_date ) ? sanitize_text_field( (string) $lease->start_date ) : '';
-		$end_date         = isset( $lease->end_date ) ? sanitize_text_field( (string) $lease->end_date ) : '';
-		$monthly_rent_raw = isset( $lease->monthly_rent ) ? (float) $lease->monthly_rent : 0.0;
-
-		// Build full payload to generate a proper legal contract.
-		$accommodation_title   = $accommodation_id ? (string) get_the_title( $accommodation_id ) : '________________________';
-		$accommodation_address = $accommodation_id ? (string) get_post_meta( $accommodation_id, '_af_address', true ) : '________________________';
-
-		$owner_name      = '________________________';
-		$owner_id_number = '________________________';
-		$owner_email     = '';
-		if ( $accommodation_id ) {
-			$owner_user_id = absint( get_post_meta( $accommodation_id, '_af_owner_id', true ) );
-			if ( $owner_user_id ) {
-				$owner_user = get_user_by( 'id', $owner_user_id );
-				if ( $owner_user ) {
-					$owner_name  = (string) $owner_user->display_name;
-					$owner_email = (string) $owner_user->user_email;
-				}
-			}
-		}
-
-		$guest_name      = '________________________';
-		$guest_email     = '';
-		$guest_phone     = '';
-		$guest_id_number = '________________________';
-		$guarantee_text  = 'Garantia equivalente a dos (2) meses del canon de arrendamiento.';
-		if ( $guest_id ) {
-			global $wpdb;
-			$guest_row = $wpdb->get_row(
-				$wpdb->prepare(
-					"SELECT * FROM {$wpdb->prefix}af_guests WHERE id = %d LIMIT 1",
-					$guest_id
-				)
-			);
-			if ( $guest_row ) {
-				$guest_name      = trim( (string) $guest_row->first_name . ' ' . (string) $guest_row->last_name );
-				$guest_email     = (string) $guest_row->email;
-				$guest_phone     = (string) $guest_row->phone;
-				$guest_id_number = (string) $guest_row->id_number;
-				if ( ! empty( $guest_row->guarantee_text ) ) {
-					$guarantee_text = (string) $guest_row->guarantee_text;
-				}
-			}
-		}
-
-		$payload = array(
-			'owner_name'            => $owner_name,
-			'owner_email'           => $owner_email,
-			'owner_id_number'       => $owner_id_number,
-			'guest_name'            => $guest_name,
-			'guest_email'           => $guest_email,
-			'guest_phone'           => $guest_phone,
-			'guest_id_number'       => $guest_id_number,
-			'accommodation_title'   => $accommodation_title,
-			'accommodation_address' => $accommodation_address,
-			'start_date'            => $start_date,
-			'end_date'              => $end_date,
-			'monthly_rent'          => $monthly_rent_raw,
-			'guarantee_text'        => $guarantee_text,
-			'mascotas'              => 0,
-			'personas_viviran'      => 0,
-			'referencia_personal_1' => '________________________',
-			'referencia_personal_2' => '________________________',
-		);
-
-		// Try AI generation first.
-		if ( class_exists( 'Arriendo_Facil_AI_Service' ) ) {
-			try {
-				$ai_payload_full = array_merge( $payload, array(
-					'template_available' => false,
-					'template_text'      => '',
-				) );
-				$ai = new Arriendo_Facil_AI_Service();
-				$result = $ai->generate_document( $ai_payload_full );
-				if ( ! is_wp_error( $result ) && isset( $result['contract_text'] ) && '' !== trim( (string) $result['contract_text'] ) ) {
-					return trim( wp_strip_all_tags( (string) $result['contract_text'] ) );
-				}
-			} catch ( Throwable $throwable ) {
-				error_log( 'Arriendo Facil lease auto-repair AI error: ' . $throwable->getMessage() );
-			}
-		}
-
-		// Inline legal contract fallback (Ecuador 2026).
-		$rent_formatted = number_format( $monthly_rent_raw, 2, '.', '' );
-		$city_and_date  = sprintf( 'Quito, %s', current_time( 'Y-m-d' ) );
-
-		$text  = "CONTRATO DE ARRENDAMIENTO DE INMUEBLE\n";
-		$text .= "(Conforme al Codigo Civil del Ecuador, Arts. 1857-1948, y la Ley de Inquilinato vigente con sus reformas)\n";
-		$text .= "\n" . $city_and_date . "\n";
-		$text .= "\nCOMPARECIENTES\n";
-		$text .= "\nARRENDADOR: " . $owner_name . "\nARRENDATARIO: " . $guest_name . " (Cedula: " . $guest_id_number . ", Celular: " . $guest_phone . ", Correo: " . $guest_email . ")\n";
-		$text .= "\nCLAUSULA PRIMERA - OBJETO DEL CONTRATO\n";
-		$text .= "El ARRENDADOR da en arrendamiento el inmueble \"" . $accommodation_title . "\", ubicado en " . $accommodation_address . ".\n";
-		$text .= "\nCLAUSULA SEGUNDA - PLAZO\n";
-		$text .= "Vigencia: " . $start_date . " hasta el " . $end_date . ". Prorroga automatica de 30 dias salvo aviso previo escrito.\n";
-		$text .= "\nCLAUSULA TERCERA - CANON Y FORMA DE PAGO\n";
-		$text .= "Canon mensual: USD " . $rent_formatted . ", pagadero dentro de los primeros cinco (5) dias de cada mes. Mora del 1% mensual por retraso.\n";
-		$text .= "\nCLAUSULA CUARTA - GARANTIA\n";
-		$text .= $guarantee_text . "\n";
-		$text .= "\nCLAUSULA QUINTA - DESTINO Y USO\n";
-		$text .= "Uso exclusivo habitacional. Prohibido subarrendar sin autorizacion escrita del ARRENDADOR.\n";
-		$text .= "\nCLAUSULA SEXTA - SERVICIOS BASICOS\n";
-		$text .= "Energia, agua, telefonia, internet y gas a cargo del ARRENDATARIO. Predial y administracion a cargo del ARRENDADOR.\n";
-		$text .= "\nCLAUSULA SEPTIMA - OBLIGACIONES DEL ARRENDATARIO\n";
-		$text .= "Pago puntual, conservacion del inmueble, no modificar sin autorizacion, permitir inspecciones con 24 h de aviso.\n";
-		$text .= "\nCLAUSULA OCTAVA - OBLIGACIONES DEL ARRENDADOR\n";
-		$text .= "Garantizar la posesion pacifica y atender reparaciones estructurales (Art. 1937 CC).\n";
-		$text .= "\nCLAUSULA NOVENA - TERMINACION\n";
-		$text .= "Por vencimiento, mutuo acuerdo, incumplimiento o desahucio conforme COGEP. Aviso de 30 dias para desahucio voluntario.\n";
-		$text .= "\nCLAUSULA DECIMA - JURISDICCION\n";
-		$text .= "Jueces competentes del Ecuador. Ley de Inquilinato, Codigo Civil Arts. 1857-1948 y COGEP vigentes 2026. Renuncia a domicilio y fuero especial.\n";
-		$text .= "\nEn fe de lo cual las partes suscriben el presente contrato en dos ejemplares.\n";
-		$text .= "\nFIRMAS\n";
-		$text .= "\nARRENDADOR: ________________________\nNombre: " . $owner_name . "\nCedula/RUC: " . $owner_id_number . "\n";
-		$text .= "\nARRENDATARIO: ________________________\nNombre: " . $guest_name . "\nCedula: " . $guest_id_number . "\n";
-
-		return $text;
-	}
-
-	/**
-	 * Writes a formatted DOCX fallback contract file.
-	 *
-	 * @param string $file_path Destination file path.
-	 * @param string $contract_text Contract text content.
-	 * @return bool
-	 */
-	private function write_fallback_contract_docx( $file_path, $contract_text ) {
-		if ( ! class_exists( 'ZipArchive' ) ) {
-			return false;
-		}
-
-		$zip = new ZipArchive();
-		if ( true !== $zip->open( $file_path, ZipArchive::CREATE | ZipArchive::OVERWRITE ) ) {
-			return false;
-		}
-
-		$lines = preg_split( '/\r\n|\r|\n/', (string) $contract_text );
-		if ( ! is_array( $lines ) ) {
-			$lines = array( (string) $contract_text );
-		}
-
-		$doc_paragraphs_xml = '';
-		$first_line = true;
-		foreach ( $lines as $line ) {
-			$line = trim( (string) $line );
-			if ( '' === $line ) {
-				$doc_paragraphs_xml .= '<w:p/>';
-				continue;
-			}
-
-			$upper = strtoupper( $line );
-			$is_title  = $first_line || false !== strpos( $upper, 'CONTRATO DE ARRENDAMIENTO' );
-			$is_clause = 0 === strpos( $upper, 'CLAUSULA ' );
-			$first_line = false;
-
-			$ppr = '';
-			$rpr = '';
-			if ( $is_title ) {
-				$ppr = '<w:pPr><w:jc w:val="center"/></w:pPr>';
-				$rpr = '<w:rPr><w:b/><w:bCs/><w:sz w:val="28"/><w:szCs w:val="28"/></w:rPr>';
-			} elseif ( $is_clause ) {
-				$ppr = '<w:pPr><w:jc w:val="left"/></w:pPr>';
-				$rpr = '<w:rPr><w:b/><w:bCs/></w:rPr>';
-			} else {
-				$ppr = '<w:pPr><w:jc w:val="both"/></w:pPr>';
-			}
-
-			$doc_paragraphs_xml .= '<w:p>' . $ppr . '<w:r>' . $rpr . '<w:t xml:space="preserve">' . esc_xml( $line ) . '</w:t></w:r></w:p>';
-		}
-
-		if ( '' === $doc_paragraphs_xml ) {
-			$doc_paragraphs_xml = '<w:p><w:r><w:t xml:space="preserve">Contrato</w:t></w:r></w:p>';
-		}
-
-		$document_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-			. '<w:document xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:wp14="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:w10="urn:schemas-microsoft-com:office:word" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml" xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup" xmlns:wpi="http://schemas.microsoft.com/office/word/2010/wordprocessingInk" xmlns:wne="http://schemas.microsoft.com/office/word/2006/wordml" xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" mc:Ignorable="w14 w15 wp14">'
-			. '<w:body>' . $doc_paragraphs_xml . '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/><w:cols w:space="720"/></w:sectPr></w:body></w:document>';
-
-		$content_types_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-			. '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
-			. '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
-			. '<Default Extension="xml" ContentType="application/xml"/>'
-			. '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>'
-			. '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
-			. '</Types>';
-
-		$styles_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-			. '<w:styles xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" mc:Ignorable="">'
-			. '<w:docDefaults>'
-			. '<w:rPrDefault><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr></w:rPrDefault>'
-			. '<w:pPrDefault><w:pPr><w:spacing w:before="0" w:after="160" w:line="360" w:lineRule="auto"/><w:jc w:val="both"/></w:pPr></w:pPrDefault>'
-			. '</w:docDefaults>'
-			. '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>'
-			. '</w:styles>';
-
-		$rels_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-			. '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
-			. '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>'
-			. '</Relationships>';
-
-		$doc_rels_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-			. '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
-			. '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
-			. '</Relationships>';
-
-		$zip->addFromString( '[Content_Types].xml', $content_types_xml );
-		$zip->addFromString( '_rels/.rels', $rels_xml );
-		$zip->addFromString( 'word/document.xml', $document_xml );
-		$zip->addFromString( 'word/styles.xml', $styles_xml );
-		$zip->addFromString( 'word/_rels/document.xml.rels', $doc_rels_xml );
-
-		return $zip->close();
+		$result = $generator->generate_for_lease( $lease_id );
+		return ! empty( $result['generated'] );
 	}
 
 	/**
@@ -1371,6 +983,8 @@ class Arriendo_Facil_Lease {
 				if ( ! is_wp_error( $upload_r2 ) ) {
 					$approved_pdf['provider']   = Arriendo_Facil_Private_Storage::PROVIDER_R2;
 					$approved_pdf['object_key'] = $object_key;
+					$approved_pdf['local_url']  = '';
+					Arriendo_Facil_Contract_File_Store::discard_local_copy( $file_path );
 				}
 			}
 		}

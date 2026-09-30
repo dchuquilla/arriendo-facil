@@ -360,10 +360,10 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 		// choose which one generates the lease document.
 		const templateIndex = <?php
 		$template_index = array();
-		if ( $lease_service && class_exists( 'Arriendo_Facil_Guest' ) ) {
-			$guest_service = new Arriendo_Facil_Guest();
+		if ( $lease_service ) {
+			$contract_generator = new Arriendo_Facil_Contract_Generator();
 			foreach ( (array) $lease_accommodations as $acc_item ) {
-				$templates = $guest_service->get_owner_contract_templates_for_accommodation( (int) $acc_item->ID );
+				$templates = $contract_generator->get_owner_contract_templates_for_accommodation( (int) $acc_item->ID );
 				if ( ! empty( $templates ) ) {
 					$template_index[ (int) $acc_item->ID ] = array_map(
 						static function ( $t ) {
@@ -498,24 +498,14 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 					}
 					?>
 					<?php
-					if ( $lease_service && empty( $lease->document_url ) ) {
-						$saved_accommodation_title = isset( $lease->accommodation_title ) ? $lease->accommodation_title : null;
-						$lease_service->ensure_lease_document_available( (int) $lease->id );
-						$refreshed_lease = $lease_service->get_lease( (int) $lease->id );
-						if ( $refreshed_lease ) {
-							$lease = $refreshed_lease;
-							if ( null !== $saved_accommodation_title ) {
-								$lease->accommodation_title = $saved_accommodation_title;
-							} else {
-								$lease->accommodation_title = isset( $lease->accommodation_id ) ? get_the_title( (int) $lease->accommodation_id ) : '';
-							}
-						}
-					}
-
 					$versions_data   = $lease_service ? $lease_service->get_contract_versions( (int) $lease->id ) : array( 'active_version' => 0, 'versions' => array() );
 					$active_version  = isset( $versions_data['active_version'] ) ? (int) $versions_data['active_version'] : 0;
 					$versions        = isset( $versions_data['versions'] ) && is_array( $versions_data['versions'] ) ? $versions_data['versions'] : array();
 					$versions_count  = count( $versions );
+					$document_queued = false;
+					if ( $lease_service && empty( $lease->document_url ) && 0 === $versions_count ) {
+						$document_queued = Arriendo_Facil_Contract_Generator::schedule( (int) $lease->id );
+					}
 					$next_version    = $versions_count + 1;
 					$active_entry    = null;
 					if ( $versions_count > 0 ) {
@@ -627,8 +617,10 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 										</div>
 									<?php endif; ?>
 								<?php endif; ?>
+							<?php elseif ( $document_queued ) : ?>
+								<span class="af-lease-empty-document"><?php esc_html_e( 'Generando documento en segundo plano. Recarga en unos segundos.', 'arriendo-facil' ); ?></span>
 							<?php else : ?>
-								<span class="af-lease-empty-document"><?php esc_html_e( 'Aun no hay contrato. Se genera desde el flujo del chatbot.', 'arriendo-facil' ); ?></span>
+								<span class="af-lease-empty-document"><?php esc_html_e( 'Aun no hay contrato. Sube una version Word desde Acciones.', 'arriendo-facil' ); ?></span>
 							<?php endif; ?>
 						</td>
 						<td class="af-lease-actions-cell af-td-actions" data-label="<?php esc_attr_e( 'Acciones', 'arriendo-facil' ); ?>">

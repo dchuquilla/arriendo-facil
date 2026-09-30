@@ -7,9 +7,10 @@
  * 'self'):
  *
  *  1. Página "Mi perfil" (af-admin-profile): checklist de onboarding,
- *     datos de la empresa, identidad (cédula/RUC validada) y subida de
- *     documentos (cédula/papeleta, certificado laboral, certificado
- *     bancario) con almacenamiento privado.
+ *     datos de la empresa, identidad (cédula/RUC validada) y subida del
+ *     documento de identidad (cédula/papeleta) con almacenamiento privado.
+ *     Los certificados laboral y bancario solo aplican a inquilinos; al
+ *     administrador de propiedades solo se le exige identidad.
  *  2. Banner contextual en wp-admin recordando completar el perfil y
  *     avisando que los datos de la demo son de ejemplo; permite limpiar
  *     el dataset de ejemplo.
@@ -27,7 +28,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Arriendo_Facil_Property_Admin_Onboarding {
 
 	const PREFIX           = 'af_admin_';
-	const DOC_TYPES        = array( 'cedula_papeleta', 'certificado_laboral', 'certificado_bancario' );
+	const DOC_TYPES        = array( 'cedula_papeleta' );
 	const PROFILE_NONCE    = 'af_admin_profile_nonce';
 	const REVIEW_NONCE     = 'af_property_admin_nonce';
 	const PAGE_SLUG        = 'af-admin-profile';
@@ -201,7 +202,7 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 			'email'     => array( 'label' => __( 'Verifica tu correo', 'arriendo-facil' ), 'hint' => __( 'Revisa tu bandeja y usa el enlace de verificacion.', 'arriendo-facil' ) ),
 			'company'   => array( 'label' => __( 'Datos de la empresa', 'arriendo-facil' ), 'hint' => __( 'Nombre, responsable y telefono de contacto.', 'arriendo-facil' ) ),
 			'identity'  => array( 'label' => __( 'Identidad del responsable', 'arriendo-facil' ), 'hint' => __( 'Cedula o RUC validados automaticamente.', 'arriendo-facil' ) ),
-			'documents' => array( 'label' => __( 'Documentos de soporte', 'arriendo-facil' ), 'hint' => __( 'Cedula/papeleta, certificado laboral y bancario (PDF).', 'arriendo-facil' ) ),
+			'documents' => array( 'label' => __( 'Documentos de soporte', 'arriendo-facil' ), 'hint' => __( 'Cedula o papeleta de votacion (PDF).', 'arriendo-facil' ) ),
 			'review'    => array( 'label' => __( 'Revision del equipo', 'arriendo-facil' ), 'hint' => __( 'El equipo supervisor valida tus documentos.', 'arriendo-facil' ) ),
 		);
 
@@ -338,7 +339,7 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 						<div class="af-section__header">
 							<div>
 								<h2 class="af-section__title"><?php esc_html_e( 'Documentos de soporte', 'arriendo-facil' ); ?></h2>
-								<p class="af-section__subtitle"><?php esc_html_e( 'Cédula o papeleta de votación, certificado laboral y certificado bancario en PDF. Se guardan de forma privada.', 'arriendo-facil' ); ?></p>
+								<p class="af-section__subtitle"><?php esc_html_e( 'Cédula o papeleta de votación en PDF. Se guarda de forma privada.', 'arriendo-facil' ); ?></p>
 							</div>
 						</div>
 						<form data-af-doc-form>

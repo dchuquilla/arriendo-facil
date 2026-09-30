@@ -131,6 +131,36 @@ $documents = class_exists( 'Arriendo_Facil_Document_Verification' )
 $doc_status  = isset( $guest->doc_status ) && $guest->doc_status ? (string) $guest->doc_status : 'pendiente';
 $doc_variant = 'verificado' === $doc_status ? 'success' : ( 'rechazado' === $doc_status ? 'danger' : 'warning' );
 
+$required_guest_docs = class_exists( 'Arriendo_Facil_Document_Verification' )
+	? Arriendo_Facil_Document_Verification::required_document_types()
+	: array();
+$missing_guest_docs  = class_exists( 'Arriendo_Facil_Document_Verification' )
+	? Arriendo_Facil_Document_Verification::missing_required_documents( $guest_id )
+	: array();
+$missing_guest_labels = array();
+foreach ( $missing_guest_docs as $missing_doc_type ) {
+	$missing_guest_labels[] = isset( $required_guest_docs[ $missing_doc_type ] )
+		? $required_guest_docs[ $missing_doc_type ]
+		: $missing_doc_type;
+}
+
+$guest_doc_labels = array_merge(
+	$required_guest_docs,
+	array(
+		'garantia_alicuota' => __( 'Garantía y alícuota', 'arriendo-facil' ),
+	)
+);
+
+$latest_guest_doc = array();
+foreach ( $documents as $document_row ) {
+	$document_type = isset( $document_row->doc_type ) ? (string) $document_row->doc_type : '';
+	if ( $document_type && ! isset( $latest_guest_doc[ $document_type ] ) ) {
+		$latest_guest_doc[ $document_type ] = $document_row;
+	}
+}
+
+$profile_doc_nonce = wp_create_nonce( 'af_document_nonce' );
+
 $identity_status = isset( $guest->identity_match_status ) ? (string) $guest->identity_match_status : 'not_checked';
 
 $can_manage = current_user_can( Arriendo_Facil_Tenancy::CAP );
@@ -201,7 +231,117 @@ $full_name  = trim( $guest->first_name . ' ' . $guest->last_name );
 			<div class="af-kpi__head"><span class="af-kpi__label"><?php esc_html_e( 'Evaluaciones cualitativas', 'arriendo-facil' ); ?></span></div>
 			<div class="af-kpi__value"><?php echo esc_html( count( $reviews ) ); ?></div>
 			<div class="af-kpi__hint"><?php esc_html_e( 'Puntualidad, cuidado, convivencia y comunicación', 'arriendo-facil' ); ?></div>
-			<?php if ( $can_manage && $latest_lease_id ) : ?>
+<?php if ( $can_manage ) : ?>
+<script>
+(function () {
+	const ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
+	const docNonce = <?php echo wp_json_encode( $profile_doc_nonce ); ?>;
+	const guestId = <?php echo (int) $guest_id; ?>;
+	const form = document.getElementById('af-profile-docs-form');
+	const status = document.getElementById('af-profile-docs-status');
+
+	function setStatus(message, variant) {
+		if (!status) { return; }
+		status.textContent = message;
+		status.className = 'af-modal__status' + (variant ? ' is-' + variant : '');
+	}
+
+	function post(body) {
+		return fetch(ajaxUrl, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+			body: body
+		}).then(function (r) { return r.json(); });
+	}
+
+	if (form) {
+		form.addEventListener('submit', function (event) {
+			event.preventDefault();
+
+			const btn = form.querySelector('button[type="submit"]');
+			const data = new FormData(form);
+			let selected = 0;
+			data.forEach(function (value, key) {
+				if (key.indexOf('guest_') === 0 && value instanceof File && value.size > 0) { selected += 1; }
+			});
+
+			if (!selected) {
+				setStatus(<?php echo wp_json_encode( __( 'Selecciona al menos un PDF.', 'arriendo-facil' ) ); ?>, 'error');
+				return;
+			}
+
+			btn.disabled = true;
+			setStatus(<?php echo wp_json_encode( __( 'Subiendo documentos…', 'arriendo-facil' ) ); ?>, '');
+
+			data.append('action', 'af_update_guest_documents');
+			data.append('nonce', docNonce);
+			data.append('guest_id', guestId);
+
+			fetch(ajaxUrl, { method: 'POST', body: data, credentials: 'same-origin' })
+				.then(function (r) { return r.json(); })
+				.then(function (json) {
+					btn.disabled = false;
+					if (!json || !json.success) {
+						setStatus((json && json.data && json.data.message) || <?php echo wp_json_encode( __( 'No se pudieron subir los documentos.', 'arriendo-facil' ) ); ?>, 'error');
+						return;
+					}
+					setStatus(json.data.message, 'success');
+					setTimeout(function () { window.location.reload(); }, 900);
+				})
+				.catch(function () {
+					btn.disabled = false;
+					setStatus(<?php echo wp_json_encode( __( 'La solicitud falló.', 'arriendo-facil' ) ); ?>, 'error');
+				});
+		});
+	}
+
+	const verifyBtn = document.getElementById('af-profile-docs-verify');
+	if (verifyBtn) {
+		verifyBtn.addEventListener('click', function () {
+			verifyBtn.disabled = true;
+			setStatus(<?php echo wp_json_encode( __( 'Verificando…', 'arriendo-facil' ) ); ?>, '');
+
+			const body = new URLSearchParams();
+			body.append('action', 'af_set_document_status');
+			body.append('nonce', docNonce);
+			body.append('guest_id', guestId);
+			body.append('doc_status', 'verificado');
+
+			post(body).then(function (json) {
+				verifyBtn.disabled = false;
+				if (!json || !json.success) {
+					setStatus((json && json.data && json.data.message) || <?php echo wp_json_encode( __( 'No se pudo verificar.', 'arriendo-facil' ) ); ?>, 'error');
+					return;
+				}
+				setStatus(json.data.message, 'success');
+				setTimeout(function () { window.location.reload(); }, 900);
+			});
+		});
+	}
+
+	document.querySelectorAll('.af-guest-doc-view').forEach(function (btn) {
+		btn.addEventListener('click', function () {
+			btn.disabled = true;
+			const body = new URLSearchParams();
+			body.append('action', 'af_download_guest_document');
+			body.append('nonce', docNonce);
+			body.append('document_id', btn.getAttribute('data-document'));
+
+			post(body).then(function (json) {
+				btn.disabled = false;
+				if (!json || !json.success || !json.data || !json.data.url) {
+					window.alert((json && json.data && json.data.message) || <?php echo wp_json_encode( __( 'No se pudo abrir el documento.', 'arriendo-facil' ) ); ?>);
+					return;
+				}
+				window.open(json.data.url, '_blank', 'noopener,noreferrer');
+			});
+		});
+	});
+})();
+</script>
+<?php endif; ?>
+
+<?php if ( $can_manage && $latest_lease_id ) : ?>
 				<div class="af-kpi__footer">
 					<button type="button" class="af-kpi__link" id="af-profile-rate-btn" data-lease="<?php echo esc_attr( $latest_lease_id ); ?>" data-suggested="<?php echo esc_attr( $payment_score ? $payment_score['score'] : 0 ); ?>" style="background:none;border:0;cursor:pointer;padding:0;">
 						<?php esc_html_e( 'Calificar ahora', 'arriendo-facil' ); ?>
@@ -230,6 +370,119 @@ $full_name  = trim( $guest->first_name . ' ' . $guest->last_name );
 			</div>
 		</div>
 	<?php endif; ?>
+
+	<section class="af-section" aria-labelledby="af-profile-docs">
+		<header class="af-section__header">
+			<div>
+				<h2 class="af-section__title" id="af-profile-docs"><?php esc_html_e( 'Documentos del inquilino', 'arriendo-facil' ); ?></h2>
+				<p class="af-section__subtitle"><?php esc_html_e( 'Carga aquí la identidad y los ingresos. No necesitas enviarle ningún enlace.', 'arriendo-facil' ); ?></p>
+			</div>
+			<span class="af-pill af-pill--<?php echo esc_attr( $doc_variant ); ?>"><?php echo esc_html( ucfirst( $doc_status ) ); ?></span>
+		</header>
+
+		<?php if ( ! empty( $missing_guest_labels ) ) : ?>
+			<div class="notice notice-warning inline" style="margin: 0 0 var(--af-space-4);">
+				<p>
+					<?php
+					echo esc_html(
+						sprintf(
+							/* translators: %s: comma-separated list of missing documents */
+							__( 'Faltan documentos requeridos para verificar: %s', 'arriendo-facil' ),
+							implode( ', ', $missing_guest_labels )
+						)
+					);
+					?>
+				</p>
+			</div>
+		<?php endif; ?>
+
+		<div class="af-table-scroll">
+			<table class="wp-list-table widefat fixed striped af-data-table">
+				<thead>
+					<tr>
+						<th><?php esc_html_e( 'Documento', 'arriendo-facil' ); ?></th>
+						<th><?php esc_html_e( 'Estado', 'arriendo-facil' ); ?></th>
+						<th><?php esc_html_e( 'Archivo', 'arriendo-facil' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+					<?php foreach ( $guest_doc_labels as $doc_type_key => $doc_type_label ) : ?>
+						<?php
+						$doc_row        = isset( $latest_guest_doc[ $doc_type_key ] ) ? $latest_guest_doc[ $doc_type_key ] : null;
+						$is_required    = array_key_exists( $doc_type_key, $required_guest_docs );
+						$has_document   = null !== $doc_row;
+						?>
+						<tr>
+							<td data-label="<?php esc_attr_e( 'Documento', 'arriendo-facil' ); ?>">
+								<strong><?php echo esc_html( $doc_type_label ); ?></strong>
+								<?php if ( ! $is_required ) : ?>
+									<span class="af-td-meta"><?php esc_html_e( 'opcional', 'arriendo-facil' ); ?></span>
+								<?php endif; ?>
+							</td>
+							<td data-label="<?php esc_attr_e( 'Estado', 'arriendo-facil' ); ?>">
+								<?php if ( $has_document ) : ?>
+									<span class="af-pill af-pill--success"><?php esc_html_e( 'Subido', 'arriendo-facil' ); ?></span>
+								<?php elseif ( $is_required ) : ?>
+									<span class="af-pill af-pill--danger"><?php esc_html_e( 'Falta', 'arriendo-facil' ); ?></span>
+								<?php else : ?>
+									<span class="af-pill af-pill--neutral"><?php esc_html_e( 'No subido', 'arriendo-facil' ); ?></span>
+								<?php endif; ?>
+							</td>
+							<td data-label="<?php esc_attr_e( 'Archivo', 'arriendo-facil' ); ?>">
+								<?php if ( $has_document && $can_manage ) : ?>
+									<button type="button" class="button af-btn af-btn--ghost af-btn--sm af-guest-doc-view"
+										data-document="<?php echo esc_attr( (int) $doc_row->id ); ?>">
+										<?php esc_html_e( 'Ver PDF', 'arriendo-facil' ); ?>
+									</button>
+								<?php elseif ( $has_document ) : ?>
+									<span class="af-td-meta"><?php esc_html_e( 'Cargado', 'arriendo-facil' ); ?></span>
+								<?php else : ?>
+									<span class="af-td-meta">—</span>
+								<?php endif; ?>
+							</td>
+						</tr>
+					<?php endforeach; ?>
+				</tbody>
+			</table>
+		</div>
+
+		<?php if ( $can_manage ) : ?>
+			<form id="af-profile-docs-form" style="margin-top: var(--af-space-4);">
+				<p class="af-modal__status" id="af-profile-docs-status"></p>
+				<table class="form-table" role="presentation">
+					<?php foreach ( $guest_doc_labels as $doc_type_key => $doc_type_label ) : ?>
+						<?php $form_has_document = isset( $latest_guest_doc[ $doc_type_key ] ); ?>
+						<tr>
+							<th scope="row">
+								<label for="af-profile-doc-<?php echo esc_attr( $doc_type_key ); ?>">
+									<?php
+									echo esc_html(
+										$form_has_document
+											? sprintf(
+												/* translators: %s: document label */
+												__( 'Reemplazar %s', 'arriendo-facil' ),
+												$doc_type_label
+											)
+											: $doc_type_label
+									);
+									?>
+								</label>
+							</th>
+							<td>
+								<input type="file" class="regular-text" accept="application/pdf,.pdf"
+									id="af-profile-doc-<?php echo esc_attr( $doc_type_key ); ?>"
+									name="guest_<?php echo esc_attr( $doc_type_key ); ?>_pdf" />
+							</td>
+						</tr>
+					<?php endforeach; ?>
+				</table>
+				<p class="submit">
+					<button type="submit" class="button button-primary"><?php esc_html_e( 'Subir documentos', 'arriendo-facil' ); ?></button>
+					<button type="button" class="button" id="af-profile-docs-verify"><?php esc_html_e( 'Marcar como verificados', 'arriendo-facil' ); ?></button>
+				</p>
+			</form>
+		<?php endif; ?>
+	</section>
 
 	<div class="af-split">
 		<section class="af-section" aria-labelledby="af-profile-leases">

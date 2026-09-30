@@ -225,7 +225,7 @@ if ( $is_owner ) {
 		array(
 			'eyebrow'  => __( 'Personas', 'arriendo-facil' ),
 			'title'    => __( 'Inquilinos', 'arriendo-facil' ),
-			'subtitle' => __( 'Inquilinos bajo administración. Regístralos, envíales el formulario para que completen su perfil y verifica sus documentos.', 'arriendo-facil' ),
+			'subtitle' => __( 'Inquilinos bajo administración. Regístralos, sube sus documentos y verifica su identidad e ingresos.', 'arriendo-facil' ),
 			'actions'  => array(
 				current_user_can( Arriendo_Facil_Tenancy::CAP ) ? sprintf(
 					'<button type="button" class="button af-btn af-btn--primary" id="af-new-guest"><span class="af-btn__icon" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>%s</button>',
@@ -245,7 +245,7 @@ if ( $is_owner ) {
 	<div id="af-guest-form-card" class="card" style="max-width: 900px; margin: 16px 0; padding: 16px; display: none;">
 		<h2><?php esc_html_e( 'Nuevo inquilino', 'arriendo-facil' ); ?></h2>
 		<p class="af-modal__hint" style="margin:0 0 16px;">
-			<?php esc_html_e( 'Registra solo los datos de contacto. El resto de la información y los documentos los completa el inquilino desde el enlace seguro que le enviarás después.', 'arriendo-facil' ); ?>
+			<?php esc_html_e( 'Registra al inquilino desde el panel. Puedes subir sus documentos ahora (certificados laboral y bancario, cédula/papeleta) para agilizar la verificación de identidad.', 'arriendo-facil' ); ?>
 		</p>
 		<form id="af-guest-form" method="post" action="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>" enctype="multipart/form-data">
 			<input type="hidden" name="action" value="af_create_guest" />
@@ -262,14 +262,14 @@ if ( $is_owner ) {
 					<th scope="row"><label for="af_guest_id_number"><?php esc_html_e( 'Cédula / RUC', 'arriendo-facil' ); ?> *</label></th>
 					<td>
 						<input type="text" required id="af_guest_id_number" name="id_number" class="regular-text" inputmode="numeric" pattern="^[0-9]{10,13}$" maxlength="13" title="<?php esc_attr_e( 'Solo números (10 dígitos para cédula, 13 para RUC)', 'arriendo-facil' ); ?>" />
-						<p class="description"><?php esc_html_e( 'Se valida contra el documento que suba el inquilino.', 'arriendo-facil' ); ?></p>
+						<p class="description"><?php esc_html_e( 'Se valida con el dígito verificador y con el documento que subas.', 'arriendo-facil' ); ?></p>
 					</td>
 				</tr>
 				<tr>
 					<th scope="row"><label for="af_guest_email"><?php esc_html_e( 'Email', 'arriendo-facil' ); ?> *</label></th>
 					<td>
 						<input type="email" required id="af_guest_email" name="email" class="regular-text" />
-						<p class="description"><?php esc_html_e( 'A este correo se enviará el enlace para completar el perfil.', 'arriendo-facil' ); ?></p>
+						<p class="description"><?php esc_html_e( 'Sirve para identificar al inquilino dentro del historial y de los contratos.', 'arriendo-facil' ); ?></p>
 					</td>
 				</tr>
 				<tr>
@@ -280,61 +280,84 @@ if ( $is_owner ) {
 				</tr>
 			</table>
 
-			<?php if ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) : ?>
-				<!-- Campos extendidos del modelo anterior: hoy los completa el inquilino por token. -->
-				<table class="form-table" role="presentation">
-					<tr>
-						<th scope="row"><label for="af_guest_mascotas"><?php esc_html_e( 'Mascotas (1 a 10)', 'arriendo-facil' ); ?></label></th>
-						<td><input type="number" id="af_guest_mascotas" name="mascotas" class="small-text" min="1" max="10" step="1" /></td>
-					</tr>
-					<tr>
-						<th scope="row"><label for="af_guest_referencia_1"><?php esc_html_e( 'Referencias personales', 'arriendo-facil' ); ?></label></th>
-						<td>
-							<input type="text" id="af_guest_referencia_1" name="referencia_personal_1" class="regular-text" placeholder="<?php esc_attr_e( 'Referencia 1', 'arriendo-facil' ); ?>" style="margin-bottom:8px;" />
-							<br />
-							<input type="text" id="af_guest_referencia_2" name="referencia_personal_2" class="regular-text" placeholder="<?php esc_attr_e( 'Referencia 2', 'arriendo-facil' ); ?>" />
-						</td>
-					</tr>
-					<tr>
-						<th scope="row"><label for="af_guest_personas_viviran"><?php esc_html_e( 'Personas que vivirán en el inmueble', 'arriendo-facil' ); ?></label></th>
-						<td>
-							<select id="af_guest_personas_viviran" name="personas_viviran">
-								<option value="">--</option>
-								<?php for ( $i = 1; $i <= 10; $i++ ) : ?>
-									<option value="<?php echo esc_attr( (string) $i ); ?>"><?php echo esc_html( (string) $i ); ?></option>
-								<?php endfor; ?>
-							</select>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row"><label for="af_guest_garantia_alicuota_pdf"><?php esc_html_e( 'Garantía y alícuota (PDF)', 'arriendo-facil' ); ?></label></th>
-						<td><input type="file" id="af_guest_garantia_alicuota_pdf" name="guest_garantia_alicuota_pdf" class="regular-text" accept="application/pdf,.pdf" /></td>
-					</tr>
-					<tr>
-						<th scope="row"><label for="af_guest_cedula_papeleta_pdf"><?php esc_html_e( 'Cédula y papeleta (PDF)', 'arriendo-facil' ); ?></label></th>
-						<td><input type="file" id="af_guest_cedula_papeleta_pdf" name="guest_cedula_papeleta_pdf" class="regular-text" accept="application/pdf,.pdf" /></td>
-					</tr>
-					<tr>
-					<th scope="row"><label for="af_guest_genero"><?php esc_html_e( 'Nacionalidad', 'arriendo-facil' ); ?></label></th>
+			<h3 style="margin: 16px 0 8px;"><?php esc_html_e( 'Vincular a un inmueble', 'arriendo-facil' ); ?></h3>
+			<p class="af-modal__hint" style="margin: 0 0 8px;">
+				<?php esc_html_e( 'Opcional. Puedes vincular al inquilino a un inmueble aquí o más adelante al crear el contrato desde la sección Contratos.', 'arriendo-facil' ); ?>
+			</p>
+			<table class="form-table" role="presentation">
+				<tr>
+					<th scope="row"><label for="af_guest_accommodation_id"><?php esc_html_e( 'Inmueble', 'arriendo-facil' ); ?></label></th>
+					<td>
+						<select id="af_guest_accommodation_id" name="accommodation_id" class="regular-text">
+							<option value=""><?php esc_html_e( '— Sin vincular por ahora —', 'arriendo-facil' ); ?></option>
+							<?php
+							$guest_form_accommodation_args = array(
+								'post_type'      => 'accommodation',
+								'posts_per_page' => 300,
+								'orderby'        => 'title',
+								'order'          => 'ASC',
+								'post_status'    => 'any',
+							);
+							if ( $is_owner ) {
+								$guest_form_accommodation_args['post__in'] = $owner_ids ? $owner_ids : array( 0 );
+							}
+							$guest_form_accommodations = get_posts( $guest_form_accommodation_args );
+							foreach ( $guest_form_accommodations as $guest_form_accommodation ) :
+								?>
+								<option value="<?php echo esc_attr( (int) $guest_form_accommodation->ID ); ?>">
+									<?php echo esc_html( $guest_form_accommodation->post_title ); ?>
+								</option>
+							<?php endforeach; ?>
+						</select>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="af_guest_rental_start_date"><?php esc_html_e( 'Inicio del arriendo', 'arriendo-facil' ); ?></label></th>
+					<td><input type="date" id="af_guest_rental_start_date" name="rental_start_date" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="af_guest_rental_end_date"><?php esc_html_e( 'Fin del arriendo', 'arriendo-facil' ); ?></label></th>
+					<td><input type="date" id="af_guest_rental_end_date" name="rental_end_date" /></td>
+				</tr>
+			</table>
+
+			<h3 style="margin: 16px 0 8px;"><?php esc_html_e( 'Identidad', 'arriendo-facil' ); ?></h3>
+			<table class="form-table" role="presentation">
+				<tr>
+					<th scope="row"><label for="af_guest_nationality"><?php esc_html_e( 'Nacionalidad', 'arriendo-facil' ); ?></label></th>
 					<td><input type="text" id="af_guest_nationality" name="nationality" class="regular-text" maxlength="100" placeholder="<?php esc_attr_e( 'Ej: Ecuatoriana', 'arriendo-facil' ); ?>" /></td>
 				</tr>
 				<tr>
 					<th scope="row"><label for="af_guest_birth_city"><?php esc_html_e( 'Ciudad de nacimiento', 'arriendo-facil' ); ?></label></th>
 					<td><input type="text" id="af_guest_birth_city" name="birth_city" class="regular-text" maxlength="150" placeholder="<?php esc_attr_e( 'Ej: Quito', 'arriendo-facil' ); ?>" /></td>
 				</tr>
+			</table>
+
+			<h3 style="margin: 16px 0 8px;"><?php esc_html_e( 'Documentos de identidad e ingresos', 'arriendo-facil' ); ?></h3>
+			<p class="af-modal__hint" style="margin: 0 0 8px;">
+				<?php esc_html_e( 'Todos en PDF. Con la cédula/papeleta, el certificado laboral y el certificado bancario subidos podrás verificar su identidad e ingresos sin enviarle nada.', 'arriendo-facil' ); ?>
+			</p>
+			<table class="form-table" role="presentation">
 				<tr>
-					<th scope="row"><label for="af_guest_certificado_bancario_pdf"><?php esc_html_e( 'Certificado bancario (PDF)', 'arriendo-facil' ); ?></label></th>
-					<td><input type="file" id="af_guest_certificado_bancario_pdf" name="guest_certificado_bancario_pdf" class="regular-text" accept="application/pdf,.pdf" /></td>
+					<th scope="row"><label for="af_guest_cedula_papeleta_pdf"><?php esc_html_e( 'Cédula o papeleta (PDF)', 'arriendo-facil' ); ?></label></th>
+					<td><input type="file" id="af_guest_cedula_papeleta_pdf" name="guest_cedula_papeleta_pdf" class="regular-text" accept="application/pdf,.pdf" /></td>
 				</tr>
 				<tr>
 					<th scope="row"><label for="af_guest_certificado_laboral_pdf"><?php esc_html_e( 'Certificado laboral (PDF)', 'arriendo-facil' ); ?></label></th>
 					<td><input type="file" id="af_guest_certificado_laboral_pdf" name="guest_certificado_laboral_pdf" class="regular-text" accept="application/pdf,.pdf" /></td>
 				</tr>
+				<tr>
+					<th scope="row"><label for="af_guest_certificado_bancario_pdf"><?php esc_html_e( 'Certificado bancario (PDF)', 'arriendo-facil' ); ?></label></th>
+					<td><input type="file" id="af_guest_certificado_bancario_pdf" name="guest_certificado_bancario_pdf" class="regular-text" accept="application/pdf,.pdf" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="af_guest_garantia_alicuota_pdf"><?php esc_html_e( 'Garantía y alícuota (PDF)', 'arriendo-facil' ); ?></label></th>
+					<td><input type="file" id="af_guest_garantia_alicuota_pdf" name="guest_garantia_alicuota_pdf" class="regular-text" accept="application/pdf,.pdf" /></td>
+				</tr>
 			</table>
-		<?php endif; ?>
 
 			<p class="submit">
-				<button type="submit" class="button button-primary"><?php esc_html_e( 'Guardar y continuar', 'arriendo-facil' ); ?></button>
+				<button type="submit" class="button button-primary"><?php esc_html_e( 'Guardar inquilino', 'arriendo-facil' ); ?></button>
 				<button type="button" class="button" id="af-cancel-new-guest"><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
 			</p>
 		</form>
@@ -603,12 +626,6 @@ if ( $is_owner ) {
 											<?php esc_html_e( 'Ver ficha', 'arriendo-facil' ); ?>
 										</a>
 										<?php if ( current_user_can( Arriendo_Facil_Tenancy::CAP ) ) : ?>
-											<button type="button" class="button af-btn af-btn--primary af-btn--sm af-send-form"
-												data-guest-id="<?php echo esc_attr( $guest->id ); ?>"
-												data-guest-name="<?php echo esc_attr( trim( $guest->first_name . ' ' . $guest->last_name ) ); ?>"
-												data-guest-email="<?php echo esc_attr( $guest->email ); ?>">
-												<?php esc_html_e( 'Enviar formulario', 'arriendo-facil' ); ?>
-											</button>
 											<button type="button" class="button af-btn af-btn--ghost af-btn--sm af-verify-docs"
 												data-guest-id="<?php echo esc_attr( $guest->id ); ?>"
 												data-guest-name="<?php echo esc_attr( trim( $guest->first_name . ' ' . $guest->last_name ) ); ?>"
@@ -641,38 +658,6 @@ if ( $is_owner ) {
 				</div>
 			</section>
 
-		</div>
-	</div>
-</div>
-
-<!-- Modal: enviar formulario de perfil legal -->
-<div class="af-modal" id="af-modal-send-form" role="dialog" aria-modal="true" aria-labelledby="af-modal-send-form-title">
-	<div class="af-modal__backdrop" data-af-modal-close></div>
-	<div class="af-modal__dialog">
-		<button type="button" class="af-modal__close" data-af-modal-close aria-label="<?php esc_attr_e( 'Cerrar', 'arriendo-facil' ); ?>">&times;</button>
-		<div class="af-modal__header">
-			<h2 class="af-modal__title" id="af-modal-send-form-title"><?php esc_html_e( 'Enviar formulario de datos', 'arriendo-facil' ); ?></h2>
-			<p class="af-modal__subtitle"><?php esc_html_e( 'Se enviará un enlace seguro y de un solo uso para que complete sus datos y suba los documentos de identidad.', 'arriendo-facil' ); ?></p>
-		</div>
-		<div class="af-modal__body">
-			<p class="af-modal__status" id="af-send-form-status"></p>
-			<div class="af-modal__field">
-				<label><?php esc_html_e( 'Destinatario', 'arriendo-facil' ); ?></label>
-				<p class="af-modal__hint" id="af-send-form-recipient" style="margin:0;font-size:13px;color:#1d2327;"></p>
-			</div>
-			<div class="af-modal__field">
-				<label for="af-send-form-expires"><?php esc_html_e( 'Vigencia del enlace', 'arriendo-facil' ); ?></label>
-				<select id="af-send-form-expires">
-					<option value="24"><?php esc_html_e( '24 horas', 'arriendo-facil' ); ?></option>
-					<option value="72" selected><?php esc_html_e( '3 días (recomendado)', 'arriendo-facil' ); ?></option>
-					<option value="168"><?php esc_html_e( '7 días', 'arriendo-facil' ); ?></option>
-				</select>
-				<p class="af-modal__hint"><?php esc_html_e( 'Pasado este tiempo el enlace caduca y habrá que reenviarlo.', 'arriendo-facil' ); ?></p>
-			</div>
-		</div>
-		<div class="af-modal__footer">
-			<button type="button" class="button" data-af-modal-close><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
-			<button type="button" class="button button-primary" id="af-send-form-confirm"><?php esc_html_e( 'Enviar enlace', 'arriendo-facil' ); ?></button>
 		</div>
 	</div>
 </div>
@@ -731,7 +716,6 @@ if ( $is_owner ) {
 (function () {
 	const ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
 	const docNonce = <?php echo wp_json_encode( wp_create_nonce( 'af_document_nonce' ) ); ?>;
-	const linkNonce = <?php echo wp_json_encode( wp_create_nonce( 'af_owner_contact_nonce' ) ); ?>;
 
 	function post(payload) {
 		const body = new URLSearchParams();
@@ -772,43 +756,6 @@ if ( $is_owner ) {
 	document.addEventListener('keydown', function (e) {
 		if (e.key !== 'Escape') { return; }
 		document.querySelectorAll('.af-modal.is-open').forEach(closeModal);
-	});
-
-	// ---- Enviar formulario de perfil legal ----
-	const sendModal = document.getElementById('af-modal-send-form');
-	const sendStatus = document.getElementById('af-send-form-status');
-	const sendRecipient = document.getElementById('af-send-form-recipient');
-	const sendExpires = document.getElementById('af-send-form-expires');
-	const sendConfirm = document.getElementById('af-send-form-confirm');
-	let sendGuestId = 0;
-
-	document.querySelectorAll('.af-send-form').forEach(function (btn) {
-		btn.addEventListener('click', function () {
-			sendGuestId = btn.getAttribute('data-guest-id');
-			sendRecipient.textContent = btn.getAttribute('data-guest-name') + ' — ' + btn.getAttribute('data-guest-email');
-			clearStatus(sendStatus);
-			openModal(sendModal);
-		});
-	});
-
-	sendConfirm.addEventListener('click', function () {
-		sendConfirm.disabled = true;
-		clearStatus(sendStatus);
-
-		post({
-			action: 'af_send_guest_profile_link',
-			nonce: linkNonce,
-			guest_id: sendGuestId,
-			expires_hours: sendExpires.value
-		}).then(function (json) {
-			sendConfirm.disabled = false;
-			if (!json || !json.success) {
-				setStatus(sendStatus, (json && json.data && json.data.message) || 'No se pudo enviar el enlace.', 'error');
-				return;
-			}
-			setStatus(sendStatus, json.data.message, 'success');
-			setTimeout(function () { closeModal(sendModal); }, 1400);
-		});
 	});
 
 	// ---- Verificación de documentos ----

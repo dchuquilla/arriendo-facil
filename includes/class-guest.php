@@ -40,6 +40,7 @@ class Arriendo_Facil_Guest {
 		add_action( 'wp_ajax_nopriv_af_refresh_nonce', array( $this, 'ajax_refresh_nonce' ) );
 		add_action( 'wp_ajax_af_get_guests', array( $this, 'ajax_get_guests' ) );
 		add_action( 'wp_ajax_af_score_guest', array( $this, 'ajax_score_guest' ) );
+		add_action( 'wp_ajax_af_update_guest_documents', array( $this, 'ajax_update_guest_documents' ) );
 		add_action( 'af_process_guest_post_submit', array( $this, 'process_guest_post_submit_async' ), 10, 1 );
 		add_action( 'af_guest_reminders_cron', array( $this, 'dispatch_guest_reminders' ) );
 		add_shortcode( 'af_tenant_signup', array( $this, 'render_tenant_signup_shortcode' ) );
@@ -2229,8 +2230,14 @@ class Arriendo_Facil_Guest {
 			wp_send_json_error( array( 'message' => __( 'Faltan campos obligatorios.', 'arriendo-facil' ) ) );
 		}
 
-		if ( $accommodation_id && 'accommodation' !== get_post_type( $accommodation_id ) ) {
-			wp_send_json_error( array( 'message' => __( 'ID de alojamiento invalido.', 'arriendo-facil' ) ) );
+		if ( $accommodation_id ) {
+			if ( 'accommodation' !== get_post_type( $accommodation_id ) ) {
+				wp_send_json_error( array( 'message' => __( 'ID de alojamiento invalido.', 'arriendo-facil' ) ) );
+			}
+
+			if ( ! Arriendo_Facil_Tenancy::can_access_accommodation( $accommodation_id ) ) {
+				wp_send_json_error( array( 'message' => __( 'No puedes vincular este inquilino a un inmueble que no administras.', 'arriendo-facil' ) ), 403 );
+			}
 		}
 
 		if ( ! is_email( $email ) ) {
@@ -2252,7 +2259,8 @@ class Arriendo_Facil_Guest {
 			wp_send_json_error( array( 'message' => __( 'El numero de cedula o RUC no es valido (digito verificador incorrecto).', 'arriendo-facil' ) ) );
 		}
 
-		// El perfil extendido lo completa el inquilino por enlace con token, no el operador.
+		// El operador registra lo basico y los documentos; el flujo por token se
+		// mantiene solo como compatibilidad para el enlace legado.
 		if ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) {
 			if ( ! $referencia_personal_1 || ! $referencia_personal_2 ) {
 				wp_send_json_error( array( 'message' => __( 'Indica al menos dos referencias personales.', 'arriendo-facil' ) ) );
@@ -2319,6 +2327,64 @@ class Arriendo_Facil_Guest {
 	}
 
 	/**
+	 * AJAX: uploads identity/income PDFs for an existing guest from the admin
+	 * profile, so operations never depends on emailing a token link.
+	 *
+	 * @return void
+	 */
+	public function ajax_update_guest_documents() {
+		check_ajax_referer( 'af_document_nonce', 'nonce' );
+
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$guest_id = isset( $_POST['guest_id'] ) ? absint( wp_unslash( $_POST['guest_id'] ) ) : 0;
+		if ( ! $guest_id ) {
+			wp_send_json_error( array( 'message' => __( 'Huesped no encontrado.', 'arriendo-facil' ) ), 404 );
+		}
+
+		if ( ! Arriendo_Facil_Tenancy::can_access_guest( $guest_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes acceso a este huesped.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$uploaded = $this->upload_guest_documents( $guest_id );
+		if ( is_wp_error( $uploaded ) ) {
+			wp_send_json_error( array( 'message' => $uploaded->get_error_message() ) );
+		}
+
+		if ( empty( $uploaded ) ) {
+			wp_send_json_error( array( 'message' => __( 'Selecciona al menos un archivo PDF.', 'arriendo-facil' ) ) );
+		}
+
+		// Un documento nuevo invalida cualquier revision previa: vuelve a pendiente.
+		global $wpdb;
+		$guests_table = $wpdb->prefix . 'af_guests';
+		$doc_status   = (string) $wpdb->get_var(
+			$wpdb->prepare( "SELECT doc_status FROM {$guests_table} WHERE id = %d", $guest_id )
+		);
+
+		if ( in_array( $doc_status, array( 'verificado', 'rechazado' ), true ) ) {
+			$wpdb->update(
+				$guests_table,
+				array( 'doc_status' => 'pendiente' ),
+				array( 'id' => $guest_id ),
+				array( '%s' ),
+				array( '%d' )
+			);
+			$doc_status = 'pendiente';
+		}
+
+		wp_send_json_success(
+			array(
+				'uploaded_documents' => $uploaded,
+				'doc_status'         => $doc_status,
+				'message'            => __( 'Documentos cargados. Quedan pendientes de verificacion.', 'arriendo-facil' ),
+			)
+		);
+	}
+
+	/**
 	 * Daily automatic reminders for guests.
 	 *
 	 * Emails tenants whose documents are still pending and reminds active
@@ -2365,7 +2431,7 @@ class Arriendo_Facil_Guest {
 				esc_html__( 'Hola %s,', 'arriendo-facil' ),
 				esc_html( trim( $guest->first_name . ' ' . $guest->last_name ) )
 			) . '</p>';
-			$message .= '<p>' . esc_html__( 'Aun no hemos completado la revision de tu documentacion para el arriendo. Por favor revisa tu perfil y carga los documentos faltantes.', 'arriendo-facil' ) . '</p>';
+			$message .= '<p>' . esc_html__( 'Aun no hemos completado la revision de tu documentacion para el arriendo. Nuestro equipo la esta tramitando; si necesitas enviar algun documento, responde a este correo.', 'arriendo-facil' ) . '</p>';
 			$message .= '<p>' . esc_html__( 'Si ya los cargaste, este correo es solo un recordatorio para el equipo.', 'arriendo-facil' ) . '</p>';
 
 			if ( wp_mail( $guest->email, $subject, $message, array( 'Content-Type: text/html; charset=UTF-8' ) ) ) {
@@ -2578,7 +2644,11 @@ class Arriendo_Facil_Guest {
 		$lease_id = (int) $wpdb->insert_id;
 
 		// Auto-marcar acomodación como ocupada al crear contrato en borrador.
-		update_post_meta( $accommodation_id, '_af_is_occupied', '1' );
+		if ( class_exists( 'Arriendo_Facil_Occupancy' ) ) {
+			Arriendo_Facil_Occupancy::mark_occupied( $accommodation_id );
+		} else {
+			update_post_meta( $accommodation_id, '_af_is_occupied', '1' );
+		}
 
 		$this->send_tenant_processing_email(
 			isset( $data['email'] ) ? sanitize_email( (string) $data['email'] ) : '',

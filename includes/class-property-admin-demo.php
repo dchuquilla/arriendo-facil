@@ -117,7 +117,11 @@ class Arriendo_Facil_Property_Admin_Demo {
 
 		$accommodation_id = (int) $accommodation_id;
 		update_post_meta( $accommodation_id, '_af_owner_id', $user_id );
-		update_post_meta( $accommodation_id, '_af_status', 'rented' );
+		if ( class_exists( 'Arriendo_Facil_Occupancy' ) ) {
+			Arriendo_Facil_Occupancy::mark_occupied( $accommodation_id );
+		} else {
+			update_post_meta( $accommodation_id, '_af_status', 'rented' );
+		}
 		update_post_meta( $accommodation_id, '_af_monthly_rent', 420.00 );
 		update_post_meta( $accommodation_id, '_af_address', 'de los Nogales N45-12 y Río Coca' );
 		update_post_meta( $accommodation_id, '_af_city', 'Quito' );

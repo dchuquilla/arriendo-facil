@@ -109,6 +109,49 @@ class Arriendo_Facil_Document_Verification {
 	}
 
 	/**
+	 * Document types required before a tenant's documents can be approved.
+	 *
+	 * Identity (cedula/papeleta) + income/security (laboral y bancario). El
+	 * administrador de propiedades solo necesita identidad (ver
+	 * Arriendo_Facil_Property_Admin_Onboarding::DOC_TYPES).
+	 *
+	 * @return array<string,string>
+	 */
+	public static function required_document_types() {
+		return array(
+			'cedula_papeleta'     => __( 'Cédula o papeleta', 'arriendo-facil' ),
+			'certificado_laboral' => __( 'Certificado laboral', 'arriendo-facil' ),
+			'certificado_bancario' => __( 'Certificado bancario', 'arriendo-facil' ),
+		);
+	}
+
+	/**
+	 * Required document types that are still missing for a tenant.
+	 *
+	 * @param int $guest_id Guest ID.
+	 * @return array<int,string>
+	 */
+	public static function missing_required_documents( $guest_id ) {
+		global $wpdb;
+
+		$guest_id = absint( $guest_id );
+		if ( ! $guest_id ) {
+			return array_keys( self::required_document_types() );
+		}
+
+		$rows = (array) $wpdb->get_col(
+			$wpdb->prepare(
+				"SELECT DISTINCT doc_type FROM {$wpdb->prefix}af_guest_documents WHERE guest_id = %d",
+				$guest_id
+			)
+		);
+
+		$present = array_map( 'strval', $rows );
+
+		return array_values( array_diff( array_keys( self::required_document_types() ), $present ) );
+	}
+
+	/**
 	 * Updates the verification state of a tenant's documents.
 	 *
 	 * @param int    $guest_id Guest ID.
@@ -128,6 +171,27 @@ class Arriendo_Facil_Document_Verification {
 
 		if ( ! array_key_exists( $status, self::statuses() ) ) {
 			return new WP_Error( 'af_doc_status_invalid', __( 'Estado de verificacion invalido.', 'arriendo-facil' ) );
+		}
+
+		if ( 'verificado' === $status ) {
+			$missing = self::missing_required_documents( $guest_id );
+			if ( ! empty( $missing ) ) {
+				$labels = array();
+				foreach ( $missing as $doc_type ) {
+					$labels[] = self::required_document_types()[ $doc_type ]
+						? self::required_document_types()[ $doc_type ]
+						: $doc_type;
+				}
+
+				return new WP_Error(
+					'af_doc_missing_required',
+					sprintf(
+						/* translators: %s: comma-separated list of missing documents */
+						__( 'No se puede verificar: faltan documentos requeridos (%s). Sube los documentos antes de aprobar.', 'arriendo-facil' ),
+						implode( ', ', $labels )
+					)
+				);
+			}
 		}
 
 		$updated = $wpdb->update(

@@ -426,7 +426,13 @@ class Arriendo_Facil_Accommodation_Occupied_Admin {
 			wp_send_json_error( array( 'message' => __( 'Sin permisos para esta acomodación.', 'arriendo-facil' ) ), 403 );
 		}
 
-		if ( $occupied ) {
+		if ( class_exists( 'Arriendo_Facil_Occupancy' ) ) {
+			if ( $occupied ) {
+				Arriendo_Facil_Occupancy::mark_occupied( $post_id );
+			} else {
+				Arriendo_Facil_Occupancy::mark_available( $post_id );
+			}
+		} elseif ( $occupied ) {
 			update_post_meta( $post_id, self::META_KEY, '1' );
 		} else {
 			delete_post_meta( $post_id, self::META_KEY );

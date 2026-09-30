@@ -163,7 +163,11 @@ class Arriendo_Facil_OTA_Sync_Manager {
 
 		// If remote says occupied, mark locally as occupied
 		if ( $remote_occupied && ! $local_occupied ) {
-			update_post_meta( $accommodation_id, '_af_is_occupied', 1 );
+			if ( class_exists( 'Arriendo_Facil_Occupancy' ) ) {
+				Arriendo_Facil_Occupancy::mark_occupied( $accommodation_id );
+			} else {
+				update_post_meta( $accommodation_id, '_af_is_occupied', 1 );
+			}
 
 			// Store occupancy dates for reference
 			if ( ! empty( $remote_status['booked_dates'] ) ) {

@@ -1056,11 +1056,15 @@ class Arriendo_Facil_Rental_Workflow {
 		);
 
 		// Free the accommodation and reset all blocking flags.
-		self::set_commercial_state( $accommodation_id, 'available', 'public' );
-		update_post_meta( $accommodation_id, '_af_status', 'available' );
+		if ( class_exists( 'Arriendo_Facil_Occupancy' ) ) {
+			Arriendo_Facil_Occupancy::mark_available( $accommodation_id );
+		} else {
+			self::set_commercial_state( $accommodation_id, 'available', 'public' );
+			update_post_meta( $accommodation_id, '_af_status', 'available' );
+			delete_post_meta( $accommodation_id, '_af_is_occupied' );
+		}
 		delete_post_meta( $accommodation_id, '_af_release_date' );
 		delete_post_meta( $accommodation_id, '_af_release_reason' );
-		delete_post_meta( $accommodation_id, '_af_is_occupied' );
 
 		self::log_lease_event(
 			$lease_id,
@@ -1161,8 +1165,12 @@ class Arriendo_Facil_Rental_Workflow {
 		}
 		$terminated_on = current_time( 'Y-m-d' );
 
-		self::set_commercial_state( $accommodation_id, 'available', 'public' );
-		update_post_meta( $accommodation_id, '_af_status', 'available' );
+		if ( class_exists( 'Arriendo_Facil_Occupancy' ) ) {
+			Arriendo_Facil_Occupancy::mark_available( $accommodation_id );
+		} else {
+			self::set_commercial_state( $accommodation_id, 'available', 'public' );
+			update_post_meta( $accommodation_id, '_af_status', 'available' );
+		}
 		delete_post_meta( $accommodation_id, '_af_release_date' );
 		delete_post_meta( $accommodation_id, '_af_release_reason' );
 
@@ -1188,12 +1196,20 @@ class Arriendo_Facil_Rental_Workflow {
 	/**
 	 * Updates commercial state meta.
 	 *
+	 * Delega en Arriendo_Facil_Occupancy para que la ocupacion nunca se
+	 * desincronice del estado comercial.
+	 *
 	 * @param int    $accommodation_id Accommodation ID.
 	 * @param string $state State.
 	 * @param string $visibility Visibility.
 	 * @return void
 	 */
 	public static function set_commercial_state( $accommodation_id, $state, $visibility ) {
+		if ( class_exists( 'Arriendo_Facil_Occupancy' ) ) {
+			Arriendo_Facil_Occupancy::apply_commercial_state( $accommodation_id, $state, $visibility );
+			return;
+		}
+
 		$accommodation_id = absint( $accommodation_id );
 		if ( ! $accommodation_id ) {
 			return;

@@ -116,7 +116,11 @@ class Arriendo_Facil_Lease {
 		if ( class_exists( 'Arriendo_Facil_Rental_Workflow' ) ) {
 			$lease = $this->get_lease( $lease_id );
 			if ( $lease && isset( $lease->accommodation_id ) ) {
-				Arriendo_Facil_Rental_Workflow::set_commercial_state( (int) $lease->accommodation_id, 'rented', 'private' );
+				if ( class_exists( 'Arriendo_Facil_Occupancy' ) ) {
+					Arriendo_Facil_Occupancy::mark_occupied( (int) $lease->accommodation_id );
+				} else {
+					Arriendo_Facil_Rental_Workflow::set_commercial_state( (int) $lease->accommodation_id, 'rented', 'private' );
+				}
 				Arriendo_Facil_Rental_Workflow::log_lease_event( $lease_id, (int) $lease->accommodation_id, 'lease_approved_active' );
 			}
 		}
@@ -367,7 +371,11 @@ class Arriendo_Facil_Lease {
 		}
 
 		$new_id = (int) $wpdb->insert_id;
-		update_post_meta( $accommodation_id, '_af_is_occupied', '1' );
+		if ( class_exists( 'Arriendo_Facil_Occupancy' ) ) {
+			Arriendo_Facil_Occupancy::mark_occupied( $accommodation_id );
+		} else {
+			update_post_meta( $accommodation_id, '_af_is_occupied', '1' );
+		}
 		return array( 'id' => $new_id );
 	}
 
@@ -399,6 +407,12 @@ class Arriendo_Facil_Lease {
 		);
 
 		if ( false !== $updated ) {
+			if ( class_exists( 'Arriendo_Facil_Occupancy' ) ) {
+				$lease = $this->get_lease( $lease_id );
+				if ( $lease && isset( $lease->accommodation_id ) ) {
+					Arriendo_Facil_Occupancy::sync_from_leases( (int) $lease->accommodation_id );
+				}
+			}
 			wp_send_json_success();
 		} else {
 			wp_send_json_error( array( 'message' => __( 'No se pudo actualizar el contrato.', 'arriendo-facil' ) ) );

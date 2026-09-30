@@ -45,6 +45,12 @@ if ( ! function_exists( 'sanitize_textarea_field' ) ) {
 	}
 }
 
+if ( ! function_exists( 'sanitize_key' ) ) {
+	function sanitize_key( $key ) {
+		return strtolower( preg_replace( '/[^a-z0-9_\-]/', '', (string) $key ) );
+	}
+}
+
 if ( ! function_exists( 'absint' ) ) {
 	function absint( $val ) {
 		return abs( (int) $val );
@@ -114,6 +120,9 @@ if ( ! class_exists( 'WPDB_Stub' ) ) {
 		/** @var string Table prefix. */
 		public $prefix = 'wp_';
 
+		/** @var string Options table name. */
+		public $options = 'wp_options';
+
 		/** Silently accept inserts (used by AI log, etc.). */
 		public function insert( $table, $data, $format = null ) {
 			return 1;
@@ -133,6 +142,14 @@ if ( ! class_exists( 'WPDB_Stub' ) ) {
 		}
 
 		public function update( $table, $data, $where, $format = null, $where_format = null ) {
+			return 1;
+		}
+
+		public function get_var( $query ) {
+			return 0;
+		}
+
+		public function query( $query ) {
 			return 1;
 		}
 	}

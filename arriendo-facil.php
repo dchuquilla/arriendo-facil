@@ -54,6 +54,7 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-cleaning-service.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-docx-template-processor.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-lease.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-lease-operations.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-occupancy.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-alerts.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-aviso.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-calendar.php';
@@ -352,7 +353,7 @@ function arriendo_facil_maybe_upgrade_schema() {
 		return;
 	}
 
-	$target_schema_version = '2026-09-catalogo-v2';
+	$target_schema_version = '2026-10-occupancy-sync';
 	$current_schema_version = (string) get_option( 'af_db_schema_version', '' );
 
 	if ( $current_schema_version === $target_schema_version && ! arriendo_facil_has_lease_schema_drift() ) {
@@ -360,6 +361,14 @@ function arriendo_facil_maybe_upgrade_schema() {
 	}
 
 	Arriendo_Facil_Activator::activate();
+
+	// Migración legacy: normaliza la ocupación de todos los inmuebles para
+	// que las metas (_af_is_occupied, _af_status, af_leases.status) no se
+	// contradigan entre sí. Idempotente.
+	if ( class_exists( 'Arriendo_Facil_Occupancy' ) ) {
+		Arriendo_Facil_Occupancy::backfill_all();
+	}
+
 	update_option( 'af_db_schema_version', $target_schema_version, false );
 }
 add_action( 'admin_init', 'arriendo_facil_maybe_upgrade_schema' );

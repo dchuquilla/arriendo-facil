@@ -168,7 +168,13 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 		)
 	);
 	$lease_guests = $wpdb->get_results(
-		"SELECT id, first_name, last_name, email FROM {$wpdb->prefix}af_guests ORDER BY first_name ASC LIMIT 300"
+		$wpdb->prepare(
+			"SELECT id, first_name, last_name, email, accommodation_id, rental_start_date, rental_end_date, desired_price, guarantee_text, doc_status
+			 FROM {$wpdb->prefix}af_guests
+			 ORDER BY first_name ASC
+			 LIMIT %d",
+			300
+		)
 	);
 	?>
 
@@ -198,8 +204,18 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 				<select name="guest_id" required style="width:100%;">
 					<option value=""><?php esc_html_e( '— Seleccionar —', 'arriendo-facil' ); ?></option>
 					<?php foreach ( (array) $lease_guests as $lease_guest ) : ?>
-						<option value="<?php echo esc_attr( (int) $lease_guest->id ); ?>">
-							<?php echo esc_html( trim( $lease_guest->first_name . ' ' . $lease_guest->last_name ) ); ?>
+						<option value="<?php echo esc_attr( (int) $lease_guest->id ); ?>"
+							data-accommodation="<?php echo esc_attr( (int) $lease_guest->accommodation_id ); ?>"
+							data-start="<?php echo esc_attr( (string) $lease_guest->rental_start_date ); ?>"
+							data-end="<?php echo esc_attr( (string) $lease_guest->rental_end_date ); ?>"
+							data-price="<?php echo esc_attr( (string) $lease_guest->desired_price ); ?>"
+							data-doc-status="<?php echo esc_attr( (string) $lease_guest->doc_status ); ?>">
+							<?php
+							echo esc_html( trim( $lease_guest->first_name . ' ' . $lease_guest->last_name ) );
+							if ( 'verificado' === (string) $lease_guest->doc_status ) {
+								echo esc_html( ' · ' . __( 'verificado', 'arriendo-facil' ) );
+							}
+							?>
 						</option>
 					<?php endforeach; ?>
 				</select>
@@ -275,11 +291,68 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 
 		cancelBtn.addEventListener('click', function () { card.style.display = 'none'; });
 
+		// Prefill the agreement from what the operator already captured for the
+		// tenant (dates, property link) so nothing is retyped by hand.
+		function addMonths(isoDate, months) {
+			const parts = String(isoDate).split('-');
+			if (parts.length !== 3) { return ''; }
+			const date = new Date(Date.UTC(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])));
+			if (isNaN(date.getTime())) { return ''; }
+			date.setUTCMonth(date.getUTCMonth() + months);
+			date.setUTCDate(date.getUTCDate() - 1);
+			return date.toISOString().slice(0, 10);
+		}
+
+		form.guest_id.addEventListener('change', function () {
+			const opt = this.options[this.selectedIndex];
+			if (!opt || !opt.value) { return; }
+
+			const start = opt.getAttribute('data-start') || '';
+			const end = opt.getAttribute('data-end') || '';
+
+			if (start && !form.start_date.value) { form.start_date.value = start; }
+			if (end && !form.end_date.value) { form.end_date.value = end; }
+			if (!form.end_date.value && form.start_date.value) {
+				form.end_date.value = addMonths(form.start_date.value, 12);
+			}
+
+			// Guarantee defaults to two months of rent, the common practice.
+			const rent = parseFloat(form.monthly_rent.value || '0');
+			if (!form.deposit_amount.value && rent > 0) {
+				form.deposit_amount.value = (rent * 2).toFixed(2);
+			}
+
+			// Payment day follows the start of the lease, capped to 1-28.
+			if (form.start_date.value && form.payment_due_day) {
+				const startParts = form.start_date.value.split('-');
+				const day = Number(startParts[2]);
+				if (startParts.length === 3 && day >= 1) {
+					form.payment_due_day.value = String(Math.min(28, day));
+				}
+			}
+
+			// If the tenant is already linked to a property, preselect it.
+			const linkedId = opt.getAttribute('data-accommodation');
+			if (linkedId && form.accommodation_id.value !== linkedId) {
+				const exists = Array.prototype.some.call(form.accommodation_id.options, function (o) { return o.value === linkedId; });
+				if (exists) {
+					form.accommodation_id.value = linkedId;
+					form.accommodation_id.dispatchEvent(new Event('change'));
+				}
+			}
+		});
+
 		// Prefill rent from the selected property so the operator doesn't retype it.
 		form.accommodation_id.addEventListener('change', function () {
 			const opt = this.options[this.selectedIndex];
 			const rent = opt ? opt.getAttribute('data-rent') : '';
-			if (rent && !form.monthly_rent.value) { form.monthly_rent.value = parseFloat(rent).toFixed(2); }
+			if (rent && !form.monthly_rent.value) {
+				form.monthly_rent.value = parseFloat(rent).toFixed(2);
+			}
+			if (rent && !form.deposit_amount.value) {
+				const parsed = parseFloat(rent);
+				if (parsed > 0) { form.deposit_amount.value = (parsed * 2).toFixed(2); }
+			}
 			refreshTemplates(opt ? opt.value : '');
 		});
 

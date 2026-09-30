@@ -160,12 +160,31 @@ foreach ( $documents as $document_row ) {
 }
 
 $profile_doc_nonce = wp_create_nonce( 'af_document_nonce' );
+$profile_edit_nonce = wp_create_nonce( 'af_guest_edit_nonce' );
 
 $identity_status = isset( $guest->identity_match_status ) ? (string) $guest->identity_match_status : 'not_checked';
 
 $can_manage = current_user_can( Arriendo_Facil_Tenancy::CAP );
 $back_url   = admin_url( 'admin.php?page=af-guests' );
 $full_name  = trim( $guest->first_name . ' ' . $guest->last_name );
+
+// Propuestas de inmueble para el selector de vinculacion (solo el operador ve el
+// formulario; la lista se limita a lo que administra).
+$profile_accommodations = array();
+if ( $can_manage ) {
+	$profile_accommodation_args = array(
+		'post_type'      => 'accommodation',
+		'posts_per_page' => 300,
+		'orderby'        => 'title',
+		'order'          => 'ASC',
+		'post_status'    => 'any',
+	);
+	$profile_accessible_ids     = Arriendo_Facil_Tenancy::accessible_accommodation_ids();
+	if ( is_array( $profile_accessible_ids ) ) {
+		$profile_accommodation_args['post__in'] = $profile_accessible_ids ? $profile_accessible_ids : array( 0 );
+	}
+	$profile_accommodations = get_posts( $profile_accommodation_args );
+}
 ?>
 <div class="wrap af-shell">
 	<?php
@@ -236,14 +255,21 @@ $full_name  = trim( $guest->first_name . ' ' . $guest->last_name );
 (function () {
 	const ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
 	const docNonce = <?php echo wp_json_encode( $profile_doc_nonce ); ?>;
+	const editNonce = <?php echo wp_json_encode( $profile_edit_nonce ); ?>;
 	const guestId = <?php echo (int) $guest_id; ?>;
 	const form = document.getElementById('af-profile-docs-form');
 	const status = document.getElementById('af-profile-docs-status');
+	const editForm = document.getElementById('af-profile-edit-form');
+	const editStatus = document.getElementById('af-profile-edit-status');
 
 	function setStatus(message, variant) {
-		if (!status) { return; }
-		status.textContent = message;
-		status.className = 'af-modal__status' + (variant ? ' is-' + variant : '');
+		setStatusTo(status, message, variant);
+	}
+
+	function setStatusTo(target, message, variant) {
+		if (!target) { return; }
+		target.textContent = message;
+		target.className = 'af-modal__status' + (variant ? ' is-' + variant : '');
 	}
 
 	function post(body) {
@@ -292,6 +318,35 @@ $full_name  = trim( $guest->first_name . ' ' . $guest->last_name );
 					btn.disabled = false;
 					setStatus(<?php echo wp_json_encode( __( 'La solicitud falló.', 'arriendo-facil' ) ); ?>, 'error');
 				});
+		});
+	}
+
+	// ---- Guardar correcciones de la ficha ----
+	if (editForm) {
+		editForm.addEventListener('submit', function (event) {
+			event.preventDefault();
+
+			const btn = editForm.querySelector('button[type="submit"]');
+			btn.disabled = true;
+			setStatus(<?php echo wp_json_encode( __( 'Guardando…', 'arriendo-facil' ) ); ?>, '');
+
+			const body = new URLSearchParams(new FormData(editForm));
+			body.append('action', 'af_update_guest');
+			body.append('nonce', editNonce);
+			body.append('guest_id', guestId);
+
+			post(body).then(function (json) {
+				btn.disabled = false;
+				if (!json || !json.success) {
+					setStatusTo(editStatus, (json && json.data && json.data.message) || <?php echo wp_json_encode( __( 'No se pudo guardar.', 'arriendo-facil' ) ); ?>, 'error');
+					return;
+				}
+				setStatusTo(editStatus, json.data.message, 'success');
+				setTimeout(function () { window.location.reload(); }, 800);
+			}).catch(function () {
+				btn.disabled = false;
+				setStatusTo(editStatus, <?php echo wp_json_encode( __( 'La solicitud falló.', 'arriendo-facil' ) ); ?>, 'error');
+			});
 		});
 	}
 
@@ -370,6 +425,79 @@ $full_name  = trim( $guest->first_name . ' ' . $guest->last_name );
 			</div>
 		</div>
 	<?php endif; ?>
+
+	<section class="af-section" aria-labelledby="af-profile-edit">
+		<header class="af-section__header">
+			<div>
+				<h2 class="af-section__title" id="af-profile-edit"><?php esc_html_e( 'Datos del inquilino', 'arriendo-facil' ); ?></h2>
+				<p class="af-section__subtitle"><?php esc_html_e( 'Corrige un dato mal capturado sin tener que volver a registrarlo. Si cambias la cédula, la verificación de documentos vuelve a pendiente.', 'arriendo-facil' ); ?></p>
+			</div>
+		</header>
+
+		<?php if ( $can_manage ) : ?>
+			<form id="af-profile-edit-form">
+				<p class="af-modal__status" id="af-profile-edit-status"></p>
+				<table class="form-table" role="presentation">
+					<tr>
+						<th scope="row"><label for="af-profile-first-name"><?php esc_html_e( 'Nombre', 'arriendo-facil' ); ?> *</label></th>
+						<td><input type="text" id="af-profile-first-name" name="first_name" class="regular-text" maxlength="100" required value="<?php echo esc_attr( (string) $guest->first_name ); ?>" /></td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="af-profile-last-name"><?php esc_html_e( 'Apellido', 'arriendo-facil' ); ?></label></th>
+						<td><input type="text" id="af-profile-last-name" name="last_name" class="regular-text" maxlength="100" value="<?php echo esc_attr( (string) $guest->last_name ); ?>" /></td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="af-profile-email"><?php esc_html_e( 'Correo', 'arriendo-facil' ); ?> *</label></th>
+						<td>
+							<input type="email" id="af-profile-email" name="email" class="regular-text" required value="<?php echo esc_attr( (string) $guest->email ); ?>" />
+							<p class="description"><?php esc_html_e( 'Debe ser único. Identifica al inquilino en el historial y en los contratos.', 'arriendo-facil' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="af-profile-phone"><?php esc_html_e( 'Teléfono', 'arriendo-facil' ); ?></label></th>
+						<td><input type="text" id="af-profile-phone" name="phone" class="regular-text" inputmode="numeric" pattern="^[0-9]{1,10}$" maxlength="10" value="<?php echo esc_attr( (string) $guest->phone ); ?>" /></td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="af-profile-id-number"><?php esc_html_e( 'Cédula / RUC', 'arriendo-facil' ); ?></label></th>
+						<td>
+							<input type="text" id="af-profile-id-number" name="id_number" class="regular-text" inputmode="numeric" pattern="^[0-9]{10,13}$" maxlength="13" value="<?php echo esc_attr( (string) $guest->id_number ); ?>" />
+							<p class="description"><?php esc_html_e( '10 dígitos para cédula, 13 para RUC. Se valida el dígito verificador.', 'arriendo-facil' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="af-profile-nationality"><?php esc_html_e( 'Nacionalidad', 'arriendo-facil' ); ?></label></th>
+						<td><input type="text" id="af-profile-nationality" name="nationality" class="regular-text" maxlength="100" value="<?php echo esc_attr( (string) $guest->nationality ); ?>" /></td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="af-profile-birth-city"><?php esc_html_e( 'Ciudad de nacimiento', 'arriendo-facil' ); ?></label></th>
+						<td><input type="text" id="af-profile-birth-city" name="birth_city" class="regular-text" maxlength="150" value="<?php echo esc_attr( (string) $guest->birth_city ); ?>" /></td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="af-profile-accommodation"><?php esc_html_e( 'Inmueble vinculado', 'arriendo-facil' ); ?></label></th>
+						<td>
+							<select id="af-profile-accommodation" name="accommodation_id" class="regular-text">
+								<option value="0"><?php esc_html_e( '— Sin vincular —', 'arriendo-facil' ); ?></option>
+								<?php foreach ( (array) $profile_accommodations as $profile_accommodation ) : ?>
+									<option value="<?php echo esc_attr( (int) $profile_accommodation->ID ); ?>" <?php selected( (int) $guest->accommodation_id, (int) $profile_accommodation->ID ); ?>>
+										<?php echo esc_html( $profile_accommodation->post_title ); ?>
+									</option>
+								<?php endforeach; ?>
+							</select>
+							<p class="description"><?php esc_html_e( 'Referencia para el historial. La ocupación del inmueble la define el contrato, no este campo.', 'arriendo-facil' ); ?></p>
+						</td>
+					</tr>
+				</table>
+				<p class="submit">
+					<button type="submit" class="button button-primary"><?php esc_html_e( 'Guardar cambios', 'arriendo-facil' ); ?></button>
+				</p>
+			</form>
+		<?php else : ?>
+			<div class="af-info-strip">
+				<strong><?php esc_html_e( 'Solo lectura', 'arriendo-facil' ); ?></strong>
+				<span><?php esc_html_e( 'Necesitas permiso de administrador de propiedades para editar esta ficha.', 'arriendo-facil' ); ?></span>
+			</div>
+		<?php endif; ?>
+	</section>
 
 	<section class="af-section" aria-labelledby="af-profile-docs">
 		<header class="af-section__header">

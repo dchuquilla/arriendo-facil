@@ -41,6 +41,7 @@ class Arriendo_Facil_Guest {
 		add_action( 'wp_ajax_af_get_guests', array( $this, 'ajax_get_guests' ) );
 		add_action( 'wp_ajax_af_score_guest', array( $this, 'ajax_score_guest' ) );
 		add_action( 'wp_ajax_af_update_guest_documents', array( $this, 'ajax_update_guest_documents' ) );
+		add_action( 'wp_ajax_af_update_guest', array( $this, 'ajax_update_guest' ) );
 		add_action( 'af_process_guest_post_submit', array( $this, 'process_guest_post_submit_async' ), 10, 1 );
 		add_action( 'af_guest_reminders_cron', array( $this, 'dispatch_guest_reminders' ) );
 		add_shortcode( 'af_tenant_signup', array( $this, 'render_tenant_signup_shortcode' ) );
@@ -2324,6 +2325,146 @@ class Arriendo_Facil_Guest {
 		} else {
 			wp_send_json_error( array( 'message' => __( 'No se pudo crear el huesped.', 'arriendo-facil' ) ) );
 		}
+	}
+
+	/**
+	 * AJAX: edits an existing guest from the admin profile (contact, identity
+	 * and property link). Corrections are routine: a wrong digit in the cedula
+	 * or a phone typed badly must not require recreating the tenant.
+	 *
+	 * @return void
+	 */
+	public function ajax_update_guest() {
+		check_ajax_referer( 'af_guest_edit_nonce', 'nonce' );
+
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$guest_id = isset( $_POST['guest_id'] ) ? absint( wp_unslash( $_POST['guest_id'] ) ) : 0;
+		if ( ! $guest_id ) {
+			wp_send_json_error( array( 'message' => __( 'Huesped no encontrado.', 'arriendo-facil' ) ), 404 );
+		}
+
+		if ( ! Arriendo_Facil_Tenancy::can_access_guest( $guest_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes acceso a este huesped.', 'arriendo-facil' ) ), 403 );
+		}
+
+		global $wpdb;
+		$guests_table = $wpdb->prefix . 'af_guests';
+
+		$current = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$guests_table} WHERE id = %d", $guest_id ) );
+		if ( ! $current ) {
+			wp_send_json_error( array( 'message' => __( 'Huesped no encontrado.', 'arriendo-facil' ) ), 404 );
+		}
+
+		$first_name = isset( $_POST['first_name'] ) ? sanitize_text_field( wp_unslash( $_POST['first_name'] ) ) : '';
+		$last_name  = isset( $_POST['last_name'] ) ? sanitize_text_field( wp_unslash( $_POST['last_name'] ) ) : '';
+		$email      = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
+		$phone      = isset( $_POST['phone'] ) ? sanitize_text_field( wp_unslash( $_POST['phone'] ) ) : '';
+		$id_number  = isset( $_POST['id_number'] ) ? sanitize_text_field( wp_unslash( $_POST['id_number'] ) ) : '';
+		$nationality = isset( $_POST['nationality'] ) ? sanitize_text_field( wp_unslash( $_POST['nationality'] ) ) : '';
+		$birth_city  = isset( $_POST['birth_city'] ) ? sanitize_text_field( wp_unslash( $_POST['birth_city'] ) ) : '';
+		$accommodation_id = isset( $_POST['accommodation_id'] ) ? absint( wp_unslash( $_POST['accommodation_id'] ) ) : 0;
+
+		if ( ! $first_name ) {
+			wp_send_json_error( array( 'message' => __( 'El nombre es obligatorio.', 'arriendo-facil' ) ) );
+		}
+
+		if ( ! is_email( $email ) ) {
+			wp_send_json_error( array( 'message' => __( 'Correo electronico invalido.', 'arriendo-facil' ) ) );
+		}
+
+		if ( $phone && 1 !== preg_match( '/^[0-9]{1,10}$/', $phone ) ) {
+			wp_send_json_error( array( 'message' => __( 'El telefono debe contener solo numeros, maximo 10 digitos.', 'arriendo-facil' ) ) );
+		}
+
+		if ( $id_number && 1 !== preg_match( '/^[0-9]{10,13}$/', $id_number ) ) {
+			wp_send_json_error( array( 'message' => __( 'La cedula debe tener 10 digitos y el RUC 13.', 'arriendo-facil' ) ) );
+		}
+
+		// El digito verificador se revalida igual que en el alta: una cedula
+		// inventada no debe quedar guardada por un descuido del operador.
+		if ( $id_number ) {
+			$id_doc_type = 13 === strlen( $id_number ) ? 'ruc' : 'cedula';
+			if ( ! Arriendo_Facil_Identity_Validator::validate( $id_doc_type, $id_number ) ) {
+				wp_send_json_error( array( 'message' => __( 'El numero de cedula o RUC no es valido (digito verificador incorrecto).', 'arriendo-facil' ) ) );
+			}
+		}
+
+		$email_owner = (int) $wpdb->get_var(
+			$wpdb->prepare( "SELECT id FROM {$guests_table} WHERE email = %s AND id <> %d", $email, $guest_id )
+		);
+		if ( $email_owner ) {
+			wp_send_json_error(
+				array( 'message' => __( 'Ese correo ya pertenece a otro inquilino registrado.', 'arriendo-facil' ) ),
+				409
+			);
+		}
+
+		if ( $accommodation_id ) {
+			if ( 'accommodation' !== get_post_type( $accommodation_id ) ) {
+				wp_send_json_error( array( 'message' => __( 'ID de alojamiento invalido.', 'arriendo-facil' ) ) );
+			}
+
+			if ( ! Arriendo_Facil_Tenancy::can_access_accommodation( $accommodation_id ) ) {
+				wp_send_json_error( array( 'message' => __( 'No puedes vincular este inquilino a un inmueble que no administras.', 'arriendo-facil' ) ), 403 );
+			}
+		}
+
+		$update  = array();
+		$formats = array();
+
+		$update['first_name']  = $first_name;
+		$formats[]             = '%s';
+		$update['last_name']   = $last_name;
+		$formats[]             = '%s';
+		$update['email']       = $email;
+		$formats[]             = '%s';
+		$update['phone']       = $phone;
+		$formats[]             = '%s';
+		$update['nationality'] = $nationality;
+		$formats[]             = '%s';
+		$update['birth_city']  = $birth_city;
+		$formats[]             = '%s';
+		// 0 = sin vincular, igual que en el alta.
+		$update['accommodation_id'] = $accommodation_id;
+		$formats[]                 = '%d';
+
+		$identity_changed = false;
+		if ( $id_number && (string) $current->id_number !== $id_number ) {
+			$update['id_number'] = $id_number;
+			$formats[]           = '%s';
+			$identity_changed    = true;
+		}
+
+		// Cambiar la identificacion invalida la revision previa: el documento
+		// verificado era de otra persona.
+		if ( $identity_changed ) {
+			$update['doc_status']            = 'pendiente';
+			$formats[]                       = '%s';
+			$update['identity_match_status'] = 'not_checked';
+			$formats[]                       = '%s';
+		}
+
+		$updated = $wpdb->update(
+			$guests_table,
+			$update,
+			array( 'id' => $guest_id ),
+			$formats,
+			array( '%d' )
+		);
+
+		if ( false === $updated ) {
+			wp_send_json_error( array( 'message' => __( 'No se pudo actualizar el huesped.', 'arriendo-facil' ) ) );
+		}
+
+		wp_send_json_success(
+			array(
+				'message'         => __( 'Ficha del inquilino actualizada.', 'arriendo-facil' ),
+				'identity_changed' => $identity_changed,
+			)
+		);
 	}
 
 	/**

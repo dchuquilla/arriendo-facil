@@ -70,14 +70,16 @@
 		var statusFilter = document.getElementById( 'af-maint-status-filter' );
 		var typeFilter = document.getElementById( 'af-maint-type-filter' );
 
-		// The table is not rendered at all when the portfolio has no requests yet,
-		// so the toolbar (search, filters, CSV) is all that exists here.
-		var table = root.querySelector( '.af-maint-table' );
-		if ( ! table ) {
+		// The grid is not rendered at all when the portfolio has no requests yet.
+		var grid = document.getElementById( 'af-maint-grid' );
+		if ( ! grid ) {
 			return;
 		}
 
-		var rows = Array.prototype.slice.call( table.querySelectorAll( 'tr.af-maint-row' ) );
+		var rows = Array.prototype.slice.call( grid.querySelectorAll( '.af-maint-row' ) );
+		rows.forEach( function ( row, i ) {
+			row.dataset.order = i;
+		} );
 
 		// The summary strip doubles as a filter. 'open' covers two states, which
 		// a single <select> cannot express, so this axis is kept apart from the
@@ -129,9 +131,9 @@
 					return;
 				}
 				el.textContent = totals[ key ];
-				var chip = el.closest( '.af-maint-stat' );
-				if ( chip && chip.dataset.attention ) {
-					chip.classList.toggle( 'af-maint-stat--attention', totals[ key ] > 0 );
+				var seg = el.closest( '[data-hide-empty]' );
+				if ( seg ) {
+					seg.hidden = 0 === totals[ key ] && 'true' !== seg.getAttribute( 'aria-pressed' );
 				}
 			} );
 		}
@@ -190,20 +192,6 @@
 
 				row.classList.toggle( 'is-hidden', ! show );
 
-				var detail = row.nextElementSibling;
-				if ( detail && detail.classList.contains( 'af-maint-detail' ) ) {
-					// Collapse an expanded detail row whenever its request is filtered
-					// out, so reopening it later starts from a predictable state.
-					if ( ! show ) {
-						detail.classList.add( 'is-hidden' );
-						row.classList.remove( 'is-expanded' );
-						var rowToggle = row.querySelector( '.af-maint-toggle' );
-						if ( rowToggle ) {
-							rowToggle.setAttribute( 'aria-expanded', 'false' );
-						}
-					}
-				}
-
 				if ( show ) {
 					visible++;
 				}
@@ -221,82 +209,26 @@
 			}
 		}
 
-		// Sortable columns. Numeric and date columns sort on data-sort so we never
-		// rely on locale-aware parsing of formatted text.
-		root.querySelectorAll( '[data-sort-key]' ).forEach( function ( button ) {
-			button.addEventListener( 'click', function () {
-				var key = button.getAttribute( 'data-sort-key' );
-				var isNumeric = 'number' === button.getAttribute( 'data-sort-type' );
-				var current = button.getAttribute( 'aria-sort' );
-				var dir = 'ascending' === current ? 'descending' : 'ascending';
+		// Sort select: "key:dir"; empty restores the server order (most recent).
+		var sortSelect = document.getElementById( 'af-maint-sort' );
+		if ( sortSelect ) {
+			sortSelect.addEventListener( 'change', function () {
+				var parts = ( sortSelect.value || 'order:asc' ).split( ':' );
+				var key = parts[ 0 ];
+				var dir = 'desc' === parts[ 1 ] ? -1 : 1;
+				var numeric = 'order' === key || 'cost' === key || 'priorityRank' === key;
 
-				root.querySelectorAll( '[data-sort-key]' ).forEach( function ( other ) {
-					other.setAttribute( 'aria-sort', 'none' );
-				} );
-				button.setAttribute( 'aria-sort', dir );
-
-				var tbody = table.tBodies[ 0 ];
-				var fragment = document.createDocumentFragment();
-
-				// Rows and their detail siblings must travel together, so sort the
-				// request rows and re-attach each detail row right after its own.
-				var sorted = rows.slice().sort( function ( a, b ) {
-					var av = a.dataset[ key ];
-					var bv = b.dataset[ key ];
-
-					var result = isNumeric
+				rows.slice().sort( function ( a, b ) {
+					var av = a.dataset[ key ] || '';
+					var bv = b.dataset[ key ] || '';
+					return dir * ( numeric
 						? ( parseFloat( av ) || 0 ) - ( parseFloat( bv ) || 0 )
-						: String( av ).localeCompare( String( bv ), undefined, { numeric: true } );
-					return 'descending' === dir ? -result : result;
+						: String( av ).localeCompare( String( bv ), undefined, { numeric: true } ) );
+				} ).forEach( function ( row ) {
+					grid.appendChild( row );
 				} );
-
-				sorted.forEach( function ( row ) {
-					fragment.appendChild( row );
-
-					var detail = row.nextElementSibling;
-					if ( detail && detail.classList.contains( 'af-maint-detail' ) ) {
-						fragment.appendChild( detail );
-					}
-				} );
-
-				tbody.appendChild( fragment );
 			} );
-		} );
-
-		// Expandable detail row per request.
-		rows.forEach( function ( row ) {
-			var toggle = row.querySelector( '.af-maint-toggle' );
-			var detail = row.nextElementSibling;
-
-			if ( ! toggle || ! detail || ! detail.classList.contains( 'af-maint-detail' ) ) {
-				return;
-			}
-
-			detail.classList.add( 'is-hidden' );
-
-			toggle.addEventListener( 'click', function () {
-				var expanded = 'true' === toggle.getAttribute( 'aria-expanded' );
-
-				toggle.setAttribute( 'aria-expanded', expanded ? 'false' : 'true' );
-				detail.classList.toggle( 'is-hidden', expanded );
-				row.classList.toggle( 'is-expanded', ! expanded );
-			} );
-		} );
-
-		// Clicking anywhere on the row opens it. The button stays for keyboard and
-		// screen-reader users; this only adds a larger target for the mouse.
-		rows.forEach( function ( row ) {
-			row.addEventListener( 'click', function ( e ) {
-				if ( e.target.closest( '.af-maint-toggle' ) || e.target.closest( 'a, button, select' ) ) {
-					return;
-				}
-
-				var toggle = row.querySelector( '.af-maint-toggle' );
-				if ( toggle ) {
-					toggle.click();
-				}
-			} );
-		} );
+		}
 
 		// Status change. The pill and the status filter both read from the row's
 		// data-status, so the row is refreshed from the response instead of
@@ -308,7 +240,7 @@
 				return;
 			}
 
-			var row = select.closest( 'tr.af-maint-row' );
+			var row = select.closest( '.af-maint-row' );
 			var previous = row ? row.dataset.status : '';
 			var next = select.value;
 
@@ -500,10 +432,10 @@
 				}
 
 				var next = btn.getAttribute( 'data-quick-filter' );
-				quickFilter = quickFilter === next ? '' : next;
+				quickFilter = next;
 
 				stats.querySelectorAll( '[data-quick-filter]' ).forEach( function ( other ) {
-					other.setAttribute( 'aria-pressed', other === btn && quickFilter ? 'true' : 'false' );
+					other.setAttribute( 'aria-pressed', other === btn ? 'true' : 'false' );
 				} );
 
 				refresh();
@@ -794,22 +726,6 @@
 					resetForm();
 				}
 				formCard.hidden = ! formCard.hidden;
-			} );
-		}
-
-		var headerNew = document.getElementById( 'af-maint-new-contact' );
-		if ( headerNew && formCard ) {
-			headerNew.addEventListener( 'click', function () {
-				var tab = document.getElementById( 'af-tab-personal' );
-				if ( tab ) {
-					tab.checked = true;
-				}
-				resetForm();
-				formCard.hidden = false;
-				formCard.scrollIntoView( { behavior: 'smooth', block: 'start' } );
-				if ( form ) {
-					form.elements.name.focus( { preventScroll: true } );
-				}
 			} );
 		}
 

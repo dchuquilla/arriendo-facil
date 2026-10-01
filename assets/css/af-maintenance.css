@@ -91,8 +91,8 @@
 	justify-content: space-between;
 	gap: var(--af-space-3);
 	flex-wrap: wrap;
-	padding: var(--af-space-3) var(--af-space-4);
-	margin-bottom: var(--af-space-3);
+	padding: 0;
+	margin-bottom: var(--af-space-4);
 }
 
 /* Only the search stays always-on. The two selects move into a popover so the
@@ -265,12 +265,23 @@
 .af-maint-formcard .af-modal__status:empty { display: none; }
 .af-maint-formcard .af-modal__status { margin: var(--af-space-3) var(--af-space-5) 0; }
 
-#af-maint-request-form {
+.af-maint-stepform {
 	display: flex;
 	flex-direction: column;
-	gap: var(--af-space-4);
+	align-items: stretch;
+	gap: var(--af-space-5);
 	padding: var(--af-space-5);
 }
+.af-maint-stepform .af-maint-optional__body input,
+.af-maint-stepform .af-maint-optional__body select,
+.af-maint-stepform .af-maint-optional__body textarea { width: 100%; }
+.af-maint-stepform .af-maint-optional__body { align-items: start; }
+.af-maint-stepform .af-maint-optional__body label { display: block; }
+.af-maint-stepform .af-maint-step input[type="tel"],
+.af-maint-stepform .af-maint-step input[type="email"] { width: 100%; }
+.af-maint-stepform .af-maint-label { display: block; font-weight: 600; margin-bottom: 6px; color: var(--af-gray-700); }
+.af-maint-stepform .af-maint-step:last-of-type { border-bottom: 0; padding-bottom: 0; }
+.af-maint-stepform abbr { color: var(--af-danger-500); text-decoration: none; border: 0; }
 
 .af-maint-step {
 	display: flex;
@@ -452,9 +463,10 @@
 .af-maint-sort:focus-visible { outline: 2px solid var(--af-accent-500); outline-offset: 3px; }
 
 .af-maint-sort__icon {
-	opacity: .35;
+	opacity: 0;
 	transition: opacity .15s ease, transform .15s ease;
 }
+.af-maint-sort:hover .af-maint-sort__icon { opacity: .4; }
 
 .af-maint-sort[aria-sort="ascending"] .af-maint-sort__icon,
 .af-maint-sort[aria-sort="descending"] .af-maint-sort__icon { opacity: 1; color: var(--af-accent-500); }

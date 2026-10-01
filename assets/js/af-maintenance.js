@@ -211,7 +211,7 @@
 
 			if ( countEl ) {
 				countEl.textContent = visible === rows.length
-					? afMaintenance.i18n.countAll.replace( '%d', rows.length )
+					? ( 1 === rows.length ? afMaintenance.i18n.countOne : afMaintenance.i18n.countAll.replace( '%d', rows.length ) )
 					: afMaintenance.i18n.countFiltered.replace( '%1$d', visible ).replace( '%2$d', rows.length );
 			}
 
@@ -728,7 +728,7 @@
 
 			if ( countEl ) {
 				countEl.textContent = visible === cards.length
-					? afMaintenance.i18n.countAll.replace( '%d', cards.length )
+					? ( 1 === cards.length ? afMaintenance.i18n.countContact : afMaintenance.i18n.countContacts.replace( '%d', cards.length ) )
 					: afMaintenance.i18n.countFiltered.replace( '%1$d', visible ).replace( '%2$d', cards.length );
 			}
 
@@ -780,6 +780,11 @@
 			cancel.addEventListener( 'click', function () {
 				formCard.hidden = true;
 				resetForm();
+			} );
+			formCard.querySelectorAll( '[data-af-close-prov]' ).forEach( function ( btn ) {
+				btn.addEventListener( 'click', function () {
+					cancel.click();
+				} );
 			} );
 		}
 
@@ -841,6 +846,11 @@
 			form.elements.job_price.value = card.dataset.jobPrice || '0.00';
 			form.elements.notes.value = card.dataset.notes || '';
 
+			var optional = form.querySelector( '.af-maint-optional' );
+			if ( optional ) {
+				optional.open = !! ( card.dataset.city || card.dataset.zone || card.dataset.notes || parseFloat( card.dataset.hourlyRate ) || parseFloat( card.dataset.jobPrice ) );
+			}
+
 			if ( idField ) {
 				idField.value = btn.getAttribute( 'data-id' );
 			}
@@ -852,7 +862,8 @@
 			}
 
 			formCard.hidden = false;
-			form.elements.name.focus();
+			formCard.scrollIntoView( { behavior: 'smooth', block: 'start' } );
+			form.elements.name.focus( { preventScroll: true } );
 		} );
 
 		form.addEventListener( 'submit', function ( e ) {

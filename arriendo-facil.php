@@ -43,6 +43,7 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-billing-ledger.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing-ledger/class-billing-ledger-controller.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-document-verification.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-maintenance.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-service-providers.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-owner-settlement.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-wizard.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-featured-admin.php';
@@ -265,6 +266,7 @@ function arriendo_facil_init() {
 		'Arriendo_Facil_Accommodation_List_Admin',
 		'Arriendo_Facil_Cleaning_Service',
 		'Arriendo_Facil_Maintenance',
+		'Arriendo_Facil_Service_Providers',
 		'Arriendo_Facil_Lease',
 		'Arriendo_Facil_Contract_Generator',
 		'Arriendo_Facil_Lease_Operations',
@@ -383,7 +385,7 @@ function arriendo_facil_maybe_upgrade_schema() {
 		return;
 	}
 
-	$target_schema_version = '2026-12-refactor-indexes';
+	$target_schema_version = '2026-12-mantenimiento-catalogo';
 	$current_schema_version = (string) get_option( 'af_db_schema_version', '' );
 
 	if ( $current_schema_version === $target_schema_version && ! arriendo_facil_has_lease_schema_drift() ) {

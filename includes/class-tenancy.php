@@ -248,6 +248,31 @@ class Arriendo_Facil_Tenancy {
 	}
 
 	/**
+	 * Whether the given user can operate on a service provider (tenant-scoped by owner_id).
+	 *
+	 * @param int $provider_id Provider ID.
+	 * @param int $user_id     User ID. Defaults to current user.
+	 * @return bool
+	 */
+	public static function can_access_service_provider( $provider_id, $user_id = 0 ) {
+		if ( self::can_manage_all( $user_id ) ) {
+			return true;
+		}
+
+		global $wpdb;
+		$user_id = $user_id ? absint( $user_id ) : get_current_user_id();
+
+		$owner = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT owner_id FROM {$wpdb->prefix}af_service_providers WHERE id = %d",
+				absint( $provider_id )
+			)
+		);
+
+		return $owner > 0 && $owner === $user_id;
+	}
+
+	/**
 	 * Whether the given user can operate on a maintenance request.
 	 *
 	 * @param int $request_id Maintenance request ID.

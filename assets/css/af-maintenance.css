@@ -1,0 +1,303 @@
+/**
+ * Mantenimiento: catálogo de personal + tabla interactiva de reparaciones.
+ *
+ * Both tabs live inside .af-maint to keep every rule scoped to this screen and
+ * out of the shared admin stylesheets.
+ */
+
+.af-maint__section + .af-maint__section { margin-top: var(--af-space-4); }
+
+/* ── Tabs (CSS-only radio switcher, following the af-buildings pattern) ──── */
+
+#af-tab-solicitudes:checked ~ .af-tabs__nav > label[for="af-tab-solicitudes"],
+#af-tab-personal:checked ~ .af-tabs__nav > label[for="af-tab-personal"] {
+	background: var(--af-gray-0, #fff);
+	color: var(--af-gray-900);
+	box-shadow: var(--af-shadow-sm);
+}
+
+#af-tab-solicitudes:checked ~ .af-tabs__panels > .af-tabs__panel--solicitudes,
+#af-tab-personal:checked ~ .af-tabs__panels > .af-tabs__panel--personal {
+	display: block;
+}
+
+.af-tabs__radio:focus-visible ~ .af-tabs__nav > label { box-shadow: var(--af-focus-ring); }
+
+/* ── Toolbar: buscador + acciones ─────────────────────────────────────────── */
+
+.af-maint-toolbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--af-space-3);
+	flex-wrap: wrap;
+	padding: var(--af-space-3) var(--af-space-4);
+	margin-bottom: var(--af-space-3);
+}
+
+.af-maint-toolbar__filters {
+	display: flex;
+	align-items: center;
+	gap: var(--af-space-2);
+	flex-wrap: wrap;
+}
+
+.af-maint-search {
+	position: relative;
+	display: flex;
+	align-items: center;
+	min-width: 260px;
+}
+
+.af-maint-search .dashicons {
+	position: absolute;
+	left: 10px;
+	color: var(--af-gray-400);
+	pointer-events: none;
+	font-size: 18px;
+	width: 18px;
+	height: 18px;
+}
+
+.af-maint-search input {
+	width: 100%;
+	min-height: 36px;
+	padding-left: 34px;
+}
+
+.af-maint-toolbar__actions {
+	display: flex;
+	align-items: center;
+	gap: var(--af-space-2);
+	flex-wrap: wrap;
+}
+
+.af-maint-count {
+	color: var(--af-gray-500);
+	font-size: var(--af-text-xs);
+	font-weight: 600;
+	white-space: nowrap;
+}
+
+/* ── Tabla interactiva ───────────────────────────────────────────────────── */
+
+.af-maint-tablewrap {
+	overflow-x: auto;
+	border-radius: var(--af-radius-lg);
+}
+
+.af-maint-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: var(--af-text-sm);
+}
+
+.af-maint-table th,
+.af-maint-table td {
+	padding: var(--af-space-3);
+	text-align: left;
+	vertical-align: top;
+	border-bottom: 1px solid var(--af-gray-200);
+}
+
+.af-maint-table thead th {
+	background: var(--af-gray-50);
+	color: var(--af-gray-600);
+	font-size: var(--af-text-xs);
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: .04em;
+	white-space: nowrap;
+	position: sticky;
+	top: 0;
+	z-index: 2;
+}
+
+/* Sortable headers: button keeps native semantics but looks like plain th text. */
+.af-maint-sort {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	background: none;
+	border: 0;
+	padding: 0;
+	margin: 0;
+	font: inherit;
+	color: inherit;
+	text-transform: inherit;
+	letter-spacing: inherit;
+	cursor: pointer;
+}
+
+.af-maint-sort:hover { color: var(--af-gray-900); }
+.af-maint-sort:focus-visible { outline: 2px solid var(--af-accent-500); outline-offset: 3px; }
+
+.af-maint-sort__icon {
+	opacity: .35;
+	transition: opacity .15s ease, transform .15s ease;
+}
+
+.af-maint-sort[aria-sort="ascending"] .af-maint-sort__icon,
+.af-maint-sort[aria-sort="descending"] .af-maint-sort__icon { opacity: 1; color: var(--af-accent-500); }
+.af-maint-sort[aria-sort="descending"] .af-maint-sort__icon { transform: rotate(180deg); }
+
+.af-maint-table tbody tr:hover { background: var(--af-gray-50); }
+.af-maint-table tbody tr.is-hidden { display: none; }
+
+.af-maint-table__asset { font-weight: 600; color: var(--af-gray-900); }
+.af-maint-table__sub { display: block; color: var(--af-gray-500); font-size: var(--af-text-xs); margin-top: 2px; }
+.af-maint-table__actions { white-space: nowrap; }
+
+/* Detail row expanded under a request. */
+.af-maint-detail > td {
+	background: var(--af-gray-50);
+	padding: 0;
+	border-bottom: 1px solid var(--af-gray-200);
+}
+
+.af-maint-detail__inner {
+	padding: var(--af-space-4);
+	display: grid;
+	gap: var(--af-space-3);
+	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.af-maint-detail__block { min-width: 0; }
+.af-maint-detail__label {
+	display: block;
+	font-size: var(--af-text-xs);
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: .04em;
+	color: var(--af-gray-500);
+	margin-bottom: 4px;
+}
+.af-maint-detail__value { color: var(--af-gray-700); white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.af-maint-toggle {
+	background: none;
+	border: 0;
+	padding: 4px;
+	cursor: pointer;
+	color: var(--af-gray-500);
+	border-radius: var(--af-radius-sm);
+	display: inline-flex;
+}
+.af-maint-toggle:hover { color: var(--af-gray-900); background: var(--af-gray-100); }
+.af-maint-toggle:focus-visible { outline: 2px solid var(--af-accent-500); outline-offset: 2px; }
+.af-maint-toggle .dashicons { transition: transform .15s ease; }
+.af-maint-toggle[aria-expanded="true"] .dashicons { transform: rotate(180deg); }
+
+/* ── Formularios: bloques del formulario de solicitud ────────────────────── */
+
+.af-maint-form {
+	display: grid;
+	gap: var(--af-space-4);
+	grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+	align-items: end;
+}
+
+.af-maint-form__full { grid-column: 1 / -1; }
+.af-maint-form__section {
+	grid-column: 1 / -1;
+	border-top: 1px solid var(--af-gray-200);
+	padding-top: var(--af-space-3);
+}
+
+.af-maint-form__legend {
+	font-size: var(--af-text-xs);
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: .04em;
+	color: var(--af-gray-500);
+	margin-bottom: var(--af-space-2);
+}
+
+.af-maint-form label > span.af-maint-label {
+	display: block;
+	font-weight: 600;
+	margin-bottom: 4px;
+}
+
+.af-maint-form select,
+.af-maint-form input[type="text"],
+.af-maint-form input[type="tel"],
+.af-maint-form input[type="email"],
+.af-maint-form input[type="number"],
+.af-maint-form input[type="date"],
+.af-maint-form textarea { width: 100%; }
+
+/* Bloque de contacto manual: se muestra solo cuando no hay proveedor del catálogo. */
+.af-maint-manual { display: none; gap: var(--af-space-3); grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.af-maint-manual.is-visible { display: grid; }
+
+/* ── Catálogo de personal ────────────────────────────────────────────────── */
+
+.af-prov-grid {
+	display: grid;
+	gap: var(--af-space-3);
+	grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+.af-prov-card {
+	border: 1px solid var(--af-gray-200);
+	border-radius: var(--af-radius-lg);
+	padding: var(--af-space-4);
+	background: var(--af-gray-0);
+	display: flex;
+	flex-direction: column;
+	gap: var(--af-space-2);
+}
+
+.af-prov-card.is-hidden { display: none; }
+.af-prov-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--af-space-2); }
+.af-prov-card__name { font-size: var(--af-text-base); font-weight: 700; color: var(--af-gray-900); margin: 0; }
+.af-prov-card__company { color: var(--af-gray-500); font-size: var(--af-text-xs); margin: 2px 0 0; }
+
+.af-prov-card__trade { display: flex; align-items: center; gap: 6px; }
+.af-prov-card__trade .dashicons { color: var(--af-gray-400); font-size: 16px; width: 16px; height: 16px; }
+.af-prov-card__trade-label { font-size: var(--af-text-xs); font-weight: 700; color: var(--af-gray-700); text-transform: uppercase; letter-spacing: .04em; }
+
+.af-prov-card__contacts { display: flex; flex-wrap: wrap; gap: var(--af-space-2); margin-top: auto; }
+
+.af-prov-card__contact {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-size: var(--af-text-xs);
+	font-weight: 600;
+	text-decoration: none;
+	color: var(--af-gray-700);
+	background: var(--af-gray-100);
+	border-radius: var(--af-radius-full);
+	padding: 5px 10px;
+}
+.af-prov-card__contact:hover { background: var(--af-accent-50); color: var(--af-accent-600); }
+.af-prov-card__contact .dashicons { font-size: 14px; width: 14px; height: 14px; }
+
+.af-prov-card__meta { display: flex; flex-wrap: wrap; gap: var(--af-space-3); color: var(--af-gray-500); font-size: var(--af-text-xs); }
+.af-prov-card__actions { display: flex; gap: var(--af-space-2); border-top: 1px solid var(--af-gray-200); padding-top: var(--af-space-2); }
+
+/* ── Impresión: el dueño pidió una hoja; sale limpia, sin cromo del admin ── */
+
+@media print {
+	#af-maint-toolbar,
+	.af-maint-table__actions,
+	.af-maint-toggle,
+	.af-prov-card__actions,
+	.af-maint-toolbar__actions,
+	.af-page-header__actions { display: none !important; }
+
+	.af-maint-table thead th { background: transparent !important; color: #000 !important; position: static; }
+	.af-maint-table { font-size: 11pt; }
+	.af-maint-tablewrap { overflow: visible; }
+	.af-maint-detail { display: table-row !important; }
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 782px) {
+	.af-maint-search { min-width: 100%; }
+	.af-maint-toolbar { flex-direction: column; align-items: stretch; }
+	.af-prov-grid { grid-template-columns: 1fr; }
+}

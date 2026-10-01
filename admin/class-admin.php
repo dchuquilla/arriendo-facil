@@ -1636,6 +1636,26 @@ array(
 			);
 		}
 
+		// Mantenimiento: catálogo de personal + tabla interactiva de reparaciones.
+		if ( 'arriendo-facil_page_af-maintenance' === $hook ) {
+			$maintenance_css_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-maintenance.css';
+			wp_enqueue_style(
+				'af-maintenance',
+				ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/af-maintenance.css',
+				array( 'af-tokens', 'af-shell', 'af-forms', 'af-admin-chrome' ),
+				file_exists( $maintenance_css_path ) ? (string) filemtime( $maintenance_css_path ) : ARRIENDO_FACIL_VERSION
+			);
+
+			$maintenance_js_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/af-maintenance.js';
+			wp_enqueue_script(
+				'af-maintenance',
+				ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/af-maintenance.js',
+				array(),
+				file_exists( $maintenance_js_path ) ? (string) filemtime( $maintenance_js_path ) : ARRIENDO_FACIL_VERSION,
+				true
+			);
+		}
+
 		// Estilos del catálogo de inmuebles.
 		if ( 'arriendo-facil_page_af-catalog' === $hook ) {
 			$catalog_css_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-catalog.css';

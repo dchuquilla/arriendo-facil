@@ -30,6 +30,8 @@ $open_count   = 0;
 $urgent_count = 0;
 $month_cost   = 0.0;
 $scheduled_count = 0;
+$overdue_count   = 0;
+$today           = current_time( 'Y-m-d' );
 
 foreach ( $requests as $request ) {
 	$status = (string) $request->status;
@@ -39,14 +41,16 @@ foreach ( $requests as $request ) {
 		if ( 'alta' === (string) $request->priority ) {
 			$urgent_count++;
 		}
+		if ( ! empty( $request->scheduled_date ) ) {
+			$scheduled_count++;
+			if ( (string) $request->scheduled_date < $today ) {
+				$overdue_count++;
+			}
+		}
 	}
 
 	if ( 'completed' === $status && (string) $request->completed_date >= gmdate( 'Y-m-01' ) ) {
 		$month_cost += (float) $request->cost;
-	}
-
-	if ( 'pending' === $status && ! empty( $request->scheduled_date ) ) {
-		$scheduled_count++;
 	}
 }
 
@@ -102,7 +106,7 @@ $active_providers = array_values(
 					esc_html__( 'Nueva solicitud', 'arriendo-facil' )
 				),
 				sprintf(
-					'<button type="button" class="button af-btn af-btn--ghost" onclick="document.getElementById(\'af-tab-personal\').checked=true;">%s</button>',
+					'<button type="button" class="button af-btn af-btn--ghost" id="af-maint-new-contact">%s</button>',
 					esc_html__( 'Nuevo contacto', 'arriendo-facil' )
 				),
 			),
@@ -139,19 +143,25 @@ $active_providers = array_values(
 				<div class="af-maint-stats" id="af-maint-stats" role="group" aria-label="<?php esc_attr_e( 'Resumen y filtros rápidos de solicitudes', 'arriendo-facil' ); ?>">
 					<button type="button" class="af-maint-stat af-maint-stat--<?php echo $open_count > 0 ? 'attention' : 'success'; ?>"
 						data-quick-filter="open" aria-pressed="false">
-						<span class="af-maint-stat__value"><?php echo esc_html( number_format_i18n( $open_count ) ); ?></span>
+						<span class="af-maint-stat__value" data-stat="open"><?php echo esc_html( number_format_i18n( $open_count ) ); ?></span>
 						<span class="af-maint-stat__label"><?php esc_html_e( 'abiertas', 'arriendo-facil' ); ?></span>
 					</button>
 
+					<button type="button" class="af-maint-stat <?php echo $overdue_count > 0 ? 'af-maint-stat--attention' : ''; ?>"
+						data-quick-filter="overdue" data-attention="1" aria-pressed="false">
+						<span class="af-maint-stat__value" data-stat="overdue"><?php echo esc_html( number_format_i18n( $overdue_count ) ); ?></span>
+						<span class="af-maint-stat__label"><?php esc_html_e( 'atrasadas', 'arriendo-facil' ); ?></span>
+					</button>
+
 					<button type="button" class="af-maint-stat <?php echo $urgent_count > 0 ? 'af-maint-stat--attention' : ''; ?>"
-						data-quick-filter="alta" aria-pressed="false">
-						<span class="af-maint-stat__value"><?php echo esc_html( number_format_i18n( $urgent_count ) ); ?></span>
+						data-quick-filter="alta" data-attention="1" aria-pressed="false">
+						<span class="af-maint-stat__value" data-stat="alta"><?php echo esc_html( number_format_i18n( $urgent_count ) ); ?></span>
 						<span class="af-maint-stat__label"><?php esc_html_e( 'prioridad alta', 'arriendo-facil' ); ?></span>
 					</button>
 
 					<button type="button" class="af-maint-stat <?php echo $scheduled_count > 0 ? 'af-maint-stat--info' : ''; ?>"
 						data-quick-filter="scheduled" aria-pressed="false">
-						<span class="af-maint-stat__value"><?php echo esc_html( number_format_i18n( $scheduled_count ) ); ?></span>
+						<span class="af-maint-stat__value" data-stat="scheduled"><?php echo esc_html( number_format_i18n( $scheduled_count ) ); ?></span>
 						<span class="af-maint-stat__label"><?php esc_html_e( 'con fecha pactada', 'arriendo-facil' ); ?></span>
 					</button>
 
@@ -161,109 +171,101 @@ $active_providers = array_values(
 					</button>
 				</div>
 
-				<div class="af-section" id="af-maint-request-form-card" hidden style="padding: var(--af-space-5); margin-bottom: var(--af-space-4);">
-					<h2 class="af-section__title" style="margin-top:0;"><?php esc_html_e( 'Nueva solicitud de reparación', 'arriendo-facil' ); ?></h2>
-					<p class="af-modal__status" id="af-maint-request-status"></p>
+				<div class="af-section af-maint-formcard" id="af-maint-request-form-card" hidden>
+					<header class="af-maint-formcard__head">
+						<div>
+							<h2 class="af-maint-formcard__title"><?php esc_html_e( 'Nueva solicitud de reparación', 'arriendo-facil' ); ?></h2>
+							<p class="af-maint-formcard__sub"><?php esc_html_e( 'Solo 2 datos son obligatorios. Lo demás puedes completarlo después.', 'arriendo-facil' ); ?></p>
+						</div>
+						<button type="button" class="af-maint-formcard__close" data-af-close-request aria-label="<?php esc_attr_e( 'Cerrar', 'arriendo-facil' ); ?>">&times;</button>
+					</header>
+					<p class="af-modal__status" id="af-maint-request-status" aria-live="polite"></p>
 
 					<form id="af-maint-request-form" class="af-maint-form">
 
-						<div class="af-maint-form__section">
-							<p class="af-maint-form__legend"><?php esc_html_e( 'Lo esencial', 'arriendo-facil' ); ?></p>
+						<fieldset class="af-maint-step">
+							<legend class="af-maint-step__title"><span class="af-maint-step__num">1</span><?php esc_html_e( '¿Dónde?', 'arriendo-facil' ); ?></legend>
 
-							<label class="af-maint-form__full">
-								<span class="af-maint-label"><?php esc_html_e( 'Inmueble', 'arriendo-facil' ); ?> *</span>
-								<select name="accommodation_id" required>
-									<option value=""><?php esc_html_e( '— Seleccionar —', 'arriendo-facil' ); ?></option>
-									<?php foreach ( $maintenance_properties as $maintenance_property ) : ?>
-										<option value="<?php echo esc_attr( (int) $maintenance_property->ID ); ?>"><?php echo esc_html( $maintenance_property->post_title ); ?></option>
-									<?php endforeach; ?>
-								</select>
-							</label>
-
-							<label>
-								<span class="af-maint-label"><?php esc_html_e( 'Unidad', 'arriendo-facil' ); ?></span>
-								<select name="unit_id" id="af-maint-unit">
-									<option value=""><?php esc_html_e( '— Sin unidad —', 'arriendo-facil' ); ?></option>
-								</select>
-							</label>
-
-							<label>
-								<span class="af-maint-label"><?php esc_html_e( 'Categoría del bien', 'arriendo-facil' ); ?></span>
-								<select name="asset_category" id="af-maint-category">
-									<option value=""><?php esc_html_e( '— Seleccionar —', 'arriendo-facil' ); ?></option>
-									<?php foreach ( $categories as $category_key => $category_label ) : ?>
-										<option value="<?php echo esc_attr( $category_key ); ?>"><?php echo esc_html( $category_label ); ?></option>
-									<?php endforeach; ?>
-								</select>
-							</label>
-
-							<label>
-								<span class="af-maint-label"><?php esc_html_e( 'Tipo de trabajo', 'arriendo-facil' ); ?></span>
-								<select name="request_type">
-									<?php foreach ( $types as $type_key => $type_label ) : ?>
-										<option value="<?php echo esc_attr( $type_key ); ?>" <?php selected( 'reparacion', $type_key ); ?>><?php echo esc_html( $type_label ); ?></option>
-									<?php endforeach; ?>
-								</select>
-							</label>
-
-							<label>
-								<span class="af-maint-label"><?php esc_html_e( 'Prioridad', 'arriendo-facil' ); ?></span>
-								<select name="priority">
-									<?php foreach ( $priorities as $priority_key => $priority_label ) : ?>
-										<option value="<?php echo esc_attr( $priority_key ); ?>" <?php selected( 'media', $priority_key ); ?>><?php echo esc_html( $priority_label ); ?></option>
-									<?php endforeach; ?>
-								</select>
-							</label>
-
-							<label class="af-maint-form__full">
-								<span class="af-maint-label"><?php esc_html_e( '¿Qué hay que reparar?', 'arriendo-facil' ); ?> *</span>
-								<input type="text" name="asset_name" required placeholder="<?php esc_attr_e( 'Ej: lavadora LG, puerta principal, calentador de agua', 'arriendo-facil' ); ?>" />
-							</label>
-
-							<label class="af-maint-form__full">
-								<span class="af-maint-label"><?php esc_html_e( '¿Qué está dañado?', 'arriendo-facil' ); ?></span>
-								<textarea name="damage_details" rows="3" placeholder="<?php esc_attr_e( 'Ej: no drena, se queda con agua dentro y hace ruido al centrifugar.', 'arriendo-facil' ); ?>"></textarea>
-							</label>
-						</div>
-
-						<details class="af-maint-optional">
-							<summary class="af-maint-optional__summary">
-								<span class="af-maint-optional__label"><?php esc_html_e( 'Detalles, fecha y contacto', 'arriendo-facil' ); ?></span>
-								<span class="af-maint-optional__hint"><?php esc_html_e( 'Opcional — se puede completar después desde la ficha', 'arriendo-facil' ); ?></span>
-							</summary>
-
-							<div class="af-maint-optional__body">
+							<div class="af-maint-step__grid">
 								<label>
-									<span class="af-maint-label"><?php esc_html_e( 'Fecha pactada', 'arriendo-facil' ); ?></span>
-									<input type="date" name="scheduled_date" value="<?php echo esc_attr( current_time( 'Y-m-d' ) ); ?>" />
-								</label>
-
-								<label>
-									<span class="af-maint-label"><?php esc_html_e( 'Reportado por', 'arriendo-facil' ); ?></span>
-									<select name="reported_by">
-										<?php foreach ( $reporters as $reporter_key => $reporter_label ) : ?>
-											<option value="<?php echo esc_attr( $reporter_key ); ?>" <?php selected( 'operador', $reporter_key ); ?>><?php echo esc_html( $reporter_label ); ?></option>
+									<span class="af-maint-label"><?php esc_html_e( 'Inmueble', 'arriendo-facil' ); ?> <abbr title="<?php esc_attr_e( 'obligatorio', 'arriendo-facil' ); ?>">*</abbr></span>
+									<select name="accommodation_id" required>
+										<option value=""><?php esc_html_e( 'Elige el inmueble…', 'arriendo-facil' ); ?></option>
+										<?php foreach ( $maintenance_properties as $maintenance_property ) : ?>
+											<option value="<?php echo esc_attr( (int) $maintenance_property->ID ); ?>"><?php echo esc_html( $maintenance_property->post_title ); ?></option>
 										<?php endforeach; ?>
 									</select>
 								</label>
 
-								<label>
-									<span class="af-maint-label"><?php esc_html_e( 'Costo estimado (USD)', 'arriendo-facil' ); ?></span>
-									<input type="number" name="cost" step="0.01" min="0" value="0.00" />
+								<label id="af-maint-unit-wrap" hidden>
+									<span class="af-maint-label"><?php esc_html_e( 'Unidad', 'arriendo-facil' ); ?></span>
+									<select name="unit_id" id="af-maint-unit">
+										<option value=""><?php esc_html_e( '— Sin unidad —', 'arriendo-facil' ); ?></option>
+									</select>
 								</label>
 
 								<label>
-									<span class="af-maint-label"><?php esc_html_e( 'Características', 'arriendo-facil' ); ?></span>
-									<input type="text" name="asset_specs" placeholder="<?php esc_attr_e( 'Marca, modelo, color', 'arriendo-facil' ); ?>" />
+									<span class="af-maint-label"><?php esc_html_e( '¿En qué parte del inmueble?', 'arriendo-facil' ); ?></span>
+									<input type="text" name="asset_location" placeholder="<?php esc_attr_e( 'Ej: cocina, baño principal', 'arriendo-facil' ); ?>" />
 								</label>
+							</div>
+						</fieldset>
 
-								<label>
-									<span class="af-maint-label"><?php esc_html_e( 'Ubicación dentro del inmueble', 'arriendo-facil' ); ?></span>
-									<input type="text" name="asset_location" placeholder="<?php esc_attr_e( 'Ej: cocina, segundo piso', 'arriendo-facil' ); ?>" />
-								</label>
+						<fieldset class="af-maint-step">
+							<legend class="af-maint-step__title"><span class="af-maint-step__num">2</span><?php esc_html_e( '¿Qué pasó?', 'arriendo-facil' ); ?></legend>
 
+							<span class="af-maint-label"><?php esc_html_e( 'Es un problema de…', 'arriendo-facil' ); ?></span>
+							<div class="af-maint-chips" role="radiogroup">
+								<?php foreach ( $categories as $category_key => $category_label ) : ?>
+									<label class="af-maint-chip">
+										<input type="radio" name="asset_category" value="<?php echo esc_attr( $category_key ); ?>" />
+										<span><?php echo esc_html( $category_label ); ?></span>
+									</label>
+								<?php endforeach; ?>
+							</div>
+
+							<label>
+								<span class="af-maint-label"><?php esc_html_e( '¿Qué hay que reparar?', 'arriendo-facil' ); ?> <abbr title="<?php esc_attr_e( 'obligatorio', 'arriendo-facil' ); ?>">*</abbr></span>
+								<input type="text" name="asset_name" required maxlength="190" placeholder="<?php esc_attr_e( 'Ej: lavadora, puerta principal, calentador de agua', 'arriendo-facil' ); ?>" />
+							</label>
+
+							<label>
+								<span class="af-maint-label"><?php esc_html_e( 'Describe el daño', 'arriendo-facil' ); ?></span>
+								<textarea name="damage_details" rows="3" placeholder="<?php esc_attr_e( 'Ej: no drena, se queda con agua y hace ruido al centrifugar.', 'arriendo-facil' ); ?>"></textarea>
+								<span class="af-maint-help"><?php esc_html_e( 'Mientras más claro, más rápido cotiza el técnico.', 'arriendo-facil' ); ?></span>
+							</label>
+						</fieldset>
+
+						<fieldset class="af-maint-step">
+							<legend class="af-maint-step__title"><span class="af-maint-step__num">3</span><?php esc_html_e( '¿Qué tan urgente es?', 'arriendo-facil' ); ?></legend>
+
+							<?php
+							$priority_hints = array(
+								'baja'  => __( 'Puede esperar', 'arriendo-facil' ),
+								'media' => __( 'Resolver esta semana', 'arriendo-facil' ),
+								'alta'  => __( 'Hoy: riesgo o sin servicio', 'arriendo-facil' ),
+							);
+							?>
+							<div class="af-maint-segment" role="radiogroup">
+								<?php foreach ( $priorities as $priority_key => $priority_label ) : ?>
+									<label class="af-maint-segment__opt af-maint-segment__opt--<?php echo esc_attr( $priority_key ); ?>">
+										<input type="radio" name="priority" value="<?php echo esc_attr( $priority_key ); ?>" <?php checked( 'media', $priority_key ); ?> />
+										<span class="af-maint-segment__label"><?php echo esc_html( $priority_label ); ?></span>
+										<span class="af-maint-segment__hint"><?php echo esc_html( $priority_hints[ $priority_key ] ?? '' ); ?></span>
+									</label>
+								<?php endforeach; ?>
+							</div>
+						</fieldset>
+
+						<details class="af-maint-optional">
+							<summary class="af-maint-optional__summary">
+								<span class="af-maint-optional__label"><?php esc_html_e( 'Asignar técnico, fecha y costo', 'arriendo-facil' ); ?></span>
+								<span class="af-maint-optional__hint"><?php esc_html_e( 'Opcional', 'arriendo-facil' ); ?></span>
+							</summary>
+
+							<div class="af-maint-optional__body">
 								<label class="af-maint-form__full">
-									<span class="af-maint-label"><?php esc_html_e( 'Contacto del catálogo', 'arriendo-facil' ); ?></span>
+									<span class="af-maint-label"><?php esc_html_e( '¿Quién lo va a reparar?', 'arriendo-facil' ); ?></span>
 									<select name="provider_id">
 										<option value=""><?php esc_html_e( '— Sin asignar —', 'arriendo-facil' ); ?></option>
 										<?php foreach ( $trades as $trade_key => $trade_label ) : ?>
@@ -308,6 +310,40 @@ $active_providers = array_values(
 									</label>
 								</div>
 
+								<label>
+									<span class="af-maint-label"><?php esc_html_e( 'Fecha acordada con el técnico', 'arriendo-facil' ); ?></span>
+									<input type="date" name="scheduled_date" min="<?php echo esc_attr( $today ); ?>" />
+									<span class="af-maint-help"><?php esc_html_e( 'Déjala vacía si aún no hay fecha.', 'arriendo-facil' ); ?></span>
+								</label>
+
+								<label>
+									<span class="af-maint-label"><?php esc_html_e( 'Costo estimado', 'arriendo-facil' ); ?></span>
+									<span class="af-maint-money"><span aria-hidden="true">$</span><input type="number" name="cost" step="0.01" min="0" placeholder="0.00" inputmode="decimal" /></span>
+								</label>
+
+								<label>
+									<span class="af-maint-label"><?php esc_html_e( 'Tipo de trabajo', 'arriendo-facil' ); ?></span>
+									<select name="request_type">
+										<?php foreach ( $types as $type_key => $type_label ) : ?>
+											<option value="<?php echo esc_attr( $type_key ); ?>" <?php selected( 'reparacion', $type_key ); ?>><?php echo esc_html( $type_label ); ?></option>
+										<?php endforeach; ?>
+									</select>
+								</label>
+
+								<label>
+									<span class="af-maint-label"><?php esc_html_e( '¿Quién lo reportó?', 'arriendo-facil' ); ?></span>
+									<select name="reported_by">
+										<?php foreach ( $reporters as $reporter_key => $reporter_label ) : ?>
+											<option value="<?php echo esc_attr( $reporter_key ); ?>" <?php selected( 'operador', $reporter_key ); ?>><?php echo esc_html( $reporter_label ); ?></option>
+										<?php endforeach; ?>
+									</select>
+								</label>
+
+								<label class="af-maint-form__full">
+									<span class="af-maint-label"><?php esc_html_e( 'Marca, modelo o color', 'arriendo-facil' ); ?></span>
+									<input type="text" name="asset_specs" placeholder="<?php esc_attr_e( 'Ej: LG 18 kg, blanca', 'arriendo-facil' ); ?>" />
+								</label>
+
 								<label class="af-maint-form__full">
 									<span class="af-maint-label"><?php esc_html_e( 'Notas', 'arriendo-facil' ); ?></span>
 									<textarea name="notes" rows="2" placeholder="<?php esc_attr_e( 'Contexto adicional, accesos, disponibilidad…', 'arriendo-facil' ); ?>"></textarea>
@@ -315,15 +351,16 @@ $active_providers = array_values(
 							</div>
 						</details>
 
-						<div class="af-maint-form__full" style="display:flex; gap:8px;">
-							<button type="submit" class="button button-primary"><?php esc_html_e( 'Registrar solicitud', 'arriendo-facil' ); ?></button>
-							<button type="button" class="button" id="af-maint-request-cancel"><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
-						</div>
+						<footer class="af-maint-formcard__foot">
+							<span class="af-maint-help"><abbr>*</abbr> <?php esc_html_e( 'Obligatorio', 'arriendo-facil' ); ?></span>
+							<button type="button" class="button af-btn af-btn--ghost" id="af-maint-request-cancel"><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
+							<button type="submit" class="button af-btn af-btn--primary"><?php esc_html_e( 'Registrar solicitud', 'arriendo-facil' ); ?></button>
+						</footer>
 					</form>
 				</div>
 
 				<div class="af-section" id="af-maint-requests">
-					<div class="af-maint-toolbar" id="af-maint-toolbar">
+					<div class="af-maint-toolbar" id="af-maint-toolbar"<?php echo empty( $requests ) ? ' hidden' : ''; ?>>
 						<div class="af-maint-toolbar__filters">
 							<label class="screen-reader-text" for="af-maint-search-input"><?php esc_html_e( 'Buscar solicitudes', 'arriendo-facil' ); ?></label>
 							<span class="af-maint-search">
@@ -377,6 +414,7 @@ $active_providers = array_values(
 							<span class="af-empty__icon" aria-hidden="true"><?php echo af_lucide( 'wrench', 28 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
 							<h3 class="af-empty__title"><?php esc_html_e( 'Sin solicitudes', 'arriendo-facil' ); ?></h3>
 							<p class="af-empty__text"><?php esc_html_e( 'Crea la primera solicitud de reparación para un inmueble de tu cartera.', 'arriendo-facil' ); ?></p>
+							<button type="button" class="button af-btn af-btn--primary" data-af-open-request><?php esc_html_e( 'Registrar primera solicitud', 'arriendo-facil' ); ?></button>
 						</div>
 					<?php else : ?>
 						<div class="af-maint-tablewrap">
@@ -517,6 +555,7 @@ $active_providers = array_values(
 											<td>
 												<?php if ( ! empty( $request->scheduled_date ) ) : ?>
 													<?php echo esc_html( (string) $request->scheduled_date ); ?>
+													<span class="af-maint-overdue"><?php esc_html_e( 'Atrasada', 'arriendo-facil' ); ?></span>
 												<?php else : ?>
 													<span class="af-maint-table__sub"><?php esc_html_e( 'Sin pactar', 'arriendo-facil' ); ?></span>
 												<?php endif; ?>
@@ -560,7 +599,10 @@ $active_providers = array_values(
 														<span class="af-maint-detail__value">
 															<?php echo esc_html( $contact_name ? $contact_name : __( 'Sin asignar', 'arriendo-facil' ) ); ?>
 															<?php if ( $contact_phone ) : ?>
-																<br /><a href="tel:<?php echo esc_attr( $contact_phone ); ?>"><?php echo esc_html( $contact_phone ); ?></a>
+																<span class="af-prov-card__contacts">
+																	<a class="af-prov-card__contact" href="tel:<?php echo esc_attr( $contact_phone ); ?>"><span class="dashicons dashicons-phone" aria-hidden="true"></span><?php echo esc_html( $contact_phone ); ?></a>
+																	<a class="af-prov-card__contact" href="https://wa.me/<?php echo esc_attr( preg_replace( '/\D+/', '', $contact_phone ) ); ?>" target="_blank" rel="noopener noreferrer"><span class="dashicons dashicons-format-chat" aria-hidden="true"></span><?php esc_html_e( 'WhatsApp', 'arriendo-facil' ); ?></a>
+																</span>
 															<?php endif; ?>
 														</span>
 													</div>
@@ -859,9 +901,13 @@ wp_localize_script(
 		'maintenanceNonce' => wp_create_nonce( 'af_maintenance_nonce' ),
 		'providerNonce'   => wp_create_nonce( class_exists( 'Arriendo_Facil_Service_Providers' ) ? Arriendo_Facil_Service_Providers::NONCE : 'af_service_provider_nonce' ),
 		'csvFilename'     => 'solicitudes-mantenimiento-' . gmdate( 'Y-m-d' ) . '.csv',
+		'today'           => $today,
+		'units'           => $units_index,
 		'i18n'            => array(
 			'countAll'      => __( '%d solicitudes', 'arriendo-facil' ),
-			'countFiltered' => __( '%d de %d', 'arriendo-facil' ),
+			'countFiltered' => __( '%1$d de %2$d', 'arriendo-facil' ),
+			'noUnit'        => __( '— Sin unidad —', 'arriendo-facil' ),
+			'unitPrefix'    => __( 'Unidad', 'arriendo-facil' ),
 			'nothingToExport' => __( 'No hay solicitudes visibles para exportar.', 'arriendo-facil' ),
 			'confirmDelete' => __( '¿Eliminar este contacto del catálogo? Esta acción no se puede deshacer.', 'arriendo-facil' ),
 			'newContactTitle' => __( 'Nuevo contacto de mantenimiento', 'arriendo-facil' ),

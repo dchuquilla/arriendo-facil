@@ -483,12 +483,21 @@ class Arriendo_Facil_Activator {
 				accommodation_id BIGINT(20) UNSIGNED NOT NULL,
 				unit_id          BIGINT(20) UNSIGNED DEFAULT NULL,
 				lease_id         BIGINT(20) UNSIGNED DEFAULT NULL,
+				provider_id      BIGINT(20) UNSIGNED DEFAULT NULL COMMENT 'Contacto del catalogo de personal asignado',
 				request_type     VARCHAR(30) NOT NULL DEFAULT 'limpieza',
 				priority         VARCHAR(20) NOT NULL DEFAULT 'media',
 				cost             DECIMAL(12,2) NOT NULL DEFAULT 0.00,
 				reported_by      VARCHAR(30) NOT NULL DEFAULT 'operador',
 				requested_date   DATE NOT NULL,
+				scheduled_date   DATE DEFAULT NULL COMMENT 'Fecha prevista de la reparacion',
 				completed_date   DATE DEFAULT NULL,
+				asset_category   VARCHAR(40) NOT NULL DEFAULT '' COMMENT 'electrodomestico, mueble, instalacion, inmueble, jardin, otro',
+				asset_name       VARCHAR(190) DEFAULT NULL COMMENT 'Nombre de que toca reparar',
+				damage_details   TEXT DEFAULT NULL COMMENT 'Que esta danado y las caracteristicas',
+				asset_specs      VARCHAR(255) DEFAULT NULL COMMENT 'Marca, modelo, color, serie',
+				asset_location   VARCHAR(120) DEFAULT NULL COMMENT 'Donde esta dentro del inmueble',
+				contact_name     VARCHAR(190) DEFAULT NULL COMMENT 'Contacto suelto cuando no hay proveedor en el catalogo',
+				contact_phone    VARCHAR(50) DEFAULT NULL,
 				status           VARCHAR(20) NOT NULL DEFAULT 'pending',
 				notes            TEXT DEFAULT NULL,
 				created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -496,7 +505,35 @@ class Arriendo_Facil_Activator {
 				PRIMARY KEY (id),
 				KEY accommodation_id (accommodation_id),
 				KEY lease_id (lease_id),
-				KEY unit_id (unit_id)
+				KEY unit_id (unit_id),
+				KEY provider_id (provider_id),
+				KEY status_scheduled (status, scheduled_date)
+			) $charset_collate;",
+
+			// Catalogo de personal de mantenimiento: plomeros, albañiles, carpinteros,
+			// etc. Es tenant-scoped por owner_id igual que af_buildings, de modo que
+			// cada gestor de propiedades solo ve y usa sus propios contactos.
+			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_service_providers (
+				id          BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+				owner_id     BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'WP user dueno del catalogo (tenant scope)',
+				name        VARCHAR(190) NOT NULL,
+				trade       VARCHAR(60) NOT NULL DEFAULT 'general' COMMENT 'plomero, albañil, carpintero, electricista, ...',
+				company     VARCHAR(190) DEFAULT NULL,
+				phone       VARCHAR(50) DEFAULT NULL,
+				whatsapp    VARCHAR(50) DEFAULT NULL,
+				email       VARCHAR(190) DEFAULT NULL,
+				city        VARCHAR(120) DEFAULT NULL,
+				zone        VARCHAR(120) DEFAULT NULL COMMENT 'Sector o barrio donde presta servicio',
+				hourly_rate DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+				job_price   DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT 'Costo tipico por trabajo',
+				rating      TINYINT(3) UNSIGNED NOT NULL DEFAULT 0 COMMENT '0 = sin calificar, 1-5 estrellas',
+				notes       TEXT DEFAULT NULL,
+				status      VARCHAR(20) NOT NULL DEFAULT 'active',
+				created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				KEY owner_status (owner_id, status),
+				KEY trade (trade)
 			) $charset_collate;",
 
 			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_owner_contacts (
@@ -982,6 +1019,8 @@ class Arriendo_Facil_Activator {
 		foreach ( $tables as $sql ) {
 			dbDelta( $sql );
 		}
+
+		self::maybe_add_maintenance_repair_columns();
 
 		$meter_readings_table = $wpdb->prefix . 'af_meter_readings';
 
@@ -1654,6 +1693,73 @@ class Arriendo_Facil_Activator {
 		update_option( 'af_catalog_groups_schema', '1', false );
 
 		flush_rewrite_rules();
+	}
+
+	/**
+	 * Adds the repair-detail columns to af_cleaning_requests on installs that
+	 * predate the "solicitudes de reparación" workflow.
+	 *
+	 * dbDelta already adds them from the CREATE definition, but the requests
+	 * table already holds live rows on production, so this guarded ALTER is the
+	 * reliable path: it never runs twice and never touches existing data.
+	 *
+	 * @return void
+	 */
+	private static function maybe_add_maintenance_repair_columns() {
+		global $wpdb;
+
+		$table = $wpdb->prefix . 'af_cleaning_requests';
+
+		$columns = array(
+			'provider_id'     => 'BIGINT(20) UNSIGNED DEFAULT NULL',
+			'scheduled_date'  => 'DATE DEFAULT NULL',
+			'asset_category'  => "VARCHAR(40) NOT NULL DEFAULT ''",
+			'asset_name'      => 'VARCHAR(190) DEFAULT NULL',
+			'damage_details'  => 'TEXT DEFAULT NULL',
+			'asset_specs'     => 'VARCHAR(255) DEFAULT NULL',
+			'asset_location'  => 'VARCHAR(120) DEFAULT NULL',
+			'contact_name'    => 'VARCHAR(190) DEFAULT NULL',
+			'contact_phone'   => 'VARCHAR(50) DEFAULT NULL',
+		);
+
+		$existing = $wpdb->get_col(
+			$wpdb->prepare(
+				"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+				 WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s",
+				DB_NAME,
+				$table
+			)
+		);
+		$existing = array_map( 'strtolower', (array) $existing );
+
+		foreach ( $columns as $column => $definition ) {
+			if ( in_array( $column, $existing, true ) ) {
+				continue;
+			}
+
+			$wpdb->query( "ALTER TABLE {$table} ADD COLUMN {$column} {$definition}" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		}
+
+		$indexes = array(
+			'idx_maint_provider'  => 'provider_id (provider_id)',
+			'idx_maint_status_sch' => 'status, scheduled_date',
+		);
+
+		foreach ( $indexes as $name => $columns_spec ) {
+			$exists = $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS
+					 WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND INDEX_NAME = %s",
+					DB_NAME,
+					$table,
+					$name
+				)
+			);
+
+			if ( ! $exists ) {
+				$wpdb->query( "ALTER TABLE {$table} ADD INDEX {$name} ({$columns_spec})" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			}
+		}
 	}
 
 	/**

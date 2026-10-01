@@ -97,10 +97,27 @@ sesión anterior.
 
 | Pedido | Estado |
 |---|---|
-| Alta (inmueble, tipo, descripción, prioridad) | ✅ `admin/views/maintenance.php` |
-| Bandeja tipo Kanban/lista | ✅ grid de tarjetas `.af-maint-card`, borde de color por prioridad |
-| Estados Registrado/En proceso/Resuelto | ✅ `class-maintenance.php` |
+| Alta (inmueble, tipo, prioridad) | ✅ `admin/views/maintenance.php` |
+| **Qué se va a reparar** (categoría de activo, nombre, características, ubicación) | ✅ columnas `asset_category`, `asset_name`, `asset_specs`, `asset_location` |
+| **Qué está dañado** (descripción libre del daño) | ✅ columna `damage_details` |
+| **Fecha pactada** de la visita, separada de la fecha de reporte | ✅ columna `scheduled_date` (antes solo `requested_date`) |
+| **Contacto directo** (nombre y teléfono ad-hoc, sin catálogo) | ✅ columnas `contact_name`, `contact_phone` |
+| **Catálogo de contactos de mantenimiento** (plomero, albañil, carpintero,…) con oficio, empresa, teléfono/WhatsApp, correo, zona, tarifas y notas | ✅ `af_service_providers` + `class-service-providers.php` |
+| **Vincular una solicitud a un contacto del catálogo** | ✅ `provider_id`, con el teléfono del proveedor como fallback en la ficha |
+| Listado tipo lista (no tarjetas) | ✅ tabla interactiva `af-maint-table`: búsqueda, filtro por estado y tipo, ordenamiento por columna, fila de detalle expandible |
+| Exportación de lo que el usuario está viendo | ✅ CSV generado en el navegador con BOM UTF-8, sin round-trip al servidor |
+| Impresión de la bandeja | ✅ `window.print()` con CSS `@media print` |
+| Bandeja ordenada por prioridad y fecha | ✅ `ORDER BY FIELD(priority, alta, media, baja), COALESCE(scheduled_date, requested_date) DESC` |
+| Estados Pendiente / En proceso / Completado / Cancelado | ✅ `class-maintenance.php`, cambio de estado en la fila de detalle sin recargar |
+| Aislamiento del catálogo por administrador | ✅ `owner_id`; `can_manage_all()` deja ver todo a la plataforma, el resto solo lo suyo |
 | Costo asociado, descuento en liquidación/garantía | ✅ `cost` en `af_cleaning_requests`, usado por `Owner_Settlement` y por la calculadora de garantía |
+
+**Nota de compatibilidad:** la tabla `af_cleaning_requests` se conserva como
+almacén (no se renombró) para no romper limpieza, liquidaciones, dashboard ni
+los endpoints AJAX preexistentes. Las columnas nuevas se añaden por migración
+idempotente en `class-activator.php`
+(`maybe_add_maintenance_repair_columns()`), de modo que una instalación
+existente las obtiene sin perder las solicitudes históricas.
 
 ## Gaps reales encontrados en esta pasada
 

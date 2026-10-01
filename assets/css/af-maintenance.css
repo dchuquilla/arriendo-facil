@@ -7,6 +7,66 @@
 
 .af-maint__section + .af-maint__section { margin-top: var(--af-space-4); }
 
+/* ── Resumen accionable ──────────────────────────────────────────────────
+ * Four 140px KPI cards pushed the first table row below the fold on a laptop.
+ * They became a single dense strip that doubles as a filter: the number the
+ * owner reads and the control they click are the same object.
+ */
+
+.af-maint-stats {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--af-space-2);
+	margin-bottom: var(--af-space-3);
+}
+
+.af-maint-stat {
+	display: inline-flex;
+	align-items: baseline;
+	gap: var(--af-space-2);
+	padding: var(--af-space-2) var(--af-space-3);
+	border: 1px solid var(--af-gray-200);
+	border-left: 3px solid var(--af-gray-300);
+	border-radius: var(--af-radius-md);
+	background: var(--af-gray-0);
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+	transition: border-color var(--af-motion-fast), background var(--af-motion-fast), box-shadow var(--af-motion-fast);
+}
+
+.af-maint-stat:hover { border-color: var(--af-primary-200); box-shadow: var(--af-shadow-xs); }
+
+.af-maint-stat__value {
+	font-family: var(--af-font-numeric);
+	font-size: var(--af-text-lg);
+	font-weight: 700;
+	color: var(--af-gray-900);
+	line-height: 1;
+	font-variant-numeric: tabular-nums;
+}
+
+.af-maint-stat__label {
+	font-size: var(--af-text-xs);
+	font-weight: 600;
+	color: var(--af-gray-500);
+	white-space: nowrap;
+}
+
+/* The count is the reason to click, so it is the part that carries the accent. */
+.af-maint-stat--attention { border-left-color: var(--af-danger-500); }
+.af-maint-stat--attention .af-maint-stat__value { color: var(--af-danger-700); }
+.af-maint-stat--info { border-left-color: var(--af-info-500); }
+.af-maint-stat--success { border-left-color: var(--af-success-500); }
+
+.af-maint-stat[aria-pressed="true"] {
+	border-color: var(--af-primary-500);
+	background: var(--af-primary-50);
+	box-shadow: var(--af-shadow-xs);
+}
+
+.af-maint-stat:focus-visible { outline: 2px solid var(--af-accent-500); outline-offset: 2px; }
+
 /* ── Tabs (CSS-only radio switcher, following the af-buildings pattern) ──── */
 
 #af-tab-solicitudes:checked ~ .af-tabs__nav > label[for="af-tab-solicitudes"],
@@ -35,19 +95,85 @@
 	margin-bottom: var(--af-space-3);
 }
 
+/* Only the search stays always-on. The two selects move into a popover so the
+ * bar reads as "one search box + three buttons" instead of six controls. */
 .af-maint-toolbar__filters {
 	display: flex;
 	align-items: center;
 	gap: var(--af-space-2);
 	flex-wrap: wrap;
+	flex: 1 1 auto;
 }
+
+.af-maint-filters { position: relative; }
+
+.af-maint-filters__panel {
+	position: absolute;
+	top: calc(100% + 6px);
+	left: 0;
+	z-index: 20;
+	min-width: 230px;
+	display: flex;
+	flex-direction: column;
+	gap: var(--af-space-3);
+	padding: var(--af-space-4);
+	background: var(--af-gray-0);
+	border: 1px solid var(--af-gray-200);
+	border-radius: var(--af-radius-lg);
+	box-shadow: var(--af-shadow-lg);
+}
+
+.af-maint-filters__panel[hidden] { display: none; }
+.af-maint-filters__panel label { display: block; }
+.af-maint-filters__panel select { width: 100%; }
+
+.af-maint-filters__badge {
+	position: absolute;
+	top: -5px;
+	right: -5px;
+	min-width: 17px;
+	height: 17px;
+	padding: 0 4px;
+	border-radius: var(--af-radius-full);
+	background: var(--af-accent-500);
+	color: #fff;
+	font-size: 11px;
+	font-weight: 700;
+	line-height: 17px;
+	text-align: center;
+	pointer-events: none;
+}
+
+.af-maint-filters__trigger.is-active { border-color: var(--af-primary-500); color: var(--af-primary-600); }
 
 .af-maint-search {
 	position: relative;
 	display: flex;
 	align-items: center;
 	min-width: 260px;
+	flex: 1 1 260px;
+	max-width: 420px;
 }
+
+/* Clear button inside the search field. */
+.af-maint-search__clear {
+	position: absolute;
+	right: 8px;
+	width: 20px;
+	height: 20px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border: 0;
+	border-radius: var(--af-radius-full);
+	background: var(--af-gray-200);
+	color: var(--af-gray-700);
+	font-size: 14px;
+	line-height: 1;
+	cursor: pointer;
+}
+.af-maint-search__clear[hidden] { display: none; }
+.af-maint-search__clear:hover { background: var(--af-gray-300); }
 
 .af-maint-search .dashicons {
 	position: absolute;
@@ -144,6 +270,13 @@
 .af-maint-table tbody tr:hover { background: var(--af-gray-50); }
 .af-maint-table tbody tr.is-hidden { display: none; }
 
+/* Urgency without spending a column on it: the accent lives on the row edge,
+ * so scanning the list reads as "red lines first". */
+.af-maint-row--alta > td:first-child { box-shadow: inset 3px 0 0 var(--af-danger-500); }
+.af-maint-row--scheduled:not(.af-maint-row--alta) > td:first-child { box-shadow: inset 3px 0 0 var(--af-info-500); }
+
+.af-maint-row.is-expanded { background: var(--af-primary-50); }
+
 .af-maint-table__asset { font-weight: 600; color: var(--af-gray-900); }
 .af-maint-table__sub { display: block; color: var(--af-gray-500); font-size: var(--af-text-xs); margin-top: 2px; }
 .af-maint-table__actions { white-space: nowrap; }
@@ -203,6 +336,63 @@
 	border-top: 1px solid var(--af-gray-200);
 	padding-top: var(--af-space-3);
 }
+
+/* Disclosure for the non-essential fields. Native <details> so it opens and
+ * closes (and is findable by in-page search) with no JavaScript at all.
+ */
+.af-maint-optional {
+	grid-column: 1 / -1;
+	border: 1px dashed var(--af-gray-300);
+	border-radius: var(--af-radius-md);
+	background: var(--af-gray-50);
+}
+
+.af-maint-optional__summary {
+	display: flex;
+	align-items: baseline;
+	gap: var(--af-space-2);
+	flex-wrap: wrap;
+	padding: var(--af-space-3);
+	cursor: pointer;
+	list-style: none;
+	font-weight: 600;
+	color: var(--af-gray-700);
+	border-radius: var(--af-radius-md);
+}
+
+.af-maint-optional__summary::-webkit-details-marker { display: none; }
+
+.af-maint-optional__summary::before {
+	content: "";
+	flex: none;
+	width: 0;
+	height: 0;
+	border-left: 5px solid currentColor;
+	border-top: 4px solid transparent;
+	border-bottom: 4px solid transparent;
+	transition: transform var(--af-motion-fast);
+}
+
+.af-maint-optional[open] > .af-maint-optional__summary::before { transform: rotate(90deg); }
+.af-maint-optional__summary:hover { color: var(--af-gray-900); background: var(--af-gray-100); }
+.af-maint-optional__summary:focus-visible { outline: 2px solid var(--af-accent-500); outline-offset: -2px; }
+
+.af-maint-optional__hint {
+	font-weight: 400;
+	font-size: var(--af-text-xs);
+	color: var(--af-gray-500);
+}
+
+.af-maint-optional__body {
+	display: grid;
+	gap: var(--af-space-4);
+	grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+	align-items: end;
+	padding: var(--af-space-4);
+	border-top: 1px dashed var(--af-gray-300);
+}
+
+.af-maint-optional__body > .af-maint-form__full { grid-column: 1 / -1; }
 
 .af-maint-form__legend {
 	font-size: var(--af-text-xs);

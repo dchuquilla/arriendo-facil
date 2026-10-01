@@ -65,6 +65,7 @@
 		}
 
 		var search = document.getElementById( 'af-maint-search-input' );
+		var searchClear = document.getElementById( 'af-maint-search-clear' );
 		var countEl = document.getElementById( 'af-maint-count' );
 		var statusFilter = document.getElementById( 'af-maint-status-filter' );
 		var typeFilter = document.getElementById( 'af-maint-type-filter' );
@@ -78,8 +79,38 @@
 
 		var rows = Array.prototype.slice.call( table.querySelectorAll( 'tr.af-maint-row' ) );
 
+		// The summary strip doubles as a filter. 'open' covers two states, which
+		// a single <select> cannot express, so this axis is kept apart from the
+		// status select and the two combine.
+		var stats = document.getElementById( 'af-maint-stats' );
+		var quickFilter = '';
+
 		function rowText( row ) {
 			return ( row.dataset.search || row.textContent ).toLowerCase();
+		}
+
+		function matchesQuick( row ) {
+			if ( ! quickFilter ) {
+				return true;
+			}
+
+			if ( 'open' === quickFilter ) {
+				return 'pending' === row.dataset.status || 'in_progress' === row.dataset.status;
+			}
+
+			if ( 'alta' === quickFilter ) {
+				return 'alta' === row.dataset.priority;
+			}
+
+			if ( 'scheduled' === quickFilter ) {
+				return '1' === row.dataset.scheduledFlag;
+			}
+
+			if ( 'month' === quickFilter ) {
+				return '1' === row.dataset.month;
+			}
+
+			return true;
 		}
 
 		function matches( row ) {
@@ -97,7 +128,7 @@
 				return false;
 			}
 
-			return true;
+			return matchesQuick( row );
 		}
 
 		function refresh() {
@@ -110,9 +141,15 @@
 
 				var detail = row.nextElementSibling;
 				if ( detail && detail.classList.contains( 'af-maint-detail' ) ) {
-					// Hide an expanded detail row whenever its request is filtered out.
+					// Collapse an expanded detail row whenever its request is filtered
+					// out, so reopening it later starts from a predictable state.
 					if ( ! show ) {
 						detail.classList.add( 'is-hidden' );
+						row.classList.remove( 'is-expanded' );
+						var rowToggle = row.querySelector( '.af-maint-toggle' );
+						if ( rowToggle ) {
+							rowToggle.setAttribute( 'aria-expanded', 'false' );
+						}
 					}
 				}
 
@@ -193,6 +230,22 @@
 
 				toggle.setAttribute( 'aria-expanded', expanded ? 'false' : 'true' );
 				detail.classList.toggle( 'is-hidden', expanded );
+				row.classList.toggle( 'is-expanded', ! expanded );
+			} );
+		} );
+
+		// Clicking anywhere on the row opens it. The button stays for keyboard and
+		// screen-reader users; this only adds a larger target for the mouse.
+		rows.forEach( function ( row ) {
+			row.addEventListener( 'click', function ( e ) {
+				if ( e.target.closest( '.af-maint-toggle' ) || e.target.closest( 'a, button, select' ) ) {
+					return;
+				}
+
+				var toggle = row.querySelector( '.af-maint-toggle' );
+				if ( toggle ) {
+					toggle.click();
+				}
 			} );
 		} );
 
@@ -281,15 +334,142 @@
 		}
 
 		if ( search ) {
-			search.addEventListener( 'input', refresh );
-		}
-		if ( statusFilter ) {
-			statusFilter.addEventListener( 'change', refresh );
-		}
-		if ( typeFilter ) {
-			typeFilter.addEventListener( 'change', refresh );
+			search.addEventListener( 'input', function () {
+				if ( searchClear ) {
+					searchClear.hidden = ! search.value;
+				}
+				refresh();
+			} );
 		}
 
+		// Search clear button.
+		if ( search && searchClear ) {
+			searchClear.addEventListener( 'click', function () {
+				search.value = '';
+				searchClear.hidden = true;
+				refresh();
+				search.focus();
+			} );
+		}
+
+		if ( statusFilter ) {
+			statusFilter.addEventListener( 'change', function () {
+				syncFiltersBadge();
+				refresh();
+			} );
+		}
+		if ( typeFilter ) {
+			typeFilter.addEventListener( 'change', function () {
+				syncFiltersBadge();
+				refresh();
+			} );
+		}
+
+		// Filters popover: the two selects moved out of the toolbar so the bar
+		// reads as one search box instead of three controls competing for
+		// attention.
+		var filtersTrigger = document.getElementById( 'af-maint-filters-trigger' );
+		var filtersPanel = document.getElementById( 'af-maint-filters-panel' );
+		var filtersBadge = document.getElementById( 'af-maint-filters-badge' );
+
+		function activeFilterCount() {
+			var n = 0;
+			if ( statusFilter && statusFilter.value ) {
+				n++;
+			}
+			if ( typeFilter && typeFilter.value ) {
+				n++;
+			}
+			return n;
+		}
+
+		function syncFiltersBadge() {
+			var n = activeFilterCount();
+
+			if ( filtersBadge ) {
+				filtersBadge.textContent = n;
+				filtersBadge.hidden = 0 === n;
+			}
+			if ( filtersTrigger ) {
+				filtersTrigger.classList.toggle( 'is-active', n > 0 );
+			}
+		}
+
+		if ( filtersTrigger && filtersPanel ) {
+			filtersTrigger.addEventListener( 'click', function ( e ) {
+				e.stopPropagation();
+				var open = filtersPanel.hidden;
+				filtersPanel.hidden = ! open;
+				filtersTrigger.setAttribute( 'aria-expanded', open ? 'true' : 'false' );
+			} );
+
+			// Close on outside click or Escape — the standard popover contract.
+			document.addEventListener( 'click', function ( e ) {
+				if ( filtersPanel.hidden || filtersPanel.contains( e.target ) ) {
+					return;
+				}
+				filtersPanel.hidden = true;
+				filtersTrigger.setAttribute( 'aria-expanded', 'false' );
+			} );
+
+			document.addEventListener( 'keydown', function ( e ) {
+				if ( 'Escape' === e.key && ! filtersPanel.hidden ) {
+					filtersPanel.hidden = true;
+					filtersTrigger.setAttribute( 'aria-expanded', 'false' );
+					filtersTrigger.focus();
+				}
+			} );
+		}
+
+		var filtersClear = document.getElementById( 'af-maint-filters-clear' );
+		if ( filtersClear ) {
+			filtersClear.addEventListener( 'click', function () {
+				if ( statusFilter ) {
+					statusFilter.value = '';
+				}
+				if ( typeFilter ) {
+					typeFilter.value = '';
+				}
+				syncFiltersBadge();
+				refresh();
+			} );
+		}
+
+		// Quick filters from the summary strip. Clicking the active one clears it,
+		// so the strip never leaves the user in a state they cannot undo by
+		// clicking the same thing twice.
+		if ( stats ) {
+			stats.addEventListener( 'click', function ( e ) {
+				var btn = e.target.closest( '[data-quick-filter]' );
+				if ( ! btn ) {
+					return;
+				}
+
+				var next = btn.getAttribute( 'data-quick-filter' );
+				quickFilter = quickFilter === next ? '' : next;
+
+				stats.querySelectorAll( '[data-quick-filter]' ).forEach( function ( other ) {
+					other.setAttribute( 'aria-pressed', other === btn && quickFilter ? 'true' : 'false' );
+				} );
+
+				refresh();
+			} );
+		}
+
+		// Escape clears the search from anywhere, which is what people try first
+		// when a filtered list comes back empty.
+		document.addEventListener( 'keydown', function ( e ) {
+			if ( 'Escape' !== e.key || ! search || ! search.value ) {
+				return;
+			}
+			search.value = '';
+			if ( searchClear ) {
+				searchClear.hidden = true;
+			}
+			refresh();
+		} );
+
+		syncFiltersBadge();
 		refresh();
 	}
 

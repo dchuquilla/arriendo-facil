@@ -89,21 +89,72 @@
 			return ( row.dataset.search || row.textContent ).toLowerCase();
 		}
 
+		function isOpen( row ) {
+			return 'pending' === row.dataset.status || 'in_progress' === row.dataset.status;
+		}
+
+		function isOverdue( row ) {
+			return isOpen( row ) && '1' === row.dataset.scheduledFlag && row.dataset.scheduled < afMaintenance.today;
+		}
+
+		// Keeps the chips and row accents true after inline status changes.
+		function recount() {
+			var totals = { open: 0, alta: 0, scheduled: 0, overdue: 0 };
+
+			rows.forEach( function ( row ) {
+				var overdue = isOverdue( row );
+				row.classList.toggle( 'af-maint-row--overdue', overdue );
+
+				if ( ! isOpen( row ) ) {
+					return;
+				}
+				totals.open++;
+				if ( 'alta' === row.dataset.priority ) {
+					totals.alta++;
+				}
+				if ( '1' === row.dataset.scheduledFlag ) {
+					totals.scheduled++;
+				}
+				if ( overdue ) {
+					totals.overdue++;
+				}
+			} );
+
+			if ( ! stats ) {
+				return;
+			}
+			Object.keys( totals ).forEach( function ( key ) {
+				var el = stats.querySelector( '[data-stat="' + key + '"]' );
+				if ( ! el ) {
+					return;
+				}
+				el.textContent = totals[ key ];
+				var chip = el.closest( '.af-maint-stat' );
+				if ( chip && chip.dataset.attention ) {
+					chip.classList.toggle( 'af-maint-stat--attention', totals[ key ] > 0 );
+				}
+			} );
+		}
+
 		function matchesQuick( row ) {
 			if ( ! quickFilter ) {
 				return true;
 			}
 
 			if ( 'open' === quickFilter ) {
-				return 'pending' === row.dataset.status || 'in_progress' === row.dataset.status;
+				return isOpen( row );
 			}
 
 			if ( 'alta' === quickFilter ) {
-				return 'alta' === row.dataset.priority;
+				return isOpen( row ) && 'alta' === row.dataset.priority;
 			}
 
 			if ( 'scheduled' === quickFilter ) {
-				return '1' === row.dataset.scheduledFlag;
+				return isOpen( row ) && '1' === row.dataset.scheduledFlag;
+			}
+
+			if ( 'overdue' === quickFilter ) {
+				return isOverdue( row );
 			}
 
 			if ( 'month' === quickFilter ) {
@@ -161,7 +212,7 @@
 			if ( countEl ) {
 				countEl.textContent = visible === rows.length
 					? afMaintenance.i18n.countAll.replace( '%d', rows.length )
-					: afMaintenance.i18n.countFiltered.replace( '%d', visible );
+					: afMaintenance.i18n.countFiltered.replace( '%1$d', visible ).replace( '%2$d', rows.length );
 			}
 
 			var empty = document.getElementById( 'af-maint-empty' );
@@ -193,11 +244,9 @@
 					var av = a.dataset[ key ];
 					var bv = b.dataset[ key ];
 
-					if ( isNumeric ) {
-						return ( parseFloat( av ) || 0 ) - ( parseFloat( bv ) || 0 );
-					}
-
-					var result = String( av ).localeCompare( String( bv ), undefined, { numeric: true } );
+					var result = isNumeric
+						? ( parseFloat( av ) || 0 ) - ( parseFloat( bv ) || 0 )
+						: String( av ).localeCompare( String( bv ), undefined, { numeric: true } );
 					return 'descending' === dir ? -result : result;
 				} );
 
@@ -290,6 +339,11 @@
 						pill.textContent = label;
 						pill.className = 'af-pill af-pill--' + statusVariant( next );
 					}
+					row.classList.add( 'is-flash' );
+					window.setTimeout( function () {
+						row.classList.remove( 'is-flash' );
+					}, 1200 );
+					recount();
 					refresh();
 				}
 			} ).catch( function () {
@@ -457,8 +511,13 @@
 		}
 
 		// Escape clears the search from anywhere, which is what people try first
-		// when a filtered list comes back empty.
+		// when a filtered list comes back empty. "/" jumps to the search box.
 		document.addEventListener( 'keydown', function ( e ) {
+			if ( '/' === e.key && search && ! e.target.closest( 'input, textarea, select, [contenteditable]' ) ) {
+				e.preventDefault();
+				search.focus();
+				return;
+			}
 			if ( 'Escape' !== e.key || ! search || ! search.value ) {
 				return;
 			}
@@ -469,6 +528,7 @@
 			refresh();
 		} );
 
+		recount();
 		syncFiltersBadge();
 		refresh();
 	}
@@ -484,16 +544,45 @@
 			return;
 		}
 
+		function openCard() {
+			var tab = document.getElementById( 'af-tab-solicitudes' );
+			if ( tab ) {
+				tab.checked = true;
+			}
+			card.hidden = false;
+			card.scrollIntoView( { behavior: 'smooth', block: 'start' } );
+			var first = form && form.querySelector( '[name="accommodation_id"]' );
+			if ( first ) {
+				first.focus( { preventScroll: true } );
+			}
+		}
+
 		toggle.addEventListener( 'click', function () {
-			card.hidden = ! card.hidden;
+			if ( card.hidden ) {
+				openCard();
+			} else {
+				card.hidden = true;
+			}
+		} );
+
+		document.querySelectorAll( '[data-af-open-request]' ).forEach( function ( btn ) {
+			btn.addEventListener( 'click', openCard );
 		} );
 
 		var cancel = document.getElementById( 'af-maint-request-cancel' );
-		if ( cancel ) {
-			cancel.addEventListener( 'click', function () {
-				card.hidden = true;
-			} );
+		function closeCard() {
+			card.hidden = true;
+			if ( form ) {
+				form.reset();
+				form.dispatchEvent( new Event( 'af:reset' ) );
+			}
 		}
+		if ( cancel ) {
+			cancel.addEventListener( 'click', closeCard );
+		}
+		card.querySelectorAll( '[data-af-close-request]' ).forEach( function ( btn ) {
+			btn.addEventListener( 'click', closeCard );
+		} );
 
 		if ( ! form ) {
 			return;
@@ -514,6 +603,41 @@
 			providerSelect.addEventListener( 'change', syncManual );
 		}
 		syncManual();
+
+		// Units depend on the chosen property.
+		var propertySelect = form.querySelector( '[name="accommodation_id"]' );
+		var unitSelect = document.getElementById( 'af-maint-unit' );
+
+		function syncUnits() {
+			if ( ! propertySelect || ! unitSelect ) {
+				return;
+			}
+			var units = ( afMaintenance.units || {} )[ propertySelect.value ] || [];
+
+			unitSelect.innerHTML = '';
+			unitSelect.appendChild( new Option( afMaintenance.i18n.noUnit, '' ) );
+			units.forEach( function ( unit ) {
+				unitSelect.appendChild( new Option( afMaintenance.i18n.unitPrefix + ' ' + unit.code, unit.id ) );
+			} );
+			unitSelect.disabled = ! units.length;
+			var unitWrap = document.getElementById( 'af-maint-unit-wrap' );
+			if ( unitWrap ) {
+				unitWrap.hidden = ! units.length;
+			}
+			if ( 1 === units.length ) {
+				unitSelect.value = String( units[ 0 ].id );
+			}
+		}
+
+		if ( propertySelect ) {
+			propertySelect.addEventListener( 'change', syncUnits );
+		}
+		syncUnits();
+
+		form.addEventListener( 'af:reset', function () {
+			syncUnits();
+			syncManual();
+		} );
 
 		form.addEventListener( 'submit', function ( e ) {
 			e.preventDefault();
@@ -605,7 +729,7 @@
 			if ( countEl ) {
 				countEl.textContent = visible === cards.length
 					? afMaintenance.i18n.countAll.replace( '%d', cards.length )
-					: afMaintenance.i18n.countFiltered.replace( '%d', visible );
+					: afMaintenance.i18n.countFiltered.replace( '%1$d', visible ).replace( '%2$d', cards.length );
 			}
 
 			var empty = document.getElementById( 'af-prov-empty' );
@@ -665,6 +789,22 @@
 					resetForm();
 				}
 				formCard.hidden = ! formCard.hidden;
+			} );
+		}
+
+		var headerNew = document.getElementById( 'af-maint-new-contact' );
+		if ( headerNew && formCard ) {
+			headerNew.addEventListener( 'click', function () {
+				var tab = document.getElementById( 'af-tab-personal' );
+				if ( tab ) {
+					tab.checked = true;
+				}
+				resetForm();
+				formCard.hidden = false;
+				formCard.scrollIntoView( { behavior: 'smooth', block: 'start' } );
+				if ( form ) {
+					form.elements.name.focus( { preventScroll: true } );
+				}
 			} );
 		}
 
@@ -794,6 +934,9 @@
 
 				btn.disabled = false;
 				window.alert( ( json && json.data && json.data.message ) || afMaintenance.i18n.genericError );
+			} ).catch( function () {
+				btn.disabled = false;
+				window.alert( afMaintenance.i18n.networkError );
 			} );
 		} );
 	}

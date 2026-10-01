@@ -700,6 +700,20 @@
 	white-space: nowrap;
 }
 
+.af-shell .af-sp-mark-paid {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.af-sp-unmark {
+	color: var(--af-gray-500);
+}
+
+.af-sp-unmark:hover {
+	color: var(--af-danger-700);
+}
+
 /* Add tile */
 
 .af-sp-tile--add {

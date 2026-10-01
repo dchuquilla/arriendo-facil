@@ -31,6 +31,8 @@ class Arriendo_Facil_Billing_Ledger_Controller {
 		add_action( 'wp_ajax_af_save_service_schedule', array( $this, 'ajax_save_service_schedule' ) );
 		add_action( 'wp_ajax_af_delete_service_schedule', array( $this, 'ajax_delete_service_schedule' ) );
 		add_action( 'wp_ajax_af_generate_service_charges', array( $this, 'ajax_generate_service_charges' ) );
+		add_action( 'wp_ajax_af_mark_service_paid', array( $this, 'ajax_mark_service_paid' ) );
+		add_action( 'wp_ajax_af_unmark_service_paid', array( $this, 'ajax_unmark_service_paid' ) );
 	}
 
 	/**
@@ -411,5 +413,84 @@ class Arriendo_Facil_Billing_Ledger_Controller {
 				'stats'   => $stats,
 			)
 		);
+	}
+
+	/**
+	 * AJAX: marks the bill of a service as paid for a period.
+	 *
+	 * @return void
+	 */
+	public function ajax_mark_service_paid() {
+		$schedule = $this->authorize_schedule_request();
+		$period   = isset( $_POST['period'] ) ? sanitize_text_field( wp_unslash( $_POST['period'] ) ) : '';
+
+		$result = Arriendo_Facil_Billing_Ledger::mark_service_paid(
+			(int) $schedule->id,
+			$period,
+			array(
+				'paid_on'   => isset( $_POST['paid_on'] ) ? sanitize_text_field( wp_unslash( $_POST['paid_on'] ) ) : '',
+				'amount'    => isset( $_POST['amount'] ) ? (float) wp_unslash( $_POST['amount'] ) : 0,
+				'reference' => isset( $_POST['reference'] ) ? sanitize_text_field( wp_unslash( $_POST['reference'] ) ) : '',
+			)
+		);
+
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ), 400 );
+		}
+
+		wp_send_json_success( array( 'message' => __( 'Servicio marcado como pagado.', 'arriendo-facil' ) ) );
+	}
+
+	/**
+	 * AJAX: removes the paid mark of a service for a period.
+	 *
+	 * @return void
+	 */
+	public function ajax_unmark_service_paid() {
+		$schedule = $this->authorize_schedule_request();
+		$period   = isset( $_POST['period'] ) ? sanitize_text_field( wp_unslash( $_POST['period'] ) ) : '';
+
+		$result = Arriendo_Facil_Billing_Ledger::unmark_service_paid( (int) $schedule->id, $period );
+
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ), 400 );
+		}
+
+		wp_send_json_success( array( 'message' => __( 'Pago deshecho.', 'arriendo-facil' ) ) );
+	}
+
+	/**
+	 * Checks nonce, capability and scope access for a schedule_id request.
+	 * Sends a JSON error and exits when any check fails.
+	 *
+	 * @return object Schedule row.
+	 */
+	private function authorize_schedule_request() {
+		global $wpdb;
+
+		check_ajax_referer( 'af_ledger_nonce', 'nonce' );
+
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$schedule_id = isset( $_POST['schedule_id'] ) ? absint( wp_unslash( $_POST['schedule_id'] ) ) : 0;
+		$schedule    = $wpdb->get_row(
+			$wpdb->prepare( 'SELECT * FROM ' . Arriendo_Facil_Billing_Ledger::schedules_table() . ' WHERE id = %d', $schedule_id )
+		);
+
+		if ( ! $schedule ) {
+			wp_send_json_error( array( 'message' => __( 'El servicio no existe.', 'arriendo-facil' ) ), 404 );
+		}
+
+		$allowed = $schedule->unit_id
+			? Arriendo_Facil_Tenancy::can_access_unit( (int) $schedule->unit_id )
+			: Arriendo_Facil_Tenancy::can_access_accommodation( (int) $schedule->accommodation_id );
+
+		if ( ! $allowed ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes acceso a ese inmueble.', 'arriendo-facil' ) ), 403 );
+		}
+
+		return $schedule;
 	}
 }

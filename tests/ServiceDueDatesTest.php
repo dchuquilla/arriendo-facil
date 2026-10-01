@@ -455,6 +455,13 @@ class AF_Service_Test_WPDB {
 	}
 
 	/**
+	 * @return string
+	 */
+	public function get_charset_collate() {
+		return '';
+	}
+
+	/**
 	 * Strips the table prefix so assertions can talk about short names.
 	 *
 	 * @param string $table Full table name.
@@ -1274,8 +1281,8 @@ class ServiceDueDatesTest extends TestCase {
 	}
 
 	/**
-	 * The due-rows query has two period placeholders (charges and readings);
-	 * passing a single argument made prepare() fail on every page load.
+	 * The due-rows query has three period placeholders (charges, readings and
+	 * bill payments); a missing argument made prepare() fail on every page load.
 	 */
 	public function test_due_rows_binds_both_period_placeholders() {
 		$this->givenSchedule( array( 'accommodation_id' => 77 ) );
@@ -1285,7 +1292,7 @@ class ServiceDueDatesTest extends TestCase {
 
 		Arriendo_Facil_Billing_Ledger::get_service_due_rows( '2026-10' );
 
-		$this->assertSame( 2, substr_count( $this->db->last_sql, "'2026-10'" ) );
+		$this->assertSame( 3, substr_count( $this->db->last_sql, "'2026-10'" ) );
 		$this->assertStringNotContainsString( '%s', $this->db->last_sql );
 	}
 

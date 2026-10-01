@@ -181,7 +181,7 @@ $active_providers = array_values(
 					</header>
 					<p class="af-modal__status" id="af-maint-request-status" aria-live="polite"></p>
 
-					<form id="af-maint-request-form" class="af-maint-form">
+					<form id="af-maint-request-form" class="af-maint-stepform">
 
 						<fieldset class="af-maint-step">
 							<legend class="af-maint-step__title"><span class="af-maint-step__num">1</span><?php esc_html_e( '¿Dónde?', 'arriendo-facil' ); ?></legend>
@@ -663,75 +663,93 @@ $active_providers = array_values(
 					</span>
 				</div>
 
-				<div class="af-section" id="af-prov-form-card" hidden style="padding: var(--af-space-5); margin-bottom: var(--af-space-4);">
-					<h2 class="af-section__title" id="af-prov-form-title" style="margin-top:0;"><?php esc_html_e( 'Nuevo contacto de mantenimiento', 'arriendo-facil' ); ?></h2>
-					<p class="af-modal__status" id="af-prov-status"></p>
-
-					<form id="af-prov-form" class="af-maint-form">
-						<input type="hidden" name="id" id="af-prov-id" value="" />
-						<label>
-							<span class="af-maint-label"><?php esc_html_e( 'Nombre', 'arriendo-facil' ); ?> *</span>
-							<input type="text" name="name" id="af-prov-name" required placeholder="<?php esc_attr_e( 'Ej: Juan Pérez', 'arriendo-facil' ); ?>" />
-						</label>
-
-						<label>
-							<span class="af-maint-label"><?php esc_html_e( 'Oficio', 'arriendo-facil' ); ?> *</span>
-							<select name="trade" required>
-								<?php foreach ( $trades as $trade_key => $trade_label ) : ?>
-									<option value="<?php echo esc_attr( $trade_key ); ?>"><?php echo esc_html( $trade_label ); ?></option>
-								<?php endforeach; ?>
-							</select>
-						</label>
-
-						<label>
-							<span class="af-maint-label"><?php esc_html_e( 'Empresa', 'arriendo-facil' ); ?></span>
-							<input type="text" name="company" />
-						</label>
-
-						<label>
-							<span class="af-maint-label"><?php esc_html_e( 'Teléfono', 'arriendo-facil' ); ?></span>
-							<input type="tel" name="phone" />
-						</label>
-
-						<label>
-							<span class="af-maint-label"><?php esc_html_e( 'WhatsApp', 'arriendo-facil' ); ?></span>
-							<input type="tel" name="whatsapp" />
-						</label>
-
-						<label>
-							<span class="af-maint-label"><?php esc_html_e( 'Correo', 'arriendo-facil' ); ?></span>
-							<input type="email" name="email" />
-						</label>
-
-						<label>
-							<span class="af-maint-label"><?php esc_html_e( 'Ciudad', 'arriendo-facil' ); ?></span>
-							<input type="text" name="city" />
-						</label>
-
-						<label>
-							<span class="af-maint-label"><?php esc_html_e( 'Sector / barrio', 'arriendo-facil' ); ?></span>
-							<input type="text" name="zone" />
-						</label>
-
-						<label>
-							<span class="af-maint-label"><?php esc_html_e( 'Tarifa por hora (USD)', 'arriendo-facil' ); ?></span>
-							<input type="number" name="hourly_rate" step="0.01" min="0" value="0.00" />
-						</label>
-
-						<label>
-							<span class="af-maint-label"><?php esc_html_e( 'Costo típico (USD)', 'arriendo-facil' ); ?></span>
-							<input type="number" name="job_price" step="0.01" min="0" value="0.00" />
-						</label>
-
-						<label class="af-maint-form__full">
-							<span class="af-maint-label"><?php esc_html_e( 'Notas', 'arriendo-facil' ); ?></span>
-							<textarea name="notes" rows="2" placeholder="<?php esc_attr_e( 'Horario, formas de pago, cobertura…', 'arriendo-facil' ); ?>"></textarea>
-						</label>
-
-						<div class="af-maint-form__full" style="display:flex; gap:8px;">
-							<button type="submit" class="button button-primary"><?php esc_html_e( 'Guardar contacto', 'arriendo-facil' ); ?></button>
-							<button type="button" class="button" id="af-prov-cancel"><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
+				<div class="af-section af-maint-formcard" id="af-prov-form-card" hidden>
+					<header class="af-maint-formcard__head">
+						<div>
+							<h2 class="af-maint-formcard__title" id="af-prov-form-title"><?php esc_html_e( 'Nuevo contacto de mantenimiento', 'arriendo-facil' ); ?></h2>
+							<p class="af-maint-formcard__sub"><?php esc_html_e( 'Con nombre, oficio y un teléfono ya puedes asignarlo a una solicitud.', 'arriendo-facil' ); ?></p>
 						</div>
+						<button type="button" class="af-maint-formcard__close" data-af-close-prov aria-label="<?php esc_attr_e( 'Cerrar', 'arriendo-facil' ); ?>">&times;</button>
+					</header>
+					<p class="af-modal__status" id="af-prov-status" aria-live="polite"></p>
+
+					<form id="af-prov-form" class="af-maint-stepform">
+						<input type="hidden" name="id" id="af-prov-id" value="" />
+
+						<fieldset class="af-maint-step">
+							<legend class="af-maint-step__title"><span class="af-maint-step__num">1</span><?php esc_html_e( '¿Quién es?', 'arriendo-facil' ); ?></legend>
+							<div class="af-maint-step__grid">
+								<label>
+									<span class="af-maint-label"><?php esc_html_e( 'Nombre', 'arriendo-facil' ); ?> <abbr title="<?php esc_attr_e( 'obligatorio', 'arriendo-facil' ); ?>">*</abbr></span>
+									<input type="text" name="name" id="af-prov-name" required placeholder="<?php esc_attr_e( 'Ej: Juan Pérez', 'arriendo-facil' ); ?>" />
+								</label>
+								<label>
+									<span class="af-maint-label"><?php esc_html_e( 'Oficio', 'arriendo-facil' ); ?> <abbr title="<?php esc_attr_e( 'obligatorio', 'arriendo-facil' ); ?>">*</abbr></span>
+									<select name="trade" required>
+										<?php foreach ( $trades as $trade_key => $trade_label ) : ?>
+											<option value="<?php echo esc_attr( $trade_key ); ?>"><?php echo esc_html( $trade_label ); ?></option>
+										<?php endforeach; ?>
+									</select>
+								</label>
+								<label>
+									<span class="af-maint-label"><?php esc_html_e( 'Empresa', 'arriendo-facil' ); ?></span>
+									<input type="text" name="company" placeholder="<?php esc_attr_e( 'Si trabaja para una', 'arriendo-facil' ); ?>" />
+								</label>
+							</div>
+						</fieldset>
+
+						<fieldset class="af-maint-step">
+							<legend class="af-maint-step__title"><span class="af-maint-step__num">2</span><?php esc_html_e( '¿Cómo lo contacto?', 'arriendo-facil' ); ?></legend>
+							<div class="af-maint-step__grid">
+								<label>
+									<span class="af-maint-label"><?php esc_html_e( 'Teléfono', 'arriendo-facil' ); ?></span>
+									<input type="tel" name="phone" placeholder="<?php esc_attr_e( 'Ej: 0987654321', 'arriendo-facil' ); ?>" />
+								</label>
+								<label>
+									<span class="af-maint-label"><?php esc_html_e( 'WhatsApp', 'arriendo-facil' ); ?></span>
+									<input type="tel" name="whatsapp" placeholder="<?php esc_attr_e( 'Si es distinto al teléfono', 'arriendo-facil' ); ?>" />
+								</label>
+								<label>
+									<span class="af-maint-label"><?php esc_html_e( 'Correo', 'arriendo-facil' ); ?></span>
+									<input type="email" name="email" />
+								</label>
+							</div>
+						</fieldset>
+
+						<details class="af-maint-optional">
+							<summary class="af-maint-optional__summary">
+								<span class="af-maint-optional__label"><?php esc_html_e( 'Zona, tarifas y notas', 'arriendo-facil' ); ?></span>
+								<span class="af-maint-optional__hint"><?php esc_html_e( 'Opcional', 'arriendo-facil' ); ?></span>
+							</summary>
+							<div class="af-maint-optional__body">
+								<label>
+									<span class="af-maint-label"><?php esc_html_e( 'Ciudad', 'arriendo-facil' ); ?></span>
+									<input type="text" name="city" />
+								</label>
+								<label>
+									<span class="af-maint-label"><?php esc_html_e( 'Sector / barrio', 'arriendo-facil' ); ?></span>
+									<input type="text" name="zone" />
+								</label>
+								<label>
+									<span class="af-maint-label"><?php esc_html_e( 'Cobra por hora', 'arriendo-facil' ); ?></span>
+									<span class="af-maint-money"><span aria-hidden="true">$</span><input type="number" name="hourly_rate" step="0.01" min="0" placeholder="0.00" inputmode="decimal" /></span>
+								</label>
+								<label>
+									<span class="af-maint-label"><?php esc_html_e( 'Cobra por trabajo (aprox.)', 'arriendo-facil' ); ?></span>
+									<span class="af-maint-money"><span aria-hidden="true">$</span><input type="number" name="job_price" step="0.01" min="0" placeholder="0.00" inputmode="decimal" /></span>
+								</label>
+								<label class="af-maint-form__full">
+									<span class="af-maint-label"><?php esc_html_e( 'Notas', 'arriendo-facil' ); ?></span>
+									<textarea name="notes" rows="2" placeholder="<?php esc_attr_e( 'Horario, formas de pago, cobertura…', 'arriendo-facil' ); ?>"></textarea>
+								</label>
+							</div>
+						</details>
+
+						<footer class="af-maint-formcard__foot">
+							<span class="af-maint-help"><abbr>*</abbr> <?php esc_html_e( 'Obligatorio', 'arriendo-facil' ); ?></span>
+							<button type="button" class="button af-btn af-btn--ghost" id="af-prov-cancel"><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
+							<button type="submit" class="button af-btn af-btn--primary"><?php esc_html_e( 'Guardar contacto', 'arriendo-facil' ); ?></button>
+						</footer>
 					</form>
 				</div>
 
@@ -905,6 +923,9 @@ wp_localize_script(
 		'units'           => $units_index,
 		'i18n'            => array(
 			'countAll'      => __( '%d solicitudes', 'arriendo-facil' ),
+			'countOne'      => __( '1 solicitud', 'arriendo-facil' ),
+			'countContacts' => __( '%d contactos', 'arriendo-facil' ),
+			'countContact'  => __( '1 contacto', 'arriendo-facil' ),
 			'countFiltered' => __( '%1$d de %2$d', 'arriendo-facil' ),
 			'noUnit'        => __( '— Sin unidad —', 'arriendo-facil' ),
 			'unitPrefix'    => __( 'Unidad', 'arriendo-facil' ),

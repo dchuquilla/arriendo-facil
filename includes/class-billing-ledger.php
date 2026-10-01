@@ -372,6 +372,145 @@ class Arriendo_Facil_Billing_Ledger {
 	}
 
 	/**
+	 * Table where the operator marks a service bill as paid for a period,
+	 * independent of any charge to the tenant.
+	 *
+	 * @return string
+	 */
+	public static function bill_payments_table() {
+		global $wpdb;
+
+		return $wpdb->prefix . 'af_service_bill_payments';
+	}
+
+	/**
+	 * Creates the bill payments table on first use, so installs updated without
+	 * re-activation do not break the service board.
+	 *
+	 * @return bool Whether the table can be queried.
+	 */
+	public static function ensure_bill_payments_table() {
+		global $wpdb;
+		static $ready = null;
+
+		if ( null !== $ready ) {
+			return $ready;
+		}
+
+		$table = self::bill_payments_table();
+
+		if ( $table === $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) ) {
+			$ready = true;
+			return $ready;
+		}
+
+		$created = $wpdb->query( // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			"CREATE TABLE IF NOT EXISTS {$table} (
+				id           BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+				schedule_id  BIGINT(20) UNSIGNED NOT NULL,
+				period       CHAR(7) NOT NULL,
+				paid_on      DATE NOT NULL,
+				amount       DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+				reference    VARCHAR(190) DEFAULT NULL,
+				recorded_by  BIGINT(20) UNSIGNED DEFAULT NULL,
+				created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				UNIQUE KEY uniq_schedule_period (schedule_id, period),
+				KEY period (period)
+			) " . $wpdb->get_charset_collate()
+		);
+
+		$ready = false !== $created;
+
+		return $ready;
+	}
+
+	/**
+	 * Marks the bill of a service as paid for a period.
+	 *
+	 * @param int                 $schedule_id Schedule ID.
+	 * @param string              $period      Period in YYYY-MM format.
+	 * @param array<string,mixed> $data        paid_on (Y-m-d), amount, reference.
+	 * @return true|WP_Error
+	 */
+	public static function mark_service_paid( $schedule_id, $period, array $data = array() ) {
+		global $wpdb;
+
+		$schedule_id = absint( $schedule_id );
+		$period      = self::validate_period( (string) $period );
+
+		if ( ! $schedule_id || '' === $period ) {
+			return new WP_Error( 'af_bill_invalid', __( 'Servicio o periodo no valido.', 'arriendo-facil' ) );
+		}
+
+		$paid_on = isset( $data['paid_on'] ) ? (string) $data['paid_on'] : '';
+		if ( ! preg_match( '/^(\d{4})-(\d{2})-(\d{2})$/', $paid_on, $m ) || ! checkdate( (int) $m[2], (int) $m[3], (int) $m[1] ) ) {
+			$paid_on = current_time( 'Y-m-d' );
+		}
+
+		$amount = isset( $data['amount'] ) ? round( (float) $data['amount'], 2 ) : 0.0;
+		if ( $amount < 0 ) {
+			return new WP_Error( 'af_bill_amount_invalid', __( 'El monto no puede ser negativo.', 'arriendo-facil' ) );
+		}
+
+		$reference = isset( $data['reference'] ) ? mb_substr( sanitize_text_field( (string) $data['reference'] ), 0, 190 ) : '';
+
+		if ( ! self::ensure_bill_payments_table() ) {
+			return new WP_Error( 'af_bill_table_missing', __( 'No se pudo guardar el pago.', 'arriendo-facil' ) );
+		}
+
+		$saved = $wpdb->replace(
+			self::bill_payments_table(),
+			array(
+				'schedule_id' => $schedule_id,
+				'period'      => $period,
+				'paid_on'     => $paid_on,
+				'amount'      => $amount,
+				'reference'   => '' !== $reference ? $reference : null,
+				'recorded_by' => get_current_user_id(),
+			),
+			array( '%d', '%s', '%s', '%f', '%s', '%d' )
+		);
+
+		if ( false === $saved ) {
+			return new WP_Error( 'af_bill_save_failed', __( 'No se pudo guardar el pago.', 'arriendo-facil' ) );
+		}
+
+		return true;
+	}
+
+	/**
+	 * Removes the paid mark of a service for a period.
+	 *
+	 * @param int    $schedule_id Schedule ID.
+	 * @param string $period      Period in YYYY-MM format.
+	 * @return true|WP_Error
+	 */
+	public static function unmark_service_paid( $schedule_id, $period ) {
+		global $wpdb;
+
+		$period = self::validate_period( (string) $period );
+		if ( '' === $period || ! self::ensure_bill_payments_table() ) {
+			return new WP_Error( 'af_bill_invalid', __( 'Servicio o periodo no valido.', 'arriendo-facil' ) );
+		}
+
+		$deleted = $wpdb->delete(
+			self::bill_payments_table(),
+			array(
+				'schedule_id' => absint( $schedule_id ),
+				'period'      => $period,
+			),
+			array( '%d', '%s' )
+		);
+
+		if ( false === $deleted ) {
+			return new WP_Error( 'af_bill_delete_failed', __( 'No se pudo deshacer el pago.', 'arriendo-facil' ) );
+		}
+
+		return true;
+	}
+
+	/**
 	 * Materialises the due-date rules of a period as charges.
 	 *
 	 * Pricing is mixed: when a reading exists for the scope + service + period
@@ -621,6 +760,14 @@ class Arriendo_Facil_Billing_Ledger {
 		$leases_table   = $wpdb->prefix . 'af_leases';
 		$units_table    = Arriendo_Facil_Property_Structure::units_table();
 
+		$bill_select = 'NULL AS bill_id, NULL AS bill_paid_on, NULL AS bill_amount, NULL AS bill_reference';
+		$bill_join   = '';
+		if ( self::ensure_bill_payments_table() ) {
+			$bill_select = 'bp.id AS bill_id, bp.paid_on AS bill_paid_on, bp.amount AS bill_amount, bp.reference AS bill_reference';
+			$bill_join   = ' LEFT JOIN ' . self::bill_payments_table() . ' bp ON bp.schedule_id = s.id AND bp.period = %s';
+			$params[]    = $period;
+		}
+
 		// The active lease of an accommodation is resolved to the newest one so a
 		// duplicated active lease cannot multiply the rows.
 		$active_leases = "( SELECT l1.*
@@ -639,6 +786,7 @@ class Arriendo_Facil_Billing_Ledger {
 			        c.id AS charge_id, c.amount, c.amount_paid, c.due_date, c.status AS charge_status,
 			        r.id AS reading_id, r.calculated_amount, r.consumption, r.current_reading, r.previous_reading, r.unit_rate,
 			        u.unit_code,
+			        {$bill_select},
 			        p.post_title AS accommodation_title,
 			        CONCAT(g.first_name, ' ', g.last_name) AS guest_name
 			 FROM " . self::schedules_table() . " s
@@ -651,7 +799,7 @@ class Arriendo_Facil_Billing_Ledger {
 			        ON c.lease_id = l.id AND c.charge_type = s.service AND c.period = %s AND c.status <> 'void'
 			 LEFT JOIN {$readings_table} r
 			        ON r.unit_id = s.unit_id AND r.accommodation_id = s.accommodation_id
-			        AND r.service = s.service AND r.period = %s
+			        AND r.service = s.service AND r.period = %s{$bill_join}
 			 WHERE 1 = 1{$scope}
 			 ORDER BY s.due_day ASC, s.service ASC, p.post_title ASC, u.unit_code ASC", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			$params
@@ -732,6 +880,10 @@ class Arriendo_Facil_Billing_Ledger {
 				'previous_reading' => null === $row->previous_reading ? 0.0 : (float) $row->previous_reading,
 				'unit_rate'        => null === $row->unit_rate ? 0.0 : (float) $row->unit_rate,
 				'is_active'        => (int) $row->is_active,
+				'bill_paid'        => ! empty( $row->bill_id ),
+				'bill_paid_on'     => empty( $row->bill_paid_on ) ? '' : (string) $row->bill_paid_on,
+				'bill_amount'      => empty( $row->bill_amount ) ? 0.0 : (float) $row->bill_amount,
+				'bill_reference'   => empty( $row->bill_reference ) ? '' : (string) $row->bill_reference,
 			);
 		}
 

@@ -130,7 +130,7 @@ foreach ( $rows as $row ) {
 
 	$days = $row['due_date'] ? (int) round( ( strtotime( $row['due_date'] ) - $today_ts ) / DAY_IN_SECONDS ) : 0;
 
-	if ( 'paid' === $row['status'] ) {
+	if ( 'paid' === $row['status'] || $row['bill_paid'] ) {
 		$bucket = 'paid';
 	} elseif ( $days < 0 ) {
 		$bucket = 'overdue';
@@ -145,7 +145,7 @@ foreach ( $rows as $row ) {
 	$row['open_amount'] = $row['has_charge'] ? $row['outstanding'] : $row['expected_amount'];
 
 	++$totals[ $bucket ]['count'];
-	$totals[ $bucket ]['amount'] += 'paid' === $bucket ? $row['amount_paid'] : $row['open_amount'];
+	$totals[ $bucket ]['amount'] += 'paid' === $bucket ? ( $row['bill_amount'] > 0 ? $row['bill_amount'] : $row['amount_paid'] ) : $row['open_amount'];
 	++$active_count;
 
 	$key = $row['unit_id'] ? 'unit:' . $row['unit_id'] : 'acc:' . $row['accommodation_id'];
@@ -469,7 +469,10 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 								$progress = ( $row['has_charge'] && $row['charge_amount'] > 0 ) ? (int) min( 100, round( $row['amount_paid'] / $row['charge_amount'] * 100 ) ) : 0;
 
 								if ( 'paid' === $row['bucket'] ) {
-									$countdown = __( 'Pagado', 'arriendo-facil' );
+									$countdown = $row['bill_paid_on']
+										/* translators: %s: date */
+										? sprintf( __( 'Pagado el %s', 'arriendo-facil' ), date_i18n( 'j M', strtotime( $row['bill_paid_on'] . ' UTC' ) ) )
+										: __( 'Pagado', 'arriendo-facil' );
 								} elseif ( $days < 0 ) {
 									/* translators: %d: days */
 									$countdown = sprintf( _n( 'Venció hace %d día', 'Venció hace %d días', abs( $days ), 'arriendo-facil' ), abs( $days ) );
@@ -532,25 +535,54 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 										<p class="af-sp-tile__note"><?php echo esc_html( $row['notes'] ); ?></p>
 									<?php endif; ?>
 
+									<?php if ( $row['bill_paid'] && ( $row['bill_amount'] > 0 || '' !== $row['bill_reference'] ) ) : ?>
+										<p class="af-sp-tile__meta">
+											<?php
+											$bill_bits = array();
+											if ( $row['bill_amount'] > 0 ) {
+												$bill_bits[] = '$' . number_format_i18n( $row['bill_amount'], 2 );
+											}
+											if ( '' !== $row['bill_reference'] ) {
+												$bill_bits[] = $row['bill_reference'];
+											}
+											echo esc_html( implode( ' · ', $bill_bits ) );
+											?>
+										</p>
+									<?php endif; ?>
+
 									<div class="af-sp-tile__actions">
-										<?php if ( $row['has_charge'] && $row['outstanding'] > 0 ) : ?>
+										<?php if ( 'paid' === $row['bucket'] ) : ?>
+											<span class="af-service-actions__done"><?php echo af_lucide( 'check', 14 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?> <?php esc_html_e( 'Pagado', 'arriendo-facil' ); ?></span>
+											<?php if ( $row['bill_paid'] ) : ?>
+												<button type="button" class="af-sp-link af-sp-unmark" data-schedule="<?php echo esc_attr( (string) $row['schedule_id'] ); ?>"><?php esc_html_e( 'Deshacer', 'arriendo-facil' ); ?></button>
+											<?php endif; ?>
+										<?php else : ?>
 											<button
 												type="button"
-												class="button button-small button-primary af-record-payment"
-												data-charge="<?php echo esc_attr( (string) $row['charge_id'] ); ?>"
-												data-outstanding="<?php echo esc_attr( (string) $row['outstanding'] ); ?>"
-												data-concept="<?php echo esc_attr( $row['service_label'] . ' · ' . $period ); ?>"
-												data-tenant="<?php echo esc_attr( $row['guest_name'] ? $row['guest_name'] : $group['title'] ); ?>"
-											><?php esc_html_e( 'Registrar pago', 'arriendo-facil' ); ?></button>
-										<?php elseif ( $row['needs_charge'] && $row['lease_id'] ) : ?>
-											<button type="button" class="button button-small af-generate-services">
-												<?php esc_html_e( 'Generar cobro', 'arriendo-facil' ); ?>
-											</button>
-										<?php elseif ( 'paid' === $row['bucket'] ) : ?>
-											<span class="af-service-actions__done"><?php echo af_lucide( 'check', 14 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?> <?php esc_html_e( 'Saldado', 'arriendo-facil' ); ?></span>
+												class="button button-small button-primary af-sp-mark-paid"
+												data-schedule="<?php echo esc_attr( (string) $row['schedule_id'] ); ?>"
+												data-amount="<?php echo esc_attr( (string) ( $row['open_amount'] > 0 ? $row['open_amount'] : $row['expected_amount'] ) ); ?>"
+												data-concept="<?php echo esc_attr( $row['service_label'] . ' · ' . $group['title'] ); ?>"
+											><?php echo af_lucide( 'check', 14 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?> <?php esc_html_e( 'Marcar pagado', 'arriendo-facil' ); ?></button>
+											<?php if ( $row['has_charge'] && $row['outstanding'] > 0 ) : ?>
+												<button
+													type="button"
+													class="button button-small af-record-payment"
+													title="<?php esc_attr_e( 'Registrar lo que pagó el inquilino por este cobro', 'arriendo-facil' ); ?>"
+													data-charge="<?php echo esc_attr( (string) $row['charge_id'] ); ?>"
+													data-outstanding="<?php echo esc_attr( (string) $row['outstanding'] ); ?>"
+													data-concept="<?php echo esc_attr( $row['service_label'] . ' · ' . $period ); ?>"
+													data-tenant="<?php echo esc_attr( $row['guest_name'] ? $row['guest_name'] : $group['title'] ); ?>"
+												><?php esc_html_e( 'Pago inquilino', 'arriendo-facil' ); ?></button>
+											<?php endif; ?>
 										<?php endif; ?>
 
 										<span class="af-sp-tile__tools">
+											<?php if ( $row['needs_charge'] && $row['lease_id'] && 'paid' !== $row['bucket'] ) : ?>
+												<button type="button" class="af-sp-icon-btn af-generate-services" title="<?php esc_attr_e( 'Generar cobro al inquilino', 'arriendo-facil' ); ?>" aria-label="<?php esc_attr_e( 'Generar cobro al inquilino', 'arriendo-facil' ); ?>">
+													<?php echo af_lucide( 'receipt', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+												</button>
+											<?php endif; ?>
 											<?php if ( $row['lease_id'] && 'paid' !== $row['bucket'] ) : ?>
 												<a class="af-sp-icon-btn" href="<?php echo esc_url( $aviso_url ); ?>" title="<?php esc_attr_e( 'Avisar al inquilino', 'arriendo-facil' ); ?>" aria-label="<?php esc_attr_e( 'Avisar al inquilino', 'arriendo-facil' ); ?>">
 													<?php echo af_lucide( 'bell', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
@@ -747,6 +779,37 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 	</div>
 </div>
 
+<!-- Modal: marcar servicio como pagado -->
+<div class="af-modal" id="af-modal-bill" role="dialog" aria-modal="true" aria-labelledby="af-modal-bill-title">
+	<div class="af-modal__backdrop" data-af-modal-close></div>
+	<div class="af-modal__dialog">
+		<button type="button" class="af-modal__close" data-af-modal-close aria-label="<?php esc_attr_e( 'Cerrar', 'arriendo-facil' ); ?>">&times;</button>
+		<div class="af-modal__header">
+			<h2 class="af-modal__title" id="af-modal-bill-title"><?php esc_html_e( 'Marcar como pagado', 'arriendo-facil' ); ?></h2>
+			<p class="af-modal__subtitle" id="af-bill-subtitle"></p>
+		</div>
+		<div class="af-modal__body">
+			<p class="af-modal__status" id="af-bill-status"></p>
+			<div class="af-modal__field">
+				<label for="af-bill-date"><?php esc_html_e( 'Fecha de pago', 'arriendo-facil' ); ?></label>
+				<input type="date" id="af-bill-date" value="<?php echo esc_attr( $today ); ?>" max="<?php echo esc_attr( $today ); ?>" />
+			</div>
+			<div class="af-modal__field">
+				<label for="af-bill-amount"><?php esc_html_e( 'Monto pagado (opcional)', 'arriendo-facil' ); ?></label>
+				<input type="number" id="af-bill-amount" step="0.01" min="0" placeholder="0.00" />
+			</div>
+			<div class="af-modal__field">
+				<label for="af-bill-reference"><?php esc_html_e( 'Comprobante o nota (opcional)', 'arriendo-facil' ); ?></label>
+				<input type="text" id="af-bill-reference" placeholder="<?php esc_attr_e( 'Ej: pagado en línea, ref. 98765', 'arriendo-facil' ); ?>" />
+			</div>
+		</div>
+		<div class="af-modal__footer">
+			<button type="button" class="button" data-af-modal-close><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
+			<button type="button" class="button button-primary" id="af-bill-confirm"><?php esc_html_e( 'Confirmar pago', 'arriendo-facil' ); ?></button>
+		</div>
+	</div>
+</div>
+
 <script>
 (function () {
 	const ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
@@ -770,6 +833,7 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 		'dueTomorrow'    => __( 'mañana', 'arriendo-facil' ),
 		'dueIn'          => __( 'en %d días', 'arriendo-facil' ),
 		'shortMonth'     => __( 'En meses más cortos se usará el último día del mes.', 'arriendo-facil' ),
+		'confirmUnmark'  => __( '¿Deshacer el pago? El servicio volverá a aparecer como pendiente.', 'arriendo-facil' ),
 	) ); ?>;
 
 	function post(payload) {
@@ -1192,6 +1256,68 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 		}).catch(function () {
 			scheduleConfirm.disabled = false;
 			setStatus(scheduleStatus, i18n.genericError, 'error');
+		});
+	});
+
+	// ---- Marcar servicio como pagado ----
+	const billModal = document.getElementById('af-modal-bill');
+	const billStatus = document.getElementById('af-bill-status');
+	const billSubtitle = document.getElementById('af-bill-subtitle');
+	const billDate = document.getElementById('af-bill-date');
+	const billAmount = document.getElementById('af-bill-amount');
+	const billReference = document.getElementById('af-bill-reference');
+	const billConfirm = document.getElementById('af-bill-confirm');
+	let billSchedule = '';
+
+	document.querySelectorAll('.af-sp-mark-paid').forEach(function (btn) {
+		btn.addEventListener('click', function () {
+			billSchedule = btn.getAttribute('data-schedule');
+			billSubtitle.textContent = btn.getAttribute('data-concept') + ' · ' + period;
+			const suggested = parseFloat(btn.getAttribute('data-amount')) || 0;
+			billAmount.value = suggested > 0 ? suggested.toFixed(2) : '';
+			billReference.value = '';
+			clearStatus(billStatus);
+			openModal(billModal);
+		});
+	});
+
+	billConfirm.addEventListener('click', function () {
+		billConfirm.disabled = true;
+		clearStatus(billStatus);
+		post({
+			action: 'af_mark_service_paid',
+			nonce: nonce,
+			schedule_id: billSchedule,
+			period: period,
+			paid_on: billDate.value,
+			amount: billAmount.value || '0',
+			reference: billReference.value
+		}).then(function (json) {
+			billConfirm.disabled = false;
+			if (!json || !json.success) {
+				setStatus(billStatus, (json && json.data && json.data.message) || i18n.genericError, 'error');
+				return;
+			}
+			setStatus(billStatus, json.data.message, 'success');
+			setTimeout(function () { window.location.reload(); }, 500);
+		}).catch(function () {
+			billConfirm.disabled = false;
+			setStatus(billStatus, i18n.genericError, 'error');
+		});
+	});
+
+	document.querySelectorAll('.af-sp-unmark').forEach(function (btn) {
+		btn.addEventListener('click', function () {
+			if (!window.confirm(i18n.confirmUnmark)) { return; }
+			btn.disabled = true;
+			post({ action: 'af_unmark_service_paid', nonce: nonce, schedule_id: btn.getAttribute('data-schedule'), period: period }).then(function (json) {
+				btn.disabled = false;
+				if (!json || !json.success) {
+					window.alert((json && json.data && json.data.message) || i18n.genericError);
+					return;
+				}
+				window.location.reload();
+			});
 		});
 	});
 

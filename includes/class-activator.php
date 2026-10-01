@@ -420,6 +420,20 @@ class Arriendo_Facil_Activator {
 			KEY is_active (is_active)
 		) $charset_collate;",
 
+		"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_service_bill_payments (
+			id           BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+			schedule_id  BIGINT(20) UNSIGNED NOT NULL,
+			period       CHAR(7) NOT NULL COMMENT 'YYYY-MM',
+			paid_on      DATE NOT NULL,
+			amount       DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+			reference    VARCHAR(190) DEFAULT NULL,
+			recorded_by  BIGINT(20) UNSIGNED DEFAULT NULL,
+			created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY uniq_schedule_period (schedule_id, period),
+			KEY period (period)
+		) $charset_collate;",
+
 		"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_guest_documents (
 				id                BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
 				guest_id          BIGINT(20) UNSIGNED NOT NULL,

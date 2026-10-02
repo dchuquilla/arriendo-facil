@@ -501,6 +501,8 @@
 		el.visitFields.style.display = type === 'visit' ? 'block' : 'none';
 		if (el.moveFields) { el.moveFields.style.display = type === 'move' ? 'block' : 'none'; }
 		if (el.leaseField) { el.leaseField.hidden = type !== 'move'; }
+		var accField = document.getElementById('af-cal-acc-field');
+		if (accField) { accField.style.display = type === 'move' ? 'none' : ''; }
 		el.blockFields.style.display = type === 'block' ? 'block' : 'none';
 		el.submitBtn.textContent = SUBMIT_LABELS[type] || SUBMIT_LABELS.visit;
 	}
@@ -524,7 +526,7 @@
 			if (acc && Array.prototype.some.call(el.accSelect.options, function (o) { return o.value === acc; })) {
 				el.accSelect.value = acc;
 			}
-			var fill = { 'af-cal-move-name': 'data-name', 'af-cal-move-phone': 'data-phone', 'af-cal-move-email': 'data-email' };
+			var fill = {};
 			Object.keys(fill).forEach(function (id) {
 				var input = document.getElementById(id);
 				if (input) { input.value = opt.getAttribute(fill[id]) || ''; }
@@ -611,7 +613,7 @@
 			}
 
 			var type = el.modalType.value;
-			var acc = el.accSelect.value;
+			var acc = type === 'move' ? '' : el.accSelect.value;
 			var lease = (type === 'move' && el.leaseSelect) ? el.leaseSelect.value : '';
 
 			if (type === 'move' && !lease) {
@@ -619,7 +621,7 @@
 				return;
 			}
 
-			if (!acc && !lease) {
+			if (type !== 'move' && !acc) {
 				setStatus('Elige un inmueble.', true);
 				return;
 			}
@@ -630,10 +632,6 @@
 
 			if (type === 'move') {
 				var val = function (id) { return (document.getElementById(id) || {}).value || ''; };
-				if (!val('af-cal-move-name').trim()) {
-					setStatus('Escribe el nombre de quien se muda.', true);
-					return;
-				}
 				var tasks = Array.prototype.filter.call(el.form.querySelectorAll('input[name="af-cal-move-task"]'), function (b) { return b.checked; })
 					.map(function (b) { return b.value; });
 				el.submitBtn.disabled = true;
@@ -643,9 +641,6 @@
 					date: date,
 					start_time: val('af-cal-move-start'),
 					end_time: val('af-cal-move-end'),
-					contact_name: val('af-cal-move-name'),
-					contact_phone: val('af-cal-move-phone'),
-					contact_email: val('af-cal-move-email'),
 					tasks: tasks.join(','),
 					notes: val('af-cal-move-notes')
 				}).then(function (res) {

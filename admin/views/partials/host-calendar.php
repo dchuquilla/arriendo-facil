@@ -89,7 +89,7 @@ $cal_leases     = Arriendo_Facil_Calendar::lease_options( Arriendo_Facil_Tenancy
 					<input type="date" id="af-cal-date" min="<?php echo esc_attr( wp_date( 'Y-m-d' ) ); ?>" />
 				</div>
 				<div class="af-modal__field" id="af-cal-lease-field" hidden>
-					<label for="af-cal-lease"><?php esc_html_e( 'Inquilino con contrato (obligatorio)', 'arriendo-facil' ); ?></label>
+					<label for="af-cal-lease"><?php esc_html_e( 'Quién se muda', 'arriendo-facil' ); ?></label>
 					<select id="af-cal-lease">
 						<option value=""><?php esc_html_e( 'Elige un inquilino con contrato…', 'arriendo-facil' ); ?></option>
 						<?php foreach ( $cal_leases as $cal_lease ) : ?>
@@ -104,9 +104,9 @@ $cal_leases     = Arriendo_Facil_Calendar::lease_options( Arriendo_Facil_Tenancy
 							><?php echo esc_html( sprintf( '%1$s — %2$s (%3$s)', $cal_lease_guest ? $cal_lease_guest : __( 'Inquilino', 'arriendo-facil' ), $cal_lease->accommodation_title ? $cal_lease->accommodation_title : '#' . (int) $cal_lease->accommodation_id, wp_date( 'd/m/Y', strtotime( (string) $cal_lease->start_date ) ) ) ); ?></option>
 						<?php endforeach; ?>
 					</select>
-					<p class="af-modal__hint"><?php echo esc_html( $cal_leases ? __( 'Al elegir un contrato se completan el inmueble, el inquilino y su contacto.', 'arriendo-facil' ) : __( 'Aún no hay inquilinos con contrato. Regístralos primero en Inquilinos y Contratos.', 'arriendo-facil' ) ); ?></p>
+					<p class="af-modal__hint"><?php echo esc_html( $cal_leases ? __( 'El inmueble y el contacto se toman del inquilino registrado y su contrato.', 'arriendo-facil' ) : __( 'Aún no hay inquilinos con contrato. Regístralos primero en Inquilinos y Contratos.', 'arriendo-facil' ) ); ?></p>
 				</div>
-				<div class="af-modal__field">
+				<div class="af-modal__field" id="af-cal-acc-field">
 					<label for="af-cal-accommodation"><?php esc_html_e( 'Inmueble', 'arriendo-facil' ); ?></label>
 					<select id="af-cal-accommodation">
 						<option value=""><?php esc_html_e( 'Elige un inmueble…', 'arriendo-facil' ); ?></option>
@@ -151,10 +151,6 @@ $cal_leases     = Arriendo_Facil_Calendar::lease_options( Arriendo_Facil_Tenancy
 					</div>
 				</div>
 				<div id="af-cal-move-fields" style="display:none;">
-					<div class="af-modal__field">
-						<label for="af-cal-move-name"><?php esc_html_e( 'Quién se muda', 'arriendo-facil' ); ?></label>
-						<input type="text" id="af-cal-move-name" autocomplete="off" />
-					</div>
 					<div class="af-modal__field" style="display:grid; grid-template-columns:1fr 1fr; gap:10px; align-items:end;">
 						<div>
 							<label for="af-cal-move-start"><?php esc_html_e( 'Desde', 'arriendo-facil' ); ?></label>
@@ -163,16 +159,6 @@ $cal_leases     = Arriendo_Facil_Calendar::lease_options( Arriendo_Facil_Tenancy
 						<div>
 							<label for="af-cal-move-end"><?php esc_html_e( 'Hasta', 'arriendo-facil' ); ?></label>
 							<input type="time" id="af-cal-move-end" value="12:00" />
-						</div>
-					</div>
-					<div class="af-modal__field" style="display:grid; grid-template-columns:1fr 1fr; gap:10px; align-items:end;">
-						<div>
-							<label for="af-cal-move-phone"><?php esc_html_e( 'Teléfono', 'arriendo-facil' ); ?></label>
-							<input type="tel" id="af-cal-move-phone" />
-						</div>
-						<div>
-							<label for="af-cal-move-email"><?php esc_html_e( 'Email', 'arriendo-facil' ); ?></label>
-							<input type="email" id="af-cal-move-email" />
 						</div>
 					</div>
 					<fieldset class="af-modal__field af-cal__tasks">

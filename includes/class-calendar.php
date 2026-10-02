@@ -1081,7 +1081,10 @@ class Arriendo_Facil_Calendar {
 			}
 			$lease = $wpdb->get_row(
 				$wpdb->prepare(
-					"SELECT id, accommodation_id, guest_id FROM {$wpdb->prefix}af_leases WHERE id = %d AND deleted_at IS NULL",
+					"SELECT l.id, l.accommodation_id, l.guest_id, g.first_name, g.last_name, g.phone, g.email
+					 FROM {$wpdb->prefix}af_leases l
+					 LEFT JOIN {$wpdb->prefix}af_guests g ON g.id = l.guest_id
+					 WHERE l.id = %d AND l.deleted_at IS NULL",
 					$lease_id
 				)
 			);
@@ -1094,6 +1097,9 @@ class Arriendo_Facil_Calendar {
 			if ( ! $guest_id ) {
 				wp_send_json_error( array( 'message' => __( 'El contrato no tiene un inquilino registrado.', 'arriendo-facil' ) ) );
 			}
+			$contact_name  = trim( $lease->first_name . ' ' . $lease->last_name );
+			$contact_phone = (string) $lease->phone;
+			$contact_email = (string) $lease->email;
 		}
 
 		if ( ! $this->accommodation_in_scope( $accommodation_id ) ) {
@@ -1109,7 +1115,7 @@ class Arriendo_Facil_Calendar {
 			wp_send_json_error( array( 'message' => __( 'La hora de fin debe ser posterior a la de inicio.', 'arriendo-facil' ) ) );
 		}
 		if ( '' === trim( $contact_name ) ) {
-			wp_send_json_error( array( 'message' => __( 'Escribe el nombre de quien se muda.', 'arriendo-facil' ) ) );
+			wp_send_json_error( array( 'message' => __( 'Selecciona quién se muda.', 'arriendo-facil' ) ) );
 		}
 
 		$existing = $wpdb->get_var(

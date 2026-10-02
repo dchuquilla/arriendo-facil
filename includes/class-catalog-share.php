@@ -40,7 +40,7 @@ class Arriendo_Facil_Catalog_Share {
 		add_filter( 'query_vars', array( $this, 'add_query_var' ) );
 		add_filter( 'template_include', array( $this, 'load_public_template' ) );
 		add_action( 'template_redirect', array( $this, 'maybe_stream_pdf' ), 5 );
-		add_action( 'admin_init', array( $this, 'maybe_flush_rules' ) );
+		add_action( 'init', array( $this, 'maybe_flush_rules' ), 99 );
 
 		add_action( 'wp_ajax_af_catalog_share_generate', array( $this, 'ajax_generate' ) );
 		add_action( 'wp_ajax_af_catalog_share_revoke', array( $this, 'ajax_revoke' ) );
@@ -62,7 +62,7 @@ class Arriendo_Facil_Catalog_Share {
 	 */
 	public function register_routes() {
 		add_rewrite_rule(
-			'^' . self::REWRITE_SLUG . '/([a-z0-9][a-z0-9-]{1,62}[a-z0-9])/?$',
+			self::route_regex(),
 			'index.php?' . self::QUERY_VAR . '=$matches[1]',
 			'top'
 		);
@@ -78,18 +78,21 @@ class Arriendo_Facil_Catalog_Share {
 	}
 
 	/**
-	 * Flushes rewrite rules once so the tokenized catalog route works
-	 * on installations upgraded after this feature landed.
+	 * Flushes rewrite rules when the stored set lacks the current catalog route.
 	 */
 	public function maybe_flush_rules() {
-		if ( ! current_user_can( 'manage_options' ) ) {
-			return;
-		}
-		if ( get_option( 'af_catalog_share_rules_flushed_v2' ) ) {
+		$rules = get_option( 'rewrite_rules' );
+		if ( is_array( $rules ) && isset( $rules[ self::route_regex() ] ) ) {
 			return;
 		}
 		flush_rewrite_rules( false );
-		update_option( 'af_catalog_share_rules_flushed_v2', 1, false );
+	}
+
+	/**
+	 * @return string
+	 */
+	private static function route_regex() {
+		return '^' . self::REWRITE_SLUG . '/([a-z0-9][a-z0-9-]{1,62}[a-z0-9])/?$';
 	}
 
 	/**

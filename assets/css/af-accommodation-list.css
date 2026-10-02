@@ -98,8 +98,8 @@ body.af-native-inmuebles.af-restricted-list .row-actions .inline {
 /* Columnas residuales (tags, taxonomías, autor…) que no forman parte de la
  * vista restringida: ocultamos la celda y su cabecera para no descolocar el
  * layout. El super admin conserva esas columnas. */
-body.af-native-inmuebles.af-restricted-list .wp-list-table thead th:not(.column-af_thumb):not(.column-title):not(.column-af_meta):not(.column-af_price):not(.column-af_status):not(.column-af_featured):not(.column-af_occupied):not(.column-date):not(.check-column),
-body.af-native-inmuebles.af-restricted-list .wp-list-table tbody tr:not(.inline-edit-row):not(.no-items) > td:not(.column-af_thumb):not(.column-title):not(.column-af_meta):not(.column-af_price):not(.column-af_status):not(.column-af_featured):not(.column-af_occupied):not(.column-date):not(.check-column) {
+body.af-native-inmuebles.af-restricted-list .wp-list-table thead th:not(.column-af_thumb):not(.column-title):not(.column-af_meta):not(.column-af_group):not(.column-af_price):not(.column-af_status):not(.column-af_featured):not(.column-af_occupied):not(.column-date):not(.check-column),
+body.af-native-inmuebles.af-restricted-list .wp-list-table tbody tr:not(.inline-edit-row):not(.no-items) > td:not(.column-af_thumb):not(.column-title):not(.column-af_meta):not(.column-af_group):not(.column-af_price):not(.column-af_status):not(.column-af_featured):not(.column-af_occupied):not(.column-date):not(.check-column) {
 	display: none;
 }
 

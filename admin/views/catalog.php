@@ -187,33 +187,46 @@ $af_prefix     = ( isset( $af_home_parts['host'] ) ? $af_home_parts['host'] : ''
 ?>
 <section class="af-section af-share-panel">
 	<div class="af-share-panel__head">
-		<h2 class="af-section__title"><?php esc_html_e( 'Tu enlace público', 'arriendo-facil' ); ?></h2>
-		<p class="af-share-panel__hint"><?php esc_html_e( 'Compártelo por WhatsApp o redes. Solo muestra los inmuebles marcados "En catálogo" y puedes desactivarlo cuando quieras.', 'arriendo-facil' ); ?></p>
+		<span class="af-share-panel__icon" aria-hidden="true"><?php echo af_lucide( 'link-2', 20 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+		<div class="af-share-panel__titles">
+			<h2 class="af-section__title"><?php esc_html_e( 'Tu enlace público', 'arriendo-facil' ); ?></h2>
+			<p class="af-share-panel__hint"><?php esc_html_e( 'Compártelo por WhatsApp o redes. Puedes cambiarle el nombre o desactivarlo cuando quieras.', 'arriendo-facil' ); ?></p>
+		</div>
+		<span class="af-share-panel__state" id="af-share-state" data-on="<?php esc_attr_e( 'Activo', 'arriendo-facil' ); ?>" data-off="<?php esc_attr_e( 'Sin crear', 'arriendo-facil' ); ?>">
+			<?php echo $share_url ? esc_html__( 'Activo', 'arriendo-facil' ) : esc_html__( 'Sin crear', 'arriendo-facil' ); ?>
+		</span>
 	</div>
 
-	<div class="af-share-card" id="af-share-card" data-active="<?php echo $share_url ? '1' : '0'; ?>" data-saved-slug="<?php echo esc_attr( $af_link ? $af_link['slug'] : '' ); ?>">
-		<div class="af-slug">
-			<label class="af-slug__prefix" for="af-share-slug"><?php echo esc_html( $af_prefix ); ?></label>
-			<input type="text" id="af-share-slug" class="af-slug__input" value="<?php echo esc_attr( $af_slug ); ?>"
-				maxlength="<?php echo esc_attr( Arriendo_Facil_Catalog_Share::SLUG_MAX ); ?>" autocomplete="off" spellcheck="false"
-				aria-describedby="af-slug-msg" placeholder="<?php esc_attr_e( 'nombre-de-tu-catalogo', 'arriendo-facil' ); ?>" />
-		</div>
-		<input type="hidden" id="af-share-url" value="<?php echo esc_attr( $share_url ); ?>" />
+	<div class="af-share-card<?php echo $share_url ? ' is-active' : ''; ?>" id="af-share-card" data-active="<?php echo $share_url ? '1' : '0'; ?>" data-saved-slug="<?php echo esc_attr( $af_link ? $af_link['slug'] : '' ); ?>">
+		<div class="af-share-card__main">
+			<div class="af-slug">
+				<span class="af-slug__icon" aria-hidden="true"><?php echo af_lucide( 'globe', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+				<label class="af-slug__prefix" for="af-share-slug"><?php echo esc_html( $af_prefix ); ?></label>
+				<input type="text" id="af-share-slug" class="af-slug__input" value="<?php echo esc_attr( $af_slug ); ?>"
+					maxlength="<?php echo esc_attr( Arriendo_Facil_Catalog_Share::SLUG_MAX ); ?>" autocomplete="off" spellcheck="false"
+					aria-describedby="af-slug-msg" placeholder="<?php esc_attr_e( 'nombre-de-tu-catalogo', 'arriendo-facil' ); ?>" />
+				<span class="af-slug__edit" aria-hidden="true" title="<?php esc_attr_e( 'Puedes editar este nombre', 'arriendo-facil' ); ?>"><?php echo af_lucide( 'pencil', 14 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+			</div>
+			<input type="hidden" id="af-share-url" value="<?php echo esc_attr( $share_url ); ?>" />
 
-		<div class="af-share-card__actions" id="af-share-actions" <?php echo $share_url ? '' : 'hidden'; ?>>
-			<button type="button" class="button af-btn af-btn--primary" id="af-share-slug-save" hidden><?php esc_html_e( 'Guardar nombre', 'arriendo-facil' ); ?></button>
-			<button type="button" class="button af-btn af-btn--primary" id="af-share-copy"><?php esc_html_e( 'Copiar enlace', 'arriendo-facil' ); ?></button>
-			<button type="button" class="button af-btn af-btn--ghost" id="af-share-preview"><?php esc_html_e( 'Ver', 'arriendo-facil' ); ?></button>
-			<a class="button af-btn af-btn--ghost" id="af-share-pdf" href="<?php echo esc_url( $share_pdf ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'PDF', 'arriendo-facil' ); ?></a>
-			<button type="button" class="button-link af-share-revoke" id="af-share-revoke"><?php esc_html_e( 'Desactivar', 'arriendo-facil' ); ?></button>
-		</div>
-		<div class="af-share-card__actions" id="af-share-generate-wrap" <?php echo $share_url ? 'hidden' : ''; ?>>
-			<button type="button" class="button af-btn af-btn--primary" id="af-share-generate"><?php esc_html_e( 'Crear enlace', 'arriendo-facil' ); ?></button>
+			<div class="af-share-card__primary" id="af-share-primary" <?php echo $share_url ? '' : 'hidden'; ?>>
+				<button type="button" class="button af-btn af-btn--primary" id="af-share-slug-save" hidden><?php echo af_lucide( 'save', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?> <?php esc_html_e( 'Guardar nombre', 'arriendo-facil' ); ?></button>
+				<button type="button" class="button af-btn af-btn--primary" id="af-share-copy"><?php echo af_lucide( 'link-2', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?> <span data-label><?php esc_html_e( 'Copiar enlace', 'arriendo-facil' ); ?></span></button>
+			</div>
+			<div class="af-share-card__primary" id="af-share-generate-wrap" <?php echo $share_url ? 'hidden' : ''; ?>>
+				<button type="button" class="button af-btn af-btn--primary" id="af-share-generate"><?php echo af_lucide( 'plus', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?> <?php esc_html_e( 'Crear enlace', 'arriendo-facil' ); ?></button>
+			</div>
 		</div>
 
 		<p class="af-slug__msg" id="af-slug-msg" aria-live="polite"></p>
 		<div class="af-slug__suggest" id="af-slug-suggest" hidden></div>
 		<p class="af-share-status" id="af-share-status" aria-live="polite"></p>
+
+		<div class="af-share-card__footer" id="af-share-actions" <?php echo $share_url ? '' : 'hidden'; ?>>
+			<button type="button" class="af-share-link" id="af-share-preview"><?php echo af_lucide( 'globe', 15 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?> <?php esc_html_e( 'Ver catálogo', 'arriendo-facil' ); ?></button>
+			<a class="af-share-link" id="af-share-pdf" href="<?php echo esc_url( $share_pdf ); ?>" target="_blank" rel="noopener"><?php echo af_lucide( 'file-text', 15 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?> <?php esc_html_e( 'Descargar PDF', 'arriendo-facil' ); ?></a>
+			<button type="button" class="af-share-link af-share-link--danger" id="af-share-revoke"><?php esc_html_e( 'Desactivar enlace', 'arriendo-facil' ); ?></button>
+		</div>
 	</div>
 </section>
 

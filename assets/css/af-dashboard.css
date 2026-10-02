@@ -451,7 +451,12 @@
 
 .af-calendar-col__cta {
 	margin-top: auto;
+	display: inline-flex;
+	align-items: center;
 	justify-content: center;
+	width: 100%;
+	white-space: nowrap;
+	min-height: 38px;
 }
 
 .af-calendar-col .af-exit-row {

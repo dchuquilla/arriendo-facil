@@ -255,10 +255,56 @@ class Arriendo_Facil_Calendar {
 			 FROM {$wpdb->prefix}af_leases l
 			 LEFT JOIN {$wpdb->posts} p ON p.ID = l.accommodation_id
 			 LEFT JOIN {$wpdb->prefix}af_guests g ON g.id = l.guest_id
-			 WHERE l.deleted_at IS NULL AND l.status IN ('active', 'draft'){$scope}
+			 WHERE l.deleted_at IS NULL AND l.guest_id > 0 AND l.status IN ('active', 'draft'){$scope}
 			 ORDER BY l.start_date DESC
 			 LIMIT 200" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		);
+	}
+
+	/**
+	 * Ecuador national holidays for a year (official dates, no decree-based bridge moves).
+	 *
+	 * @param int $year Four-digit year.
+	 * @return array<string,string> Y-m-d => name.
+	 */
+	public static function ecuador_holidays( $year ) {
+		$year = (int) $year;
+
+		// Anonymous Gregorian (Meeus/Jones/Butcher) computus.
+		$a = $year % 19;
+		$b = intdiv( $year, 100 );
+		$c = $year % 100;
+		$d = intdiv( $b, 4 );
+		$e = $b % 4;
+		$f = intdiv( $b + 8, 25 );
+		$g = intdiv( $b - $f + 1, 3 );
+		$h = ( 19 * $a + $b - $d - $g + 15 ) % 30;
+		$i = intdiv( $c, 4 );
+		$k = $c % 4;
+		$l = ( 32 + 2 * $e + 2 * $i - $h - $k ) % 7;
+		$m = intdiv( $a + 11 * $h + 22 * $l, 451 );
+		$easter = gmmktime( 0, 0, 0, intdiv( $h + $l - 7 * $m + 114, 31 ), ( ( $h + $l - 7 * $m + 114 ) % 31 ) + 1, $year );
+
+		$rel = static function ( $days ) use ( $easter ) {
+			return gmdate( 'Y-m-d', $easter + $days * DAY_IN_SECONDS );
+		};
+
+		$holidays = array(
+			$year . '-01-01' => __( 'Año Nuevo', 'arriendo-facil' ),
+			$rel( -48 )      => __( 'Carnaval (lunes)', 'arriendo-facil' ),
+			$rel( -47 )      => __( 'Carnaval (martes)', 'arriendo-facil' ),
+			$rel( -2 )       => __( 'Viernes Santo', 'arriendo-facil' ),
+			$year . '-05-01' => __( 'Día del Trabajo', 'arriendo-facil' ),
+			$year . '-05-24' => __( 'Batalla de Pichincha', 'arriendo-facil' ),
+			$year . '-08-10' => __( 'Primer Grito de Independencia', 'arriendo-facil' ),
+			$year . '-10-09' => __( 'Independencia de Guayaquil', 'arriendo-facil' ),
+			$year . '-11-02' => __( 'Día de los Difuntos', 'arriendo-facil' ),
+			$year . '-11-03' => __( 'Independencia de Cuenca', 'arriendo-facil' ),
+			$year . '-12-25' => __( 'Navidad', 'arriendo-facil' ),
+		);
+		ksort( $holidays );
+
+		return $holidays;
 	}
 
 	/**
@@ -303,6 +349,12 @@ class Arriendo_Facil_Calendar {
 			array(
 				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 				'nonce'   => wp_create_nonce( self::NONCE ),
+				'holidays' => array_merge(
+					self::ecuador_holidays( (int) wp_date( 'Y' ) - 1 ),
+					self::ecuador_holidays( (int) wp_date( 'Y' ) ),
+					self::ecuador_holidays( (int) wp_date( 'Y' ) + 1 ),
+					self::ecuador_holidays( (int) wp_date( 'Y' ) + 2 )
+				),
 			)
 		);
 	}
@@ -1019,6 +1071,10 @@ class Arriendo_Facil_Calendar {
 		$end_time         = self::request_time( 'end_time' );
 		$guest_id         = 0;
 
+		if ( ! $lease_id ) {
+			wp_send_json_error( array( 'message' => __( 'Primero registra al inquilino y su contrato; luego podrás programar la mudanza.', 'arriendo-facil' ) ) );
+		}
+
 		if ( $lease_id ) {
 			if ( ! Arriendo_Facil_Tenancy::can_access_lease( $lease_id ) ) {
 				wp_send_json_error( array( 'message' => __( 'No tienes acceso a ese contrato.', 'arriendo-facil' ) ) );
@@ -1035,6 +1091,9 @@ class Arriendo_Facil_Calendar {
 			// The contract decides the property, so both can never disagree.
 			$accommodation_id = (int) $lease->accommodation_id;
 			$guest_id         = (int) $lease->guest_id;
+			if ( ! $guest_id ) {
+				wp_send_json_error( array( 'message' => __( 'El contrato no tiene un inquilino registrado.', 'arriendo-facil' ) ) );
+			}
 		}
 
 		if ( ! $this->accommodation_in_scope( $accommodation_id ) ) {

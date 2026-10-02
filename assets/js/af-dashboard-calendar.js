@@ -14,6 +14,7 @@
 	}
 
 	var HIDDEN_KEY = 'afCalHiddenTypes';
+	var HOLIDAYS = afDashboardCalendar.holidays || {};
 	var hiddenTypes = {};
 	try {
 		(JSON.parse(window.localStorage.getItem(HIDDEN_KEY) || '[]') || []).forEach(function (t) { hiddenTypes[t] = true; });
@@ -170,13 +171,16 @@
 
 	function cell(dateStr, dayNum, outside, isToday) {
 		var evs = visibleEvents(dateStr);
-		var classes = 'af-cal__day' + (outside ? ' is-outside' : '') + (isToday ? ' is-today' : '') + (dateStr < todayStr ? ' is-past' : '');
+		var classes = 'af-cal__day' + (outside ? ' is-outside' : '') + (isToday ? ' is-today' : '') + (dateStr < todayStr ? ' is-past' : '') + (HOLIDAYS[dateStr] ? ' is-holiday' : '');
 		if (SELECTED_DATE === dateStr) {
 			classes += ' is-selected';
 		}
 
 		var chips = '';
 		var shown = 0;
+		if (HOLIDAYS[dateStr]) {
+			chips += '<span class="af-cal__chip af-cal__chip--holiday" title="Feriado: ' + escapeHtml(HOLIDAYS[dateStr]) + '">' + escapeHtml(HOLIDAYS[dateStr]) + '</span>';
+		}
 		for (var k = 0; k < evs.length; k++) {
 			if (shown >= 3) {
 				chips += '<span class="af-cal__chip af-cal__chip--more">+ ' + (evs.length - shown) + ' más</span>';
@@ -261,10 +265,15 @@
 		var isPast = SELECTED_DATE < todayStr;
 		var pastNotice = isPast ? '<p class="af-cal__drawer-past">No se pueden programar visitas ni bloqueos en fechas pasadas.</p>' : '';
 		var hint = isPast ? '' : '<p class="af-cal__drawer-hint">Para programar en otra fecha, toca ese día en el calendario.</p>';
+		if (HOLIDAYS[SELECTED_DATE]) {
+			var holidayEvs = visibleEvents(SELECTED_DATE).filter(function (ev) { return ev.type === 'service' || ev.type === 'checkout' || ev.type === 'checkin'; });
+			pastNotice += '<p class="af-cal__holiday-notice"><strong>Feriado: ' + escapeHtml(HOLIDAYS[SELECTED_DATE]) + '.</strong>' +
+				(holidayEvs.length ? ' Hay cobros, pagos, mudanzas o salidas este día: considera adelantarlos o confirmarlos antes, pues bancos y oficinas pueden no atender.' : ' Bancos y oficinas públicas no atienden; ten en cuenta pagos, cobros y trámites.') + '</p>';
+		}
 
 		var evs = visibleEvents(SELECTED_DATE);
 		if (!evs.length) {
-			el.drawerBody.innerHTML = '<p class="af-cal__drawer-empty">Sin eventos este día.' + (isPast ? '' : ' Usa los botones de abajo para agendar una visita, registrar una mudanza o bloquear el día.') + '</p>' + pastNotice + hint;
+			el.drawerBody.innerHTML = '<p class="af-cal__drawer-empty">Sin eventos este día.' + (isPast ? '' : ' Usa los botones de abajo para agendar una visita o registrar una mudanza.') + '</p>' + pastNotice + hint;
 		} else {
 			var html = '';
 			evs.forEach(function (ev) {
@@ -538,9 +547,12 @@
 				if (SELECTED_DATE) { openModal(SELECTED_DATE, 'move'); }
 			});
 		}
-		el.drawerFooter.querySelector('[data-cal-block]').addEventListener('click', function () {
-			if (SELECTED_DATE) { openModal(SELECTED_DATE, 'block'); }
-		});
+		var blockBtn = el.drawerFooter.querySelector('[data-cal-block]');
+		if (blockBtn) {
+			blockBtn.addEventListener('click', function () {
+				if (SELECTED_DATE) { openModal(SELECTED_DATE, 'block'); }
+			});
+		}
 	}
 
 	// Shortcut buttons outside the calendar (e.g. "Registrar mudanza").
@@ -602,8 +614,17 @@
 			var acc = el.accSelect.value;
 			var lease = (type === 'move' && el.leaseSelect) ? el.leaseSelect.value : '';
 
+			if (type === 'move' && !lease) {
+				setStatus('Para registrar una mudanza, primero el inquilino debe estar registrado y tener contrato.', true);
+				return;
+			}
+
 			if (!acc && !lease) {
 				setStatus('Elige un inmueble.', true);
+				return;
+			}
+
+			if (HOLIDAYS[date] && !window.confirm('El ' + formatLongDate(date) + ' es feriado (' + HOLIDAYS[date] + '). ¿Programar de todos modos?')) {
 				return;
 			}
 

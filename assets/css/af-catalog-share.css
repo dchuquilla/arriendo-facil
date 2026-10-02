@@ -1054,8 +1054,35 @@
 }
 
 /* Public link panel (Catálogo screen). */
+.af-share-panel [hidden] {
+	display: none !important;
+}
+
 .af-share-panel__head {
-	margin-bottom: 10px;
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	margin-bottom: 14px;
+}
+
+.af-share-panel__icon {
+	display: inline-grid;
+	place-items: center;
+	flex: 0 0 40px;
+	width: 40px;
+	height: 40px;
+	border-radius: 10px;
+	background: #ecf7f2;
+	color: #2f8f68;
+}
+
+.af-share-panel__titles {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.af-share-panel__titles .af-section__title {
+	margin: 0;
 }
 
 .af-share-panel__hint {
@@ -1064,82 +1091,163 @@
 	color: #646970;
 }
 
+.af-share-panel__state {
+	flex: 0 0 auto;
+	padding: 3px 10px;
+	border-radius: 999px;
+	background: #f0f2f4;
+	color: #646970;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.af-share-panel:has(.af-share-card.is-active) .af-share-panel__state {
+	background: #ecf7f2;
+	color: #15803d;
+}
+
 .af-share-panel .af-share-card {
+	display: grid;
+	gap: 10px;
+	margin: 0;
+	padding: 14px;
+	border: 1px solid #e2e5ea;
+	border-radius: 12px;
+	background: #f8faf9;
+	box-shadow: none;
+}
+
+.af-share-card__main {
 	display: flex;
 	flex-wrap: wrap;
-	align-items: center;
+	align-items: stretch;
 	gap: 8px;
-	margin: 0;
-	padding: 0;
-	border: 0;
-	background: none;
-	box-shadow: none;
 }
 
 .af-slug {
 	display: flex;
 	align-items: center;
-	flex: 1 1 320px;
+	flex: 1 1 340px;
 	min-width: 0;
+	min-height: 44px;
+	padding: 0 12px;
 	border: 1px solid #c3c4c7;
-	border-radius: 8px;
+	border-radius: 10px;
 	background: #fff;
-	overflow: hidden;
+	transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .af-slug:focus-within {
 	border-color: #4caf88;
-	box-shadow: 0 0 0 1px #4caf88;
+	box-shadow: 0 0 0 3px rgba(76, 175, 136, 0.18);
 }
 
 .has-slug-error .af-slug {
 	border-color: #b42318;
-	box-shadow: 0 0 0 1px #b42318;
+	box-shadow: 0 0 0 3px rgba(180, 35, 24, 0.12);
+}
+
+.af-slug__icon,
+.af-slug__edit {
+	display: inline-flex;
+	flex: 0 0 auto;
+	color: #8c8f94;
+}
+
+.af-slug__icon {
+	margin-right: 8px;
 }
 
 .af-slug__prefix {
 	flex: 0 1 auto;
-	padding: 0 2px 0 12px;
-	color: #646970;
-	font-size: 13px;
+	min-width: 0;
+	color: #8c8f94;
+	font-size: 14px;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
+	cursor: text;
 }
 
-.af-share-panel .af-slug__input {
-	flex: 1 1 140px;
-	min-width: 100px;
-	min-height: 36px;
-	border: 0;
-	padding: 0 12px 0 0;
-	background: transparent;
-	font-weight: 600;
-	box-shadow: none;
+.af-share-panel input.af-slug__input,
+.af-share-panel input.af-slug__input:focus {
+	flex: 1 1 120px;
+	min-width: 90px;
+	min-height: 40px;
+	margin: 0;
+	padding: 0 4px 0 1px;
+	border: 0 !important;
+	border-radius: 0;
+	background: transparent !important;
+	box-shadow: none !important;
 	outline: none;
+	color: #1d2327;
+	font-size: 14px;
+	font-weight: 600;
 }
 
-.af-share-panel .af-share-card__actions {
+.af-share-card__primary {
+	display: flex;
+	gap: 8px;
+}
+
+.af-share-card__primary .af-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	min-height: 44px;
+	padding: 0 18px;
+	border-radius: 10px;
+	white-space: nowrap;
+}
+
+.af-share-card__primary .af-btn.is-copied {
+	background: #15803d;
+	border-color: #15803d;
+}
+
+.af-share-card__footer {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
+	gap: 4px 18px;
+	padding-top: 10px;
+	border-top: 1px dashed #dfe3e8;
+}
+
+.af-share-link {
+	display: inline-flex;
+	align-items: center;
 	gap: 6px;
-}
-
-.af-share-panel .af-share-card__actions[hidden],
-.af-share-panel [hidden] {
-	display: none;
-}
-
-.af-share-panel .af-share-revoke {
-	margin-left: 4px;
-	color: #b42318;
+	padding: 4px 0;
+	border: 0;
+	background: none;
+	color: #2f6f55;
 	font-size: 13px;
+	font-weight: 600;
+	text-decoration: none;
+	cursor: pointer;
+}
+
+.af-share-link:hover,
+.af-share-link:focus-visible {
+	color: #14532d;
+	text-decoration: underline;
+}
+
+.af-share-link--danger {
+	margin-left: auto;
+	color: #b42318;
+	font-weight: 500;
+}
+
+.af-share-link--danger:hover,
+.af-share-link--danger:focus-visible {
+	color: #8a1c13;
 }
 
 .af-slug__msg,
 .af-share-panel .af-share-status {
-	flex: 1 1 100%;
 	margin: 0;
 	font-size: 13px;
 }
@@ -1158,9 +1266,20 @@
 	flex-wrap: wrap;
 	align-items: center;
 	gap: 6px;
-	flex: 1 1 100%;
 	font-size: 13px;
 	color: #646970;
+}
+
+@media (max-width: 600px) {
+	.af-share-card__primary,
+	.af-share-card__primary .af-btn {
+		flex: 1 1 100%;
+		justify-content: center;
+	}
+
+	.af-slug__prefix {
+		max-width: 45%;
+	}
 }
 
 .af-slug__chip {

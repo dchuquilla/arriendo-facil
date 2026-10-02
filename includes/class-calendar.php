@@ -35,6 +35,8 @@ class Arriendo_Facil_Calendar {
 		add_action( 'wp_ajax_af_calendar_events', array( $this, 'ajax_events' ) );
 		add_action( 'wp_ajax_af_calendar_add_visit', array( $this, 'ajax_add_visit' ) );
 		add_action( 'wp_ajax_af_calendar_remove_visit', array( $this, 'ajax_remove_visit' ) );
+		add_action( 'wp_ajax_af_calendar_visit_outcome', array( $this, 'ajax_visit_outcome' ) );
+		add_action( 'wp_ajax_af_calendar_register_prospect', array( $this, 'ajax_register_prospect' ) );
 		add_action( 'wp_ajax_af_calendar_add_move', array( $this, 'ajax_add_move' ) );
 		add_action( 'wp_ajax_af_calendar_update_move', array( $this, 'ajax_update_move' ) );
 		add_action( 'wp_ajax_af_calendar_remove_move', array( $this, 'ajax_remove_move' ) );
@@ -353,10 +355,11 @@ class Arriendo_Facil_Calendar {
 		$events = array();
 
 		// Visitas agendadas (confirmadas/completadas).
+		$has_outcome = self::ensure_visit_outcome_columns();
 		$visits = (array) $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT vs.visit_date, vs.start_time, vs.end_time, vb.guest_name, vb.accommodation_id,
-				        p.post_title AS accommodation_title, vb.id AS booking_id, vs.id AS slot_id
+				        p.post_title AS accommodation_title, vb.id AS booking_id, vs.id AS slot_id" . ( $has_outcome ? ', vb.outcome, vb.rating' : '' ) . "
 				 FROM {$wpdb->prefix}af_visit_bookings vb
 				 LEFT JOIN {$wpdb->prefix}af_visit_slots vs ON vs.id = vb.slot_id
 				 LEFT JOIN {$wpdb->posts} p ON p.ID = vb.accommodation_id
@@ -375,6 +378,8 @@ class Arriendo_Facil_Calendar {
 				'meta'  => substr( (string) $visit->start_time, 0, 5 ),
 				'accommodation' => (string) $visit->accommodation_title,
 				'id'    => (int) $visit->booking_id,
+				'outcome' => isset( $visit->outcome ) ? (string) $visit->outcome : 'pending',
+				'rating'  => isset( $visit->rating ) ? (string) $visit->rating : '',
 				'removable' => true,
 			);
 		}
@@ -655,6 +660,320 @@ class Arriendo_Facil_Calendar {
 		}
 
 		wp_send_json_success( array( 'message' => __( 'Visita cancelada.', 'arriendo-facil' ) ) );
+	}
+
+	/**
+	 * Post-visit results a booking can have.
+	 *
+	 * @return array<string,string>
+	 */
+	public static function visit_outcomes() {
+		return array(
+			'pending'    => __( 'Sin resultado', 'arriendo-facil' ),
+			'thinking'   => __( 'Indeciso · volverá', 'arriendo-facil' ),
+			'not_closed' => __( 'No concretada', 'arriendo-facil' ),
+			'no_show'    => __( 'No asistió', 'arriendo-facil' ),
+			'registered' => __( 'Registrado como inquilino', 'arriendo-facil' ),
+		);
+	}
+
+	/**
+	 * Prospect ratings.
+	 *
+	 * @return array<string,string>
+	 */
+	public static function prospect_ratings() {
+		return array(
+			'A' => __( 'Muy interesado', 'arriendo-facil' ),
+			'B' => __( 'Interesado, indeciso', 'arriendo-facil' ),
+			'C' => __( 'Poco probable', 'arriendo-facil' ),
+		);
+	}
+
+	/**
+	 * Adds the post-visit columns to af_visit_bookings on first use.
+	 *
+	 * @return bool
+	 */
+	public static function ensure_visit_outcome_columns() {
+		global $wpdb;
+		static $ready = null;
+
+		if ( null !== $ready ) {
+			return $ready;
+		}
+
+		$table   = $wpdb->prefix . 'af_visit_bookings';
+		$columns = (array) $wpdb->get_col( "SHOW COLUMNS FROM {$table}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		if ( ! $columns ) {
+			$ready = false;
+			return $ready;
+		}
+
+		$add = array(
+			'outcome'    => "VARCHAR(20) NOT NULL DEFAULT 'pending'",
+			'rating'     => 'CHAR(1) DEFAULT NULL',
+			'guest_id'   => 'BIGINT(20) UNSIGNED DEFAULT NULL',
+			'outcome_at' => 'DATETIME DEFAULT NULL',
+		);
+		foreach ( $add as $column => $definition ) {
+			if ( ! in_array( $column, $columns, true ) ) {
+				$wpdb->query( "ALTER TABLE {$table} ADD COLUMN {$column} {$definition}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			}
+		}
+
+		$ready = true;
+		return $ready;
+	}
+
+	/**
+	 * Identity used to group visits of the same person: phone, else real email, else name.
+	 *
+	 * @param object $row Booking row.
+	 * @return string
+	 */
+	private static function prospect_key( $row ) {
+		$phone = preg_replace( '/\D+/', '', (string) $row->guest_phone );
+		if ( strlen( $phone ) >= 7 ) {
+			return 'p:' . substr( $phone, -9 );
+		}
+		$email = strtolower( trim( (string) $row->guest_email ) );
+		if ( is_email( $email ) && 'visita@local' !== $email ) {
+			return 'e:' . $email;
+		}
+		return 'n:' . remove_accents( strtolower( trim( preg_replace( '/\s+/', ' ', (string) $row->guest_name ) ) ) );
+	}
+
+	/**
+	 * Visit history grouped by person (prospects), most recent activity first.
+	 *
+	 * @param int[]|null $scope_ids Accommodation scope, null = all.
+	 * @return array<int,array<string,mixed>>
+	 */
+	public static function prospects( $scope_ids ) {
+		global $wpdb;
+
+		if ( ! self::ensure_visit_outcome_columns() ) {
+			return array();
+		}
+
+		$scope = is_array( $scope_ids ) ? ' AND vb.accommodation_id IN (' . Arriendo_Facil_Tenancy::ids_in_clause( $scope_ids ) . ')' : '';
+		$rows  = (array) $wpdb->get_results(
+			"SELECT vb.id, vb.accommodation_id, vb.guest_name, vb.guest_email, vb.guest_phone, vb.notes,
+			        vb.outcome, vb.rating, vb.guest_id, vs.visit_date, vs.start_time, p.post_title AS accommodation_title
+			 FROM {$wpdb->prefix}af_visit_bookings vb
+			 LEFT JOIN {$wpdb->prefix}af_visit_slots vs ON vs.id = vb.slot_id
+			 LEFT JOIN {$wpdb->posts} p ON p.ID = vb.accommodation_id
+			 WHERE vb.status IN ('confirmed', 'completed'){$scope}
+			 ORDER BY vs.visit_date DESC, vs.start_time DESC
+			 LIMIT 600" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		);
+
+		$outcomes = self::visit_outcomes();
+		$today    = current_time( 'Y-m-d' );
+		$people   = array();
+
+		foreach ( $rows as $row ) {
+			$key   = self::prospect_key( $row );
+			$email = 'visita@local' === (string) $row->guest_email ? '' : (string) $row->guest_email;
+			$out   = isset( $outcomes[ (string) $row->outcome ] ) ? (string) $row->outcome : 'pending';
+
+			if ( ! isset( $people[ $key ] ) ) {
+				// Rows come newest first, so the first one carries the latest contact data.
+				$people[ $key ] = array(
+					'key'      => $key,
+					'name'     => (string) $row->guest_name,
+					'phone'    => (string) $row->guest_phone,
+					'email'    => $email,
+					'rating'   => '',
+					'guest_id' => 0,
+					'pending'  => 0,
+					'visits'   => array(),
+				);
+			}
+
+			$person = &$people[ $key ];
+			if ( '' === $person['rating'] && $row->rating ) {
+				$person['rating'] = (string) $row->rating;
+			}
+			if ( '' === $person['email'] && $email ) {
+				$person['email'] = $email;
+			}
+			if ( ! $person['guest_id'] && $row->guest_id ) {
+				$person['guest_id'] = (int) $row->guest_id;
+			}
+			if ( 'pending' === $out && (string) $row->visit_date <= $today ) {
+				++$person['pending'];
+			}
+			$person['visits'][] = array(
+				'id'            => (int) $row->id,
+				'date'          => (string) $row->visit_date,
+				'time'          => substr( (string) $row->start_time, 0, 5 ),
+				'accommodation' => (string) $row->accommodation_title,
+				'outcome'       => $out,
+				'notes'         => (string) $row->notes,
+				'upcoming'      => (string) $row->visit_date > $today,
+			);
+			unset( $person );
+		}
+
+		foreach ( $people as &$person ) {
+			$person['status'] = $person['guest_id'] ? 'registered' : $person['visits'][0]['outcome'];
+			if ( $person['guest_id'] ) {
+				$person['profile_url'] = admin_url( 'admin.php?page=af-guests&view=profile&guest_id=' . $person['guest_id'] );
+			}
+		}
+		unset( $person );
+
+		return array_values( $people );
+	}
+
+	/**
+	 * Loads a booking within the caller's scope or ends the request.
+	 *
+	 * @param int $booking_id Booking ID.
+	 * @return object
+	 */
+	private function scoped_booking( $booking_id ) {
+		global $wpdb;
+
+		self::ensure_visit_outcome_columns();
+
+		$booking = $booking_id ? $wpdb->get_row(
+			$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}af_visit_bookings WHERE id = %d", $booking_id )
+		) : null;
+		if ( ! $booking || ! $this->accommodation_in_scope( (int) $booking->accommodation_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'No se encontró la visita.', 'arriendo-facil' ) ) );
+		}
+
+		return $booking;
+	}
+
+	/**
+	 * AJAX: saves the result of a visit (outcome, A/B/C rating, notes).
+	 *
+	 * @return void
+	 */
+	public function ajax_visit_outcome() {
+		$this->guard();
+
+		global $wpdb;
+
+		$booking = $this->scoped_booking( isset( $_REQUEST['id'] ) ? absint( $_REQUEST['id'] ) : 0 );
+		$outcome = isset( $_REQUEST['outcome'] ) ? sanitize_key( wp_unslash( $_REQUEST['outcome'] ) ) : '';
+		$rating  = isset( $_REQUEST['rating'] ) ? strtoupper( sanitize_text_field( wp_unslash( $_REQUEST['rating'] ) ) ) : '';
+		$notes   = isset( $_REQUEST['notes'] ) ? sanitize_textarea_field( wp_unslash( $_REQUEST['notes'] ) ) : null;
+
+		if ( ! isset( self::visit_outcomes()[ $outcome ] ) || 'registered' === $outcome ) {
+			wp_send_json_error( array( 'message' => __( 'Resultado inválido.', 'arriendo-facil' ) ) );
+		}
+		if ( '' !== $rating && ! isset( self::prospect_ratings()[ $rating ] ) ) {
+			wp_send_json_error( array( 'message' => __( 'Calificación inválida.', 'arriendo-facil' ) ) );
+		}
+
+		$data = array(
+			'outcome'    => $outcome,
+			'rating'     => '' === $rating ? null : $rating,
+			'outcome_at' => current_time( 'mysql' ),
+			'status'     => 'no_show' === $outcome ? 'confirmed' : 'completed',
+		);
+		if ( null !== $notes ) {
+			$data['notes'] = $notes;
+		}
+		$wpdb->update( $wpdb->prefix . 'af_visit_bookings', $data, array( 'id' => (int) $booking->id ) );
+
+		wp_send_json_success( array( 'message' => __( 'Resultado de la visita guardado.', 'arriendo-facil' ) ) );
+	}
+
+	/**
+	 * AJAX: turns a visitor into a tenant (af_guests) in one step, reusing
+	 * an existing record with the same cédula or email.
+	 *
+	 * @return void
+	 */
+	public function ajax_register_prospect() {
+		$this->guard();
+
+		global $wpdb;
+
+		$booking   = $this->scoped_booking( isset( $_REQUEST['id'] ) ? absint( $_REQUEST['id'] ) : 0 );
+		$name      = isset( $_REQUEST['name'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['name'] ) ) : '';
+		$email     = isset( $_REQUEST['email'] ) ? sanitize_email( wp_unslash( $_REQUEST['email'] ) ) : '';
+		$phone     = isset( $_REQUEST['phone'] ) ? preg_replace( '/\D+/', '', sanitize_text_field( wp_unslash( $_REQUEST['phone'] ) ) ) : '';
+		$id_number = isset( $_REQUEST['id_number'] ) ? preg_replace( '/\D+/', '', sanitize_text_field( wp_unslash( $_REQUEST['id_number'] ) ) ) : '';
+		$rating    = isset( $_REQUEST['rating'] ) ? strtoupper( sanitize_text_field( wp_unslash( $_REQUEST['rating'] ) ) ) : '';
+
+		$parts = preg_split( '/\s+/', trim( $name ) );
+		if ( '' === $parts[0] || ! $email || ! $phone || ! $id_number ) {
+			wp_send_json_error( array( 'message' => __( 'Completa nombre, cédula, teléfono y correo.', 'arriendo-facil' ) ) );
+		}
+		if ( ! is_email( $email ) || 'visita@local' === $email ) {
+			wp_send_json_error( array( 'message' => __( 'Correo electrónico inválido.', 'arriendo-facil' ) ) );
+		}
+		if ( 1 !== preg_match( '/^[0-9]{7,10}$/', $phone ) ) {
+			wp_send_json_error( array( 'message' => __( 'El teléfono debe tener entre 7 y 10 dígitos.', 'arriendo-facil' ) ) );
+		}
+		$doc_type = 13 === strlen( $id_number ) ? 'ruc' : 'cedula';
+		if ( 1 !== preg_match( '/^[0-9]{10}([0-9]{3})?$/', $id_number ) || ! Arriendo_Facil_Identity_Validator::validate( $doc_type, $id_number ) ) {
+			wp_send_json_error( array( 'message' => __( 'La cédula o RUC no es válido.', 'arriendo-facil' ) ) );
+		}
+
+		$schema = Arriendo_Facil_Guest::ensure_guest_extra_columns();
+		if ( is_wp_error( $schema ) ) {
+			wp_send_json_error( array( 'message' => $schema->get_error_message() ) );
+		}
+
+		$guests   = $wpdb->prefix . 'af_guests';
+		$guest_id = (int) $wpdb->get_var(
+			$wpdb->prepare( "SELECT id FROM {$guests} WHERE id_number = %s OR email = %s ORDER BY id_number = %s DESC LIMIT 1", $id_number, $email, $id_number ) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		);
+
+		if ( $guest_id ) {
+			if ( ! Arriendo_Facil_Tenancy::can_access_guest( $guest_id ) ) {
+				wp_send_json_error( array( 'message' => __( 'Ya existe un inquilino con esa cédula o correo administrado por otra cuenta.', 'arriendo-facil' ) ) );
+			}
+			$reused = true;
+		} else {
+			$inserted = $wpdb->insert(
+				$guests,
+				array(
+					'first_name'       => $parts[0],
+					'last_name'        => trim( implode( ' ', array_slice( $parts, 1 ) ) ),
+					'email'            => $email,
+					'phone'            => $phone,
+					'id_number'        => $id_number,
+					'accommodation_id' => (int) $booking->accommodation_id,
+				),
+				array( '%s', '%s', '%s', '%s', '%s', '%d' )
+			);
+			if ( ! $inserted ) {
+				wp_send_json_error( array( 'message' => __( 'No se pudo registrar el inquilino.', 'arriendo-facil' ) ) );
+			}
+			$guest_id = (int) $wpdb->insert_id;
+			$reused   = false;
+		}
+
+		$wpdb->update(
+			$wpdb->prefix . 'af_visit_bookings',
+			array(
+				'outcome'    => 'registered',
+				'rating'     => isset( self::prospect_ratings()[ $rating ] ) ? $rating : 'A',
+				'guest_id'   => $guest_id,
+				'outcome_at' => current_time( 'mysql' ),
+				'status'     => 'completed',
+			),
+			array( 'id' => (int) $booking->id )
+		);
+
+		wp_send_json_success(
+			array(
+				'message'     => $reused
+					? __( 'Ya estaba registrado: se vinculó la visita a su ficha.', 'arriendo-facil' )
+					: __( 'Inquilino registrado. Completa documentos y contrato desde su ficha.', 'arriendo-facil' ),
+				'guest_id'    => $guest_id,
+				'profile_url' => admin_url( 'admin.php?page=af-guests&view=profile&guest_id=' . $guest_id ),
+			)
+		);
 	}
 
 	/**

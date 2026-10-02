@@ -277,7 +277,7 @@
 					'<div class="af-cal__event-meta">' + escapeHtml(typeLabel) +
 					(ev.meta ? ' · ' + escapeHtml(ev.meta) : '') +
 					(ev.accommodation ? ' · ' + escapeHtml(ev.accommodation) : '') +
-					'</div>' + moveDetails(ev) + '</div>';
+					'</div>' + moveDetails(ev) + visitDetails(ev) + '</div>';
 				if (ev.removable) {
 					html += '<button type="button" class="af-cal__event-remove" data-remove-type="' + ev.type + '" data-remove-id="' + ev.id + '" title="Quitar">×</button>';
 				}
@@ -299,6 +299,19 @@
 		}
 
 		el.drawerFooter.style.visibility = isPast ? 'hidden' : 'visible';
+	}
+
+	// Post-visit result shortcut; the Calendario page owns the modal that handles it.
+	var VISIT_OUTCOMES = { thinking: 'Indeciso · volverá', not_closed: 'No concretada', no_show: 'No asistió', registered: '✓ Registrado como inquilino' };
+	function visitDetails(ev) {
+		if (ev.type !== 'visit' || !document.getElementById('af-modal-visit-outcome')) {
+			return '';
+		}
+		var badge = VISIT_OUTCOMES[ev.outcome] ? escapeHtml(VISIT_OUTCOMES[ev.outcome]) + (ev.rating ? ' · ' + escapeHtml(ev.rating) : '') + ' · ' : '';
+		return '<div class="af-cal__event-meta">' + badge +
+			'<button type="button" class="af-cal__link" data-visit-outcome="' + ev.id + '" data-name="' + escapeHtml(ev.title) +
+			'" data-accommodation="' + escapeHtml(ev.accommodation || '') + '">' +
+			(ev.outcome === 'registered' ? 'Ver resultado' : '¿Cómo terminó la visita?') + '</button></div>';
 	}
 
 	// Checklist + contact of a move-in, editable in place from the agenda.

@@ -56,9 +56,14 @@ $upcoming_checkouts = Arriendo_Facil_Calendar::upcoming_checkouts( $calendar_fro
 $calendar_today     = current_time( 'Y-m-d' );
 $legal_statuses     = Arriendo_Facil_Lease_Operations::legal_statuses();
 
+// Historial de visitas agrupado por persona (cruza inmuebles: el mismo prospecto puede visitar varios).
+$prospects         = Arriendo_Facil_Calendar::prospects( $scope_ids );
+$prospects_pending = array_sum( wp_list_pluck( $prospects, 'pending' ) );
+$visit_outcomes    = Arriendo_Facil_Calendar::visit_outcomes();
+
 $upcoming_visits = (array) $wpdb->get_results(
 	$wpdb->prepare(
-		"SELECT vb.id, vs.visit_date, vs.start_time, vb.accommodation_id,
+		"SELECT vb.id, vs.visit_date, vs.start_time, vb.accommodation_id, vb.outcome, vb.rating,
 		        vb.guest_name, p.post_title AS accommodation_title
 		 FROM {$wpdb->prefix}af_visit_bookings vb
 		 LEFT JOIN {$wpdb->prefix}af_visit_slots vs ON vs.id = vb.slot_id
@@ -103,6 +108,8 @@ $calendar_month_anchor = $calendar_from;
 			'actions'  => array(
 				'<button type="button" class="button af-btn af-btn--primary" data-cal-open="move">' . af_lucide( 'plus', 16 ) . esc_html__( 'Registrar mudanza', 'arriendo-facil' ) . '</button>',
 				'<button type="button" class="button af-btn af-btn--ghost" data-cal-open="visit">' . af_lucide( 'user-plus', 16 ) . esc_html__( 'Agendar visita', 'arriendo-facil' ) . '</button>',
+				'<button type="button" class="button af-btn af-btn--ghost" data-prospects-open>' . af_lucide( 'users', 16 ) . esc_html__( 'Prospectos', 'arriendo-facil' )
+					. ( $prospects_pending ? ' <span class="af-prospect-badge" title="' . esc_attr__( 'Visitas sin resultado', 'arriendo-facil' ) . '">' . (int) $prospects_pending . '</span>' : '' ) . '</button>',
 			),
 		)
 	);
@@ -249,30 +256,7 @@ $calendar_month_anchor = $calendar_from;
 				<a class="button af-btn af-btn--ghost af-calendar-col__cta" href="<?php echo esc_url( admin_url( 'admin.php?page=af-leases' ) ); ?>"><?php esc_html_e( 'Ver contratos', 'arriendo-facil' ); ?></a>
 			</article>
 
-			<article class="af-calendar-col af-calendar-col--visit">
-				<header class="af-calendar-col__head">
-					<span class="af-calendar-col__icon" aria-hidden="true"><?php echo af_lucide( 'user-plus', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-					<div class="af-calendar-col__title">
-						<h3><?php esc_html_e( 'Visitas agendadas', 'arriendo-facil' ); ?></h3>
-						<span class="af-calendar-col__count"><?php echo esc_html( sprintf( /* translators: %d: count */ _n( '%d agendada', '%d agendadas', count( $upcoming_visits ), 'arriendo-facil' ), count( $upcoming_visits ) ) ); ?></span>
-					</div>
-				</header>
-				<?php if ( empty( $upcoming_visits ) ) : ?>
-					<p class="af-empty__text"><?php esc_html_e( 'Sin visitas confirmadas en el rango.', 'arriendo-facil' ); ?></p>
-				<?php else : ?>
-					<div class="af-semaforo__table" role="table" aria-label="<?php esc_attr_e( 'Visitas agendadas', 'arriendo-facil' ); ?>">
-						<?php foreach ( $upcoming_visits as $visit ) : ?>
-							<a class="af-semaforo__row" href="<?php echo esc_url( admin_url( 'admin.php?page=af-guests' ) ); ?>">
-								<span class="af-semaforo__tenant">
-									<strong><?php echo esc_html( trim( (string) $visit->guest_name ) ? trim( (string) $visit->guest_name ) : __( 'Visitante', 'arriendo-facil' ) ); ?></strong>
-									<small><?php echo esc_html( $visit->accommodation_title ? $visit->accommodation_title : '—' ); ?></small>
-								</span>
-								<span class="af-pill af-pill--info"><?php echo esc_html( wp_date( 'd/m/Y H:i', strtotime( $visit->visit_date . ' ' . $visit->start_time ) ) ); ?></span>
-							</a>
-						<?php endforeach; ?>
-					</div>
-				<?php endif; ?>
-			</article>
+			<?php include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/partials/visits-column.php'; ?>
 		</div>
 	</section>
 
@@ -335,6 +319,8 @@ $calendar_month_anchor = $calendar_from;
 		</div>
 	</div>
 </div>
+
+<?php include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/partials/visit-prospects.php'; ?>
 
 <script>
 (function () {

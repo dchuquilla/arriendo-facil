@@ -179,23 +179,39 @@ $share_token = class_exists( 'Arriendo_Facil_Catalog_Share' ) ? Arriendo_Facil_C
 $share_url   = $share_token ? home_url( '/catalogo/' . $share_token . '/' ) : '';
 $share_pdf   = $share_token ? add_query_arg( Arriendo_Facil_Catalog_Share::PDF_ARG, '1', $share_url ) : '';
 ?>
-<section class="af-section af-cs-groups">
-	<header class="af-section__header">
-		<div>
-			<h2 class="af-section__title"><?php esc_html_e( 'Edificios y conjuntos', 'arriendo-facil' ); ?></h2>
-			<p class="af-section__subtitle"><?php esc_html_e( 'Agrupa propiedades que comparten un mismo edificio o conjunto. El catálogo público los presenta en secciones con ese nombre.', 'arriendo-facil' ); ?></p>
+<section class="af-section af-catalog-tools">
+	<div class="af-catalog-tools__row">
+		<p class="af-catalog-tools__label"><?php esc_html_e( 'Enlace público', 'arriendo-facil' ); ?></p>
+		<div class="af-share-card" id="af-share-card">
+		<div class="af-share-card__url">
+			<label class="screen-reader-text" for="af-share-url"><?php esc_html_e( 'Enlace del catálogo', 'arriendo-facil' ); ?></label>
+			<input type="text" id="af-share-url" value="<?php echo esc_attr( $share_url ); ?>" readonly
+				placeholder="<?php esc_attr_e( 'Aún no hay enlace…', 'arriendo-facil' ); ?>" />
 		</div>
-		<?php if ( $catalog_owner_id ) : ?>
-			<button type="button" class="button af-btn af-btn--primary" id="af-cs-group-new">
-				<?php esc_html_e( 'Nuevo edificio', 'arriendo-facil' ); ?>
-			</button>
-		<?php endif; ?>
-	</header>
+		<div class="af-share-card__actions" id="af-share-actions" <?php echo $share_url ? '' : 'hidden'; ?>>
+			<button type="button" class="button af-btn af-btn--primary" id="af-share-copy"><?php esc_html_e( 'Copiar', 'arriendo-facil' ); ?></button>
+			<button type="button" class="button af-btn af-btn--ghost" id="af-share-preview"><?php esc_html_e( 'Ver', 'arriendo-facil' ); ?></button>
+			<a class="button af-btn af-btn--ghost" id="af-share-pdf" href="<?php echo esc_url( $share_pdf ); ?>" target="_blank" rel="noopener">
+				<?php esc_html_e( 'PDF', 'arriendo-facil' ); ?>
+			</a>
+			<button type="button" class="button af-btn af-btn--ghost" id="af-share-rotate" title="<?php esc_attr_e( 'Crea un enlace nuevo; el anterior deja de funcionar.', 'arriendo-facil' ); ?>"><?php esc_html_e( 'Regenerar', 'arriendo-facil' ); ?></button>
+			<button type="button" class="button af-btn af-btn--ghost" id="af-share-revoke" style="color:#b42318;"><?php esc_html_e( 'Desactivar', 'arriendo-facil' ); ?></button>
+		</div>
+		<div class="af-share-card__actions" id="af-share-generate-wrap" <?php echo $share_url ? 'hidden' : ''; ?>>
+			<button type="button" class="button af-btn af-btn--primary" id="af-share-generate"><?php esc_html_e( 'Generar enlace', 'arriendo-facil' ); ?></button>
+		</div>
+		<p class="af-share-hint" id="af-share-hint" hidden></p>
+		<p class="af-share-hint" id="af-share-empty" <?php echo $share_url ? 'hidden' : ''; ?>>
+			<?php esc_html_e( 'Genera un enlace único para compartir tu catálogo con posibles arrendatarios.', 'arriendo-facil' ); ?>
+		</p>
+		<p class="af-share-status" id="af-share-status" aria-live="polite"></p>
+		</div>
+	</div>
 
-	<p class="af-share-hint">
-		<?php esc_html_e( 'Agrupa por nombre solamente: no hace falta crear direcciones ni unidades. Una propiedad sin grupo aparece al final, en "Otros inmuebles".', 'arriendo-facil' ); ?>
-	</p>
-
+	<div class="af-catalog-tools__row af-cs-groups">
+		<p class="af-catalog-tools__label" title="<?php esc_attr_e( 'El catálogo público agrupa las propiedades por edificio. Las que no tienen grupo aparecen en "Otros inmuebles".', 'arriendo-facil' ); ?>">
+			<?php esc_html_e( 'Edificios y conjuntos', 'arriendo-facil' ); ?>
+		</p>
 	<ul class="af-cs-group-list" id="af-cs-group-list" data-owner-id="<?php echo esc_attr( (int) $catalog_owner_id ); ?>">
 		<?php if ( empty( $catalog_groups ) ) : ?>
 			<li class="af-cs-group-list__empty" id="af-cs-group-empty">
@@ -228,43 +244,12 @@ $share_pdf   = $share_token ? add_query_arg( Arriendo_Facil_Catalog_Share::PDF_A
 			<?php endforeach; ?>
 		<?php endif; ?>
 	</ul>
-
-	<p class="af-share-status" id="af-cs-group-status" aria-live="polite"></p>
-</section>
-
-<section class="af-section">
-	<header class="af-section__header">
-		<div>
-			<h2 class="af-section__title"><?php esc_html_e( 'Compartir catálogo', 'arriendo-facil' ); ?></h2>
-			<p class="af-section__subtitle"><?php esc_html_e( 'Difunde un enlace público con tus propiedades en arriendo, agrupadas por edificio, y descárgalo como PDF para enviarlo o imprimirlo.', 'arriendo-facil' ); ?></p>
-		</div>
-	</header>
-
-	<div class="af-share-card" id="af-share-card">
-		<div class="af-share-card__url">
-			<label class="screen-reader-text" for="af-share-url"><?php esc_html_e( 'Enlace del catálogo', 'arriendo-facil' ); ?></label>
-			<input type="text" id="af-share-url" value="<?php echo esc_attr( $share_url ); ?>" readonly
-				placeholder="<?php esc_attr_e( 'Aún no hay enlace…', 'arriendo-facil' ); ?>" />
-		</div>
-		<div class="af-share-card__actions" id="af-share-actions" <?php echo $share_url ? '' : 'hidden'; ?>>
-			<button type="button" class="button af-btn af-btn--ghost" id="af-share-copy"><?php esc_html_e( 'Copiar', 'arriendo-facil' ); ?></button>
-			<button type="button" class="button af-btn af-btn--ghost" id="af-share-preview"><?php esc_html_e( 'Previsualizar', 'arriendo-facil' ); ?></button>
-			<a class="button af-btn af-btn--ghost" id="af-share-pdf" href="<?php echo esc_url( $share_pdf ); ?>" target="_blank" rel="noopener">
-				<?php esc_html_e( 'Descargar PDF', 'arriendo-facil' ); ?>
-			</a>
-			<button type="button" class="button af-btn af-btn--ghost" id="af-share-rotate"><?php esc_html_e( 'Regenerar', 'arriendo-facil' ); ?></button>
-			<button type="button" class="button af-btn" id="af-share-revoke" style="color:#b42318;"><?php esc_html_e( 'Desactivar', 'arriendo-facil' ); ?></button>
-		</div>
-		<div class="af-share-card__actions" id="af-share-generate-wrap" <?php echo $share_url ? 'hidden' : ''; ?>>
-			<button type="button" class="button af-btn af-btn--primary" id="af-share-generate"><?php esc_html_e( 'Generar enlace', 'arriendo-facil' ); ?></button>
-		</div>
-		<p class="af-share-hint" id="af-share-hint" <?php echo $share_url ? '' : 'hidden'; ?>>
-			<?php esc_html_e( 'Este enlace muestra las propiedades publicadas al alcance de tu cuenta. Es válido hasta que lo desactives o regeneres.', 'arriendo-facil' ); ?>
-		</p>
-		<p class="af-share-hint" id="af-share-empty" <?php echo $share_url ? 'hidden' : ''; ?>>
-			<?php esc_html_e( 'Genera un enlace único para compartir tu catálogo con posibles arrendatarios.', 'arriendo-facil' ); ?>
-		</p>
-		<p class="af-share-status" id="af-share-status" aria-live="polite"></p>
+		<?php if ( $catalog_owner_id ) : ?>
+			<button type="button" class="button af-btn af-btn--ghost" id="af-cs-group-new">
+				+ <?php esc_html_e( 'Nuevo edificio', 'arriendo-facil' ); ?>
+			</button>
+		<?php endif; ?>
+		<p class="af-share-status" id="af-cs-group-status" aria-live="polite"></p>
 	</div>
 </section>
 

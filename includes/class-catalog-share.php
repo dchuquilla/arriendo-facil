@@ -544,6 +544,15 @@ class Arriendo_Facil_Catalog_Share {
 				? wp_get_attachment_image_url( (int) $row->thumbnail_id, 'large' )
 				: get_the_post_thumbnail_url( $post_id, 'large' );
 
+			$photos  = $thumbnail ? array( $thumbnail ) : array();
+			$gallery = get_post_meta( $post_id, '_af_gallery', true );
+			foreach ( array_slice( array_unique( array_map( 'absint', (array) $gallery ) ), 0, 10 ) as $att_id ) {
+				$url = $att_id ? wp_get_attachment_image_url( $att_id, 'large' ) : '';
+				if ( $url && ! in_array( $url, $photos, true ) ) {
+					$photos[] = $url;
+				}
+			}
+
 			$address = trim( trim( (string) $row->address ) . ( $row->city ? ', ' . $row->city : '' ) );
 			if ( ! $address && $row->location_text ) {
 				$address = (string) $row->location_text;
@@ -556,7 +565,8 @@ class Arriendo_Facil_Catalog_Share {
 			$cards[] = array(
 				'id'            => $post_id,
 				'title'         => get_the_title( $post_id ),
-				'thumb'         => $thumbnail ? $thumbnail : '',
+				'thumb'         => $thumbnail ? $thumbnail : ( $photos ? $photos[0] : '' ),
+				'photos'        => $photos,
 				'status'        => $status,
 				'status_lbl'    => isset( $status_labels[ $status ] ) ? $status_labels[ $status ] : $status,
 				'type'          => isset( $type_labels[ $type ] ) ? $type_labels[ $type ] : ( $type ? ucfirst( $type ) : '' ),

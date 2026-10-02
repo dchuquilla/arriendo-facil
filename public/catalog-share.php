@@ -306,12 +306,31 @@ get_header();
 							<div class="af-cs-card__inner">
 								<div class="af-cs-card__face af-cs-card__face--front">
 									<div class="af-cs-card__media">
-										<?php if ( $af_card['thumb'] ) : ?>
-											<img
-												src="<?php echo esc_url( $af_card['thumb'] ); ?>"
-												alt="<?php echo esc_attr( $af_card['title'] ); ?>"
-												loading="lazy"
-											/>
+										<?php
+										$af_photos = ! empty( $af_card['photos'] ) ? (array) $af_card['photos'] : ( $af_card['thumb'] ? array( $af_card['thumb'] ) : array() );
+										?>
+										<?php if ( $af_photos ) : ?>
+											<div class="af-cs-carousel" data-af-cs-carousel>
+												<div class="af-cs-carousel__track" data-af-cs-track>
+													<?php foreach ( $af_photos as $af_i => $af_photo ) : ?>
+														<img
+															class="af-cs-carousel__slide"
+															src="<?php echo esc_url( $af_photo ); ?>"
+															alt="<?php echo esc_attr( sprintf( '%1$s (%2$d/%3$d)', $af_card['title'], $af_i + 1, count( $af_photos ) ) ); ?>"
+															loading="lazy"
+														/>
+													<?php endforeach; ?>
+												</div>
+												<?php if ( count( $af_photos ) > 1 ) : ?>
+													<button type="button" class="af-cs-carousel__nav af-cs-carousel__nav--prev" data-af-cs-prev aria-label="<?php esc_attr_e( 'Foto anterior', 'arriendo-facil' ); ?>">&#8249;</button>
+													<button type="button" class="af-cs-carousel__nav af-cs-carousel__nav--next" data-af-cs-next aria-label="<?php esc_attr_e( 'Foto siguiente', 'arriendo-facil' ); ?>">&#8250;</button>
+													<span class="af-cs-carousel__dots" data-af-cs-dots aria-hidden="true">
+														<?php foreach ( $af_photos as $af_i => $af_photo ) : ?>
+															<span class="af-cs-carousel__dot<?php echo 0 === $af_i ? ' is-active' : ''; ?>"></span>
+														<?php endforeach; ?>
+													</span>
+												<?php endif; ?>
+											</div>
 										<?php else : ?>
 											<span class="af-cs-card__placeholder" aria-hidden="true">🏠</span>
 										<?php endif; ?>

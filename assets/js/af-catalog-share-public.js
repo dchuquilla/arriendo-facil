@@ -323,6 +323,45 @@
 		} );
 	}
 
+	/* ---------------------------------------------------------- Carousel */
+
+	function initCarousels( root ) {
+		Array.prototype.forEach.call( root.querySelectorAll( '[data-af-cs-carousel]' ), function ( carousel ) {
+			var track = carousel.querySelector( '[data-af-cs-track]' );
+			var dots = carousel.querySelectorAll( '.af-cs-carousel__dot' );
+			var total = track ? track.children.length : 0;
+
+			if ( ! track || total < 2 ) {
+				return;
+			}
+
+			function current() {
+				return Math.round( track.scrollLeft / Math.max( 1, track.clientWidth ) );
+			}
+
+			function go( index ) {
+				var next = ( index + total ) % total;
+				track.scrollTo( { left: next * track.clientWidth, behavior: 'smooth' } );
+			}
+
+			carousel.querySelector( '[data-af-cs-prev]' ).addEventListener( 'click', function ( e ) {
+				e.stopPropagation();
+				go( current() - 1 );
+			} );
+			carousel.querySelector( '[data-af-cs-next]' ).addEventListener( 'click', function ( e ) {
+				e.stopPropagation();
+				go( current() + 1 );
+			} );
+
+			track.addEventListener( 'scroll', function () {
+				var idx = current();
+				Array.prototype.forEach.call( dots, function ( dot, i ) {
+					dot.classList.toggle( 'is-active', i === idx );
+				} );
+			}, { passive: true } );
+		} );
+	}
+
 	/* -------------------------------------------------------------- Boot */
 
 	function boot() {
@@ -333,6 +372,7 @@
 		}
 
 		initFlip( root );
+		initCarousels( root );
 		initSizing( root );
 		initFilters( root );
 

@@ -50,18 +50,18 @@ $cal_leases     = Arriendo_Facil_Calendar::lease_options( Arriendo_Facil_Tenancy
 			<span><?php esc_html_e( 'Dom', 'arriendo-facil' ); ?></span>
 		</div>
 		<div class="af-cal__grid" id="af-cal-grid" role="grid" aria-label="<?php esc_attr_e( 'Calendario interactivo', 'arriendo-facil' ); ?>"></div>
-		<p class="af-td-meta" style="margin-top:10px;"><?php esc_html_e( 'Haz clic en un día para ver sus eventos, agendar una visita, registrar una mudanza o bloquear disponibilidad.', 'arriendo-facil' ); ?></p>
+		<p class="af-td-meta" style="margin-top:10px;"><?php esc_html_e( 'Toca cualquier día para ver sus eventos y programar en esa fecha.', 'arriendo-facil' ); ?></p>
 	</div>
 
 	<aside class="af-cal__drawer" aria-live="polite">
 		<div class="af-cal__drawer-head">
 			<div class="af-cal__drawer-date" id="af-cal-drawer-date">—</div>
-			<h3 class="af-cal__drawer-title" id="af-cal-drawer-title"><?php esc_html_e( 'Selecciona un día', 'arriendo-facil' ); ?></h3>
+			<h3 class="af-cal__drawer-title" id="af-cal-drawer-title"><?php esc_html_e( 'Hoy', 'arriendo-facil' ); ?></h3>
 		</div>
 		<div class="af-cal__drawer-body" id="af-cal-drawer-body"></div>
 		<div class="af-cal__drawer-actions" id="af-cal-drawer-actions" style="visibility:hidden;">
-			<button type="button" class="button af-btn af-btn--primary" data-cal-add><?php esc_html_e( '+ Visita', 'arriendo-facil' ); ?></button>
-			<button type="button" class="button af-btn af-btn--primary" data-cal-move><?php esc_html_e( '+ Mudanza', 'arriendo-facil' ); ?></button>
+			<button type="button" class="button af-btn af-btn--primary" data-cal-add><?php esc_html_e( '+ Agendar visita', 'arriendo-facil' ); ?></button>
+			<button type="button" class="button af-btn af-btn--primary" data-cal-move><?php esc_html_e( '+ Registrar mudanza', 'arriendo-facil' ); ?></button>
 			<button type="button" class="button af-btn button--danger" data-cal-block><?php esc_html_e( 'Bloquear día', 'arriendo-facil' ); ?></button>
 		</div>
 	</aside>

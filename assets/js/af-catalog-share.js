@@ -43,6 +43,13 @@
 	/* Share link                                                          */
 	/* ================================================================== */
 
+	var intro = document.querySelector( '[data-af-move-under-title]' );
+	var headerEnd = document.querySelector( '.wp-header-end' );
+
+	if ( intro && headerEnd ) {
+		headerEnd.parentNode.insertBefore( intro, headerEnd.nextSibling );
+	}
+
 	var card = document.getElementById( 'af-share-card' );
 
 	if ( card ) {
@@ -130,31 +137,154 @@
 
 			generateBtn.addEventListener( 'click', function () {
 				generateBtn.disabled = true;
-				post( 'af_catalog_share_generate', { rotate: '0' } ).then( function ( json ) {
+				post( 'af_catalog_share_generate', { slug: slugInput ? slugInput.value : '' } ).then( function ( json ) {
 					generateBtn.disabled = false;
 					if ( ! json || ! json.success ) {
-						flash( errorOf( json ), true );
+						showSlugError( json );
 						return;
 					}
+					applySaved( json.data );
 					showUrl( json.data.url );
 					flash( json.data.message, false );
 				} );
 			} );
 		}
 
-		var rotateBtn = document.getElementById( 'af-share-rotate' );
-		if ( rotateBtn ) {
-			rotateBtn.addEventListener( 'click', function () {
-				if ( ! window.confirm( '¿Regenerar el enlace? El enlace actual dejará de funcionar.' ) ) {
-					return;
-				}
-				rotateBtn.disabled = true;
-				post( 'af_catalog_share_generate', { rotate: '1' } ).then( function ( json ) {
-					rotateBtn.disabled = false;
-					if ( ! json || ! json.success ) {
-						flash( errorOf( json ), true );
+		/* --------------------------- Short name (slug) --------------------------- */
+
+		var slugInput = document.getElementById( 'af-share-slug' );
+		var slugMsg = document.getElementById( 'af-slug-msg' );
+		var slugSuggest = document.getElementById( 'af-slug-suggest' );
+		var slugSave = document.getElementById( 'af-share-slug-save' );
+		var checkTimer = null;
+		var checkSeq = 0;
+
+		function isActive() {
+			return card.getAttribute( 'data-active' ) === '1';
+		}
+
+		function savedSlug() {
+			return card.getAttribute( 'data-saved-slug' ) || '';
+		}
+
+		function setSlugMsg( text, state ) {
+			if ( ! slugMsg ) {
+				return;
+			}
+			slugMsg.textContent = text || '';
+			slugMsg.className = 'af-slug__msg' + ( state ? ' is-' + state : '' );
+			card.classList.toggle( 'has-slug-error', 'error' === state );
+		}
+
+		function renderSuggestions( list ) {
+			if ( ! slugSuggest ) {
+				return;
+			}
+			slugSuggest.innerHTML = '';
+			if ( ! list || ! list.length ) {
+				slugSuggest.hidden = true;
+				return;
+			}
+			var label = document.createElement( 'span' );
+			label.textContent = t( 'tryThese', 'Prueba con:' );
+			slugSuggest.appendChild( label );
+			list.forEach( function ( value ) {
+				var chip = document.createElement( 'button' );
+				chip.type = 'button';
+				chip.className = 'af-slug__chip';
+				chip.textContent = value;
+				chip.addEventListener( 'click', function () {
+					slugInput.value = value;
+					slugInput.focus();
+					onSlugInput();
+				} );
+				slugSuggest.appendChild( chip );
+			} );
+			slugSuggest.hidden = false;
+		}
+
+		function showSlugError( json ) {
+			setSlugMsg( errorOf( json ), 'error' );
+			renderSuggestions( json && json.data ? json.data.suggestions : [] );
+		}
+
+		function applySaved( data ) {
+			card.setAttribute( 'data-active', '1' );
+			card.setAttribute( 'data-saved-slug', data.slug || '' );
+			if ( slugInput && data.slug ) {
+				slugInput.value = data.slug;
+			}
+			if ( slugSave ) {
+				slugSave.hidden = true;
+			}
+			setSlugMsg( '', '' );
+			renderSuggestions( [] );
+		}
+
+		function onSlugInput() {
+			var value = slugInput.value.trim().toLowerCase();
+			var changed = value !== savedSlug();
+
+			if ( slugSave ) {
+				slugSave.hidden = ! ( isActive() && changed );
+			}
+			renderSuggestions( [] );
+
+			if ( checkTimer ) {
+				clearTimeout( checkTimer );
+			}
+			if ( ! changed ) {
+				setSlugMsg( '', '' );
+				return;
+			}
+
+			setSlugMsg( t( 'checking', 'Comprobando…' ), '' );
+			checkTimer = setTimeout( function () {
+				var seq = ++checkSeq;
+				post( 'af_catalog_share_slug', { slug: value, check: '1' } ).then( function ( json ) {
+					if ( seq !== checkSeq ) {
 						return;
 					}
+					if ( ! json || ! json.success ) {
+						showSlugError( json );
+						return;
+					}
+					if ( json.data.slug && json.data.slug !== value ) {
+						slugInput.value = json.data.slug;
+					}
+					setSlugMsg( '✓ ' + json.data.message, 'ok' );
+				} );
+			}, 400 );
+		}
+
+		if ( slugInput ) {
+			slugInput.addEventListener( 'input', onSlugInput );
+			slugInput.addEventListener( 'keydown', function ( e ) {
+				if ( 'Enter' !== e.key ) {
+					return;
+				}
+				e.preventDefault();
+				if ( isActive() && slugSave && ! slugSave.hidden ) {
+					slugSave.click();
+				} else if ( ! isActive() && generateBtn ) {
+					generateBtn.click();
+				}
+			} );
+		}
+
+		if ( slugSave ) {
+			slugSave.addEventListener( 'click', function () {
+				if ( ! window.confirm( t( 'slugChange', 'El enlace anterior dejará de funcionar. ¿Guardar el nuevo nombre?' ) ) ) {
+					return;
+				}
+				slugSave.disabled = true;
+				post( 'af_catalog_share_slug', { slug: slugInput.value } ).then( function ( json ) {
+					slugSave.disabled = false;
+					if ( ! json || ! json.success ) {
+						showSlugError( json );
+						return;
+					}
+					applySaved( json.data );
 					showUrl( json.data.url );
 					flash( json.data.message, false );
 				} );
@@ -204,6 +334,8 @@
 						return;
 					}
 					showEmpty();
+					card.setAttribute( 'data-active', '0' );
+					card.setAttribute( 'data-saved-slug', '' );
 					flash( json.data.message, false );
 				} );
 			} );
@@ -225,13 +357,13 @@
 
 	var groupList = document.getElementById( 'af-cs-group-list' );
 
-	if ( groupList ) {
+	if ( groupList || document.querySelector( '[data-af-cs-include], [data-af-cs-assign]' ) ) {
 		initGroups( groupList );
 	}
 
 	function initGroups( list ) {
-		var ownerId = list.getAttribute( 'data-owner-id' ) || '0';
-		var status = document.getElementById( 'af-cs-group-status' );
+		var ownerId = list ? ( list.getAttribute( 'data-owner-id' ) || '0' ) : '0';
+		var status = document.getElementById( 'af-cs-group-status' ) || document.getElementById( 'af-share-status' );
 		var newBtn = document.getElementById( 'af-cs-group-new' );
 		var timer = null;
 
@@ -390,6 +522,9 @@
 		}
 
 		function refresh() {
+			if ( ! list ) {
+				return;
+			}
 			post( 'af_catalog_share_stats', { owner_id: ownerId } ).then( function ( json ) {
 				if ( ! json || ! json.success ) {
 					return;
@@ -466,5 +601,8 @@
 				} );
 			} );
 		} );
+
+		// Server-rendered chips have no handlers yet; repaint wires them.
+		refresh();
 	}
 }() );

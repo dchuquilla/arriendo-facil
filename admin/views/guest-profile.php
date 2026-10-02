@@ -630,7 +630,6 @@ if ( $can_manage ) {
 								<th><?php esc_html_e( 'Vigencia', 'arriendo-facil' ); ?></th>
 								<th><?php esc_html_e( 'Canon', 'arriendo-facil' ); ?></th>
 								<th><?php esc_html_e( 'Estado', 'arriendo-facil' ); ?></th>
-								<th><?php esc_html_e( 'Estado de cuenta', 'arriendo-facil' ); ?></th>
 							</tr>
 						</thead>
 						<tbody>
@@ -643,9 +642,6 @@ if ( $can_manage ) {
 									<td data-label="<?php esc_attr_e( 'Vigencia', 'arriendo-facil' ); ?>"><?php echo esc_html( $lease_row->start_date . ' → ' . $lease_row->end_date ); ?></td>
 									<td data-label="<?php esc_attr_e( 'Canon', 'arriendo-facil' ); ?>">$<?php echo esc_html( number_format_i18n( (float) $lease_row->monthly_rent, 2 ) ); ?></td>
 									<td data-label="<?php esc_attr_e( 'Estado', 'arriendo-facil' ); ?>"><span class="af-pill af-pill--<?php echo esc_attr( $status_variant ); ?>"><?php echo esc_html( ucfirst( $lease_row->status ) ); ?></span></td>
-									<td data-label="<?php esc_attr_e( 'Estado de cuenta', 'arriendo-facil' ); ?>">
-										<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-collections&statement_lease=' . (int) $lease_row->id ) ); ?>"><?php esc_html_e( 'Ver estado de cuenta', 'arriendo-facil' ); ?></a>
-									</td>
 								</tr>
 							<?php endforeach; ?>
 						</tbody>

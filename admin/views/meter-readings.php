@@ -36,7 +36,6 @@ $period_ts      = gmmktime( 0, 0, 0, $month, 1, $year );
 $current_period = current_time( 'Y-m' );
 $prev_period    = gmdate( 'Y-m', gmmktime( 0, 0, 0, $month - 1, 1, $year ) );
 $next_period    = gmdate( 'Y-m', gmmktime( 0, 0, 0, $month + 1, 1, $year ) );
-$days_in_month  = (int) gmdate( 't', $period_ts );
 $base_url       = admin_url( 'admin.php?page=af-meter-readings' );
 $soon_days      = (int) $ledger::SERVICE_DUE_SOON_DAYS;
 
@@ -117,7 +116,6 @@ foreach ( array_keys( $bucket_meta ) as $bucket_key ) {
 
 $groups         = array();
 $paused         = array();
-$timeline       = array();
 $configured_map = array();
 $active_count   = 0;
 $today_ts       = strtotime( $today );
@@ -169,20 +167,6 @@ foreach ( $rows as $row ) {
 
 	if ( ! $row['unit_id'] ) {
 		$configured_map[ $row['accommodation_id'] ][] = $row['service'];
-	}
-
-	if ( $row['due_date'] && substr( $row['due_date'], 0, 7 ) === $period ) {
-		$due_day_num = (int) substr( $row['due_date'], 8, 2 );
-		if ( ! isset( $timeline[ $due_day_num ] ) ) {
-			$timeline[ $due_day_num ] = array(
-				'count'  => 0,
-				'bucket' => $bucket,
-			);
-		}
-		++$timeline[ $due_day_num ]['count'];
-		if ( $bucket_rank[ $bucket ] < $bucket_rank[ $timeline[ $due_day_num ]['bucket'] ] ) {
-			$timeline[ $due_day_num ]['bucket'] = $bucket;
-		}
 	}
 }
 
@@ -340,41 +324,10 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 		<?php endforeach; ?>
 	</div>
 
-	<section class="af-sp-calendar" aria-labelledby="af-sp-calendar-title">
-		<header class="af-sp-calendar__head">
-			<h2 id="af-sp-calendar-title"><?php esc_html_e( 'Calendario de vencimientos', 'arriendo-facil' ); ?></h2>
-			<div class="af-sp-legend" aria-hidden="true">
-				<?php foreach ( $bucket_meta as $bucket_key => $bucket_info ) : ?>
-					<span class="af-sp-legend__item is-<?php echo esc_attr( $bucket_key ); ?>"><?php echo esc_html( $bucket_info['tag'] ); ?></span>
-				<?php endforeach; ?>
-			</div>
-			<button type="button" class="af-sp-link" id="af-sp-clear-day" hidden><?php esc_html_e( 'Ver todo el mes', 'arriendo-facil' ); ?></button>
-		</header>
-		<div class="af-sp-days">
-			<?php for ( $d = 1; $d <= $days_in_month; $d++ ) : ?>
-				<?php
-				$day_ts   = gmmktime( 0, 0, 0, $month, $d, $year );
-				$day_info = isset( $timeline[ $d ] ) ? $timeline[ $d ] : null;
-				$classes  = 'af-sp-day';
-				if ( $day_info ) {
-					$classes .= ' has-due is-' . $day_info['bucket'];
-				}
-				if ( $period === $current_period && (int) current_time( 'j' ) === $d ) {
-					$classes .= ' is-today';
-				}
-				$day_label = date_i18n( 'l j', $day_ts );
-				if ( $day_info ) {
-					/* translators: 1: day label, 2: count */
-					$day_label = sprintf( _n( '%1$s: %2$d servicio vence', '%1$s: %2$d servicios vencen', $day_info['count'], 'arriendo-facil' ), $day_label, $day_info['count'] );
-				}
-				?>
-				<button type="button" class="<?php echo esc_attr( $classes ); ?>" data-day="<?php echo esc_attr( (string) $d ); ?>" aria-pressed="false" aria-label="<?php echo esc_attr( $day_label ); ?>" <?php disabled( null === $day_info ); ?>>
-					<span class="af-sp-day__dow"><?php echo esc_html( mb_substr( date_i18n( 'D', $day_ts ), 0, 2 ) ); ?></span>
-					<span class="af-sp-day__num"><?php echo esc_html( (string) $d ); ?></span>
-					<span class="af-sp-day__dot"><?php echo $day_info && $day_info['count'] > 1 ? esc_html( (string) $day_info['count'] ) : ''; ?></span>
-				</button>
-			<?php endfor; ?>
-		</div>
+	<section class="af-sp-calendar-link">
+		<?php echo af_lucide( 'calendar', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+		<span><?php esc_html_e( 'Los vencimientos de servicios ahora se ven junto a visitas, mudanzas y salidas en el calendario unificado.', 'arriendo-facil' ); ?></span>
+		<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-calendar&af_date_from=' . $period . '-01&af_date_to=' . gmdate( 'Y-m-t', $period_ts ) ) ); ?>"><?php esc_html_e( 'Abrir calendario →', 'arriendo-facil' ); ?></a>
 	</section>
 
 	<?php if ( empty( $groups ) ) : ?>
@@ -496,7 +449,7 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 									) . '&af_aviso_type=cobro'
 								);
 								?>
-								<article class="af-sp-tile is-<?php echo esc_attr( $row['bucket'] ); ?>" data-bucket="<?php echo esc_attr( $row['bucket'] ); ?>" data-service="<?php echo esc_attr( $row['service'] ); ?>" data-day="<?php echo esc_attr( $row['due_date'] && substr( $row['due_date'], 0, 7 ) === $period ? (string) (int) substr( $row['due_date'], 8, 2 ) : '' ); ?>">
+								<article class="af-sp-tile is-<?php echo esc_attr( $row['bucket'] ); ?>" data-bucket="<?php echo esc_attr( $row['bucket'] ); ?>" data-service="<?php echo esc_attr( $row['service'] ); ?>">
 									<div class="af-sp-tile__top">
 										<span class="af-sp-icon af-sp-icon--<?php echo esc_attr( $row['service'] ); ?>" aria-hidden="true"><?php echo af_lucide( $icon_key, 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
 										<div class="af-sp-tile__name">
@@ -904,9 +857,8 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 	// ---- Filtros del tablero ----
 	const board = document.getElementById('af-sp-board');
 	const noResults = document.getElementById('af-sp-noresults');
-	const clearDay = document.getElementById('af-sp-clear-day');
 	const searchInput = document.getElementById('af-sp-search');
-	const state = { bucket: 'all', service: '', day: '', q: '' };
+	const state = { bucket: 'all', service: '', q: '' };
 
 	function norm(value) {
 		return (value || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
@@ -921,10 +873,9 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 	}
 
 	function applyFilters() {
-		if (clearDay) { clearDay.hidden = !state.day; }
 		if (!board) { return; }
 
-		const filtering = state.bucket !== 'all' || state.service !== '' || state.day !== '';
+		const filtering = state.bucket !== 'all' || state.service !== '';
 		let shown = 0;
 
 		board.querySelectorAll('.af-sp-property').forEach(function (card) {
@@ -934,8 +885,7 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 			card.querySelectorAll('.af-sp-tile[data-bucket]').forEach(function (tile) {
 				const ok = textOk
 					&& (state.bucket === 'all' || tile.getAttribute('data-bucket') === state.bucket)
-					&& (!state.service || tile.getAttribute('data-service') === state.service)
-					&& (!state.day || tile.getAttribute('data-day') === state.day);
+					&& (!state.service || tile.getAttribute('data-service') === state.service);
 				tile.hidden = !ok;
 				if (ok) { tiles++; }
 			});
@@ -968,25 +918,6 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 		});
 	});
 
-	const days = Array.prototype.slice.call(document.querySelectorAll('.af-sp-day'));
-	days.forEach(function (dayBtn) {
-		dayBtn.addEventListener('click', function () {
-			const value = dayBtn.getAttribute('data-day');
-			state.day = state.day === value ? '' : value;
-			setPressed(days, state.day ? dayBtn : null);
-			applyFilters();
-			if (state.day && board) { board.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
-		});
-	});
-
-	if (clearDay) {
-		clearDay.addEventListener('click', function () {
-			state.day = '';
-			setPressed(days, null);
-			applyFilters();
-		});
-	}
-
 	if (searchInput) {
 		searchInput.addEventListener('input', function () {
 			state.q = norm(searchInput.value);
@@ -997,11 +928,10 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 	const resetButton = document.getElementById('af-sp-reset');
 	if (resetButton) {
 		resetButton.addEventListener('click', function () {
-			state.bucket = 'all'; state.service = ''; state.day = ''; state.q = '';
+			state.bucket = 'all'; state.service = ''; state.q = '';
 			if (searchInput) { searchInput.value = ''; }
 			setPressed(tabs, tabs[0]);
 			setPressed(chips, chips[0]);
-			setPressed(days, null);
 			applyFilters();
 		});
 	}

@@ -41,11 +41,8 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 	const GATED_SLUGS = array(
 		'af-catalog',
 		'af-leases',
-		'af-upcoming-exits',
 		'af-buildings',
-		'af-collections',
 		'af-meter-readings',
-		'af-owner-settlements',
 		'af-maintenance',
 		'af-cleaning-requests',
 		'af-owner-contacts',

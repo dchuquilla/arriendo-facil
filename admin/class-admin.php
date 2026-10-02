@@ -45,6 +45,29 @@ class Arriendo_Facil_Admin {
 		add_filter( 'wp_authenticate_user', array( $this, 'block_suspended_property_admin_login' ), 10, 2 );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
 		add_action( 'admin_notices', array( $this, 'pandoc_notice' ) );
+		add_action( 'admin_page_access_denied', array( $this, 'redirect_retired_pages' ) );
+	}
+
+	/**
+	 * Sends bookmarks and stored alert links of retired modules to the page
+	 * that now holds that information instead of an access-denied screen.
+	 *
+	 * @return void
+	 */
+	public function redirect_retired_pages() {
+		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+
+		$targets = array(
+			'af-upcoming-exits'    => 'af-calendar',
+			'af-cobros'            => 'af-meter-readings',
+			'af-collections'       => 'af-buildings',
+			'af-owner-settlements' => 'af-buildings',
+		);
+
+		if ( isset( $targets[ $page ] ) && current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
+			wp_safe_redirect( admin_url( 'admin.php?page=' . $targets[ $page ] ) );
+			exit;
+		}
 	}
 
 	/**
@@ -115,38 +138,11 @@ class Arriendo_Facil_Admin {
 
 		add_submenu_page(
 			'arriendo-facil',
-			__( 'Próximas salidas', 'arriendo-facil' ),
-			__( 'Próximas salidas', 'arriendo-facil' ),
-			Arriendo_Facil_Tenancy::CAP,
-			'af-upcoming-exits',
-			array( $this, 'render_upcoming_exits' )
-		);
-
-		add_submenu_page(
-			'arriendo-facil',
-			__( 'Cobros y Servicios', 'arriendo-facil' ),
-			__( 'Cobros y Servicios', 'arriendo-facil' ),
-			Arriendo_Facil_Tenancy::CAP,
-			'af-cobros',
-			array( $this, 'render_cobros' )
-		);
-
-		add_submenu_page(
-			'arriendo-facil',
 			__( 'Cobranza de inmuebles', 'arriendo-facil' ),
 			__( 'Cobranza de inmuebles', 'arriendo-facil' ),
 			Arriendo_Facil_Tenancy::CAP,
 			'af-buildings',
 			array( $this, 'render_buildings' )
-		);
-
-		add_submenu_page(
-			'arriendo-facil',
-			__( 'Control de pagos', 'arriendo-facil' ),
-			__( 'Control de pagos', 'arriendo-facil' ),
-			Arriendo_Facil_Tenancy::CAP,
-			'af-collections',
-			array( $this, 'render_collections' )
 		);
 
 		add_submenu_page(
@@ -174,15 +170,6 @@ class Arriendo_Facil_Admin {
 			Arriendo_Facil_Tenancy::CAP,
 			'af-avisos',
 			array( $this, 'render_avisos' )
-		);
-
-		add_submenu_page(
-			'arriendo-facil',
-			__( 'Liquidación al propietario', 'arriendo-facil' ),
-			__( 'Liquidaciones', 'arriendo-facil' ),
-			Arriendo_Facil_Tenancy::CAP,
-			'af-owner-settlements',
-			array( $this, 'render_owner_settlements' )
 		);
 
 		add_submenu_page(
@@ -784,42 +771,6 @@ array(
 			'cap'   => 'edit_posts',
 			'gate'  => true,
 		),
-		array(
-			'slug'  => 'af-upcoming-exits',
-			'label' => __( 'Próximas salidas', 'arriendo-facil' ),
-			'url'   => admin_url( 'admin.php?page=af-upcoming-exits' ),
-			'icon'  => 'calendar',
-			'group' => 'contratos',
-			'cap'   => Arriendo_Facil_Tenancy::CAP,
-			'gate'  => true,
-		),
-			array(
-				'slug'  => 'af-cobros',
-				'label' => __( 'Cobros y Servicios', 'arriendo-facil' ),
-				'url'   => admin_url( 'admin.php?page=af-cobros' ),
-				'icon'  => 'circle-alert',
-				'group' => 'pagos',
-				'cap'   => Arriendo_Facil_Tenancy::CAP,
-				'gate'  => true,
-			),
-			array(
-				'slug'  => 'af-collections',
-				'label' => __( 'Pagos y dispersión', 'arriendo-facil' ),
-				'url'   => admin_url( 'admin.php?page=af-collections' ),
-				'icon'  => 'credit-card',
-				'group' => 'pagos',
-				'cap'   => Arriendo_Facil_Tenancy::CAP,
-				'gate'  => true,
-			),
-			array(
-				'slug'  => 'af-owner-settlements',
-				'label' => __( 'Liquidaciones', 'arriendo-facil' ),
-				'url'   => admin_url( 'admin.php?page=af-owner-settlements' ),
-				'icon'  => 'wallet',
-				'group' => 'pagos',
-				'cap'   => Arriendo_Facil_Tenancy::CAP,
-				'gate'  => true,
-			),
 			array(
 				'slug'  => 'af-maintenance',
 				'label' => __( 'Mantenimiento', 'arriendo-facil' ),
@@ -1825,20 +1776,6 @@ array(
 	}
 
 	/**
-	 * Renders the collections (cobranza) admin page.
-	 */
-	public function render_collections() {
-		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/collections.php';
-	}
-
-	/**
-	 * Renders contract expirations, renewal context and deposit settlement.
-	 */
-	public function render_upcoming_exits() {
-		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/upcoming-exits.php';
-	}
-
-	/**
 	 * Renders the buildings and units admin page.
 	 */
 	public function render_buildings() {
@@ -1864,20 +1801,6 @@ array(
 	 */
 	public function render_avisos() {
 		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/avisos.php';
-	}
-
-	/**
-	 * Renders the collections & services hub (cobros) admin page.
-	 */
-	public function render_cobros() {
-		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/cobros.php';
-	}
-
-	/**
-	 * Renders the owner settlements admin page.
-	 */
-	public function render_owner_settlements() {
-		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/owner-settlements.php';
 	}
 
 	/**

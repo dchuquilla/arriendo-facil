@@ -16,6 +16,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 $cal_base_year  = (int) gmdate( 'Y', strtotime( $calendar_month_anchor ) );
 $cal_base_month = (int) gmdate( 'n', strtotime( $calendar_month_anchor ) );
+$cal_types      = array(
+	'visit'    => __( 'Visitas', 'arriendo-facil' ),
+	'checkin'  => __( 'Mudanzas', 'arriendo-facil' ),
+	'checkout' => __( 'Salidas', 'arriendo-facil' ),
+	'service'  => __( 'Servicios', 'arriendo-facil' ),
+	'block'    => __( 'Bloqueos', 'arriendo-facil' ),
+);
+$cal_leases     = Arriendo_Facil_Calendar::lease_options( Arriendo_Facil_Tenancy::accessible_accommodation_ids() );
 ?>
 <div class="af-cal" id="af-interactive-calendar" data-year="<?php echo esc_attr( $cal_base_year ); ?>" data-month="<?php echo esc_attr( $cal_base_month ); ?>">
 	<div class="af-cal__grid-wrap">
@@ -26,11 +34,10 @@ $cal_base_month = (int) gmdate( 'n', strtotime( $calendar_month_anchor ) );
 				<button type="button" class="af-cal__today" id="af-cal-today"><?php esc_html_e( 'Hoy', 'arriendo-facil' ); ?></button>
 				<button type="button" id="af-cal-next" aria-label="<?php esc_attr_e( 'Mes siguiente', 'arriendo-facil' ); ?>">›</button>
 			</span>
-			<span class="af-cal__legend">
-				<span><i style="background:#eef4ff;"></i><?php esc_html_e( 'Visita', 'arriendo-facil' ); ?></span>
-				<span><i style="background:#e7f6ec;"></i><?php esc_html_e( 'Check-in', 'arriendo-facil' ); ?></span>
-				<span><i style="background:#fff4ed;"></i><?php esc_html_e( 'Check-out', 'arriendo-facil' ); ?></span>
-				<span><i style="background:#f2f4f7;"></i><?php esc_html_e( 'Bloqueado', 'arriendo-facil' ); ?></span>
+			<span class="af-cal__legend" role="group" aria-label="<?php esc_attr_e( 'Mostrar u ocultar tipos de evento', 'arriendo-facil' ); ?>">
+				<?php foreach ( $cal_types as $cal_type => $cal_type_label ) : ?>
+					<button type="button" class="af-cal__toggle af-cal__toggle--<?php echo esc_attr( $cal_type ); ?>" data-cal-toggle="<?php echo esc_attr( $cal_type ); ?>" aria-pressed="true"><i aria-hidden="true"></i><?php echo esc_html( $cal_type_label ); ?></button>
+				<?php endforeach; ?>
 			</span>
 		</div>
 		<div class="af-cal__week">
@@ -43,7 +50,7 @@ $cal_base_month = (int) gmdate( 'n', strtotime( $calendar_month_anchor ) );
 			<span><?php esc_html_e( 'Dom', 'arriendo-facil' ); ?></span>
 		</div>
 		<div class="af-cal__grid" id="af-cal-grid" role="grid" aria-label="<?php esc_attr_e( 'Calendario interactivo', 'arriendo-facil' ); ?>"></div>
-		<p class="af-td-meta" style="margin-top:10px;"><?php esc_html_e( 'Haz clic en un día para ver sus eventos, agendar una visita o bloquear disponibilidad.', 'arriendo-facil' ); ?></p>
+		<p class="af-td-meta" style="margin-top:10px;"><?php esc_html_e( 'Haz clic en un día para ver sus eventos, agendar una visita, registrar una mudanza o bloquear disponibilidad.', 'arriendo-facil' ); ?></p>
 	</div>
 
 	<aside class="af-cal__drawer" aria-live="polite">
@@ -54,6 +61,7 @@ $cal_base_month = (int) gmdate( 'n', strtotime( $calendar_month_anchor ) );
 		<div class="af-cal__drawer-body" id="af-cal-drawer-body"></div>
 		<div class="af-cal__drawer-actions" id="af-cal-drawer-actions" style="visibility:hidden;">
 			<button type="button" class="button af-btn af-btn--primary" data-cal-add><?php esc_html_e( '+ Visita', 'arriendo-facil' ); ?></button>
+			<button type="button" class="button af-btn af-btn--primary" data-cal-move><?php esc_html_e( '+ Mudanza', 'arriendo-facil' ); ?></button>
 			<button type="button" class="button af-btn button--danger" data-cal-block><?php esc_html_e( 'Bloquear día', 'arriendo-facil' ); ?></button>
 		</div>
 	</aside>
@@ -74,8 +82,31 @@ $cal_base_month = (int) gmdate( 'n', strtotime( $calendar_month_anchor ) );
 					<label for="af-cal-action-type"><?php esc_html_e( 'Acción', 'arriendo-facil' ); ?></label>
 					<select id="af-cal-action-type">
 						<option value="visit"><?php esc_html_e( 'Agendar visita', 'arriendo-facil' ); ?></option>
+						<option value="move"><?php esc_html_e( 'Registrar mudanza (check-in)', 'arriendo-facil' ); ?></option>
 						<option value="block"><?php esc_html_e( 'Bloquear disponibilidad', 'arriendo-facil' ); ?></option>
 					</select>
+				</div>
+				<div class="af-modal__field" id="af-cal-date-field">
+					<label for="af-cal-date"><?php esc_html_e( 'Fecha', 'arriendo-facil' ); ?></label>
+					<input type="date" id="af-cal-date" min="<?php echo esc_attr( wp_date( 'Y-m-d' ) ); ?>" />
+				</div>
+				<div class="af-modal__field" id="af-cal-lease-field" hidden>
+					<label for="af-cal-lease"><?php esc_html_e( 'Contrato (recomendado)', 'arriendo-facil' ); ?></label>
+					<select id="af-cal-lease">
+						<option value=""><?php esc_html_e( 'Sin contrato — completar a mano', 'arriendo-facil' ); ?></option>
+						<?php foreach ( $cal_leases as $cal_lease ) : ?>
+							<?php $cal_lease_guest = trim( (string) $cal_lease->guest_name ); ?>
+							<option
+								value="<?php echo esc_attr( (int) $cal_lease->id ); ?>"
+								data-accommodation="<?php echo esc_attr( (int) $cal_lease->accommodation_id ); ?>"
+								data-name="<?php echo esc_attr( $cal_lease_guest ); ?>"
+								data-phone="<?php echo esc_attr( (string) $cal_lease->guest_phone ); ?>"
+								data-email="<?php echo esc_attr( (string) $cal_lease->guest_email ); ?>"
+								data-start="<?php echo esc_attr( (string) $cal_lease->start_date ); ?>"
+							><?php echo esc_html( sprintf( '%1$s — %2$s (%3$s)', $cal_lease_guest ? $cal_lease_guest : __( 'Inquilino', 'arriendo-facil' ), $cal_lease->accommodation_title ? $cal_lease->accommodation_title : '#' . (int) $cal_lease->accommodation_id, wp_date( 'd/m/Y', strtotime( (string) $cal_lease->start_date ) ) ) ); ?></option>
+						<?php endforeach; ?>
+					</select>
+					<p class="af-modal__hint"><?php esc_html_e( 'Al elegir un contrato se completan el inmueble, el inquilino y su contacto.', 'arriendo-facil' ); ?></p>
 				</div>
 				<div class="af-modal__field">
 					<label for="af-cal-accommodation"><?php esc_html_e( 'Inmueble', 'arriendo-facil' ); ?></label>
@@ -119,6 +150,43 @@ $cal_base_month = (int) gmdate( 'n', strtotime( $calendar_month_anchor ) );
 					<div class="af-modal__field">
 						<label for="af-cal-visit-notes"><?php esc_html_e( 'Notas (opcional)', 'arriendo-facil' ); ?></label>
 						<textarea id="af-cal-visit-notes" rows="2"></textarea>
+					</div>
+				</div>
+				<div id="af-cal-move-fields" style="display:none;">
+					<div class="af-modal__field">
+						<label for="af-cal-move-name"><?php esc_html_e( 'Quién se muda', 'arriendo-facil' ); ?></label>
+						<input type="text" id="af-cal-move-name" autocomplete="off" />
+					</div>
+					<div class="af-modal__field" style="display:grid; grid-template-columns:1fr 1fr; gap:10px; align-items:end;">
+						<div>
+							<label for="af-cal-move-start"><?php esc_html_e( 'Desde', 'arriendo-facil' ); ?></label>
+							<input type="time" id="af-cal-move-start" value="09:00" />
+						</div>
+						<div>
+							<label for="af-cal-move-end"><?php esc_html_e( 'Hasta', 'arriendo-facil' ); ?></label>
+							<input type="time" id="af-cal-move-end" value="12:00" />
+						</div>
+					</div>
+					<div class="af-modal__field" style="display:grid; grid-template-columns:1fr 1fr; gap:10px; align-items:end;">
+						<div>
+							<label for="af-cal-move-phone"><?php esc_html_e( 'Teléfono', 'arriendo-facil' ); ?></label>
+							<input type="tel" id="af-cal-move-phone" />
+						</div>
+						<div>
+							<label for="af-cal-move-email"><?php esc_html_e( 'Email', 'arriendo-facil' ); ?></label>
+							<input type="email" id="af-cal-move-email" />
+						</div>
+					</div>
+					<fieldset class="af-modal__field af-cal__tasks">
+						<legend><?php esc_html_e( 'Lista de entrega', 'arriendo-facil' ); ?></legend>
+						<?php foreach ( Arriendo_Facil_Calendar::move_tasks() as $cal_task_key => $cal_task_label ) : ?>
+							<label class="af-cal__task"><input type="checkbox" name="af-cal-move-task" value="<?php echo esc_attr( $cal_task_key ); ?>" checked /> <?php echo esc_html( $cal_task_label ); ?></label>
+						<?php endforeach; ?>
+						<p class="af-modal__hint"><?php esc_html_e( 'Podrás marcar cada tarea como hecha desde el día de la mudanza.', 'arriendo-facil' ); ?></p>
+					</fieldset>
+					<div class="af-modal__field">
+						<label for="af-cal-move-notes"><?php esc_html_e( 'Notas (opcional)', 'arriendo-facil' ); ?></label>
+						<textarea id="af-cal-move-notes" rows="2" placeholder="<?php esc_attr_e( 'p. ej. camión de mudanza, parqueadero reservado…', 'arriendo-facil' ); ?>"></textarea>
 					</div>
 				</div>
 				<div id="af-cal-block-fields" style="display:none;">

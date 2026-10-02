@@ -449,6 +449,21 @@
 	gap: var(--af-space-2);
 }
 
+.af-calendar-col__cta {
+	margin-top: auto;
+	justify-content: center;
+}
+
+.af-calendar-col .af-exit-row {
+	flex-wrap: wrap;
+}
+
+.af-exit-row__actions {
+	display: flex;
+	gap: var(--af-space-3);
+	flex-basis: 100%;
+}
+
 /* ── Contratos por vencer: buckets 30/60/90 ──────────────────────────────── */
 
 .af-schedule__buckets {

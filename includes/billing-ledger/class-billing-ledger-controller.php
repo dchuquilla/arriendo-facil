@@ -24,10 +24,7 @@ class Arriendo_Facil_Billing_Ledger_Controller {
 		add_action( 'wp_ajax_af_record_payment', array( $this, 'ajax_record_payment' ) );
 		add_action( 'wp_ajax_af_cobranza_snapshot', array( $this, 'ajax_cobranza_snapshot' ) );
 		add_action( 'wp_ajax_af_create_charge', array( $this, 'ajax_create_charge' ) );
-		add_action( 'wp_ajax_af_generate_period_charges', array( $this, 'ajax_generate_period_charges' ) );
-		add_action( 'wp_ajax_af_record_meter_reading', array( $this, 'ajax_record_meter_reading' ) );
 		add_action( 'wp_ajax_af_delete_meter_reading', array( $this, 'ajax_delete_meter_reading' ) );
-		add_action( 'wp_ajax_af_void_charge', array( $this, 'ajax_void_charge' ) );
 		add_action( 'wp_ajax_af_save_service_schedule', array( $this, 'ajax_save_service_schedule' ) );
 		add_action( 'wp_ajax_af_delete_service_schedule', array( $this, 'ajax_delete_service_schedule' ) );
 		add_action( 'wp_ajax_af_generate_service_charges', array( $this, 'ajax_generate_service_charges' ) );
@@ -139,90 +136,6 @@ class Arriendo_Facil_Billing_Ledger_Controller {
 	}
 
 	/**
-	 * AJAX: generates canon + alicuota charges for a period.
-	 *
-	 * @return void
-	 */
-	public function ajax_generate_period_charges() {
-		check_ajax_referer( 'af_ledger_nonce', 'nonce' );
-
-		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
-			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
-		}
-
-		$period = isset( $_POST['period'] ) ? sanitize_text_field( wp_unslash( $_POST['period'] ) ) : '';
-		$result = Arriendo_Facil_Billing_Ledger::generate_monthly_charges( $period, Arriendo_Facil_Tenancy::accessible_accommodation_ids() );
-
-		wp_send_json_success(
-			array(
-				'message' => sprintf(
-					/* translators: 1: created count, 2: skipped count */
-					__( '%1$d cargos creados, %2$d omitidos (ya existian).', 'arriendo-facil' ),
-					$result['created'],
-					$result['skipped']
-				),
-				'created' => $result['created'],
-				'skipped' => $result['skipped'],
-			)
-		);
-	}
-
-	/**
-	 * AJAX: records a meter reading.
-	 *
-	 * @return void
-	 */
-	public function ajax_record_meter_reading() {
-		check_ajax_referer( 'af_ledger_nonce', 'nonce' );
-
-		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
-			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
-		}
-
-		$unit_id          = isset( $_POST['unit_id'] ) ? absint( wp_unslash( $_POST['unit_id'] ) ) : 0;
-		$accommodation_id = isset( $_POST['accommodation_id'] ) ? absint( wp_unslash( $_POST['accommodation_id'] ) ) : 0;
-
-		if ( $unit_id ) {
-			if ( ! Arriendo_Facil_Tenancy::can_access_unit( $unit_id ) ) {
-				wp_send_json_error( array( 'message' => __( 'No tienes acceso a esta unidad.', 'arriendo-facil' ) ), 403 );
-			}
-		} elseif ( $accommodation_id ) {
-			if ( ! Arriendo_Facil_Tenancy::can_access_accommodation( $accommodation_id ) ) {
-				wp_send_json_error( array( 'message' => __( 'No tienes acceso a este inmueble.', 'arriendo-facil' ) ), 403 );
-			}
-		} else {
-			wp_send_json_error( array( 'message' => __( 'Selecciona una unidad o un inmueble.', 'arriendo-facil' ) ), 400 );
-		}
-
-		$result = Arriendo_Facil_Billing_Ledger::record_meter_reading(
-			array(
-				'unit_id'          => $unit_id,
-				'accommodation_id' => $accommodation_id,
-				'service'          => isset( $_POST['service'] ) ? sanitize_key( wp_unslash( $_POST['service'] ) ) : '',
-				'period'           => isset( $_POST['period'] ) ? sanitize_text_field( wp_unslash( $_POST['period'] ) ) : '',
-				'current_reading'  => isset( $_POST['current_reading'] ) ? (float) wp_unslash( $_POST['current_reading'] ) : 0,
-				'unit_rate'        => isset( $_POST['unit_rate'] ) ? (float) wp_unslash( $_POST['unit_rate'] ) : 0,
-			)
-		);
-
-		if ( is_wp_error( $result ) ) {
-			wp_send_json_error( array( 'message' => $result->get_error_message() ), 400 );
-		}
-
-		wp_send_json_success(
-			array(
-				'message' => $result['charge_id']
-					? sprintf(
-						/* translators: %s: billed amount */
-						__( 'Lectura guardada y cargo de $%s generado.', 'arriendo-facil' ),
-						number_format_i18n( $result['amount'], 2 )
-					)
-					: __( 'Lectura guardada. No hay contrato activo, no se genero cargo.', 'arriendo-facil' ),
-			)
-		);
-	}
-
-	/**
 	 * AJAX: deletes a meter reading (voiding its auto-generated charge when it
 	 * has no payments yet).
 	 *
@@ -264,32 +177,6 @@ class Arriendo_Facil_Billing_Ledger_Controller {
 		}
 
 		wp_send_json_success( array( 'message' => __( 'Lectura borrada y cargo asociado anulado.', 'arriendo-facil' ) ) );
-	}
-
-	/**
-	 * AJAX: voids a charge (only if it has no payments yet).
-	 *
-	 * @return void
-	 */
-	public function ajax_void_charge() {
-		check_ajax_referer( 'af_ledger_nonce', 'nonce' );
-
-		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
-			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
-		}
-
-		$charge_id = isset( $_POST['charge_id'] ) ? absint( wp_unslash( $_POST['charge_id'] ) ) : 0;
-		if ( ! Arriendo_Facil_Tenancy::can_access_charge( $charge_id ) ) {
-			wp_send_json_error( array( 'message' => __( 'No tienes acceso a este cargo.', 'arriendo-facil' ) ), 403 );
-		}
-
-		$result = Arriendo_Facil_Billing_Ledger::void_charge( $charge_id );
-
-		if ( is_wp_error( $result ) ) {
-			wp_send_json_error( array( 'message' => $result->get_error_message() ), 400 );
-		}
-
-		wp_send_json_success( array( 'message' => __( 'Cargo anulado correctamente.', 'arriendo-facil' ) ) );
 	}
 
 	/**

@@ -499,7 +499,7 @@ class Arriendo_Facil_Alerts {
 					$charge->period,
 					date_i18n( get_option( 'date_format' ), strtotime( (string) $charge->due_date ) )
 				),
-				admin_url( 'admin.php?page=af-collections&statement_lease=' . (int) $charge->lease_id ),
+				admin_url( 'admin.php?page=af-buildings' ),
 				'charge-overdue-' . (int) $charge->lease_id
 			);
 			$created++;

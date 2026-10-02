@@ -57,7 +57,10 @@
 		submitBtn: document.getElementById('af-cal-submit')
 	};
 
-	var SELECTED_DATE = null;
+	// Start on today (or the 1st of the shown month) so the agenda and its actions are visible right away.
+	var SELECTED_DATE = (STATE.year === today.getFullYear() && STATE.month === today.getMonth() + 1)
+		? todayStr
+		: STATE.year + '-' + pad(STATE.month) + '-01';
 	var dragIndicator = {
 		start: false
 	};
@@ -251,16 +254,17 @@
 			return;
 		}
 
-		el.drawerDate.textContent = SELECTED_DATE;
+		el.drawerDate.textContent = SELECTED_DATE === todayStr ? 'Hoy' : 'Día seleccionado';
 		el.drawerTitle.textContent = formatLongDate(SELECTED_DATE);
 
 		// Las fechas pasadas solo se pueden consultar, no programar.
 		var isPast = SELECTED_DATE < todayStr;
 		var pastNotice = isPast ? '<p class="af-cal__drawer-past">No se pueden programar visitas ni bloqueos en fechas pasadas.</p>' : '';
+		var hint = isPast ? '' : '<p class="af-cal__drawer-hint">Para programar en otra fecha, toca ese día en el calendario.</p>';
 
 		var evs = visibleEvents(SELECTED_DATE);
 		if (!evs.length) {
-			el.drawerBody.innerHTML = '<p class="af-cal__drawer-empty">Sin eventos programados para este día.</p>' + pastNotice;
+			el.drawerBody.innerHTML = '<p class="af-cal__drawer-empty">Sin eventos este día.' + (isPast ? '' : ' Usa los botones de abajo para agendar una visita, registrar una mudanza o bloquear el día.') + '</p>' + pastNotice + hint;
 		} else {
 			var html = '';
 			evs.forEach(function (ev) {
@@ -283,7 +287,7 @@
 				}
 				html += '</div>';
 			});
-			el.drawerBody.innerHTML = html + pastNotice;
+			el.drawerBody.innerHTML = html + pastNotice + hint;
 
 			Array.prototype.forEach.call(el.drawerBody.querySelectorAll('.af-cal__event-remove'), function (btn) {
 				btn.addEventListener('click', function () { removeEvent(btn.getAttribute('data-remove-type'), btn.getAttribute('data-remove-id')); });

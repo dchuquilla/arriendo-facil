@@ -104,10 +104,8 @@ $calendar_month_anchor = $calendar_from;
 		array(
 			'eyebrow'  => __( 'Operación', 'arriendo-facil' ),
 			'title'    => __( 'Calendario', 'arriendo-facil' ),
-			'subtitle' => __( 'Visitas, mudanzas, salidas de contratos, vencimientos de servicios y días bloqueados en un solo lugar. Selecciona un día para gestionarlo.', 'arriendo-facil' ),
+			'subtitle' => __( 'Visitas, mudanzas, salidas de contratos, vencimientos de servicios y días bloqueados en un solo lugar.', 'arriendo-facil' ),
 			'actions'  => array(
-				'<button type="button" class="button af-btn af-btn--primary" data-cal-open="move">' . af_lucide( 'plus', 16 ) . esc_html__( 'Registrar mudanza', 'arriendo-facil' ) . '</button>',
-				'<button type="button" class="button af-btn af-btn--ghost" data-cal-open="visit">' . af_lucide( 'user-plus', 16 ) . esc_html__( 'Agendar visita', 'arriendo-facil' ) . '</button>',
 				'<button type="button" class="button af-btn af-btn--ghost" data-prospects-open>' . af_lucide( 'users', 16 ) . esc_html__( 'Prospectos', 'arriendo-facil' )
 					. ( $prospects_pending ? ' <span class="af-prospect-badge" title="' . esc_attr__( 'Visitas sin resultado', 'arriendo-facil' ) . '">' . (int) $prospects_pending . '</span>' : '' ) . '</button>',
 			),

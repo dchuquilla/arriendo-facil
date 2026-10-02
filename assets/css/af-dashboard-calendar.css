@@ -467,6 +467,7 @@
 
 /* Status in modal -------------------------------------------------------- */
 .af-cal__status { margin: 0 0 14px; }
+.af-cal__drawer-hint { margin: 10px 0 0; font-size: 12px; color: var(--af-gray-500, #667085); }
 
 .af-cal__status.is-error { color: #b42318; }
 .af-cal__status.is-success { color: #027a48; }

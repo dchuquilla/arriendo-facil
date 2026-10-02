@@ -129,6 +129,87 @@ if ( ! function_exists( 'af_page_header' ) ) {
 	}
 }
 
+if ( ! function_exists( 'af_catalog_flow' ) ) {
+	/**
+	 * Three-step guide shared by Inmuebles and Catálogo: register → group → share.
+	 *
+	 * @param int $current Active step (1-3).
+	 */
+	function af_catalog_flow( $current ) {
+		$steps = array(
+			1 => array( __( 'Registra tus inmuebles', 'arriendo-facil' ), admin_url( 'edit.php?post_type=accommodation' ) ),
+			2 => array( __( 'Agrúpalos por edificio (opcional)', 'arriendo-facil' ), admin_url( 'edit.php?post_type=accommodation#af-groups' ) ),
+			3 => array( __( 'Comparte tu catálogo', 'arriendo-facil' ), admin_url( 'admin.php?page=af-catalog' ) ),
+		);
+		?>
+		<ol class="af-flow" aria-label="<?php esc_attr_e( 'Cómo funciona', 'arriendo-facil' ); ?>">
+			<?php foreach ( $steps as $n => $step ) : ?>
+				<li class="af-flow__step<?php echo $n === (int) $current ? ' is-current' : ''; ?>">
+					<a href="<?php echo esc_url( $step[1] ); ?>" <?php echo $n === (int) $current ? 'aria-current="step"' : ''; ?>>
+						<span class="af-flow__num"><?php echo (int) $n; ?></span>
+						<?php echo esc_html( $step[0] ); ?>
+					</a>
+				</li>
+			<?php endforeach; ?>
+		</ol>
+		<?php
+	}
+}
+
+if ( ! function_exists( 'af_catalog_groups_panel' ) ) {
+	/**
+	 * Building/complex chips with create/rename/delete (driven by af-catalog-share.js).
+	 *
+	 * @param int   $owner_id Owner whose groups are managed (0 = read-only).
+	 * @param array $counts   group_id => property count.
+	 */
+	function af_catalog_groups_panel( $owner_id, array $counts ) {
+		$groups = ( $owner_id && class_exists( 'Arriendo_Facil_Catalog_Groups' ) )
+			? Arriendo_Facil_Catalog_Groups::get_for_owner( $owner_id )
+			: array();
+		?>
+		<section class="af-groups-panel" id="af-groups">
+			<div class="af-groups-panel__head">
+				<h2 class="af-groups-panel__title">
+					<?php esc_html_e( 'Edificios y conjuntos', 'arriendo-facil' ); ?>
+					<span class="af-groups-panel__opt"><?php esc_html_e( 'Opcional', 'arriendo-facil' ); ?></span>
+				</h2>
+				<p class="af-groups-panel__hint">
+					<?php esc_html_e( '¿Tienes varios inmuebles en un mismo edificio? Créalo aquí y elígelo en la columna "Edificio". En tu catálogo público aparecerán juntos.', 'arriendo-facil' ); ?>
+				</p>
+			</div>
+			<div class="af-catalog-tools__row">
+				<ul class="af-cs-group-list" id="af-cs-group-list" data-owner-id="<?php echo esc_attr( (int) $owner_id ); ?>">
+					<?php if ( empty( $groups ) ) : ?>
+						<li class="af-cs-group-list__empty" id="af-cs-group-empty">
+							<?php esc_html_e( 'Todavía no has creado ningún edificio o conjunto.', 'arriendo-facil' ); ?>
+						</li>
+					<?php else : ?>
+						<?php foreach ( $groups as $group ) : ?>
+							<?php $count = isset( $counts[ $group->id ] ) ? (int) $counts[ $group->id ] : 0; ?>
+							<li class="af-cs-group-row" data-group-id="<?php echo esc_attr( (int) $group->id ); ?>">
+								<span class="af-cs-group-row__name"><?php echo esc_html( $group->name ); ?></span>
+								<span class="af-cs-group-row__count" data-group-count>
+									<?php echo esc_html( sprintf( /* translators: %d: number of properties */ _n( '%d inmueble', '%d inmuebles', $count, 'arriendo-facil' ), $count ) ); ?>
+								</span>
+								<span class="af-cs-group-row__actions">
+									<button type="button" class="button-link af-cs-group-rename" data-group-id="<?php echo esc_attr( (int) $group->id ); ?>"><?php esc_html_e( 'Renombrar', 'arriendo-facil' ); ?></button>
+									<button type="button" class="button-link af-cs-group-delete" data-group-id="<?php echo esc_attr( (int) $group->id ); ?>"><?php esc_html_e( 'Eliminar', 'arriendo-facil' ); ?></button>
+								</span>
+							</li>
+						<?php endforeach; ?>
+					<?php endif; ?>
+				</ul>
+				<?php if ( $owner_id ) : ?>
+					<button type="button" class="button af-btn af-btn--ghost" id="af-cs-group-new">+ <?php esc_html_e( 'Nuevo edificio', 'arriendo-facil' ); ?></button>
+				<?php endif; ?>
+			</div>
+			<p class="af-share-status" id="af-cs-group-status" aria-live="polite"></p>
+		</section>
+		<?php
+	}
+}
+
 if ( ! function_exists( 'af_lucide' ) ) {
 	/**
 	 * Renders a Lucide-style icon as inline SVG.

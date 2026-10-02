@@ -929,10 +929,112 @@
    public stylesheet).
    ================================================================== */
 
-/* Compact catalog toolbar: share link + building chips in one card. */
-.af-catalog-tools {
-	display: grid;
-	gap: 14px;
+/* 3-step guide shared by Inmuebles and Catálogo. */
+.af-flow {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin: 0 0 16px;
+	padding: 0;
+	list-style: none;
+}
+
+.af-flow__step {
+	display: inline-flex;
+	align-items: center;
+	margin: 0;
+}
+
+.af-flow__step a {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 14px 6px 6px;
+	border: 1px solid #e2e5ea;
+	border-radius: 999px;
+	background: #fff;
+	color: #50575e;
+	font-size: 13px;
+	text-decoration: none;
+}
+
+.af-flow__step a:hover,
+.af-flow__step a:focus-visible {
+	border-color: #4caf88;
+	color: #1d2327;
+}
+
+.af-flow__num {
+	display: inline-grid;
+	place-items: center;
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	background: #f0f2f4;
+	font-weight: 600;
+	font-size: 12px;
+}
+
+.af-flow__step.is-current a {
+	border-color: #4caf88;
+	background: #ecf7f2;
+	color: #14532d;
+	font-weight: 600;
+}
+
+.af-flow__step.is-current .af-flow__num {
+	background: #4caf88;
+	color: #fff;
+}
+
+.af-flow__step + .af-flow__step::before {
+	content: "→";
+	margin: 0 4px 0 0;
+	color: #a7aaad;
+}
+
+/* Buildings panel (Inmuebles screen). */
+.af-listing-intro {
+	margin: 12px 0 16px;
+}
+
+.af-groups-panel {
+	padding: 14px 16px;
+	background: #fff;
+	border: 1px solid #e2e5ea;
+	border-radius: 12px;
+}
+
+.af-groups-panel__head {
+	margin-bottom: 10px;
+}
+
+.af-groups-panel__title {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 0 0 2px;
+	font-size: 15px;
+	font-weight: 600;
+}
+
+.af-groups-panel__opt {
+	padding: 1px 8px;
+	border-radius: 999px;
+	background: #f0f2f4;
+	color: #646970;
+	font-size: 11px;
+	font-weight: 500;
+}
+
+.af-groups-panel__hint {
+	margin: 0;
+	font-size: 13px;
+	color: #646970;
+}
+
+.af-groups-panel .af-share-status:empty {
+	display: none;
 }
 
 .af-catalog-tools__row {
@@ -942,28 +1044,31 @@
 	gap: 8px 12px;
 }
 
-.af-catalog-tools__label {
-	flex: 0 0 auto;
-	min-width: 150px;
-	margin: 0;
-	font-size: 13px;
-	font-weight: 600;
-	color: #3c434a;
+.column-af_group {
+	width: 170px;
 }
 
-.af-catalog-tools__hint {
-	margin: 0;
-	font-size: 12px;
+.column-af_group select {
+	width: 100%;
+	max-width: 170px;
+}
+
+/* Public link panel (Catálogo screen). */
+.af-share-panel__head {
+	margin-bottom: 10px;
+}
+
+.af-share-panel__hint {
+	margin: 2px 0 0;
+	font-size: 13px;
 	color: #646970;
 }
 
-.af-catalog-tools .af-share-card {
+.af-share-panel .af-share-card {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	gap: 6px 8px;
-	flex: 1 1 400px;
-	min-width: 0;
+	gap: 8px;
 	margin: 0;
 	padding: 0;
 	border: 0;
@@ -971,41 +1076,116 @@
 	box-shadow: none;
 }
 
-.af-catalog-tools .af-share-hint,
-.af-catalog-tools .af-share-status {
-	flex: 1 1 100%;
-	margin: 0;
-	font-size: 12px;
-}
-
-.af-catalog-tools .af-share-hint:empty,
-.af-catalog-tools .af-share-status:empty {
-	display: none;
-}
-
-.af-catalog-tools .af-share-card__url {
-	flex: 1 1 260px;
+.af-slug {
+	display: flex;
+	align-items: center;
+	flex: 1 1 320px;
 	min-width: 0;
+	border: 1px solid #c3c4c7;
+	border-radius: 8px;
+	background: #fff;
+	overflow: hidden;
 }
 
-.af-catalog-tools .af-share-card__url input {
-	width: 100%;
+.af-slug:focus-within {
+	border-color: #4caf88;
+	box-shadow: 0 0 0 1px #4caf88;
 }
 
-.af-catalog-tools .af-share-card__actions {
+.has-slug-error .af-slug {
+	border-color: #b42318;
+	box-shadow: 0 0 0 1px #b42318;
+}
+
+.af-slug__prefix {
+	flex: 0 1 auto;
+	padding: 0 2px 0 12px;
+	color: #646970;
+	font-size: 13px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.af-share-panel .af-slug__input {
+	flex: 1 1 140px;
+	min-width: 100px;
+	min-height: 36px;
+	border: 0;
+	padding: 0 12px 0 0;
+	background: transparent;
+	font-weight: 600;
+	box-shadow: none;
+	outline: none;
+}
+
+.af-share-panel .af-share-card__actions {
 	display: flex;
 	flex-wrap: wrap;
+	align-items: center;
 	gap: 6px;
 }
 
-.af-catalog-tools .af-share-card__actions[hidden] {
+.af-share-panel .af-share-card__actions[hidden],
+.af-share-panel [hidden] {
 	display: none;
 }
 
-.af-catalog-tools .af-share-card__actions .button {
-	min-height: 32px;
-	padding: 0 12px;
+.af-share-panel .af-share-revoke {
+	margin-left: 4px;
+	color: #b42318;
 	font-size: 13px;
+}
+
+.af-slug__msg,
+.af-share-panel .af-share-status {
+	flex: 1 1 100%;
+	margin: 0;
+	font-size: 13px;
+}
+
+.af-slug__msg:empty,
+.af-share-panel .af-share-status:empty {
+	display: none;
+}
+
+.af-slug__msg { color: #646970; }
+.af-slug__msg.is-ok { color: #15803d; }
+.af-slug__msg.is-error { color: #b42318; font-weight: 600; }
+
+.af-slug__suggest {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+	flex: 1 1 100%;
+	font-size: 13px;
+	color: #646970;
+}
+
+.af-slug__chip {
+	padding: 3px 10px;
+	border: 1px solid #c3e6d5;
+	border-radius: 999px;
+	background: #ecf7f2;
+	color: #14532d;
+	font-size: 13px;
+	cursor: pointer;
+}
+
+.af-slug__chip:hover,
+.af-slug__chip:focus-visible {
+	background: #d6f0e3;
+}
+
+.af-cs-prop-controls__group {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	flex: 1 1 auto;
+	min-width: 0;
+	font-size: 12px;
+	color: #50575e;
 }
 
 .af-cs-group-list {

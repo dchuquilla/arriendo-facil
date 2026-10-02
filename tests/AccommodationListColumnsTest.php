@@ -100,7 +100,7 @@ class AccommodationListColumnsTest extends TestCase {
 	public function test_custom_columns_surround_the_title() {
 		$columns = array_keys( $this->listTable()->add_columns( $this->coreColumns() ) );
 
-		$expected = array( 'af_thumb', 'title', 'af_meta', 'af_price', 'af_status', 'date' );
+		$expected = array( 'af_thumb', 'title', 'af_meta', 'af_group', 'af_price', 'af_status', 'date' );
 
 		$this->assertSame( $expected, $columns );
 	}

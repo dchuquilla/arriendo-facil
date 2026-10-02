@@ -27,6 +27,72 @@ class Arriendo_Facil_Accommodation_List_Admin {
 		add_filter( 'manage_edit-accommodation_sortable_columns', array( $this, 'sortable_columns' ) );
 		add_action( 'pre_get_posts', array( $this, 'apply_query_filters' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue' ) );
+		add_action( 'all_admin_notices', array( $this, 'render_intro' ) );
+	}
+
+	/**
+	 * Owner whose catalog groups are editable on this screen (0 = read-only).
+	 *
+	 * @return int
+	 */
+	private function group_owner_id() {
+		return Arriendo_Facil_Accommodation::user_is_owner() ? get_current_user_id() : 0;
+	}
+
+	/**
+	 * Step guide + building groups panel, moved under the page title by af-catalog-share.js.
+	 */
+	public function render_intro() {
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( ! $screen || 'edit-accommodation' !== $screen->id || ! function_exists( 'af_catalog_flow' ) ) {
+			return;
+		}
+
+		$owner_id = $this->group_owner_id();
+		?>
+		<div class="af-listing-intro" data-af-move-under-title>
+			<?php af_catalog_flow( 1 ); ?>
+			<?php
+			if ( $owner_id && class_exists( 'Arriendo_Facil_Catalog_Share' ) ) {
+				af_catalog_groups_panel( $owner_id, Arriendo_Facil_Catalog_Share::group_counts_for_owner( $owner_id ) );
+			}
+			?>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Building selector (owner) or read-only building name.
+	 *
+	 * @param int $post_id Accommodation ID.
+	 */
+	private function render_group( $post_id ) {
+		if ( ! class_exists( 'Arriendo_Facil_Catalog_Groups' ) ) {
+			return;
+		}
+
+		static $groups = null;
+		$owner_id = $this->group_owner_id();
+		if ( null === $groups ) {
+			$groups = $owner_id ? Arriendo_Facil_Catalog_Groups::get_for_owner( $owner_id ) : array();
+		}
+
+		$group_id = (int) Arriendo_Facil_Catalog_Groups::get_group_id_for_property( $post_id );
+
+		if ( ! $owner_id ) {
+			$group = $group_id ? Arriendo_Facil_Catalog_Groups::get( $group_id ) : null;
+			echo $group ? esc_html( $group->name ) : '<span class="af-list-empty">—</span>';
+			return;
+		}
+		?>
+		<label class="screen-reader-text" for="af-cs-group-<?php echo esc_attr( (int) $post_id ); ?>"><?php esc_html_e( 'Edificio', 'arriendo-facil' ); ?></label>
+		<select id="af-cs-group-<?php echo esc_attr( (int) $post_id ); ?>" class="af-cs-prop-controls__select" data-af-cs-assign data-property-id="<?php echo esc_attr( (int) $post_id ); ?>">
+			<option value="0"><?php esc_html_e( 'Sin edificio', 'arriendo-facil' ); ?></option>
+			<?php foreach ( $groups as $group ) : ?>
+				<option value="<?php echo esc_attr( (int) $group->id ); ?>" <?php selected( $group_id, (int) $group->id ); ?>><?php echo esc_html( $group->name ); ?></option>
+			<?php endforeach; ?>
+		</select>
+		<?php
 	}
 
 	/**
@@ -84,6 +150,7 @@ class Arriendo_Facil_Accommodation_List_Admin {
 			$new[ $key ] = $label;
 			if ( 'title' === $key ) {
 				$new['af_meta']   = __( 'Tipo y ubicación', 'arriendo-facil' );
+				$new['af_group']  = __( 'Edificio', 'arriendo-facil' );
 				$new['af_price']  = __( 'Renta mensual', 'arriendo-facil' );
 				$new['af_status'] = __( 'Estado', 'arriendo-facil' );
 			}
@@ -152,6 +219,10 @@ class Arriendo_Facil_Accommodation_List_Admin {
 
 			case 'af_meta':
 				$this->render_meta( $post_id );
+				break;
+
+			case 'af_group':
+				$this->render_group( $post_id );
 				break;
 		}
 	}

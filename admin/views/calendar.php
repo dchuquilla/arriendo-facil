@@ -48,39 +48,13 @@ if ( $calendar_accommodation_id ) {
 	$calendar_scope_ids = is_array( $calendar_scope_ids ) ? array_intersect( $calendar_scope_ids, array( $calendar_accommodation_id ) ) : array( $calendar_accommodation_id );
 }
 
-$calendar_scope_clause     = is_array( $calendar_scope_ids ) ? ' AND l.accommodation_id IN (' . Arriendo_Facil_Tenancy::ids_in_clause( $calendar_scope_ids ) . ')' : '';
 $calendar_visits_scope_clause = is_array( $calendar_scope_ids ) ? ' AND vb.accommodation_id IN (' . Arriendo_Facil_Tenancy::ids_in_clause( $calendar_scope_ids ) . ')' : '';
 
-// ── Listas próximas (check-in / check-out / visitas) ─────────────────────
-$upcoming_checkins = (array) $wpdb->get_results(
-	$wpdb->prepare(
-		"SELECT l.id, l.start_date, l.accommodation_id, p.post_title AS accommodation_title,
-		        CONCAT(g.first_name, ' ', g.last_name) AS guest_name
-		 FROM {$wpdb->prefix}af_leases l
-		 LEFT JOIN {$wpdb->posts} p ON p.ID = l.accommodation_id
-		 LEFT JOIN {$wpdb->prefix}af_guests g ON g.id = l.guest_id
-		 WHERE l.deleted_at IS NULL AND l.start_date BETWEEN %s AND %s{$calendar_scope_clause}
-		 ORDER BY l.start_date ASC
-		 LIMIT 10", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		$calendar_from,
-		$calendar_to
-	)
-);
-
-$upcoming_checkouts = (array) $wpdb->get_results(
-	$wpdb->prepare(
-		"SELECT l.id, l.end_date, l.accommodation_id, p.post_title AS accommodation_title,
-		        CONCAT(g.first_name, ' ', g.last_name) AS guest_name
-		 FROM {$wpdb->prefix}af_leases l
-		 LEFT JOIN {$wpdb->posts} p ON p.ID = l.accommodation_id
-		 LEFT JOIN {$wpdb->prefix}af_guests g ON g.id = l.guest_id
-		 WHERE l.deleted_at IS NULL AND l.status = 'active' AND l.end_date BETWEEN %s AND %s{$calendar_scope_clause}
-		 ORDER BY l.end_date ASC
-		 LIMIT 10", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		$calendar_from,
-		$calendar_to
-	)
-);
+// ── Listas próximas (mudanzas registradas / salidas según contratos / visitas) ──
+$upcoming_moves     = Arriendo_Facil_Calendar::upcoming_moves( $calendar_from, $calendar_to, $calendar_scope_ids, 20 );
+$upcoming_checkouts = Arriendo_Facil_Calendar::upcoming_checkouts( $calendar_from, $calendar_to, $calendar_scope_ids, 20 );
+$calendar_today     = current_time( 'Y-m-d' );
+$legal_statuses     = Arriendo_Facil_Lease_Operations::legal_statuses();
 
 $upcoming_visits = (array) $wpdb->get_results(
 	$wpdb->prepare(
@@ -125,7 +99,11 @@ $calendar_month_anchor = $calendar_from;
 		array(
 			'eyebrow'  => __( 'Operación', 'arriendo-facil' ),
 			'title'    => __( 'Calendario', 'arriendo-facil' ),
-			'subtitle' => __( 'Visitas, entradas, salidas y días bloqueados en un solo lugar. Selecciona un día para gestionarlo.', 'arriendo-facil' ),
+			'subtitle' => __( 'Visitas, mudanzas, salidas de contratos, vencimientos de servicios y días bloqueados en un solo lugar. Selecciona un día para gestionarlo.', 'arriendo-facil' ),
+			'actions'  => array(
+				'<button type="button" class="button af-btn af-btn--primary" data-cal-open="move">' . af_lucide( 'plus', 16 ) . esc_html__( 'Registrar mudanza', 'arriendo-facil' ) . '</button>',
+				'<button type="button" class="button af-btn af-btn--ghost" data-cal-open="visit">' . af_lucide( 'user-plus', 16 ) . esc_html__( 'Agendar visita', 'arriendo-facil' ) . '</button>',
+			),
 		)
 	);
 	?>
@@ -189,55 +167,86 @@ $calendar_month_anchor = $calendar_from;
 
 		<?php include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/partials/host-calendar.php'; ?>
 
-		<div class="af-calendar-cols">
+		<div class="af-calendar-cols" data-from="<?php echo esc_attr( $calendar_from ); ?>" data-to="<?php echo esc_attr( $calendar_to ); ?>">
 			<article class="af-calendar-col af-calendar-col--in">
 				<header class="af-calendar-col__head">
 					<span class="af-calendar-col__icon" aria-hidden="true"><?php echo af_lucide( 'log-in', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
 					<div class="af-calendar-col__title">
-						<h3><?php esc_html_e( 'Próximos check-in (mudanza)', 'arriendo-facil' ); ?></h3>
-						<span class="af-calendar-col__count"><?php echo esc_html( sprintf( /* translators: %d: count */ _n( '%d programado', '%d programados', count( $upcoming_checkins ), 'arriendo-facil' ), count( $upcoming_checkins ) ) ); ?></span>
+						<h3><?php esc_html_e( 'Próximas mudanzas (check-in)', 'arriendo-facil' ); ?></h3>
+						<span class="af-calendar-col__count"><?php echo esc_html( sprintf( /* translators: %d: count */ _n( '%d registrada', '%d registradas', count( $upcoming_moves ), 'arriendo-facil' ), count( $upcoming_moves ) ) ); ?></span>
 					</div>
 				</header>
-				<?php if ( empty( $upcoming_checkins ) ) : ?>
-					<p class="af-empty__text"><?php esc_html_e( 'Sin check-ins programados en el rango.', 'arriendo-facil' ); ?></p>
+				<?php if ( empty( $upcoming_moves ) ) : ?>
+					<p class="af-empty__text"><?php esc_html_e( 'Sin mudanzas registradas en el rango.', 'arriendo-facil' ); ?></p>
 				<?php else : ?>
-					<div class="af-semaforo__table" role="table" aria-label="<?php esc_attr_e( 'Próximos check-in', 'arriendo-facil' ); ?>">
-						<?php foreach ( $upcoming_checkins as $checkin ) : ?>
-							<a class="af-semaforo__row" href="<?php echo esc_url( admin_url( 'admin.php?page=af-leases' ) ); ?>">
+					<div class="af-semaforo__table" role="table" aria-label="<?php esc_attr_e( 'Próximas mudanzas', 'arriendo-facil' ); ?>">
+						<?php foreach ( $upcoming_moves as $move ) : ?>
+							<?php
+							$move_tasks = Arriendo_Facil_Calendar::move_checklist( $move );
+							$move_done  = count( array_filter( wp_list_pluck( $move_tasks, 'done' ) ) );
+							$move_when  = wp_date( 'd/m/Y', strtotime( $move->move_date ) ) . ( $move->start_time ? ' ' . substr( (string) $move->start_time, 0, 5 ) : '' );
+							?>
+							<div class="af-semaforo__row">
 								<span class="af-semaforo__tenant">
-									<strong><?php echo esc_html( trim( (string) $checkin->guest_name ) ? trim( (string) $checkin->guest_name ) : __( 'Inquilino', 'arriendo-facil' ) ); ?></strong>
-									<small><?php echo esc_html( $checkin->accommodation_title ? $checkin->accommodation_title : '—' ); ?></small>
+									<strong><?php echo esc_html( $move->contact_name ? $move->contact_name : __( 'Inquilino', 'arriendo-facil' ) ); ?></strong>
+									<small>
+										<?php echo esc_html( $move->accommodation_title ? $move->accommodation_title : '—' ); ?>
+										<?php if ( $move_tasks ) : ?>
+											· <?php echo esc_html( sprintf( /* translators: 1: done, 2: total */ __( '%1$d/%2$d tareas', 'arriendo-facil' ), $move_done, count( $move_tasks ) ) ); ?>
+										<?php endif; ?>
+									</small>
 								</span>
-								<span class="af-pill af-pill--info"><?php echo esc_html( wp_date( 'd/m/Y', strtotime( $checkin->start_date ) ) ); ?></span>
-							</a>
+								<span class="af-pill af-pill--<?php echo esc_attr( 'done' === $move->status ? 'success' : 'info' ); ?>"><?php echo esc_html( 'done' === $move->status ? __( 'Realizada', 'arriendo-facil' ) : $move_when ); ?></span>
+							</div>
 						<?php endforeach; ?>
 					</div>
 				<?php endif; ?>
+				<button type="button" class="button af-btn af-btn--ghost af-calendar-col__cta" data-cal-open="move"><?php esc_html_e( '+ Registrar mudanza', 'arriendo-facil' ); ?></button>
 			</article>
 
 			<article class="af-calendar-col af-calendar-col--out">
 				<header class="af-calendar-col__head">
 					<span class="af-calendar-col__icon" aria-hidden="true"><?php echo af_lucide( 'log-out', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
 					<div class="af-calendar-col__title">
-						<h3><?php esc_html_e( 'Próximos check-out (salida)', 'arriendo-facil' ); ?></h3>
-						<span class="af-calendar-col__count"><?php echo esc_html( sprintf( /* translators: %d: count */ _n( '%d programado', '%d programados', count( $upcoming_checkouts ), 'arriendo-facil' ), count( $upcoming_checkouts ) ) ); ?></span>
+						<h3><?php esc_html_e( 'Próximos a salir (según contratos)', 'arriendo-facil' ); ?></h3>
+						<span class="af-calendar-col__count"><?php echo esc_html( sprintf( /* translators: %d: count */ _n( '%d contrato vence', '%d contratos vencen', count( $upcoming_checkouts ), 'arriendo-facil' ), count( $upcoming_checkouts ) ) ); ?></span>
 					</div>
 				</header>
 				<?php if ( empty( $upcoming_checkouts ) ) : ?>
-					<p class="af-empty__text"><?php esc_html_e( 'Sin check-outs programados en el rango.', 'arriendo-facil' ); ?></p>
+					<p class="af-empty__text"><?php esc_html_e( 'Ningún contrato activo termina en el rango.', 'arriendo-facil' ); ?></p>
 				<?php else : ?>
-					<div class="af-semaforo__table" role="table" aria-label="<?php esc_attr_e( 'Próximos check-out', 'arriendo-facil' ); ?>">
+					<div class="af-semaforo__table" role="table" aria-label="<?php esc_attr_e( 'Próximos a salir', 'arriendo-facil' ); ?>">
 						<?php foreach ( $upcoming_checkouts as $checkout ) : ?>
-							<a class="af-semaforo__row" href="<?php echo esc_url( admin_url( 'admin.php?page=af-upcoming-exits' ) ); ?>">
+							<?php
+							$exit_days    = max( 0, (int) floor( ( strtotime( $checkout->end_date ) - strtotime( $calendar_today ) ) / DAY_IN_SECONDS ) );
+							$exit_tone    = $exit_days <= 30 ? 'danger' : ( $exit_days <= 60 ? 'warning' : 'neutral' );
+							$exit_legal   = $checkout->legal_status ? (string) $checkout->legal_status : 'pendiente';
+							$exit_title   = $checkout->accommodation_title ? $checkout->accommodation_title : '#' . (int) $checkout->accommodation_id;
+							?>
+							<div class="af-semaforo__row af-exit-row">
 								<span class="af-semaforo__tenant">
 									<strong><?php echo esc_html( trim( (string) $checkout->guest_name ) ? trim( (string) $checkout->guest_name ) : __( 'Inquilino', 'arriendo-facil' ) ); ?></strong>
-									<small><?php echo esc_html( $checkout->accommodation_title ? $checkout->accommodation_title : '—' ); ?></small>
+									<small><?php echo esc_html( $exit_title . ' · ' . ( $legal_statuses[ $exit_legal ] ?? $exit_legal ) ); ?></small>
 								</span>
-								<span class="af-pill af-pill--warning"><?php echo esc_html( wp_date( 'd/m/Y', strtotime( $checkout->end_date ) ) ); ?></span>
-							</a>
+								<span class="af-pill af-pill--<?php echo esc_attr( $exit_tone ); ?>" title="<?php echo esc_attr( wp_date( 'd/m/Y', strtotime( $checkout->end_date ) ) ); ?>">
+									<?php echo esc_html( 0 === $exit_days ? __( 'Vence hoy', 'arriendo-facil' ) : sprintf( /* translators: %d: days remaining */ _n( 'En %d día', 'En %d días', $exit_days, 'arriendo-facil' ), $exit_days ) ); ?>
+								</span>
+								<span class="af-exit-row__actions">
+									<button type="button" class="af-cal__link af-exit-open-renew"
+										data-lease="<?php echo esc_attr( (int) $checkout->id ); ?>"
+										data-title="<?php echo esc_attr( $exit_title ); ?>"
+										data-min-date="<?php echo esc_attr( gmdate( 'Y-m-d', strtotime( $checkout->end_date . ' +1 day' ) ) ); ?>"><?php esc_html_e( 'Renovar', 'arriendo-facil' ); ?></button>
+									<button type="button" class="af-cal__link af-exit-open-legal"
+										data-lease="<?php echo esc_attr( (int) $checkout->id ); ?>"
+										data-title="<?php echo esc_attr( $exit_title ); ?>"
+										data-status="<?php echo esc_attr( $exit_legal ); ?>"
+										data-notes="<?php echo esc_attr( (string) $checkout->legal_notes ); ?>"><?php esc_html_e( 'Estado legal', 'arriendo-facil' ); ?></button>
+								</span>
+							</div>
 						<?php endforeach; ?>
 					</div>
 				<?php endif; ?>
+				<a class="button af-btn af-btn--ghost af-calendar-col__cta" href="<?php echo esc_url( admin_url( 'admin.php?page=af-leases' ) ); ?>"><?php esc_html_e( 'Ver contratos', 'arriendo-facil' ); ?></a>
 			</article>
 
 			<article class="af-calendar-col af-calendar-col--visit">
@@ -268,3 +277,161 @@ $calendar_month_anchor = $calendar_from;
 	</section>
 
 </div>
+
+<!-- Modal: renovar contrato -->
+<div class="af-modal" id="af-modal-renew" role="dialog" aria-modal="true" aria-labelledby="af-modal-renew-title">
+	<div class="af-modal__backdrop" data-af-modal-close></div>
+	<div class="af-modal__dialog">
+		<button type="button" class="af-modal__close" data-af-modal-close aria-label="<?php esc_attr_e( 'Cerrar', 'arriendo-facil' ); ?>">&times;</button>
+		<div class="af-modal__header">
+			<h2 class="af-modal__title" id="af-modal-renew-title"><?php esc_html_e( 'Renovar contrato', 'arriendo-facil' ); ?></h2>
+			<p class="af-modal__subtitle" id="af-modal-renew-subtitle"></p>
+		</div>
+		<div class="af-modal__body">
+			<p class="af-modal__status" id="af-modal-renew-status"></p>
+			<div class="af-modal__field">
+				<label for="af-renew-end-date"><?php esc_html_e( 'Nueva fecha de fin', 'arriendo-facil' ); ?></label>
+				<input type="date" id="af-renew-end-date" required />
+			</div>
+			<div class="af-modal__field">
+				<label for="af-renew-reason"><?php esc_html_e( 'Motivo de la renovación', 'arriendo-facil' ); ?></label>
+				<textarea id="af-renew-reason" rows="3" required></textarea>
+			</div>
+		</div>
+		<div class="af-modal__footer">
+			<button type="button" class="button" data-af-modal-close><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
+			<button type="button" class="button button-primary" id="af-renew-save"><?php esc_html_e( 'Renovar', 'arriendo-facil' ); ?></button>
+		</div>
+	</div>
+</div>
+
+<!-- Modal: estado legal -->
+<div class="af-modal" id="af-modal-legal" role="dialog" aria-modal="true" aria-labelledby="af-modal-legal-title">
+	<div class="af-modal__backdrop" data-af-modal-close></div>
+	<div class="af-modal__dialog">
+		<button type="button" class="af-modal__close" data-af-modal-close aria-label="<?php esc_attr_e( 'Cerrar', 'arriendo-facil' ); ?>">&times;</button>
+		<div class="af-modal__header">
+			<h2 class="af-modal__title" id="af-modal-legal-title"><?php esc_html_e( 'Estado legal del contrato', 'arriendo-facil' ); ?></h2>
+			<p class="af-modal__subtitle" id="af-modal-legal-subtitle"></p>
+		</div>
+		<div class="af-modal__body">
+			<p class="af-modal__status" id="af-modal-legal-status-msg"></p>
+			<div class="af-modal__field">
+				<label for="af-legal-select"><?php esc_html_e( 'Estado', 'arriendo-facil' ); ?></label>
+				<select id="af-legal-select">
+					<?php foreach ( $legal_statuses as $legal_key => $legal_label ) : ?>
+						<option value="<?php echo esc_attr( $legal_key ); ?>"><?php echo esc_html( $legal_label ); ?></option>
+					<?php endforeach; ?>
+				</select>
+			</div>
+			<div class="af-modal__field">
+				<label for="af-legal-notes"><?php esc_html_e( 'Referencia o nota (notaría, número de trámite, etc.)', 'arriendo-facil' ); ?></label>
+				<input type="text" id="af-legal-notes" />
+			</div>
+		</div>
+		<div class="af-modal__footer">
+			<button type="button" class="button" data-af-modal-close><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
+			<button type="button" class="button button-primary" id="af-legal-save"><?php esc_html_e( 'Guardar', 'arriendo-facil' ); ?></button>
+		</div>
+	</div>
+</div>
+
+<script>
+(function () {
+	const ajaxUrl    = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
+	const leaseNonce = <?php echo wp_json_encode( wp_create_nonce( 'af_lease_nonce' ) ); ?>;
+	const opsNonce   = <?php echo wp_json_encode( wp_create_nonce( 'af_lease_operations_nonce' ) ); ?>;
+	const modals     = ['af-modal-renew', 'af-modal-legal'].map(function (id) { return document.getElementById(id); });
+
+	function post(action, nonce, payload) {
+		const body = new URLSearchParams();
+		Object.keys(payload).forEach(function (k) { body.append(k, payload[k]); });
+		body.append('action', action);
+		body.append('nonce', nonce);
+		return fetch(ajaxUrl, {
+			method: 'POST',
+			credentials: 'same-origin',
+			headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+			body: body
+		}).then(function (r) { return r.json(); });
+	}
+
+	function openModal(modal) {
+		modal.classList.add('is-open');
+		document.body.classList.add('af-modal-open');
+		const focusable = modal.querySelector('input, select, textarea, button.button-primary');
+		if (focusable) { focusable.focus(); }
+	}
+
+	function closeModal(modal) {
+		modal.classList.remove('is-open');
+		document.body.classList.remove('af-modal-open');
+	}
+
+	modals.forEach(function (modal) {
+		modal.querySelectorAll('[data-af-modal-close]').forEach(function (btn) {
+			btn.addEventListener('click', function () { closeModal(modal); });
+		});
+	});
+	document.addEventListener('keydown', function (e) {
+		if (e.key !== 'Escape') { return; }
+		modals.forEach(closeModal);
+	});
+
+	function setStatus(el, message, isError) {
+		el.textContent = message;
+		el.className = 'af-modal__status ' + (isError ? 'is-error' : 'is-success');
+	}
+
+	function done(statusEl) {
+		return function (res) {
+			if (res && res.success) { window.location.reload(); return; }
+			setStatus(statusEl, (res && res.data && res.data.message) || <?php echo wp_json_encode( __( 'No se pudo completar la operación.', 'arriendo-facil' ) ); ?>, true);
+		};
+	}
+
+	// ---- Renovar ----
+	const renewModal = document.getElementById('af-modal-renew');
+	document.querySelectorAll('.af-exit-open-renew').forEach(function (btn) {
+		btn.addEventListener('click', function () {
+			document.getElementById('af-modal-renew-subtitle').textContent = btn.dataset.title || '';
+			document.getElementById('af-renew-end-date').min = btn.dataset.minDate || '';
+			document.getElementById('af-renew-end-date').value = btn.dataset.minDate || '';
+			document.getElementById('af-renew-reason').value = '';
+			document.getElementById('af-modal-renew-status').textContent = '';
+			renewModal.dataset.lease = btn.dataset.lease;
+			openModal(renewModal);
+		});
+	});
+	document.getElementById('af-renew-save').addEventListener('click', function () {
+		const status = document.getElementById('af-modal-renew-status');
+		const reason = document.getElementById('af-renew-reason').value.trim();
+		const endDate = document.getElementById('af-renew-end-date').value;
+		if (!reason || !endDate) {
+			setStatus(status, <?php echo wp_json_encode( __( 'Completa la fecha y el motivo.', 'arriendo-facil' ) ); ?>, true);
+			return;
+		}
+		post('af_renew_lease', leaseNonce, { lease_id: renewModal.dataset.lease, new_end_date: endDate, reason: reason }).then(done(status));
+	});
+
+	// ---- Estado legal ----
+	const legalModal = document.getElementById('af-modal-legal');
+	document.querySelectorAll('.af-exit-open-legal').forEach(function (btn) {
+		btn.addEventListener('click', function () {
+			document.getElementById('af-modal-legal-subtitle').textContent = btn.dataset.title || '';
+			document.getElementById('af-legal-select').value = btn.dataset.status || 'pendiente';
+			document.getElementById('af-legal-notes').value = btn.dataset.notes || '';
+			document.getElementById('af-modal-legal-status-msg').textContent = '';
+			legalModal.dataset.lease = btn.dataset.lease;
+			openModal(legalModal);
+		});
+	});
+	document.getElementById('af-legal-save').addEventListener('click', function () {
+		post('af_update_lease_legal_status', opsNonce, {
+			lease_id: legalModal.dataset.lease,
+			legal_status: document.getElementById('af-legal-select').value,
+			legal_notes: document.getElementById('af-legal-notes').value
+		}).then(done(document.getElementById('af-modal-legal-status-msg')));
+	});
+})();
+</script>

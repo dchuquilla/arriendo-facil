@@ -1663,58 +1663,6 @@ class Arriendo_Facil_Billing_Ledger {
 	}
 
 	/**
-	 * Returns overdue charges bucketed by aging (30/60/90+ days).
-	 *
-	 * @param int[]|null $accommodation_ids Restrict to these accommodations
-	 *                                       (property-admin scope). Null = all.
-	 * @return array<string,array<int,object>>
-	 */
-	public static function get_aging_report( $accommodation_ids = null ) {
-		global $wpdb;
-
-		$scope_clause = '';
-		if ( is_array( $accommodation_ids ) ) {
-			$scope_clause = empty( $accommodation_ids )
-				? ' AND 1 = 0'
-				: ' AND c.lease_id IN (SELECT id FROM ' . $wpdb->prefix . 'af_leases WHERE accommodation_id IN (' . implode( ',', array_map( 'absint', $accommodation_ids ) ) . '))';
-		}
-
-		$rows = (array) $wpdb->get_results(
-			$wpdb->prepare(
-				'SELECT c.*, DATEDIFF(%s, c.due_date) AS days_overdue
-				 FROM ' . self::charges_table() . " c
-				 WHERE c.status IN ('pending', 'partial', 'overdue')
-				   AND c.due_date < %s{$scope_clause}
-				 ORDER BY c.due_date ASC", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-				gmdate( 'Y-m-d' ),
-				gmdate( 'Y-m-d' )
-			)
-		);
-
-		$buckets = array(
-			'1_30'  => array(),
-			'31_60' => array(),
-			'61_90' => array(),
-			'90mas' => array(),
-		);
-
-		foreach ( $rows as $row ) {
-			$days = (int) $row->days_overdue;
-			if ( $days <= 30 ) {
-				$buckets['1_30'][] = $row;
-			} elseif ( $days <= 60 ) {
-				$buckets['31_60'][] = $row;
-			} elseif ( $days <= 90 ) {
-				$buckets['61_90'][] = $row;
-			} else {
-				$buckets['90mas'][] = $row;
-			}
-		}
-
-		return $buckets;
-	}
-
-	/**
 	 * Human labels for the charge types.
 	 *
 	 * @return array<string,string>

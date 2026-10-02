@@ -550,10 +550,9 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 						<td data-label="<?php esc_attr_e( 'Día de pago', 'arriendo-facil' ); ?>"><?php echo esc_html( ! empty( $lease->payment_due_day ) ? (int) $lease->payment_due_day : 5 ); ?></td>
 						<td data-label="<?php esc_attr_e( 'Saldo', 'arriendo-facil' ); ?>">
 							<?php $lease_balance = $lease_balance_map[ (int) $lease->id ] ?? 0.0; ?>
-							<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-collections&statement_lease=' . (int) $lease->id ) ); ?>"
-								class="af-pill <?php echo $lease_balance > 0 ? 'af-pill--attention' : 'af-pill--success'; ?>">
+							<span class="af-pill <?php echo $lease_balance > 0 ? 'af-pill--attention' : 'af-pill--success'; ?>">
 								$<?php echo esc_html( number_format_i18n( $lease_balance, 2 ) ); ?>
-							</a>
+							</span>
 						</td>
 						<td class="af-lease-status-cell" data-label="<?php esc_attr_e( 'Estado', 'arriendo-facil' ); ?>"><?php echo af_pill( (string) $lease->status ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></td>					<?php
 					$binfo  = isset( $billing_status_map[ (int) $lease->id ] ) ? $billing_status_map[ (int) $lease->id ] : null;

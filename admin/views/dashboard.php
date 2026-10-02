@@ -168,37 +168,8 @@ if ( $calendar_accommodation_id ) {
 	$calendar_scope_ids = is_array( $calendar_scope_ids ) ? array_intersect( $calendar_scope_ids, array( $calendar_accommodation_id ) ) : array( $calendar_accommodation_id );
 }
 
-$calendar_scope_clause = is_array( $calendar_scope_ids ) ? ' AND l.accommodation_id IN (' . Arriendo_Facil_Tenancy::ids_in_clause( $calendar_scope_ids ) . ')' : '';
-
-$upcoming_checkins = (array) $wpdb->get_results(
-	$wpdb->prepare(
-		"SELECT l.id, l.start_date, l.accommodation_id, p.post_title AS accommodation_title,
-		        CONCAT(g.first_name, ' ', g.last_name) AS guest_name
-		 FROM {$wpdb->prefix}af_leases l
-		 LEFT JOIN {$wpdb->posts} p ON p.ID = l.accommodation_id
-		 LEFT JOIN {$wpdb->prefix}af_guests g ON g.id = l.guest_id
-		 WHERE l.deleted_at IS NULL AND l.start_date BETWEEN %s AND %s{$calendar_scope_clause}
-		 ORDER BY l.start_date ASC
-		 LIMIT 10", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		$calendar_from,
-		$calendar_to
-	)
-);
-
-$upcoming_checkouts = (array) $wpdb->get_results(
-	$wpdb->prepare(
-		"SELECT l.id, l.end_date, l.accommodation_id, p.post_title AS accommodation_title,
-		        CONCAT(g.first_name, ' ', g.last_name) AS guest_name
-		 FROM {$wpdb->prefix}af_leases l
-		 LEFT JOIN {$wpdb->posts} p ON p.ID = l.accommodation_id
-		 LEFT JOIN {$wpdb->prefix}af_guests g ON g.id = l.guest_id
-		 WHERE l.deleted_at IS NULL AND l.status = 'active' AND l.end_date BETWEEN %s AND %s{$calendar_scope_clause}
-		 ORDER BY l.end_date ASC
-		 LIMIT 10", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		$calendar_from,
-		$calendar_to
-	)
-);
+$upcoming_moves     = Arriendo_Facil_Calendar::upcoming_moves( $calendar_from, $calendar_to, $calendar_scope_ids, 10 );
+$upcoming_checkouts = Arriendo_Facil_Calendar::upcoming_checkouts( $calendar_from, $calendar_to, $calendar_scope_ids, 10 );
 
 // Visitas agendadas dentro del rango (pueden existir aunque los endpoints
 // de reserva esten desactivados en el modelo de administracion).
@@ -394,7 +365,7 @@ if ( $is_management_model ) {
 		$tasks[] = array(
 			'label' => _n( 'cargo vencido por cobrar', 'cargos vencidos por cobrar', $overdue_count, 'arriendo-facil' ),
 			'count' => $overdue_count,
-			'url'   => admin_url( 'admin.php?page=af-collections&charge_status=overdue' ),
+			'url'   => admin_url( 'admin.php?page=af-buildings' ),
 		);
 	}
 	if ( $docs_pending > 0 ) {
@@ -647,7 +618,7 @@ $recent_reviews        = (array) $wpdb->get_results(
 						<span style="width: <?php echo esc_attr( min( 100, max( 0, (float) $collection_rate ) ) ); ?>%"></span>
 					</div>
 					<div class="af-overview-hero__actions">
-						<a class="af-overview-hero__cta" href="<?php echo esc_url( admin_url( 'admin.php?page=af-collections' ) ); ?>">
+						<a class="af-overview-hero__cta" href="<?php echo esc_url( admin_url( 'admin.php?page=af-buildings' ) ); ?>">
 							<?php esc_html_e( 'Ver cobranza', 'arriendo-facil' ); ?> <span aria-hidden="true">&rarr;</span>
 						</a>
 					</div>
@@ -679,7 +650,7 @@ $recent_reviews        = (array) $wpdb->get_results(
 						</span>
 					</span>
 					<?php if ( $overdue_count > 0 ) : ?>
-						<a class="af-overview-stat__link" href="<?php echo esc_url( admin_url( 'admin.php?page=af-collections&charge_status=overdue' ) ); ?>"><?php esc_html_e( 'Gestionar', 'arriendo-facil' ); ?></a>
+						<a class="af-overview-stat__link" href="<?php echo esc_url( admin_url( 'admin.php?page=af-buildings' ) ); ?>"><?php esc_html_e( 'Gestionar', 'arriendo-facil' ); ?></a>
 					<?php endif; ?>
 				</article>
 
@@ -924,7 +895,7 @@ $recent_reviews        = (array) $wpdb->get_results(
 					<p class="af-section__subtitle"><?php echo esc_html( sprintf( /* translators: %s: period */ __( 'Estado de los cargos de %s en tiempo real.', 'arriendo-facil' ), $current_period ) ); ?></p>
 				</div>
 			</div>
-			<a class="af-kpi__link" href="<?php echo esc_url( admin_url( 'admin.php?page=af-collections' ) ); ?>"><?php esc_html_e( 'Ver control de pagos →', 'arriendo-facil' ); ?></a>
+			<a class="af-kpi__link" href="<?php echo esc_url( admin_url( 'admin.php?page=af-buildings' ) ); ?>"><?php esc_html_e( 'Ver cobranza de inmuebles →', 'arriendo-facil' ); ?></a>
 		</header>
 
 		<div class="af-semaforo__lights" role="list">
@@ -963,7 +934,7 @@ $recent_reviews        = (array) $wpdb->get_results(
 					$due  = (float) $mora_row->amount - (float) $mora_row->amount_paid;
 					$row_name = trim( (string) $mora_row->guest_name ) ? trim( (string) $mora_row->guest_name ) : __( 'Inquilino', 'arriendo-facil' );
 					?>
-					<a class="af-semaforo__row af-semaforo__row--with-avatar" href="<?php echo esc_url( admin_url( 'admin.php?page=af-collections&statement_lease=' . (int) $mora_row->lease_id ) ); ?>">
+					<a class="af-semaforo__row af-semaforo__row--with-avatar" href="<?php echo esc_url( admin_url( 'admin.php?page=af-buildings' ) ); ?>">
 						<span class="af-semaforo__avatar" aria-hidden="true"><?php echo esc_html( $af_initial( $row_name ) ); ?></span>
 						<span class="af-semaforo__tenant">
 							<strong><?php echo esc_html( $row_name ); ?></strong>
@@ -1044,26 +1015,26 @@ $recent_reviews        = (array) $wpdb->get_results(
 		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/partials/host-calendar.php';
 		?>
 
-		<div class="af-calendar-cols">
+		<div class="af-calendar-cols" data-from="<?php echo esc_attr( $calendar_from ); ?>" data-to="<?php echo esc_attr( $calendar_to ); ?>">
 			<article class="af-calendar-col af-calendar-col--in">
 				<header class="af-calendar-col__head">
 					<span class="af-calendar-col__icon" aria-hidden="true"><?php echo af_lucide( 'log-in', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
 					<div class="af-calendar-col__title">
-						<h3><?php esc_html_e( 'Próximos check-in (mudanza)', 'arriendo-facil' ); ?></h3>
-						<span class="af-calendar-col__count"><?php echo esc_html( sprintf( /* translators: %d: count */ _n( '%d programado', '%d programados', count( $upcoming_checkins ), 'arriendo-facil' ), count( $upcoming_checkins ) ) ); ?></span>
+						<h3><?php esc_html_e( 'Próximas mudanzas (check-in)', 'arriendo-facil' ); ?></h3>
+						<span class="af-calendar-col__count"><?php echo esc_html( sprintf( /* translators: %d: count */ _n( '%d registrada', '%d registradas', count( $upcoming_moves ), 'arriendo-facil' ), count( $upcoming_moves ) ) ); ?></span>
 					</div>
 				</header>
-				<?php if ( empty( $upcoming_checkins ) ) : ?>
-					<p class="af-empty__text"><?php esc_html_e( 'Sin check-ins programados en el rango.', 'arriendo-facil' ); ?></p>
+				<?php if ( empty( $upcoming_moves ) ) : ?>
+					<p class="af-empty__text"><?php esc_html_e( 'Sin mudanzas registradas en el rango.', 'arriendo-facil' ); ?></p>
 				<?php else : ?>
-					<div class="af-semaforo__table" role="table" aria-label="<?php esc_attr_e( 'Próximos check-in', 'arriendo-facil' ); ?>">
-						<?php foreach ( $upcoming_checkins as $checkin ) : ?>
-							<a class="af-semaforo__row" href="<?php echo esc_url( admin_url( 'admin.php?page=af-leases' ) ); ?>">
+					<div class="af-semaforo__table" role="table" aria-label="<?php esc_attr_e( 'Próximas mudanzas', 'arriendo-facil' ); ?>">
+						<?php foreach ( $upcoming_moves as $move ) : ?>
+							<a class="af-semaforo__row" href="<?php echo esc_url( admin_url( 'admin.php?page=af-calendar' ) ); ?>">
 								<span class="af-semaforo__tenant">
-									<strong><?php echo esc_html( trim( (string) $checkin->guest_name ) ? trim( (string) $checkin->guest_name ) : __( 'Inquilino', 'arriendo-facil' ) ); ?></strong>
-									<small><?php echo esc_html( $checkin->accommodation_title ? $checkin->accommodation_title : '—' ); ?></small>
+									<strong><?php echo esc_html( $move->contact_name ? $move->contact_name : __( 'Inquilino', 'arriendo-facil' ) ); ?></strong>
+									<small><?php echo esc_html( $move->accommodation_title ? $move->accommodation_title : '—' ); ?></small>
 								</span>
-								<span class="af-pill af-pill--info"><?php echo esc_html( wp_date( 'd/m/Y', strtotime( $checkin->start_date ) ) ); ?></span>
+								<span class="af-pill af-pill--<?php echo esc_attr( 'done' === $move->status ? 'success' : 'info' ); ?>"><?php echo esc_html( wp_date( 'd/m/Y', strtotime( $move->move_date ) ) ); ?></span>
 							</a>
 						<?php endforeach; ?>
 					</div>
@@ -1083,7 +1054,7 @@ $recent_reviews        = (array) $wpdb->get_results(
 				<?php else : ?>
 					<div class="af-semaforo__table" role="table" aria-label="<?php esc_attr_e( 'Próximos check-out', 'arriendo-facil' ); ?>">
 						<?php foreach ( $upcoming_checkouts as $checkout ) : ?>
-							<a class="af-semaforo__row" href="<?php echo esc_url( admin_url( 'admin.php?page=af-upcoming-exits' ) ); ?>">
+							<a class="af-semaforo__row" href="<?php echo esc_url( admin_url( 'admin.php?page=af-calendar' ) ); ?>">
 								<span class="af-semaforo__tenant">
 									<strong><?php echo esc_html( trim( (string) $checkout->guest_name ) ? trim( (string) $checkout->guest_name ) : __( 'Inquilino', 'arriendo-facil' ) ); ?></strong>
 									<small><?php echo esc_html( $checkout->accommodation_title ? $checkout->accommodation_title : '—' ); ?></small>
@@ -1132,7 +1103,7 @@ $recent_reviews        = (array) $wpdb->get_results(
 					<p class="af-section__subtitle"><?php esc_html_e( 'Cronograma de próximas salidas para anticipar renovaciones y liquidar garantías.', 'arriendo-facil' ); ?></p>
 				</div>
 			</div>
-			<a class="af-kpi__link" href="<?php echo esc_url( admin_url( 'admin.php?page=af-upcoming-exits' ) ); ?>"><?php esc_html_e( 'Ver próximas salidas →', 'arriendo-facil' ); ?></a>
+			<a class="af-kpi__link" href="<?php echo esc_url( admin_url( 'admin.php?page=af-calendar' ) ); ?>"><?php esc_html_e( 'Ver en el calendario →', 'arriendo-facil' ); ?></a>
 		</header>
 
 		<div class="af-schedule__buckets" role="list">
@@ -1160,7 +1131,7 @@ $recent_reviews        = (array) $wpdb->get_results(
 					$urgency = '30' === $exit_card['bucket'] ? 'af-pill--danger' : ( '60' === $exit_card['bucket'] ? 'af-pill--warning' : 'af-pill--neutral' );
 					$row_name = trim( (string) $lease->guest_name ) ? trim( (string) $lease->guest_name ) : __( 'Sin inquilino', 'arriendo-facil' );
 					?>
-					<a class="af-semaforo__row af-semaforo__row--with-avatar" href="<?php echo esc_url( admin_url( 'admin.php?page=af-upcoming-exits' ) ); ?>">
+					<a class="af-semaforo__row af-semaforo__row--with-avatar" href="<?php echo esc_url( admin_url( 'admin.php?page=af-calendar' ) ); ?>">
 						<span class="af-semaforo__avatar" aria-hidden="true"><?php echo esc_html( $af_initial( $row_name ) ); ?></span>
 						<span class="af-semaforo__tenant">
 							<strong><?php echo esc_html( $lease->accommodation_title ? $lease->accommodation_title : '#' . (int) $lease->accommodation_id ); ?></strong>
@@ -1342,8 +1313,8 @@ $recent_reviews        = (array) $wpdb->get_results(
 							'af-maintenance'        => 'wrench',
 							'af-cleaning-requests'  => 'sparkles',
 							'af-leases'             => 'file-text',
-							'af-upcoming-exits'     => 'calendar',
-							'af-collections'        => 'credit-card',
+							'af-calendar'           => 'calendar',
+							'af-buildings'          => 'credit-card',
 							'af-reviews'            => 'star',
 							'af-guests'             => 'user',
 							'af-pending-approvals'  => 'user-check',

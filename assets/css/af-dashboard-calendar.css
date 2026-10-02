@@ -67,7 +67,7 @@
 
 .af-cal__legend {
 	display: flex;
-	gap: 12px;
+	gap: 6px;
 	align-items: center;
 	flex-wrap: wrap;
 	margin-left: auto;
@@ -75,20 +75,51 @@
 	color: #475467;
 }
 
-.af-cal__legend span {
+.af-cal__toggle {
+	appearance: none;
 	display: inline-flex;
 	align-items: center;
-	gap: 5px;
+	gap: 6px;
+	padding: 4px 10px;
+	border: 1px solid #eaecf0;
+	border-radius: 999px;
+	background: #fff;
+	color: #344054;
+	font-size: 12px;
+	font-weight: 600;
+	line-height: 1.4;
 	white-space: nowrap;
+	cursor: pointer;
+	transition: background .15s, opacity .15s;
 }
 
-.af-cal__legend i {
+.af-cal__toggle:hover {
+	background: #f9fafb;
+}
+
+.af-cal__toggle i {
 	width: 10px;
 	height: 10px;
 	border-radius: 3px;
 	display: inline-block;
 	flex: 0 0 auto;
 }
+
+.af-cal__toggle.is-off {
+	opacity: .5;
+	text-decoration: line-through;
+}
+
+.af-cal__toggle.is-off i {
+	background: transparent !important;
+	box-shadow: inset 0 0 0 1.5px #98a2b3;
+}
+
+.af-cal__toggle--visit i { background: #2e90fa; }
+.af-cal__toggle--checkin i { background: #12b76a; }
+.af-cal__toggle--checkout i { background: #f79009; }
+.af-cal__toggle--service i { background: #7a5af8; }
+.af-cal__toggle--block i { background: #98a2b3; }
 
 .af-cal__week {
 	display: grid;
@@ -186,8 +217,9 @@
 	font-size: 10.5px;
 	font-weight: 650;
 	line-height: 1.2;
-	padding: 3px 6px;
+	padding: 3px 6px 3px 5px;
 	border-radius: 6px;
+	border-left: 3px solid currentColor;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -203,9 +235,28 @@
 	color: #027a48;
 }
 
+.af-cal__chip--checkin.is-done {
+	text-decoration: line-through;
+	opacity: .7;
+}
+
 .af-cal__chip--checkout {
 	background: #fff4ed;
+	color: #b54708;
+}
+
+.af-cal__chip--service {
+	background: #f4f3ff;
+	color: #5925dc;
+}
+
+.af-cal__chip--service.is-overdue {
+	background: #fef3f2;
 	color: #b42318;
+}
+
+.af-cal__chip--service.is-paid {
+	opacity: .6;
 }
 
 .af-cal__chip--block {
@@ -216,6 +267,7 @@
 
 .af-cal__chip--more {
 	background: transparent;
+	border-left: 0;
 	color: #475467;
 	font-size: 10.5px;
 	font-weight: 650;
@@ -262,7 +314,7 @@
 
 .af-cal__drawer-actions {
 	display: grid;
-	grid-template-columns: 1fr 1fr;
+	grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
 	gap: 8px;
 	padding: 14px 16px;
 	border-top: 1px solid #f2f4f7;
@@ -306,7 +358,75 @@
 .af-cal__event.is-visit .af-cal__event-icon { background: #eef4ff; }
 .af-cal__event.is-checkin .af-cal__event-icon { background: #e7f6ec; }
 .af-cal__event.is-checkout .af-cal__event-icon { background: #fff4ed; }
+.af-cal__event.is-service .af-cal__event-icon { background: #f4f3ff; }
+.af-cal__event.is-service.is-overdue .af-cal__event-icon { background: #fef3f2; }
 .af-cal__event.is-block .af-cal__event-icon { background: #f2f4f7; }
+
+.af-cal__event-title a {
+	color: inherit;
+	text-decoration: none;
+}
+
+.af-cal__event-title a:hover {
+	color: var(--af-color-primary, #2d6cdf);
+	text-decoration: underline;
+}
+
+.af-cal__checklist {
+	list-style: none;
+	margin: 8px 0 4px;
+	padding: 0;
+	display: grid;
+	gap: 4px;
+}
+
+.af-cal__checklist label {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 12.5px;
+	color: #344054;
+	cursor: pointer;
+}
+
+.af-cal__checklist label:has(input:checked) {
+	color: #667085;
+	text-decoration: line-through;
+}
+
+.af-cal__link {
+	appearance: none;
+	border: 0;
+	background: transparent;
+	padding: 4px 0 0;
+	color: var(--af-color-primary, #2d6cdf);
+	font-size: 12.5px;
+	font-weight: 650;
+	cursor: pointer;
+}
+
+.af-cal__link:hover {
+	text-decoration: underline;
+}
+
+.af-cal__tasks {
+	border: 1px solid #eaecf0;
+	border-radius: 10px;
+	padding: 10px 12px;
+}
+
+.af-cal__tasks legend {
+	padding: 0 4px;
+	font-weight: 650;
+}
+
+.af-cal__task {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 3px 0;
+	font-size: 13px;
+}
 
 .af-cal__event-main {
 	flex: 1;

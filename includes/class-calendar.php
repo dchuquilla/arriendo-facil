@@ -13,11 +13,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Class Arriendo_Facil_Calendar
  *
- * Exposes AJAX endpoints used by the dashboard interactive calendar:
- *  - af_calendar_events    -> events for a given month (visits, check-in/out, blocks)
- *  - af_calendar_add_visit -> registers a booked visit slot + booking
+ * Exposes AJAX endpoints used by the interactive calendar:
+ *  - af_calendar_events       -> events for a given month (visits, move-ins,
+ *                                contract check-outs, service due dates, blocks)
+ *  - af_calendar_add_visit    -> registers a booked visit slot + booking
  *  - af_calendar_remove_visit -> removes a visit booking (and its slot)
- *  - af_calendar_add_block -> blocks a date for an accommodation
+ *  - af_calendar_add_move     -> registers a move-in (mudanza)
+ *  - af_calendar_update_move  -> updates a move-in checklist / status
+ *  - af_calendar_remove_move  -> removes a move-in
+ *  - af_calendar_add_block    -> blocks a date for an accommodation
  *  - af_calendar_remove_block -> removes a calendar block
  */
 class Arriendo_Facil_Calendar {
@@ -31,6 +35,9 @@ class Arriendo_Facil_Calendar {
 		add_action( 'wp_ajax_af_calendar_events', array( $this, 'ajax_events' ) );
 		add_action( 'wp_ajax_af_calendar_add_visit', array( $this, 'ajax_add_visit' ) );
 		add_action( 'wp_ajax_af_calendar_remove_visit', array( $this, 'ajax_remove_visit' ) );
+		add_action( 'wp_ajax_af_calendar_add_move', array( $this, 'ajax_add_move' ) );
+		add_action( 'wp_ajax_af_calendar_update_move', array( $this, 'ajax_update_move' ) );
+		add_action( 'wp_ajax_af_calendar_remove_move', array( $this, 'ajax_remove_move' ) );
 		add_action( 'wp_ajax_af_calendar_add_block', array( $this, 'ajax_add_block' ) );
 		add_action( 'wp_ajax_af_calendar_remove_block', array( $this, 'ajax_remove_block' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_dashboard_assets' ) );
@@ -44,6 +51,212 @@ class Arriendo_Facil_Calendar {
 	public static function table() {
 		global $wpdb;
 		return $wpdb->prefix . 'af_calendar_blocks';
+	}
+
+	/**
+	 * Returns the move-ins (mudanzas) table name.
+	 *
+	 * @return string
+	 */
+	public static function moves_table() {
+		global $wpdb;
+		return $wpdb->prefix . 'af_calendar_moves';
+	}
+
+	/**
+	 * Creates the move-ins table on first use, so installs updated without
+	 * re-activation keep working.
+	 *
+	 * @return bool Whether the table can be queried.
+	 */
+	public static function ensure_moves_table() {
+		global $wpdb;
+		static $ready = null;
+
+		if ( null !== $ready ) {
+			return $ready;
+		}
+
+		$table = self::moves_table();
+
+		if ( $table === $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) ) {
+			$ready = true;
+			return $ready;
+		}
+
+		$created = $wpdb->query( self::moves_table_sql( $wpdb->get_charset_collate() ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+
+		$ready = false !== $created;
+
+		return $ready;
+	}
+
+	/**
+	 * CREATE TABLE statement of the move-ins table (shared with the activator).
+	 *
+	 * @param string $charset_collate Charset/collation clause.
+	 * @return string
+	 */
+	public static function moves_table_sql( $charset_collate ) {
+		return 'CREATE TABLE IF NOT EXISTS ' . self::moves_table() . " (
+			id               BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+			accommodation_id BIGINT(20) UNSIGNED NOT NULL,
+			lease_id         BIGINT(20) UNSIGNED DEFAULT NULL,
+			guest_id         BIGINT(20) UNSIGNED DEFAULT NULL,
+			move_date        DATE NOT NULL,
+			start_time       TIME DEFAULT NULL,
+			end_time         TIME DEFAULT NULL,
+			contact_name     VARCHAR(190) NOT NULL DEFAULT '',
+			contact_phone    VARCHAR(50) DEFAULT NULL,
+			contact_email    VARCHAR(190) DEFAULT NULL,
+			tasks            VARCHAR(255) NOT NULL DEFAULT '',
+			tasks_done       VARCHAR(255) NOT NULL DEFAULT '',
+			status           VARCHAR(20) NOT NULL DEFAULT 'scheduled',
+			notes            TEXT DEFAULT NULL,
+			created_by       BIGINT(20) UNSIGNED DEFAULT NULL,
+			created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			KEY move_date (move_date),
+			KEY accommodation_id (accommodation_id),
+			KEY lease_id (lease_id)
+		) {$charset_collate}";
+	}
+
+	/**
+	 * Checklist of a move-in, in display order.
+	 *
+	 * @return array<string,string>
+	 */
+	public static function move_tasks() {
+		return array(
+			'keys'      => __( 'Entrega de llaves', 'arriendo-facil' ),
+			'inventory' => __( 'Inventario y acta de entrega firmados', 'arriendo-facil' ),
+			'meters'    => __( 'Lectura inicial de medidores', 'arriendo-facil' ),
+			'deposit'   => __( 'Garantía y primer canon recibidos', 'arriendo-facil' ),
+			'photos'    => __( 'Fotos del estado del inmueble', 'arriendo-facil' ),
+			'access'    => __( 'Registro en portería / administración', 'arriendo-facil' ),
+		);
+	}
+
+	/**
+	 * Keeps only known checklist keys from a comma list or array.
+	 *
+	 * @param string|string[] $raw Raw keys.
+	 * @return string[]
+	 */
+	private static function clean_task_keys( $raw ) {
+		$keys = is_array( $raw ) ? $raw : explode( ',', (string) $raw );
+		$keys = array_map( 'sanitize_key', array_map( 'trim', $keys ) );
+
+		return array_values( array_intersect( array_keys( self::move_tasks() ), $keys ) );
+	}
+
+	/**
+	 * Builds the checklist payload of a move-in row.
+	 *
+	 * @param object $move Move row.
+	 * @return array<int,array<string,mixed>>
+	 */
+	public static function move_checklist( $move ) {
+		$labels = self::move_tasks();
+		$done   = self::clean_task_keys( (string) $move->tasks_done );
+		$out    = array();
+
+		foreach ( self::clean_task_keys( (string) $move->tasks ) as $key ) {
+			$out[] = array(
+				'key'   => $key,
+				'label' => $labels[ $key ],
+				'done'  => in_array( $key, $done, true ),
+			);
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Registered move-ins between two dates.
+	 *
+	 * @param string     $from      Y-m-d.
+	 * @param string     $to        Y-m-d.
+	 * @param int[]|null $scope_ids Accommodation scope, null = all.
+	 * @param int        $limit     Max rows (0 = no limit).
+	 * @return object[]
+	 */
+	public static function upcoming_moves( $from, $to, $scope_ids, $limit = 10 ) {
+		global $wpdb;
+
+		if ( ! self::ensure_moves_table() ) {
+			return array();
+		}
+
+		$scope = is_array( $scope_ids ) ? ' AND m.accommodation_id IN (' . Arriendo_Facil_Tenancy::ids_in_clause( $scope_ids ) . ')' : '';
+		$limit = $limit > 0 ? ' LIMIT ' . absint( $limit ) : '';
+
+		return (array) $wpdb->get_results(
+			$wpdb->prepare(
+				'SELECT m.*, p.post_title AS accommodation_title
+				 FROM ' . self::moves_table() . " m
+				 LEFT JOIN {$wpdb->posts} p ON p.ID = m.accommodation_id
+				 WHERE m.move_date BETWEEN %s AND %s AND m.status <> 'cancelled'{$scope}
+				 ORDER BY m.move_date ASC, m.start_time ASC{$limit}", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+				$from,
+				$to
+			)
+		);
+	}
+
+	/**
+	 * Active contracts ending between two dates (the "próximos a salir").
+	 *
+	 * @param string     $from      Y-m-d.
+	 * @param string     $to        Y-m-d.
+	 * @param int[]|null $scope_ids Accommodation scope, null = all.
+	 * @param int        $limit     Max rows (0 = no limit).
+	 * @return object[]
+	 */
+	public static function upcoming_checkouts( $from, $to, $scope_ids, $limit = 10 ) {
+		global $wpdb;
+
+		$scope = is_array( $scope_ids ) ? ' AND l.accommodation_id IN (' . Arriendo_Facil_Tenancy::ids_in_clause( $scope_ids ) . ')' : '';
+		$limit = $limit > 0 ? ' LIMIT ' . absint( $limit ) : '';
+
+		return (array) $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT l.*, p.post_title AS accommodation_title,
+				        CONCAT(g.first_name, ' ', g.last_name) AS guest_name, g.phone AS guest_phone
+				 FROM {$wpdb->prefix}af_leases l
+				 LEFT JOIN {$wpdb->posts} p ON p.ID = l.accommodation_id
+				 LEFT JOIN {$wpdb->prefix}af_guests g ON g.id = l.guest_id
+				 WHERE l.deleted_at IS NULL AND l.status = 'active' AND l.end_date BETWEEN %s AND %s{$scope}
+				 ORDER BY l.end_date ASC{$limit}", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+				$from,
+				$to
+			)
+		);
+	}
+
+	/**
+	 * Contracts a move-in can be linked to (active or draft, in scope).
+	 *
+	 * @param int[]|null $scope_ids Accommodation scope, null = all.
+	 * @return object[]
+	 */
+	public static function lease_options( $scope_ids ) {
+		global $wpdb;
+
+		$scope = is_array( $scope_ids ) ? ' AND l.accommodation_id IN (' . Arriendo_Facil_Tenancy::ids_in_clause( $scope_ids ) . ')' : '';
+
+		return (array) $wpdb->get_results(
+			"SELECT l.id, l.accommodation_id, l.start_date, l.status, p.post_title AS accommodation_title,
+			        CONCAT(g.first_name, ' ', g.last_name) AS guest_name, g.phone AS guest_phone, g.email AS guest_email
+			 FROM {$wpdb->prefix}af_leases l
+			 LEFT JOIN {$wpdb->posts} p ON p.ID = l.accommodation_id
+			 LEFT JOIN {$wpdb->prefix}af_guests g ON g.id = l.guest_id
+			 WHERE l.deleted_at IS NULL AND l.status IN ('active', 'draft'){$scope}
+			 ORDER BY l.start_date DESC
+			 LIMIT 200" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		);
 	}
 
 	/**
@@ -158,61 +371,92 @@ class Arriendo_Facil_Calendar {
 				'type'  => 'visit',
 				'label' => __( 'Visita', 'arriendo-facil' ),
 				'title' => trim( (string) $visit->guest_name ) ? (string) $visit->guest_name : __( 'Visitante', 'arriendo-facil' ),
-				'meta'  => wp_date( 'H:i', strtotime( (string) $visit->start_time ) ),
+				'time'  => substr( (string) $visit->start_time, 0, 5 ),
+				'meta'  => substr( (string) $visit->start_time, 0, 5 ),
 				'accommodation' => (string) $visit->accommodation_title,
 				'id'    => (int) $visit->booking_id,
 				'removable' => true,
 			);
 		}
 
-		// Check-in (inicio de contrato) — incluye borradores no eliminados.
-		$checkins = (array) $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT l.id, l.start_date, l.accommodation_id, p.post_title AS accommodation_title,
-				        CONCAT(g.first_name, ' ', g.last_name) AS guest_name
-				 FROM {$wpdb->prefix}af_leases l
-				 LEFT JOIN {$wpdb->posts} p ON p.ID = l.accommodation_id
-				 LEFT JOIN {$wpdb->prefix}af_guests g ON g.id = l.guest_id
-				 WHERE l.deleted_at IS NULL AND l.start_date BETWEEN %s AND %s{$scope_clause}
-				 ORDER BY l.start_date ASC", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-				$from,
-				$to
-			)
-		);
-		foreach ( $checkins as $checkin ) {
-			$events[ (string) $checkin->start_date ][] = array(
-				'type'  => 'checkin',
-				'label' => __( 'Check-in', 'arriendo-facil' ),
-				'title' => trim( (string) $checkin->guest_name ) ? (string) $checkin->guest_name : __( 'Inquilino', 'arriendo-facil' ),
-				'meta'  => '',
-				'accommodation' => (string) $checkin->accommodation_title,
-				'id'    => (int) $checkin->id,
+		// Mudanzas (check-in) registradas desde el calendario.
+		foreach ( self::upcoming_moves( $from, $to, $scope_ids, 0 ) as $move ) {
+			$checklist = self::move_checklist( $move );
+			$done      = count( array_filter( wp_list_pluck( $checklist, 'done' ) ) );
+			$time      = $move->start_time ? substr( (string) $move->start_time, 0, 5 ) : '';
+			if ( $time && $move->end_time ) {
+				$time .= '–' . substr( (string) $move->end_time, 0, 5 );
+			}
+
+			$events[ (string) $move->move_date ][] = array(
+				'type'          => 'checkin',
+				'label'         => __( 'Mudanza', 'arriendo-facil' ),
+				'title'         => trim( (string) $move->contact_name ) ? (string) $move->contact_name : __( 'Inquilino', 'arriendo-facil' ),
+				'time'          => $move->start_time ? substr( (string) $move->start_time, 0, 5 ) : '',
+				'meta'          => trim( $time . ( $checklist ? ' · ' . sprintf( /* translators: 1: done, 2: total */ __( '%1$d/%2$d tareas', 'arriendo-facil' ), $done, count( $checklist ) ) : '' ), ' ·' ),
+				'accommodation' => (string) $move->accommodation_title,
+				'phone'         => (string) $move->contact_phone,
+				'notes'         => (string) $move->notes,
+				'status'        => 'done' === $move->status ? 'done' : 'scheduled',
+				'checklist'     => $checklist,
+				'id'            => (int) $move->id,
+				'removable'     => true,
 			);
 		}
 
-		// Check-out (fin de contrato activo).
-		$checkouts = (array) $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT l.id, l.end_date, l.accommodation_id, p.post_title AS accommodation_title,
-				        CONCAT(g.first_name, ' ', g.last_name) AS guest_name
-				 FROM {$wpdb->prefix}af_leases l
-				 LEFT JOIN {$wpdb->posts} p ON p.ID = l.accommodation_id
-				 LEFT JOIN {$wpdb->prefix}af_guests g ON g.id = l.guest_id
-				 WHERE l.deleted_at IS NULL AND l.status = 'active' AND l.end_date BETWEEN %s AND %s{$scope_clause}
-				 ORDER BY l.end_date ASC", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-				$from,
-				$to
-			)
-		);
-		foreach ( $checkouts as $checkout ) {
+		// Check-out: fin de los contratos activos registrados en Contratos.
+		foreach ( self::upcoming_checkouts( $from, $to, $scope_ids, 0 ) as $checkout ) {
 			$events[ (string) $checkout->end_date ][] = array(
-				'type'  => 'checkout',
-				'label' => __( 'Check-out', 'arriendo-facil' ),
-				'title' => trim( (string) $checkout->guest_name ) ? (string) $checkout->guest_name : __( 'Inquilino', 'arriendo-facil' ),
-				'meta'  => '',
+				'type'          => 'checkout',
+				'label'         => __( 'Salida', 'arriendo-facil' ),
+				'title'         => trim( (string) $checkout->guest_name ) ? (string) $checkout->guest_name : __( 'Inquilino', 'arriendo-facil' ),
+				'meta'          => __( 'Fin de contrato', 'arriendo-facil' ),
 				'accommodation' => (string) $checkout->accommodation_title,
-				'id'    => (int) $checkout->id,
+				'url'           => admin_url( 'admin.php?page=af-leases' ),
+				'id'            => (int) $checkout->id,
 			);
+		}
+
+		// Vencimientos de servicios (agua, luz, gas, internet…) configurados en Pagos de servicios.
+		if ( class_exists( 'Arriendo_Facil_Billing_Ledger' ) ) {
+			$today  = current_time( 'Y-m-d' );
+			$period = substr( $from, 0, 7 );
+			$last   = substr( $to, 0, 7 );
+
+			while ( $period <= $last ) {
+				foreach ( Arriendo_Facil_Billing_Ledger::get_service_due_rows( $period, $scope_ids ) as $row ) {
+					if ( empty( $row['is_active'] ) || ! $row['due_date'] || $row['due_date'] < $from || $row['due_date'] > $to ) {
+						continue;
+					}
+
+					if ( 'paid' === $row['status'] || ! empty( $row['bill_paid'] ) ) {
+						$state       = 'paid';
+						$state_label = __( 'Pagado', 'arriendo-facil' );
+					} elseif ( $row['due_date'] < $today ) {
+						$state       = 'overdue';
+						$state_label = __( 'Vencido', 'arriendo-facil' );
+					} else {
+						$state       = 'pending';
+						$state_label = __( 'Por pagar', 'arriendo-facil' );
+					}
+
+					$amount = $row['has_charge'] ? (float) $row['charge_amount'] : (float) $row['expected_amount'];
+					$place  = '' !== $row['unit_code'] ? $row['unit_code'] : (string) $row['accommodation_title'];
+
+					$events[ (string) $row['due_date'] ][] = array(
+						'type'          => 'service',
+						'label'         => (string) $row['service_label'],
+						'title'         => $row['service_label'] . ( $place ? ' · ' . $place : '' ),
+						'meta'          => $state_label . ( $amount > 0 ? ' · $' . number_format_i18n( $amount, 2 ) : '' ),
+						'accommodation' => (string) $row['accommodation_title'],
+						'status'        => $state,
+						'url'           => admin_url( 'admin.php?page=af-meter-readings&period=' . $period ),
+						'id'            => (int) $row['schedule_id'],
+					);
+				}
+
+				$period = gmdate( 'Y-m', strtotime( $period . '-01 +1 month' ) );
+			}
 		}
 
 		// Bloqueos de disponibilidad.
@@ -240,6 +484,19 @@ class Arriendo_Facil_Calendar {
 		}
 
 		ksort( $events );
+
+		// Within a day, timed events first in chronological order (agenda style).
+		foreach ( $events as $day => $day_events ) {
+			usort(
+				$day_events,
+				static function ( $a, $b ) {
+					$ta = isset( $a['time'] ) && '' !== $a['time'] ? $a['time'] : '99:99';
+					$tb = isset( $b['time'] ) && '' !== $b['time'] ? $b['time'] : '99:99';
+					return strcmp( $ta, $tb );
+				}
+			);
+			$events[ $day ] = $day_events;
+		}
 
 		return $events;
 	}
@@ -398,6 +655,209 @@ class Arriendo_Facil_Calendar {
 		}
 
 		wp_send_json_success( array( 'message' => __( 'Visita cancelada.', 'arriendo-facil' ) ) );
+	}
+
+	/**
+	 * Normalises an optional HH:MM time.
+	 *
+	 * @param string $key Request key.
+	 * @return string|null Null when empty.
+	 */
+	private static function request_time( $key ) {
+		$value = isset( $_REQUEST[ $key ] ) ? sanitize_text_field( wp_unslash( $_REQUEST[ $key ] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- guarded by caller.
+		if ( '' === $value ) {
+			return null;
+		}
+		if ( ! preg_match( '/^([01]\d|2[0-3]):[0-5]\d$/', $value ) ) {
+			wp_send_json_error( array( 'message' => __( 'Hora inválida.', 'arriendo-facil' ) ) );
+		}
+		return $value;
+	}
+
+	/**
+	 * AJAX: register a move-in (mudanza), optionally linked to a contract.
+	 *
+	 * @return void
+	 */
+	public function ajax_add_move() {
+		$this->guard();
+
+		global $wpdb;
+
+		if ( ! self::ensure_moves_table() ) {
+			wp_send_json_error( array( 'message' => __( 'No se pudo preparar el registro de mudanzas.', 'arriendo-facil' ) ) );
+		}
+
+		$accommodation_id = isset( $_REQUEST['accommodation_id'] ) ? absint( $_REQUEST['accommodation_id'] ) : 0;
+		$lease_id         = isset( $_REQUEST['lease_id'] ) ? absint( $_REQUEST['lease_id'] ) : 0;
+		$date             = isset( $_REQUEST['date'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['date'] ) ) : '';
+		$contact_name     = isset( $_REQUEST['contact_name'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['contact_name'] ) ) : '';
+		$contact_phone    = isset( $_REQUEST['contact_phone'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['contact_phone'] ) ) : '';
+		$contact_email    = isset( $_REQUEST['contact_email'] ) ? sanitize_email( wp_unslash( $_REQUEST['contact_email'] ) ) : '';
+		$notes            = isset( $_REQUEST['notes'] ) ? sanitize_textarea_field( wp_unslash( $_REQUEST['notes'] ) ) : '';
+		$tasks            = self::clean_task_keys( isset( $_REQUEST['tasks'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['tasks'] ) ) : '' );
+		$start_time       = self::request_time( 'start_time' );
+		$end_time         = self::request_time( 'end_time' );
+		$guest_id         = 0;
+
+		if ( $lease_id ) {
+			if ( ! Arriendo_Facil_Tenancy::can_access_lease( $lease_id ) ) {
+				wp_send_json_error( array( 'message' => __( 'No tienes acceso a ese contrato.', 'arriendo-facil' ) ) );
+			}
+			$lease = $wpdb->get_row(
+				$wpdb->prepare(
+					"SELECT id, accommodation_id, guest_id FROM {$wpdb->prefix}af_leases WHERE id = %d AND deleted_at IS NULL",
+					$lease_id
+				)
+			);
+			if ( ! $lease ) {
+				wp_send_json_error( array( 'message' => __( 'Contrato no encontrado.', 'arriendo-facil' ) ) );
+			}
+			// The contract decides the property, so both can never disagree.
+			$accommodation_id = (int) $lease->accommodation_id;
+			$guest_id         = (int) $lease->guest_id;
+		}
+
+		if ( ! $this->accommodation_in_scope( $accommodation_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'Inmueble inválido o fuera de tu alcance.', 'arriendo-facil' ) ) );
+		}
+		if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) ) {
+			wp_send_json_error( array( 'message' => __( 'Fecha inválida.', 'arriendo-facil' ) ) );
+		}
+		if ( $date < wp_date( 'Y-m-d' ) ) {
+			wp_send_json_error( array( 'message' => __( 'No se pueden programar mudanzas en fechas pasadas.', 'arriendo-facil' ) ) );
+		}
+		if ( $start_time && $end_time && $end_time <= $start_time ) {
+			wp_send_json_error( array( 'message' => __( 'La hora de fin debe ser posterior a la de inicio.', 'arriendo-facil' ) ) );
+		}
+		if ( '' === trim( $contact_name ) ) {
+			wp_send_json_error( array( 'message' => __( 'Escribe el nombre de quien se muda.', 'arriendo-facil' ) ) );
+		}
+
+		$existing = $wpdb->get_var(
+			$wpdb->prepare(
+				'SELECT id FROM ' . self::moves_table() . " WHERE accommodation_id = %d AND move_date = %s AND status <> 'cancelled'", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+				$accommodation_id,
+				$date
+			)
+		);
+		if ( $existing ) {
+			wp_send_json_error( array( 'message' => __( 'Ya hay una mudanza registrada ese día para el inmueble.', 'arriendo-facil' ) ) );
+		}
+
+		$inserted = $wpdb->insert(
+			self::moves_table(),
+			array(
+				'accommodation_id' => $accommodation_id,
+				'lease_id'         => $lease_id ? $lease_id : null,
+				'guest_id'         => $guest_id ? $guest_id : null,
+				'move_date'        => $date,
+				'start_time'       => $start_time,
+				'end_time'         => $end_time,
+				'contact_name'     => $contact_name,
+				'contact_phone'    => $contact_phone,
+				'contact_email'    => $contact_email,
+				'tasks'            => implode( ',', $tasks ),
+				'tasks_done'       => '',
+				'status'           => 'scheduled',
+				'notes'            => $notes,
+				'created_by'       => get_current_user_id(),
+			),
+			array( '%d', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d' )
+		);
+
+		if ( false === $inserted ) {
+			wp_send_json_error( array( 'message' => __( 'No se pudo registrar la mudanza.', 'arriendo-facil' ) ) );
+		}
+
+		wp_send_json_success(
+			array(
+				'message' => sprintf(
+					/* translators: 1: person name, 2: date */
+					__( 'Mudanza de %1$s registrada para el %2$s.', 'arriendo-facil' ),
+					$contact_name,
+					wp_date( 'd/m/Y', strtotime( $date ) )
+				),
+				'date'    => $date,
+			)
+		);
+	}
+
+	/**
+	 * Loads a move-in the caller can manage, or ends the request.
+	 *
+	 * @return object
+	 */
+	private function require_move() {
+		global $wpdb;
+
+		$move_id = isset( $_REQUEST['id'] ) ? absint( $_REQUEST['id'] ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- guarded by caller.
+		$move    = ( $move_id && self::ensure_moves_table() )
+			? $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . self::moves_table() . ' WHERE id = %d', $move_id ) ) // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			: null;
+
+		if ( ! $move || ! $this->accommodation_in_scope( (int) $move->accommodation_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'No se encontró la mudanza.', 'arriendo-facil' ) ) );
+		}
+
+		return $move;
+	}
+
+	/**
+	 * AJAX: tick checklist tasks and/or mark a move-in done.
+	 *
+	 * @return void
+	 */
+	public function ajax_update_move() {
+		$this->guard();
+
+		global $wpdb;
+
+		$move = $this->require_move();
+		$data = array();
+
+		if ( isset( $_REQUEST['tasks_done'] ) ) {
+			$planned            = self::clean_task_keys( (string) $move->tasks );
+			$done               = self::clean_task_keys( sanitize_text_field( wp_unslash( $_REQUEST['tasks_done'] ) ) );
+			$data['tasks_done'] = implode( ',', array_values( array_intersect( $planned, $done ) ) );
+		}
+
+		if ( isset( $_REQUEST['status'] ) ) {
+			$status = sanitize_key( wp_unslash( $_REQUEST['status'] ) );
+			if ( ! in_array( $status, array( 'scheduled', 'done' ), true ) ) {
+				wp_send_json_error( array( 'message' => __( 'Estado inválido.', 'arriendo-facil' ) ) );
+			}
+			$data['status'] = $status;
+		}
+
+		if ( ! $data ) {
+			wp_send_json_error( array( 'message' => __( 'Nada que actualizar.', 'arriendo-facil' ) ) );
+		}
+
+		$wpdb->update( self::moves_table(), $data, array( 'id' => (int) $move->id ), null, array( '%d' ) );
+
+		wp_send_json_success(
+			array(
+				'message' => __( 'Mudanza actualizada.', 'arriendo-facil' ),
+				'date'    => (string) $move->move_date,
+			)
+		);
+	}
+
+	/**
+	 * AJAX: remove a move-in.
+	 *
+	 * @return void
+	 */
+	public function ajax_remove_move() {
+		$this->guard();
+
+		global $wpdb;
+
+		$move = $this->require_move();
+		$wpdb->delete( self::moves_table(), array( 'id' => (int) $move->id ), array( '%d' ) );
+
+		wp_send_json_success( array( 'message' => __( 'Mudanza eliminada.', 'arriendo-facil' ) ) );
 	}
 
 	/**

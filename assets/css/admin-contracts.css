@@ -83,13 +83,59 @@
 }
 
 /* Actions cell improvements */
+.af-lease-actions-menu {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
+
+.af-lease-actions-menu summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px !important;
+  border: 1px solid #d1d5db !important;
+  border-radius: 4px !important;
+  background: #fff !important;
+  color: #374151 !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  cursor: pointer;
+  user-select: none;
+  transition: all 150ms ease;
+  outline: none;
+}
+
+.af-lease-actions-menu summary:hover {
+  background: #f3f4f6 !important;
+  border-color: #9ca3af !important;
+}
+
+.af-lease-actions-menu summary:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+.af-lease-actions-menu[open] summary {
+  background: #f9fafb !important;
+  border-color: #6b7280 !important;
+  color: #111 !important;
+}
+
 .af-lease-actions-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
   background: #fff !important;
   border: 1px solid #e5e7eb !important;
   border-radius: 6px !important;
   padding: 8px !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
-  min-width: 180px !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15) !important;
+  min-width: 240px !important;
+  z-index: 1000;
+  display: grid;
+  gap: 4px;
 }
 
 .af-lease-actions-dropdown button {
@@ -97,34 +143,95 @@
   width: 100% !important;
   text-align: left !important;
   margin: 0 !important;
-  margin-bottom: 4px !important;
-  padding: 8px 10px !important;
-  font-size: 12px !important;
-  border: none !important;
+  padding: 10px 12px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  border: 1px solid transparent !important;
   border-radius: 4px !important;
-  background: none !important;
+  background: #fff !important;
+  color: #374151 !important;
   cursor: pointer !important;
-  transition: background-color 150ms ease !important;
-}
-
-.af-lease-actions-dropdown button:last-child {
-  margin-bottom: 0 !important;
+  transition: all 150ms ease !important;
+  white-space: normal !important;
+  line-height: 1.4;
 }
 
 .af-lease-actions-dropdown button:hover {
   background-color: #f3f4f6 !important;
+  border-color: #e5e7eb !important;
+  color: #111 !important;
+}
+
+.af-lease-actions-dropdown button:active {
+  background-color: #e5e7eb !important;
+}
+
+.af-lease-actions-dropdown button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .af-lease-actions-dropdown button.button-primary {
   background-color: #3b82f6 !important;
   color: #fff !important;
+  border-color: #3b82f6 !important;
 }
 
 .af-lease-actions-dropdown button.button-primary:hover {
   background-color: #2563eb !important;
+  border-color: #2563eb !important;
 }
 
-/* Responsive table */
+.af-lease-actions-dropdown button.button-secondary {
+  background-color: #fff !important;
+  color: #374151 !important;
+  border-color: #d1d5db !important;
+}
+
+.af-lease-actions-dropdown button.button-secondary:hover {
+  background-color: #f3f4f6 !important;
+  border-color: #9ca3af !important;
+}
+
+/* Actions cell positioning */
+.af-lease-actions-cell {
+  position: relative;
+  overflow: visible !important;
+}
+
+.af-lease-actions-menu {
+  position: relative;
+}
+
+/* Table scroll container */
+.af-table-scroll {
+  overflow-x: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.af-table-scroll table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+/* Ensure dropdown is visible on scroll */
+.af-table-scroll .af-lease-actions-cell {
+  overflow: visible !important;
+}
+
+/* Button styles in dropdown - danger button */
+.af-lease-actions-dropdown button.af-btn--danger {
+  background-color: #dc2626 !important;
+  color: #fff !important;
+  border-color: #991b1b !important;
+}
+
+.af-lease-actions-dropdown button.af-btn--danger:hover {
+  background-color: #b91c1c !important;
+  border-color: #7f1d1d !important;
+}
 @media (max-width: 1200px) {
   .af-leases-table th:nth-child(n+8) {
     display: none !important;

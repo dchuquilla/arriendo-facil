@@ -158,24 +158,69 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 	?>
 
 	<?php
-	$lease_accommodations = get_posts(
-		array(
-			'post_type'      => 'accommodation',
-			'post_status'    => array( 'publish', 'draft', 'private' ),
-			'posts_per_page' => 200,
-			'orderby'        => 'title',
-			'order'          => 'ASC',
-		)
-	);
-	$lease_guests = $wpdb->get_results(
-		$wpdb->prepare(
-			"SELECT id, first_name, last_name, email, accommodation_id, rental_start_date, rental_end_date, desired_price, guarantee_text, doc_status
-			 FROM {$wpdb->prefix}af_guests
-			 ORDER BY first_name ASC
-			 LIMIT %d",
-			300
-		)
-	);
+	// Filter accommodations by current user's scope
+	// Note: accessible_accommodation_ids() returns null if user is admin (can manage all)
+	$accessible_acc_ids = Arriendo_Facil_Tenancy::accessible_accommodation_ids();
+	
+	if ( null === $accessible_acc_ids ) {
+		// User is admin - can see all accommodations
+		$lease_accommodations = get_posts(
+			array(
+				'post_type'      => 'accommodation',
+				'post_status'    => array( 'publish', 'draft', 'private' ),
+				'posts_per_page' => 200,
+				'orderby'        => 'title',
+				'order'          => 'ASC',
+			)
+		);
+		$ids_sql = null; // Will be handled in guest query
+	} elseif ( ! empty( $accessible_acc_ids ) ) {
+		// User is owner - can only see their accommodations
+		$lease_accommodations = get_posts(
+			array(
+				'post_type'      => 'accommodation',
+				'post_status'    => array( 'publish', 'draft', 'private' ),
+				'posts_per_page' => 200,
+				'orderby'        => 'title',
+				'order'          => 'ASC',
+				'post__in'       => $accessible_acc_ids,
+			)
+		);
+		$ids_sql = implode( ',', array_map( 'intval', $accessible_acc_ids ) );
+	} else {
+		// User has no accommodations
+		$lease_accommodations = array();
+		$ids_sql = null;
+	}
+
+	// Filter guests by current user's accommodations
+	if ( null === $ids_sql ) {
+		// Admin - show all guests
+		$lease_guests = $wpdb->get_results(
+			"SELECT g.id, g.first_name, g.last_name, g.email, g.accommodation_id, 
+			        g.rental_start_date, g.rental_end_date, g.desired_price, g.guarantee_text, g.doc_status,
+			        g.document_id, g.nationality, a.post_title AS accommodation_title
+			 FROM {$wpdb->prefix}af_guests g
+			 LEFT JOIN {$wpdb->posts} a ON a.ID = g.accommodation_id
+			 ORDER BY g.first_name ASC
+			 LIMIT 300"
+		);
+	} elseif ( ! empty( $ids_sql ) ) {
+		// Owner - show only guests linked to their accommodations
+		$lease_guests = $wpdb->get_results(
+			"SELECT g.id, g.first_name, g.last_name, g.email, g.accommodation_id, 
+			        g.rental_start_date, g.rental_end_date, g.desired_price, g.guarantee_text, g.doc_status,
+			        g.document_id, g.nationality, a.post_title AS accommodation_title
+			 FROM {$wpdb->prefix}af_guests g
+			 LEFT JOIN {$wpdb->posts} a ON a.ID = g.accommodation_id
+			 WHERE g.accommodation_id IN ($ids_sql) OR g.accommodation_id IS NULL OR g.accommodation_id = 0
+			 ORDER BY g.first_name ASC
+			 LIMIT 300"
+		);
+	} else {
+		// No accommodations
+		$lease_guests = array();
+	}
 	?>
 
 	<!-- Contract Process Steps -->
@@ -232,9 +277,20 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 						<span style="display:block; font-weight:600; margin-bottom:6px; font-size: 13px;"><?php esc_html_e( 'Inmueble', 'arriendo-facil' ); ?> *</span>
 						<select name="accommodation_id" required style="width:100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
 							<option value=""><?php esc_html_e( '— Seleccionar —', 'arriendo-facil' ); ?></option>
-							<?php foreach ( $lease_accommodations as $lease_accommodation ) : ?>
-								<option value="<?php echo esc_attr( (int) $lease_accommodation->ID ); ?>"
-									data-rent="<?php echo esc_attr( (string) get_post_meta( $lease_accommodation->ID, '_af_monthly_rent', true ) ); ?>">
+							<?php foreach ( $lease_accommodations as $lease_accommodation ) : 
+								$acc_id = (int) $lease_accommodation->ID;
+								$acc_address = (string) get_post_meta( $acc_id, '_af_address', true );
+								$acc_type = (string) get_post_meta( $acc_id, '_af_property_type', true );
+								$acc_bedrooms = (int) get_post_meta( $acc_id, '_af_bedrooms', true );
+								$acc_bathrooms = (int) get_post_meta( $acc_id, '_af_bathrooms', true );
+								$acc_rent = (string) get_post_meta( $acc_id, '_af_monthly_rent', true );
+							?>
+								<option value="<?php echo esc_attr( $acc_id ); ?>"
+									data-rent="<?php echo esc_attr( $acc_rent ); ?>"
+									data-address="<?php echo esc_attr( $acc_address ); ?>"
+									data-property-type="<?php echo esc_attr( $acc_type ); ?>"
+									data-bedrooms="<?php echo esc_attr( $acc_bedrooms ); ?>"
+									data-bathrooms="<?php echo esc_attr( $acc_bathrooms ); ?>">
 									<?php echo esc_html( $lease_accommodation->post_title ); ?>
 								</option>
 							<?php endforeach; ?>
@@ -251,7 +307,10 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 									data-start="<?php echo esc_attr( (string) $lease_guest->rental_start_date ); ?>"
 									data-end="<?php echo esc_attr( (string) $lease_guest->rental_end_date ); ?>"
 									data-price="<?php echo esc_attr( (string) $lease_guest->desired_price ); ?>"
-									data-doc-status="<?php echo esc_attr( (string) $lease_guest->doc_status ); ?>">
+									data-doc-status="<?php echo esc_attr( (string) $lease_guest->doc_status ); ?>"
+									data-guest-name="<?php echo esc_attr( trim( $lease_guest->first_name . ' ' . $lease_guest->last_name ) ); ?>"
+									data-document-id="<?php echo esc_attr( (string) $lease_guest->document_id ); ?>"
+									data-nationality="<?php echo esc_attr( (string) $lease_guest->nationality ); ?>">
 									<?php
 									echo esc_html( trim( $lease_guest->first_name . ' ' . $lease_guest->last_name ) );
 									if ( 'verificado' === (string) $lease_guest->doc_status ) {
@@ -580,6 +639,86 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 		}
 		refreshTemplates(form.accommodation_id.value);
 
+		// ─── Auto-fill advanced data fields based on selection ───────────────────
+		function prefillAdvancedFields() {
+			const accOpt = form.accommodation_id.options[form.accommodation_id.selectedIndex];
+			const guestOpt = form.querySelector('select[name="guest_id"]').options[form.querySelector('select[name="guest_id"]').selectedIndex];
+			
+			// Pre-fill guest data
+			if (guestOpt && guestOpt.value) {
+				const guestName = guestOpt.getAttribute('data-guest-name');
+				const docId = guestOpt.getAttribute('data-document-id');
+				const nationality = guestOpt.getAttribute('data-nationality');
+				
+				const nameField = document.getElementById('af-placeholder-nombres-inquilino');
+				const docField = document.getElementById('af-placeholder-cedula-inquilino');
+				const natField = document.getElementById('af-placeholder-nacionalidad-inquilino');
+				
+				if (nameField && !nameField.value && guestName) {
+					nameField.value = guestName;
+				}
+				if (docField && !docField.value && docId) {
+					docField.value = docId;
+				}
+				if (natField && !natField.value && nationality) {
+					natField.value = nationality;
+				}
+			}
+			
+			// Pre-fill property data
+			if (accOpt && accOpt.value) {
+				const address = accOpt.getAttribute('data-address');
+				const propType = accOpt.getAttribute('data-property-type');
+				const bedrooms = accOpt.getAttribute('data-bedrooms');
+				const bathrooms = accOpt.getAttribute('data-bathrooms');
+				
+				const addressField = document.getElementById('af-placeholder-dirección-inmueble');
+				const typeField = document.getElementById('af-placeholder-tipo-inmueble');
+				const bedroomsField = document.getElementById('af-placeholder-n-habitacion');
+				const bathroomsField = document.getElementById('af-placeholder-n-baños');
+				
+				if (addressField && !addressField.value && address) {
+					addressField.value = address;
+				}
+				if (typeField && !typeField.value && propType) {
+					typeField.value = propType;
+				}
+				if (bedroomsField && !bedroomsField.value && bedrooms) {
+					bedroomsField.value = bedrooms;
+				}
+				if (bathroomsField && !bathroomsField.value && bathrooms) {
+					bathroomsField.value = bathrooms;
+				}
+			}
+			
+			// Pre-fill rent and deposit in advanced fields
+			const rentField = document.getElementById('af-placeholder-canon-mensual');
+			const depositField = document.getElementById('af-placeholder-monto-en-números');
+			
+			const rent = form.monthly_rent.value;
+			const deposit = form.deposit_amount.value;
+			
+			if (rentField && !rentField.value && rent) {
+				rentField.value = parseFloat(rent).toFixed(2);
+			}
+			if (depositField && !depositField.value && deposit) {
+				depositField.value = parseFloat(deposit).toFixed(2);
+			}
+		}
+
+		// Trigger pre-fill on accommodation change
+		form.accommodation_id.addEventListener('change', prefillAdvancedFields);
+		
+		// Trigger pre-fill on guest change
+		form.querySelector('select[name="guest_id"]').addEventListener('change', prefillAdvancedFields);
+		
+		// Trigger pre-fill on rent/deposit change
+		form.monthly_rent.addEventListener('change', prefillAdvancedFields);
+		form.deposit_amount.addEventListener('change', prefillAdvancedFields);
+		
+		// Initial pre-fill
+		prefillAdvancedFields();
+
 		form.addEventListener('submit', function (e) {
 			e.preventDefault();
 
@@ -813,43 +952,43 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 							<?php endif; ?>
 						</td>
 						<td class="af-lease-actions-cell af-td-actions" data-label="<?php esc_attr_e( 'Acciones', 'arriendo-facil' ); ?>">
-						<details class="af-lease-actions-menu">
-							<summary>
-								<span><?php esc_html_e( 'Acciones', 'arriendo-facil' ); ?></span>
-								<svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true" style="flex-shrink:0;"><path d="M5 7.5 10 12.5 15 7.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-							</summary>
-							<div class="af-lease-actions-dropdown">
-							<button type="button" class="button button-secondary af-open-upload-version-modal"
-									data-lease-id="<?php echo esc_attr( $lease->id ); ?>"
-									data-next-version="<?php echo esc_attr( $next_version ); ?>">
-									<?php echo esc_html( sprintf( __( 'Subir v%d', 'arriendo-facil' ), $next_version ) ); ?>
-								</button>
-								<?php if ( $versions_count > 0 || $lease->document_url ) : ?>
-									<button type="button" class="button button-primary af-approve-lease-document"
-										data-lease-id="<?php echo esc_attr( $lease->id ); ?>"
-										data-active-version="<?php echo esc_attr( max( 1, $active_version ) ); ?>"
-										<?php disabled( $has_approved_pdf ); ?>>
-										<?php echo esc_html( $has_approved_pdf ? __( 'Documento aprobado', 'arriendo-facil' ) : __( 'Aprobar documento', 'arriendo-facil' ) ); ?>
-									</button>
-								<?php endif; ?>
-							<button type="button" class="button button-primary af-change-lease-status af-lease-activate-button"
-								data-lease-id="<?php echo esc_attr( $lease->id ); ?>"
-								data-status="active"
-								<?php disabled( in_array( (string) $lease->status, array( 'active', 'pending_release' ), true ) ); ?>>
-								<?php echo esc_html( in_array( (string) $lease->status, array( 'active', 'pending_release' ), true ) ? __( 'Contrato activo', 'arriendo-facil' ) : __( 'Activar contrato', 'arriendo-facil' ) ); ?>
-							</button>
-							<?php if ( in_array( (string) $lease->status, array( 'active', 'pending_release' ), true ) ) : ?>
-								<button type="button"
-									class="button"
-									data-lease-id="<?php echo esc_attr( $lease->id ); ?>"
-									data-nonce="<?php echo esc_attr( wp_create_nonce( 'af_lease_nonce' ) ); ?>"
-									id="af-early-terminate-lease-btn-<?php echo esc_attr( $lease->id ); ?>"
-									style="background:#b91c1c;border-color:#991b1b;color:#fff;">
-									<?php esc_html_e( 'Terminar anticipadamente', 'arriendo-facil' ); ?>
-								</button>
-							<?php endif; ?>
-							</div>
-						</details>
+							<details class="af-lease-actions-menu" role="region" aria-label="<?php esc_attr_e( 'Acciones disponibles', 'arriendo-facil' ); ?>">
+								<summary role="button" aria-label="<?php esc_attr_e( 'Abrir menu de acciones', 'arriendo-facil' ); ?>">
+									<span><?php esc_html_e( 'Acciones', 'arriendo-facil' ); ?></span>
+									<svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true" style="flex-shrink:0;"><path d="M5 7.5 10 12.5 15 7.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+								</summary>
+								<div class="af-lease-actions-dropdown">
+									<button type="button" class="button button-secondary af-open-upload-version-modal"
+											data-lease-id="<?php echo esc_attr( $lease->id ); ?>"
+											data-next-version="<?php echo esc_attr( $next_version ); ?>">
+											<?php echo esc_html( sprintf( __( 'Subir v%d', 'arriendo-facil' ), $next_version ) ); ?>
+										</button>
+										<?php if ( $versions_count > 0 || $lease->document_url ) : ?>
+											<button type="button" class="button button-primary af-approve-lease-document"
+												data-lease-id="<?php echo esc_attr( $lease->id ); ?>"
+												data-active-version="<?php echo esc_attr( max( 1, $active_version ) ); ?>"
+												<?php disabled( $has_approved_pdf ); ?>>
+												<?php echo esc_html( $has_approved_pdf ? __( 'Documento aprobado', 'arriendo-facil' ) : __( 'Aprobar documento', 'arriendo-facil' ) ); ?>
+											</button>
+										<?php endif; ?>
+										<button type="button" class="button button-primary af-change-lease-status af-lease-activate-button"
+											data-lease-id="<?php echo esc_attr( $lease->id ); ?>"
+											data-status="active"
+											<?php disabled( in_array( (string) $lease->status, array( 'active', 'pending_release' ), true ) ); ?>>
+											<?php echo esc_html( in_array( (string) $lease->status, array( 'active', 'pending_release' ), true ) ? __( 'Contrato activo', 'arriendo-facil' ) : __( 'Activar contrato', 'arriendo-facil' ) ); ?>
+										</button>
+										<?php if ( in_array( (string) $lease->status, array( 'active', 'pending_release' ), true ) ) : ?>
+											<button type="button"
+												class="button af-btn af-btn--danger"
+												data-lease-id="<?php echo esc_attr( $lease->id ); ?>"
+												data-nonce="<?php echo esc_attr( wp_create_nonce( 'af_lease_nonce' ) ); ?>"
+												id="af-early-terminate-lease-btn-<?php echo esc_attr( $lease->id ); ?>"
+												style="background:#b91c1c !important;border-color:#991b1b !important;color:#fff !important;">
+												<?php esc_html_e( 'Terminar anticipadamente', 'arriendo-facil' ); ?>
+											</button>
+										<?php endif; ?>
+								</div>
+							</details>
 						</td>
 					</tr>
 				<?php endforeach; ?>

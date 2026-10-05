@@ -1,0 +1,368 @@
+/**
+ * Admin UI - Calendar Styles
+ * Improves visual presentation of calendar interface
+ */
+
+/* ──────────────────────────────────────────────────────────────────────────
+   CALENDAR IMPROVEMENTS
+   ────────────────────────────────────────────────────────────────────────── */
+
+.af-calendar-page {
+  padding: var(--af-space-4) !important;
+}
+
+/* Calendar columns layout */
+.af-calendar-cols {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)) !important;
+  gap: var(--af-space-4) !important;
+  margin-top: var(--af-space-4) !important;
+}
+
+.af-calendar-col {
+  background: #fff !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+  transition: box-shadow 150ms ease, border-color 150ms ease !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.af-calendar-col:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12) !important;
+  border-color: #d1d5db !important;
+}
+
+/* Type-specific styling */
+.af-calendar-col--in {
+  border-left: 4px solid #10b981 !important;
+}
+
+.af-calendar-col--in:hover {
+  border-left-color: #059669 !important;
+}
+
+.af-calendar-col--out {
+  border-left: 4px solid #ef4444 !important;
+}
+
+.af-calendar-col--out:hover {
+  border-left-color: #dc2626 !important;
+}
+
+.af-calendar-col__head {
+  padding: 14px 16px !important;
+  background: linear-gradient(to right, #f9fafb, #f3f4f6) !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  display: flex !important;
+  gap: var(--af-space-2) !important;
+  align-items: flex-start !important;
+}
+
+.af-cal-icon--checkin {
+  color: #10b981 !important;
+}
+
+.af-cal-icon--checkout {
+  color: #ef4444 !important;
+}
+
+.af-calendar-col__title {
+  flex: 1 !important;
+  min-width: 0 !important;
+}
+
+.af-calendar-col__title h3 {
+  margin: 0 !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: #111 !important;
+}
+
+.af-calendar-col__count {
+  display: inline-block !important;
+  margin-top: 4px !important;
+  padding: 4px 10px !important;
+  background: #f0f0f0 !important;
+  border-radius: 10px !important;
+  font-size: 11px !important;
+  color: #6b7280 !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.3px !important;
+}
+
+.af-calendar-col__count--checkin {
+  background: #ecfdf5 !important;
+  color: #047857 !important;
+}
+
+.af-calendar-col__count--checkout {
+  background: #fef2f2 !important;
+  color: #991b1b !important;
+}
+
+/* Semaforo table (timeline list) */
+.af-semaforo__table {
+  display: flex !important;
+  flex-direction: column !important;
+  max-height: 500px !important;
+  overflow-y: auto !important;
+  flex: 1 !important;
+}
+
+.af-semaforo__table::-webkit-scrollbar {
+  width: 6px !important;
+}
+
+.af-semaforo__table::-webkit-scrollbar-track {
+  background: #f3f4f6 !important;
+}
+
+.af-semaforo__table::-webkit-scrollbar-thumb {
+  background: #d1d5db !important;
+  border-radius: 3px !important;
+}
+
+.af-semaforo__table::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af !important;
+}
+
+.af-semaforo__row {
+  display: flex !important;
+  align-items: center !important;
+  gap: var(--af-space-2) !important;
+  padding: 10px 12px !important;
+  border-bottom: 1px solid #f0f0f0 !important;
+  transition: background-color 150ms ease !important;
+  cursor: pointer !important;
+  text-decoration: none !important;
+}
+
+.af-semaforo__row:hover {
+  background-color: #f9fafb !important;
+}
+
+.af-semaforo__row:last-child {
+  border-bottom: none !important;
+}
+
+/* Row state styling */
+.af-semaforo__row--success {
+  border-left: 3px solid #10b981 !important;
+}
+
+.af-semaforo__row--success:hover {
+  background-color: #ecfdf5 !important;
+}
+
+.af-semaforo__row--danger {
+  border-left: 3px solid #ef4444 !important;
+}
+
+.af-semaforo__row--danger:hover {
+  background-color: #fef2f2 !important;
+}
+
+.af-semaforo__row--warning {
+  border-left: 3px solid #f59e0b !important;
+}
+
+.af-semaforo__row--warning:hover {
+  background-color: #fef3c7 !important;
+}
+
+.af-semaforo__tenant {
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+  min-width: 0 !important;
+}
+
+.af-semaforo__tenant strong {
+  display: block !important;
+  font-weight: 600 !important;
+  color: #111 !important;
+  font-size: 13px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.af-semaforo__tenant small {
+  display: block !important;
+  font-size: 11px !important;
+  color: #6b7280 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.af-semaforo__amount {
+  display: block !important;
+  flex-shrink: 0 !important;
+  font-size: 12px !important;
+  color: #6b7280 !important;
+  font-weight: 500 !important;
+  min-width: 60px !important;
+  text-align: right !important;
+}
+
+/* Pill badges - Status indicators */
+.af-pill {
+  display: inline-block !important;
+  padding: 4px 10px !important;
+  border-radius: 6px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+}
+
+.af-pill--success {
+  background-color: #ecfdf5 !important;
+  color: #047857 !important;
+}
+
+.af-pill--danger {
+  background-color: #fee2e2 !important;
+  color: #991b1b !important;
+}
+
+.af-pill--warning {
+  background-color: #fef3c7 !important;
+  color: #a16207 !important;
+}
+
+.af-pill--info {
+  background-color: #eff6ff !important;
+  color: #1e40af !important;
+}
+
+/* Exit row actions */
+.af-exit-row {
+  align-items: stretch !important;
+}
+
+.af-exit-row__actions {
+  display: flex !important;
+  gap: 4px !important;
+  flex-shrink: 0 !important;
+}
+
+.af-cal__link {
+  padding: 4px 8px !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  color: #0891b2 !important;
+  background: none !important;
+  border: none !important;
+  cursor: pointer !important;
+  text-decoration: none !important;
+  transition: color 150ms ease, text-decoration 150ms ease !important;
+}
+
+.af-cal__link:hover {
+  color: #0e7490 !important;
+  text-decoration: underline !important;
+}
+
+/* Empty state */
+.af-empty__text {
+  padding: var(--af-space-3) !important;
+  text-align: center !important;
+  color: #9ca3af !important;
+  font-size: 13px !important;
+  margin: 0 !important;
+}
+
+/* Calendar filter form */
+.af-calendar-filters {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: var(--af-space-3) !important;
+  align-items: flex-end !important;
+  margin: var(--af-space-4) 0 !important;
+  padding: var(--af-space-3) !important;
+  background: linear-gradient(to right, #f9fafb, #f3f4f6) !important;
+  border-radius: 6px !important;
+  border: 1px solid #e5e7eb !important;
+}
+
+.af-calendar-filters__group {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: var(--af-space-2) !important;
+  flex: 1 !important;
+}
+
+.af-calendar-filters__field {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+  min-width: 150px !important;
+}
+
+.af-calendar-filters__field span {
+  font-weight: 600 !important;
+  font-size: 12px !important;
+  color: #374151 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.3px !important;
+}
+
+.af-calendar-filters__field input,
+.af-calendar-filters__field select {
+  padding: 6px 8px !important;
+  border: 1px solid #d1d5db !important;
+  border-radius: 4px !important;
+  font-size: 13px !important;
+  background: #fff !important;
+}
+
+/* CTA Button */
+.af-calendar-col__cta {
+  margin-top: auto !important;
+  margin: var(--af-space-3) !important;
+  margin-top: auto !important;
+}
+
+/* Responsive layout */
+@media (max-width: 1200px) {
+  .af-calendar-cols {
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)) !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .af-calendar-cols {
+    grid-template-columns: 1fr !important;
+    gap: var(--af-space-3) !important;
+  }
+
+  .af-calendar-filters {
+    flex-direction: column !important;
+  }
+
+  .af-calendar-filters__group {
+    width: 100% !important;
+  }
+
+  .af-calendar-filters__field {
+    width: 100% !important;
+  }
+
+  .af-semaforo__table {
+    max-height: 300px !important;
+  }
+
+  .af-exit-row__actions {
+    flex-direction: column !important;
+  }
+
+  .af-cal__link {
+    padding: 6px 10px !important;
+  }
+}

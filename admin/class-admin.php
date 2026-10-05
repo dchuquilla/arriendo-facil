@@ -1526,6 +1526,28 @@ array(
 			$admin_css_version
 		);
 
+		// Admin contracts list and form enhancements.
+		$contracts_css_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/admin-contracts.css';
+		if ( file_exists( $contracts_css_path ) ) {
+			wp_enqueue_style(
+				'af-admin-contracts',
+				ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/admin-contracts.css',
+				array( 'af-shell' ),
+				file_exists( $contracts_css_path ) ? (string) filemtime( $contracts_css_path ) : ARRIENDO_FACIL_VERSION
+			);
+		}
+
+		// Admin calendar enhancements.
+		$calendar_css_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/admin-calendar.css';
+		if ( file_exists( $calendar_css_path ) ) {
+			wp_enqueue_style(
+				'af-admin-calendar',
+				ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/admin-calendar.css',
+				array( 'af-shell' ),
+				file_exists( $calendar_css_path ) ? (string) filemtime( $calendar_css_path ) : ARRIENDO_FACIL_VERSION
+			);
+		}
+
 		wp_enqueue_script(
 			'mammoth',
 			ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/vendor/mammoth.browser.min.js',

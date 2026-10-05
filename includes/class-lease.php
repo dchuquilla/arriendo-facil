@@ -271,6 +271,31 @@ class Arriendo_Facil_Lease {
 			wp_send_json_error( array( 'message' => __( 'Faltan campos obligatorios.', 'arriendo-facil' ) ) );
 		}
 
+		// ── Procesar Placeholders ─────────────────────────────────────────────
+		$placeholders = array();
+		if ( class_exists( 'Arriendo_Facil_Contract_Storage' ) ) {
+			// Capturar todos los campos placeholder_* del POST
+			foreach ( $_POST as $key => $value ) {
+				if ( strpos( $key, 'placeholder_' ) === 0 ) {
+					$placeholder_key = substr( $key, strlen( 'placeholder_' ) );
+					$placeholders[ $placeholder_key ] = sanitize_text_field( wp_unslash( $value ) );
+				}
+			}
+
+			// Validar placeholders contra el schema
+			if ( ! empty( $placeholders ) ) {
+				$validation = Arriendo_Facil_Contract_Storage::validate_placeholders( $placeholders );
+				if ( ! $validation['valid'] ) {
+					wp_send_json_error(
+						array(
+							'message' => __( 'Errores en Datos Avanzados:', 'arriendo-facil' ),
+							'errors'  => $validation['errors'],
+						)
+					);
+				}
+			}
+		}
+
 		// Optional idempotency guard: activates only when the client sends the key.
 		$idempotency_key = Arriendo_Facil_Idempotency::key_from_request();
 		if ( null !== $idempotency_key ) {
@@ -284,14 +309,15 @@ class Arriendo_Facil_Lease {
 					'monthly_rent'     => $monthly_rent,
 					'deposit_amount'   => $deposit_amount,
 					'payment_due_day'  => $payment_due_day,
+					'placeholders'     => $placeholders,
 				)
 			);
 			$idem_response = Arriendo_Facil_Idempotency::remember(
 				$scope,
 				$idempotency_key,
 				DAY_IN_SECONDS,
-				function () use ( $accommodation_id, $guest_id, $start_date, $end_date, $monthly_rent, $deposit_amount, $payment_due_day, $template_attachment_id ) {
-					return $this->insert_lease_record( $accommodation_id, $guest_id, $start_date, $end_date, $monthly_rent, $deposit_amount, $payment_due_day, $template_attachment_id );
+				function () use ( $accommodation_id, $guest_id, $start_date, $end_date, $monthly_rent, $deposit_amount, $payment_due_day, $template_attachment_id, $placeholders ) {
+					return $this->insert_lease_record( $accommodation_id, $guest_id, $start_date, $end_date, $monthly_rent, $deposit_amount, $payment_due_day, $template_attachment_id, $placeholders );
 				},
 				$fingerprint
 			);
@@ -315,7 +341,7 @@ class Arriendo_Facil_Lease {
 			wp_send_json_error( array( 'message' => __( 'No se pudo crear el contrato.', 'arriendo-facil' ) ) );
 		}
 
-		$result = $this->insert_lease_record( $accommodation_id, $guest_id, $start_date, $end_date, $monthly_rent, $deposit_amount, $payment_due_day, $template_attachment_id );
+		$result = $this->insert_lease_record( $accommodation_id, $guest_id, $start_date, $end_date, $monthly_rent, $deposit_amount, $payment_due_day, $template_attachment_id, $placeholders );
 		if ( is_array( $result ) && ! empty( $result['id'] ) ) {
 			wp_send_json_success( array( 'id' => (int) $result['id'] ) );
 		}
@@ -333,9 +359,10 @@ class Arriendo_Facil_Lease {
 	 * @param float  $deposit_amount   Refundable deposit received.
 	 * @param int    $payment_due_day  Monthly payment due day (1-28), 0 = not set.
 	 * @param int    $template_attachment_id Owner DOCX template to use for the contract, 0 = latest.
+	 * @param array  $placeholders     Optional array of placeholder values to store in meta.
 	 * @return array
 	 */
-	private function insert_lease_record( int $accommodation_id, int $guest_id, string $start_date, string $end_date, float $monthly_rent, float $deposit_amount = 0.0, int $payment_due_day = 0, int $template_attachment_id = 0 ): array {
+	private function insert_lease_record( int $accommodation_id, int $guest_id, string $start_date, string $end_date, float $monthly_rent, float $deposit_amount = 0.0, int $payment_due_day = 0, int $template_attachment_id = 0, array $placeholders = array() ): array {
 		global $wpdb;
 		$inserted = $wpdb->insert(
 			$wpdb->prefix . 'af_leases',
@@ -358,6 +385,22 @@ class Arriendo_Facil_Lease {
 		}
 
 		$new_id = (int) $wpdb->insert_id;
+
+		// ── Guardar Placeholders en Meta ──────────────────────────────────────
+		if ( ! empty( $placeholders ) ) {
+			// Guardar como una entrada en post_meta con clave serializada
+			update_post_meta( $new_id, 'af_contract_placeholders', wp_json_encode( $placeholders ) );
+		}
+
+		// ── Auto-vinculación: Inquilino → Inmueble ───────────────────────────
+		// Si el inquilino no tiene accommodation_id, asignarlo automáticamente
+		if ( $guest_id > 0 ) {
+			$guest_accommodation_id = get_post_meta( $guest_id, 'accommodation_id', true );
+			if ( empty( $guest_accommodation_id ) ) {
+				update_post_meta( $guest_id, 'accommodation_id', $accommodation_id );
+			}
+		}
+
 		if ( class_exists( 'Arriendo_Facil_Occupancy' ) ) {
 			Arriendo_Facil_Occupancy::mark_occupied( $accommodation_id );
 		} else {

@@ -178,98 +178,263 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 	);
 	?>
 
+	<!-- Contract Process Steps -->
+	<div class="af-section" style="padding: var(--af-space-4); margin-bottom: var(--af-space-5); background:#f9fafb; border-radius: 8px;">
+		<h3 style="margin: 0 0 var(--af-space-3); font-size: 14px; font-weight: 600; text-transform: uppercase; color: #6b7280;">
+			<?php esc_html_e( 'Flujo de Contratos', 'arriendo-facil' ); ?>
+		</h3>
+		<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--af-space-3);">
+			<div style="padding: var(--af-space-3); background: #fff; border-radius: 6px; border-left: 3px solid #10b981;">
+				<div style="font-weight: 600; font-size: 13px; color: #111; margin-bottom: 4px;">1. <?php esc_html_e( 'Registrar Inquilino', 'arriendo-facil' ); ?></div>
+				<p style="margin: 0; font-size: 12px; color: #6b7280;">
+					<?php esc_html_e( 'Completa datos de identidad y referencias.', 'arriendo-facil' ); ?>
+				</p>
+				<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-guests' ) ); ?>" style="display: inline-block; margin-top: 6px; font-size: 12px; color: #0891b2; text-decoration: none; font-weight: 500;">
+					<?php esc_html_e( 'Ir a Inquilinos →', 'arriendo-facil' ); ?>
+				</a>
+			</div>
+			<div style="padding: var(--af-space-3); background: #fff; border-radius: 6px; border-left: 3px solid #3b82f6;">
+				<div style="font-weight: 600; font-size: 13px; color: #111; margin-bottom: 4px;">2. <?php esc_html_e( 'Crear Contrato', 'arriendo-facil' ); ?></div>
+				<p style="margin: 0; font-size: 12px; color: #6b7280;">
+					<?php esc_html_e( 'Vincula inmueble + inquilino + datos financieros.', 'arriendo-facil' ); ?>
+				</p>
+				<button type="button" id="af-new-lease-from-steps" style="display: inline-block; margin-top: 6px; font-size: 12px; background: none; border: none; color: #0891b2; text-decoration: none; font-weight: 500; cursor: pointer; padding: 0;">
+					<?php esc_html_e( 'Crear Contrato →', 'arriendo-facil' ); ?>
+				</button>
+			</div>
+			<div style="padding: var(--af-space-3); background: #fff; border-radius: 6px; border-left: 3px solid #8b5cf6;">
+				<div style="font-weight: 600; font-size: 13px; color: #111; margin-bottom: 4px;">3. <?php esc_html_e( 'Activar', 'arriendo-facil' ); ?></div>
+				<p style="margin: 0; font-size: 12px; color: #6b7280;">
+					<?php esc_html_e( 'Sube documento y activa para emitir facturas.', 'arriendo-facil' ); ?>
+				</p>
+			</div>
+		</div>
+	</div>
+
 	<div id="af-lease-form-card" class="af-section" style="padding: var(--af-space-5); margin-bottom: var(--af-space-4); display:none;">
-		<h2 class="af-section__title" style="margin-top:0;"><?php esc_html_e( 'Nuevo contrato', 'arriendo-facil' ); ?></h2>
-		<p class="af-modal__hint" style="margin:0 0 16px;">
-			<?php esc_html_e( 'Registra un contrato ya acordado. El canon y la alícuota se generarán automáticamente cada mes en Control de pagos.', 'arriendo-facil' ); ?>
+		<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--af-space-3);">
+			<h2 class="af-section__title" style="margin:0;"><?php esc_html_e( 'Nuevo Contrato', 'arriendo-facil' ); ?></h2>
+			<button type="button" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #9ca3af; padding: 0;" id="af-lease-form-close" aria-label="<?php esc_attr_e( 'Cerrar', 'arriendo-facil' ); ?>">&times;</button>
+		</div>
+		<p class="af-modal__hint" style="margin:0 0 var(--af-space-4);">
+			<?php esc_html_e( 'Selecciona el inmueble e inquilino ya registrados. El sistema generará automáticamente el contrato con los datos.', 'arriendo-facil' ); ?>
 		</p>
-		<p class="af-modal__status" id="af-lease-status"></p>
+		<p class="af-modal__status" id="af-lease-status" style="display:none;"></p>
 
-		<form id="af-lease-form" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:14px; align-items:end;">
-			<label>
-				<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Inmueble', 'arriendo-facil' ); ?> *</span>
-				<select name="accommodation_id" required style="width:100%;">
-					<option value=""><?php esc_html_e( '— Seleccionar —', 'arriendo-facil' ); ?></option>
-					<?php foreach ( $lease_accommodations as $lease_accommodation ) : ?>
-						<option value="<?php echo esc_attr( (int) $lease_accommodation->ID ); ?>"
-							data-rent="<?php echo esc_attr( (string) get_post_meta( $lease_accommodation->ID, '_af_monthly_rent', true ) ); ?>">
-							<?php echo esc_html( $lease_accommodation->post_title ); ?>
-						</option>
-					<?php endforeach; ?>
-				</select>
-			</label>
+		<form id="af-lease-form">
+			<!-- Section 1: Inmueble e Inquilino -->
+			<fieldset style="border: none; padding: 0; margin-bottom: var(--af-space-4);">
+				<legend style="font-weight: 600; font-size: 14px; color: #111; margin-bottom: var(--af-space-3); text-transform: uppercase;">
+					<?php esc_html_e( 'Seleccionar Inmueble e Inquilino', 'arriendo-facil' ); ?>
+				</legend>
+				<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--af-space-3);">
+					<label style="display: block;">
+						<span style="display:block; font-weight:600; margin-bottom:6px; font-size: 13px;"><?php esc_html_e( 'Inmueble', 'arriendo-facil' ); ?> *</span>
+						<select name="accommodation_id" required style="width:100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+							<option value=""><?php esc_html_e( '— Seleccionar —', 'arriendo-facil' ); ?></option>
+							<?php foreach ( $lease_accommodations as $lease_accommodation ) : ?>
+								<option value="<?php echo esc_attr( (int) $lease_accommodation->ID ); ?>"
+									data-rent="<?php echo esc_attr( (string) get_post_meta( $lease_accommodation->ID, '_af_monthly_rent', true ) ); ?>">
+									<?php echo esc_html( $lease_accommodation->post_title ); ?>
+								</option>
+							<?php endforeach; ?>
+						</select>
+					</label>
 
-			<label>
-				<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Inquilino', 'arriendo-facil' ); ?> *</span>
-				<select name="guest_id" required style="width:100%;">
-					<option value=""><?php esc_html_e( '— Seleccionar —', 'arriendo-facil' ); ?></option>
-					<?php foreach ( (array) $lease_guests as $lease_guest ) : ?>
-						<option value="<?php echo esc_attr( (int) $lease_guest->id ); ?>"
-							data-accommodation="<?php echo esc_attr( (int) $lease_guest->accommodation_id ); ?>"
-							data-start="<?php echo esc_attr( (string) $lease_guest->rental_start_date ); ?>"
-							data-end="<?php echo esc_attr( (string) $lease_guest->rental_end_date ); ?>"
-							data-price="<?php echo esc_attr( (string) $lease_guest->desired_price ); ?>"
-							data-doc-status="<?php echo esc_attr( (string) $lease_guest->doc_status ); ?>">
-							<?php
-							echo esc_html( trim( $lease_guest->first_name . ' ' . $lease_guest->last_name ) );
-							if ( 'verificado' === (string) $lease_guest->doc_status ) {
-								echo esc_html( ' · ' . __( 'verificado', 'arriendo-facil' ) );
-							}
-							?>
-						</option>
-					<?php endforeach; ?>
-				</select>
-				<span class="af-modal__hint" style="display:block;">
-					<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-guests' ) ); ?>"><?php esc_html_e( 'Registrar inquilino', 'arriendo-facil' ); ?></a>
-				</span>
-			</label>
+					<label style="display: block;">
+						<span style="display:block; font-weight:600; margin-bottom:6px; font-size: 13px;"><?php esc_html_e( 'Inquilino', 'arriendo-facil' ); ?> *</span>
+						<select name="guest_id" required style="width:100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+							<option value=""><?php esc_html_e( '— Seleccionar —', 'arriendo-facil' ); ?></option>
+							<?php foreach ( (array) $lease_guests as $lease_guest ) : ?>
+								<option value="<?php echo esc_attr( (int) $lease_guest->id ); ?>"
+									data-accommodation="<?php echo esc_attr( (int) $lease_guest->accommodation_id ); ?>"
+									data-start="<?php echo esc_attr( (string) $lease_guest->rental_start_date ); ?>"
+									data-end="<?php echo esc_attr( (string) $lease_guest->rental_end_date ); ?>"
+									data-price="<?php echo esc_attr( (string) $lease_guest->desired_price ); ?>"
+									data-doc-status="<?php echo esc_attr( (string) $lease_guest->doc_status ); ?>">
+									<?php
+									echo esc_html( trim( $lease_guest->first_name . ' ' . $lease_guest->last_name ) );
+									if ( 'verificado' === (string) $lease_guest->doc_status ) {
+										echo esc_html( ' ✓' );
+									}
+									?>
+								</option>
+							<?php endforeach; ?>
+						</select>
+						<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-guests' ) ); ?>" style="display: inline-block; margin-top: 6px; font-size: 12px; color: #0891b2; text-decoration: none;">
+							<?php esc_html_e( '+ Registrar nuevo inquilino', 'arriendo-facil' ); ?>
+						</a>
+					</label>
+				</div>
+			</fieldset>
 
-			<label>
-				<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Plantilla del contrato', 'arriendo-facil' ); ?></span>
-				<select name="template_attachment_id" id="af-lease-template" style="width:100%;">
-					<option value=""><?php esc_html_e( 'Plantilla del propietario (última)', 'arriendo-facil' ); ?></option>
-				</select>
-				<span class="af-modal__hint" style="display:block;">
-					<?php esc_html_e( 'Se usará para generar el documento del contrato.', 'arriendo-facil' ); ?>
-					<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-owner-contacts' ) ); ?>"><?php esc_html_e( 'Administrar plantillas', 'arriendo-facil' ); ?></a>
-				</span>
-			</label>
+			<!-- Section 2: Fechas -->
+			<fieldset style="border: none; padding: 0; margin-bottom: var(--af-space-4);">
+				<legend style="font-weight: 600; font-size: 14px; color: #111; margin-bottom: var(--af-space-3); text-transform: uppercase;">
+					<?php esc_html_e( 'Fechas del Contrato', 'arriendo-facil' ); ?>
+				</legend>
+				<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--af-space-3);">
+					<label style="display: block;">
+						<span style="display:block; font-weight:600; margin-bottom:6px; font-size: 13px;"><?php esc_html_e( 'Inicio', 'arriendo-facil' ); ?> *</span>
+						<input type="date" name="start_date" required style="width:100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;" />
+					</label>
 
-			<label>
-				<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Inicio', 'arriendo-facil' ); ?> *</span>
-				<input type="date" name="start_date" required style="width:100%;" />
-			</label>
+					<label style="display: block;">
+						<span style="display:block; font-weight:600; margin-bottom:6px; font-size: 13px;"><?php esc_html_e( 'Fin', 'arriendo-facil' ); ?> *</span>
+						<input type="date" name="end_date" required style="width:100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;" />
+					</label>
+				</div>
+			</fieldset>
 
-			<label>
-				<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Fin', 'arriendo-facil' ); ?> *</span>
-				<input type="date" name="end_date" required style="width:100%;" />
-			</label>
+			<!-- Section 3: Canon y Garantía -->
+			<fieldset style="border: none; padding: 0; margin-bottom: var(--af-space-4);">
+				<legend style="font-weight: 600; font-size: 14px; color: #111; margin-bottom: var(--af-space-3); text-transform: uppercase;">
+					<?php esc_html_e( 'Datos Financieros', 'arriendo-facil' ); ?>
+				</legend>
+				<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--af-space-3);">
+					<label style="display: block;">
+						<span style="display:block; font-weight:600; margin-bottom:6px; font-size: 13px;"><?php esc_html_e( 'Canon Mensual (USD)', 'arriendo-facil' ); ?> *</span>
+						<input type="number" name="monthly_rent" step="0.01" min="0" required style="width:100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;" placeholder="0.00" />
+					</label>
 
-			<label>
-				<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Canon mensual (USD)', 'arriendo-facil' ); ?> *</span>
-				<input type="number" name="monthly_rent" step="0.01" min="0" required style="width:100%;" placeholder="0.00" />
-			</label>
+					<label style="display: block;">
+						<span style="display:block; font-weight:600; margin-bottom:6px; font-size: 13px;"><?php esc_html_e( 'Garantía (USD)', 'arriendo-facil' ); ?></span>
+						<input type="number" name="deposit_amount" step="0.01" min="0" style="width:100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;" placeholder="0.00" />
+					</label>
 
-			<label>
-				<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Garantía recibida (USD)', 'arriendo-facil' ); ?></span>
-				<input type="number" name="deposit_amount" step="0.01" min="0" style="width:100%;" placeholder="0.00" />
-			</label>
+					<label style="display: block;">
+						<span style="display:block; font-weight:600; margin-bottom:6px; font-size: 13px;"><?php esc_html_e( 'Día Límite de Pago', 'arriendo-facil' ); ?></span>
+						<select name="payment_due_day" style="width:100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+							<option value=""><?php esc_html_e( 'Día 5 (predeterminado)', 'arriendo-facil' ); ?></option>
+							<?php for ( $day = 1; $day <= 28; $day++ ) : ?>
+								<option value="<?php echo esc_attr( $day ); ?>"><?php echo esc_html( sprintf( __( 'Día %d', 'arriendo-facil' ), $day ) ); ?></option>
+							<?php endfor; ?>
+						</select>
+					</label>
+				</div>
+			</fieldset>
 
-			<label>
-				<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Día límite de pago', 'arriendo-facil' ); ?></span>
-				<select name="payment_due_day" style="width:100%;">
-					<option value=""><?php esc_html_e( 'Día 5 (predeterminado)', 'arriendo-facil' ); ?></option>
-					<?php for ( $day = 1; $day <= 28; $day++ ) : ?>
-						<option value="<?php echo esc_attr( $day ); ?>"><?php echo esc_html( sprintf( /* translators: %d: day of month */ __( 'Día %d', 'arriendo-facil' ), $day ) ); ?></option>
-					<?php endfor; ?>
-				</select>
-			</label>
+			<!-- Section 4: Plantilla -->
+			<fieldset style="border: none; padding: 0; margin-bottom: var(--af-space-4);">
+				<legend style="font-weight: 600; font-size: 14px; color: #111; margin-bottom: var(--af-space-3); text-transform: uppercase;">
+					<?php esc_html_e( 'Plantilla de Contrato', 'arriendo-facil' ); ?>
+				</legend>
+				<label style="display: block;">
+					<span style="display:block; font-weight:600; margin-bottom:6px; font-size: 13px;"><?php esc_html_e( 'Seleccionar Plantilla', 'arriendo-facil' ); ?></span>
+					<select name="template_attachment_id" id="af-lease-template" style="width:100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+						<option value=""><?php esc_html_e( 'Plantilla del Propietario (Última)', 'arriendo-facil' ); ?></option>
+					</select>
+					<p style="margin: 6px 0 0; font-size: 12px; color: #6b7280;">
+						<?php esc_html_e( 'Se usará para generar automáticamente el documento.', 'arriendo-facil' ); ?>
+						<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-owner-contacts' ) ); ?>" style="color: #0891b2; text-decoration: none;">
+							<?php esc_html_e( 'Administrar Plantillas', 'arriendo-facil' ); ?>
+						</a>
+					</p>
+				</label>
+			</fieldset>
 
-			<div style="display:flex; gap:8px;">
-				<button type="submit" class="button button-primary"><?php esc_html_e( 'Crear contrato', 'arriendo-facil' ); ?></button>
-				<button type="button" class="button" id="af-lease-cancel"><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
+			<!-- Section 5: Placeholders Avanzados (Collapsible) -->
+			<?php if ( class_exists( 'Arriendo_Facil_Contract_Storage' ) ) : ?>
+				<?php $placeholders_by_section = Arriendo_Facil_Contract_Storage::get_placeholders_by_section(); ?>
+				<fieldset style="border: none; padding: 0; margin-bottom: var(--af-space-4);">
+					<legend style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: var(--af-space-3); font-weight: 600; font-size: 14px; color: #111; text-transform: uppercase;">
+						<span style="display: inline-block; width: 16px; height: 16px; background: #e5e7eb; border-radius: 2px; text-align: center; line-height: 14px; font-size: 11px; color: #6b7280;" id="af-advanced-toggle">▶</span>
+						<?php esc_html_e( 'Datos Avanzados (Placeholders)', 'arriendo-facil' ); ?>
+					</legend>
+
+					<div id="af-advanced-fields" style="display: none; padding: var(--af-space-3); background: #fafafa; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: var(--af-space-3);">
+						<?php foreach ( $placeholders_by_section as $section_id => $section_data ) : ?>
+							<div style="margin-bottom: var(--af-space-4);">
+								<h4 style="margin: 0 0 var(--af-space-2); font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase; letter-spacing: 0.3px;">
+									<?php echo esc_html( $section_data['label'] ); ?>
+								</h4>
+								<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--af-space-2);">
+									<?php foreach ( $section_data['placeholders'] as $placeholder => $config ) : ?>
+										<?php
+										$field_id = 'af-placeholder-' . str_replace( '_', '-', $placeholder );
+										$field_name = 'placeholder_' . $placeholder;
+										$input_type = 'text';
+										$input_attrs = '';
+
+										switch ( $config['type'] ) {
+											case 'date':
+												$input_type = 'date';
+												break;
+											case 'integer':
+												$input_type = 'number';
+												$input_attrs = ' step="1"';
+												break;
+											case 'decimal':
+												$input_type = 'number';
+												$input_attrs = ' step="0.01" min="0"';
+												break;
+											case 'select':
+												$input_type = 'select';
+												break;
+											case 'textarea':
+												$input_type = 'textarea';
+												break;
+										}
+										?>
+										<label style="display: block;">
+											<span style="display:block; font-weight:600; margin-bottom:4px; font-size: 12px;">
+												<?php echo esc_html( $config['label'] ); ?>
+												<?php if ( ! empty( $config['required'] ) ) : ?>
+													<span style="color: #ef4444;">*</span>
+												<?php endif; ?>
+											</span>
+											<?php if ( 'select' === $input_type ) : ?>
+												<select name="<?php echo esc_attr( $field_name ); ?>" id="<?php echo esc_attr( $field_id ); ?>" style="width:100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+													<option value=""><?php esc_html_e( '— Seleccionar —', 'arriendo-facil' ); ?></option>
+													<?php foreach ( (array) $config['options'] as $opt_value => $opt_label ) : ?>
+														<option value="<?php echo esc_attr( $opt_value ); ?>"><?php echo esc_html( $opt_label ); ?></option>
+													<?php endforeach; ?>
+												</select>
+											<?php elseif ( 'textarea' === $input_type ) : ?>
+												<textarea name="<?php echo esc_attr( $field_name ); ?>" id="<?php echo esc_attr( $field_id ); ?>" rows="3" style="width:100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;"></textarea>
+											<?php else : ?>
+												<input type="<?php echo esc_attr( $input_type ); ?>" name="<?php echo esc_attr( $field_name ); ?>" id="<?php echo esc_attr( $field_id ); ?>" style="width:100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;"<?php echo wp_kses_post( $input_attrs ); ?> />
+											<?php endif; ?>
+											<?php if ( ! empty( $config['description'] ) ) : ?>
+												<small style="display:block; margin-top:2px; color: #9ca3af; font-size: 11px;">
+													<?php echo esc_html( $config['description'] ); ?>
+												</small>
+											<?php endif; ?>
+										</label>
+									<?php endforeach; ?>
+								</div>
+							</div>
+						<?php endforeach; ?>
+					</div>
+				</fieldset>
+			<?php endif; ?>
+
+			<!-- Actions -->
+			<div style="display:flex; gap:var(--af-space-3); padding-top: var(--af-space-4); border-top: 1px solid #e5e7eb;">
+				<button type="submit" class="button button-primary" style="flex: 1;"><?php esc_html_e( 'Crear Contrato', 'arriendo-facil' ); ?></button>
+				<button type="button" class="button" id="af-lease-cancel" style="min-width: 120px;"><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
 			</div>
 		</form>
+
+		<script>
+		(function () {
+			const toggleBtn = document.getElementById('af-advanced-toggle');
+			const advancedFields = document.getElementById('af-advanced-fields');
+			if (toggleBtn && advancedFields) {
+				toggleBtn.parentElement.addEventListener('click', function () {
+					const isHidden = advancedFields.style.display === 'none';
+					advancedFields.style.display = isHidden ? 'block' : 'none';
+					toggleBtn.textContent = isHidden ? '▼' : '▶';
+					localStorage.setItem('af-advanced-fields-expanded', isHidden ? '1' : '0');
+				});
+				// Restore last state
+				if (localStorage.getItem('af-advanced-fields-expanded') === '1') {
+					advancedFields.style.display = 'block';
+					toggleBtn.textContent = '▼';
+				}
+			}
+		})();
+		</script>
 	</div>
 
 	<script>
@@ -278,18 +443,39 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 		const form = document.getElementById('af-lease-form');
 		const status = document.getElementById('af-lease-status');
 		const openBtn = document.getElementById('af-new-lease');
+		const openBtnFromSteps = document.getElementById('af-new-lease-from-steps');
 		const cancelBtn = document.getElementById('af-lease-cancel');
-		if (!card || !form || !openBtn) { return; }
+		const closeBtn = document.getElementById('af-lease-form-close');
+		if (!card || !form || (!openBtn && !openBtnFromSteps)) { return; }
 
 		const ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
 		const nonce = <?php echo wp_json_encode( wp_create_nonce( 'af_lease_nonce' ) ); ?>;
 
-		openBtn.addEventListener('click', function () {
-			card.style.display = card.style.display === 'none' ? 'block' : 'none';
-			if (card.style.display === 'block') { card.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
-		});
+		function openForm() {
+			card.style.display = 'block';
+			card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+			form.querySelector('select[name="accommodation_id"]').focus();
+		}
 
-		cancelBtn.addEventListener('click', function () { card.style.display = 'none'; });
+		function closeForm() {
+			card.style.display = 'none';
+			form.reset();
+			status.style.display = 'none';
+			status.textContent = '';
+		}
+
+		if (openBtn) {
+			openBtn.addEventListener('click', openForm);
+		}
+		if (openBtnFromSteps) {
+			openBtnFromSteps.addEventListener('click', openForm);
+		}
+		if (cancelBtn) {
+			cancelBtn.addEventListener('click', closeForm);
+		}
+		if (closeBtn) {
+			closeBtn.addEventListener('click', closeForm);
+		}
 
 		// Prefill the agreement from what the operator already captured for the
 		// tenant (dates, property link) so nothing is retyped by hand.
@@ -400,12 +586,14 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 			if (form.end_date.value <= form.start_date.value) {
 				status.textContent = <?php echo wp_json_encode( __( 'La fecha de fin debe ser posterior al inicio.', 'arriendo-facil' ) ); ?>;
 				status.className = 'af-modal__status is-error';
+				status.style.display = 'block';
 				return;
 			}
 
 			const btn = form.querySelector('button[type="submit"]');
 			btn.disabled = true;
 			status.textContent = '';
+			status.style.display = 'none';
 			status.className = 'af-modal__status';
 
 			const body = new URLSearchParams(new FormData(form));
@@ -421,11 +609,13 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 				if (!json || !json.success) {
 					status.textContent = (json && json.data && json.data.message) || 'Error';
 					status.className = 'af-modal__status is-error';
+					status.style.display = 'block';
 					return;
 				}
-				status.textContent = <?php echo wp_json_encode( __( 'Contrato creado correctamente.', 'arriendo-facil' ) ); ?>;
+				status.textContent = <?php echo wp_json_encode( __( 'Contrato creado correctamente. Redirigiendo...', 'arriendo-facil' ) ); ?>;
 				status.className = 'af-modal__status is-success';
-				setTimeout(function () { window.location.reload(); }, 800);
+				status.style.display = 'block';
+				setTimeout(function () { window.location.reload(); }, 1200);
 			});
 		});
 	}());
@@ -642,33 +832,22 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 										<?php echo esc_html( $has_approved_pdf ? __( 'Documento aprobado', 'arriendo-facil' ) : __( 'Aprobar documento', 'arriendo-facil' ) ); ?>
 									</button>
 								<?php endif; ?>
-							<button type="button" class="button af-change-lease-status af-lease-activate-button"
+							<button type="button" class="button button-primary af-change-lease-status af-lease-activate-button"
 								data-lease-id="<?php echo esc_attr( $lease->id ); ?>"
-								data-status="active">
-								<?php esc_html_e( 'Activar', 'arriendo-facil' ); ?>
+								data-status="active"
+								<?php disabled( in_array( (string) $lease->status, array( 'active', 'pending_release' ), true ) ); ?>>
+								<?php echo esc_html( in_array( (string) $lease->status, array( 'active', 'pending_release' ), true ) ? __( 'Contrato activo', 'arriendo-facil' ) : __( 'Activar contrato', 'arriendo-facil' ) ); ?>
 							</button>
 							<?php if ( in_array( (string) $lease->status, array( 'active', 'pending_release' ), true ) ) : ?>
 								<button type="button"
-									class="button af-early-terminate-lease-btn"
+									class="button"
 									data-lease-id="<?php echo esc_attr( $lease->id ); ?>"
 									data-nonce="<?php echo esc_attr( wp_create_nonce( 'af_lease_nonce' ) ); ?>"
+									id="af-early-terminate-lease-btn-<?php echo esc_attr( $lease->id ); ?>"
 									style="background:#b91c1c;border-color:#991b1b;color:#fff;">
 									<?php esc_html_e( 'Terminar anticipadamente', 'arriendo-facil' ); ?>
 								</button>
 							<?php endif; ?>
-							<button type="button"
-								class="button button-small af-generate-review-test-link"
-								data-lease-id="<?php echo esc_attr( $lease->id ); ?>"
-								data-reviewer-type="tenant">
-								<?php esc_html_e( 'Link reseña inquilino', 'arriendo-facil' ); ?>
-							</button>
-							<button type="button"
-								class="button button-small af-generate-review-test-link"
-								data-lease-id="<?php echo esc_attr( $lease->id ); ?>"
-								data-reviewer-type="owner">
-								<?php esc_html_e( 'Link reseña propietario', 'arriendo-facil' ); ?>
-							</button>
-							<div class="af-review-test-link-output" data-lease-id="<?php echo esc_attr( $lease->id ); ?>" style="display:none;margin-top:8px;padding:8px;border:1px solid #dbeafe;background:#eff6ff;border-radius:6px;font-size:12px;line-height:1.4;"></div>
 							</div>
 						</details>
 						</td>

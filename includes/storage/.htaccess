@@ -1,0 +1,17 @@
+# Proteger acceso directo a archivos de almacenamiento
+# Bloquear todos los archivos .docx en esta carpeta
+<FilesMatch "\.docx$">
+    Deny from all
+</FilesMatch>
+
+# Si mod_rewrite está disponible, también usarlo
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteRule ^(.*)\.docx$ - [F,L]
+</IfModule>
+
+# Denegar acceso a todos los archivos
+<FilesMatch ".*">
+    Deny from all
+</FilesMatch>

@@ -1,0 +1,226 @@
+/**
+ * Admin UI - Contracts List & Form Styles
+ * Improves visual presentation of contracts management interface
+ */
+
+/* ──────────────────────────────────────────────────────────────────────────
+   CONTRACTS TABLE IMPROVEMENTS
+   ────────────────────────────────────────────────────────────────────────── */
+
+.af-leases-table {
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  background: #fff !important;
+}
+
+.af-leases-table thead tr {
+  background: linear-gradient(to right, #f9fafb, #f3f4f6) !important;
+  border-bottom: 2px solid #e5e7eb !important;
+}
+
+.af-leases-table thead th {
+  padding: 12px 14px !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.3px !important;
+  color: #374151 !important;
+  white-space: nowrap !important;
+}
+
+.af-leases-table tbody tr {
+  border-bottom: 1px solid #f0f0f0 !important;
+  transition: background-color 150ms ease !important;
+}
+
+.af-leases-table tbody tr:hover {
+  background-color: #f9fafb !important;
+}
+
+.af-leases-table td {
+  padding: 12px 14px !important;
+  font-size: 13px !important;
+  vertical-align: middle !important;
+}
+
+.af-leases-table td strong {
+  display: block !important;
+  font-weight: 600 !important;
+  color: #111 !important;
+  margin-bottom: 2px !important;
+}
+
+.af-leases-table td small {
+  display: block !important;
+  font-size: 11px !important;
+  color: #6b7280 !important;
+  margin-top: 2px !important;
+}
+
+/* Status pills */
+.af-pill {
+  display: inline-block !important;
+  padding: 4px 10px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  white-space: nowrap !important;
+}
+
+.af-pill--success {
+  background-color: #ecfdf5 !important;
+  color: #047857 !important;
+}
+
+.af-pill--attention {
+  background-color: #fef2f2 !important;
+  color: #991b1b !important;
+}
+
+.af-pill--pending {
+  background-color: #fef3c7 !important;
+  color: #a16207 !important;
+}
+
+/* Actions cell improvements */
+.af-lease-actions-dropdown {
+  background: #fff !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 6px !important;
+  padding: 8px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+  min-width: 180px !important;
+}
+
+.af-lease-actions-dropdown button {
+  display: block !important;
+  width: 100% !important;
+  text-align: left !important;
+  margin: 0 !important;
+  margin-bottom: 4px !important;
+  padding: 8px 10px !important;
+  font-size: 12px !important;
+  border: none !important;
+  border-radius: 4px !important;
+  background: none !important;
+  cursor: pointer !important;
+  transition: background-color 150ms ease !important;
+}
+
+.af-lease-actions-dropdown button:last-child {
+  margin-bottom: 0 !important;
+}
+
+.af-lease-actions-dropdown button:hover {
+  background-color: #f3f4f6 !important;
+}
+
+.af-lease-actions-dropdown button.button-primary {
+  background-color: #3b82f6 !important;
+  color: #fff !important;
+}
+
+.af-lease-actions-dropdown button.button-primary:hover {
+  background-color: #2563eb !important;
+}
+
+/* Responsive table */
+@media (max-width: 1200px) {
+  .af-leases-table th:nth-child(n+8) {
+    display: none !important;
+  }
+
+  .af-leases-table td:nth-child(n+8) {
+    display: none !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .af-leases-table th:nth-child(n+5) {
+    display: none !important;
+  }
+
+  .af-leases-table td:nth-child(n+5) {
+    display: none !important;
+  }
+
+  .af-leases-table {
+    border: 1px solid #e5e7eb !important;
+  }
+
+  .af-leases-table thead {
+    display: none !important;
+  }
+
+  .af-leases-table tbody,
+  .af-leases-table tr,
+  .af-leases-table td {
+    display: block !important;
+    width: 100% !important;
+  }
+
+  .af-leases-table tr {
+    margin-bottom: 16px !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 6px !important;
+    padding: 12px !important;
+    background: #fff !important;
+  }
+
+  .af-leases-table td {
+    text-align: right !important;
+    padding-left: 50% !important;
+    position: relative !important;
+    border: none !important;
+  }
+
+  .af-leases-table td::before {
+    content: attr(data-label) !important;
+    position: absolute !important;
+    left: 12px !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    font-size: 11px !important;
+    color: #6b7280 !important;
+    min-width: 120px !important;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   FORM IMPROVEMENTS
+   ────────────────────────────────────────────────────────────────────────── */
+
+.af-modal__status {
+  padding: 10px 12px !important;
+  border-radius: 6px !important;
+  font-size: 13px !important;
+  margin-bottom: var(--af-space-3) !important;
+}
+
+.af-modal__status.is-success {
+  background-color: #ecfdf5 !important;
+  color: #047857 !important;
+  border: 1px solid #a7f3d0 !important;
+}
+
+.af-modal__status.is-error {
+  background-color: #fef2f2 !important;
+  color: #991b1b !important;
+  border: 1px solid #fecaca !important;
+}
+
+.af-modal__hint {
+  font-size: 12px !important;
+  color: #6b7280 !important;
+  line-height: 1.5 !important;
+}
+
+.af-modal__hint a {
+  color: #0891b2 !important;
+  text-decoration: none !important;
+  font-weight: 500 !important;
+}
+
+.af-modal__hint a:hover {
+  text-decoration: underline !important;
+}

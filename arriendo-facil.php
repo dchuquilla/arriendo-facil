@@ -32,6 +32,7 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-text-normalizer.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-identity-validator.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/support/class-job-lock.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/storage/class-private-storage.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-contract-storage.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/contracts/class-contract-text-extractor.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/contracts/class-contract-file-store.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/contracts/class-contract-generator.php';

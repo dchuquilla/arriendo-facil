@@ -175,10 +175,10 @@ $calendar_month_anchor = $calendar_from;
 		<div class="af-calendar-cols" data-from="<?php echo esc_attr( $calendar_from ); ?>" data-to="<?php echo esc_attr( $calendar_to ); ?>">
 			<article class="af-calendar-col af-calendar-col--in">
 				<header class="af-calendar-col__head">
-					<span class="af-calendar-col__icon" aria-hidden="true"><?php echo af_lucide( 'log-in', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+					<span class="af-calendar-col__icon af-cal-icon--checkin" aria-hidden="true"><?php echo af_lucide( 'log-in', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
 					<div class="af-calendar-col__title">
-						<h3><?php esc_html_e( 'Próximas mudanzas (check-in)', 'arriendo-facil' ); ?></h3>
-						<span class="af-calendar-col__count"><?php echo esc_html( sprintf( /* translators: %d: count */ _n( '%d registrada', '%d registradas', count( $upcoming_moves ), 'arriendo-facil' ), count( $upcoming_moves ) ) ); ?></span>
+						<h3><?php esc_html_e( 'Check-in', 'arriendo-facil' ); ?></h3>
+						<span class="af-calendar-col__count af-calendar-col__count--checkin"><?php echo esc_html( sprintf( /* translators: %d: count */ _n( '%d mudanza', '%d mudanzas', count( $upcoming_moves ), 'arriendo-facil' ), count( $upcoming_moves ) ) ); ?></span>
 					</div>
 				</header>
 				<?php if ( empty( $upcoming_moves ) ) : ?>
@@ -190,8 +190,10 @@ $calendar_month_anchor = $calendar_from;
 							$move_tasks = Arriendo_Facil_Calendar::move_checklist( $move );
 							$move_done  = count( array_filter( wp_list_pluck( $move_tasks, 'done' ) ) );
 							$move_when  = wp_date( 'd/m/Y', strtotime( $move->move_date ) ) . ( $move->start_time ? ' ' . substr( (string) $move->start_time, 0, 5 ) : '' );
+							$move_days  = max( 0, (int) floor( ( strtotime( $move->move_date ) - strtotime( $calendar_today ) ) / DAY_IN_SECONDS ) );
+							$move_tone  = 'done' === $move->status ? 'success' : ( $move_days <= 7 ? 'danger' : 'warning' );
 							?>
-							<div class="af-semaforo__row">
+							<div class="af-semaforo__row af-semaforo__row--<?php echo esc_attr( $move_tone ); ?>">
 								<span class="af-semaforo__tenant">
 									<strong><?php echo esc_html( $move->contact_name ? $move->contact_name : __( 'Inquilino', 'arriendo-facil' ) ); ?></strong>
 									<small>
@@ -201,7 +203,7 @@ $calendar_month_anchor = $calendar_from;
 										<?php endif; ?>
 									</small>
 								</span>
-								<span class="af-pill af-pill--<?php echo esc_attr( 'done' === $move->status ? 'success' : 'info' ); ?>"><?php echo esc_html( 'done' === $move->status ? __( 'Realizada', 'arriendo-facil' ) : $move_when ); ?></span>
+								<span class="af-pill af-pill--<?php echo esc_attr( $move_tone ); ?>" title="<?php echo esc_attr( $move_when ); ?>"><?php echo esc_html( 'done' === $move->status ? __( '✓ Realizada', 'arriendo-facil' ) : ( 0 === $move_days ? __( 'Hoy', 'arriendo-facil' ) : sprintf( /* translators: %d: days */ _n( 'En %d día', 'En %d días', $move_days, 'arriendo-facil' ), $move_days ) ) ); ?></span>
 							</div>
 						<?php endforeach; ?>
 					</div>
@@ -211,10 +213,10 @@ $calendar_month_anchor = $calendar_from;
 
 			<article class="af-calendar-col af-calendar-col--out">
 				<header class="af-calendar-col__head">
-					<span class="af-calendar-col__icon" aria-hidden="true"><?php echo af_lucide( 'log-out', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+					<span class="af-calendar-col__icon af-cal-icon--checkout" aria-hidden="true"><?php echo af_lucide( 'log-out', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
 					<div class="af-calendar-col__title">
-						<h3><?php esc_html_e( 'Próximos a salir (según contratos)', 'arriendo-facil' ); ?></h3>
-						<span class="af-calendar-col__count"><?php echo esc_html( sprintf( /* translators: %d: count */ _n( '%d contrato vence', '%d contratos vencen', count( $upcoming_checkouts ), 'arriendo-facil' ), count( $upcoming_checkouts ) ) ); ?></span>
+						<h3><?php esc_html_e( 'Check-out', 'arriendo-facil' ); ?></h3>
+						<span class="af-calendar-col__count af-calendar-col__count--checkout"><?php echo esc_html( sprintf( /* translators: %d: count */ _n( '%d vencimiento', '%d vencimientos', count( $upcoming_checkouts ), 'arriendo-facil' ), count( $upcoming_checkouts ) ) ); ?></span>
 					</div>
 				</header>
 				<?php if ( empty( $upcoming_checkouts ) ) : ?>
@@ -224,17 +226,17 @@ $calendar_month_anchor = $calendar_from;
 						<?php foreach ( $upcoming_checkouts as $checkout ) : ?>
 							<?php
 							$exit_days    = max( 0, (int) floor( ( strtotime( $checkout->end_date ) - strtotime( $calendar_today ) ) / DAY_IN_SECONDS ) );
-							$exit_tone    = $exit_days <= 30 ? 'danger' : ( $exit_days <= 60 ? 'warning' : 'neutral' );
+							$exit_tone    = $exit_days <= 30 ? 'danger' : ( $exit_days <= 60 ? 'warning' : 'success' );
 							$exit_legal   = $checkout->legal_status ? (string) $checkout->legal_status : 'pendiente';
 							$exit_title   = $checkout->accommodation_title ? $checkout->accommodation_title : '#' . (int) $checkout->accommodation_id;
 							?>
-							<div class="af-semaforo__row af-exit-row">
+							<div class="af-semaforo__row af-semaforo__row--<?php echo esc_attr( $exit_tone ); ?> af-exit-row">
 								<span class="af-semaforo__tenant">
 									<strong><?php echo esc_html( trim( (string) $checkout->guest_name ) ? trim( (string) $checkout->guest_name ) : __( 'Inquilino', 'arriendo-facil' ) ); ?></strong>
 									<small><?php echo esc_html( $exit_title . ' · ' . ( $legal_statuses[ $exit_legal ] ?? $exit_legal ) ); ?></small>
 								</span>
 								<span class="af-pill af-pill--<?php echo esc_attr( $exit_tone ); ?>" title="<?php echo esc_attr( wp_date( 'd/m/Y', strtotime( $checkout->end_date ) ) ); ?>">
-									<?php echo esc_html( 0 === $exit_days ? __( 'Vence hoy', 'arriendo-facil' ) : sprintf( /* translators: %d: days remaining */ _n( 'En %d día', 'En %d días', $exit_days, 'arriendo-facil' ), $exit_days ) ); ?>
+									<?php echo esc_html( 0 === $exit_days ? __( '⚠ Vence hoy', 'arriendo-facil' ) : sprintf( /* translators: %d: days remaining */ _n( 'En %d día', 'En %d días', $exit_days, 'arriendo-facil' ), $exit_days ) ); ?>
 								</span>
 								<span class="af-exit-row__actions">
 									<button type="button" class="af-cal__link af-exit-open-renew"

@@ -206,20 +206,31 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 			 LIMIT 300"
 		);
 	} elseif ( ! empty( $ids_sql ) ) {
-		// Owner - show only guests linked to their accommodations
+		// Owner - show only guests linked to their accommodations (or unlinked)
+		$lease_guests = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT g.id, g.first_name, g.last_name, g.email, g.accommodation_id, 
+				        g.rental_start_date, g.rental_end_date, g.desired_price, g.guarantee_text, g.doc_status,
+				        g.document_id, g.nationality, a.post_title AS accommodation_title
+				 FROM {$wpdb->prefix}af_guests g
+				 LEFT JOIN {$wpdb->posts} a ON a.ID = g.accommodation_id
+				 WHERE g.accommodation_id IN ($ids_sql) OR g.accommodation_id IS NULL OR g.accommodation_id = 0
+				 ORDER BY g.first_name ASC
+				 LIMIT 300"
+			) // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		);
+	} else {
+		// Owner with no accommodations - show only unlinked guests
 		$lease_guests = $wpdb->get_results(
 			"SELECT g.id, g.first_name, g.last_name, g.email, g.accommodation_id, 
 			        g.rental_start_date, g.rental_end_date, g.desired_price, g.guarantee_text, g.doc_status,
 			        g.document_id, g.nationality, a.post_title AS accommodation_title
 			 FROM {$wpdb->prefix}af_guests g
 			 LEFT JOIN {$wpdb->posts} a ON a.ID = g.accommodation_id
-			 WHERE g.accommodation_id IN ($ids_sql) OR g.accommodation_id IS NULL OR g.accommodation_id = 0
+			 WHERE g.accommodation_id IS NULL OR g.accommodation_id = 0
 			 ORDER BY g.first_name ASC
 			 LIMIT 300"
 		);
-	} else {
-		// No accommodations
-		$lease_guests = array();
 	}
 	?>
 
@@ -392,22 +403,25 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 				</label>
 			</fieldset>
 
-			<!-- Section 5: Placeholders Avanzados (Collapsible) -->
+			<!-- Section 5: Información Adicional del Contrato (Collapsible) -->
 			<?php if ( class_exists( 'Arriendo_Facil_Contract_Storage' ) ) : ?>
 				<?php $placeholders_by_section = Arriendo_Facil_Contract_Storage::get_placeholders_by_section(); ?>
 				<fieldset style="border: none; padding: 0; margin-bottom: var(--af-space-4);">
 					<legend style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: var(--af-space-3); font-weight: 600; font-size: 14px; color: #111; text-transform: uppercase;">
 						<span style="display: inline-block; width: 16px; height: 16px; background: #e5e7eb; border-radius: 2px; text-align: center; line-height: 14px; font-size: 11px; color: #6b7280;" id="af-advanced-toggle">▶</span>
-						<?php esc_html_e( 'Datos Avanzados (Placeholders)', 'arriendo-facil' ); ?>
+						<?php esc_html_e( 'Información Adicional del Contrato', 'arriendo-facil' ); ?>
 					</legend>
 
 					<div id="af-advanced-fields" style="display: none; padding: var(--af-space-3); background: #fafafa; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: var(--af-space-3);">
 						<?php foreach ( $placeholders_by_section as $section_id => $section_data ) : ?>
-							<div style="margin-bottom: var(--af-space-4);">
-								<h4 style="margin: 0 0 var(--af-space-2); font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase; letter-spacing: 0.3px;">
-									<?php echo esc_html( $section_data['label'] ); ?>
-								</h4>
-								<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--af-space-2);">
+							<div style="margin-bottom: var(--af-space-4); padding-bottom: var(--af-space-4); border-bottom: 1px solid #e5e7eb;">
+								<div style="margin-bottom: var(--af-space-3);">
+									<h4 style="margin: 0 0 var(--af-space-2); font-size: 13px; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: 0.4px;">
+										<?php echo esc_html( $section_data['label'] ); ?>
+									</h4>
+									<div style="width: 36px; height: 3px; background: linear-gradient(90deg, #3b82f6, #0891b2); border-radius: 2px;"></div>
+								</div>
+								<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--af-space-3);">
 									<?php foreach ( $section_data['placeholders'] as $placeholder => $config ) : ?>
 										<?php
 										$field_id = 'af-placeholder-' . str_replace( '_', '-', $placeholder );
@@ -436,26 +450,26 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 										}
 										?>
 										<label style="display: block;">
-											<span style="display:block; font-weight:600; margin-bottom:4px; font-size: 12px;">
+											<span style="display:block; font-weight:600; margin-bottom:6px; font-size: 13px; color: #111;">
 												<?php echo esc_html( $config['label'] ); ?>
 												<?php if ( ! empty( $config['required'] ) ) : ?>
 													<span style="color: #ef4444;">*</span>
 												<?php endif; ?>
 											</span>
 											<?php if ( 'select' === $input_type ) : ?>
-												<select name="<?php echo esc_attr( $field_name ); ?>" id="<?php echo esc_attr( $field_id ); ?>" style="width:100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+												<select name="<?php echo esc_attr( $field_name ); ?>" id="<?php echo esc_attr( $field_id ); ?>" style="width:100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; background: #fff;">
 													<option value=""><?php esc_html_e( '— Seleccionar —', 'arriendo-facil' ); ?></option>
 													<?php foreach ( (array) $config['options'] as $opt_value => $opt_label ) : ?>
 														<option value="<?php echo esc_attr( $opt_value ); ?>"><?php echo esc_html( $opt_label ); ?></option>
 													<?php endforeach; ?>
 												</select>
 											<?php elseif ( 'textarea' === $input_type ) : ?>
-												<textarea name="<?php echo esc_attr( $field_name ); ?>" id="<?php echo esc_attr( $field_id ); ?>" rows="3" style="width:100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;"></textarea>
+												<textarea name="<?php echo esc_attr( $field_name ); ?>" id="<?php echo esc_attr( $field_id ); ?>" rows="4" style="width:100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; background: #fff; font-family: inherit; resize: vertical;"></textarea>
 											<?php else : ?>
-												<input type="<?php echo esc_attr( $input_type ); ?>" name="<?php echo esc_attr( $field_name ); ?>" id="<?php echo esc_attr( $field_id ); ?>" style="width:100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;"<?php echo wp_kses_post( $input_attrs ); ?> />
+												<input type="<?php echo esc_attr( $input_type ); ?>" name="<?php echo esc_attr( $field_name ); ?>" id="<?php echo esc_attr( $field_id ); ?>" style="width:100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; background: #fff;"<?php echo wp_kses_post( $input_attrs ); ?> />
 											<?php endif; ?>
 											<?php if ( ! empty( $config['description'] ) ) : ?>
-												<small style="display:block; margin-top:2px; color: #9ca3af; font-size: 11px;">
+												<small style="display:block; margin-top:4px; color: #6b7280; font-size: 12px; line-height: 1.4;">
 													<?php echo esc_html( $config['description'] ); ?>
 												</small>
 											<?php endif; ?>
@@ -1253,4 +1267,35 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 		} );
 	}());
 }());
+
+// Position fixed dropdowns for actions menu
+(function() {
+	function positionDropdown(detailsElement) {
+		const dropdown = detailsElement.querySelector('.af-lease-actions-dropdown');
+		if (!dropdown) return;
+
+		const summary = detailsElement.querySelector('summary');
+		if (!summary) return;
+
+		const rect = summary.getBoundingClientRect();
+		dropdown.style.top = (rect.bottom + window.scrollY) + 'px';
+		dropdown.style.left = (rect.right - 280) + 'px';
+		dropdown.style.display = detailsElement.open ? 'grid' : 'none';
+	}
+
+	// Handle toggle events
+	document.querySelectorAll('.af-lease-actions-menu').forEach(details => {
+		details.addEventListener('toggle', () => {
+			positionDropdown(details);
+		});
+	});
+
+	// Reposition on scroll
+	document.addEventListener('scroll', () => {
+		document.querySelectorAll('.af-lease-actions-menu[open]').forEach(details => {
+			positionDropdown(details);
+		});
+	}, true);
+})();
 </script>
+

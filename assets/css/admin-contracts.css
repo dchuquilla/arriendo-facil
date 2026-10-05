@@ -124,17 +124,16 @@
 }
 
 .af-lease-actions-dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
+  position: fixed;
   background: #fff !important;
   border: 1px solid #e5e7eb !important;
   border-radius: 6px !important;
   padding: 8px !important;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15) !important;
-  min-width: 240px !important;
-  z-index: 1000;
-  display: grid;
+  min-width: 220px !important;
+  max-width: 280px !important;
+  z-index: 99999;
+  display: none !important;
   gap: 4px;
 }
 
@@ -197,6 +196,7 @@
 .af-lease-actions-cell {
   position: relative;
   overflow: visible !important;
+  white-space: nowrap;
 }
 
 .af-lease-actions-menu {
@@ -206,9 +206,12 @@
 /* Table scroll container */
 .af-table-scroll {
   overflow-x: auto;
+  overflow-y: visible;
   border: 1px solid #e5e7eb;
   border-radius: 6px;
   background: #fff;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
 }
 
 .af-table-scroll table {

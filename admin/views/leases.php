@@ -675,7 +675,7 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 				case 'guest.document_id': return gOpt ? (gOpt.getAttribute('data-document-id') || '') : '';
 				case 'guest.nationality': return gOpt ? (gOpt.getAttribute('data-nationality') || '') : '';
 				case 'accommodation.address': return accOpt ? (accOpt.getAttribute('data-address') || '') : '';
-				case 'accommodation.property_type': return accOpt ? (accOpt.getAttribute('data-property-type') || '') : '';
+				case 'accommodation.property_type': return propertyType(accOpt);
 				case 'accommodation.bedrooms': return accOpt ? (accOpt.getAttribute('data-bedrooms') || '') : '';
 				case 'accommodation.bathrooms': return accOpt ? (accOpt.getAttribute('data-bathrooms') || '') : '';
 				case 'accommodation.parking': return accOpt ? (accOpt.getAttribute('data-parking') || '') : '';
@@ -687,6 +687,28 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 				case 'accommodation.owner_id': return accOpt ? (accOpt.getAttribute('data-owner-id') || '') : '';
 				default: return '';
 			}
+		}
+
+		/* Tipo de inmueble: el catálogo guarda slugs en inglés (apartment, house…)
+			y la plantilla espera slugs en español. Se traduce aquí; si el valor
+			ya fuera una de las opciones del select, pasa tal cual. */
+		function propertyType(accOpt) {
+			if (!accOpt) { return ''; }
+			const raw = String(accOpt.getAttribute('data-property-type') || '').toLowerCase().trim();
+			if (!raw) { return ''; }
+			const map = {
+				apartment: 'apartamento',
+				house: 'casa',
+				office: 'oficina',
+				commercial: 'local',
+				room: 'habitacion',
+				apartamento: 'apartamento',
+				casa: 'casa',
+				oficina: 'oficina',
+				local: 'local',
+				habitacion: 'habitacion',
+			};
+			return map[raw] || raw;
 		}
 
 		/* Estado del inmueble derivado del mobiliario y la conservación. */

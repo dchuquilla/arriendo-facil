@@ -415,7 +415,8 @@ class Arriendo_Facil_Lease {
 		if ( $guest_id > 0 ) {
 			$guest_row = $wpdb->get_row(
 				$wpdb->prepare(
-					'SELECT id, accommodation_id FROM ' . $wpdb->prefix . 'af_guests WHERE id = %d', // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+					'SELECT id, accommodation_id, first_name, last_name, id_number, nationality, rental_start_date, rental_end_date
+					 FROM ' . $wpdb->prefix . 'af_guests WHERE id = %d', // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 					$guest_id
 				)
 			);
@@ -427,6 +428,64 @@ class Arriendo_Facil_Lease {
 					array( '%d' ),
 					array( '%d' )
 				);
+			}
+
+			// ── Retro-completar la ficha del inquilino ─────────────────────
+			// Si el inquilino quedó registrado sin algunos datos (nacionalidad,
+			// cédula, fechas, etc.) y el operador los dejó al crear el contrato,
+			// se copian a su ficha. Solo se llenan huecos: nunca se pisa un dato
+			// que el inquilino ya tenga.
+			if ( $guest_row ) {
+				$guest_updates = array();
+
+				$guest_name   = isset( $placeholders['nombres_inquilino'] ) ? trim( (string) $placeholders['nombres_inquilino'] ) : '';
+				$guest_cedula = isset( $placeholders['cedula_inquilino'] ) ? trim( (string) $placeholders['cedula_inquilino'] ) : '';
+				$guest_nac    = isset( $placeholders['nacionalidad_inquilino'] ) ? trim( (string) $placeholders['nacionalidad_inquilino'] ) : '';
+
+				if ( '' !== $guest_name ) {
+					$name_parts = preg_split( '/\s+/', $guest_name, 2 );
+					if ( false === $name_parts ) {
+						$name_parts = array();
+					}
+					if ( isset( $name_parts[0] ) && '' === (string) $guest_row->first_name ) {
+						$guest_updates['first_name'] = $name_parts[0];
+					}
+					// Apellido: solo si falta y no está ya incluido en el nombre
+					// guardado (evita "Maria Diaz" -> "Maria Diaz Diaz").
+					$last_name_candidate = isset( $name_parts[1] ) ? $name_parts[1] : '';
+					if ( '' !== $last_name_candidate && '' === (string) $guest_row->last_name ) {
+						$full_in_first_name = false !== mb_stripos( (string) $guest_row->first_name, $last_name_candidate );
+						if ( ! $full_in_first_name ) {
+							$guest_updates['last_name'] = $last_name_candidate;
+						}
+					}
+				}
+
+				if ( '' === (string) $guest_row->id_number && '' !== $guest_cedula ) {
+					$guest_updates['id_number'] = $guest_cedula;
+				}
+
+				if ( '' === (string) $guest_row->nationality && '' !== $guest_nac ) {
+					$guest_updates['nationality'] = $guest_nac;
+				}
+
+				if ( '' === (string) $guest_row->rental_start_date && '' !== $start_date ) {
+					$guest_updates['rental_start_date'] = $start_date;
+				}
+
+				if ( '' === (string) $guest_row->rental_end_date && '' !== $end_date ) {
+					$guest_updates['rental_end_date'] = $end_date;
+				}
+
+				if ( ! empty( $guest_updates ) ) {
+					$wpdb->update(
+						$wpdb->prefix . 'af_guests',
+						$guest_updates,
+						array( 'id' => (int) $guest_id ),
+						array_fill( 0, count( $guest_updates ), '%s' ),
+						array( '%d' )
+					);
+				}
 			}
 		}
 

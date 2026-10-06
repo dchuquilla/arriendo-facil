@@ -286,6 +286,7 @@ class Arriendo_Facil_Contract_Storage {
 					'casa'        => __( 'Casa', 'arriendo-facil' ),
 					'oficina'     => __( 'Oficina', 'arriendo-facil' ),
 					'local'       => __( 'Local comercial', 'arriendo-facil' ),
+					'habitacion'  => __( 'Habitación', 'arriendo-facil' ),
 				),
 				'source' => 'accommodation.property_type',
 			),
@@ -319,7 +320,7 @@ class Arriendo_Facil_Contract_Storage {
 				'source' => 'accommodation.parking',
 			),
 			'dimensiones_inmueble'   => array(
-				'label'       => __( 'Dimensiones', 'arriendo-facil' ),
+				'label'       => __( 'Dimensiones (m²)', 'arriendo-facil' ),
 				'description' => __( 'Superficie del inmueble en m².', 'arriendo-facil' ),
 				'type'        => 'text',
 				'section'     => 'inmueble',

@@ -101,6 +101,7 @@ foreach ( $property_admins as $admin_user ) {
 
 	$rows[] = array(
 		'user'             => $admin_user,
+		'contact_name'     => get_user_meta( $user_id, 'af_contact_name', true ),
 		'company'          => get_user_meta( $user_id, 'af_company_name', true ),
 		'phone'             => get_user_meta( $user_id, 'af_contact_phone', true ),
 		'buildings'        => $buildings_count,
@@ -276,7 +277,7 @@ $totals_platform = array(
 						?>
 						<tr>
 							<td data-label="<?php esc_attr_e( 'Gestor', 'arriendo-facil' ); ?>">
-								<strong><?php echo esc_html( $row['company'] ? $row['company'] : $admin_user->display_name ); ?></strong><br />
+								<strong><?php echo esc_html( $row['contact_name'] ? $row['contact_name'] : $admin_user->display_name ); ?></strong><br />
 								<span style="color:#666;"><?php echo esc_html( $admin_user->user_email ); ?></span>
 							</td>
 							<td data-label="<?php esc_attr_e( 'Edificios', 'arriendo-facil' ); ?>"><?php echo esc_html( number_format_i18n( $row['buildings'] ) ); ?></td>
@@ -315,7 +316,7 @@ $totals_platform = array(
 									<?php echo $is_active ? esc_html__( 'Suspender', 'arriendo-facil' ) : esc_html__( 'Activar', 'arriendo-facil' ); ?>
 								</button>
 								<?php if ( $needs_review ) : ?>
-									<button type="button" class="button af-review-admin" data-user-id="<?php echo esc_attr( $admin_user->ID ); ?>" data-user-name="<?php echo esc_attr( $row['company'] ? $row['company'] : $admin_user->display_name ); ?>">
+									<button type="button" class="button af-review-admin" data-user-id="<?php echo esc_attr( $admin_user->ID ); ?>" data-user-name="<?php echo esc_attr( $row['contact_name'] ? $row['contact_name'] : $admin_user->display_name ); ?>">
 										<?php esc_html_e( 'Revisar', 'arriendo-facil' ); ?>
 									</button>
 								<?php endif; ?>

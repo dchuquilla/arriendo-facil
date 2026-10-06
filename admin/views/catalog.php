@@ -143,12 +143,14 @@ if ( ! empty( $catalog_owners ) ) {
 }
 foreach ( $accommodation_ids as $post_id ) {
 	$owner_id = isset( $fetched[ $post_id ]->owner_id ) ? (int) $fetched[ $post_id ]->owner_id : 0;
-	if ( $owner_id && ! isset( $owner_names[ $owner_id ] ) ) {
-		$user = get_userdata( $owner_id );
-		if ( $user ) {
-			$owner_names[ $owner_id ] = get_user_meta( $owner_id, 'af_company_name', true ) ? get_user_meta( $owner_id, 'af_company_name', true ) : $user->display_name;
+		if ( $owner_id && ! isset( $owner_names[ $owner_id ] ) ) {
+			$user = get_userdata( $owner_id );
+			if ( $user ) {
+				// Use af_contact_name (responsible person) in catalog, not af_company_name.
+				$contact_name = (string) get_user_meta( $owner_id, 'af_contact_name', true );
+				$owner_names[ $owner_id ] = ! empty( $contact_name ) ? $contact_name : $user->display_name;
+			}
 		}
-	}
 }
 ?>
 <div class="wrap af-shell af-catalog-page">

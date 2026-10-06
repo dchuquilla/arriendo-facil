@@ -49,6 +49,25 @@ class Arriendo_Facil_Admin {
 	}
 
 	/**
+	 * Gets the display name for the current user.
+	 *
+	 * For property admins (af_property_admin role), returns the responsible person name (af_contact_name).
+	 * For other roles, returns the WordPress display_name.
+	 *
+	 * @param WP_User $user The user object.
+	 * @return string The display name to show in the UI.
+	 */
+	private function get_user_display_name( WP_User $user ) {
+		if ( in_array( 'af_property_admin', (array) $user->roles, true ) ) {
+			$contact_name = (string) get_user_meta( $user->ID, 'af_contact_name', true );
+			if ( ! empty( $contact_name ) ) {
+				return $contact_name;
+			}
+		}
+		return $user->display_name;
+	}
+
+	/**
 	 * Sends bookmarks and stored alert links of retired modules to the page
 	 * that now holds that information instead of an access-denied screen.
 	 *
@@ -935,7 +954,7 @@ array(
 					<?php echo af_lucide( 'home', 22 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
 					<span class="af-app-sidebar__logo-copy">
 						<span class="af-app-sidebar__logo-text"><?php esc_html_e( 'Arriendo Fácil', 'arriendo-facil' ); ?></span>
-						<span class="af-app-sidebar__logo-tagline"><?php echo esc_html( $current_user->display_name ); ?></span>
+						<span class="af-app-sidebar__logo-tagline"><?php echo esc_html( $this->get_user_display_name( $current_user ) ); ?></span>
 					</span>
 				</a>
 				<button type="button" class="af-app-sidebar__toggle" id="af-app-sidebar-toggle" aria-label="<?php esc_attr_e( 'Contraer menú', 'arriendo-facil' ); ?>">
@@ -1002,7 +1021,7 @@ array(
 			<div class="af-app-sidebar__footer">
 				<a class="af-app-sidebar__user" href="<?php echo esc_url( admin_url( 'admin.php?page=af-admin-profile' ) ); ?>">
 					<?php echo get_avatar( $current_user->ID, 32 ); ?>
-					<span class="af-app-sidebar__user-name"><?php echo esc_html( $current_user->display_name ); ?></span>
+					<span class="af-app-sidebar__user-name"><?php echo esc_html( $this->get_user_display_name( $current_user ) ); ?></span>
 				</a>
 				<a class="af-app-sidebar__logout" href="<?php echo esc_url( wp_logout_url( home_url( '/' ) ) ); ?>" title="<?php esc_attr_e( 'Cerrar sesión', 'arriendo-facil' ); ?>">
 					<?php echo af_lucide( 'log-out', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
@@ -1068,7 +1087,7 @@ array(
 			</div>
 			<a class="af-app-topbar__user" href="<?php echo esc_url( admin_url( 'admin.php?page=af-admin-profile' ) ); ?>">
 				<?php echo get_avatar( $current_user->ID, 28 ); ?>
-				<span class="af-app-topbar__user-name"><?php echo esc_html( $current_user->display_name ); ?></span>
+				<span class="af-app-topbar__user-name"><?php echo esc_html( $this->get_user_display_name( $current_user ) ); ?></span>
 				<?php echo af_lucide( 'chevron-down', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
 			</a>
 		</div>

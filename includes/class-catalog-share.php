@@ -505,7 +505,8 @@ class Arriendo_Facil_Catalog_Share {
 	public static function get_catalog( WP_User $owner ) {
 		$owner_id = (int) $owner->ID;
 
-		$company = (string) get_user_meta( $owner_id, 'af_company_name', true );
+		// Use af_contact_name (responsible person) instead of af_company_name in catalogs.
+		$company = (string) get_user_meta( $owner_id, 'af_contact_name', true );
 		if ( '' === trim( $company ) ) {
 			$company = $owner->display_name ? $owner->display_name : $owner->user_login;
 		}

@@ -177,7 +177,8 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 		}
 
 		$email_ok   = 1 === (int) get_user_meta( $user_id, 'af_admin_email_verified', true );
-		$company_ok = '' !== $company_name && '' !== $contact_name && '' !== $phone;
+		// Datos de empresa es opcional (solo nombre empresa es opcional, pero responsable es OBLIGATORIO)
+		$company_ok = '' !== $contact_name && '' !== $phone;
 		$identity_ok = in_array( $id_type, array( 'cedula', 'ruc', 'pasaporte' ), true ) && '' !== $id_enc;
 		$docs_ok     = true;
 		foreach ( self::DOC_TYPES as $doc_type ) {
@@ -263,25 +264,23 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 						<section class="af-section">
 							<div class="af-section__header">
 								<div>
-									<h2 class="af-section__title"><?php esc_html_e( 'Datos de la empresa', 'arriendo-facil' ); ?></h2>
-									<p class="af-section__subtitle"><?php esc_html_e( 'Información que usa el equipo de la plataforma para contactarte y validar tu operación.', 'arriendo-facil' ); ?></p>
-								</div>
+								<h2 class="af-section__title"><?php esc_html_e( 'Datos del responsable', 'arriendo-facil' ); ?></h2>
+								<p class="af-section__subtitle"><?php esc_html_e( 'Informacion legal del responsable de la operacion de propiedades (obligatoria). Este nombre aparecera en todos los documentos legales.', 'arriendo-facil' ); ?></p>
 							</div>
-							<div class="af-form-grid">
-								<div class="af-form-field af-form-field--full">
-									<label class="af-form-field__label" for="af-company-name"><?php esc_html_e( 'Nombre de la empresa', 'arriendo-facil' ); ?> <span class="af-required">*</span></label>
-									<input id="af-company-name" class="regular-text" type="text" name="company_name" maxlength="190" value="<?php echo esc_attr( $company_name ); ?>" required />
-								</div>
-								<div class="af-form-field">
-									<label class="af-form-field__label" for="af-contact-name"><?php esc_html_e( 'Responsable', 'arriendo-facil' ); ?> <span class="af-required">*</span></label>
-									<input id="af-contact-name" class="regular-text" type="text" name="contact_name" maxlength="190" value="<?php echo esc_attr( $contact_name ); ?>" required />
-								</div>
-								<div class="af-form-field">
-									<label class="af-form-field__label" for="af-contact-phone"><?php esc_html_e( 'Teléfono de contacto', 'arriendo-facil' ); ?> <span class="af-required">*</span></label>
-									<input id="af-contact-phone" class="regular-text" type="tel" name="phone" maxlength="20" value="<?php echo esc_attr( $phone ); ?>" required />
-								</div>
+						</div>
+						<div class="af-form-grid">
+							<div class="af-form-field af-form-field--full">
+								<label class="af-form-field__label" for="af-contact-name"><?php esc_html_e( 'Nombre completo del responsable', 'arriendo-facil' ); ?> <span class="af-required">*</span></label>
+								<input id="af-contact-name" class="regular-text" type="text" name="contact_name" maxlength="190" value="<?php echo esc_attr( $contact_name ); ?>" required />
 							</div>
-						</section>
+							<div class="af-form-field">
+								<label class="af-form-field__label" for="af-contact-phone"><?php esc_html_e( 'Telefono de contacto', 'arriendo-facil' ); ?> <span class="af-required">*</span></label>
+								<input id="af-contact-phone" class="regular-text" type="tel" name="phone" maxlength="20" value="<?php echo esc_attr( $phone ); ?>" required />
+							</div>
+							<div class="af-form-field af-form-field--full">
+								<label class="af-form-field__label" for="af-company-name"><?php esc_html_e( 'Nombre de la empresa / Razon social (opcional)', 'arriendo-facil' ); ?></label>
+								<input id="af-company-name" class="regular-text" type="text" name="company_name" maxlength="190" value="<?php echo esc_attr( $company_name ); ?>" />
+								<p class="description"><?php esc_html_e( 'Solo si operas bajo una razon social registrada.', 'arriendo-facil' ); ?></p>
 
 						<section class="af-section">
 							<div class="af-section__header">

@@ -281,10 +281,9 @@ class Arriendo_Facil_Contract_Generator {
 		if ( '' === $payload['owner_name'] && $owner_user_id ) {
 			$owner_user = get_userdata( $owner_user_id );
 			if ( $owner_user ) {
-				$payload['owner_name']  = sanitize_text_field( (string) $owner_user->display_name );
-				$payload['owner_email'] = sanitize_email( (string) $owner_user->user_email );
-			}
-		}
+			// Use af_contact_name (responsible person) for contracts, not display_name.
+			$af_contact_name = (string) get_user_meta( $owner_user_id, 'af_contact_name', true );
+			$payload['owner_name']  = ! empty( $af_contact_name ) ? sanitize_text_field( $af_contact_name ) : sanitize_text_field( (string) $owner_user->display_name );
 
 		$placeholders = $this->get_stored_placeholders( $lease );
 		if ( $placeholders ) {

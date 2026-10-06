@@ -449,6 +449,8 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 									$acc_sqm          = get_post_meta( $acc_id, '_af_square_meters', true );
 									$acc_furnished    = (string) get_post_meta( $acc_id, '_af_furnished', true );
 									$acc_condition    = (string) get_post_meta( $acc_id, '_af_condition', true );
+									$responsible_name = (string) get_user_meta( get_current_user_id(), 'af_contact_name', true );
+									$responsible_id   = (string) get_user_meta( get_current_user_id(), 'af_owner_id', true );
 
 									if ( $af_ph_generator && ! isset( $af_ph_owner_cache[ $acc_id ] ) ) {
 										$af_ph_owner_cache[ $acc_id ] = $af_ph_generator->get_owner_identity_for_accommodation( $acc_id );
@@ -467,6 +469,8 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 										data-condition="<?php echo esc_attr( $acc_condition ); ?>"
 										data-owner-name="<?php echo esc_attr( (string) $acc_owner['name'] ); ?>"
 										data-owner-id="<?php echo esc_attr( (string) $acc_owner['id_number'] ); ?>"
+										data-responsible-name="<?php echo esc_attr( $responsible_name ); ?>"
+										data-responsible-id="<?php echo esc_attr( $responsible_id ); ?>"
 										data-reference="<?php echo esc_attr( $lease_accommodation->post_title ); ?>">
 										<?php echo esc_html( $lease_accommodation->post_title ); ?>
 									</option>
@@ -703,8 +707,8 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 				case 'accommodation.reference': return accOpt ? (accOpt.getAttribute('data-reference') || '') : '';
 				case 'accommodation.delivery_state': return deliveryState(accOpt);
 				case 'accommodation.owner_name':
-				case 'owner.name': return accOpt ? (accOpt.getAttribute('data-owner-name') || '') : '';
-				case 'accommodation.owner_id': return accOpt ? (accOpt.getAttribute('data-owner-id') || '') : '';
+				case 'owner.name': return accOpt ? (accOpt.getAttribute('data-responsible-name') || '') : '';
+				case 'accommodation.owner_id': return accOpt ? (accOpt.getAttribute('data-responsible-id') || '') : '';
 				default: return '';
 			}
 		}

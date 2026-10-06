@@ -227,8 +227,8 @@ class Arriendo_Facil_Contract_Storage {
 				'system'      => true,
 			),
 			'dias_notificacion'      => array(
-				'label'       => __( 'Días de Notificación', 'arriendo-facil' ),
-				'description' => __( 'Días de aviso previo antes del vencimiento.', 'arriendo-facil' ),
+				'label'       => __( 'Aviso Previo (días)', 'arriendo-facil' ),
+				'description' => __( 'Días de anticipación antes del vencimiento para notificar al inquilino.', 'arriendo-facil' ),
 				'type'        => 'integer',
 				'section'     => 'fecha_lugar',
 				'default'     => 30,
@@ -270,9 +270,67 @@ class Arriendo_Facil_Contract_Storage {
 			'nacionalidad_inquilino' => array(
 				'label'       => __( 'Nacionalidad', 'arriendo-facil' ),
 				'description' => __( 'Nacionalidad del inquilino.', 'arriendo-facil' ),
-				'type'        => 'text',
+				'type'        => 'select',
 				'section'     => 'inquilino',
-				'source'      => 'guest.nationality',
+				'options'     => array(
+					'Ecuatoriana'   => __( 'Ecuatoriana', 'arriendo-facil' ),
+					'Colombiana'    => __( 'Colombiana', 'arriendo-facil' ),
+					'Venezolana'    => __( 'Venezolana', 'arriendo-facil' ),
+					'Peruana'       => __( 'Peruana', 'arriendo-facil' ),
+					'Chilena'       => __( 'Chilena', 'arriendo-facil' ),
+					'Argentina'     => __( 'Argentina', 'arriendo-facil' ),
+					'Boliviana'     => __( 'Boliviana', 'arriendo-facil' ),
+					'Paraguaya'     => __( 'Paraguaya', 'arriendo-facil' ),
+					'Uruguaya'      => __( 'Uruguaya', 'arriendo-facil' ),
+					'Brasileña'     => __( 'Brasileña', 'arriendo-facil' ),
+					'Española'      => __( 'Española', 'arriendo-facil' ),
+					'Francesa'      => __( 'Francesa', 'arriendo-facil' ),
+					'Alemana'       => __( 'Alemana', 'arriendo-facil' ),
+					'Italiana'      => __( 'Italiana', 'arriendo-facil' ),
+					'Portuguesa'    => __( 'Portuguesa', 'arriendo-facil' ),
+					'Británica'     => __( 'Británica', 'arriendo-facil' ),
+					'Irlandesa'     => __( 'Irlandesa', 'arriendo-facil' ),
+					'Estadounidense'=> __( 'Estadounidense', 'arriendo-facil' ),
+					'Canadiense'    => __( 'Canadiense', 'arriendo-facil' ),
+					'Mexicana'      => __( 'Mexicana', 'arriendo-facil' ),
+					'Cubana'        => __( 'Cubana', 'arriendo-facil' ),
+					'Dominicana'    => __( 'Dominicana', 'arriendo-facil' ),
+					'Puertorriqueña'=> __( 'Puertorriqueña', 'arriendo-facil' ),
+					'Guatemalteca'  => __( 'Guatemalteca', 'arriendo-facil' ),
+					'Salvadoreña'   => __( 'Salvadoreña', 'arriendo-facil' ),
+					'Hondureña'     => __( 'Hondureña', 'arriendo-facil' ),
+					'Nicaragüense'  => __( 'Nicaragüense', 'arriendo-facil' ),
+					'Costarricense' => __( 'Costarricense', 'arriendo-facil' ),
+					'Panameña'      => __( 'Panameña', 'arriendo-facil' ),
+					'Beliceña'      => __( 'Beliceña', 'arriendo-facil' ),
+					'China'         => __( 'China', 'arriendo-facil' ),
+					'Japonesa'      => __( 'Japonesa', 'arriendo-facil' ),
+					'Coreana'       => __( 'Coreana', 'arriendo-facil' ),
+					'India'         => __( 'India', 'arriendo-facil' ),
+					'Filipina'      => __( 'Filipina', 'arriendo-facil' ),
+					'Tailandesa'    => __( 'Tailandesa', 'arriendo-facil' ),
+					'Vietnamita'    => __( 'Vietnamita', 'arriendo-facil' ),
+					'Indonesa'      => __( 'Indonesa', 'arriendo-facil' ),
+					'Marroquí'      => __( 'Marroquí', 'arriendo-facil' ),
+					'Egipcia'       => __( 'Egipcia', 'arriendo-facil' ),
+					'Nigeriana'     => __( 'Nigeriana', 'arriendo-facil' ),
+					'Sudafricana'   => __( 'Sudafricana', 'arriendo-facil' ),
+					'Rusa'          => __( 'Rusa', 'arriendo-facil' ),
+					'Ucraniana'     => __( 'Ucraniana', 'arriendo-facil' ),
+					'Polaca'        => __( 'Polaca', 'arriendo-facil' ),
+					'Rumana'        => __( 'Rumana', 'arriendo-facil' ),
+					'Griega'        => __( 'Griega', 'arriendo-facil' ),
+					'Turca'         => __( 'Turca', 'arriendo-facil' ),
+					'Neerlandesa'   => __( 'Neerlandesa', 'arriendo-facil' ),
+					'Belga'         => __( 'Belga', 'arriendo-facil' ),
+					'Sueca'         => __( 'Sueca', 'arriendo-facil' ),
+					'Noruega'       => __( 'Noruega', 'arriendo-facil' ),
+					'Finlandesa'    => __( 'Finlandesa', 'arriendo-facil' ),
+					'Suiza'         => __( 'Suiza', 'arriendo-facil' ),
+					'Australiana'   => __( 'Australiana', 'arriendo-facil' ),
+					'Neozelandesa'  => __( 'Neozelandesa', 'arriendo-facil' ),
+				),
+				'source' => 'guest.nationality',
 			),
 
 			// Datos Inmueble (8)
@@ -390,26 +448,28 @@ class Arriendo_Facil_Contract_Storage {
 				'section'     => 'financiero',
 				'computed'    => 'number_to_words:monto_numero',
 			),
+
+			// Datos Bancarios (3) — paso propio, opcional, para las transferencias.
 			'número_cuenta'          => array(
 				'label'       => __( 'Número de Cuenta', 'arriendo-facil' ),
 				'description' => __( 'Número de cuenta para los pagos.', 'arriendo-facil' ),
 				'type'        => 'text',
-				'section'     => 'financiero',
-				'source' => 'manual',
+				'section'     => 'bancario',
+				'source'      => 'manual',
 			),
 			'nombre_banco'           => array(
 				'label'       => __( 'Nombre del Banco', 'arriendo-facil' ),
 				'description' => __( 'Banco donde se recibe el pago.', 'arriendo-facil' ),
 				'type'        => 'text',
-				'section'     => 'financiero',
-				'source' => 'manual',
+				'section'     => 'bancario',
+				'source'      => 'manual',
 			),
 			'nombre_titular'         => array(
 				'label'       => __( 'Nombre del Titular', 'arriendo-facil' ),
 				'description' => __( 'Titular de la cuenta de pago.', 'arriendo-facil' ),
 				'type'        => 'text',
-				'section'     => 'financiero',
-				'source' => 'owner.name',
+				'section'     => 'bancario',
+				'source'      => 'owner.name',
 			),
 
 			// Pagos de Garantía (2)
@@ -446,6 +506,7 @@ class Arriendo_Facil_Contract_Storage {
 			'inquilino'   => __( 'Datos del Inquilino', 'arriendo-facil' ),
 			'inmueble'    => __( 'Datos del Inmueble', 'arriendo-facil' ),
 			'financiero'  => __( 'Financiero', 'arriendo-facil' ),
+			'bancario'    => __( 'Datos Bancarios', 'arriendo-facil' ),
 			'garantia'    => __( 'Garantía', 'arriendo-facil' ),
 		);
 
@@ -507,7 +568,7 @@ class Arriendo_Facil_Contract_Storage {
 			'fecha_fin'      => $end_date,
 			'dias_notificacion' => '30',
 			'fecha_pago_garantia_1' => $start_date,
-			'fecha_pago_garantia_2' => self::add_months( $start_date, 1 ),
+			'fecha_pago_garantia_2' => self::add_days( $start_date, 15 ),
 		);
 
 		if ( $monthly_rent > 0 ) {
@@ -572,6 +633,23 @@ class Arriendo_Facil_Contract_Storage {
 			return '';
 		}
 		$parsed->modify( sprintf( '%+d months', (int) $months ) );
+
+		return $parsed->format( 'Y-m-d' );
+	}
+
+	/**
+	 * Suma días a una fecha Y-m-d.
+	 *
+	 * @param string $date Fecha origen.
+	 * @param int    $days Días a sumar.
+	 * @return string '' cuando la fecha no es válida.
+	 */
+	private static function add_days( $date, $days ) {
+		$parsed = self::parse_date( $date );
+		if ( ! $parsed ) {
+			return '';
+		}
+		$parsed->modify( sprintf( '%+d days', (int) $days ) );
 
 		return $parsed->format( 'Y-m-d' );
 	}

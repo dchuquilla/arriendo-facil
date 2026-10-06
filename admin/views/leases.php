@@ -280,10 +280,12 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 		$af_ph_owner_cache = array();
 
 		// Cada grupo de placeholders se dibuja en el paso que le corresponde.
+		// El paso 5 (Datos Bancarios) es opcional: ningún campo es obligatorio.
 		$af_step_groups = array(
 			1 => array( 'inquilino' ),
 			2 => array( 'inmueble' ),
 			4 => array( 'propietario', 'financiero', 'garantia', 'fecha_lugar' ),
+			5 => array( 'bancario' ),
 		);
 
 		$af_render_section = static function ( $section_id ) use ( $af_ph_sections ) {
@@ -377,14 +379,14 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 			<p class="af-modal__status" id="af-lease-status" style="display:none;"></p>
 
 			<div class="af-cwiz__progress" id="af-wizard-progress"
-				role="progressbar" aria-valuemin="1" aria-valuemax="5" aria-valuenow="1"
+				role="progressbar" aria-valuemin="1" aria-valuemax="6" aria-valuenow="1"
 				aria-label="<?php esc_attr_e( 'Progreso del formulario de contrato', 'arriendo-facil' ); ?>">
 				<div class="af-cwiz__progress-head">
-					<span class="af-cwiz__progress-label" id="af-wizard-progress-label"><?php esc_html_e( 'Paso 1 de 5 — Partes', 'arriendo-facil' ); ?></span>
-					<span class="af-cwiz__progress-pct" id="af-wizard-progress-pct">20%</span>
+					<span class="af-cwiz__progress-label" id="af-wizard-progress-label"><?php esc_html_e( 'Paso 1 de 6 — Partes', 'arriendo-facil' ); ?></span>
+					<span class="af-cwiz__progress-pct" id="af-wizard-progress-pct">17%</span>
 				</div>
 				<div class="af-cwiz__progress-track" aria-hidden="true">
-					<span class="af-cwiz__progress-fill" id="af-wizard-progress-fill" style="width:20%"></span>
+					<span class="af-cwiz__progress-fill" id="af-wizard-progress-fill" style="width:17%"></span>
 				</div>
 			</div>
 
@@ -393,7 +395,8 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 				<li><button type="button" class="af-cwiz__step" data-goto="2" data-label="<?php esc_attr_e( 'Inmueble', 'arriendo-facil' ); ?>"><span class="af-cwiz__num">2</span> <?php esc_html_e( 'Inmueble', 'arriendo-facil' ); ?></button></li>
 				<li><button type="button" class="af-cwiz__step" data-goto="3" data-label="<?php esc_attr_e( 'Vigencia', 'arriendo-facil' ); ?>"><span class="af-cwiz__num">3</span> <?php esc_html_e( 'Vigencia', 'arriendo-facil' ); ?></button></li>
 				<li><button type="button" class="af-cwiz__step" data-goto="4" data-label="<?php esc_attr_e( 'Documento', 'arriendo-facil' ); ?>"><span class="af-cwiz__num">4</span> <?php esc_html_e( 'Documento', 'arriendo-facil' ); ?></button></li>
-				<li><button type="button" class="af-cwiz__step" data-goto="5" data-label="<?php esc_attr_e( 'Revisar', 'arriendo-facil' ); ?>"><span class="af-cwiz__num">5</span> <?php esc_html_e( 'Revisar', 'arriendo-facil' ); ?></button></li>
+				<li><button type="button" class="af-cwiz__step" data-goto="5" data-label="<?php esc_attr_e( 'Banco', 'arriendo-facil' ); ?>"><span class="af-cwiz__num">5</span> <?php esc_html_e( 'Banco', 'arriendo-facil' ); ?></button></li>
+				<li><button type="button" class="af-cwiz__step" data-goto="6" data-label="<?php esc_attr_e( 'Revisar', 'arriendo-facil' ); ?>"><span class="af-cwiz__num">6</span> <?php esc_html_e( 'Revisar', 'arriendo-facil' ); ?></button></li>
 			</ol>
 
 			<p class="af-cwiz__error" id="af-wizard-error" role="alert"></p>
@@ -537,8 +540,18 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 				<?php endif; ?>
 			</section>
 
-			<!-- ── Paso 5: Revisar ───────────────────────────────────────────── -->
+			<!-- ── Paso 5: Datos Bancarios (opcional) ───────────────────────── -->
 			<section class="af-cwiz__panel" data-step="5" hidden>
+				<?php if ( ! empty( $af_step_groups[5] ) ) : ?>
+					<p class="af-cwiz__opt-hint"><?php esc_html_e( 'Datos de la cuenta para pagos por transferencia. Todos los campos son opcionales.', 'arriendo-facil' ); ?></p>
+					<?php foreach ( $af_step_groups[5] as $af_section_id ) : ?>
+						<?php $af_render_section( $af_section_id ); ?>
+					<?php endforeach; ?>
+				<?php endif; ?>
+			</section>
+
+			<!-- ── Paso 6: Revisar ──────────────────────────────────────────── -->
+			<section class="af-cwiz__panel" data-step="6" hidden>
 				<div class="af-cwiz__group">
 					<h3 class="af-cwiz__group-title"><?php esc_html_e( 'Resumen del contrato', 'arriendo-facil' ); ?></h3>
 					<dl class="af-cwiz__review" id="af-wizard-review"></dl>
@@ -609,6 +622,13 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 			return d.toISOString().slice(0, 10);
 		}
 
+		function addDays(isoDate, days) {
+			const d = parseIso(isoDate);
+			if (!d) { return ''; }
+			d.setUTCDate(d.getUTCDate() + days);
+			return d.toISOString().slice(0, 10);
+		}
+
 		function numberToWords(n) {
 			n = Math.floor(Math.abs(Number(n) || 0));
 			if (n === 0) { return 'cero'; }
@@ -670,10 +690,10 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 					return m ? (m === 1 ? '1 mes' : m + ' meses') : '';
 				}
 				case 'lease.deposit_due_1': return start;
-				case 'lease.deposit_due_2': return addMonths(start, 1);
+				case 'lease.deposit_due_2': return addDays(start, 15);
 				case 'guest.display_name': return gOpt ? (gOpt.getAttribute('data-guest-name') || '') : '';
 				case 'guest.document_id': return gOpt ? (gOpt.getAttribute('data-document-id') || '') : '';
-				case 'guest.nationality': return gOpt ? (gOpt.getAttribute('data-nationality') || '') : '';
+				case 'guest.nationality': return nationality(gOpt);
 				case 'accommodation.address': return accOpt ? (accOpt.getAttribute('data-address') || '') : '';
 				case 'accommodation.property_type': return propertyType(accOpt);
 				case 'accommodation.bedrooms': return accOpt ? (accOpt.getAttribute('data-bedrooms') || '') : '';
@@ -709,6 +729,75 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 				habitacion: 'habitacion',
 			};
 			return map[raw] || raw;
+		}
+
+		/* Nacionalidad del inquilino: el registro guarda el país o el gentilicio
+			en cualquier género; la plantilla espera el gentilicio femenino
+			(Ecuatoriana, Alemana…). Se normaliza a la opción del select. */
+		function nationality(gOpt) {
+			if (!gOpt) { return ''; }
+			const raw = String(gOpt.getAttribute('data-nationality') || '').trim();
+			if (!raw) { return ''; }
+			const norm = raw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+			const map = {
+				ecuador: 'Ecuatoriana', ecuatoriana: 'Ecuatoriana', ecuatoriano: 'Ecuatoriana',
+				colombia: 'Colombiana', colombiana: 'Colombiana', colombiano: 'Colombiana',
+				venezuela: 'Venezolana', venezolana: 'Venezolana', venezolano: 'Venezolana',
+				peru: 'Peruana', peruana: 'Peruana', peruano: 'Peruana',
+				chile: 'Chilena', chilena: 'Chilena', chileno: 'Chilena',
+				argentina: 'Argentina', argentino: 'Argentina',
+				bolivia: 'Boliviana', boliviana: 'Boliviana', boliviano: 'Boliviana',
+				paraguay: 'Paraguaya', paraguaya: 'Paraguaya', paraguayo: 'Paraguaya',
+				uruguay: 'Uruguaya', uruguaya: 'Uruguaya', uruguayo: 'Uruguaya',
+				brasil: 'Brasileña', brasileno: 'Brasileña', brasilena: 'Brasileña',
+				espana: 'Española', espanol: 'Española', espanola: 'Española',
+				francia: 'Francesa', frances: 'Francesa', francesa: 'Francesa',
+				alemania: 'Alemana', aleman: 'Alemana', alemana: 'Alemana',
+				italia: 'Italiana', italiano: 'Italiana', italiana: 'Italiana',
+				portugal: 'Portuguesa', portugues: 'Portuguesa', portuguesa: 'Portuguesa',
+				'reino unido': 'Británica', inglaterra: 'Británica', britanico: 'Británica', britanica: 'Británica', britano: 'Británica', britana: 'Británica',
+				irlanda: 'Irlandesa', irlandes: 'Irlandesa', irlandesa: 'Irlandesa',
+				'estados unidos': 'Estadounidense', usa: 'Estadounidense', eeuu: 'Estadounidense', estadounidense: 'Estadounidense', americano: 'Estadounidense', americana: 'Estadounidense',
+				canada: 'Canadiense', canadiense: 'Canadiense',
+				mexico: 'Mexicana', mexicana: 'Mexicana', mexicano: 'Mexicana',
+				cuba: 'Cubana', cubana: 'Cubana', cubano: 'Cubana',
+				'republica dominicana': 'Dominicana', dominicana: 'Dominicana', dominicano: 'Dominicana',
+				'puerto rico': 'Puertorriqueña', puertorriquena: 'Puertorriqueña', puertorriqueno: 'Puertorriqueña',
+				guatemala: 'Guatemalteca', guatemalteca: 'Guatemalteca', guatemalteco: 'Guatemalteca',
+				'el salvador': 'Salvadoreña', salvadorena: 'Salvadoreña', salvadoreno: 'Salvadoreña',
+				honduras: 'Hondureña', hondurena: 'Hondureña', hondureno: 'Hondureña',
+				nicaragua: 'Nicaragüense', nicaraguense: 'Nicaragüense', nicarageno: 'Nicaragüense',
+				'costa rica': 'Costarricense', costarricense: 'Costarricense',
+				panama: 'Panameña', panamena: 'Panameña', panameno: 'Panameña',
+				belice: 'Beliceña', belicena: 'Beliceña', beliceno: 'Beliceña',
+				china: 'China', chino: 'China',
+				japon: 'Japonesa', japonesa: 'Japonesa', japones: 'Japonesa',
+				corea: 'Coreana', coreana: 'Coreana', coreano: 'Coreana',
+				india: 'India',
+				filipinas: 'Filipina', filipina: 'Filipina', filipino: 'Filipina',
+				tailandia: 'Tailandesa', tailandesa: 'Tailandesa', tailandes: 'Tailandesa',
+				vietnam: 'Vietnamita', vietnamita: 'Vietnamita',
+				indonesia: 'Indonesa', indonesa: 'Indonesa', indones: 'Indonesa',
+				marruecos: 'Marroquí', marroqui: 'Marroquí',
+				egipto: 'Egipcia', egipcia: 'Egipcia', egipcio: 'Egipcia',
+				nigeria: 'Nigeriana', nigeriana: 'Nigeriana', nigeriano: 'Nigeriana',
+				sudafrica: 'Sudafricana', sudafricana: 'Sudafricana', sudafricano: 'Sudafricana',
+				rusia: 'Rusa', rusa: 'Rusa', ruso: 'Rusa',
+				ucrania: 'Ucraniana', ucraniana: 'Ucraniana', ucraniano: 'Ucraniana',
+				polonia: 'Polaca', polaca: 'Polaca', polaco: 'Polaca',
+				rumania: 'Rumana', rumana: 'Rumana', rumano: 'Rumana',
+				grecia: 'Griega', griega: 'Griega', griego: 'Griega',
+				turquia: 'Turca', turca: 'Turca', turco: 'Turca',
+				holanda: 'Neerlandesa', 'paises bajos': 'Neerlandesa', neerlandesa: 'Neerlandesa', neerlandes: 'Neerlandesa',
+				belgica: 'Belga', belga: 'Belga',
+				suecia: 'Sueca', sueca: 'Sueca', sueco: 'Sueca',
+				noruega: 'Noruega',
+				finlandia: 'Finlandesa', finlandesa: 'Finlandesa', finlandes: 'Finlandesa',
+				suiza: 'Suiza', suizo: 'Suiza',
+				australia: 'Australiana', australiana: 'Australiana', australiano: 'Australiana',
+				'nueva zelanda': 'Neozelandesa', neozelandesa: 'Neozelandesa', neozelandes: 'Neozelandesa',
+			};
+			return map[norm] || raw;
 		}
 
 		/* Estado del inmueble derivado del mobiliario y la conservación. */

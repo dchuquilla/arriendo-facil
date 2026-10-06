@@ -281,20 +281,23 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 								<label class="af-form-field__label" for="af-company-name"><?php esc_html_e( 'Nombre de la empresa / Razon social (opcional)', 'arriendo-facil' ); ?></label>
 								<input id="af-company-name" class="regular-text" type="text" name="company_name" maxlength="190" value="<?php echo esc_attr( $company_name ); ?>" />
 								<p class="description"><?php esc_html_e( 'Solo si operas bajo una razon social registrada.', 'arriendo-facil' ); ?></p>
-
-						<section class="af-section">
-							<div class="af-section__header">
-								<div>
-									<h2 class="af-section__title"><?php esc_html_e( 'Identidad del responsable', 'arriendo-facil' ); ?></h2>
-									<p class="af-section__subtitle"><?php esc_html_e( 'Se valida automáticamente y se guarda cifrada.', 'arriendo-facil' ); ?></p>
-								</div>
-								<?php if ( $identity_ok ) : ?>
-									<span class="af-pill af-pill--success"><?php esc_html_e( 'Guardado', 'arriendo-facil' ); ?></span>
-								<?php else : ?>
-									<span class="af-pill af-pill--warning"><?php esc_html_e( 'Pendiente', 'arriendo-facil' ); ?></span>
-								<?php endif; ?>
 							</div>
-							<div class="af-form-grid">
+						</div>
+					</section>
+
+					<section class="af-section">
+						<div class="af-section__header">
+							<div>
+								<h2 class="af-section__title"><?php esc_html_e( 'Identidad del responsable', 'arriendo-facil' ); ?></h2>
+								<p class="af-section__subtitle"><?php esc_html_e( 'Se valida automáticamente y se guarda cifrada.', 'arriendo-facil' ); ?></p>
+							</div>
+							<?php if ( $identity_ok ) : ?>
+								<span class="af-pill af-pill--success"><?php esc_html_e( 'Guardado', 'arriendo-facil' ); ?></span>
+							<?php else : ?>
+								<span class="af-pill af-pill--warning"><?php esc_html_e( 'Pendiente', 'arriendo-facil' ); ?></span>
+							<?php endif; ?>
+						</div>
+						<div class="af-form-grid">
 								<div class="af-form-field">
 									<label class="af-form-field__label" for="af-id-type"><?php esc_html_e( 'Tipo de identificación', 'arriendo-facil' ); ?></label>
 									<select id="af-id-type" class="regular-text" name="id_type">

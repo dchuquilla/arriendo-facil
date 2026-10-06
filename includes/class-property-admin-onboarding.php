@@ -1345,6 +1345,44 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 	}
 
 	/**
+	 * Gets the decrypted identity (cedula/RUC/pasaporte) for a property admin user.
+	 * Used to populate lease contract forms and other documents with the
+	 * responsible person's identification.
+	 *
+	 * @param int $user_id User ID (property admin).
+	 * @return string Plain decrypted ID number, or empty string if not found/failed.
+	 */
+	public static function get_admin_identity_number( $user_id ) {
+		$user_id = absint( $user_id );
+		if ( ! $user_id ) {
+			return '';
+		}
+
+		$id_enc = (string) get_user_meta( $user_id, 'af_admin_id_number_enc', true );
+		if ( '' === $id_enc ) {
+			return '';
+		}
+
+		$instance = new self();
+		return $instance->decrypt_sensitive_value( $id_enc );
+	}
+
+	/**
+	 * Gets the identity type (cedula/ruc/pasaporte) for a property admin user.
+	 *
+	 * @param int $user_id User ID (property admin).
+	 * @return string Identity type or empty string.
+	 */
+	public static function get_admin_identity_type( $user_id ) {
+		$user_id = absint( $user_id );
+		if ( ! $user_id ) {
+			return '';
+		}
+
+		return (string) get_user_meta( $user_id, 'af_admin_id_type', true );
+	}
+
+	/**
 	 * Encrypts a sensitive value (libsodium secretbox, admin scope).
 	 *
 	 * @param string $value Plain value.

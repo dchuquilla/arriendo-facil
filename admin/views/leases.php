@@ -450,7 +450,10 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 									$acc_furnished    = (string) get_post_meta( $acc_id, '_af_furnished', true );
 									$acc_condition    = (string) get_post_meta( $acc_id, '_af_condition', true );
 									$responsible_name = (string) get_user_meta( get_current_user_id(), 'af_contact_name', true );
-									$responsible_id   = (string) get_user_meta( get_current_user_id(), 'af_owner_id', true );
+									// Get decrypted identity from admin's profile (from af_admin_id_number_enc)
+									$responsible_id   = class_exists( 'Arriendo_Facil_Property_Admin_Onboarding' )
+										? Arriendo_Facil_Property_Admin_Onboarding::get_admin_identity_number( get_current_user_id() )
+										: '';
 
 									if ( $af_ph_generator && ! isset( $af_ph_owner_cache[ $acc_id ] ) ) {
 										$af_ph_owner_cache[ $acc_id ] = $af_ph_generator->get_owner_identity_for_accommodation( $acc_id );

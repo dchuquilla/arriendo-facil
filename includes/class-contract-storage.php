@@ -78,11 +78,11 @@ class Arriendo_Facil_Contract_Storage {
 	public static function create_working_copy( $lease_id ) {
 		$source = self::get_base_contract_path();
 		if ( ! $source ) {
-			return new WP_Error( 'contract_not_found', __( 'Base contract template not found', 'arriendo-facil' ) );
+			return new WP_Error( 'contract_not_found', __( 'No se encontró la plantilla base del contrato.', 'arriendo-facil' ) );
 		}
 
 		if ( ! is_readable( $source ) ) {
-			return new WP_Error( 'contract_not_readable', __( 'Base contract is not readable', 'arriendo-facil' ) );
+			return new WP_Error( 'contract_not_readable', __( 'La plantilla base del contrato no se puede leer.', 'arriendo-facil' ) );
 		}
 
 		// Create working copy with unique identifier
@@ -91,7 +91,7 @@ class Arriendo_Facil_Contract_Storage {
 		$dest_path = self::get_storage_dir() . $dest_name;
 
 		if ( ! copy( $source, $dest_path ) ) {
-			return new WP_Error( 'copy_failed', __( 'Could not create working copy of contract', 'arriendo-facil' ) );
+			return new WP_Error( 'copy_failed', __( 'No se pudo crear la copia de trabajo del contrato.', 'arriendo-facil' ) );
 		}
 
 		return $dest_path;
@@ -176,45 +176,59 @@ class Arriendo_Facil_Contract_Storage {
 	 */
 	public static function get_placeholders_schema() {
 		return array(
-			// Datos de Fecha y Lugar (7)
+			/*
+			 * Fecha de firma: se calculan en el servidor en el momento de crear
+			 * el contrato, nunca se piden al operador (`system` los oculta del
+			 * formulario y `get_placeholders_by_section()` los descarta).
+			 */
 			'año'                    => array(
 				'label'       => __( 'Año', 'arriendo-facil' ),
-				'description' => __( 'Year of contract execution', 'arriendo-facil' ),
+				'description' => __( 'Año en que se firma el contrato.', 'arriendo-facil' ),
 				'type'        => 'year',
 				'section'     => 'fecha_lugar',
 				'pattern'     => '/^\d{4}$/',
+				'source'      => 'contract.signed_year',
+				'system'      => true,
 			),
 			'mes'                    => array(
 				'label'       => __( 'Mes', 'arriendo-facil' ),
-				'description' => __( 'Month number (1-12)', 'arriendo-facil' ),
+				'description' => __( 'Mes de firma del contrato (1-12).', 'arriendo-facil' ),
 				'type'        => 'month',
 				'section'     => 'fecha_lugar',
 				'pattern'     => '/^(0?[1-9]|1[0-2])$/',
+				'source'      => 'contract.signed_month',
+				'system'      => true,
 			),
 			'dia_numero'             => array(
 				'label'       => __( 'Día', 'arriendo-facil' ),
-				'description' => __( 'Day of month (1-31)', 'arriendo-facil' ),
+				'description' => __( 'Día de firma del contrato (1-31).', 'arriendo-facil' ),
 				'type'        => 'day',
 				'section'     => 'fecha_lugar',
 				'pattern'     => '/^(0?[1-9]|[12][0-9]|3[01])$/',
+				'source'      => 'contract.signed_day',
+				'system'      => true,
 			),
+
+			// Fechas del contrato: espejo de los campos base del paso "Vigencia".
 			'fecha_incio'            => array(
 				'label'       => __( 'Fecha de Inicio', 'arriendo-facil' ),
-				'description' => __( 'Contract start date (YYYY-MM-DD)', 'arriendo-facil' ),
+				'description' => __( 'Fecha de inicio del contrato.', 'arriendo-facil' ),
 				'type'        => 'date',
 				'section'     => 'fecha_lugar',
 				'source'      => 'lease.start_date',
+				'system'      => true,
 			),
 			'fecha_fin'              => array(
 				'label'       => __( 'Fecha de Fin', 'arriendo-facil' ),
-				'description' => __( 'Contract end date (YYYY-MM-DD)', 'arriendo-facil' ),
+				'description' => __( 'Fecha de finalización del contrato.', 'arriendo-facil' ),
 				'type'        => 'date',
 				'section'     => 'fecha_lugar',
 				'source'      => 'lease.end_date',
+				'system'      => true,
 			),
 			'dias_notificacion'      => array(
 				'label'       => __( 'Días de Notificación', 'arriendo-facil' ),
-				'description' => __( 'Notification period in days', 'arriendo-facil' ),
+				'description' => __( 'Días de aviso previo antes del vencimiento.', 'arriendo-facil' ),
 				'type'        => 'integer',
 				'section'     => 'fecha_lugar',
 				'default'     => 30,
@@ -223,14 +237,14 @@ class Arriendo_Facil_Contract_Storage {
 			// Datos Propietario (2)
 			'nombres_propietario'    => array(
 				'label'       => __( 'Nombre del Propietario', 'arriendo-facil' ),
-				'description' => __( 'Full name of property owner', 'arriendo-facil' ),
+				'description' => __( 'Nombre completo del propietario del inmueble.', 'arriendo-facil' ),
 				'type'        => 'text',
 				'section'     => 'propietario',
 				'source'      => 'accommodation.owner_name',
 			),
 			'cedula_propietario'     => array(
 				'label'       => __( 'Cédula del Propietario', 'arriendo-facil' ),
-				'description' => __( 'Owner identification document', 'arriendo-facil' ),
+				'description' => __( 'Cédula o identificación del propietario.', 'arriendo-facil' ),
 				'type'        => 'text',
 				'section'     => 'propietario',
 				'source'      => 'accommodation.owner_id',
@@ -239,7 +253,7 @@ class Arriendo_Facil_Contract_Storage {
 			// Datos Inquilino (3)
 			'nombres_inquilino'      => array(
 				'label'       => __( 'Nombre del Inquilino', 'arriendo-facil' ),
-				'description' => __( 'Full name of tenant', 'arriendo-facil' ),
+				'description' => __( 'Nombre completo del inquilino.', 'arriendo-facil' ),
 				'type'        => 'text',
 				'section'     => 'inquilino',
 				'source'      => 'guest.display_name',
@@ -247,7 +261,7 @@ class Arriendo_Facil_Contract_Storage {
 			),
 			'cedula_inquilino'       => array(
 				'label'       => __( 'Cédula del Inquilino', 'arriendo-facil' ),
-				'description' => __( 'Tenant identification document', 'arriendo-facil' ),
+				'description' => __( 'Cédula o identificación del inquilino.', 'arriendo-facil' ),
 				'type'        => 'text',
 				'section'     => 'inquilino',
 				'source'      => 'guest.document_id',
@@ -255,7 +269,7 @@ class Arriendo_Facil_Contract_Storage {
 			),
 			'nacionalidad_inquilino' => array(
 				'label'       => __( 'Nacionalidad', 'arriendo-facil' ),
-				'description' => __( 'Tenant nationality', 'arriendo-facil' ),
+				'description' => __( 'Nacionalidad del inquilino.', 'arriendo-facil' ),
 				'type'        => 'text',
 				'section'     => 'inquilino',
 				'source'      => 'guest.nationality',
@@ -264,19 +278,20 @@ class Arriendo_Facil_Contract_Storage {
 			// Datos Inmueble (8)
 			'tipo_inmueble'          => array(
 				'label'       => __( 'Tipo de Inmueble', 'arriendo-facil' ),
-				'description' => __( 'Property type (apartment, house, etc.)', 'arriendo-facil' ),
+				'description' => __( 'Tipo de inmueble arrendado.', 'arriendo-facil' ),
 				'type'        => 'select',
 				'section'     => 'inmueble',
 				'options'     => array(
-					'apartamento' => __( 'Apartment', 'arriendo-facil' ),
-					'casa'        => __( 'House', 'arriendo-facil' ),
-					'oficina'     => __( 'Office', 'arriendo-facil' ),
-					'local'       => __( 'Commercial', 'arriendo-facil' ),
+					'apartamento' => __( 'Apartamento', 'arriendo-facil' ),
+					'casa'        => __( 'Casa', 'arriendo-facil' ),
+					'oficina'     => __( 'Oficina', 'arriendo-facil' ),
+					'local'       => __( 'Local comercial', 'arriendo-facil' ),
 				),
+				'source' => 'accommodation.property_type',
 			),
 			'dirección_inmueble'     => array(
 				'label'       => __( 'Dirección del Inmueble', 'arriendo-facil' ),
-				'description' => __( 'Full property address', 'arriendo-facil' ),
+				'description' => __( 'Dirección completa del inmueble.', 'arriendo-facil' ),
 				'type'        => 'text',
 				'section'     => 'inmueble',
 				'source'      => 'accommodation.address',
@@ -284,115 +299,132 @@ class Arriendo_Facil_Contract_Storage {
 			),
 			'n_habitacion'           => array(
 				'label'       => __( 'Número de Habitaciones', 'arriendo-facil' ),
-				'description' => __( 'Number of bedrooms', 'arriendo-facil' ),
+				'description' => __( 'Cantidad de habitaciones.', 'arriendo-facil' ),
 				'type'        => 'integer',
 				'section'     => 'inmueble',
+				'source' => 'accommodation.bedrooms',
 			),
 			'n_baños'                => array(
 				'label'       => __( 'Número de Baños', 'arriendo-facil' ),
-				'description' => __( 'Number of bathrooms', 'arriendo-facil' ),
+				'description' => __( 'Cantidad de baños.', 'arriendo-facil' ),
 				'type'        => 'integer',
 				'section'     => 'inmueble',
+				'source' => 'accommodation.bathrooms',
 			),
 			'parqueadero'            => array(
 				'label'       => __( 'Parqueaderos', 'arriendo-facil' ),
-				'description' => __( 'Number of parking spaces', 'arriendo-facil' ),
+				'description' => __( 'Cantidad de parqueaderos.', 'arriendo-facil' ),
 				'type'        => 'integer',
 				'section'     => 'inmueble',
+				'source' => 'accommodation.parking',
 			),
 			'dimensiones_inmueble'   => array(
 				'label'       => __( 'Dimensiones', 'arriendo-facil' ),
-				'description' => __( 'Property size (m²)', 'arriendo-facil' ),
+				'description' => __( 'Superficie del inmueble en m².', 'arriendo-facil' ),
 				'type'        => 'text',
 				'section'     => 'inmueble',
+				'source' => 'accommodation.square_meters',
 			),
 			'estado_mobiliario'      => array(
-				'label'       => __( 'Estado del Mobiliario', 'arriendo-facil' ),
-				'description' => __( 'Furniture condition description', 'arriendo-facil' ),
-				'type'        => 'textarea',
+				'label'       => __( 'Estado del Inmueble', 'arriendo-facil' ),
+				'description' => __( 'Estado en que se entrega el inmueble.', 'arriendo-facil' ),
+				'type'        => 'select',
 				'section'     => 'inmueble',
+				'options'     => array(
+					'amueblado'     => __( 'Amueblado', 'arriendo-facil' ),
+					'semi_amoblado' => __( 'Semi-amoblado', 'arriendo-facil' ),
+					'sin_amoblar'   => __( 'Sin amoblar', 'arriendo-facil' ),
+					'nuevo'         => __( 'Nuevo', 'arriendo-facil' ),
+					'buen_estado'   => __( 'Buen estado', 'arriendo-facil' ),
+					'reparacion'    => __( 'Requiere reparación', 'arriendo-facil' ),
+				),
+				'source' => 'accommodation.delivery_state',
 			),
 			'identificación'         => array(
 				'label'       => __( 'Identificación del Inmueble', 'arriendo-facil' ),
-				'description' => __( 'Property ID or reference', 'arriendo-facil' ),
+				'description' => __( 'Código o referencia del inmueble.', 'arriendo-facil' ),
 				'type'        => 'text',
 				'section'     => 'inmueble',
+				'source' => 'accommodation.reference',
 			),
 
 			// Datos Financieros (8)
 			'canon_mensual'          => array(
 				'label'       => __( 'Renta Mensual', 'arriendo-facil' ),
-				'description' => __( 'Monthly rent amount', 'arriendo-facil' ),
+				'description' => __( 'Valor de la renta mensual.', 'arriendo-facil' ),
 				'type'        => 'decimal',
 				'section'     => 'financiero',
 				'source'      => 'lease.monthly_rent',
 				'required'    => true,
+				// Espejo del campo base "Canon Mensual" del paso Vigencia.
+				'system'      => true,
 			),
 			'canon_letra'            => array(
 				'label'       => __( 'Renta en Letras', 'arriendo-facil' ),
-				'description' => __( 'Monthly rent written in words', 'arriendo-facil' ),
+				'description' => __( 'Renta mensual escrita en letras.', 'arriendo-facil' ),
 				'type'        => 'text',
 				'section'     => 'financiero',
 				'computed'    => 'number_to_words:canon_mensual',
 			),
 			'plazo_contrato'         => array(
 				'label'       => __( 'Plazo del Contrato', 'arriendo-facil' ),
-				'description' => __( 'Contract duration (e.g., "12 meses")', 'arriendo-facil' ),
+				'description' => __( 'Duración del contrato, por ejemplo "12 meses".', 'arriendo-facil' ),
 				'type'        => 'text',
 				'section'     => 'financiero',
+				'source' => 'lease.duration',
 			),
-			'monto número'           => array(
+			'monto_numero'           => array(
 				'label'       => __( 'Monto en Números', 'arriendo-facil' ),
-				'description' => __( 'Total amount in numbers', 'arriendo-facil' ),
+				'description' => __( 'Valor total de la garantía en números.', 'arriendo-facil' ),
 				'type'        => 'decimal',
 				'section'     => 'financiero',
+				'source'      => 'lease.deposit_amount',
+				// Espejo del campo base "Garantía" del paso Vigencia.
+				'system'      => true,
 			),
-			'monto letra'            => array(
+			'monto_letra'            => array(
 				'label'       => __( 'Monto en Letras', 'arriendo-facil' ),
-				'description' => __( 'Total amount written in words', 'arriendo-facil' ),
+				'description' => __( 'Valor de la garantía escrito en letras.', 'arriendo-facil' ),
 				'type'        => 'text',
 				'section'     => 'financiero',
-				'computed'    => 'number_to_words:monto número',
+				'computed'    => 'number_to_words:monto_numero',
 			),
 			'número_cuenta'          => array(
 				'label'       => __( 'Número de Cuenta', 'arriendo-facil' ),
-				'description' => __( 'Bank account number for payments', 'arriendo-facil' ),
+				'description' => __( 'Número de cuenta para los pagos.', 'arriendo-facil' ),
 				'type'        => 'text',
 				'section'     => 'financiero',
+				'source' => 'manual',
 			),
 			'nombre_banco'           => array(
 				'label'       => __( 'Nombre del Banco', 'arriendo-facil' ),
-				'description' => __( 'Bank name', 'arriendo-facil' ),
+				'description' => __( 'Banco donde se recibe el pago.', 'arriendo-facil' ),
 				'type'        => 'text',
 				'section'     => 'financiero',
+				'source' => 'manual',
 			),
 			'nombre_titular'         => array(
 				'label'       => __( 'Nombre del Titular', 'arriendo-facil' ),
-				'description' => __( 'Account holder name', 'arriendo-facil' ),
+				'description' => __( 'Titular de la cuenta de pago.', 'arriendo-facil' ),
 				'type'        => 'text',
 				'section'     => 'financiero',
+				'source' => 'owner.name',
 			),
 
 			// Pagos de Garantía (2)
 			'fecha_pago_garantia_1'  => array(
 				'label'       => __( 'Fecha Primer Pago Garantía', 'arriendo-facil' ),
-				'description' => __( 'First deposit payment due date', 'arriendo-facil' ),
+				'description' => __( 'Fecha del primer pago de la garantía.', 'arriendo-facil' ),
 				'type'        => 'date',
 				'section'     => 'garantia',
+				'source' => 'lease.deposit_due_1',
 			),
 			'fecha_pago_garantia_2'  => array(
 				'label'       => __( 'Fecha Segundo Pago Garantía', 'arriendo-facil' ),
-				'description' => __( 'Second deposit payment due date', 'arriendo-facil' ),
+				'description' => __( 'Fecha del segundo pago de la garantía.', 'arriendo-facil' ),
 				'type'        => 'date',
 				'section'     => 'garantia',
-			),
-
-			// Otros (1)
-			'n_b_social'             => array(
-				'label'       => __( 'Nombre Comercial/Social', 'arriendo-facil' ),
-				'description' => __( 'Business or social name', 'arriendo-facil' ),
-				'type'        => 'text',
-				'section'     => 'otros',
+				'source' => 'lease.deposit_due_2',
 			),
 		);
 	}
@@ -400,18 +432,20 @@ class Arriendo_Facil_Contract_Storage {
 	/**
 	 * Get placeholders organized by section
 	 *
+	 * Placeholders flagged as `system` are computed in the server (or are a
+	 * mirror of a base form field) and are never rendered in the wizard.
+	 *
 	 * @return array Placeholders grouped by section
 	 */
 	public static function get_placeholders_by_section() {
 		$schema   = self::get_placeholders_schema();
 		$sections = array(
-			'fecha_lugar' => __( 'Datos de Fecha y Lugar', 'arriendo-facil' ),
-			'propietario' => __( 'Datos del Propietario', 'arriendo-facil' ),
+			'fecha_lugar' => __( 'Notificaciones', 'arriendo-facil' ),
+			'propietario' => __( 'Propietario', 'arriendo-facil' ),
 			'inquilino'   => __( 'Datos del Inquilino', 'arriendo-facil' ),
 			'inmueble'    => __( 'Datos del Inmueble', 'arriendo-facil' ),
-			'financiero'  => __( 'Datos Financieros', 'arriendo-facil' ),
-			'garantia'    => __( 'Pagos de Garantía', 'arriendo-facil' ),
-			'otros'       => __( 'Otros Datos', 'arriendo-facil' ),
+			'financiero'  => __( 'Financiero', 'arriendo-facil' ),
+			'garantia'    => __( 'Garantía', 'arriendo-facil' ),
 		);
 
 		$grouped = array();
@@ -423,21 +457,139 @@ class Arriendo_Facil_Contract_Storage {
 		}
 
 		foreach ( $schema as $placeholder => $config ) {
-			$section = $config['section'] ?? 'otros';
+			if ( ! empty( $config['system'] ) ) {
+				continue;
+			}
+			$section = $config['section'] ?? '';
 			if ( isset( $grouped[ $section ] ) ) {
 				$grouped[ $section ]['placeholders'][ $placeholder ] = $config;
 			}
 		}
 
-		return $grouped;
+		// Drop empty sections so the wizard never renders an empty step.
+		return array_filter(
+			$grouped,
+			static function ( $group ) {
+				return ! empty( $group['placeholders'] );
+			}
+		);
 	}
 
 	/**
-	 * Validate placeholder values
+	 * Completa los placeholders que nunca se piden al operador.
 	 *
-	 * @param array $values Placeholder values to validate.
-	 * @return array|WP_Error Valid values or error with issues found.
+	 * Abarca los marcados como `system` (fecha de firma y los espejos de los
+	 * campos base del formulario) más los derivados que se calculan a partir
+	 * de la vigencia y los montos. Solo rellena claves vacías o ausentes: lo
+	 * que el operador escribió en el formulario siempre gana.
+	 *
+	 * @param array  $values        Placeholders recibidos del formulario.
+	 * @param string $start_date    Fecha de inicio (Y-m-d).
+	 * @param string $end_date      Fecha de fin (Y-m-d).
+	 * @param float  $monthly_rent  Canon mensual.
+	 * @param float  $deposit_amount Garantía.
+	 * @return array
 	 */
+	public static function with_defaults( $values, $start_date, $end_date, $monthly_rent, $deposit_amount ) {
+		if ( ! is_array( $values ) ) {
+			$values = array();
+		}
+
+		$now = current_time( 'mysql' );
+		$now = is_string( $now ) && 10 === strlen( $now ) ? $now : gmdate( 'Y-m-d' );
+
+		$system = array(
+			'año'            => substr( $now, 0, 4 ),
+			'mes'            => (string) (int) substr( $now, 5, 2 ),
+			'dia_numero'     => (string) (int) substr( $now, 8, 2 ),
+			'fecha_incio'    => $start_date,
+			'fecha_fin'      => $end_date,
+			'dias_notificacion' => '30',
+			'fecha_pago_garantia_1' => $start_date,
+			'fecha_pago_garantia_2' => self::add_months( $start_date, 1 ),
+		);
+
+		if ( $monthly_rent > 0 ) {
+			$system['canon_mensual'] = number_format( $monthly_rent, 2, '.', '' );
+		}
+		if ( $deposit_amount > 0 ) {
+			$system['monto_numero'] = number_format( $deposit_amount, 2, '.', '' );
+		}
+		$duration = self::contract_duration( $start_date, $end_date );
+		if ( $duration ) {
+			$system['plazo_contrato'] = $duration;
+		}
+
+		foreach ( $system as $key => $value ) {
+			if ( '' === $value || null === $value ) {
+				continue;
+			}
+			if ( ! isset( $values[ $key ] ) || '' === trim( (string) $values[ $key ] ) ) {
+				$values[ $key ] = $value;
+			}
+		}
+
+		return $values;
+	}
+
+	/**
+	 * Duración del contrato en meses, expresada en texto.
+	 *
+	 * @param string $start_date Fecha de inicio (Y-m-d).
+	 * @param string $end_date   Fecha de fin (Y-m-d).
+	 * @return string '' cuando las fechas no son válidas.
+	 */
+	private static function contract_duration( $start_date, $end_date ) {
+		$start = self::parse_date( $start_date );
+		$end   = self::parse_date( $end_date );
+		if ( ! $start || ! $end || $end <= $start ) {
+			return '';
+		}
+
+		$months = ( (int) $end->format( 'Y' ) - (int) $start->format( 'Y' ) ) * 12
+			+ ( (int) $end->format( 'n' ) - (int) $start->format( 'n' ) );
+		if ( (int) $end->format( 'j' ) < (int) $start->format( 'j' ) ) {
+			--$months;
+		}
+		if ( $months < 1 ) {
+			return '';
+		}
+
+		return 1 === $months ? __( '1 mes', 'arriendo-facil' ) : sprintf( __( '%d meses', 'arriendo-facil' ), $months );
+	}
+
+	/**
+	 * Suma meses a una fecha Y-m-d.
+	 *
+	 * @param string $date   Fecha origen.
+	 * @param int    $months Meses a sumar.
+	 * @return string '' cuando la fecha no es válida.
+	 */
+	private static function add_months( $date, $months ) {
+		$parsed = self::parse_date( $date );
+		if ( ! $parsed ) {
+			return '';
+		}
+		$parsed->modify( sprintf( '%+d months', (int) $months ) );
+
+		return $parsed->format( 'Y-m-d' );
+	}
+
+	/**
+	 * @param string $date Fecha Y-m-d.
+	 * @return DateTime|null
+	 */
+	private static function parse_date( $date ) {
+		if ( ! is_string( $date ) || ! preg_match( '/^(\d{4})-(\d{2})-(\d{2})$/', $date, $m ) ) {
+			return null;
+		}
+		if ( ! checkdate( (int) $m[2], (int) $m[3], (int) $m[1] ) ) {
+			return null;
+		}
+
+		return DateTime::createFromFormat( 'Y-m-d', $date );
+	}
+
 	/**
 	 * Validate placeholder values against schema
 	 *
@@ -452,7 +604,7 @@ class Arriendo_Facil_Contract_Storage {
 		foreach ( $schema as $placeholder => $config ) {
 			if ( ! isset( $values[ $placeholder ] ) ) {
 				if ( ! empty( $config['required'] ) ) {
-					$errors[ $placeholder ] = sprintf( __( '%s is required', 'arriendo-facil' ), $config['label'] );
+					$errors[ $placeholder ] = sprintf( __( '%s es obligatorio.', 'arriendo-facil' ), $config['label'] );
 				}
 				continue;
 			}

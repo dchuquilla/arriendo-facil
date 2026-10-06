@@ -282,6 +282,16 @@ class Arriendo_Facil_Lease {
 				}
 			}
 
+			// Fecha de firma, espejos de los campos base del formulario y
+			// valores derivados: nunca se piden al operador, se calculan aquí.
+			$placeholders = Arriendo_Facil_Contract_Storage::with_defaults(
+				$placeholders,
+				$start_date,
+				$end_date,
+				$monthly_rent,
+				$deposit_amount
+			);
+
 			// Validar placeholders contra el schema
 			if ( ! empty( $placeholders ) ) {
 				$validation = Arriendo_Facil_Contract_Storage::validate_placeholders( $placeholders );
@@ -386,18 +396,37 @@ class Arriendo_Facil_Lease {
 
 		$new_id = (int) $wpdb->insert_id;
 
-		// ── Guardar Placeholders en Meta ──────────────────────────────────────
+		// ── Guardar Placeholders ─────────────────────────────────────────────
 		if ( ! empty( $placeholders ) ) {
-			// Guardar como una entrada en post_meta con clave serializada
-			update_post_meta( $new_id, 'af_contract_placeholders', wp_json_encode( $placeholders ) );
+			// Scoped by lease id in a single option: writing them as post meta
+			// under the lease id collided with real posts of the same id.
+			$all = get_option( 'af_contract_placeholders_by_lease', array() );
+			if ( ! is_array( $all ) ) {
+				$all = array();
+			}
+			$all[ $new_id ] = $placeholders;
+			update_option( 'af_contract_placeholders_by_lease', $all, false );
 		}
 
 		// ── Auto-vinculación: Inquilino → Inmueble ───────────────────────────
-		// Si el inquilino no tiene accommodation_id, asignarlo automáticamente
+		// El inquilino queda ligado al inmueble elegido para que la próxima vez
+		// que se abra el formulario se autocompleten sus datos y los del
+		// inmueble sin tener que volver a elegirlos.
 		if ( $guest_id > 0 ) {
-			$guest_accommodation_id = get_post_meta( $guest_id, 'accommodation_id', true );
-			if ( empty( $guest_accommodation_id ) ) {
-				update_post_meta( $guest_id, 'accommodation_id', $accommodation_id );
+			$guest_row = $wpdb->get_row(
+				$wpdb->prepare(
+					'SELECT id, accommodation_id FROM ' . $wpdb->prefix . 'af_guests WHERE id = %d', // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+					$guest_id
+				)
+			);
+			if ( $guest_row && (int) $guest_row->accommodation_id !== (int) $accommodation_id ) {
+				$wpdb->update(
+					$wpdb->prefix . 'af_guests',
+					array( 'accommodation_id' => (int) $accommodation_id ),
+					array( 'id' => (int) $guest_id ),
+					array( '%d' ),
+					array( '%d' )
+				);
 			}
 		}
 

@@ -286,10 +286,82 @@ class Arriendo_Facil_Contract_Generator {
 			}
 		}
 
+		$placeholders = $this->get_stored_placeholders( $lease );
+		if ( $placeholders ) {
+			// Operator-entered values win over the derived ones.
+			$overrides = array(
+				'nombres_inquilino'      => 'guest_name',
+				'cedula_inquilino'       => 'guest_id_number',
+				'nombres_propietario'    => 'owner_name',
+				'cedula_propietario'     => 'owner_id_number',
+				'dirección_inmueble'     => 'accommodation_address',
+				'tipo_inmueble'          => 'accommodation_property_type',
+				'n_habitacion'           => 'accommodation_bedrooms',
+				'n_baños'                => 'accommodation_bathrooms',
+				'dimensiones_inmueble'   => 'accommodation_square_meters',
+				'canon_mensual'          => 'monthly_rent',
+				'monto_numero'           => 'deposit_amount',
+				'fecha_incio'            => 'start_date',
+				'fecha_fin'              => 'end_date',
+			);
+
+			foreach ( $overrides as $placeholder => $payload_key ) {
+				if ( ! isset( $placeholders[ $placeholder ] ) || '' === $placeholders[ $placeholder ] ) {
+					continue;
+				}
+				$value = $placeholders[ $placeholder ];
+				if ( in_array( $payload_key, array( 'monthly_rent', 'deposit_amount' ), true ) ) {
+					$payload[ $payload_key ] = (float) $value;
+				} elseif ( 'owner_id_number' === $payload_key ) {
+					$payload[ $payload_key ] = sanitize_text_field( (string) $value );
+				} else {
+					$payload[ $payload_key ] = sanitize_text_field( (string) $value );
+				}
+			}
+
+			// Full bag for the DOCX filler and for anything that needs the
+			// exact labels the contract template expects.
+			$payload['contract_placeholders'] = $placeholders;
+		}
+
 		$payload['legal_requirements']  = $this->get_contract_legal_requirements();
 		$payload['legal_template_base'] = $this->build_legal_contract_template( $payload, '' );
 
 		return $payload;
+	}
+
+	/**
+	 * Reads the placeholders the operator typed when creating the lease.
+	 *
+	 * They are stored as JSON in post meta under the lease id (the same place
+	 * Arriendo_Facil_Lease writes them).
+	 *
+	 * @param object $lease Lease row.
+	 * @return array<string,string>
+	 */
+	private function get_stored_placeholders( $lease ) {
+		$lease_id = isset( $lease->id ) ? absint( $lease->id ) : 0;
+		if ( ! $lease_id ) {
+			return array();
+		}
+
+		$all = get_option( 'af_contract_placeholders_by_lease', array() );
+		if ( is_array( $all ) && isset( $all[ $lease_id ] ) && is_array( $all[ $lease_id ] ) ) {
+			return array_map( 'strval', $all[ $lease_id ] );
+		}
+
+		// Legacy builds wrote this as post meta keyed by the lease id.
+		$raw = get_post_meta( $lease_id, 'af_contract_placeholders', true );
+		if ( '' === $raw || null === $raw ) {
+			return array();
+		}
+
+		if ( is_array( $raw ) ) {
+			return array_map( 'strval', $raw );
+		}
+
+		$decoded = json_decode( (string) $raw, true );
+		return is_array( $decoded ) ? array_map( 'strval', $decoded ) : array();
 	}
 
 	/**
@@ -928,6 +1000,40 @@ class Arriendo_Facil_Contract_Generator {
 		}
 
 		return $templates;
+	}
+
+	/**
+	 * Returns the contract identity of the owner linked to an accommodation.
+	 *
+	 * Used by the lease form to pre-fill the owner placeholders so the operator
+	 * never retypes data the system already knows.
+	 *
+	 * @param int $accommodation_id Accommodation ID.
+	 * @return array{name:string,id_number:string}
+	 */
+	public function get_owner_identity_for_accommodation( $accommodation_id ) {
+		$empty = array(
+			'name'      => '',
+			'id_number' => '',
+		);
+
+		$owner_user_id = $this->resolve_accommodation_owner_user_id( $accommodation_id );
+		if ( ! $owner_user_id ) {
+			return $empty;
+		}
+
+		$name      = '';
+		$id_number = $this->get_owner_identification_number( $owner_user_id );
+
+		$owner_user = get_userdata( $owner_user_id );
+		if ( $owner_user ) {
+			$name = sanitize_text_field( (string) $owner_user->display_name );
+		}
+
+		return array(
+			'name'      => $name,
+			'id_number' => $id_number,
+		);
 	}
 
 	/**

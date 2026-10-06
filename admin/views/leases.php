@@ -199,7 +199,7 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 		$lease_guests = $wpdb->get_results(
 			"SELECT g.id, g.first_name, g.last_name, g.email, g.accommodation_id, 
 			        g.rental_start_date, g.rental_end_date, g.desired_price, g.guarantee_text, g.doc_status,
-			        g.document_id, g.nationality, a.post_title AS accommodation_title
+			        g.id_number, g.nationality, a.post_title AS accommodation_title
 			 FROM {$wpdb->prefix}af_guests g
 			 LEFT JOIN {$wpdb->posts} a ON a.ID = g.accommodation_id
 			 ORDER BY g.first_name ASC
@@ -211,7 +211,7 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 			$wpdb->prepare(
 				"SELECT g.id, g.first_name, g.last_name, g.email, g.accommodation_id, 
 				        g.rental_start_date, g.rental_end_date, g.desired_price, g.guarantee_text, g.doc_status,
-				        g.document_id, g.nationality, a.post_title AS accommodation_title
+				        g.id_number, g.nationality, a.post_title AS accommodation_title
 				 FROM {$wpdb->prefix}af_guests g
 				 LEFT JOIN {$wpdb->posts} a ON a.ID = g.accommodation_id
 				 WHERE g.accommodation_id IN ($ids_sql) OR g.accommodation_id IS NULL OR g.accommodation_id = 0
@@ -224,7 +224,7 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 		$lease_guests = $wpdb->get_results(
 			"SELECT g.id, g.first_name, g.last_name, g.email, g.accommodation_id, 
 			        g.rental_start_date, g.rental_end_date, g.desired_price, g.guarantee_text, g.doc_status,
-			        g.document_id, g.nationality, a.post_title AS accommodation_title
+			        g.id_number, g.nationality, a.post_title AS accommodation_title
 			 FROM {$wpdb->prefix}af_guests g
 			 LEFT JOIN {$wpdb->posts} a ON a.ID = g.accommodation_id
 			 WHERE g.accommodation_id IS NULL OR g.accommodation_id = 0
@@ -275,239 +275,295 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 		<p class="af-modal__hint" style="margin:0 0 var(--af-space-4);">
 			<?php esc_html_e( 'Selecciona el inmueble e inquilino ya registrados. El sistema generará automáticamente el contrato con los datos.', 'arriendo-facil' ); ?>
 		</p>
-		<p class="af-modal__status" id="af-lease-status" style="display:none;"></p>
 
-		<form id="af-lease-form">
-			<!-- Section 1: Inmueble e Inquilino -->
-			<fieldset style="border: none; padding: 0; margin-bottom: var(--af-space-4);">
-				<legend style="font-weight: 600; font-size: 14px; color: #111; margin-bottom: var(--af-space-3); text-transform: uppercase;">
-					<?php esc_html_e( 'Seleccionar Inmueble e Inquilino', 'arriendo-facil' ); ?>
-				</legend>
-				<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--af-space-3);">
-					<label style="display: block;">
-						<span style="display:block; font-weight:600; margin-bottom:6px; font-size: 13px;"><?php esc_html_e( 'Inmueble', 'arriendo-facil' ); ?> *</span>
-						<select name="accommodation_id" required style="width:100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
-							<option value=""><?php esc_html_e( '— Seleccionar —', 'arriendo-facil' ); ?></option>
-							<?php foreach ( $lease_accommodations as $lease_accommodation ) : 
-								$acc_id = (int) $lease_accommodation->ID;
-								$acc_address = (string) get_post_meta( $acc_id, '_af_address', true );
-								$acc_type = (string) get_post_meta( $acc_id, '_af_property_type', true );
-								$acc_bedrooms = (int) get_post_meta( $acc_id, '_af_bedrooms', true );
-								$acc_bathrooms = (int) get_post_meta( $acc_id, '_af_bathrooms', true );
-								$acc_rent = (string) get_post_meta( $acc_id, '_af_monthly_rent', true );
-							?>
-								<option value="<?php echo esc_attr( $acc_id ); ?>"
-									data-rent="<?php echo esc_attr( $acc_rent ); ?>"
-									data-address="<?php echo esc_attr( $acc_address ); ?>"
-									data-property-type="<?php echo esc_attr( $acc_type ); ?>"
-									data-bedrooms="<?php echo esc_attr( $acc_bedrooms ); ?>"
-									data-bathrooms="<?php echo esc_attr( $acc_bathrooms ); ?>">
-									<?php echo esc_html( $lease_accommodation->post_title ); ?>
-								</option>
-							<?php endforeach; ?>
-						</select>
-					</label>
+		<?php
+		$af_ph_sections    = class_exists( 'Arriendo_Facil_Contract_Storage' ) ? Arriendo_Facil_Contract_Storage::get_placeholders_by_section() : array();
+		$af_ph_generator   = class_exists( 'Arriendo_Facil_Contract_Generator' ) ? new Arriendo_Facil_Contract_Generator() : null;
+		$af_ph_owner_cache = array();
 
-					<label style="display: block;">
-						<span style="display:block; font-weight:600; margin-bottom:6px; font-size: 13px;"><?php esc_html_e( 'Inquilino', 'arriendo-facil' ); ?> *</span>
-						<select name="guest_id" required style="width:100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
-							<option value=""><?php esc_html_e( '— Seleccionar —', 'arriendo-facil' ); ?></option>
-							<?php foreach ( (array) $lease_guests as $lease_guest ) : ?>
-								<option value="<?php echo esc_attr( (int) $lease_guest->id ); ?>"
-									data-accommodation="<?php echo esc_attr( (int) $lease_guest->accommodation_id ); ?>"
-									data-start="<?php echo esc_attr( (string) $lease_guest->rental_start_date ); ?>"
-									data-end="<?php echo esc_attr( (string) $lease_guest->rental_end_date ); ?>"
-									data-price="<?php echo esc_attr( (string) $lease_guest->desired_price ); ?>"
-									data-doc-status="<?php echo esc_attr( (string) $lease_guest->doc_status ); ?>"
-									data-guest-name="<?php echo esc_attr( trim( $lease_guest->first_name . ' ' . $lease_guest->last_name ) ); ?>"
-									data-document-id="<?php echo esc_attr( (string) $lease_guest->document_id ); ?>"
-									data-nationality="<?php echo esc_attr( (string) $lease_guest->nationality ); ?>">
-									<?php
-									echo esc_html( trim( $lease_guest->first_name . ' ' . $lease_guest->last_name ) );
-									if ( 'verificado' === (string) $lease_guest->doc_status ) {
-										echo esc_html( ' ✓' );
-									}
-									?>
-								</option>
-							<?php endforeach; ?>
-						</select>
-						<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-guests' ) ); ?>" style="display: inline-block; margin-top: 6px; font-size: 12px; color: #0891b2; text-decoration: none;">
-							<?php esc_html_e( '+ Registrar nuevo inquilino', 'arriendo-facil' ); ?>
-						</a>
-					</label>
+		// Cada grupo de placeholders se dibuja en el paso que le corresponde.
+		$af_step_groups = array(
+			1 => array( 'inquilino' ),
+			2 => array( 'inmueble' ),
+			4 => array( 'propietario', 'financiero', 'garantia', 'fecha_lugar' ),
+		);
+
+		$af_render_section = static function ( $section_id ) use ( $af_ph_sections ) {
+			if ( empty( $af_ph_sections[ $section_id ]['placeholders'] ) ) {
+				return;
+			}
+			$section_data = $af_ph_sections[ $section_id ];
+			?>
+			<div class="af-cwiz__group">
+				<h3 class="af-cwiz__group-title"><?php echo esc_html( $section_data['label'] ); ?></h3>
+				<div class="af-form-grid">
+					<?php foreach ( $section_data['placeholders'] as $placeholder => $config ) :
+						$field_id   = 'af-ph-' . sanitize_title( $placeholder );
+						$field_name = 'placeholder_' . $placeholder;
+						$input_type = 'text';
+						$input_attrs = '';
+
+						switch ( $config['type'] ) {
+							case 'date':
+								$input_type = 'date';
+								break;
+							case 'year':
+								$input_type = 'number';
+								$input_attrs = ' inputmode="numeric" min="1900" max="2100"';
+								break;
+							case 'month':
+							case 'day':
+							case 'integer':
+								$input_type = 'number';
+								$input_attrs = ' step="1"';
+								break;
+							case 'decimal':
+								$input_type = 'number';
+								$input_attrs = ' step="0.01" min="0"';
+								break;
+							case 'select':
+								$input_type = 'select';
+								break;
+							case 'textarea':
+								$input_type = 'textarea';
+								break;
+						}
+
+						$source   = (string) ( $config['source'] ?? '' );
+						$computed = (string) ( $config['computed'] ?? '' );
+						$is_auto  = ( '' !== $source && 'manual' !== $source ) || '' !== $computed;
+						?>
+						<div class="af-form-field<?php echo $is_auto ? ' af-cwiz__field--auto' : ''; ?>"
+							data-ph="<?php echo esc_attr( $placeholder ); ?>"
+							data-source="<?php echo esc_attr( $source ); ?>"
+							data-computed="<?php echo esc_attr( $computed ); ?>"
+							data-default="<?php echo esc_attr( (string) ( $config['default'] ?? '' ) ); ?>">
+							<label class="af-form-field__label" for="<?php echo esc_attr( $field_id ); ?>">
+								<?php echo esc_html( $config['label'] ); ?>
+								<?php if ( ! empty( $config['required'] ) ) : ?>
+									<span class="af-required">*</span>
+								<?php endif; ?>
+								<?php if ( $is_auto ) : ?>
+									<span class="af-cwiz__badge" hidden><?php esc_html_e( 'Auto', 'arriendo-facil' ); ?></span>
+								<?php endif; ?>
+							</label>
+
+							<?php if ( 'select' === $input_type ) : ?>
+								<select name="<?php echo esc_attr( $field_name ); ?>" id="<?php echo esc_attr( $field_id ); ?>"<?php echo ! empty( $config['required'] ) ? ' required' : ''; ?>>
+									<option value=""><?php esc_html_e( '— Seleccionar —', 'arriendo-facil' ); ?></option>
+									<?php foreach ( (array) ( $config['options'] ?? array() ) as $opt_value => $opt_label ) : ?>
+										<option value="<?php echo esc_attr( $opt_value ); ?>"><?php echo esc_html( $opt_label ); ?></option>
+									<?php endforeach; ?>
+								</select>
+							<?php elseif ( 'textarea' === $input_type ) : ?>
+								<textarea name="<?php echo esc_attr( $field_name ); ?>" id="<?php echo esc_attr( $field_id ); ?>" rows="3"<?php echo ! empty( $config['required'] ) ? ' required' : ''; ?>></textarea>
+							<?php else : ?>
+								<input type="<?php echo esc_attr( $input_type ); ?>" name="<?php echo esc_attr( $field_name ); ?>" id="<?php echo esc_attr( $field_id ); ?>"<?php echo ! empty( $config['required'] ) ? ' required' : ''; ?><?php echo $input_attrs ? wp_kses_post( $input_attrs ) : ''; ?> />
+							<?php endif; ?>
+
+							<?php if ( $is_auto ) : ?>
+								<span class="af-form-field__hint"><?php esc_html_e( 'Se rellena solo; puedes editarlo si hace falta.', 'arriendo-facil' ); ?></span>
+							<?php elseif ( ! empty( $config['description'] ) ) : ?>
+								<span class="af-form-field__hint"><?php echo esc_html( $config['description'] ); ?></span>
+							<?php endif; ?>
+						</div>
+					<?php endforeach; ?>
 				</div>
-			</fieldset>
+			</div>
+			<?php
+		};
+		?>
 
-			<!-- Section 2: Fechas -->
-			<fieldset style="border: none; padding: 0; margin-bottom: var(--af-space-4);">
-				<legend style="font-weight: 600; font-size: 14px; color: #111; margin-bottom: var(--af-space-3); text-transform: uppercase;">
-					<?php esc_html_e( 'Fechas del Contrato', 'arriendo-facil' ); ?>
-				</legend>
-				<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--af-space-3);">
-					<label style="display: block;">
-						<span style="display:block; font-weight:600; margin-bottom:6px; font-size: 13px;"><?php esc_html_e( 'Inicio', 'arriendo-facil' ); ?> *</span>
-						<input type="date" name="start_date" required style="width:100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;" />
-					</label>
 
-					<label style="display: block;">
-						<span style="display:block; font-weight:600; margin-bottom:6px; font-size: 13px;"><?php esc_html_e( 'Fin', 'arriendo-facil' ); ?> *</span>
-						<input type="date" name="end_date" required style="width:100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;" />
-					</label>
+		<form id="af-lease-form" novalidate>
+			<p class="af-modal__status" id="af-lease-status" style="display:none;"></p>
+
+			<div class="af-cwiz__progress" id="af-wizard-progress"
+				role="progressbar" aria-valuemin="1" aria-valuemax="5" aria-valuenow="1"
+				aria-label="<?php esc_attr_e( 'Progreso del formulario de contrato', 'arriendo-facil' ); ?>">
+				<div class="af-cwiz__progress-head">
+					<span class="af-cwiz__progress-label" id="af-wizard-progress-label"><?php esc_html_e( 'Paso 1 de 5 — Partes', 'arriendo-facil' ); ?></span>
+					<span class="af-cwiz__progress-pct" id="af-wizard-progress-pct">20%</span>
 				</div>
-			</fieldset>
-
-			<!-- Section 3: Canon y Garantía -->
-			<fieldset style="border: none; padding: 0; margin-bottom: var(--af-space-4);">
-				<legend style="font-weight: 600; font-size: 14px; color: #111; margin-bottom: var(--af-space-3); text-transform: uppercase;">
-					<?php esc_html_e( 'Datos Financieros', 'arriendo-facil' ); ?>
-				</legend>
-				<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--af-space-3);">
-					<label style="display: block;">
-						<span style="display:block; font-weight:600; margin-bottom:6px; font-size: 13px;"><?php esc_html_e( 'Canon Mensual (USD)', 'arriendo-facil' ); ?> *</span>
-						<input type="number" name="monthly_rent" step="0.01" min="0" required style="width:100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;" placeholder="0.00" />
-					</label>
-
-					<label style="display: block;">
-						<span style="display:block; font-weight:600; margin-bottom:6px; font-size: 13px;"><?php esc_html_e( 'Garantía (USD)', 'arriendo-facil' ); ?></span>
-						<input type="number" name="deposit_amount" step="0.01" min="0" style="width:100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;" placeholder="0.00" />
-					</label>
-
-					<label style="display: block;">
-						<span style="display:block; font-weight:600; margin-bottom:6px; font-size: 13px;"><?php esc_html_e( 'Día Límite de Pago', 'arriendo-facil' ); ?></span>
-						<select name="payment_due_day" style="width:100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
-							<option value=""><?php esc_html_e( 'Día 5 (predeterminado)', 'arriendo-facil' ); ?></option>
-							<?php for ( $day = 1; $day <= 28; $day++ ) : ?>
-								<option value="<?php echo esc_attr( $day ); ?>"><?php echo esc_html( sprintf( __( 'Día %d', 'arriendo-facil' ), $day ) ); ?></option>
-							<?php endfor; ?>
-						</select>
-					</label>
+				<div class="af-cwiz__progress-track" aria-hidden="true">
+					<span class="af-cwiz__progress-fill" id="af-wizard-progress-fill" style="width:20%"></span>
 				</div>
-			</fieldset>
+			</div>
 
-			<!-- Section 4: Plantilla -->
-			<fieldset style="border: none; padding: 0; margin-bottom: var(--af-space-4);">
-				<legend style="font-weight: 600; font-size: 14px; color: #111; margin-bottom: var(--af-space-3); text-transform: uppercase;">
-					<?php esc_html_e( 'Plantilla de Contrato', 'arriendo-facil' ); ?>
-				</legend>
-				<label style="display: block;">
-					<span style="display:block; font-weight:600; margin-bottom:6px; font-size: 13px;"><?php esc_html_e( 'Seleccionar Plantilla', 'arriendo-facil' ); ?></span>
-					<select name="template_attachment_id" id="af-lease-template" style="width:100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
-						<option value=""><?php esc_html_e( 'Plantilla del Propietario (Última)', 'arriendo-facil' ); ?></option>
-					</select>
-					<p style="margin: 6px 0 0; font-size: 12px; color: #6b7280;">
-						<?php esc_html_e( 'Se usará para generar automáticamente el documento.', 'arriendo-facil' ); ?>
-						<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-owner-contacts' ) ); ?>" style="color: #0891b2; text-decoration: none;">
-							<?php esc_html_e( 'Administrar Plantillas', 'arriendo-facil' ); ?>
-						</a>
-					</p>
-				</label>
-			</fieldset>
+			<ol class="af-cwiz__steps" id="af-wizard-steps">
+				<li class="is-current"><button type="button" class="af-cwiz__step" data-goto="1" data-label="<?php esc_attr_e( 'Partes', 'arriendo-facil' ); ?>"><span class="af-cwiz__num">1</span> <?php esc_html_e( 'Partes', 'arriendo-facil' ); ?></button></li>
+				<li><button type="button" class="af-cwiz__step" data-goto="2" data-label="<?php esc_attr_e( 'Inmueble', 'arriendo-facil' ); ?>"><span class="af-cwiz__num">2</span> <?php esc_html_e( 'Inmueble', 'arriendo-facil' ); ?></button></li>
+				<li><button type="button" class="af-cwiz__step" data-goto="3" data-label="<?php esc_attr_e( 'Vigencia', 'arriendo-facil' ); ?>"><span class="af-cwiz__num">3</span> <?php esc_html_e( 'Vigencia', 'arriendo-facil' ); ?></button></li>
+				<li><button type="button" class="af-cwiz__step" data-goto="4" data-label="<?php esc_attr_e( 'Documento', 'arriendo-facil' ); ?>"><span class="af-cwiz__num">4</span> <?php esc_html_e( 'Documento', 'arriendo-facil' ); ?></button></li>
+				<li><button type="button" class="af-cwiz__step" data-goto="5" data-label="<?php esc_attr_e( 'Revisar', 'arriendo-facil' ); ?>"><span class="af-cwiz__num">5</span> <?php esc_html_e( 'Revisar', 'arriendo-facil' ); ?></button></li>
+			</ol>
 
-			<!-- Section 5: Información Adicional del Contrato (Collapsible) -->
-			<?php if ( class_exists( 'Arriendo_Facil_Contract_Storage' ) ) : ?>
-				<?php $placeholders_by_section = Arriendo_Facil_Contract_Storage::get_placeholders_by_section(); ?>
-				<fieldset style="border: none; padding: 0; margin-bottom: var(--af-space-4);">
-					<legend style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: var(--af-space-3); font-weight: 600; font-size: 14px; color: #111; text-transform: uppercase;">
-						<span style="display: inline-block; width: 16px; height: 16px; background: #e5e7eb; border-radius: 2px; text-align: center; line-height: 14px; font-size: 11px; color: #6b7280;" id="af-advanced-toggle">▶</span>
-						<?php esc_html_e( 'Información Adicional del Contrato', 'arriendo-facil' ); ?>
-					</legend>
+			<p class="af-cwiz__error" id="af-wizard-error" role="alert"></p>
 
-					<div id="af-advanced-fields" style="display: none; padding: var(--af-space-3); background: #fafafa; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: var(--af-space-3);">
-						<?php foreach ( $placeholders_by_section as $section_id => $section_data ) : ?>
-							<div style="margin-bottom: var(--af-space-4); padding-bottom: var(--af-space-4); border-bottom: 1px solid #e5e7eb;">
-								<div style="margin-bottom: var(--af-space-3);">
-									<h4 style="margin: 0 0 var(--af-space-2); font-size: 13px; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: 0.4px;">
-										<?php echo esc_html( $section_data['label'] ); ?>
-									</h4>
-									<div style="width: 36px; height: 3px; background: linear-gradient(90deg, #3b82f6, #0891b2); border-radius: 2px;"></div>
-								</div>
-								<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--af-space-3);">
-									<?php foreach ( $section_data['placeholders'] as $placeholder => $config ) : ?>
+			<!-- ── Paso 1: Partes ────────────────────────────────────────────── -->
+			<section class="af-cwiz__panel" data-step="1">
+				<div class="af-cwiz__group">
+					<h3 class="af-cwiz__group-title"><?php esc_html_e( 'Partes del contrato', 'arriendo-facil' ); ?></h3>
+					<div class="af-form-grid">
+						<div class="af-form-field">
+							<label class="af-form-field__label" for="af-lease-guest"><?php esc_html_e( 'Inquilino', 'arriendo-facil' ); ?> <span class="af-required">*</span></label>
+							<select name="guest_id" id="af-lease-guest" required>
+								<option value=""><?php esc_html_e( '— Seleccionar —', 'arriendo-facil' ); ?></option>
+								<?php foreach ( (array) $lease_guests as $lease_guest ) : ?>
+									<option value="<?php echo esc_attr( (int) $lease_guest->id ); ?>"
+										data-accommodation="<?php echo esc_attr( (int) $lease_guest->accommodation_id ); ?>"
+										data-start="<?php echo esc_attr( (string) $lease_guest->rental_start_date ); ?>"
+										data-end="<?php echo esc_attr( (string) $lease_guest->rental_end_date ); ?>"
+										data-price="<?php echo esc_attr( (string) $lease_guest->desired_price ); ?>"
+										data-doc-status="<?php echo esc_attr( (string) $lease_guest->doc_status ); ?>"
+										data-guest-name="<?php echo esc_attr( trim( $lease_guest->first_name . ' ' . $lease_guest->last_name ) ); ?>"
+										data-document-id="<?php echo esc_attr( (string) $lease_guest->id_number ); ?>"
+										data-nationality="<?php echo esc_attr( (string) $lease_guest->nationality ); ?>">
 										<?php
-										$field_id = 'af-placeholder-' . str_replace( '_', '-', $placeholder );
-										$field_name = 'placeholder_' . $placeholder;
-										$input_type = 'text';
-										$input_attrs = '';
-
-										switch ( $config['type'] ) {
-											case 'date':
-												$input_type = 'date';
-												break;
-											case 'integer':
-												$input_type = 'number';
-												$input_attrs = ' step="1"';
-												break;
-											case 'decimal':
-												$input_type = 'number';
-												$input_attrs = ' step="0.01" min="0"';
-												break;
-											case 'select':
-												$input_type = 'select';
-												break;
-											case 'textarea':
-												$input_type = 'textarea';
-												break;
+										echo esc_html( trim( $lease_guest->first_name . ' ' . $lease_guest->last_name ) );
+										if ( 'verificado' === (string) $lease_guest->doc_status ) {
+											echo esc_html( ' ✓' );
 										}
 										?>
-										<label style="display: block;">
-											<span style="display:block; font-weight:600; margin-bottom:6px; font-size: 13px; color: #111;">
-												<?php echo esc_html( $config['label'] ); ?>
-												<?php if ( ! empty( $config['required'] ) ) : ?>
-													<span style="color: #ef4444;">*</span>
-												<?php endif; ?>
-											</span>
-											<?php if ( 'select' === $input_type ) : ?>
-												<select name="<?php echo esc_attr( $field_name ); ?>" id="<?php echo esc_attr( $field_id ); ?>" style="width:100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; background: #fff;">
-													<option value=""><?php esc_html_e( '— Seleccionar —', 'arriendo-facil' ); ?></option>
-													<?php foreach ( (array) $config['options'] as $opt_value => $opt_label ) : ?>
-														<option value="<?php echo esc_attr( $opt_value ); ?>"><?php echo esc_html( $opt_label ); ?></option>
-													<?php endforeach; ?>
-												</select>
-											<?php elseif ( 'textarea' === $input_type ) : ?>
-												<textarea name="<?php echo esc_attr( $field_name ); ?>" id="<?php echo esc_attr( $field_id ); ?>" rows="4" style="width:100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; background: #fff; font-family: inherit; resize: vertical;"></textarea>
-											<?php else : ?>
-												<input type="<?php echo esc_attr( $input_type ); ?>" name="<?php echo esc_attr( $field_name ); ?>" id="<?php echo esc_attr( $field_id ); ?>" style="width:100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; background: #fff;"<?php echo wp_kses_post( $input_attrs ); ?> />
-											<?php endif; ?>
-											<?php if ( ! empty( $config['description'] ) ) : ?>
-												<small style="display:block; margin-top:4px; color: #6b7280; font-size: 12px; line-height: 1.4;">
-													<?php echo esc_html( $config['description'] ); ?>
-												</small>
-											<?php endif; ?>
-										</label>
-									<?php endforeach; ?>
-								</div>
-							</div>
-						<?php endforeach; ?>
-					</div>
-				</fieldset>
-			<?php endif; ?>
+									</option>
+								<?php endforeach; ?>
+							</select>
+							<span class="af-form-field__hint">
+								<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-guests' ) ); ?>"><?php esc_html_e( '+ Registrar nuevo inquilino', 'arriendo-facil' ); ?></a>
+							</span>
+						</div>
 
-			<!-- Actions -->
-			<div style="display:flex; gap:var(--af-space-3); padding-top: var(--af-space-4); border-top: 1px solid #e5e7eb;">
-				<button type="submit" class="button button-primary" style="flex: 1;"><?php esc_html_e( 'Crear Contrato', 'arriendo-facil' ); ?></button>
-				<button type="button" class="button" id="af-lease-cancel" style="min-width: 120px;"><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
+						<div class="af-form-field">
+							<label class="af-form-field__label" for="af-lease-accommodation"><?php esc_html_e( 'Inmueble', 'arriendo-facil' ); ?> <span class="af-required">*</span></label>
+							<select name="accommodation_id" id="af-lease-accommodation" required>
+								<option value=""><?php esc_html_e( '— Seleccionar —', 'arriendo-facil' ); ?></option>
+								<?php foreach ( $lease_accommodations as $lease_accommodation ) :
+									$acc_id           = (int) $lease_accommodation->ID;
+									$acc_address      = (string) get_post_meta( $acc_id, '_af_address', true );
+									$acc_type         = (string) get_post_meta( $acc_id, '_af_property_type', true );
+									$acc_bedrooms     = (int) get_post_meta( $acc_id, '_af_bedrooms', true );
+									$acc_bathrooms    = (int) get_post_meta( $acc_id, '_af_bathrooms', true );
+									$acc_rent         = (string) get_post_meta( $acc_id, '_af_monthly_rent', true );
+									$acc_parking      = get_post_meta( $acc_id, '_af_parking_spots', true );
+									$acc_sqm          = get_post_meta( $acc_id, '_af_square_meters', true );
+									$acc_furnished    = (string) get_post_meta( $acc_id, '_af_furnished', true );
+									$acc_condition    = (string) get_post_meta( $acc_id, '_af_condition', true );
+
+									if ( $af_ph_generator && ! isset( $af_ph_owner_cache[ $acc_id ] ) ) {
+										$af_ph_owner_cache[ $acc_id ] = $af_ph_generator->get_owner_identity_for_accommodation( $acc_id );
+									}
+									$acc_owner = $af_ph_owner_cache[ $acc_id ] ?? array( 'name' => '', 'id_number' => '' );
+									?>
+									<option value="<?php echo esc_attr( $acc_id ); ?>"
+										data-rent="<?php echo esc_attr( $acc_rent ); ?>"
+										data-address="<?php echo esc_attr( $acc_address ); ?>"
+										data-property-type="<?php echo esc_attr( $acc_type ); ?>"
+										data-bedrooms="<?php echo esc_attr( $acc_bedrooms ); ?>"
+										data-bathrooms="<?php echo esc_attr( $acc_bathrooms ); ?>"
+										data-parking="<?php echo esc_attr( $acc_parking ); ?>"
+										data-square-meters="<?php echo esc_attr( $acc_sqm ); ?>"
+										data-furnished="<?php echo esc_attr( $acc_furnished ); ?>"
+										data-condition="<?php echo esc_attr( $acc_condition ); ?>"
+										data-owner-name="<?php echo esc_attr( (string) $acc_owner['name'] ); ?>"
+										data-owner-id="<?php echo esc_attr( (string) $acc_owner['id_number'] ); ?>"
+										data-reference="<?php echo esc_attr( $lease_accommodation->post_title ); ?>">
+										<?php echo esc_html( $lease_accommodation->post_title ); ?>
+									</option>
+								<?php endforeach; ?>
+							</select>
+							<span class="af-form-field__hint">
+								<?php esc_html_e( 'Si el inquilino ya tiene un inmueble vinculado se selecciona solo.', 'arriendo-facil' ); ?>
+							</span>
+						</div>
+					</div>
+
+					<p class="af-cwiz__link" id="af-wizard-link" hidden>
+						<strong id="af-wizard-link-title"></strong>
+						<span id="af-wizard-link-text"></span>
+					</p>
+				</div>
+
+				<?php $af_render_section( 'inquilino' ); ?>
+			</section>
+
+			<!-- ── Paso 2: Inmueble ─────────────────────────────────────────── -->
+			<section class="af-cwiz__panel" data-step="2" hidden>
+				<?php $af_render_section( 'inmueble' ); ?>
+			</section>
+
+			<!-- ── Paso 3: Vigencia y condiciones ────────────────────────────── -->
+			<section class="af-cwiz__panel" data-step="3" hidden>
+				<div class="af-cwiz__group">
+					<h3 class="af-cwiz__group-title"><?php esc_html_e( 'Vigencia', 'arriendo-facil' ); ?></h3>
+					<div class="af-form-grid">
+						<div class="af-form-field">
+							<label class="af-form-field__label" for="af-lease-start"><?php esc_html_e( 'Inicio', 'arriendo-facil' ); ?> <span class="af-required">*</span></label>
+							<input type="date" name="start_date" id="af-lease-start" required />
+						</div>
+						<div class="af-form-field">
+							<label class="af-form-field__label" for="af-lease-end"><?php esc_html_e( 'Fin', 'arriendo-facil' ); ?> <span class="af-required">*</span></label>
+							<input type="date" name="end_date" id="af-lease-end" required />
+						</div>
+						<div class="af-form-field">
+							<label class="af-form-field__label" for="af-lease-rent"><?php esc_html_e( 'Canon Mensual (USD)', 'arriendo-facil' ); ?> <span class="af-required">*</span></label>
+							<input type="number" name="monthly_rent" id="af-lease-rent" step="0.01" min="0" required placeholder="0.00" />
+						</div>
+						<div class="af-form-field">
+							<label class="af-form-field__label" for="af-lease-deposit"><?php esc_html_e( 'Garantía (USD)', 'arriendo-facil' ); ?></label>
+							<input type="number" name="deposit_amount" id="af-lease-deposit" step="0.01" min="0" placeholder="0.00" />
+						</div>
+						<div class="af-form-field">
+							<label class="af-form-field__label" for="af-lease-due-day"><?php esc_html_e( 'Día Límite de Pago', 'arriendo-facil' ); ?></label>
+							<select name="payment_due_day" id="af-lease-due-day">
+								<option value=""><?php esc_html_e( 'Día 5 (predeterminado)', 'arriendo-facil' ); ?></option>
+								<?php for ( $day = 1; $day <= 28; $day++ ) : ?>
+									<option value="<?php echo esc_attr( $day ); ?>"><?php echo esc_html( sprintf( __( 'Día %d', 'arriendo-facil' ), $day ) ); ?></option>
+								<?php endfor; ?>
+							</select>
+						</div>
+					</div>
+				</div>
+			</section>
+
+			<!-- ── Paso 4: Datos del documento ───────────────────────────────── -->
+			<section class="af-cwiz__panel" data-step="4" hidden>
+				<?php if ( ! empty( $af_step_groups[4] ) ) : ?>
+					<div class="af-cwiz__autofill" id="af-wizard-autofill" hidden>
+						<span><strong id="af-wizard-autofill-count">0</strong> <?php esc_html_e( 'campos completados automáticamente desde el inmueble, el inquilino y las fechas del contrato.', 'arriendo-facil' ); ?></span>
+						<button type="button" id="af-wizard-autofill-clear"><?php esc_html_e( 'Limpiar autocompletado', 'arriendo-facil' ); ?></button>
+					</div>
+
+					<?php foreach ( $af_step_groups[4] as $af_section_id ) : ?>
+						<?php $af_render_section( $af_section_id ); ?>
+					<?php endforeach; ?>
+				<?php endif; ?>
+			</section>
+
+			<!-- ── Paso 5: Revisar ───────────────────────────────────────────── -->
+			<section class="af-cwiz__panel" data-step="5" hidden>
+				<div class="af-cwiz__group">
+					<h3 class="af-cwiz__group-title"><?php esc_html_e( 'Resumen del contrato', 'arriendo-facil' ); ?></h3>
+					<dl class="af-cwiz__review" id="af-wizard-review"></dl>
+				</div>
+				<div class="af-info-banner">
+					<span class="af-info-banner__icon" aria-hidden="true"><?php echo af_lucide( 'sparkles', 20 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG in af-view-helpers.php ?></span>
+					<div class="af-info-banner__body">
+						<p class="af-info-banner__title"><?php esc_html_e( 'Documento listo para generar', 'arriendo-facil' ); ?></p>
+						<?php esc_html_e( 'Al crear el contrato se generará el DOCX con los datos de arriba y quedará en estado Borrador para que lo revises y actives.', 'arriendo-facil' ); ?>
+					</div>
+				</div>
+			</section>
+
+			<!-- Navegación -->
+			<div class="af-cwiz__nav">
+				<button type="button" class="button" id="af-wizard-prev" hidden><?php esc_html_e( 'Atrás', 'arriendo-facil' ); ?></button>
+				<button type="button" class="button button-primary" id="af-wizard-next"><?php esc_html_e( 'Siguiente', 'arriendo-facil' ); ?></button>
+				<span class="af-cwiz__spacer"></span>
+				<button type="submit" class="button button-primary" id="af-wizard-submit" hidden><?php esc_html_e( 'Crear Contrato', 'arriendo-facil' ); ?></button>
+				<button type="button" class="button" id="af-lease-cancel"><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
 			</div>
 		</form>
 
-		<script>
-		(function () {
-			const toggleBtn = document.getElementById('af-advanced-toggle');
-			const advancedFields = document.getElementById('af-advanced-fields');
-			if (toggleBtn && advancedFields) {
-				toggleBtn.parentElement.addEventListener('click', function () {
-					const isHidden = advancedFields.style.display === 'none';
-					advancedFields.style.display = isHidden ? 'block' : 'none';
-					toggleBtn.textContent = isHidden ? '▼' : '▶';
-					localStorage.setItem('af-advanced-fields-expanded', isHidden ? '1' : '0');
-				});
-				// Restore last state
-				if (localStorage.getItem('af-advanced-fields-expanded') === '1') {
-					advancedFields.style.display = 'block';
-					toggleBtn.textContent = '▼';
-				}
-			}
-		})();
-		</script>
 	</div>
 
 	<script>
@@ -524,46 +580,432 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 		const ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
 		const nonce = <?php echo wp_json_encode( wp_create_nonce( 'af_lease_nonce' ) ); ?>;
 
+		/* ── Helper: resolve a dotted source path out of the form state ────── */
+		const guestSelect = form.querySelector('select[name="guest_id"]');
+
+		function selectedOption(select) {
+			if (!select) { return null; }
+			return select.options[select.selectedIndex] || null;
+		}
+
+		function monthsBetween(startIso, endIso) {
+			const a = parseIso(startIso);
+			const b = parseIso(endIso);
+			if (!a || !b) { return 0; }
+			let months = (b.getUTCFullYear() - a.getUTCFullYear()) * 12 + (b.getUTCMonth() - a.getUTCMonth());
+			if (b.getUTCDate() < a.getUTCDate()) { months -= 1; }
+			return Math.max(0, months);
+		}
+
+		function parseIso(iso) {
+			const parts = String(iso || '').split('-');
+			if (parts.length !== 3) { return null; }
+			const d = new Date(Date.UTC(+parts[0], +parts[1] - 1, +parts[2]));
+			return isNaN(d.getTime()) ? null : d;
+		}
+
+		function addMonths(isoDate, months) {
+			const d = parseIso(isoDate);
+			if (!d) { return ''; }
+			d.setUTCMonth(d.getUTCMonth() + months);
+			return d.toISOString().slice(0, 10);
+		}
+
+		function numberToWords(n) {
+			n = Math.floor(Math.abs(Number(n) || 0));
+			if (n === 0) { return 'cero'; }
+			const ones = ['','uno','dos','tres','cuatro','cinco','seis','siete','ocho','nueve','diez','once','doce','trece','catorce','quince','dieciséis','diecisiete','dieciocho','diecinueve','veinte','veintiuno','veintidós','veintitrés','veinticuatro','veinticinco','veintiséis','veintisiete','veintiocho','veintinueve'];
+			const tens = ['','','','treinta','cuarenta','cincuenta','sesenta','setenta','ochenta','noventa'];
+			const hundreds = ['','ciento','doscientos','trescientos','cuatrocientos','quinientos','seiscientos','setecientos','ochocientos','novecientos'];
+
+			function under1000(x) {
+				if (x < 30) { return ones[x]; }
+				if (x < 100) {
+					const t = tens[Math.floor(x / 10)];
+					const r = x % 10;
+					return r ? t + ' y ' + ones[r] : t;
+				}
+				if (x === 100) { return 'cien'; }
+				const h = hundreds[Math.floor(x / 100)];
+				const r = x % 100;
+				return r ? h + ' ' + under1000(r) : h;
+			}
+
+			const groups = [];
+			let rest = n;
+			while (rest > 0 && groups.length < 4) {
+				groups.push(rest % 1000);
+				rest = Math.floor(rest / 1000);
+			}
+
+			const scales = ['', ' mil', ' millón', ' mil millones'];
+			const parts = [];
+			for (let i = groups.length - 1; i >= 0; i--) {
+				const g = groups[i];
+				if (!g) { continue; }
+				if (i === 1 && g === 1) { parts.push('mil'); continue; }
+				if (i === 2 && g === 1) { parts.push('un millón'); continue; }
+				parts.push(under1000(g) + scales[i]);
+			}
+			return parts.join(' ').trim();
+		}
+
+		function resolveSource(path) {
+			const accOpt = selectedOption(form.accommodation_id);
+			const gOpt = selectedOption(guestSelect);
+			const today = new Date();
+			const start = form.start_date.value;
+			const end = form.end_date.value;
+			const rent = form.monthly_rent.value;
+			const deposit = form.deposit_amount.value;
+
+			switch (path) {
+				case 'contract.signed_year': return String(today.getFullYear());
+				case 'contract.signed_month': return String(today.getMonth() + 1);
+				case 'contract.signed_day': return String(today.getDate());
+				case 'lease.start_date': return start;
+				case 'lease.end_date': return end;
+				case 'lease.monthly_rent': return rent ? parseFloat(rent).toFixed(2) : '';
+				case 'lease.deposit_amount': return deposit ? parseFloat(deposit).toFixed(2) : '';
+				case 'lease.duration': {
+					const m = monthsBetween(start, end);
+					return m ? (m === 1 ? '1 mes' : m + ' meses') : '';
+				}
+				case 'lease.deposit_due_1': return start;
+				case 'lease.deposit_due_2': return addMonths(start, 1);
+				case 'guest.display_name': return gOpt ? (gOpt.getAttribute('data-guest-name') || '') : '';
+				case 'guest.document_id': return gOpt ? (gOpt.getAttribute('data-document-id') || '') : '';
+				case 'guest.nationality': return gOpt ? (gOpt.getAttribute('data-nationality') || '') : '';
+				case 'accommodation.address': return accOpt ? (accOpt.getAttribute('data-address') || '') : '';
+				case 'accommodation.property_type': return accOpt ? (accOpt.getAttribute('data-property-type') || '') : '';
+				case 'accommodation.bedrooms': return accOpt ? (accOpt.getAttribute('data-bedrooms') || '') : '';
+				case 'accommodation.bathrooms': return accOpt ? (accOpt.getAttribute('data-bathrooms') || '') : '';
+				case 'accommodation.parking': return accOpt ? (accOpt.getAttribute('data-parking') || '') : '';
+				case 'accommodation.square_meters': return accOpt ? (accOpt.getAttribute('data-square-meters') || '') : '';
+				case 'accommodation.reference': return accOpt ? (accOpt.getAttribute('data-reference') || '') : '';
+				case 'accommodation.delivery_state': return deliveryState(accOpt);
+				case 'accommodation.owner_name':
+				case 'owner.name': return accOpt ? (accOpt.getAttribute('data-owner-name') || '') : '';
+				case 'accommodation.owner_id': return accOpt ? (accOpt.getAttribute('data-owner-id') || '') : '';
+				default: return '';
+			}
+		}
+
+		/* Estado del inmueble derivado del mobiliario y la conservación. */
+		function deliveryState(accOpt) {
+			if (!accOpt) { return ''; }
+			const cond = accOpt.getAttribute('data-condition') || '';
+			const furn = accOpt.getAttribute('data-furnished') || '';
+			if (!cond && !furn) { return ''; }
+			if (cond === 'needs_repair') { return 'reparacion'; }
+			if (furn === 'furnished') { return 'amueblado'; }
+			if (furn === 'semi') { return 'semi_amoblado'; }
+			if (furn === 'unfurnished') { return 'sin_amoblar'; }
+			if (cond === 'new') { return 'nuevo'; }
+			return 'buen_estado';
+		}
+
+		/* ── Wizard state ───────────────────────────────────────────────────── */
+		const stepPanels = Array.prototype.slice.call(form.querySelectorAll('.af-cwiz__panel'));
+		const stepItems = Array.prototype.slice.call(document.querySelectorAll('#af-wizard-steps > li'));
+		const prevBtn = document.getElementById('af-wizard-prev');
+		const nextBtn = document.getElementById('af-wizard-next');
+		const submitBtn = document.getElementById('af-wizard-submit');
+		const errorBox = document.getElementById('af-wizard-error');
+		const reviewList = document.getElementById('af-wizard-review');
+		const autofillBox = document.getElementById('af-wizard-autofill');
+		const autofillCount = document.getElementById('af-wizard-autofill-count');
+		const autofillClear = document.getElementById('af-wizard-autofill-clear');
+		const progressBox = document.getElementById('af-wizard-progress');
+		const progressFill = document.getElementById('af-wizard-progress-fill');
+		const progressLabel = document.getElementById('af-wizard-progress-label');
+		const progressPct = document.getElementById('af-wizard-progress-pct');
+		const totalSteps = stepPanels.length;
+		let currentStep = 1;
+		let autoValues = {};
+
+		function showError(msg) {
+			if (!errorBox) { return; }
+			errorBox.textContent = msg || '';
+			errorBox.classList.toggle('is-visible', !!msg);
+		}
+
+		/* Barra de progreso: ancho, porcentaje y texto "Paso X de Y — nombre". */
+		function updateProgress(step) {
+			if (!progressBox || !progressFill) { return; }
+			const pct = Math.round((step / totalSteps) * 100);
+			progressFill.style.width = pct + '%';
+			const btn = stepItems[step - 1] && stepItems[step - 1].querySelector('.af-cwiz__step');
+			const name = btn ? (btn.getAttribute('data-label') || '').trim() : '';
+			const head = <?php echo wp_json_encode( __( 'Paso', 'arriendo-facil' ) ); ?> + ' ' + step + ' ' +
+				<?php echo wp_json_encode( __( 'de', 'arriendo-facil' ) ); ?> + ' ' + totalSteps +
+				(name ? ' — ' + name : '');
+			if (progressLabel) { progressLabel.textContent = head; }
+			if (progressPct) { progressPct.textContent = pct + '%'; }
+			progressBox.setAttribute('aria-valuemax', String(totalSteps));
+			progressBox.setAttribute('aria-valuenow', String(step));
+			progressBox.setAttribute('aria-valuetext', head + ' (' + pct + '%)');
+		}
+
+		function goTo(step) {
+			step = Math.min(Math.max(1, step), totalSteps);
+			currentStep = step;
+			stepPanels.forEach(function (panel) {
+				panel.hidden = Number(panel.getAttribute('data-step')) !== step;
+			});
+			stepItems.forEach(function (li, idx) {
+				const n = idx + 1;
+				li.classList.toggle('is-current', n === step);
+				li.classList.toggle('is-done', n < step);
+				const btn = li.querySelector('.af-cwiz__step');
+				if (btn) { btn.classList.toggle('is-clickable', n < step); }
+			});
+			updateProgress(step);
+			if (prevBtn) { prevBtn.hidden = step === 1; }
+			if (nextBtn) { nextBtn.hidden = step === totalSteps; }
+			if (submitBtn) { submitBtn.hidden = step !== totalSteps; }
+			showError('');
+			if (step === totalSteps) { buildReview(); }
+			applyAutofill();
+			updateLinkNote();
+		}
+
+		function stepFields(step) {
+			const panel = stepPanels[step - 1];
+			return panel ? Array.prototype.slice.call(panel.querySelectorAll('input, select, textarea')) : [];
+		}
+
+		function validateStep(step) {
+			const missing = stepFields(step).filter(function (el) {
+				if (el.disabled || el.type === 'hidden') { return false; }
+				if (!el.required) { return false; }
+				return !String(el.value || '').trim();
+			});
+			if (missing.length) {
+				const label = missing[0].id
+					? (document.querySelector('label[for="' + missing[0].id + '"]') || {}).textContent
+					: '';
+				missing[0].focus();
+				return (label ? label.replace('*', '').trim() + ' — ' : '') +
+					<?php echo wp_json_encode( __( 'Este campo es obligatorio.', 'arriendo-facil' ) ); ?>;
+			}
+			if (step === 3 && form.end_date.value && form.start_date.value &&
+				form.end_date.value <= form.start_date.value) {
+				return <?php echo wp_json_encode( __( 'La fecha de fin debe ser posterior al inicio.', 'arriendo-facil' ) ); ?>;
+			}
+			return '';
+		}
+
+		/* ── Autofill engine ───────────────────────────────────────────────── */
+		function applyAutofill() {
+			autoValues = {};
+			Array.prototype.forEach.call(form.querySelectorAll('[data-ph]'), function (field) {
+				const source = field.getAttribute('data-source') || '';
+				const computed = field.getAttribute('data-computed') || '';
+				const def = field.getAttribute('data-default') || '';
+				const control = field.querySelector('input, select, textarea');
+				if (!control) { return; }
+
+				// `dataset.auto` marks a value the machine still owns. Anything
+				// else already in the control was typed by the operator.
+				if (control.dataset.auto !== '1' && control.value !== '') { return; }
+
+				let value = '';
+				if (computed.indexOf('number_to_words:') === 0) {
+					const origin = computed.slice('number_to_words:'.length);
+					const raw = fieldOriginValue(origin);
+					value = raw === '' ? '' : numberToWords(raw) + ' dólares';
+				} else if (source && source !== 'manual') {
+					value = resolveSource(source);
+				} else if (def) {
+					value = def;
+				}
+				if (!value) { return; }
+
+				if (control.tagName === 'SELECT') {
+					const match = Array.prototype.find.call(control.options, function (o) {
+						return o.value && (o.value.toLowerCase() === String(value).toLowerCase());
+					});
+					if (!match) { return; }
+					control.value = match.value;
+				} else {
+					control.value = value;
+				}
+
+				control.dataset.auto = '1';
+				control.dataset.original = value;
+				const badge = field.querySelector('.af-cwiz__badge');
+				if (badge) { badge.hidden = false; }
+				autoValues[field.getAttribute('data-ph')] = value;
+			});
+
+			const count = Object.keys(autoValues).length;
+			if (autofillBox) {
+				autofillBox.hidden = count === 0;
+				autofillCount.textContent = String(count);
+			}
+		}
+
+		function fieldOriginValue(key) {
+			switch (key) {
+				case 'canon_mensual': return form.monthly_rent.value ? parseFloat(form.monthly_rent.value) : '';
+				case 'monto_numero': return form.deposit_amount.value ? parseFloat(form.deposit_amount.value) : '';
+				default: return '';
+			}
+		}
+
+		function clearAutofill() {
+			Array.prototype.forEach.call(form.querySelectorAll('[data-ph]'), function (field) {
+				const control = field.querySelector('input, select, textarea');
+				if (!control || control.dataset.auto !== '1') { return; }
+				control.value = '';
+				delete control.dataset.auto;
+				delete control.dataset.original;
+				const badge = field.querySelector('.af-cwiz__badge');
+				if (badge) { badge.hidden = true; }
+			});
+			autoValues = {};
+			if (autofillBox) { autofillBox.hidden = true; }
+		}
+
+		/* ── Vínculo inquilino ↔ inmueble ──────────────────────────────────── */
+		const linkBox = document.getElementById('af-wizard-link');
+		const linkTitle = document.getElementById('af-wizard-link-title');
+		const linkText = document.getElementById('af-wizard-link-text');
+
+		function updateLinkNote() {
+			if (!linkBox || !linkTitle || !linkText) { return; }
+			const gOpt = selectedOption(guestSelect);
+			const accOpt = selectedOption(form.accommodation_id);
+			const linkedId = gOpt ? (gOpt.getAttribute('data-accommodation') || '') : '';
+			const isLinked = !!gOpt && !!gOpt.value && linkedId && linkedId !== '0';
+
+			if (!gOpt || !gOpt.value) {
+				linkBox.hidden = true;
+				linkBox.classList.remove('is-linked', 'is-unlinked');
+				return;
+			}
+
+			linkBox.hidden = false;
+
+			if (isLinked) {
+				linkBox.classList.add('is-linked');
+				linkBox.classList.remove('is-unlinked');
+				linkTitle.textContent = <?php echo wp_json_encode( __( 'Inquilino con inmueble vinculado.', 'arriendo-facil' ) ); ?>;
+				if (accOpt && accOpt.value && accOpt.value === linkedId) {
+					linkText.textContent = ' ' + <?php echo wp_json_encode( __( 'Se completaron sus datos y los del inmueble automáticamente.', 'arriendo-facil' ) ); ?>;
+				} else if (accOpt && accOpt.value) {
+					linkText.textContent = ' ' + <?php echo wp_json_encode( __( 'Se usará el inmueble seleccionado y se actualizará el vínculo del inquilino.', 'arriendo-facil' ) ); ?>;
+				} else {
+					linkText.textContent = ' ' + <?php echo wp_json_encode( __( 'Elige el inmueble que se arrendará.', 'arriendo-facil' ) ); ?>;
+				}
+			} else {
+				linkBox.classList.add('is-unlinked');
+				linkBox.classList.remove('is-linked');
+				linkTitle.textContent = <?php echo wp_json_encode( __( 'Este inquilino aún no tiene inmueble.', 'arriendo-facil' ) ); ?>;
+				linkText.textContent = ' ' + <?php echo wp_json_encode( __( 'Al crear el contrato quedará vinculado al inmueble seleccionado.', 'arriendo-facil' ) ); ?>;
+			}
+		}
+
+		// Manual edits always win over the next autofill pass.
+		form.addEventListener('input', function (e) {
+			const el = e.target;
+			if (!el.dataset) { return; }
+			if (el.dataset.auto === '1' && el.dataset.original !== el.value) {
+				delete el.dataset.auto;
+				const holder = el.closest('[data-ph]');
+				const badge = holder ? holder.querySelector('.af-cwiz__badge') : null;
+				if (badge) { badge.hidden = true; }
+			}
+		});
+
+		if (autofillClear) {
+			autofillClear.addEventListener('click', clearAutofill);
+		}
+
+		/* ── Review step ────────────────────────────────────────────────────── */
+		function buildReview() {
+			if (!reviewList) { return; }
+			const accOpt = selectedOption(form.accommodation_id);
+			const gOpt = selectedOption(guestSelect);
+			const rows = [
+				[<?php echo wp_json_encode( __( 'Inmueble', 'arriendo-facil' ) ); ?>, accOpt ? accOpt.textContent.trim() : ''],
+				[<?php echo wp_json_encode( __( 'Inquilino', 'arriendo-facil' ) ); ?>, gOpt ? gOpt.textContent.trim() : ''],
+				[<?php echo wp_json_encode( __( 'Inicio', 'arriendo-facil' ) ); ?>, form.start_date.value],
+				[<?php echo wp_json_encode( __( 'Fin', 'arriendo-facil' ) ); ?>, form.end_date.value],
+				[<?php echo wp_json_encode( __( 'Plazo', 'arriendo-facil' ) ); ?>, (function () {
+					const m = monthsBetween(form.start_date.value, form.end_date.value);
+					return m ? (m === 1 ? '1 mes' : m + ' meses') : '';
+				})()],
+				[<?php echo wp_json_encode( __( 'Canon mensual (USD)', 'arriendo-facil' ) ); ?>, form.monthly_rent.value ? parseFloat(form.monthly_rent.value).toFixed(2) : ''],
+				[<?php echo wp_json_encode( __( 'Garantía (USD)', 'arriendo-facil' ) ); ?>, form.deposit_amount.value ? parseFloat(form.deposit_amount.value).toFixed(2) : ''],
+				[<?php echo wp_json_encode( __( 'Día de pago', 'arriendo-facil' ) ); ?>, form.payment_due_day.value || <?php echo wp_json_encode( __( 'Día 5 (predeterminado)', 'arriendo-facil' ) ); ?>]
+			];
+
+			reviewList.innerHTML = '';
+			rows.forEach(function (row) {
+				if (!row[1]) { return; }
+				const wrap = document.createElement('div');
+				wrap.className = 'af-cwiz__review-item';
+				const dt = document.createElement('dt');
+				dt.className = 'af-cwiz__review-label';
+				dt.textContent = row[0];
+				const dd = document.createElement('dd');
+				dd.className = 'af-cwiz__review-value';
+				dd.style.margin = '0';
+				dd.textContent = row[1];
+				wrap.appendChild(dt);
+				wrap.appendChild(dd);
+				reviewList.appendChild(wrap);
+			});
+		}
+
+		/* ── Navigation wiring ─────────────────────────────────────────────── */
+		if (nextBtn) {
+			nextBtn.addEventListener('click', function () {
+				const err = validateStep(currentStep);
+				if (err) { showError(err); return; }
+				goTo(currentStep + 1);
+			});
+		}
+		if (prevBtn) {
+			prevBtn.addEventListener('click', function () { goTo(currentStep - 1); });
+		}
+		stepItems.forEach(function (li) {
+			const btn = li.querySelector('.af-cwiz__step');
+			if (!btn) { return; }
+			btn.addEventListener('click', function () {
+				const target = Number(btn.getAttribute('data-goto'));
+				if (!target || target >= currentStep) { return; }
+				goTo(target);
+			});
+		});
+
+		/* ── Open / close ──────────────────────────────────────────────────── */
 		function openForm() {
 			card.style.display = 'block';
+			goTo(1);
 			card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-			form.querySelector('select[name="accommodation_id"]').focus();
+			form.querySelector('select[name="guest_id"]').focus();
 		}
 
 		function closeForm() {
 			card.style.display = 'none';
 			form.reset();
+			clearAutofill();
 			status.style.display = 'none';
 			status.textContent = '';
+			goTo(1);
 		}
 
-		if (openBtn) {
-			openBtn.addEventListener('click', openForm);
-		}
-		if (openBtnFromSteps) {
-			openBtnFromSteps.addEventListener('click', openForm);
-		}
-		if (cancelBtn) {
-			cancelBtn.addEventListener('click', closeForm);
-		}
-		if (closeBtn) {
-			closeBtn.addEventListener('click', closeForm);
-		}
+		if (openBtn) { openBtn.addEventListener('click', openForm); }
+		if (openBtnFromSteps) { openBtnFromSteps.addEventListener('click', openForm); }
+		if (cancelBtn) { cancelBtn.addEventListener('click', closeForm); }
+		if (closeBtn) { closeBtn.addEventListener('click', closeForm); }
 
-		// Prefill the agreement from what the operator already captured for the
-		// tenant (dates, property link) so nothing is retyped by hand.
-		function addMonths(isoDate, months) {
-			const parts = String(isoDate).split('-');
-			if (parts.length !== 3) { return ''; }
-			const date = new Date(Date.UTC(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])));
-			if (isNaN(date.getTime())) { return ''; }
-			date.setUTCMonth(date.getUTCMonth() + months);
-			date.setUTCDate(date.getUTCDate() - 1);
-			return date.toISOString().slice(0, 10);
-		}
-
-		form.guest_id.addEventListener('change', function () {
-			const opt = this.options[this.selectedIndex];
+		/* ── Prefill agreement from what the operator already captured ─────── */
+		guestSelect.addEventListener('change', function () {
+			const opt = selectedOption(this);
 			if (!opt || !opt.value) { return; }
 
 			const start = opt.getAttribute('data-start') || '';
@@ -575,175 +1017,69 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 				form.end_date.value = addMonths(form.start_date.value, 12);
 			}
 
-			// Guarantee defaults to two months of rent, the common practice.
 			const rent = parseFloat(form.monthly_rent.value || '0');
 			if (!form.deposit_amount.value && rent > 0) {
 				form.deposit_amount.value = (rent * 2).toFixed(2);
 			}
 
-			// Payment day follows the start of the lease, capped to 1-28.
 			if (form.start_date.value && form.payment_due_day) {
-				const startParts = form.start_date.value.split('-');
-				const day = Number(startParts[2]);
-				if (startParts.length === 3 && day >= 1) {
-					form.payment_due_day.value = String(Math.min(28, day));
-				}
+				const day = Number(String(form.start_date.value).split('-')[2]);
+				if (day >= 1) { form.payment_due_day.value = String(Math.min(28, day)); }
 			}
 
-			// If the tenant is already linked to a property, preselect it.
 			const linkedId = opt.getAttribute('data-accommodation');
-			if (linkedId && form.accommodation_id.value !== linkedId) {
+			if (linkedId && linkedId !== '0' && form.accommodation_id.value !== linkedId) {
 				const exists = Array.prototype.some.call(form.accommodation_id.options, function (o) { return o.value === linkedId; });
 				if (exists) {
 					form.accommodation_id.value = linkedId;
 					form.accommodation_id.dispatchEvent(new Event('change'));
 				}
 			}
+			applyAutofill();
+			updateLinkNote();
 		});
 
-		// Prefill rent from the selected property so the operator doesn't retype it.
 		form.accommodation_id.addEventListener('change', function () {
-			const opt = this.options[this.selectedIndex];
+			const opt = selectedOption(this);
 			const rent = opt ? opt.getAttribute('data-rent') : '';
 			if (rent && !form.monthly_rent.value) {
-				form.monthly_rent.value = parseFloat(rent).toFixed(2);
+				const parsed = parseFloat(rent);
+				if (!isNaN(parsed)) { form.monthly_rent.value = parsed.toFixed(2); }
 			}
 			if (rent && !form.deposit_amount.value) {
 				const parsed = parseFloat(rent);
 				if (parsed > 0) { form.deposit_amount.value = (parsed * 2).toFixed(2); }
 			}
-			refreshTemplates(opt ? opt.value : '');
+			applyAutofill();
+			updateLinkNote();
 		});
 
-		// Preload owner DOCX templates per accommodation so the operator can
-		// choose which one generates the lease document.
-		const templateIndex = <?php
-		$template_index = array();
-		if ( $lease_service ) {
-			$contract_generator = new Arriendo_Facil_Contract_Generator();
-			foreach ( (array) $lease_accommodations as $acc_item ) {
-				$templates = $contract_generator->get_owner_contract_templates_for_accommodation( (int) $acc_item->ID );
-				if ( ! empty( $templates ) ) {
-					$template_index[ (int) $acc_item->ID ] = array_map(
-						static function ( $t ) {
-							return array(
-								'id'   => (int) $t['id'],
-								'name' => (string) $t['title'] . ( $t['file_name'] ? ' — ' . $t['file_name'] : '' ),
-							);
-						},
-						$templates
-					);
+		// Keep the derived placeholders in sync while the operator types.
+		['input', 'change'].forEach(function (evt) {
+			form.addEventListener(evt, function (e) {
+				if (!e.target.name) { return; }
+				if (['monthly_rent', 'deposit_amount', 'start_date', 'end_date'].indexOf(e.target.name) !== -1) {
+					applyAutofill();
 				}
-			}
-		}
-		echo wp_json_encode( $template_index );
-		?>;
-		const templateSelect = document.getElementById('af-lease-template');
-
-		function refreshTemplates(accommodationId) {
-			if (!templateSelect) { return; }
-			templateSelect.innerHTML = '<option value=""><?php echo esc_js( __( 'Plantilla del propietario (última)', 'arriendo-facil' ) ); ?></option>';
-			const templates = (templateIndex[accommodationId] || []);
-			templates.forEach(function (t) {
-				const opt = document.createElement('option');
-				opt.value = t.id;
-				opt.textContent = t.name;
-				templateSelect.appendChild(opt);
 			});
-		}
-		refreshTemplates(form.accommodation_id.value);
+		});
 
-		// ─── Auto-fill advanced data fields based on selection ───────────────────
-		function prefillAdvancedFields() {
-			const accOpt = form.accommodation_id.options[form.accommodation_id.selectedIndex];
-			const guestOpt = form.querySelector('select[name="guest_id"]').options[form.querySelector('select[name="guest_id"]').selectedIndex];
-			
-			// Pre-fill guest data
-			if (guestOpt && guestOpt.value) {
-				const guestName = guestOpt.getAttribute('data-guest-name');
-				const docId = guestOpt.getAttribute('data-document-id');
-				const nationality = guestOpt.getAttribute('data-nationality');
-				
-				const nameField = document.getElementById('af-placeholder-nombres-inquilino');
-				const docField = document.getElementById('af-placeholder-cedula-inquilino');
-				const natField = document.getElementById('af-placeholder-nacionalidad-inquilino');
-				
-				if (nameField && !nameField.value && guestName) {
-					nameField.value = guestName;
-				}
-				if (docField && !docField.value && docId) {
-					docField.value = docId;
-				}
-				if (natField && !natField.value && nationality) {
-					natField.value = nationality;
-				}
-			}
-			
-			// Pre-fill property data
-			if (accOpt && accOpt.value) {
-				const address = accOpt.getAttribute('data-address');
-				const propType = accOpt.getAttribute('data-property-type');
-				const bedrooms = accOpt.getAttribute('data-bedrooms');
-				const bathrooms = accOpt.getAttribute('data-bathrooms');
-				
-				const addressField = document.getElementById('af-placeholder-dirección-inmueble');
-				const typeField = document.getElementById('af-placeholder-tipo-inmueble');
-				const bedroomsField = document.getElementById('af-placeholder-n-habitacion');
-				const bathroomsField = document.getElementById('af-placeholder-n-baños');
-				
-				if (addressField && !addressField.value && address) {
-					addressField.value = address;
-				}
-				if (typeField && !typeField.value && propType) {
-					typeField.value = propType;
-				}
-				if (bedroomsField && !bedroomsField.value && bedrooms) {
-					bedroomsField.value = bedrooms;
-				}
-				if (bathroomsField && !bathroomsField.value && bathrooms) {
-					bathroomsField.value = bathrooms;
-				}
-			}
-			
-			// Pre-fill rent and deposit in advanced fields
-			const rentField = document.getElementById('af-placeholder-canon-mensual');
-			const depositField = document.getElementById('af-placeholder-monto-en-números');
-			
-			const rent = form.monthly_rent.value;
-			const deposit = form.deposit_amount.value;
-			
-			if (rentField && !rentField.value && rent) {
-				rentField.value = parseFloat(rent).toFixed(2);
-			}
-			if (depositField && !depositField.value && deposit) {
-				depositField.value = parseFloat(deposit).toFixed(2);
-			}
-		}
+		goTo(1);
 
-		// Trigger pre-fill on accommodation change
-		form.accommodation_id.addEventListener('change', prefillAdvancedFields);
-		
-		// Trigger pre-fill on guest change
-		form.querySelector('select[name="guest_id"]').addEventListener('change', prefillAdvancedFields);
-		
-		// Trigger pre-fill on rent/deposit change
-		form.monthly_rent.addEventListener('change', prefillAdvancedFields);
-		form.deposit_amount.addEventListener('change', prefillAdvancedFields);
-		
-		// Initial pre-fill
-		prefillAdvancedFields();
-
+		/* ── Submit ─────────────────────────────────────────────────────────── */
 		form.addEventListener('submit', function (e) {
 			e.preventDefault();
 
-			if (form.end_date.value <= form.start_date.value) {
-				status.textContent = <?php echo wp_json_encode( __( 'La fecha de fin debe ser posterior al inicio.', 'arriendo-facil' ) ); ?>;
-				status.className = 'af-modal__status is-error';
-				status.style.display = 'block';
-				return;
+			for (let step = 1; step <= totalSteps - 1; step++) {
+				const err = validateStep(step);
+				if (err) {
+					goTo(step);
+					showError(err);
+					return;
+				}
 			}
 
-			const btn = form.querySelector('button[type="submit"]');
+			const btn = submitBtn;
 			btn.disabled = true;
 			status.textContent = '';
 			status.style.display = 'none';
@@ -769,6 +1105,11 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 				status.className = 'af-modal__status is-success';
 				status.style.display = 'block';
 				setTimeout(function () { window.location.reload(); }, 1200);
+			}).catch(function () {
+				btn.disabled = false;
+				status.textContent = 'Error de red';
+				status.className = 'af-modal__status is-error';
+				status.style.display = 'block';
 			});
 		});
 	}());
@@ -826,7 +1167,7 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 				<th><?php esc_html_e( 'Día de pago', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Saldo', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Estado', 'arriendo-facil' ); ?></th>
-			<th><?php esc_html_e( 'Factura', 'arriendo-facil' ); ?></th>
+				<th><?php esc_html_e( 'Factura', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Documento', 'arriendo-facil' ); ?></th>
 				<th><?php esc_html_e( 'Acciones', 'arriendo-facil' ); ?></th>
 			</tr>
@@ -1008,7 +1349,7 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 				<?php endforeach; ?>
 			<?php else : ?>
 				<tr>
-					<td colspan="10"><?php esc_html_e( 'No se encontraron contratos.', 'arriendo-facil' ); ?></td>
+					<td colspan="13"><?php esc_html_e( 'No se encontraron contratos.', 'arriendo-facil' ); ?></td>
 				</tr>
 			<?php endif; ?>
 		</tbody>
@@ -1268,34 +1609,112 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 	}());
 }());
 
-// Position fixed dropdowns for actions menu
-(function() {
-	function positionDropdown(detailsElement) {
-		const dropdown = detailsElement.querySelector('.af-lease-actions-dropdown');
-		if (!dropdown) return;
+// ── Action menu controller ────────────────────────────────────────────────
+// `position: fixed` resolves against the viewport, so every measurement here
+// comes from getBoundingClientRect() WITHOUT adding window.scrollY (that was
+// the reason the menu opened hundreds of pixels below its trigger).
+(function () {
+	const MENUS_SELECTOR = '.af-lease-actions-menu';
+	const DROPDOWN_CLASS = 'af-lease-actions-dropdown';
+	const VIEWPORT_PAD   = 8;
 
-		const summary = detailsElement.querySelector('summary');
-		if (!summary) return;
+	let openMenu = null;
 
-		const rect = summary.getBoundingClientRect();
-		dropdown.style.top = (rect.bottom + window.scrollY) + 'px';
-		dropdown.style.left = (rect.right - 280) + 'px';
-		dropdown.style.display = detailsElement.open ? 'grid' : 'none';
+	function place(menu) {
+		const summary = menu.querySelector('summary');
+		const panel   = menu.querySelector('.' + DROPDOWN_CLASS);
+		if (!summary || !panel) { return; }
+
+		const trigger = summary.getBoundingClientRect();
+		const height  = panel.offsetHeight  || panel.getBoundingClientRect().height  || 0;
+		const width   = panel.offsetWidth   || panel.getBoundingClientRect().width   || 0;
+		const vw      = document.documentElement.clientWidth;
+		const vh      = window.innerHeight;
+
+		let top  = trigger.bottom + 6;
+		let left = trigger.right - width;
+
+		// Flip above when the viewport has no room below.
+		if (top + height > vh - VIEWPORT_PAD && trigger.top - height - 6 > VIEWPORT_PAD) {
+			top = trigger.top - height - 6;
+		}
+		if (top + height > vh - VIEWPORT_PAD) {
+			top = Math.max(VIEWPORT_PAD, vh - height - VIEWPORT_PAD);
+		}
+
+		if (left + width > vw - VIEWPORT_PAD) {
+			left = vw - width - VIEWPORT_PAD;
+		}
+		if (left < VIEWPORT_PAD) {
+			left = VIEWPORT_PAD;
+		}
+
+		panel.style.top  = Math.round(top)  + 'px';
+		panel.style.left = Math.round(left) + 'px';
 	}
 
-	// Handle toggle events
-	document.querySelectorAll('.af-lease-actions-menu').forEach(details => {
-		details.addEventListener('toggle', () => {
-			positionDropdown(details);
+	function close(menu) {
+		if (!menu || menu.open === false) { return; }
+		menu.open = false;
+		menu.classList.remove('is-open');
+		if (openMenu === menu) { openMenu = null; }
+	}
+
+	function open(menu) {
+		closeAllOthers(menu);
+		menu.classList.add('is-open');
+		openMenu = menu;
+		// Read layout before positioning so `display:grid` has settled.
+		window.requestAnimationFrame(function () { place(menu); });
+	}
+
+	function closeAllOthers(except) {
+		document.querySelectorAll(MENUS_SELECTOR + '[open]').forEach(function (other) {
+			if (other !== except) { close(other); }
 		});
+	}
+
+	document.addEventListener('toggle', function (e) {
+		const menu = e.target;
+		if (!(menu instanceof HTMLDetailsElement) || !menu.matches(MENUS_SELECTOR)) { return; }
+		if (menu.open) {
+			open(menu);
+		} else {
+			menu.classList.remove('is-open');
+			if (openMenu === menu) { openMenu = null; }
+		}
+	}, true);
+
+	// Clicking a row action must close the menu before its handler runs.
+	document.addEventListener('click', function (e) {
+		const menu = e.target.closest ? e.target.closest(MENUS_SELECTOR) : null;
+
+		if (!menu) {
+			if (openMenu) { close(openMenu); }
+			return;
+		}
+
+		if (e.target.closest('.' + DROPDOWN_CLASS) && e.target.closest('button, a')) {
+			window.setTimeout(function () { close(menu); }, 0);
+		}
 	});
 
-	// Reposition on scroll
-	document.addEventListener('scroll', () => {
-		document.querySelectorAll('.af-lease-actions-menu[open]').forEach(details => {
-			positionDropdown(details);
-		});
+	document.addEventListener('keydown', function (e) {
+		if ('Escape' !== e.key || !openMenu) { return; }
+		const summary = openMenu.querySelector('summary');
+		close(openMenu);
+		if (summary) { summary.focus(); }
+	});
+
+	// The dropdown is fixed: keep it glued while the table container scrolls.
+	window.addEventListener('scroll', function () {
+		if (openMenu) { place(openMenu); }
 	}, true);
+
+	window.addEventListener('resize', function () {
+		if (openMenu) { place(openMenu); }
+	});
 })();
+
 </script>
 

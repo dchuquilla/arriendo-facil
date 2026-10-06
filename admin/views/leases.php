@@ -193,44 +193,42 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 		$ids_sql = null;
 	}
 
-	// Filter guests by current user's accommodations
-	if ( null === $ids_sql ) {
-		// Admin - show all guests
-		$lease_guests = $wpdb->get_results(
-			"SELECT g.id, g.first_name, g.last_name, g.email, g.accommodation_id, 
+	// Inquilinos del formulario: SIEMPRE dentro del alcance del usuario.
+	// Un huésped sin inmueble no es "de nadie", así que no se lista para
+	// nadie: dejar `accommodation_id IS NULL/0` aquí hacía que un propietario
+	// viera inquilinos de otras carteras (la página de Inquilinos ya filtra
+	// con `WHERE accommodation_id IN (...)`).
+	$af_guest_columns = "SELECT g.id, g.first_name, g.last_name, g.email, g.accommodation_id,
 			        g.rental_start_date, g.rental_end_date, g.desired_price, g.guarantee_text, g.doc_status,
 			        g.id_number, g.nationality, a.post_title AS accommodation_title
 			 FROM {$wpdb->prefix}af_guests g
-			 LEFT JOIN {$wpdb->posts} a ON a.ID = g.accommodation_id
-			 ORDER BY g.first_name ASC
-			 LIMIT 300"
-		);
-	} elseif ( ! empty( $ids_sql ) ) {
-		// Owner - show only guests linked to their accommodations (or unlinked)
+			 LEFT JOIN {$wpdb->posts} a ON a.ID = g.accommodation_id";
+
+	if ( null === $accessible_acc_ids ) {
+		// Sin restricciones (puede gestionar todo): todos los inquilinos.
 		$lease_guests = $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT g.id, g.first_name, g.last_name, g.email, g.accommodation_id, 
-				        g.rental_start_date, g.rental_end_date, g.desired_price, g.guarantee_text, g.doc_status,
-				        g.id_number, g.nationality, a.post_title AS accommodation_title
-				 FROM {$wpdb->prefix}af_guests g
-				 LEFT JOIN {$wpdb->posts} a ON a.ID = g.accommodation_id
-				 WHERE g.accommodation_id IN ($ids_sql) OR g.accommodation_id IS NULL OR g.accommodation_id = 0
-				 ORDER BY g.first_name ASC
-				 LIMIT 300"
-			) // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$af_guest_columns . '
+			 ORDER BY g.first_name ASC
+			 LIMIT 300'
+		);
+	} elseif ( ! empty( $accessible_acc_ids ) ) {
+		// Propietario/gestor: los de sus inmuebles, más cualquier inquilino
+		// que ya tenga un contrato suyo (vínculo anterior a la auto-vínculo).
+		$lease_guests = $wpdb->get_results(
+			$af_guest_columns . "
+			 WHERE g.accommodation_id IN ($ids_sql)
+			    OR EXISTS (
+			        SELECT 1 FROM {$wpdb->prefix}af_leases l
+			         WHERE l.guest_id = g.id
+			           AND l.accommodation_id IN ($ids_sql)
+			           AND l.deleted_at IS NULL
+			    )
+			 ORDER BY g.first_name ASC
+			 LIMIT 300" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- $ids_sql es enteros casteados arriba.
 		);
 	} else {
-		// Owner with no accommodations - show only unlinked guests
-		$lease_guests = $wpdb->get_results(
-			"SELECT g.id, g.first_name, g.last_name, g.email, g.accommodation_id, 
-			        g.rental_start_date, g.rental_end_date, g.desired_price, g.guarantee_text, g.doc_status,
-			        g.id_number, g.nationality, a.post_title AS accommodation_title
-			 FROM {$wpdb->prefix}af_guests g
-			 LEFT JOIN {$wpdb->posts} a ON a.ID = g.accommodation_id
-			 WHERE g.accommodation_id IS NULL OR g.accommodation_id = 0
-			 ORDER BY g.first_name ASC
-			 LIMIT 300"
-		);
+		// Sin inmuebles: no hay cartera de inquilinos que mostrar.
+		$lease_guests = array();
 	}
 	?>
 
@@ -1620,6 +1618,31 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 
 	let openMenu = null;
 
+	// `af-fade-up` termina en `transform: translateY(0)` con `fill: both`, así
+	// que `.af-section` conserva para siempre una matriz identidad. Ese
+	// transform convierte la sección en el containing block del `position:
+	// fixed`, y las coordenadas de viewport que medimos con
+	// getBoundingClientRect() ya no le corresponden: el menú se dibujaba
+	// cientos de píxeles más abajo, fuera de pantalla, y "no se abría".
+	function containingBlockOrigin(el) {
+		let node = el.parentElement;
+		while (node && node !== document.documentElement) {
+			const cs = window.getComputedStyle(node);
+			if (cs.transform !== 'none' || cs.filter !== 'none' ||
+				cs.perspective !== 'none' || cs.backdropFilter !== 'none' ||
+				(cs.willChange && cs.willChange !== 'auto') ||
+				(cs.contain && cs.contain !== 'none')) {
+				const r = node.getBoundingClientRect();
+				return {
+					top: r.top + (parseFloat(cs.borderTopWidth) || 0),
+					left: r.left + (parseFloat(cs.borderLeftWidth) || 0),
+				};
+			}
+			node = node.parentElement;
+		}
+		return { top: 0, left: 0 };
+	}
+
 	function place(menu) {
 		const summary = menu.querySelector('summary');
 		const panel   = menu.querySelector('.' + DROPDOWN_CLASS);
@@ -1649,8 +1672,10 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 			left = VIEWPORT_PAD;
 		}
 
-		panel.style.top  = Math.round(top)  + 'px';
-		panel.style.left = Math.round(left) + 'px';
+		// Rebasa sobre el containing block real (viewport => origen 0,0).
+		const origin = containingBlockOrigin(panel);
+		panel.style.top  = Math.round(top  - origin.top)  + 'px';
+		panel.style.left = Math.round(left - origin.left) + 'px';
 	}
 
 	function close(menu) {

@@ -581,6 +581,13 @@ class Arriendo_Facil_Calendar {
 	public function ajax_add_visit() {
 		$this->guard();
 
+		// Rate limiting: 30 visits per day
+		if ( class_exists( 'Arriendo_Facil_Rate_Limiter' ) ) {
+			if ( Arriendo_Facil_Rate_Limiter::is_rate_limited( 'add_visit' ) ) {
+				wp_send_json_error( array( 'message' => __( 'Demasiadas visitas. Intenta más tarde.', 'arriendo-facil' ) ), 429 );
+			}
+		}
+
 		global $wpdb;
 
 		$accommodation_id = isset( $_REQUEST['accommodation_id'] ) ? absint( $_REQUEST['accommodation_id'] ) : 0;

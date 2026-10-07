@@ -99,6 +99,13 @@ class Arriendo_Facil_Billing_API {
 	public function ajax_issue_invoice(): void {
 		check_ajax_referer( 'af_billing_nonce', 'nonce' );
 
+		// Rate limiting: 5 invoices per hour per user
+		if ( class_exists( 'Arriendo_Facil_Rate_Limiter' ) ) {
+			if ( Arriendo_Facil_Rate_Limiter::is_rate_limited( 'issue_invoice' ) ) {
+				wp_send_json_error( array( 'message' => __( 'Demasiadas solicitudes. Intenta más tarde.', 'arriendo-facil' ) ), 429 );
+			}
+		}
+
 		if ( ! $this->can_manage_billing() ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
@@ -376,6 +383,13 @@ class Arriendo_Facil_Billing_API {
 		$nonce = isset( $_GET['nonce'] ) ? sanitize_text_field( wp_unslash( $_GET['nonce'] ) ) : '';
 		if ( ! wp_verify_nonce( $nonce, 'af_billing_nonce' ) ) {
 			wp_die( esc_html__( 'Nonce invalido.', 'arriendo-facil' ), 403 );
+		}
+
+		// Rate limiting: 20 downloads per hour
+		if ( class_exists( 'Arriendo_Facil_Rate_Limiter' ) ) {
+			if ( Arriendo_Facil_Rate_Limiter::is_rate_limited( 'download_invoice' ) ) {
+				wp_die( esc_html__( 'Demasiadas descargas. Intenta más tarde.', 'arriendo-facil' ), 429 );
+			}
 		}
 
 		if ( ! $this->can_manage_billing() ) {

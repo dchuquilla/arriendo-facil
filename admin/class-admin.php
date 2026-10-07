@@ -42,6 +42,7 @@ class Arriendo_Facil_Admin {
 		add_action( 'wp_dashboard_setup', array( $this, 'remove_owner_dashboard_widgets' ), 999 );
 		add_action( 'wp_dashboard_setup', array( $this, 'register_native_dashboard_widget' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
+		add_filter( 'wp_authenticate_user', array( $this, 'check_login_rate_limit' ), 5, 2 );
 		add_filter( 'wp_authenticate_user', array( $this, 'block_suspended_property_admin_login' ), 10, 2 );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
 		add_action( 'admin_notices', array( $this, 'pandoc_notice' ) );
@@ -1231,6 +1232,33 @@ array(
 	 *
 	 * @param WP_User|WP_Error $user     Authenticated user or error.
 	 * @param string            $password Raw password (unused).
+	 * @return WP_User|WP_Error
+	 */
+	/**
+	 * Check login rate limit.
+	 *
+	 * @param WP_User|WP_Error $user User or error.
+	 * @param string           $password Password.
+	 * @return WP_User|WP_Error
+	 */
+	public function check_login_rate_limit( $user, $password ) {
+		if ( class_exists( 'Arriendo_Facil_Rate_Limiter' ) ) {
+			if ( Arriendo_Facil_Rate_Limiter::is_rate_limited( 'login_attempt' ) ) {
+				Arriendo_Facil_Secure_Logger::log_security_event( 'login_rate_limit_exceeded', array(
+					'user' => is_a( $user, 'WP_User' ) ? $user->user_login : 'unknown',
+					'ip'   => isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : 'unknown',
+				) );
+				return new WP_Error( 'too_many_login_attempts', __( 'Demasiados intentos de inicio de sesión. Intenta más tarde.', 'arriendo-facil' ) );
+			}
+		}
+		return $user;
+	}
+
+	/**
+	 * Blocks suspended property admins from logging in.
+	 *
+	 * @param WP_User|WP_Error $user User or error.
+	 * @param string           $password Password (not used).
 	 * @return WP_User|WP_Error
 	 */
 	public function block_suspended_property_admin_login( $user, $password ) {

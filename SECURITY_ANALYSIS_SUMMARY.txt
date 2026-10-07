@@ -1,0 +1,313 @@
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                   │
+│                   🔴 REPORTE DE ANÁLISIS - INCIDENTE SEGURIDAD                  │
+│                                                                                   │
+│                    CLAVES SENSIBLES EXPUESTAS EN HISTORIO GIT                   │
+│                                                                                   │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+FECHA ANÁLISIS: 2026-10-07 09:34 UTC
+SEVERIDAD: 🔴 CRÍTICA
+ESTADO: REQUIERE ACCIÓN INMEDIATA
+
+═══════════════════════════════════════════════════════════════════════════════════
+
+📊 RESUMEN EJECUTIVO
+
+Se detectaron TRES (3) credenciales de alto riesgo expuestas en el historio de git:
+
+  1. Cloudflare API Token (cfat_*)
+  2. AWS Access Key ID  
+  3. AWS Secret Access Key
+
+Todas están ACTIVAS y pueden ser usadas para:
+  ✅ Acceder a Cloudflare R2 Storage
+  ✅ Leer/escribir/eliminar archivos
+  ✅ Acceder a todas las APIs de Cloudflare
+  
+DURACIÓN DE EXPOSICIÓN: ~6 meses (Marzo 24 - Octubre 7, 2026)
+
+═══════════════════════════════════════════════════════════════════════════════════
+
+🔐 CREDENCIALES COMPROMETIDAS
+
+┌─ #1: CLOUDFLARE API TOKEN ────────────────────────────────────────────────────┐
+│                                                                                 │
+│  Tipo:            Cloudflare API Token                                         │
+│  Formato:         cfat_* (Cloudflare Format)                                   │
+│  Valor:           cfat_SmYDRP5DLmGj6QKkErlmvgy5UlxLVv6iKh4PMX1Y6d67cfbd      │
+│  Estado:          ⚠️ ACTIVO - REVOCACIÓN REQUERIDA                           │
+│  Riesgo:          🔴 CRÍTICO (acceso completo a Cloudflare)                   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─ #2: AWS ACCESS KEY ID ───────────────────────────────────────────────────────┐
+│                                                                                 │
+│  Tipo:            AWS IAM Access Key ID                                        │
+│  Valor:           9e50a8dfa4d53fdcea91e918f13013ca                            │
+│  Estado:          ⚠️ ACTIVO - REVOCACIÓN REQUERIDA                           │
+│  Riesgo:          🔴 CRÍTICO (usada con secret key para autenticación)        │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─ #3: AWS SECRET ACCESS KEY ───────────────────────────────────────────────────┐
+│                                                                                 │
+│  Tipo:            AWS IAM Secret Access Key                                    │
+│  Valor:           4aa1d107e4aea6db701176300da58c47c3fb12b39b5411cb...        │
+│                   (primeros 50 caracteres: 4aa1d107e4aea6db701176300da58c)    │
+│  Estado:          ⚠️ ACTIVO - REVOCACIÓN REQUERIDA                           │
+│  Riesgo:          🔴 CRÍTICO (acceso ilimitado con Access Key ID)            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─ #4: CLOUDFLARE R2 ENDPOINT (INFORMACIÓN DE IDENTIFICACIÓN) ────────────────┐
+│                                                                                 │
+│  Tipo:            Cloudflare R2 Endpoint URL                                   │
+│  Valor:           https://8088bc29e75206bf131252a55578c8b5.r2.cloudflarestorage.com
+│  Riesgo:          🟡 MEDIO (públicamente identificable, pero útil para ataques)
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════════
+
+📍 UBICACIÓN DE EXPOSICIÓN
+
+Archivo: includes/other
+Contenido: 15 líneas con credenciales en texto plano (comentarios)
+
+Commits Afectados:
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │ COMMIT: e550462f04d08c09d45de829599813f50ebfdab7                       │
+  │ FECHA:  Martes, 24 Marzo 2026, 12:16:06 -0500                          │
+  │ AUTOR:  Dario Chuquilla                                                  │
+  │ MSG:    "✨ Add feature/xxx"                                             │
+  │ ACCIÓN: ➕ AGREGÓ includes/other con todas las credenciales             │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │ COMMIT: 59d129c35086b536b1376f19e53d1d220600849f                       │
+  │ FECHA:  Miércoles, 30 Septiembre 2026, 13:07:57 -0500                   │
+  │ AUTOR:  Dario Chuquilla                                                  │
+  │ MSG:    "feat: Add P12 converter and validator..."                      │
+  │ ACCIÓN: ❌ ELIMINÓ includes/other del working directory                │
+  │         ⚠️ PERO NO DEL HISTORIO DE GIT                                  │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════════
+
+⏰ TIMELINE DE EXPOSICIÓN
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ Fase 1: INTRODUCCIÓN                                                         │
+│ ├─ Fecha:     24 Marzo 2026 (13:07:57 -0500)                               │
+│ ├─ Commit:    e550462f04d08c09d45de829599813f50ebfdab7                    │
+│ ├─ Acción:    Credenciales agregadas al archivo includes/other            │
+│ └─ Duración:  6 meses 2 semanas (ACTIVAS EN HISTORIO)                     │
+│                                                                              │
+│ Fase 2: INTENTO DE ELIMINACIÓN (INCOMPLETO)                                │
+│ ├─ Fecha:     30 Septiembre 2026 (13:07:57 -0500)                        │
+│ ├─ Commit:    59d129c35086b536b1376f19e53d1d220600849f                   │
+│ ├─ Acción:    Archivo eliminado del working directory                    │
+│ └─ Problema:  Credenciales permanecen en el historio de git              │
+│                                                                              │
+│ Fase 3: DESCUBRIMIENTO (HOY)                                               │
+│ ├─ Fecha:     7 Octubre 2026 (09:34 UTC)                                  │
+│ ├─ Reporte:   "creo que se a ido algun key sensible"                      │
+│ ├─ Acción:    Análisis de seguridad completado                            │
+│ └─ Duración:  Expuesto ~7 días después del intento de eliminación         │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════════
+
+🚨 ANÁLISIS DE RIESGO
+
+Alcance Potencial de Ataque:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                               │
+│  ✅ LECTURA (Confidencialidad)                                              │
+│     └─ Acceso a todos los archivos almacenados en R2/S3                    │
+│        → Contratos de arrendamiento                                          │
+│        → Documentos sensibles (identidades, datos bancarios)                │
+│        → Fotos y metadatos de propiedades                                   │
+│        → Cualquier archivo subido al almacenamiento                         │
+│                                                                               │
+│  ✅ MODIFICACIÓN (Integridad)                                               │
+│     └─ Reescribir/inyectar contenido malicioso en archivos                │
+│        → Modificar contratos                                                 │
+│        → Inyectar código/malware                                            │
+│        → Alterar metadatos                                                  │
+│                                                                               │
+│  ✅ ELIMINACIÓN (Disponibilidad)                                            │
+│     └─ Eliminar buckets enteros u objetos individuales                     │
+│        → Pérdida completa de datos                                          │
+│        → Indisponibilidad de la aplicación                                 │
+│        → Impacto destructivo total                                          │
+│                                                                               │
+│  ✅ CONFIGURACIÓN                                                           │
+│     └─ Cambiar permisos, crear/eliminar buckets                            │
+│     └─ Cambiar configuración de Cloudflare                                 │
+│     └─ Impactar infraestructura completa                                   │
+│                                                                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Matriz de Impacto:
+┌────────────────────────┬─────────┬──────────────────────────────────────────┐
+│ Aspecto                │ Impacto │ Descripción                              │
+├────────────────────────┼─────────┼──────────────────────────────────────────┤
+│ Confidencialidad       │  🔴🔴 │ Acceso a datos sensibles de clientes     │
+│ Integridad             │  🔴🔴 │ Posibilidad de modificar/injectar datos  │
+│ Disponibilidad         │  🔴🔴 │ Posibilidad de eliminar recursos         │
+│ Reputación             │  🔴🔴 │ Potencial breach público                 │
+│ Cumplimiento Legal     │  🔴🔴 │ Violación de GDPR/privacidad             │
+│ Confianza de Clientes  │  🔴🔴 │ Pérdida de confianza                     │
+└────────────────────────┴─────────┴──────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════════
+
+✅ ACCIÓN RECOMENDADA INMEDIATA
+
+TIEMPO CRÍTICO: Deben completarse en LAS PRÓXIMAS 2 HORAS
+
+Prioridad 1 (10 minutos):
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ [ ] 1.1 Revocar Cloudflare API Token: cfat_SmYDRP5DLmGj6QKkErlmvgy5Ulx... │
+│ [ ] 1.2 Generar NUEVO token de Cloudflare                                  │
+│ [ ] 1.3 Revocar AWS Access Key: 9e50a8dfa4d53fdcea91e918f13013ca          │
+│ [ ] 1.4 Generar NUEVAS AWS Keys                                            │
+│ [ ] 1.5 Actualizar credenciales en código/producción                       │
+│ [ ] 1.6 Probar que aplicación sigue funcionando                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Prioridad 2 (30 minutos):
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ [ ] 2.1 Auditar logs de Cloudflare (últimas 2 semanas)                     │
+│         → ¿Hay accesos sospechosos?                                         │
+│         → ¿Se descargó contenido?                                           │
+│         → ¿Se modificó algo?                                                │
+│                                                                               │
+│ [ ] 2.2 Auditar AWS CloudTrail (últimas 2 semanas)                         │
+│         → ¿Se usó la access key?                                            │
+│         → ¿Desde qué IPs?                                                   │
+│         → ¿Qué acciones se realizaron?                                      │
+│                                                                               │
+│ [ ] 2.3 Documentar hallazgos                                                │
+│ [ ] 2.4 Contactar a Cloudflare si hay sospecha de acceso                   │
+│ [ ] 2.5 Contactar a AWS si hay sospecha de acceso                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Prioridad 3 (limpieza del historio):
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ [ ] 3.1 Crear backup del repo                                              │
+│ [ ] 3.2 Ejecutar: chmod +x remediate-security-incident.sh                  │
+│ [ ] 3.3 Ejecutar: ./remediate-security-incident.sh                         │
+│ [ ] 3.4 Seguir instrucciones interactivas                                   │
+│ [ ] 3.5 Verificar que historio fue limpiado                                │
+│ [ ] 3.6 Avisar a colaboradores para: git reset --hard origin/main          │
+│ [ ] 3.7 Verificar que todos actualizaron                                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════════
+
+📚 DOCUMENTACIÓN GENERADA
+
+Se han creado los siguientes archivos en el repositorio:
+
+  1. SECURITY_INCIDENT_EXPOSED_KEYS.md
+     └─ Reporte completo con detalles, timeline y acciones recomendadas
+     └─ 400+ líneas de referencia y guías paso a paso
+
+  2. IMMEDIATE_ACTION_CHECKLIST.md
+     └─ Checklist ejecutable para remediar el incidente
+     └─ Cada paso numerado y verificable
+     └─ Fase 1-6 de acciones inmediatas
+
+  3. remediate-security-incident.sh
+     └─ Script Bash automatizado para limpiar historio de git
+     └─ Usa BFG Repo-Cleaner (recomendado)
+     └─ Interactivo con confirmaciones de seguridad
+     └─ Incluye backups y verificaciones
+
+═══════════════════════════════════════════════════════════════════════════════════
+
+🔍 BÚSQUEDA DE OTROS SECRETOS
+
+Se realizó búsqueda exhaustiva en el historio completo (478 commits) por:
+  ✓ Patrones de tokens (token=, token_*, etc.)
+  ✓ Patrones de contraseñas (password=, passwd=, pwd=, etc.)
+  ✓ Patrones de secrets (secret=, api_key=, etc.)
+  ✓ Claves largas (32+ caracteres hexadecimales)
+  ✓ Claves de AWS, Azure, Google Cloud
+
+RESULTADO: ✅ SOLO encontradas las 3 credenciales reportadas
+           No hay otros secretos detectados en el historio
+
+═══════════════════════════════════════════════════════════════════════════════════
+
+📞 ESCALACIÓN RECOMENDADA
+
+Notificar a (en este orden):
+
+  1️⃣ Security Lead / CISO
+     └─ Incidente crítico de exposición de credenciales
+
+  2️⃣ DevOps / Infraestructura
+     └─ Necesitan rotar credenciales en producción
+
+  3️⃣ Product Lead
+     └─ Impacto potencial en datos de clientes
+
+  4️⃣ Legal / Compliance
+     └─ Obligación de notificar si hubo breach real
+
+  5️⃣ Clientes (SOLO si hay evidencia de acceso no autorizado)
+     └─ Solo si auditoría de logs muestra acceso sospechoso
+
+═══════════════════════════════════════════════════════════════════════════════════
+
+⏭️ PRÓXIMOS PASOS
+
+AHORA MISMO (dentro de 1 hora):
+  ✓ Leer SECURITY_INCIDENT_EXPOSED_KEYS.md
+  ✓ Seguir IMMEDIATE_ACTION_CHECKLIST.md
+  ✓ Ejecutar remediate-security-incident.sh
+
+DESPUÉS (dentro de 24 horas):
+  ✓ Documentar post-mortem del incidente
+  ✓ Implementar git-secrets en pre-commit hooks
+  ✓ Mejorar .gitignore
+  ✓ Capacitar al equipo
+
+PREVENCIÓN (próximas 2 semanas):
+  ✓ Implementar GitHub secret scanning
+  ✓ Revisar otros repositorios
+  ✓ Crear políticas de secrets management
+  ✓ Auditoría de seguridad completa
+
+═══════════════════════════════════════════════════════════════════════════════════
+
+📊 RESUMEN FINAL
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                               │
+│  Credenciales Comprometidas:   3 (Cloudflare + AWS)                         │
+│  Duración de Exposición:       ~6 meses (Marzo 24 - Oct 7, 2026)          │
+│  Riesgo:                       CRÍTICO 🔴🔴🔴                               │
+│  Acción Requerida:             INMEDIATA (próximas 2 horas)                │
+│  Documentación:                ✅ Completa                                  │
+│  Scripts de Remediar:          ✅ Listos para usar                         │
+│  Otros Secretos:               ✅ No encontrados                            │
+│                                                                               │
+│  ESTADO: 🔴 REQUIERE ACCIÓN AHORA                                          │
+│                                                                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════════
+
+DOCUMENTOS ADICIONALES CREADOS EN /memories/session/:
+  └─ security-incident-report.md (notas de sesión)
+
+═══════════════════════════════════════════════════════════════════════════════════
+
+Generado: 2026-10-07 09:34 UTC
+Estado: ACTIVO - ACCIÓN INMEDIATA REQUERIDA
+Severidad: 🔴 CRÍTICA

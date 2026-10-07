@@ -113,7 +113,7 @@ https://8088bc29e75206bf131252a55578c8b5.r2.cloudflarestorage.com
 #### Cloudflare (10 min)
 ```
 1. Ir a: https://dash.cloudflare.com/profile/api-tokens
-2. Buscar: "cfat_SmYDRP5DLmGj6QKkErlmvgy5UlxLVv6iKh4PMX1Y6d67cfbd"
+2. Buscar: "cfat_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 3. Hacer clic: "Edit" o "Revoke"
 4. Seleccionar: "Revoke"
 5. Confirmar: "Yes, revoke"
@@ -125,7 +125,7 @@ https://8088bc29e75206bf131252a55578c8b5.r2.cloudflarestorage.com
 #### AWS (15 min)
 ```
 1. Ir a: https://console.aws.amazon.com/iamv2/home#/users
-2. Buscar: User que tiene la Access Key "9e50a8dfa4d53fdcea91e918f13013ca"
+2. Buscar: User que tiene la Access Key "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 3. Hacer clic: "Security credentials"
 4. Seleccionar: Access Key
 5. Hacer clic: "Deactivate" (primero)
@@ -163,11 +163,11 @@ https://8088bc29e75206bf131252a55578c8b5.r2.cloudflarestorage.com
 #### Cloudflare
 ```
 Email: security@cloudflare.com
-Asunto: API Token Exposure - cfat_SmYDRP5DLmGj6QKkErlmvgy5UlxLVv6iKh4PMX1Y6d67cfbd
+Asunto: API Token Exposure - cfat_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
 Mensaje:
 - Descripción: Token expuesto en public git repository
-- Token: cfat_SmYDRP5DLmGj6QKkErlmvgy5UlxLVv6iKh4PMX1Y6d67cfbd
+- Token: cfat_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 - Duración exposición: Marzo 24, 2026 - Septiembre 30, 2026
 - Acción tomada: Token revocado hoy
 - Solicitud: Auditar accesos a token en el período
@@ -181,7 +181,7 @@ Email: abuse@aws.amazon.com
 Asunto: AWS Access Key Exposure in Public Repository
 
 Mensaje:
-- Access Key ID: 9e50a8dfa4d53fdcea91e918f13013ca
+- Access Key ID: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 - Duración exposición: ~6 meses (Marzo - Septiembre)
 - Acción tomada: Key desactivada/eliminada hoy
 - Solicitud: Revisar accesos sospechosos en período
@@ -291,11 +291,11 @@ CONTACTO: [Tu nombre] - [Email/Teléfono]
 ## 📝 CHECKLIST DE REMEDIACIÓN
 
 ### Inmediato (HOY - 1 hora)
-- [ ] Revocar Cloudflare API Token: `cfat_SmYDRP5DLmGj6QKkErlmvgy5UlxLVv6iKh4PMX1Y6d67cfbd`
+- [ ] Revocar Cloudflare API Token: `cfat_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX`
 - [ ] Generar nuevo token de Cloudflare
 - [ ] Actualizar código/config con nuevo token
 - [ ] Probar funcionamiento de Cloudflare R2
-- [ ] Revocar AWS Access Key: `9e50a8dfa4d53fdcea91e918f13013ca`
+- [ ] Revocar AWS Access Key: `XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX`
 - [ ] Generar nuevo Access Key de AWS
 - [ ] Actualizar código/config con nuevo key
 - [ ] Probar funcionamiento de AWS/R2
@@ -343,7 +343,7 @@ git log --all --full-history -- includes/other
 
 # 2. Verificar que credenciales antiguas no funcionan
 # Intentar con token viejo en Cloudflare API
-curl -H "Authorization: Bearer cfat_SmYDRP5DLmGj6QKkErlmvgy5UlxLVv6iKh4PMX1Y6d67cfbd" \
+curl -H "Authorization: Bearer cfat_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" \
   https://api.cloudflare.com/client/v4/user
 
 # Resultado esperado: { "success": false, "errors": [...], "result": null }

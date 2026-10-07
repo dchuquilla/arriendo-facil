@@ -264,9 +264,9 @@ git filter-branch -f --tree-filter 'rm -f includes/other' -- --all
 ✅ **Resultado**: Archivo `includes/other` eliminado del historio completo
 
 **Credenciales Removidas:**
-- `cfat_SmYDRP5DLmGj6QKkErlmvgy5UlxLVv6iKh4PMX1Y6d67cfbd` (Cloudflare API Token)
-- `9e50a8dfa4d53fdcea91e918f13013ca` (AWS Access Key ID)
-- `4aa1d107e4aea6db701176300da58c47c3fb12b39b5411cb237f78ed38f0c9b` (AWS Secret Key)
+- `cfat_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX` (Cloudflare API Token)
+- `XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX` (AWS Access Key ID)
+- `XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX` (AWS Secret Key)
 
 ### 2. Limpieza de Historio
 ```bash
@@ -322,14 +322,14 @@ git reset --hard origin/main
 
 ## 🔐 ESTADO DE CREDENCIALES
 
-### Cloudflare API Token: `cfat_SmYDRP5DLmGj6QKkErlmvgy5UlxLVv6iKh4PMX1Y6d67cfbd`
+### Cloudflare API Token: `cfat_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX`
 - ⚠️ **TODAVÍA ACTIVO** en Cloudflare
 - **ACCIÓN REQUERIDA**: Revocar en dashboard de Cloudflare
 - **URL**: https://dash.cloudflare.com/profile/api-tokens
 
 ### AWS Access Keys
-- Access Key: `9e50a8dfa4d53fdcea91e918f13013ca`
-- Secret Key: `4aa1d107e4aea6db701176300da58c47c3fb12b39b5411cb237f78ed38f0c9b`
+- Access Key: `XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX`
+- Secret Key: `XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX`
 - ⚠️ **TODAVÍA ACTIVAS** en AWS
 - **ACCIÓN REQUERIDA**: Desactivar/Eliminar en AWS IAM
 - **URL**: https://console.aws.amazon.com/iamv2/home#/users
@@ -375,12 +375,12 @@ git reset --hard origin/main
 1. **Rotar Credenciales** (CRÍTICO)
    ```
    Cloudflare:
-   - Revocar: cfat_SmYDRP5DLmGj6QKkErlmvgy5UlxLVv6iKh4PMX1Y6d67cfbd
+   - Revocar: cfat_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
    - Generar nuevo token
    - Actualizar en producción
    
    AWS:
-   - Desactivar Access Key: 9e50a8dfa4d53fdcea91e918f13013ca
+   - Desactivar Access Key: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
    - Generar nuevas keys
    - Actualizar en producción
    ```

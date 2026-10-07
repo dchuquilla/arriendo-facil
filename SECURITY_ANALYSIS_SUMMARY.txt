@@ -35,7 +35,7 @@ DURACIÓN DE EXPOSICIÓN: ~6 meses (Marzo 24 - Octubre 7, 2026)
 │                                                                                 │
 │  Tipo:            Cloudflare API Token                                         │
 │  Formato:         cfat_* (Cloudflare Format)                                   │
-│  Valor:           cfat_SmYDRP5DLmGj6QKkErlmvgy5UlxLVv6iKh4PMX1Y6d67cfbd      │
+│  Valor:           cfat_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX      │
 │  Estado:          ⚠️ ACTIVO - REVOCACIÓN REQUERIDA                           │
 │  Riesgo:          🔴 CRÍTICO (acceso completo a Cloudflare)                   │
 │                                                                                 │

@@ -21,9 +21,9 @@ Se han detectado **credenciales de Cloudflare y AWS** expuestas en el historial 
 
 | # | Tipo | Valor | Formato | Estado |
 |---|------|-------|---------|--------|
-| 1 | Cloudflare API Token | `cfat_SmYDRP5DLmGj6QKkErlmvgy5UlxLVv6iKh4PMX1Y6d67cfbd` | cfat_* | ⚠️ ACTIVO |
-| 2 | AWS Access Key ID | `9e50a8dfa4d53fdcea91e918f13013ca` | Hex 32 chars | ⚠️ ACTIVO |
-| 3 | AWS Secret Key | `4aa1d107e4aea6db701176300da58c47c3fb12b39b5411cb237f78ed38f0c9b` | SHA256-like | ⚠️ ACTIVO |
+| 1 | Cloudflare API Token | `cfat_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX` | cfat_* | ⚠️ ACTIVO |
+| 2 | AWS Access Key ID | `XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX` | Hex 32 chars | ⚠️ ACTIVO |
+| 3 | AWS Secret Key | `XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX` | SHA256-like | ⚠️ ACTIVO |
 | 4 | R2 Endpoint URL | `https://8088bc29e75206bf131252a55578c8b5.r2.cloudflarestorage.com` | URL | 🔍 IDENTIFIER |
 
 ---
@@ -39,11 +39,11 @@ includes/other
 ```
 //no tomar en cuenta el siguiente código, es solo para pruebas
 //Credenciales de bucket cloudflare
-token Value= cfat_SmYDRP5DLmGj6QKkErlmvgy5UlxLVv6iKh4PMX1Y6d67cfbd
+token Value= cfat_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
 credenciales del s3 de r2
-Access Key ID= 9e50a8dfa4d53fdcea91e918f13013ca
-Secret Access Key= 4aa1d107e4aea6db701176300da58c47c3fb12b39b5411cb237f78ed38f0c9b
+Access Key ID= XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+Secret Access Key= XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
 Use jurisdiction-specific endpoints for S3 clients:
 Default
@@ -172,6 +172,8 @@ Mensaje:
 - Acción tomada: Token revocado hoy
 - Solicitud: Auditar accesos a token en el período
 ```
+
+> **NOTA**: En esta documentación de ejemplo, todos los tokens han sido ofuscados con X's para cumplir con GitHub Push Protection y evitar re-exposición durante el análisis de seguridad.
 
 #### AWS
 ```

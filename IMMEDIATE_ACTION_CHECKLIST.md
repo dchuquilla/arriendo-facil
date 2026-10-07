@@ -11,7 +11,7 @@
 
 ### Cloudflare API Token
 ```
-ACTUAL (COMPROMETIDO): cfat_SmYDRP5DLmGj6QKkErlmvgy5UlxLVv6iKh4PMX1Y6d67cfbd
+ACTUAL (COMPROMETIDO): cfat_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 ESTADO: ⚠️ ACTIVO - DEBE REVOCARSE AHORA
 ```
 
@@ -31,8 +31,8 @@ ESTADO: ⚠️ ACTIVO - DEBE REVOCARSE AHORA
 
 ### AWS Access Keys
 ```
-ACCESS KEY ID (COMPROMETIDO): 9e50a8dfa4d53fdcea91e918f13013ca
-SECRET KEY (COMPROMETIDO):    4aa1d107e4aea6db701176300da58c47c3fb12b39b5411cb237f78ed38f0c9b
+ACCESS KEY ID (COMPROMETIDO): XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+SECRET KEY (COMPROMETIDO):    XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 ESTADO: ⚠️ ACTIVO - DEBE REVOCARSE AHORA
 ```
 
@@ -40,7 +40,7 @@ ESTADO: ⚠️ ACTIVO - DEBE REVOCARSE AHORA
 1. [ ] Abrir https://console.aws.amazon.com/iamv2/home#/users
 2. [ ] Encontrar el usuario que tiene esa Access Key
 3. [ ] Clic en "Security credentials"
-4. [ ] Localizar la Access Key: `9e50a8dfa4d53fdcea91e918f13013ca`
+4. [ ] Localizar la Access Key: `XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX`
 5. [ ] Clic en "Deactivate" (primero, NO borrar todavía)
 6. [ ] Ir a aplicación y verificar que aún funciona con NUEVO key
 7. [ ] SI funciona: Volver a AWS y hacer clic en "Delete"
@@ -84,7 +84,7 @@ PERIODO: 24 Marzo 2026 - 7 Octubre 2026
 **PASOS:**
 1. [ ] Abrir https://console.aws.amazon.com/cloudtrail
 2. [ ] Eventos recientes
-3. [ ] Filtrar por Access Key: `9e50a8dfa4d53fdcea91e918f13013ca`
+3. [ ] Filtrar por Access Key: `XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX`
 4. [ ] Revisar acciones:
    - [ ] ListBucket
    - [ ] GetObject (descargas)
@@ -106,7 +106,7 @@ PERIODO: 24 Marzo 2026 - 7 Octubre 2026
 ### Notificar a Cloudflare
 ```
 Email: security@cloudflare.com
-Asunto: Exposed API Token - cfat_SmYDRP5DLmGj6QKkErlmvgy5UlxLVv6iKh4PMX1Y6d67cfbd
+Asunto: Exposed API Token - cfat_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 ```
 
 **TEMPLATE:**
@@ -118,7 +118,7 @@ Dear Cloudflare Security Team,
 We discovered an API token was accidentally committed to a public git repository.
 
 Details:
-- Token: cfat_SmYDRP5DLmGj6QKkErlmvgy5UlxLVv6iKh4PMX1Y6d67cfbd
+- Token: cfat_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 - Format: cfat_* (Cloudflare API Token)
 - Exposure Period: March 24, 2026 - September 30, 2026
 - Discovered: October 7, 2026
@@ -153,8 +153,8 @@ Dear AWS Security Team,
 We discovered AWS access keys were accidentally committed to a public git repository.
 
 Details:
-- Access Key ID: 9e50a8dfa4d53fdcea91e918f13013ca
-- Secret Access Key: 4aa1d107e4aea6db701176300da58c47c3fb12b39b5411cb237f78ed38f0c9b
+- Access Key ID: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+- Secret Access Key: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 - Exposure Period: March 24, 2026 - September 30, 2026
 - Discovered: October 7, 2026
 - Action Taken: Keys deactivated/deleted today

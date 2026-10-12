@@ -59,6 +59,7 @@ class Arriendo_Facil_Security_Hardening {
 
 		add_action( 'admin_init', array( $this, 'protect_web_accessible_logs' ), 5 );
 		add_action( 'admin_notices', array( $this, 'render_notice' ) );
+		add_action( 'admin_notices', array( $this, 'render_diagnostic' ) );
 		add_action( 'admin_post_' . self::PURGE_ACTION, array( $this, 'handle_purge' ) );
 	}
 
@@ -118,9 +119,6 @@ class Arriendo_Facil_Security_Hardening {
 					<add segment="debug.log" />
 				</hiddenSegments>
 			</requestFiltering>
-			<authorization>
-				<deny users="*" />
-			</authorization>
 		</security>
 	</system.webServer>
 </configuration>
@@ -194,6 +192,13 @@ class Arriendo_Facil_Security_Hardening {
 			return;
 		}
 
+		// Opt-in: a bad .htaccess in wp-content makes Apache answer 500 for
+		// every theme/plugin/upload asset when the host forbids those directives.
+		if ( ! defined( 'AF_WRITE_SERVER_RULES' ) || ! AF_WRITE_SERVER_RULES ) {
+			$this->remove_server_rules();
+			return;
+		}
+
 		$degraded = false;
 
 		$degraded = ! $this->protect_file(
@@ -215,6 +220,78 @@ class Arriendo_Facil_Security_Hardening {
 		}
 
 		update_option( self::OPTION_DEGRADED, $degraded ? 1 : 0 );
+	}
+
+	/**
+	 * Lists the server config files under wp-content: visit /wp-admin/?af_diag=1.
+	 *
+	 * Read-only aid for hosts where only wp-admin is reachable.
+	 */
+	public function render_diagnostic() {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if ( ! isset( $_GET['af_diag'] ) || ! current_user_can( 'manage_options' ) || ! defined( 'WP_CONTENT_DIR' ) ) {
+			return;
+		}
+
+		$files = array( WP_CONTENT_DIR . '/.htaccess', WP_CONTENT_DIR . '/web.config', WP_CONTENT_DIR . '/.htaccess.af-backup' );
+		foreach ( array( 'themes', 'plugins', 'uploads' ) as $dir ) {
+			$files[] = WP_CONTENT_DIR . '/' . $dir . '/.htaccess';
+		}
+
+		$lines   = array();
+		$lines[] = 'wp-content perms: ' . substr( sprintf( '%o', fileperms( WP_CONTENT_DIR ) ), -4 ) . ' | server: ' . ( isset( $_SERVER['SERVER_SOFTWARE'] ) ? sanitize_text_field( wp_unslash( $_SERVER['SERVER_SOFTWARE'] ) ) : '?' );
+
+		foreach ( $files as $file ) {
+			if ( ! file_exists( $file ) ) {
+				$lines[] = str_replace( WP_CONTENT_DIR, 'wp-content', $file ) . ': NO EXISTE';
+				continue;
+			}
+			$lines[] = str_replace( WP_CONTENT_DIR, 'wp-content', $file ) . ' [' . substr( sprintf( '%o', fileperms( $file ) ), -4 ) . "]:\n" . substr( (string) file_get_contents( $file ), 0, 1500 );
+		}
+
+		echo '<div class="notice notice-info"><p><strong>Arriendo Fácil diagnóstico</strong></p><pre style="white-space:pre-wrap">' . esc_html( implode( "\n\n", $lines ) ) . '</pre></div>';
+	}
+
+	/**
+	 * Removes the block this class wrote earlier, restoring the original file.
+	 *
+	 * Self-heals sites where the generated wp-content/.htaccess made Apache
+	 * answer 500 for every asset: it only needs the plugin to be updated and
+	 * wp-admin to be opened once, with no file-manager access.
+	 */
+	private function remove_server_rules() {
+		foreach ( array( '/.htaccess', '/web.config' ) as $name ) {
+			$path = WP_CONTENT_DIR . $name;
+
+			if ( ! file_exists( $path ) || ! is_writable( $path ) ) {
+				continue;
+			}
+
+			$content = (string) file_get_contents( $path );
+
+			if ( ! self::has_block( $content ) ) {
+				continue;
+			}
+
+			// The web.config block sits inside an XML comment, so stripping it
+			// textually would leave broken markup: that file is ours entirely.
+			$clean = '/web.config' === $name ? '' : self::strip_block( $content );
+
+			if ( '' === trim( $clean ) ) {
+				// phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+				unlink( $path );
+			} else {
+				self::write_file( $path, $clean );
+			}
+		}
+
+		$backup = WP_CONTENT_DIR . '/.htaccess.af-backup';
+		if ( file_exists( $backup ) ) {
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+			unlink( $backup );
+		}
+
+		delete_option( self::OPTION_DEGRADED );
 	}
 
 	/**

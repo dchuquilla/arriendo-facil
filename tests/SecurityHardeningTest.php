@@ -164,7 +164,11 @@ class SecurityHardeningTest extends TestCase {
 	 * files while leaving the public assets alone.
 	 */
 	public function test_shipped_rules_cover_the_leaked_files() {
-		$htaccess = (string) file_get_contents( ARRIENDO_FACIL_PLUGIN_DIR . '.htaccess' );
+		// Not shipped as a live .htaccess: hosts that forbid its directives
+		// answer 500 for every plugin asset. It stays as an opt-in example.
+		$this->assertFileDoesNotExist( ARRIENDO_FACIL_PLUGIN_DIR . '.htaccess' );
+
+		$htaccess = (string) file_get_contents( ARRIENDO_FACIL_PLUGIN_DIR . 'docs/htaccess-plugin.example' );
 
 		$this->assertStringContainsString( 'CONVERTIDOR_P12_VALIDO.php', $htaccess );
 		$this->assertStringContainsString( 'docs|tests|vendor', $htaccess );

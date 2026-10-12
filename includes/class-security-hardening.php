@@ -285,6 +285,16 @@ class Arriendo_Facil_Security_Hardening {
 			}
 		}
 
+		// Older releases shipped a .htaccess in the plugin root. Hosts that do
+		// not allow its Require/Order/RewriteRule directives answer 500 for
+		// every plugin asset (CSS/JS), so drop it when it is still ours.
+		$plugin_htaccess = ARRIENDO_FACIL_PLUGIN_DIR . '.htaccess';
+		if ( file_exists( $plugin_htaccess ) && is_writable( $plugin_htaccess )
+			&& 0 === strpos( (string) file_get_contents( $plugin_htaccess ), '# Protege los archivos de desarrollo' ) ) {
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+			unlink( $plugin_htaccess );
+		}
+
 		$backup = WP_CONTENT_DIR . '/.htaccess.af-backup';
 		if ( file_exists( $backup ) ) {
 			// phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink

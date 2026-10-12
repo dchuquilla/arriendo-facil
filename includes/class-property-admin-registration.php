@@ -128,18 +128,33 @@ class Arriendo_Facil_Property_Admin_Registration {
 					</label>
 					<label class="af-admin-signup__field">
 						<span class="af-admin-signup__label"><?php echo esc_html__( 'Contrasena', 'arriendo-facil' ); ?></span>
-						<input type="password" name="password" required minlength="10" maxlength="72" autocomplete="new-password" class="af-admin-signup__input" />
+						<span class="af-admin-signup__control">
+							<input type="password" name="password" required minlength="10" maxlength="72" autocomplete="new-password" class="af-admin-signup__input af-admin-signup__input--reveal" />
+							<?php $this->render_password_reveal_button(); ?>
+						</span>
+						<span class="af-admin-signup__strength" data-af-strength hidden>
+							<span class="af-admin-signup__strength-track"><span class="af-admin-signup__strength-bar" data-af-strength-bar></span></span>
+							<span class="af-admin-signup__strength-label" data-af-strength-label></span>
+						</span>
 					</label>
 					<label class="af-admin-signup__field">
 						<span class="af-admin-signup__label"><?php echo esc_html__( 'Confirmar contrasena', 'arriendo-facil' ); ?></span>
-						<input type="password" name="password_confirm" required minlength="10" maxlength="72" autocomplete="new-password" class="af-admin-signup__input" />
+						<span class="af-admin-signup__control">
+							<input type="password" name="password_confirm" required minlength="10" maxlength="72" autocomplete="new-password" class="af-admin-signup__input af-admin-signup__input--reveal" />
+							<?php $this->render_password_reveal_button(); ?>
+						</span>
+						<span class="af-admin-signup__match" data-af-match hidden aria-live="polite"></span>
 					</label>
 				</div>
 
-				<div class="af-admin-signup__password-hint">
-					<strong><?php echo esc_html__( 'Requisitos de contrasena:', 'arriendo-facil' ); ?></strong>
-					<?php echo esc_html__( 'minimo 10 caracteres, al menos 1 mayuscula, 1 minuscula, 1 numero y 1 simbolo (ej: !@#$%).', 'arriendo-facil' ); ?>
-				</div>
+				<p class="af-admin-signup__rules-title"><?php echo esc_html__( 'Requisitos de contrasena:', 'arriendo-facil' ); ?></p>
+				<ul class="af-admin-signup__rules" data-af-rules>
+					<li class="af-admin-signup__rule" data-rule="length"><?php echo esc_html__( 'Minimo 10 caracteres', 'arriendo-facil' ); ?></li>
+					<li class="af-admin-signup__rule" data-rule="upper"><?php echo esc_html__( 'Al menos 1 mayuscula', 'arriendo-facil' ); ?></li>
+					<li class="af-admin-signup__rule" data-rule="lower"><?php echo esc_html__( 'Al menos 1 minuscula', 'arriendo-facil' ); ?></li>
+					<li class="af-admin-signup__rule" data-rule="number"><?php echo esc_html__( 'Al menos 1 numero', 'arriendo-facil' ); ?></li>
+					<li class="af-admin-signup__rule" data-rule="symbol"><?php echo esc_html__( 'Al menos 1 simbolo (ej: !@#$%)', 'arriendo-facil' ); ?></li>
+				</ul>
 
 				<input type="text" name="website" value="" tabindex="-1" autocomplete="off" aria-hidden="true" class="af-admin-signup__honeypot" />
 				<input type="hidden" name="form_ts" value="<?php echo esc_attr( (string) $form_ts ); ?>" />
@@ -199,15 +214,77 @@ class Arriendo_Facil_Property_Admin_Registration {
 			}
 
 			function validatePasswordClientSide(password){
-				const checks = [
+				return passwordChecks(password).every(Boolean);
+			}
+
+			function passwordChecks(password){
+				return [
 					password.length >= 10,
 					/[A-Z]/.test(password),
 					/[a-z]/.test(password),
 					/[0-9]/.test(password),
 					/[^A-Za-z0-9]/.test(password)
 				];
-				return checks.every(Boolean);
 			}
+
+			const pwInput = form.querySelector('input[name="password"]');
+			const pwConfirmInput = form.querySelector('input[name="password_confirm"]');
+			const ruleItems = app.querySelectorAll('[data-af-rules] [data-rule]');
+			const strengthBox = app.querySelector('[data-af-strength]');
+			const strengthBar = app.querySelector('[data-af-strength-bar]');
+			const strengthLabel = app.querySelector('[data-af-strength-label]');
+			const matchBox = app.querySelector('[data-af-match]');
+			const strengthLevels = [
+				{ label: <?php echo wp_json_encode( __( 'Muy debil', 'arriendo-facil' ) ); ?>, color: '#ef4444' },
+				{ label: <?php echo wp_json_encode( __( 'Debil', 'arriendo-facil' ) ); ?>, color: '#f97316' },
+				{ label: <?php echo wp_json_encode( __( 'Media', 'arriendo-facil' ) ); ?>, color: '#eab308' },
+				{ label: <?php echo wp_json_encode( __( 'Buena', 'arriendo-facil' ) ); ?>, color: '#84cc16' },
+				{ label: <?php echo wp_json_encode( __( 'Fuerte', 'arriendo-facil' ) ); ?>, color: '#22c55e' }
+			];
+
+			function updatePasswordUi(){
+				const value = String(pwInput.value || '');
+				const checks = passwordChecks(value);
+				const passed = checks.filter(Boolean).length;
+
+				ruleItems.forEach(function(item, index){
+					item.classList.toggle('is-ok', !!checks[index]);
+				});
+
+				strengthBox.hidden = value === '';
+				if(value !== ''){
+					const level = strengthLevels[Math.max(0, passed - 1)];
+					strengthBar.style.width = (passed * 20) + '%';
+					strengthBar.style.background = level.color;
+					strengthLabel.textContent = level.label;
+				}
+
+				const confirmValue = String(pwConfirmInput.value || '');
+				matchBox.hidden = confirmValue === '';
+				if(confirmValue !== ''){
+					const same = confirmValue === value;
+					matchBox.classList.toggle('is-ok', same);
+					matchBox.classList.toggle('is-error', !same);
+					matchBox.textContent = same
+						? <?php echo wp_json_encode( __( 'Las contrasenas coinciden', 'arriendo-facil' ) ); ?>
+						: <?php echo wp_json_encode( __( 'Las contrasenas no coinciden', 'arriendo-facil' ) ); ?>;
+				}
+			}
+
+			pwInput.addEventListener('input', updatePasswordUi);
+			pwConfirmInput.addEventListener('input', updatePasswordUi);
+			form.addEventListener('reset', function(){ setTimeout(updatePasswordUi, 0); });
+
+			app.querySelectorAll('[data-af-reveal]').forEach(function(btn){
+				btn.addEventListener('click', function(){
+					const input = btn.parentElement.querySelector('input');
+					const show = input.type === 'password';
+					input.type = show ? 'text' : 'password';
+					btn.classList.toggle('is-visible', show);
+					btn.setAttribute('aria-pressed', show ? 'true' : 'false');
+					btn.setAttribute('aria-label', btn.getAttribute(show ? 'data-label-hide' : 'data-label-show'));
+				});
+			});
 
 			form.addEventListener('submit', async function(e){
 				e.preventDefault();
@@ -1057,6 +1134,18 @@ class Arriendo_Facil_Property_Admin_Registration {
 		);
 
 		return ! empty( $users );
+	}
+
+	/**
+	 * Prints the show/hide toggle button for a password input.
+	 */
+	private function render_password_reveal_button() {
+		?>
+		<button type="button" class="af-admin-signup__reveal" data-af-reveal aria-pressed="false" aria-label="<?php echo esc_attr__( 'Mostrar contrasena', 'arriendo-facil' ); ?>" data-label-show="<?php echo esc_attr__( 'Mostrar contrasena', 'arriendo-facil' ); ?>" data-label-hide="<?php echo esc_attr__( 'Ocultar contrasena', 'arriendo-facil' ); ?>">
+			<svg class="af-admin-signup__eye--off" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+			<svg class="af-admin-signup__eye--on" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+		</button>
+		<?php
 	}
 
 	/**

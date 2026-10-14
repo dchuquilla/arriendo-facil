@@ -333,7 +333,7 @@
 					if ( $output.length ) {
 						$output
 							.show()
-							.css( { borderColor: '#fecaca', background: '#fef2f2', color: '#991b1b' } )
+							.css( { borderColor: '#f2c4c2', background: '#fbeceb', color: '#b03a36' } )
 							.text( errorMessage );
 					}
 					return;
@@ -348,7 +348,7 @@
 				if ( $output.length ) {
 					$output
 						.show()
-						.css( { borderColor: '#86efac', background: '#f0fdf4', color: '#166534' } )
+						.css( { borderColor: '#9cc3c0', background: '#eaf4f2', color: '#1f5a52' } )
 						.html(
 							'<strong>Enlace generado y copiado (' + reviewerLabel + '):</strong><br>' +
 							'<a href="' + encodeURI( link ) + '" target="_blank" rel="noopener noreferrer">Abrir reseña</a><br>' +
@@ -361,7 +361,7 @@
 				if ( $output.length ) {
 					$output
 						.show()
-						.css( { borderColor: '#fecaca', background: '#fef2f2', color: '#991b1b' } )
+						.css( { borderColor: '#f2c4c2', background: '#fbeceb', color: '#b03a36' } )
 						.text( 'La solicitud fallo.' );
 				}
 			} )
@@ -1686,7 +1686,7 @@
 		var ruc = $( '#af_ruc' ).val().trim().replace( /\D/g, '' );
 
 		if ( ruc.length !== 13 ) {
-			$status.text( '❌ El RUC debe tener 13 dígitos' ).css( 'color', '#d32f2f' );
+			$status.text( '❌ El RUC debe tener 13 dígitos' ).css( 'color', '#d9534f' );
 			return;
 		}
 
@@ -1711,15 +1711,15 @@
 						$( 'input[name="af_obligado_contabilidad"][value="' + response.data.obligado_contabilidad + '"]' ).prop( 'checked', true );
 					}
 
-					$status.text( '✅ Datos cargados desde el SRI' ).css( 'color', '#2e7d32' );
+					$status.text( '✅ Datos cargados desde el SRI' ).css( 'color', '#2f7d73' );
 					$( '#af_dir_establecimiento' ).trigger( 'change' ); // Validate address
 					afUpdateDirMatrizBadge();
 				} else {
-					$status.text( '❌ ' + ( response.data ? response.data.message : 'No se pudo consultar el RUC' ) ).css( 'color', '#d32f2f' );
+					$status.text( '❌ ' + ( response.data ? response.data.message : 'No se pudo consultar el RUC' ) ).css( 'color', '#d9534f' );
 				}
 			} )
 			.fail( function () {
-				$status.text( '❌ Error de conexión' ).css( 'color', '#d32f2f' );
+				$status.text( '❌ Error de conexión' ).css( 'color', '#d9534f' );
 			} )
 			.always( function () {
 				$btn.prop( 'disabled', false ).text( '🔍 Consultar en SRI' );
@@ -1742,7 +1742,7 @@
 		}
 
 		if ( estab && estab === matriz ) {
-			$desc.html( '<span style="color:#2e7d32; font-weight:500;">✓ Igual a la dirección del establecimiento.</span>' );
+			$desc.html( '<span style="color:#2f7d73; font-weight:500;">✓ Igual a la dirección del establecimiento.</span>' );
 		} else {
 			$desc.text( 'Opcional. Solo si es diferente a la dirección del establecimiento.' );
 		}

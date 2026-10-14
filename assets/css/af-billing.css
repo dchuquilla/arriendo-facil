@@ -121,14 +121,14 @@
 	gap: 6px;
 	border: none;
 	background: none;
-	color: var(--af-primary-600, #007058);
+	color: var(--af-primary-600, #0b2f37);
 	font-weight: 600;
 	font-size: var(--af-text-sm);
 	cursor: pointer;
 	padding: 6px 10px;
 	border-radius: var(--af-radius-md);
 }
-.af-invoice-refresh:hover { background: var(--af-primary-50, #E6F7F3); }
+.af-invoice-refresh:hover { background: var(--af-primary-50, #DDEEEB); }
 
 /* Chips de estado en la tabla */
 .af-status-chip {
@@ -223,18 +223,18 @@
 }
 .af-lease-search__list a:last-child { border-bottom: none; }
 .af-lease-search__list a:hover,
-.af-lease-search__list a:focus { background: var(--af-primary-50, #E6F7F3); }
+.af-lease-search__list a:focus { background: var(--af-primary-50, #DDEEEB); }
 
 /* ─────────────────────────────────────────────────────────────────────
    4. Configuración SRI — override de af-sri-* (admin.css global)
    ───────────────────────────────────────────────────────────────────── */
 
 .af-sri-hero {
-	background: linear-gradient(135deg, var(--af-gray-0, #fff) 0%, var(--af-primary-50, #E6F7F3) 100%);
+	background: linear-gradient(135deg, var(--af-gray-0, #fff) 0%, var(--af-primary-50, #DDEEEB) 100%);
 	border-color: var(--af-primary-100, #B3E9DC);
 	box-shadow: var(--af-shadow-sm);
 }
-.af-sri-hero__eyebrow { color: var(--af-primary-700, #007058); }
+.af-sri-hero__eyebrow { color: var(--af-primary-700, #0b2f37); }
 
 .af-sri-status-card {
 	border-color: var(--af-gray-200);
@@ -257,7 +257,7 @@
 	padding: 20px 22px;
 	border-radius: var(--af-radius-lg, 14px);
 }
-.af-sri-section__pill { background: var(--af-primary-50, #E6F7F3); color: var(--af-primary-700, #007058); }
+.af-sri-section__pill { background: var(--af-primary-50, #DDEEEB); color: var(--af-primary-700, #0b2f37); }
 
 .af-sri-connect-card--ok { border-color: var(--af-success-100); background: var(--af-success-50); }
 .af-sri-connect-card--error { border-color: var(--af-warning-100); background: var(--af-warning-50); }

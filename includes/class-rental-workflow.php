@@ -1117,16 +1117,32 @@ class Arriendo_Facil_Rental_Workflow {
 			$acc_title
 		);
 
-		$message = sprintf(
-			/* translators: 1: guest name, 2: accommodation title, 3: original end date, 4: reason */
-			__( "Estimado/a %1\$s,\n\nLe informamos que el contrato de arriendo de la propiedad \"%2\$s\" ha sido terminado anticipadamente (fecha de termino original: %3\$s).\n\nMotivo: %4\$s\n\nPor favor, coordine con el administrador los detalles del proceso de entrega de la propiedad.\n\nGracias por confiar en Arriendo Facil.", 'arriendo-facil' ),
-			$guest_name,
-			$acc_title,
-			sanitize_text_field( (string) $row->end_date ),
-			$reason
+		$sent = Arriendo_Facil_Email::send(
+			sanitize_email( (string) $row->guest_email ),
+			$subject,
+			array(
+				'preheader' => $subject,
+				'eyebrow'   => $acc_title,
+				'title'     => __( 'Terminación anticipada del contrato', 'arriendo-facil' ),
+				'status'    => array( 'type' => 'warning', 'label' => __( 'Contrato terminado', 'arriendo-facil' ) ),
+				'greeting'  => sprintf(
+					/* translators: %s: guest name */
+					__( 'Estimado/a %s,', 'arriendo-facil' ),
+					$guest_name
+				),
+				'body_text' => sprintf(
+					/* translators: %s: accommodation title */
+					__( 'Le informamos que el contrato de arriendo de la propiedad "%s" ha sido terminado anticipadamente.', 'arriendo-facil' ),
+					$acc_title
+				),
+				'details'   => array(
+					__( 'Fecha de término original', 'arriendo-facil' ) => sanitize_text_field( (string) $row->end_date ),
+					__( 'Motivo', 'arriendo-facil' )                    => $reason,
+				),
+				'note'      => __( 'Por favor, coordine con el administrador los detalles del proceso de entrega de la propiedad. Gracias por confiar en Arriendo Fácil.', 'arriendo-facil' ),
+			),
+			Arriendo_Facil_Email::CAT_TRANSACTIONAL
 		);
-
-		$sent = wp_mail( sanitize_email( (string) $row->guest_email ), $subject, $message );
 		$this->log_notification( $accommodation_id, 'lease_early_termination_guest', sanitize_email( (string) $row->guest_email ), $sent ? 'sent' : 'failed' );
 	}
 
@@ -1295,14 +1311,31 @@ class Arriendo_Facil_Rental_Workflow {
 			}
 
 			$name    = isset( $row->name ) ? sanitize_text_field( (string) $row->name ) : __( 'Interesado', 'arriendo-facil' );
-			$message = sprintf(
-				/* translators: 1: interested name, 2: accommodation title */
-				__( "Hola %1\$s,\n\nTe contamos que la acomodacion '%2\$s' vuelve a estar disponible.\n\nSi aun te interesa, puedes continuar tu proceso y coordinar tu visita desde la plataforma.\n\nGracias por confiar en Arriendo Facil.", 'arriendo-facil' ),
-				$name,
-				$title
+			$sent = Arriendo_Facil_Email::send(
+				$email,
+				$subject,
+				array(
+					'preheader' => sprintf(
+						/* translators: %s: accommodation title */
+						__( '%s vuelve a estar disponible.', 'arriendo-facil' ),
+						$title
+					),
+					'title'     => __( 'Buenas noticias: vuelve a estar disponible', 'arriendo-facil' ),
+					'status'    => array( 'type' => 'success', 'label' => __( 'Disponible', 'arriendo-facil' ) ),
+					'greeting'  => sprintf(
+						/* translators: %s: interested name */
+						__( 'Hola %s,', 'arriendo-facil' ),
+						$name
+					),
+					'body_text' => sprintf(
+						/* translators: %s: accommodation title */
+						__( 'Te contamos que la acomodación "%s" vuelve a estar disponible.', 'arriendo-facil' ),
+						$title
+					) . "\n\n" . __( 'Si aún te interesa, puedes continuar tu proceso y coordinar tu visita desde la plataforma.', 'arriendo-facil' ),
+					'note'      => __( 'Gracias por confiar en Arriendo Fácil.', 'arriendo-facil' ),
+				),
+				Arriendo_Facil_Email::CAT_NOTIFICATION
 			);
-
-			$sent = wp_mail( $email, $subject, $message );
 			$this->log_notification( $accommodation_id, 'accommodation_released', $email, $sent ? 'sent' : 'failed' );
 
 			$wpdb->update(
@@ -1333,17 +1366,32 @@ class Arriendo_Facil_Rental_Workflow {
 
 		$title   = get_the_title( $accommodation_id );
 		$subject = sprintf( __( '[Arriendo Facil] Tu visita esta confirmada: %s', 'arriendo-facil' ), $title );
-		$message = sprintf(
-			/* translators: 1: guest name, 2: title, 3: date, 4: start time, 5: end time */
-			__( "Hola %1\$s,\n\nTu visita para la acomodacion '%2\$s' ha sido confirmada.\n\nFecha: %3\$s\nHora: %4\$s - %5\$s\n\nSi necesitas reprogramar, responde a este correo o contacta al propietario.\n\nTe esperamos.", 'arriendo-facil' ),
-			sanitize_text_field( $name ),
-			sanitize_text_field( $title ),
-			sanitize_text_field( $visit_date ),
-			sanitize_text_field( $start_time ),
-			sanitize_text_field( $end_time )
+		$sent = Arriendo_Facil_Email::send(
+			$email,
+			$subject,
+			array(
+				'preheader' => $subject,
+				'eyebrow'   => sanitize_text_field( $title ),
+				'title'     => __( 'Tu visita está confirmada', 'arriendo-facil' ),
+				'status'    => array( 'type' => 'success', 'label' => __( 'Confirmada', 'arriendo-facil' ) ),
+				'greeting'  => sprintf(
+					/* translators: %s: guest name */
+					__( 'Hola %s,', 'arriendo-facil' ),
+					sanitize_text_field( $name )
+				),
+				'body_text' => sprintf(
+					/* translators: %s: accommodation title */
+					__( 'Tu visita para la acomodación "%s" ha sido confirmada.', 'arriendo-facil' ),
+					sanitize_text_field( $title )
+				),
+				'details'   => array(
+					__( 'Fecha', 'arriendo-facil' ) => sanitize_text_field( $visit_date ),
+					__( 'Hora', 'arriendo-facil' )  => sanitize_text_field( $start_time ) . ' - ' . sanitize_text_field( $end_time ),
+				),
+				'note'      => __( 'Si necesitas reprogramar, responde a este correo o contacta al propietario. ¡Te esperamos!', 'arriendo-facil' ),
+			),
+			Arriendo_Facil_Email::CAT_TRANSACTIONAL
 		);
-
-		$sent = wp_mail( $email, $subject, $message );
 		$this->log_notification( $accommodation_id, 'visit_confirmation', $email, $sent ? 'sent' : 'failed' );
 	}
 
@@ -1449,83 +1497,66 @@ class Arriendo_Facil_Rental_Workflow {
 		$owner_email = sanitize_email( (string) $owner->user_email );
 		$subject     = sprintf( __( '[Arriendo Facil] Nueva solicitud recibida para %s', 'arriendo-facil' ), $acc_title );
 
-		// --- HTML email ---
-		$html  = '<div style="margin:0;padding:24px;background:#f1f5f9;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#0f172a;">';
-		$html .= '<div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">';
+		$lead_details = array(
+			__( 'Nombre', 'arriendo-facil' )         => sanitize_text_field( $lead_name ),
+			__( 'Correo', 'arriendo-facil' )         => sanitize_email( $lead_email ),
+			__( 'Teléfono', 'arriendo-facil' )       => sanitize_text_field( $lead_phone ),
+			__( 'Fecha sugerida', 'arriendo-facil' ) => sanitize_text_field( $preferred_date ),
+			__( 'Hora sugerida', 'arriendo-facil' )  => sanitize_text_field( $preferred_time ),
+		);
+		if ( '' !== trim( $lead_notes ) ) {
+			$lead_details[ __( 'Mensaje adicional', 'arriendo-facil' ) ] = sanitize_textarea_field( $lead_notes );
+		}
 
-		// Header.
-		$html .= '<div style="padding:18px 22px;background:linear-gradient(135deg,#0f766e,#0ea5a4);color:#ffffff;">';
-		$html .= '<h2 style="margin:0;font-size:20px;line-height:1.3;">' . esc_html__( 'Nueva solicitud recibida en Arriendo Facil', 'arriendo-facil' ) . '</h2>';
-		$html .= '</div>';
-
-		// Body.
-		$html .= '<div style="padding:22px;">';
-		$html .= '<p style="margin:0 0 16px;line-height:1.6;">' . esc_html( sanitize_text_field( $context ) ) . '</p>';
-
-		// Lead details table (only when we have a name/email).
+		$content = '';
 		if ( '' !== trim( $lead_name ) || '' !== trim( $lead_email ) ) {
-			$html .= '<h3 style="margin:0 0 10px;font-size:15px;color:#0f172a;">' . esc_html__( 'Datos del interesado', 'arriendo-facil' ) . '</h3>';
-			$html .= '<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;margin:0 0 20px;">';
-			if ( '' !== trim( $lead_name ) ) {
-				$html .= '<tr><td style="padding:8px 0;border-top:1px solid #e2e8f0;"><strong>' . esc_html__( 'Nombre', 'arriendo-facil' ) . ':</strong> ' . esc_html( sanitize_text_field( $lead_name ) ) . '</td></tr>';
-			}
-			if ( '' !== trim( $lead_email ) ) {
-				$html .= '<tr><td style="padding:8px 0;border-top:1px solid #e2e8f0;"><strong>' . esc_html__( 'Correo', 'arriendo-facil' ) . ':</strong> ' . esc_html( sanitize_email( $lead_email ) ) . '</td></tr>';
-			}
-			if ( '' !== trim( $lead_phone ) ) {
-				$html .= '<tr><td style="padding:8px 0;border-top:1px solid #e2e8f0;"><strong>' . esc_html__( 'Telefono', 'arriendo-facil' ) . ':</strong> ' . esc_html( sanitize_text_field( $lead_phone ) ) . '</td></tr>';
-			}
-			if ( '' !== trim( $preferred_date ) ) {
-				$html .= '<tr><td style="padding:8px 0;border-top:1px solid #e2e8f0;"><strong>' . esc_html__( 'Fecha sugerida', 'arriendo-facil' ) . ':</strong> ' . esc_html( sanitize_text_field( $preferred_date ) ) . '</td></tr>';
-			}
-			if ( '' !== trim( $preferred_time ) ) {
-				$html .= '<tr><td style="padding:8px 0;border-top:1px solid #e2e8f0;"><strong>' . esc_html__( 'Hora sugerida', 'arriendo-facil' ) . ':</strong> ' . esc_html( sanitize_text_field( $preferred_time ) ) . '</td></tr>';
-			}
-			$html .= '</table>';
-
-			if ( '' !== trim( $lead_notes ) ) {
-				$html .= '<p style="margin:0 0 8px;"><strong>' . esc_html__( 'Mensaje adicional:', 'arriendo-facil' ) . '</strong></p>';
-				$html .= '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;line-height:1.6;color:#334155;margin-bottom:20px;">' . nl2br( esc_html( sanitize_textarea_field( $lead_notes ) ) ) . '</div>';
-			}
+			$content .= '<h2 style="margin:0 0 10px;font-size:16px;color:#193238;">' . esc_html__( 'Datos del interesado', 'arriendo-facil' ) . '</h2>';
 		}
 
-		// Current accommodation summary box.
-		$html .= '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px;margin-bottom:20px;">';
-		$html .= '<h3 style="margin:0 0 10px;font-size:15px;color:#166534;">' . esc_html( $acc_title ) . '</h3>';
-		$html .= '<p style="margin:4px 0;color:#14532d;">';
-		$html .= esc_html__( 'Interesados en cola:', 'arriendo-facil' ) . ' <strong>' . absint( $queued_count ) . '</strong>';
-		$html .= ' &nbsp;|&nbsp; ';
-		$html .= esc_html__( 'Visitas agendadas:', 'arriendo-facil' ) . ' <strong>' . absint( $visit_count ) . '</strong>';
-		$html .= '</p>';
-		$html .= '</div>';
+		$summary = '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px;"><tr>'
+			. '<td style="background:#DDEEEB;border-left:4px solid #2F7D73;border-radius:8px;padding:14px 16px;color:#1F5A52;font-size:14px;line-height:1.7;">'
+			. '<strong style="font-size:15px;">' . esc_html( $acc_title ) . '</strong><br>'
+			. esc_html__( 'Interesados en cola:', 'arriendo-facil' ) . ' <strong>' . absint( $queued_count ) . '</strong>'
+			. ' &nbsp;|&nbsp; '
+			. esc_html__( 'Visitas agendadas:', 'arriendo-facil' ) . ' <strong>' . absint( $visit_count ) . '</strong>'
+			. '</td></tr></table>';
 
-		// Other accommodations summary.
+		$others = '';
 		if ( ! empty( $other_acc_rows ) ) {
-			$html .= '<h3 style="margin:0 0 10px;font-size:14px;color:#475569;">' . esc_html__( 'Resumen de tus otras acomodaciones', 'arriendo-facil' ) . '</h3>';
-			$html .= '<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;margin:0 0 16px;font-size:13px;">';
-			$html .= '<tr style="background:#f1f5f9;">';
-			$html .= '<th style="padding:8px 10px;text-align:left;border:1px solid #e2e8f0;">' . esc_html__( 'Acomodacion', 'arriendo-facil' ) . '</th>';
-			$html .= '<th style="padding:8px 10px;text-align:center;border:1px solid #e2e8f0;">' . esc_html__( 'En cola', 'arriendo-facil' ) . '</th>';
-			$html .= '<th style="padding:8px 10px;text-align:center;border:1px solid #e2e8f0;">' . esc_html__( 'Visitas', 'arriendo-facil' ) . '</th>';
-			$html .= '</tr>';
+			$others .= '<h2 style="margin:0 0 10px;font-size:15px;color:#193238;">' . esc_html__( 'Resumen de tus otras acomodaciones', 'arriendo-facil' ) . '</h2>';
+			$others .= '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:0 0 16px;font-size:13px;">';
+			$others .= '<tr style="background:#EEF2F0;">'
+				. '<th align="left" style="padding:8px 10px;border:1px solid #DCE5E3;color:#193238;">' . esc_html__( 'Acomodación', 'arriendo-facil' ) . '</th>'
+				. '<th style="padding:8px 10px;border:1px solid #DCE5E3;color:#193238;">' . esc_html__( 'En cola', 'arriendo-facil' ) . '</th>'
+				. '<th style="padding:8px 10px;border:1px solid #DCE5E3;color:#193238;">' . esc_html__( 'Visitas', 'arriendo-facil' ) . '</th></tr>';
 			foreach ( $other_acc_rows as $row ) {
-				$html .= '<tr>';
-				$html .= '<td style="padding:7px 10px;border:1px solid #e2e8f0;">' . esc_html( $row['title'] ) . '</td>';
-				$html .= '<td style="padding:7px 10px;text-align:center;border:1px solid #e2e8f0;">' . absint( $row['queued'] ) . '</td>';
-				$html .= '<td style="padding:7px 10px;text-align:center;border:1px solid #e2e8f0;">' . absint( $row['visited'] ) . '</td>';
-				$html .= '</tr>';
+				$others .= '<tr>'
+					. '<td style="padding:7px 10px;border:1px solid #DCE5E3;color:#193238;">' . esc_html( $row['title'] ) . '</td>'
+					. '<td align="center" style="padding:7px 10px;border:1px solid #DCE5E3;color:#193238;">' . absint( $row['queued'] ) . '</td>'
+					. '<td align="center" style="padding:7px 10px;border:1px solid #DCE5E3;color:#193238;">' . absint( $row['visited'] ) . '</td></tr>';
 			}
-			$html .= '</table>';
+			$others .= '</table>';
 		}
 
-		$html .= '<p style="margin:16px 0 0;line-height:1.6;color:#334155;">' . esc_html__( 'Revisa los detalles en tu panel para continuar con tranquilidad y sin cruces.', 'arriendo-facil' ) . '</p>';
-		$html .= '</div>';
-		$html .= '</div>';
-		$html .= '<p style="max-width:640px;margin:12px auto 0;font-size:12px;color:#64748b;text-align:center;">Arriendo Facil</p>';
-		$html .= '</div>';
-
-		$headers = array( 'Content-Type: text/html; charset=UTF-8' );
-		$sent    = wp_mail( $owner_email, $subject, $html, $headers );
+		$sent = Arriendo_Facil_Email::send(
+			$owner_email,
+			$subject,
+			array(
+				'preheader' => sanitize_text_field( $context ),
+				'eyebrow'   => $acc_title,
+				'title'     => __( 'Nueva solicitud recibida', 'arriendo-facil' ),
+				'status'    => array( 'type' => 'info', 'label' => __( 'Nueva', 'arriendo-facil' ) ),
+				'body_text' => sanitize_text_field( $context ),
+				'content'   => $content,
+				'details'   => $lead_details,
+				'content_after' => $summary . $others,
+				'button'    => array(
+					'label' => __( 'Abrir mi panel', 'arriendo-facil' ),
+					'url'   => admin_url(),
+				),
+			),
+			Arriendo_Facil_Email::CAT_NOTIFICATION
+		);
 		$this->log_notification( $accommodation_id, 'owner_interest_update', $owner_email, $sent ? 'sent' : 'failed' );
 	}
 
@@ -1565,14 +1596,27 @@ class Arriendo_Facil_Rental_Workflow {
 			}
 
 			$name = isset( $row->name ) ? sanitize_text_field( (string) $row->name ) : __( 'Interesado', 'arriendo-facil' );
-			$message = sprintf(
-				/* translators: 1: interested name, 2: accommodation title */
-				__( "Hola %1\$s,\n\nQueremos avisarte que la acomodacion '%2\$s' acaba de ser reservada y ya no se encuentra disponible.\n\nSi deseas, puedes seguir buscando otras opciones dentro de Arriendo Facil.\n\nGracias por tu interes.", 'arriendo-facil' ),
-				$name,
-				sanitize_text_field( (string) $title )
+			$sent = Arriendo_Facil_Email::send(
+				$email,
+				$subject,
+				array(
+					'preheader' => $subject,
+					'title'     => __( 'Esta propiedad ya no está disponible', 'arriendo-facil' ),
+					'status'    => array( 'type' => 'neutral', 'label' => __( 'Reservada', 'arriendo-facil' ) ),
+					'greeting'  => sprintf(
+						/* translators: %s: interested name */
+						__( 'Hola %s,', 'arriendo-facil' ),
+						$name
+					),
+					'body_text' => sprintf(
+						/* translators: %s: accommodation title */
+						__( 'Queremos avisarte que la acomodación "%s" acaba de ser reservada y ya no se encuentra disponible.', 'arriendo-facil' ),
+						sanitize_text_field( (string) $title )
+					) . "\n\n" . __( 'Si deseas, puedes seguir buscando otras opciones dentro de Arriendo Fácil.', 'arriendo-facil' ),
+					'note'      => __( 'Gracias por tu interés.', 'arriendo-facil' ),
+				),
+				Arriendo_Facil_Email::CAT_NOTIFICATION
 			);
-
-			$sent = wp_mail( $email, $subject, $message );
 			$this->log_notification( $accommodation_id, 'accommodation_reserved_unavailable', $email, $sent ? 'sent' : 'failed' );
 		}
 

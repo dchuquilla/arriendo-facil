@@ -40,7 +40,7 @@
 .af-occupied-widget.is-occupied .af-occupied-widget__btn {
 	border-color: #f0c9c4;
 	background: #fdecea;
-	color: #b03a2e;
+	color: #b03a36;
 }
 
 .af-occupied-widget.is-busy {
@@ -82,13 +82,13 @@
 .af-occupied-modal__box h2 {
 	margin: 0 0 8px;
 	font-size: 17px;
-	color: #b03a2e;
+	color: #b03a36;
 }
 
 .af-occupied-modal__warning {
 	margin: 0 0 14px;
 	font-size: 13px;
-	color: #374151;
+	color: #2e4046;
 	line-height: 1.5;
 }
 
@@ -104,7 +104,7 @@
 	width: 100%;
 	box-sizing: border-box;
 	padding: 8px 10px;
-	border: 1px solid #d1d5db;
+	border: 1px solid #c3d1ce;
 	border-radius: 6px;
 	font-size: 13px;
 	resize: vertical;
@@ -113,7 +113,7 @@
 .af-occupied-modal__feedback {
 	margin: 6px 0 0;
 	font-size: 12px;
-	color: #b03a2e;
+	color: #b03a36;
 }
 
 .af-occupied-modal__actions {
@@ -124,7 +124,7 @@
 }
 
 .af-occupied-modal__confirm {
-	background: #b03a2e;
+	background: #b03a36;
 	border-color: #942f25;
 	color: #fff;
 }

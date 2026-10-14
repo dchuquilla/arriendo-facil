@@ -630,7 +630,7 @@ $af_points_ready     = ! empty( $emission_points );
 						class="large-text" maxlength="300" <?php echo esc_attr( $af_readonly_attr ); ?> />
 					<p class="description" id="af-dir-matriz-desc">
 						<?php if ( $af_dir_match ) : ?>
-							<span style="color:#2e7d32; font-weight:500;">✓ Igual a la dirección del establecimiento.</span>
+							<span style="color:#2f7d73; font-weight:500;">✓ Igual a la dirección del establecimiento.</span>
 						<?php else : ?>
 							<?php esc_html_e( 'Opcional. Solo si es diferente a la dirección del establecimiento.', 'arriendo-facil' ); ?>
 						<?php endif; ?>
@@ -669,10 +669,10 @@ $af_points_ready     = ! empty( $emission_points );
 						value="<?php echo esc_attr( $cfg['email_notificacion'] ); ?>"
 						class="regular-text" required
 						pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$" />
-					<p class="description" style="color:#d32f2f; font-weight:500;">
+					<p class="description" style="color:#d9534f; font-weight:500;">
 						<?php esc_html_e( '⚠️ CRÍTICO: El SRI envía las autorizaciones de comprobantes a este email. Sin él, no recibirás los documentos autorizados.', 'arriendo-facil' ); ?>
 					</p>
-					<p id="af-email-error" class="description" style="color:#d32f2f; display:none; margin-top:5px;"></p>
+					<p id="af-email-error" class="description" style="color:#d9534f; display:none; margin-top:5px;"></p>
 				</td>
 			</tr>
 		</table>
@@ -770,19 +770,19 @@ $af_points_ready     = ! empty( $emission_points );
 			<th><?php esc_html_e( 'Estado actual', 'arriendo-facil' ); ?></th>
 			<td>
 				<?php if ( $cert_path ) : ?>
-					<span style="color:#2e7d32; font-weight:600;">
+					<span style="color:#2f7d73; font-weight:600;">
 						&#10003; <?php esc_html_e( 'Certificado cargado', 'arriendo-facil' ); ?>
 					</span>
 					&nbsp;
 					<span class="description"><?php echo esc_html( basename( $cert_path ) ); ?></span>
 					&nbsp;|&nbsp;
 					<?php if ( $cert_has_pwd ) : ?>
-						<span style="color:#2e7d32;">&#10003; <?php esc_html_e( 'Contraseña guardada', 'arriendo-facil' ); ?></span>
+						<span style="color:#2f7d73;">&#10003; <?php esc_html_e( 'Contraseña guardada', 'arriendo-facil' ); ?></span>
 					<?php else : ?>
-						<span style="color:#c62828;">&#10007; <?php esc_html_e( 'Sin contraseña', 'arriendo-facil' ); ?></span>
+						<span style="color:#b03a36;">&#10007; <?php esc_html_e( 'Sin contraseña', 'arriendo-facil' ); ?></span>
 					<?php endif; ?>
 				<?php else : ?>
-					<span style="color:#c62828;">&#10007; <?php esc_html_e( 'Ningún certificado cargado', 'arriendo-facil' ); ?></span>
+					<span style="color:#b03a36;">&#10007; <?php esc_html_e( 'Ningún certificado cargado', 'arriendo-facil' ); ?></span>
 				<?php endif; ?>
 			</td>
 		</tr>
@@ -880,9 +880,9 @@ $af_points_ready     = ! empty( $emission_points );
 						<td data-label="<?php esc_attr_e( 'Secuencial actual', 'arriendo-facil' ); ?>"><?php echo esc_html( number_format( (int) $pt->secuencial_actual, 0, '', '' ) ); ?></td>
 						<td data-label="<?php esc_attr_e( 'Activo', 'arriendo-facil' ); ?>">
 							<?php if ( $pt->activo ) : ?>
-								<span style="color:#2e7d32;">&#10003;</span>
+								<span style="color:#2f7d73;">&#10003;</span>
 							<?php else : ?>
-								<span style="color:#c62828;">&#10007;</span>
+								<span style="color:#b03a36;">&#10007;</span>
 							<?php endif; ?>
 						</td>
 					</tr>
@@ -961,7 +961,7 @@ $af_points_ready     = ! empty( $emission_points );
 		// Normalizar: cédula 10 dígitos → RUC 13 dígitos (persona natural).
 		if ( ruc.length === 10 ) { ruc = ruc + '001'; }
 		if ( ruc.length !== 13 ) {
-			status.innerHTML = '<span style="color:#c62828;">Ingresa el RUC (13 dígitos) o tu cédula (10 dígitos).</span>';
+			status.innerHTML = '<span style="color:#b03a36;">Ingresa el RUC (13 dígitos) o tu cédula (10 dígitos).</span>';
 			return;
 		}
 		btn.disabled = true;
@@ -1000,14 +1000,14 @@ $af_points_ready     = ! empty( $emission_points );
 					var radios = document.querySelectorAll( 'input[name="af_obligado_contabilidad"]' );
 					radios.forEach( function ( r ) { r.checked = ( r.value === d.obligado_contabilidad ); } );
 				}
-				status.innerHTML = '<span style="color:#2e7d32;">✓ Datos cargados desde el SRI. Revisa y guarda.</span>';
+				status.innerHTML = '<span style="color:#2f7d73;">✓ Datos cargados desde el SRI. Revisa y guarda.</span>';
 			} else {
 				var msg = ( resp.data && resp.data.message ) ? resp.data.message : 'No se encontró información.';
-				status.innerHTML = '<span style="color:#c62828;">' + msg + '</span>';
+				status.innerHTML = '<span style="color:#b03a36;">' + msg + '</span>';
 			}
 		} )
 		.catch( function ( err ) {
-			status.innerHTML = '<span style="color:#c62828;" title="' + ( err.message || '' ).replace( /"/g, '&quot;' ) + '">Error al consultar el SRI. Detalle: ' + ( err.message ? err.message.substring( 0, 120 ) : 'Error de red' ) + '</span>';
+			status.innerHTML = '<span style="color:#b03a36;" title="' + ( err.message || '' ).replace( /"/g, '&quot;' ) + '">Error al consultar el SRI. Detalle: ' + ( err.message ? err.message.substring( 0, 120 ) : 'Error de red' ) + '</span>';
 		} )
 		.finally( function () { btn.disabled = false; } );
 	} );

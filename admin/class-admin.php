@@ -96,8 +96,8 @@ class Arriendo_Facil_Admin {
 	public function add_menu() {
 		$menu_icon_svg = 'data:image/svg+xml;base64,' . base64_encode(
 			'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">'
-			. '<path d="M3 11l9-8 9 8v10a1 1 0 01-1 1h-5v-6H10v6H4a1 1 0 01-1-1V11z" stroke="#a7aaad" stroke-width="1.8" stroke-linejoin="round"/>'
-			. '<circle cx="12" cy="14" r="1.6" fill="#a7aaad"/>'
+			. '<path d="M3 11l9-8 9 8v10a1 1 0 01-1 1h-5v-6H10v6H4a1 1 0 01-1-1V11z" stroke="#8a9799" stroke-width="1.8" stroke-linejoin="round"/>'
+			. '<circle cx="12" cy="14" r="1.6" fill="#8a9799"/>'
 			. '</svg>'
 		);
 

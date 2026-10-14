@@ -198,9 +198,9 @@ class Arriendo_Facil_Accommodation_Occupied_Admin {
 		$css = '.column-af_occupied{width:80px;text-align:center;}'
 			. '.af-occupied-toggle-wrap{display:inline-flex;align-items:center;gap:6px;cursor:pointer;}'
 			. '.af-occupied-toggle-wrap input{margin:0;}'
-			. '.af-occupied-toggle-state{font-size:12px;color:#6b7280;}'
+			. '.af-occupied-toggle-state{font-size:12px;color:#647579;}'
 			. '.af-occupied-toggle-wrap.is-loading{opacity:.5;pointer-events:none;}'
-			. '.af-occupied-toggle-wrap.is-on .af-occupied-toggle-state{color:#b91c1c;font-weight:600;}';
+			. '.af-occupied-toggle-wrap.is-on .af-occupied-toggle-state{color:#b03a36;font-weight:600;}';
 		wp_register_style( 'af-occupied-toggle', false, array(), ARRIENDO_FACIL_VERSION );
 		wp_enqueue_style( 'af-occupied-toggle' );
 		wp_add_inline_style( 'af-occupied-toggle', $css );
@@ -237,14 +237,14 @@ class Arriendo_Facil_Accommodation_Occupied_Admin {
 				modalEl.style.cssText = 'display:none;position:fixed;inset:0;z-index:200000;align-items:center;justify-content:center;';
 				modalEl.innerHTML = '<div id=\"af-unoccupy-backdrop\" style=\"position:absolute;inset:0;background:rgba(0,0,0,.55);\"></div>'
 					+ '<div style=\"position:relative;background:#fff;border-radius:10px;max-width:440px;width:92%;padding:26px 26px 20px;box-shadow:0 8px 32px rgba(0,0,0,.22);\">'
-					+ '<h2 style=\"margin:0 0 6px;font-size:17px;color:#b91c1c;\">' + cfg.i18n.unoccupyTitle + '</h2>'
-					+ '<p style=\"margin:0 0 14px;font-size:13px;color:#374151;line-height:1.5;\">' + cfg.i18n.unoccupyWarning + '</p>'
+					+ '<h2 style=\"margin:0 0 6px;font-size:17px;color:#b03a36;\">' + cfg.i18n.unoccupyTitle + '</h2>'
+					+ '<p style=\"margin:0 0 14px;font-size:13px;color:#2e4046;line-height:1.5;\">' + cfg.i18n.unoccupyWarning + '</p>'
 					+ '<label style=\"display:block;font-weight:600;font-size:13px;margin-bottom:5px;\">' + cfg.i18n.reasonLabel + '</label>'
-					+ '<textarea id=\"af-unoccupy-reason\" rows=\"3\" placeholder=\"' + cfg.i18n.reasonPlaceholder + '\" style=\"width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;resize:vertical;\"></textarea>'
-					+ '<p id=\"af-unoccupy-feedback\" style=\"margin:6px 0 0;font-size:12px;color:#b91c1c;\" aria-live=\"polite\"></p>'
+					+ '<textarea id=\"af-unoccupy-reason\" rows=\"3\" placeholder=\"' + cfg.i18n.reasonPlaceholder + '\" style=\"width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #c3d1ce;border-radius:6px;font-size:13px;resize:vertical;\"></textarea>'
+					+ '<p id=\"af-unoccupy-feedback\" style=\"margin:6px 0 0;font-size:12px;color:#b03a36;\" aria-live=\"polite\"></p>'
 					+ '<div style=\"display:flex;justify-content:flex-end;gap:10px;margin-top:16px;\">'
 					+ '<button id=\"af-unoccupy-cancel\" type=\"button\" class=\"button\">' + cfg.i18n.btnCancel + '</button>'
-					+ '<button id=\"af-unoccupy-confirm\" type=\"button\" class=\"button\" style=\"background:#b91c1c;border-color:#991b1b;color:#fff;\">' + cfg.i18n.btnConfirm + '</button>'
+					+ '<button id=\"af-unoccupy-confirm\" type=\"button\" class=\"button\" style=\"background:#b03a36;border-color:#b03a36;color:#fff;\">' + cfg.i18n.btnConfirm + '</button>'
 					+ '</div>'
 					+ '</div>';
 				document.body.appendChild(modalEl);

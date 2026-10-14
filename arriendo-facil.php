@@ -61,6 +61,8 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-docx-template-processor
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-lease.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-lease-operations.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-occupancy.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-email.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-toast.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-alerts.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-aviso.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-calendar.php';
@@ -285,6 +287,7 @@ function arriendo_facil_init() {
 		'Arriendo_Facil_Catalog_Groups',
 		'Arriendo_Facil_Catalog_Share',
 		'Arriendo_Facil_Security_Hardening',
+		'Arriendo_Facil_Email',
 		'Arriendo_Facil_Aviso',
 		'Arriendo_Facil_Calendar',
 		'Arriendo_Facil_Billing_API',

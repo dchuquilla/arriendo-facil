@@ -68,14 +68,29 @@ class Arriendo_Facil_Guest {
 			}
 
 			$subject = __( '[ArriendoFacil] Documentacion pendiente de revisar', 'arriendo-facil' );
-			$message = '<p>' . sprintf(
-				esc_html__( 'Hola %s,', 'arriendo-facil' ),
-				esc_html( trim( $guest->first_name . ' ' . $guest->last_name ) )
-			) . '</p>';
-			$message .= '<p>' . esc_html__( 'Aun no hemos completado la revision de tu documentacion para el arriendo. Nuestro equipo la esta tramitando; si necesitas enviar algun documento, responde a este correo.', 'arriendo-facil' ) . '</p>';
-			$message .= '<p>' . esc_html__( 'Si ya los cargaste, este correo es solo un recordatorio para el equipo.', 'arriendo-facil' ) . '</p>';
 
-			if ( wp_mail( $guest->email, $subject, $message, array( 'Content-Type: text/html; charset=UTF-8' ) ) ) {
+			if ( Arriendo_Facil_Email::is_opted_out( (string) $guest->email ) ) {
+				update_option( $throttle_key, $now );
+				continue;
+			}
+
+			$sent = Arriendo_Facil_Email::send(
+				(string) $guest->email,
+				$subject,
+				array(
+					'title'     => __( 'Documentación pendiente de revisar', 'arriendo-facil' ),
+					'status'    => array( 'type' => 'review', 'label' => __( 'En revisión', 'arriendo-facil' ) ),
+					'greeting'  => sprintf(
+						/* translators: %s: tenant full name */
+						__( 'Hola %s,', 'arriendo-facil' ),
+						trim( $guest->first_name . ' ' . $guest->last_name )
+					),
+					'body_text' => __( 'Aún no hemos completado la revisión de tu documentación para el arriendo. Nuestro equipo la está tramitando; si necesitas enviar algún documento, responde a este correo.', 'arriendo-facil' ) . "\n\n" . __( 'Si ya los cargaste, no tienes que hacer nada más: este correo es solo un recordatorio.', 'arriendo-facil' ),
+				),
+				Arriendo_Facil_Email::CAT_NOTIFICATION
+			);
+
+			if ( $sent ) {
 				update_option( $throttle_key, $now );
 			}
 		}
@@ -88,19 +103,28 @@ class Arriendo_Facil_Guest {
 			$operator_emails = $this->get_operator_emails_for_guest_docs();
 			if ( ! empty( $operator_emails ) ) {
 				$subject = __( '[ArriendoFacil] Hay documentacion de inquilinos pendiente', 'arriendo-facil' );
-				$message = '<p>' . esc_html__( 'El siguiente inquilino tiene documentacion pendiente de revisar:', 'arriendo-facil' ) . '</p><ul>';
+				$pending = array();
 				foreach ( $guests as $guest ) {
-					$message .= '<li>' . esc_html( trim( $guest->first_name . ' ' . $guest->last_name ) ) . ' &lt;' . esc_html( $guest->email ) . '&gt;</li>';
+					$pending[] = trim( $guest->first_name . ' ' . $guest->last_name ) . ' <' . $guest->email . '>';
 				}
-				$message .= '</ul><p>' . sprintf(
-					'<a href="%1$s">%2$s</a>',
-					esc_url( $admin_url ),
-					esc_html__( 'Ir a la ficha del inquilino', 'arriendo-facil' )
-				) . '</p>';
 
 				$sent_any = false;
 				foreach ( $operator_emails as $recipient ) {
-					if ( wp_mail( $recipient, $subject, $message, array( 'Content-Type: text/html; charset=UTF-8' ) ) ) {
+					if ( Arriendo_Facil_Email::send(
+						$recipient,
+						$subject,
+						array(
+							'title'     => __( 'Documentación de inquilinos pendiente', 'arriendo-facil' ),
+							'status'    => array( 'type' => 'review', 'label' => __( 'En revisión', 'arriendo-facil' ) ),
+							'body_text' => __( 'Los siguientes inquilinos tienen documentación pendiente de revisar:', 'arriendo-facil' ),
+							'details'   => array( __( 'Inquilinos', 'arriendo-facil' ) => implode( "\n", $pending ) ),
+							'button'    => array(
+								'label' => __( 'Ir a la ficha del inquilino', 'arriendo-facil' ),
+								'url'   => $admin_url,
+							),
+						),
+						Arriendo_Facil_Email::CAT_INTERNAL
+					) ) {
 						$sent_any = true;
 					}
 				}
@@ -139,16 +163,28 @@ class Arriendo_Facil_Guest {
 
 			$days_left = max( 0, (int) ( ( strtotime( $lease->end_date ) - $now ) / DAY_IN_SECONDS ) );
 			$subject = __( '[ArriendoFacil] Tu contrato esta por vencer', 'arriendo-facil' );
-			$message = '<p>' . sprintf(
-				esc_html__( 'Hola %s,', 'arriendo-facil' ),
-				esc_html( trim( $lease->first_name . ' ' . $lease->last_name ) )
-			) . '</p>';
-			$message .= '<p>' . sprintf(
-				esc_html__( 'Tu contrato vence el %1$s. Si deseas renovarlo o tienes dudas, ponte en contacto con la administracion.', 'arriendo-facil' ),
-				esc_html( mysql2date( get_option( 'date_format' ), $lease->end_date ) )
-			) . '</p>';
 
-			if ( wp_mail( $lease->email, $subject, $message, array( 'Content-Type: text/html; charset=UTF-8' ) ) ) {
+			$sent = Arriendo_Facil_Email::send(
+				(string) $lease->email,
+				$subject,
+				array(
+					'title'     => __( 'Tu contrato está por vencer', 'arriendo-facil' ),
+					'status'    => array( 'type' => 'warning', 'label' => sprintf( /* translators: %d: days left */ _n( 'Vence en %d día', 'Vence en %d días', $days_left, 'arriendo-facil' ), $days_left ) ),
+					'greeting'  => sprintf(
+						/* translators: %s: tenant full name */
+						__( 'Hola %s,', 'arriendo-facil' ),
+						trim( $lease->first_name . ' ' . $lease->last_name )
+					),
+					'body_text' => sprintf(
+						/* translators: %s: lease end date */
+						__( 'Tu contrato vence el %s. Si deseas renovarlo o tienes dudas, ponte en contacto con la administración.', 'arriendo-facil' ),
+						mysql2date( get_option( 'date_format' ), $lease->end_date )
+					),
+				),
+				Arriendo_Facil_Email::CAT_TRANSACTIONAL
+			);
+
+			if ( $sent ) {
 				update_option( $throttle_key, $now );
 			}
 		}

@@ -1192,22 +1192,22 @@ class Arriendo_Facil_Review {
 
 		ob_start();
 		?>
-		<div id="af-review-form-app" style="max-width:760px;margin:20px auto;padding:24px;border:1px solid #e2e8f0;border-radius:12px;background:#fff;">
-			<h2 style="margin:0 0 14px;font-size:26px;line-height:1.2;color:#0f172a;"><?php echo $title; ?></h2>
-			<p style="margin:0 0 14px;color:#475569;line-height:1.6;"><?php echo esc_html__( 'Este enlace es seguro y de un solo uso. Completa las calificaciones pendientes para finalizar.', 'arriendo-facil' ); ?></p>
-			<p id="af-review-role-note" style="display:none;margin:0 0 14px;padding:10px 12px;border:1px solid #dbeafe;background:#eff6ff;border-radius:8px;color:#1e3a8a;"></p>
+		<div id="af-review-form-app" style="max-width:760px;margin:20px auto;padding:24px;border:1px solid #dce5e3;border-radius:12px;background:#fff;">
+			<h2 style="margin:0 0 14px;font-size:26px;line-height:1.2;color:#193238;"><?php echo $title; ?></h2>
+			<p style="margin:0 0 14px;color:#4a5c61;line-height:1.6;"><?php echo esc_html__( 'Este enlace es seguro y de un solo uso. Completa las calificaciones pendientes para finalizar.', 'arriendo-facil' ); ?></p>
+			<p id="af-review-role-note" style="display:none;margin:0 0 14px;padding:10px 12px;border:1px solid #dbeafe;background:#e8f1fe;border-radius:8px;color:#0f3d47;"></p>
 
 			<div id="af-review-alert" style="display:none;padding:10px 12px;border-radius:8px;margin-bottom:14px;"></div>
-			<div id="af-review-loading" style="color:#334155;"><?php echo esc_html__( 'Validando enlace…', 'arriendo-facil' ); ?></div>
+			<div id="af-review-loading" style="color:#2e4046;"><?php echo esc_html__( 'Validando enlace…', 'arriendo-facil' ); ?></div>
 
 			<form id="af-review-form" style="display:none;">
 				<div id="af-review-fields" style="display:grid;grid-template-columns:1fr;gap:14px;"></div>
-				<button type="submit" id="af-review-submit" style="margin-top:16px;padding:11px 16px;border:0;border-radius:8px;background:#1d4ed8;color:#fff;font-weight:600;cursor:pointer;">
+				<button type="submit" id="af-review-submit" style="margin-top:16px;padding:11px 16px;border:0;border-radius:8px;background:#164a55;color:#fff;font-weight:600;cursor:pointer;">
 					<?php echo esc_html__( 'Enviar calificación', 'arriendo-facil' ); ?>
 				</button>
 			</form>
 
-			<button type="button" id="af-review-new-link" style="display:none;margin-top:12px;padding:9px 14px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#0f172a;cursor:pointer;">
+			<button type="button" id="af-review-new-link" style="display:none;margin-top:12px;padding:9px 14px;border:1px solid #c3d1ce;border-radius:8px;background:#fff;color:#193238;cursor:pointer;">
 				<?php echo esc_html__( 'Solicitar nuevo enlace', 'arriendo-facil' ); ?>
 			</button>
 		</div>
@@ -1245,13 +1245,13 @@ class Arriendo_Facil_Review {
 				alertBox.style.display = 'block';
 				alertBox.textContent = message || '';
 				if(type === 'success'){
-					alertBox.style.background = '#ecfdf5';
-					alertBox.style.border = '1px solid #86efac';
-					alertBox.style.color = '#166534';
+					alertBox.style.background = '#eaf4f2';
+					alertBox.style.border = '1px solid #9cc3c0';
+					alertBox.style.color = '#1f5a52';
 				} else {
-					alertBox.style.background = '#fef2f2';
-					alertBox.style.border = '1px solid #fca5a5';
-					alertBox.style.color = '#991b1b';
+					alertBox.style.background = '#fbeceb';
+					alertBox.style.border = '1px solid #eba8a5';
+					alertBox.style.color = '#b03a36';
 				}
 			}
 
@@ -1267,17 +1267,17 @@ class Arriendo_Facil_Review {
 					const key = entry.direction;
 					const label = labels[key] || key;
 					const block = document.createElement('div');
-					block.style.border = '1px solid #e2e8f0';
+					block.style.border = '1px solid #dce5e3';
 					block.style.borderRadius = '10px';
 					block.style.padding = '12px';
 
 					if (key === 'owner_to_tenant') {
 						const criteriaRows = Object.keys(ownerToTenantCriteria).map((critKey) => `
 							<div style="margin-bottom:10px;">
-								<div style="color:#334155;margin-bottom:4px;">${ownerToTenantCriteria[critKey]}</div>
+								<div style="color:#2e4046;margin-bottom:4px;">${ownerToTenantCriteria[critKey]}</div>
 								<div style="display:flex;gap:10px;flex-wrap:wrap;">
 									${[1,2,3,4,5].map((n) => `
-										<label style="display:flex;align-items:center;gap:6px;color:#334155;">
+										<label style="display:flex;align-items:center;gap:6px;color:#2e4046;">
 											<input type="radio" name="criteria_${key}_${critKey}" value="${n}" ${n===5?'checked':''}>
 											<span>${n}★</span>
 										</label>
@@ -1286,11 +1286,11 @@ class Arriendo_Facil_Review {
 							</div>
 						`).join('');
 						block.innerHTML = `
-							<div style="font-weight:600;color:#0f172a;margin-bottom:8px;">${label}</div>
+							<div style="font-weight:600;color:#193238;margin-bottom:8px;">${label}</div>
 							${criteriaRows}
 							<div style="margin-top:10px;">
-								<label style="display:block;font-weight:600;color:#334155;margin-bottom:6px;"><?php echo esc_js( __( 'Comentario (opcional)', 'arriendo-facil' ) ); ?></label>
-								<textarea name="comment_${key}" rows="3" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;color:#0f172a;" placeholder="<?php echo esc_js( __( 'Escribe un detalle si deseas…', 'arriendo-facil' ) ); ?>"></textarea>
+								<label style="display:block;font-weight:600;color:#2e4046;margin-bottom:6px;"><?php echo esc_js( __( 'Comentario (opcional)', 'arriendo-facil' ) ); ?></label>
+								<textarea name="comment_${key}" rows="3" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #c3d1ce;border-radius:8px;color:#193238;" placeholder="<?php echo esc_js( __( 'Escribe un detalle si deseas…', 'arriendo-facil' ) ); ?>"></textarea>
 							</div>
 						`;
 						fieldsWrap.appendChild(block);
@@ -1298,18 +1298,18 @@ class Arriendo_Facil_Review {
 					}
 
 					block.innerHTML = `
-						<div style="font-weight:600;color:#0f172a;margin-bottom:8px;">${label}</div>
+						<div style="font-weight:600;color:#193238;margin-bottom:8px;">${label}</div>
 						<div style="display:flex;gap:10px;flex-wrap:wrap;">
 							${[1,2,3,4,5].map((n) => `
-								<label style="display:flex;align-items:center;gap:6px;color:#334155;">
+								<label style="display:flex;align-items:center;gap:6px;color:#2e4046;">
 									<input type="radio" name="rating_${key}" value="${n}" ${n===5?'checked':''}>
 									<span>${n}★</span>
 								</label>
 							`).join('')}
 						</div>
 						<div style="margin-top:10px;">
-							<label style="display:block;font-weight:600;color:#334155;margin-bottom:6px;"><?php echo esc_js( __( 'Comentario (opcional)', 'arriendo-facil' ) ); ?></label>
-							<textarea name="comment_${key}" rows="3" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;color:#0f172a;" placeholder="<?php echo esc_js( __( 'Escribe un detalle si deseas…', 'arriendo-facil' ) ); ?>"></textarea>
+							<label style="display:block;font-weight:600;color:#2e4046;margin-bottom:6px;"><?php echo esc_js( __( 'Comentario (opcional)', 'arriendo-facil' ) ); ?></label>
+							<textarea name="comment_${key}" rows="3" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #c3d1ce;border-radius:8px;color:#193238;" placeholder="<?php echo esc_js( __( 'Escribe un detalle si deseas…', 'arriendo-facil' ) ); ?>"></textarea>
 						</div>
 					`;
 					fieldsWrap.appendChild(block);
@@ -1499,27 +1499,27 @@ class Arriendo_Facil_Review {
 		$positive_rate    = $total_reviews > 0 ? ( $positive_reviews / $total_reviews ) * 100 : 0;
 
 		if ( 0 === $total_reviews ) {
-			return '<div class="af-review-stats" style="padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;">' . esc_html__( 'Aún no hay valoraciones públicas para esta propiedad.', 'arriendo-facil' ) . '</div>';
+			return '<div class="af-review-stats" style="padding:10px 12px;border:1px solid #dce5e3;border-radius:10px;background:#fff;">' . esc_html__( 'Aún no hay valoraciones públicas para esta propiedad.', 'arriendo-facil' ) . '</div>';
 		}
 
 		ob_start();
 		?>
-		<div class="af-review-stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;padding:12px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;">
+		<div class="af-review-stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;padding:12px;border:1px solid #dce5e3;border-radius:10px;background:#fff;">
 			<div>
-				<div style="font-size:20px;font-weight:700;color:#0f172a;"><?php echo esc_html( number_format( $avg_stars, 2 ) ); ?></div>
-				<div style="color:#64748b;font-size:12px;"><?php esc_html_e( 'Promedio', 'arriendo-facil' ); ?></div>
+				<div style="font-size:20px;font-weight:700;color:#193238;"><?php echo esc_html( number_format( $avg_stars, 2 ) ); ?></div>
+				<div style="color:#647579;font-size:12px;"><?php esc_html_e( 'Promedio', 'arriendo-facil' ); ?></div>
 			</div>
 			<div>
-				<div style="font-size:20px;font-weight:700;color:#0f172a;"><?php echo esc_html( $total_reviews ); ?></div>
-				<div style="color:#64748b;font-size:12px;"><?php esc_html_e( 'Reseñas', 'arriendo-facil' ); ?></div>
+				<div style="font-size:20px;font-weight:700;color:#193238;"><?php echo esc_html( $total_reviews ); ?></div>
+				<div style="color:#647579;font-size:12px;"><?php esc_html_e( 'Reseñas', 'arriendo-facil' ); ?></div>
 			</div>
 			<div>
-				<div style="font-size:20px;font-weight:700;color:#0f172a;"><?php echo esc_html( $positive_reviews ); ?></div>
-				<div style="color:#64748b;font-size:12px;"><?php esc_html_e( 'Positivas', 'arriendo-facil' ); ?></div>
+				<div style="font-size:20px;font-weight:700;color:#193238;"><?php echo esc_html( $positive_reviews ); ?></div>
+				<div style="color:#647579;font-size:12px;"><?php esc_html_e( 'Positivas', 'arriendo-facil' ); ?></div>
 			</div>
 			<div>
-				<div style="font-size:20px;font-weight:700;color:#0f172a;"><?php echo esc_html( number_format( $positive_rate, 1 ) ); ?>%</div>
-				<div style="color:#64748b;font-size:12px;"><?php esc_html_e( 'Tasa positiva', 'arriendo-facil' ); ?></div>
+				<div style="font-size:20px;font-weight:700;color:#193238;"><?php echo esc_html( number_format( $positive_rate, 1 ) ); ?>%</div>
+				<div style="color:#647579;font-size:12px;"><?php esc_html_e( 'Tasa positiva', 'arriendo-facil' ); ?></div>
 			</div>
 		</div>
 		<?php
@@ -2096,26 +2096,33 @@ class Arriendo_Facil_Review {
 			? __( 'Completa en un solo formulario la calificación del propietario y de la propiedad.', 'arriendo-facil' )
 			: __( 'Completa la calificación del inquilino para cerrar el ciclo del contrato.', 'arriendo-facil' );
 
-		$expires_line = '';
-		if ( '' !== trim( (string) $expires_at ) ) {
-			$expires_line = '<p style="margin:0 0 14px;color:#334155;line-height:1.6;">' . sprintf( esc_html__( 'Este enlace estara disponible hasta: %s', 'arriendo-facil' ), esc_html( $expires_at ) ) . '</p>';
-		}
+		$expires_note = '' !== trim( (string) $expires_at )
+			? sprintf(
+				/* translators: %s: expiration date */
+				__( 'Este enlace estará disponible hasta: %s', 'arriendo-facil' ),
+				$expires_at
+			)
+			: '';
 
-		$message = '<div style="margin:0;padding:24px;background:#f8fafc;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#0f172a;">';
-		$message .= '<div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">';
-		$message .= '<div style="padding:18px 22px;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#ffffff;">';
-		$message .= '<h2 style="margin:0;font-size:20px;line-height:1.3;">' . esc_html( $title ) . '</h2>';
-		$message .= '</div>';
-		$message .= '<div style="padding:22px;">';
-		$message .= '<p style="margin:0 0 12px;line-height:1.6;">' . esc_html( $description ) . '</p>';
-		$message .= '<p style="margin:0 0 18px;"><a href="' . esc_url( $review_url ) . '" style="display:inline-block;padding:12px 18px;border-radius:8px;background:#2563eb;color:#ffffff;text-decoration:none;font-weight:600;">' . esc_html__( 'Ir a calificar', 'arriendo-facil' ) . '</a></p>';
-		$message .= $expires_line;
-		$message .= '<p style="margin:0;line-height:1.6;color:#475569;">' . esc_html__( 'El enlace es de un solo uso y se invalida al enviar tu calificación.', 'arriendo-facil' ) . '</p>';
-		$message .= '</div></div>';
-		$message .= '<p style="max-width:640px;margin:12px auto 0;font-size:12px;color:#64748b;text-align:center;">Arriendo Facil</p>';
-		$message .= '</div>';
-
-		return (bool) wp_mail( $recipient_email, $subject, $message, array( 'Content-Type: text/html; charset=UTF-8' ) );
+		return Arriendo_Facil_Email::send(
+			$recipient_email,
+			$subject,
+			array(
+				'preheader' => $description,
+				'eyebrow'   => $property_title ? $property_title : __( 'Tu arriendo', 'arriendo-facil' ),
+				'title'     => $title,
+				'body_text' => $description,
+				'button'    => array(
+					'label' => __( 'Ir a calificar', 'arriendo-facil' ),
+					'url'   => $review_url,
+				),
+				'notice'    => array(
+					'type' => 'info',
+					'text' => trim( $expires_note . "\n" . __( 'El enlace es de un solo uso y se invalida al enviar tu calificación.', 'arriendo-facil' ) ),
+				),
+			),
+			Arriendo_Facil_Email::CAT_TRANSACTIONAL
+		);
 	}
 
 	/**

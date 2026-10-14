@@ -8,54 +8,89 @@
  */
 
 .af-shell {
-	/* ── Primary — Verde Arriendo Fácil (marca) ──────────────────────────── */
-	--af-primary-50:  #E6F7F3;
-	--af-primary-100: #C1EBE2;
-	--af-primary-200: #8FDBCA;
-	--af-primary-400: #3DBBA0;
-	--af-primary-500: #00A884;
-	--af-primary-600: #00926F;
-	--af-primary-700: #007058;
-	--af-primary-900: #023D30;
+	/* ── Paleta Arriendo Fácil ───────────────────────────────────────────────
+	   Proporción de uso: fondo 60% · superficies 25% · primario 10% ·
+	   secundario 3% · acento 2%.
+	   ────────────────────────────────────────────────────────────────────── */
+	--af-brand-primary:         #164A55;
+	--af-brand-primary-hover:   #0F3D47;
+	--af-brand-secondary:       #2F7D73;
+	--af-brand-secondary-light: #DDEEEB;
+	--af-brand-accent:          #D89B5B;
+	--af-brand-accent-light:    #F5E9DA;
 
-	/* ── Accent — Coral Hogar (calidez) ──────────────────────────────────── */
-	--af-accent-50:  #FFF1F0;
-	--af-accent-100: #FFE0DE;
-	--af-accent-500: #F5385C;
-	--af-accent-600: #D42548;
+	--af-bg:             #F7F8F6;
+	--af-surface:        #FFFFFF;
+	--af-text:           #193238;
+	--af-text-muted:     #647579;
+	--af-border:         #DCE5E3;
 
-	/* ── Neutrales — grises slate (fondo SaaS #F8FAFC) ───────────────────── */
+	--af-status-available: #2F7D73;
+	--af-status-pending:   #D89B5B;
+	--af-status-info:      #3882F6;
+	--af-status-error:     #D9534F;
+	--af-status-review:    #7C68AA;
+	--af-status-inactive:  #8A9799;
+
+	/* ── Primary — Petróleo (marca) ──────────────────────────────────────── */
+	--af-primary-50:  #DDEEEB;
+	--af-primary-100: #C5DDD9;
+	--af-primary-200: #9CC3C0;
+	--af-primary-400: #4F8A94;
+	--af-primary-500: #164A55;
+	--af-primary-600: #0F3D47;
+	--af-primary-700: #0B2F37;
+	--af-primary-900: #07242A;
+
+	/* ── Secondary — Verde azulado ───────────────────────────────────────── */
+	--af-secondary-50:  #DDEEEB;
+	--af-secondary-500: #2F7D73;
+	--af-secondary-700: #1F5A52;
+
+	/* ── Accent — Ámbar cálido (uso puntual) ─────────────────────────────── */
+	--af-accent-50:  #F5E9DA;
+	--af-accent-100: #EBD3B3;
+	--af-accent-500: #D89B5B;
+	--af-accent-600: #B97E3E;
+
+	/* ── Neutrales — fondo #F7F8F6, texto #193238 ────────────────────────── */
 	--af-gray-0:   #FFFFFF;
-	--af-gray-50:  #F8FAFC;
-	--af-gray-100: #F1F5F9;
-	--af-gray-200: #E2E8F0;
-	--af-gray-300: #CBD5E1;
-	--af-gray-400: #94A3B8;
-	--af-gray-500: #64748B;
-	--af-gray-600: #475569;
-	--af-gray-700: #334155;
-	--af-gray-900: #0F172A;
+	--af-gray-50:  #F7F8F6;
+	--af-gray-100: #EEF2F0;
+	--af-gray-200: #DCE5E3;
+	--af-gray-300: #C3D1CE;
+	--af-gray-400: #8A9799;
+	--af-gray-500: #647579;
+	--af-gray-600: #4A5C61;
+	--af-gray-700: #2E4046;
+	--af-gray-900: #193238;
 
-	/* ── Semánticos ──────────────────────────────────────────────────────── */
-	--af-success-50:  #E6F7EE;
-	--af-success-100: #C6ECD6;
-	--af-success-500: #0F9D58;
-	--af-success-700: #0A6B3C;
+	/* ── Semánticos (estados) ────────────────────────────────────────────── */
+	--af-success-50:  #DDEEEB;
+	--af-success-100: #C5DDD9;
+	--af-success-500: #2F7D73;
+	--af-success-700: #1F5A52;
 
-	--af-warning-50:  #FEF6E6;
-	--af-warning-100: #FBE6B8;
-	--af-warning-500: #F59E0B;
-	--af-warning-700: #A26708;
+	--af-warning-50:  #F5E9DA;
+	--af-warning-100: #EBD3B3;
+	--af-warning-500: #D89B5B;
+	--af-warning-700: #9A6128;
 
-	--af-danger-50:  #FEECEC;
-	--af-danger-100: #FBD1D1;
-	--af-danger-500: #DC2626;
-	--af-danger-700: #971818;
+	--af-danger-50:  #FBECEB;
+	--af-danger-100: #F2C4C2;
+	--af-danger-500: #D9534F;
+	--af-danger-700: #B03A36;
 
-	--af-info-50:  #E6F6FE;
-	--af-info-100: #BEE7FB;
-	--af-info-500: #0EA5E9;
-	--af-info-700: #0369A1;
+	--af-info-50:  #E8F1FE;
+	--af-info-100: #C9DEFC;
+	--af-info-500: #3882F6;
+	--af-info-700: #1F5FC4;
+
+	--af-review-50:  #EFEBF6;
+	--af-review-500: #7C68AA;
+	--af-review-700: #5A4A82;
+
+	--af-inactive-500: #8A9799;
 
 	/* ── Typography ──────────────────────────────────────────────────────── */
 	--af-font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -94,11 +129,11 @@
 	--af-radius-full: 999px;
 
 	/* ── Shadows ─────────────────────────────────────────────────────────── */
-	--af-shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.05);
-	--af-shadow-sm: 0 2px 6px rgba(16, 24, 40, 0.06);
-	--af-shadow-md: 0 8px 20px rgba(16, 24, 40, 0.08);
-	--af-shadow-lg: 0 20px 40px rgba(16, 24, 40, 0.10);
-	--af-focus-ring: 0 0 0 3px rgba(0, 168, 132, 0.35);
+	--af-shadow-xs: 0 1px 2px rgba(25, 50, 56, 0.05);
+	--af-shadow-sm: 0 2px 6px rgba(25, 50, 56, 0.06);
+	--af-shadow-md: 0 8px 20px rgba(25, 50, 56, 0.08);
+	--af-shadow-lg: 0 20px 40px rgba(25, 50, 56, 0.10);
+	--af-focus-ring: 0 0 0 3px rgba(22, 74, 85, 0.35);
 
 	/* ── Motion ──────────────────────────────────────────────────────────── */
 	--af-motion-fast: 120ms cubic-bezier(0.2, 0.8, 0.2, 1);

@@ -597,7 +597,7 @@ if ( $is_owner ) {
 											?>
 											<span class="af-td-meta" title="<?php esc_attr_e( 'La cédula declarada aparece en el texto del documento subido. Señal automática de apoyo, no reemplaza la revisión humana.', 'arriendo-facil' ); ?>">✓ <?php esc_html_e( 'coincide con el documento', 'arriendo-facil' ); ?></span>
 										<?php elseif ( 'no_match' === $identity_status ) : ?>
-											<span class="af-td-meta" style="color:#b32d2e;" title="<?php esc_attr_e( 'La cédula declarada NO aparece en el texto del documento subido. Revisa manualmente antes de aprobar.', 'arriendo-facil' ); ?>">⚠ <?php esc_html_e( 'no coincide, revisar', 'arriendo-facil' ); ?></span>
+											<span class="af-td-meta" style="color:#b03a36;" title="<?php esc_attr_e( 'La cédula declarada NO aparece en el texto del documento subido. Revisa manualmente antes de aprobar.', 'arriendo-facil' ); ?>">⚠ <?php esc_html_e( 'no coincide, revisar', 'arriendo-facil' ); ?></span>
 										<?php endif; ?>
 										<?php if ( current_user_can( Arriendo_Facil_Tenancy::CAP ) && class_exists( 'Arriendo_Facil_Document_Verification' ) ) : ?>
 											<?php $guest_docs = Arriendo_Facil_Document_Verification::get_guest_documents( $guest->id ); ?>

@@ -72,6 +72,20 @@ tests/
   AIServiceTest.php           Unit tests for AI service
 ```
 
+## Correos
+
+Todos los correos del plugin se envían con `Arriendo_Facil_Email::send()` (`includes/class-email.php`): plantilla responsive con la paleta de la marca, versión en texto plano y pie legal (motivo de recepción, derechos del titular, política de privacidad, términos y enlace de baja).
+
+| Categoría | Uso | ¿Respeta la baja? |
+|-----------|-----|-------------------|
+| `CAT_TRANSACTIONAL` | Verificación, activación, contratos, avisos legales | No (mensajes de servicio) |
+| `CAT_NOTIFICATION` | Recordatorios, resúmenes, novedades | Sí + cabeceras `List-Unsubscribe` (RFC 8058) |
+| `CAT_INTERNAL` | Avisos al equipo operativo | No (sin enlace de baja) |
+
+Datos del pie configurables (opciones o filtros): `af_email_legal_entity`, `af_email_legal_address`, `af_email_support_address` (por defecto, el correo del administrador).
+
+Los formularios públicos de registro muestran un toast de **Registro aprobado / rechazado** (`includes/class-toast.php`).
+
 ## Running Tests
 
 ```bash

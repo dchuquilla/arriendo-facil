@@ -5,7 +5,7 @@
  */
 
 body.index-php .af-tenant-dash-widget .af-dash-widget__hero {
-	background: linear-gradient(135deg, #0f766e 0%, #0f766e 20%, #0f172a 100%);
+	background: linear-gradient(135deg, #2f7d73 0%, #2f7d73 20%, #193238 100%);
 }
 
 .af-tenant-dashboard #dashboard-widgets-wrap {
@@ -69,27 +69,27 @@ body.index-php .af-tenant-dash-widget .af-dash-widget__hero {
 }
 
 .af-tenant-portal .af-section {
-	background: linear-gradient(180deg, #ffffff 0%, #fbfdfd 100%);
+	background: linear-gradient(180deg, #ffffff 0%, #f7f8f6 100%);
 }
 
 .af-tenant-portal .af-kpi__value {
 	font-size: clamp(22px, 2vw, 28px);
 	font-weight: 800;
 	line-height: 1.1;
-	color: var(--af-gray-900, #1b1a16);
+	color: var(--af-gray-900, #193238);
 }
 
 .af-tenant-portal .widefat {
 	border-radius: 12px;
 	overflow: hidden;
-	border: 1px solid var(--af-gray-200, #e2e1db);
+	border: 1px solid var(--af-gray-200, #dce5e3);
 	table-layout: fixed;
 	width: 100%;
 }
 
 .af-tenant-portal .widefat thead th {
-	background: #f8fafc;
-	color: #0f172a;
+	background: #f7f8f6;
+	color: #193238;
 	font-weight: 700;
 }
 
@@ -108,7 +108,7 @@ body.index-php .af-tenant-dash-widget .af-dash-widget__hero {
 
 .af-tenant-portal .af-tasklist__badge {
 	background: #e6f4f1;
-	color: #0f766e;
+	color: #2f7d73;
 }
 
 .af-tenant-dash-widget {
@@ -176,7 +176,7 @@ body.index-php .af-tenant-dash-widget .af-dash-widget__hero {
 #af-tenant-review-feedback {
 	margin-top: 10px;
 	min-height: 20px;
-	color: var(--af-gray-600, #5b594f);
+	color: var(--af-gray-600, #4a5c61);
 }
 
 @media (max-width: 1100px) {

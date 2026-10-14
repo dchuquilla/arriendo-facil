@@ -38,7 +38,7 @@
 	flex: 0 0 auto;
 	min-width: 220px;
 	padding: 12px 16px;
-	border: 1px solid var(--af-gray-200, #E2E8F0);
+	border: 1px solid var(--af-gray-200, #DCE5E3);
 	border-radius: var(--af-radius-lg, 14px);
 	background: var(--af-gray-0, #fff);
 	box-shadow: var(--af-shadow-xs, 0 1px 2px rgba(16, 24, 40, 0.05));
@@ -54,9 +54,9 @@
 }
 
 .af-building-chip.is-active {
-	border-color: var(--af-primary-500, #00A884);
-	background: var(--af-primary-50, #E6F7F3);
-	box-shadow: 0 0 0 3px rgba(0, 168, 132, 0.18);
+	border-color: var(--af-primary-500, #164A55);
+	background: var(--af-primary-50, #DDEEEB);
+	box-shadow: 0 0 0 3px rgba(22, 74, 85, 0.18);
 }
 
 .af-building-chip__icon {
@@ -67,13 +67,13 @@
 	width: 38px;
 	height: 38px;
 	border-radius: var(--af-radius-md, 10px);
-	background: var(--af-gray-100, #F1F5F9);
-	color: var(--af-gray-500, #64748B);
+	background: var(--af-gray-100, #EEF2F0);
+	color: var(--af-gray-500, #647579);
 	transition: background var(--af-motion-fast, 0.1s), color var(--af-motion-fast, 0.1s);
 }
 
 .af-building-chip.is-active .af-building-chip__icon {
-	background: var(--af-primary-500, #00A884);
+	background: var(--af-primary-500, #164A55);
 	color: #fff;
 }
 
@@ -87,7 +87,7 @@
 .af-building-chip__name {
 	font-size: 13.5px;
 	font-weight: 700;
-	color: var(--af-gray-900, #0F172A);
+	color: var(--af-gray-900, #193238);
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -95,7 +95,7 @@
 
 .af-building-chip__meta {
 	font-size: 11.5px;
-	color: var(--af-gray-500, #64748B);
+	color: var(--af-gray-500, #647579);
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -106,8 +106,8 @@
 	margin-left: auto;
 	padding: 3px 10px;
 	border-radius: var(--af-radius-full, 100px);
-	background: var(--af-gray-100, #F1F5F9);
-	color: var(--af-gray-600, #475569);
+	background: var(--af-gray-100, #EEF2F0);
+	color: var(--af-gray-600, #4a5c61);
 	font-size: 11px;
 	font-weight: 700;
 	white-space: nowrap;
@@ -115,7 +115,7 @@
 
 .af-building-chip.is-active .af-building-chip__count {
 	background: var(--af-gray-0, #fff);
-	color: var(--af-primary-700, #007058);
+	color: var(--af-primary-700, #0b2f37);
 }
 
 /* ── Creation forms ─────────────────────────────────────────────────────── */
@@ -158,16 +158,16 @@
 	gap: 8px;
 	font-size: 14px;
 	font-weight: 800;
-	color: var(--af-gray-900, #0F172A);
+	color: var(--af-gray-900, #193238);
 }
 
 .af-unit-code .af-icon {
-	color: var(--af-primary-500, #00A884);
+	color: var(--af-primary-500, #164A55);
 }
 
 .af-unit-linked {
 	font-size: 12.5px;
-	color: var(--af-gray-600, #475569);
+	color: var(--af-gray-600, #4a5c61);
 }
 
 .af-coef {
@@ -181,7 +181,7 @@
 	font-family: var(--af-font-numeric, ui-monospace, SFMono-Regular, Menlo, monospace);
 	font-variant-numeric: tabular-nums;
 	font-size: 13px;
-	color: var(--af-gray-800, #1E293B);
+	color: var(--af-gray-800, #22373D);
 }
 
 .af-coef__bar {
@@ -189,7 +189,7 @@
 	width: 120px;
 	height: 5px;
 	border-radius: 100px;
-	background: var(--af-gray-100, #F1F5F9);
+	background: var(--af-gray-100, #EEF2F0);
 	overflow: hidden;
 }
 
@@ -197,12 +197,12 @@
 	display: block;
 	height: 100%;
 	border-radius: inherit;
-	background: var(--af-primary-500, #00A884);
+	background: var(--af-primary-500, #164A55);
 	transition: width var(--af-motion-base, 0.15s);
 }
 
 .af-coef.is-over .af-coef__bar > span {
-	background: var(--af-warning-500, #F59E0B);
+	background: var(--af-warning-500, #D89B5B);
 }
 
 .af-unit-hoa {
@@ -210,22 +210,22 @@
 	font-variant-numeric: tabular-nums;
 	font-size: 14px;
 	font-weight: 800;
-	color: var(--af-gray-900, #0F172A);
+	color: var(--af-gray-900, #193238);
 	white-space: nowrap;
 }
 
 .af-units-table tfoot td {
 	font-weight: 700;
-	color: var(--af-gray-700, #334155);
-	background: var(--af-gray-50, #F8FAFC);
-	border-top: 1px solid var(--af-gray-200, #E2E8F0);
+	color: var(--af-gray-700, #2e4046);
+	background: var(--af-gray-50, #F7F8F6);
+	border-top: 1px solid var(--af-gray-200, #DCE5E3);
 }
 
 .af-units-table tfoot .af-totals-label {
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
 	font-size: 11px;
-	color: var(--af-gray-500, #64748B);
+	color: var(--af-gray-500, #647579);
 	font-weight: 700;
 }
 
@@ -238,14 +238,14 @@
 .af-units-cobranza .af-unit-linked strong {
 	display: block;
 	font-size: 14px;
-	color: var(--af-gray-900, #0F172A);
+	color: var(--af-gray-900, #193238);
 }
 
 .af-unit-fine {
 	display: block;
 	margin-top: 2px;
 	font-size: var(--af-text-xs, 12px);
-	color: var(--af-gray-500, #64748B);
+	color: var(--af-gray-500, #647579);
 }
 
 .af-unit-canon {
@@ -253,7 +253,7 @@
 	font-variant-numeric: tabular-nums;
 	font-size: 14px;
 	font-weight: 700;
-	color: var(--af-gray-800, #1E293B);
+	color: var(--af-gray-800, #22373D);
 	white-space: nowrap;
 }
 
@@ -262,8 +262,8 @@
 	font-variant-numeric: tabular-nums;
 	font-size: 13px;
 	font-weight: 800;
-	color: var(--af-warning-700, #B45309);
-	background: var(--af-warning-50, #FFFBEB);
+	color: var(--af-warning-700, #9A6128);
+	background: var(--af-warning-50, #F5E9DA);
 	padding: 2px 8px;
 	border-radius: 100px;
 	white-space: nowrap;
@@ -292,7 +292,7 @@
 }
 
 .af-muted {
-	color: var(--af-gray-400, #94A3B8);
+	color: var(--af-gray-400, #8A9799);
 }
 
 .af-units-cobranza .af-actions-col {
@@ -313,13 +313,13 @@
 	height: 40px;
 	flex: 0 0 auto;
 	border-radius: var(--af-radius-md, 12px);
-	background: var(--af-primary-50, #E6F7F3);
+	background: var(--af-primary-50, #DDEEEB);
 	color: var(--af-primary-600, #008A6B);
 }
 
 .af-section__icon--slate {
-	background: var(--af-gray-100, #F1F5F9);
-	color: var(--af-gray-600, #475569);
+	background: var(--af-gray-100, #EEF2F0);
+	color: var(--af-gray-600, #4a5c61);
 }
 
 /* ── Columnas desplegables (gestión de estructura) ──────────────────────── */
@@ -343,7 +343,7 @@
 }
 
 .af-collapse > summary:hover {
-	background: var(--af-gray-50, #F8FAFC);
+	background: var(--af-gray-50, #F7F8F6);
 }
 
 .af-collapse__label {
@@ -355,12 +355,12 @@
 
 .af-collapse__chevron {
 	display: inline-flex;
-	color: var(--af-gray-400, #94A3B8);
+	color: var(--af-gray-400, #8A9799);
 	transition: transform var(--af-motion-base, 0.15s);
 }
 
 .af-collapse[open] > summary {
-	border-bottom: 1px solid var(--af-gray-200, #E2E8F0);
+	border-bottom: 1px solid var(--af-gray-200, #DCE5E3);
 }
 
 .af-collapse[open] .af-collapse__chevron {
@@ -388,13 +388,13 @@
 }
 
 .af-coefficient-value.is-ok {
-	color: var(--af-success-700, #15803D);
-	background: var(--af-success-50, #F0FDF4);
+	color: var(--af-success-700, #2F7D73);
+	background: var(--af-success-50, #EAF4F2);
 }
 
 .af-coefficient-value.is-warning {
-	color: var(--af-warning-700, #B45309);
-	background: var(--af-warning-50, #FFFBEB);
+	color: var(--af-warning-700, #9A6128);
+	background: var(--af-warning-50, #F5E9DA);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -464,33 +464,33 @@
 
 .af-cobranza-alert__body span {
 	font-size: var(--af-text-xs, 12px);
-	color: var(--af-gray-600, #475569);
+	color: var(--af-gray-600, #4a5c61);
 	line-height: var(--af-leading-relaxed, 1.6);
 }
 
 .af-cobranza-alert--danger {
-	border-color: color-mix(in srgb, var(--af-danger-500, #E5484D) 30%, transparent);
-	background: var(--af-danger-50, #FFF5F5);
+	border-color: color-mix(in srgb, var(--af-danger-500, #D9534F) 30%, transparent);
+	background: var(--af-danger-50, #FBECEB);
 }
 
 .af-cobranza-alert--danger .af-cobranza-alert__icon {
-	background: var(--af-danger-500, #E5484D);
+	background: var(--af-danger-500, #D9534F);
 	color: #fff;
 }
 
 .af-cobranza-alert--warning {
-	border-color: color-mix(in srgb, var(--af-warning-500, #F59E0B) 30%, transparent);
-	background: var(--af-warning-50, #FFFBEB);
+	border-color: color-mix(in srgb, var(--af-warning-500, #D89B5B) 30%, transparent);
+	background: var(--af-warning-50, #F5E9DA);
 }
 
 .af-cobranza-alert--warning .af-cobranza-alert__icon {
-	background: var(--af-warning-500, #F59E0B);
+	background: var(--af-warning-500, #D89B5B);
 	color: #fff;
 }
 
 .af-cobranza-alert--ok .af-cobranza-alert__icon {
 	background: var(--af-success-100, #DCFCE7);
-	color: var(--af-success-700, #15803D);
+	color: var(--af-success-700, #2F7D73);
 }
 
 /* ── Tarjetas cobranza (estilo catálogo) ───────────────────────────────── */
@@ -524,7 +524,7 @@
 	right: 0;
 	left: 0;
 	height: var(--af-space-1);
-	background: var(--af-gray-300, #CBD5E1);
+	background: var(--af-gray-300, #C3D1CE);
 	z-index: 1;
 }
 
@@ -537,40 +537,40 @@
    cinco estados para que el color se lea siempre igual. */
 
 .af-cobranza-card.is-danger {
-	border-color: var(--af-danger-500, #DC2626);
-	box-shadow: 0 0 0 3px var(--af-danger-100, #FBD1D1);
+	border-color: var(--af-danger-500, #D9534F);
+	box-shadow: 0 0 0 3px var(--af-danger-100, #F2C4C2);
 }
 
 .af-cobranza-card.is-danger::before {
-	background: var(--af-danger-500, #DC2626);
+	background: var(--af-danger-500, #D9534F);
 }
 
 .af-cobranza-card.is-danger:hover {
-	border-color: var(--af-danger-600, #B91C1C);
+	border-color: var(--af-danger-600, #B03A36);
 	box-shadow: 0 12px 28px -10px rgba(220, 38, 38, 0.30);
 }
 
 .af-cobranza-card.is-warning {
-	border-color: var(--af-warning-500, #F59E0B);
-	box-shadow: 0 0 0 3px var(--af-warning-100, #FBE6B8);
+	border-color: var(--af-warning-500, #D89B5B);
+	box-shadow: 0 0 0 3px var(--af-warning-100, #EBD3B3);
 }
 
 .af-cobranza-card.is-warning::before {
-	background: var(--af-warning-500, #F59E0B);
+	background: var(--af-warning-500, #D89B5B);
 }
 
 .af-cobranza-card.is-warning:hover {
-	border-color: var(--af-warning-600, #D97706);
+	border-color: var(--af-warning-600, #D89B5B);
 	box-shadow: 0 12px 28px -10px rgba(245, 158, 11, 0.30);
 }
 
 .af-cobranza-card.is-info {
-	border-color: var(--af-info-500, #0EA5E9);
+	border-color: var(--af-info-500, #3882F6);
 	box-shadow: 0 0 0 3px var(--af-info-100, #BEE7FB);
 }
 
 .af-cobranza-card.is-info::before {
-	background: var(--af-info-500, #0EA5E9);
+	background: var(--af-info-500, #3882F6);
 }
 
 .af-cobranza-card.is-info:hover {
@@ -579,16 +579,16 @@
 }
 
 .af-cobranza-card.is-ok {
-	border-color: var(--af-success-500, #0F9D58);
-	box-shadow: 0 0 0 3px var(--af-success-100, #C6ECD6);
+	border-color: var(--af-success-500, #2F7D73);
+	box-shadow: 0 0 0 3px var(--af-success-100, #C5DDD9);
 }
 
 .af-cobranza-card.is-ok::before {
-	background: var(--af-success-500, #0F9D58);
+	background: var(--af-success-500, #2F7D73);
 }
 
 .af-cobranza-card.is-ok:hover {
-	border-color: var(--af-success-600, #0B7A44);
+	border-color: var(--af-success-600, #1F5A52);
 	box-shadow: 0 12px 28px -10px rgba(15, 157, 88, 0.28);
 }
 
@@ -596,13 +596,13 @@
 
 .af-cobranza-card.is-muted,
 .af-cobranza-card.is-available {
-	border-color: var(--af-gray-300, #CBD5E1);
+	border-color: var(--af-gray-300, #C3D1CE);
 	box-shadow: none;
 }
 
 .af-cobranza-card.is-muted::before,
 .af-cobranza-card.is-available::before {
-	background: var(--af-gray-300, #CBD5E1);
+	background: var(--af-gray-300, #C3D1CE);
 }
 
 .af-buildings-page .af-property-card__media::after {
@@ -621,8 +621,8 @@
 }
 
 .af-buildings-page .af-property-card__placeholder {
-	background: linear-gradient(135deg, var(--af-primary-50, #E6F7F3), var(--af-gray-50, #F8FAFC));
-	color: var(--af-primary-600, #00926F);
+	background: linear-gradient(135deg, var(--af-primary-50, #DDEEEB), var(--af-gray-50, #F7F8F6));
+	color: var(--af-primary-600, #0F3D47);
 }
 
 .af-buildings-page .af-catalog-card__type {
@@ -633,8 +633,8 @@
 	white-space: nowrap;
 	padding: 3px 10px;
 	border-radius: var(--af-radius-full);
-	background: var(--af-primary-50, #E6F7F3);
-	color: var(--af-primary-700, #007058);
+	background: var(--af-primary-50, #DDEEEB);
+	color: var(--af-primary-700, #0b2f37);
 	font-size: 11px;
 	font-weight: 700;
 	text-transform: uppercase;
@@ -659,7 +659,7 @@
 	gap: 6px;
 	margin: 0;
 	font-size: var(--af-text-xs);
-	color: var(--af-gray-500, #64748B);
+	color: var(--af-gray-500, #647579);
 }
 
 .af-buildings-page .af-catalog-card__address-text {
@@ -674,28 +674,28 @@
 	display: inline-flex;
 	flex: 0 0 auto;
 	margin-top: 1px;
-	color: var(--af-gray-400, #94A3B8);
+	color: var(--af-gray-400, #8A9799);
 }
 
 .af-buildings-page .af-catalog-card__spec-icon {
 	display: inline-flex;
 	flex: 0 0 auto;
-	color: var(--af-gray-400, #94A3B8);
+	color: var(--af-gray-400, #8A9799);
 }
 
 .af-cobranza-card__amount {
 	display: inline-flex;
 	flex-direction: column;
 	padding: calc(var(--af-space-1) + 1px) var(--af-space-3);
-	border: 1px solid var(--af-gray-200, #E2E8F0);
+	border: 1px solid var(--af-gray-200, #DCE5E3);
 	border-radius: var(--af-radius-md, 10px);
-	background: var(--af-gray-50, #F8FAFC);
+	background: var(--af-gray-50, #F7F8F6);
 	font-family: var(--af-font-numeric, ui-monospace, SFMono-Regular, Menlo, monospace);
 	font-variant-numeric: tabular-nums;
 	font-size: var(--af-text-lg, 18px);
 	font-weight: 800;
 	line-height: 1.2;
-	color: var(--af-gray-900, #0F172A);
+	color: var(--af-gray-900, #193238);
 }
 
 .af-cobranza-card__amount small {
@@ -707,15 +707,15 @@
 }
 
 .af-cobranza-card__amount.is-danger {
-	border-color: var(--af-danger-100, #FBD1D1);
-	background: var(--af-danger-50, #FEECEC);
-	color: var(--af-danger-700, #971818);
+	border-color: var(--af-danger-100, #F2C4C2);
+	background: var(--af-danger-50, #FBECEB);
+	color: var(--af-danger-700, #b03a36);
 }
 
 .af-cobranza-card__amount.is-warning {
-	border-color: var(--af-warning-100, #FBE6B8);
-	background: var(--af-warning-50, #FEF6E6);
-	color: var(--af-warning-700, #A26708);
+	border-color: var(--af-warning-100, #EBD3B3);
+	background: var(--af-warning-50, #F5E9DA);
+	color: var(--af-warning-700, #9A6128);
 }
 
 .af-cobranza-card__due {
@@ -725,16 +725,16 @@
 	gap: calc(var(--af-space-1) + 1px);
 	font-size: var(--af-text-xs, 12px);
 	font-weight: 700;
-	color: var(--af-gray-500, #64748B);
+	color: var(--af-gray-500, #647579);
 	text-align: right;
 }
 
 .af-cobranza-card__due.is-danger {
-	color: var(--af-danger-700, #971818);
+	color: var(--af-danger-700, #b03a36);
 }
 
 .af-cobranza-card__due.is-warning {
-	color: var(--af-warning-700, #A26708);
+	color: var(--af-warning-700, #9A6128);
 }
 
 .af-cobranza-card__due.is-danger::before,
@@ -753,8 +753,8 @@
 	gap: 4px;
 	padding: 5px 10px;
 	border-radius: var(--af-radius-full);
-	background: var(--af-primary-50, #E6F7F3);
-	color: var(--af-primary-700, #007058);
+	background: var(--af-primary-50, #DDEEEB);
+	color: var(--af-primary-700, #0b2f37);
 	font-size: var(--af-text-xs);
 	font-weight: 700;
 	transition: background var(--af-motion-fast), color var(--af-motion-fast);
@@ -762,7 +762,7 @@
 }
 
 .af-buildings-page .af-cobranza-card:hover .af-catalog-card__hint {
-	background: var(--af-primary-500, #00A884);
+	background: var(--af-primary-500, #164A55);
 	color: #fff;
 }
 
@@ -813,7 +813,7 @@
 	text-align: center;
 	font-size: 15px;
 	font-weight: 800;
-	color: var(--af-gray-900, #0F172A);
+	color: var(--af-gray-900, #193238);
 	text-transform: capitalize;
 }
 
@@ -822,8 +822,8 @@
 .af-cobranza-cal__spinner {
 	width: 14px;
 	height: 14px;
-	border: 2px solid var(--af-gray-200, #E2E8F0);
-	border-top-color: var(--af-primary-500, #00A884);
+	border: 2px solid var(--af-gray-200, #DCE5E3);
+	border-top-color: var(--af-primary-500, #164A55);
 	border-radius: 50%;
 	animation: af-cobranza-spin 0.7s linear infinite;
 }
@@ -881,13 +881,13 @@
 	font-weight: 700;
 	text-transform: uppercase;
 	letter-spacing: 0.05em;
-	color: var(--af-gray-400, #94A3B8);
+	color: var(--af-gray-400, #8A9799);
 }
 
 .af-calendar-mini__day {
 	position: relative;
 	min-height: 58px;
-	border: 1px solid var(--af-gray-200, #E2E8F0);
+	border: 1px solid var(--af-gray-200, #DCE5E3);
 	border-radius: var(--af-radius-md, 10px);
 	background: var(--af-gray-0, #fff);
 	display: flex;
@@ -905,11 +905,11 @@
 
 .af-calendar-mini__day:hover {
 	border-color: var(--af-primary-400);
-	box-shadow: 0 0 0 2px var(--af-primary-100, #D5F3E9);
+	box-shadow: 0 0 0 2px var(--af-primary-100, #DDEEEB);
 }
 
 .af-calendar-mini__day:focus-visible {
-	outline: 2px solid var(--af-primary-500, #00A884);
+	outline: 2px solid var(--af-primary-500, #164A55);
 	outline-offset: 2px;
 	z-index: 1;
 }
@@ -917,8 +917,8 @@
 /* Días que tienen al menos un cargo este mes. */
 
 .af-calendar-mini__day.has-charges {
-	border-color: var(--af-gray-300, #CBD5E1);
-	background: var(--af-gray-50, #F8FAFC);
+	border-color: var(--af-gray-300, #C3D1CE);
+	background: var(--af-gray-50, #F7F8F6);
 }
 
 .af-calendar-mini__day.is-outside {
@@ -927,8 +927,8 @@
 }
 
 .af-calendar-mini__day.is-today {
-	border-color: var(--af-primary-500, #00A884);
-	box-shadow: 0 0 0 2px var(--af-primary-100, #D5F3E9);
+	border-color: var(--af-primary-500, #164A55);
+	box-shadow: 0 0 0 2px var(--af-primary-100, #DDEEEB);
 }
 
 .af-calendar-mini__day.is-payday::after {
@@ -937,15 +937,15 @@
 	inset: auto 0 0;
 	height: 3px;
 	border-radius: 0 0 var(--af-radius-md, 10px) var(--af-radius-md, 10px);
-	background: var(--af-primary-500, #00A884);
+	background: var(--af-primary-500, #164A55);
 }
 
 /* Día pulsado: la lista de cargos de abajo queda filtrada a ese día. */
 
 .af-calendar-mini__day.is-selected {
-	border-color: var(--af-primary-600, #00926F);
-	background: var(--af-primary-50, #E6F7F3);
-	box-shadow: 0 0 0 3px color-mix(in srgb, var(--af-primary-500, #00A884) 28%, transparent);
+	border-color: var(--af-primary-600, #0F3D47);
+	background: var(--af-primary-50, #DDEEEB);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--af-primary-500, #164A55) 28%, transparent);
 }
 
 .af-calendar-mini__day.is-dimmed {
@@ -955,12 +955,12 @@
 .af-calendar-mini__day-num {
 	font-size: 12.5px;
 	font-weight: 700;
-	color: var(--af-gray-700, #334155);
+	color: var(--af-gray-700, #2e4046);
 	line-height: 1;
 }
 
 .af-calendar-mini__day.is-today .af-calendar-mini__day-num {
-	color: var(--af-primary-700, #007058);
+	color: var(--af-primary-700, #0b2f37);
 }
 
 /* Saldo del día: el número que hace falta cobrar, o el total si está pagado. */
@@ -971,15 +971,15 @@
 	font-size: 10px;
 	font-weight: 700;
 	line-height: 1.1;
-	color: var(--af-gray-500, #64748B);
+	color: var(--af-gray-500, #647579);
 }
 
 .af-calendar-mini__day-amt.is-paid {
-	color: var(--af-success-700, #15803D);
+	color: var(--af-success-700, #2F7D73);
 }
 
 .af-calendar-mini__day-amt.is-pending {
-	color: var(--af-warning-700, #B45309);
+	color: var(--af-warning-700, #9A6128);
 }
 
 .af-calendar-mini__day-amt.is-overdue {
@@ -991,7 +991,7 @@
 	width: 7px;
 	height: 7px;
 	border-radius: 50%;
-	background: var(--af-gray-200, #E2E8F0);
+	background: var(--af-gray-200, #DCE5E3);
 }
 
 .af-calendar-mini__dots {
@@ -1003,20 +1003,20 @@
 }
 
 .af-calendar-mini__day-dot.is-paid {
-	background: var(--af-success-500, #22C55E);
+	background: var(--af-success-500, #2F7D73);
 }
 
 .af-calendar-mini__day-dot.is-pending {
-	background: var(--af-info-500, #3B82F6);
+	background: var(--af-info-500, #3882F6);
 }
 
 .af-calendar-mini__day-dot.is-overdue {
-	background: var(--af-danger-500, #E5484D);
+	background: var(--af-danger-500, #D9534F);
 }
 
 .af-calendar-mini__day-dot.is-payday {
-	background: var(--af-primary-500, #00A884);
-	outline: 2px solid var(--af-primary-100, #D5F3E9);
+	background: var(--af-primary-500, #164A55);
+	outline: 2px solid var(--af-primary-100, #DDEEEB);
 	outline-offset: 1px;
 }
 
@@ -1029,9 +1029,9 @@
 	margin-bottom: var(--af-space-4);
 	padding: var(--af-space-3) var(--af-space-4);
 	border-radius: var(--af-radius-md);
-	background: var(--af-gray-50, #F8FAFC);
+	background: var(--af-gray-50, #F7F8F6);
 	font-size: var(--af-text-xs, 12px);
-	color: var(--af-gray-600, #475569);
+	color: var(--af-gray-600, #4a5c61);
 }
 
 .af-calendar-mini__legend span,
@@ -1052,23 +1052,23 @@
 	border-radius: 50%;
 	font-style: normal;
 	vertical-align: middle;
-	background: var(--af-gray-200, #E2E8F0);
+	background: var(--af-gray-200, #DCE5E3);
 }
 
 .af-calendar-mini__legend i.is-paid {
-	background: var(--af-success-500, #22C55E);
+	background: var(--af-success-500, #2F7D73);
 }
 
 .af-calendar-mini__legend i.is-pending {
-	background: var(--af-info-500, #3B82F6);
+	background: var(--af-info-500, #3882F6);
 }
 
 .af-calendar-mini__legend i.is-overdue {
-	background: var(--af-danger-500, #E5484D);
+	background: var(--af-danger-500, #D9534F);
 }
 
 .af-calendar-mini__legend i.is-payday {
-	background: var(--af-primary-500, #00A884);
+	background: var(--af-primary-500, #164A55);
 }
 
 /* Filtro por estado: al pulsarse, la lista de cargos se queda solo con los
@@ -1077,10 +1077,10 @@
 .af-calendar-mini__filter {
 	margin: 0;
 	padding: 3px 9px;
-	border: 1px solid var(--af-gray-200, #E2E8F0);
+	border: 1px solid var(--af-gray-200, #DCE5E3);
 	border-radius: var(--af-radius-full);
 	background: var(--af-gray-0, #fff);
-	color: var(--af-gray-700, #334155);
+	color: var(--af-gray-700, #2e4046);
 	font-size: var(--af-text-xs, 12px);
 	font-weight: 700;
 	line-height: 1.6;
@@ -1093,8 +1093,8 @@
 }
 
 .af-calendar-mini__filter.is-active {
-	border-color: var(--af-primary-500, #00A884);
-	background: var(--af-primary-500, #00A884);
+	border-color: var(--af-primary-500, #164A55);
+	background: var(--af-primary-500, #164A55);
 	color: #fff;
 }
 
@@ -1109,7 +1109,7 @@
 }
 
 .af-calendar-mini__filter:focus-visible {
-	outline: 2px solid var(--af-primary-500, #00A884);
+	outline: 2px solid var(--af-primary-500, #164A55);
 	outline-offset: 2px;
 }
 
@@ -1118,7 +1118,7 @@
 .af-cobranza-summary {
 	margin: 0 0 var(--af-space-4);
 	padding: var(--af-space-4);
-	border: 1px solid var(--af-gray-200, #E2E8F0);
+	border: 1px solid var(--af-gray-200, #DCE5E3);
 	border-radius: var(--af-radius-lg, 14px);
 	background: var(--af-gray-0, #fff);
 }
@@ -1141,7 +1141,7 @@
 	font-weight: 700;
 	text-transform: uppercase;
 	letter-spacing: 0.05em;
-	color: var(--af-gray-500, #64748B);
+	color: var(--af-gray-500, #647579);
 }
 
 .af-cobranza-summary__v {
@@ -1149,11 +1149,11 @@
 	font-variant-numeric: tabular-nums;
 	font-size: var(--af-text-base, 16px);
 	font-weight: 800;
-	color: var(--af-gray-900, #0F172A);
+	color: var(--af-gray-900, #193238);
 }
 
 .af-cobranza-summary__v.is-ok {
-	color: var(--af-success-700, #15803D);
+	color: var(--af-success-700, #2F7D73);
 }
 
 .af-cobranza-summary__v.is-danger {
@@ -1163,7 +1163,7 @@
 .af-cobranza-summary__bar {
 	height: 8px;
 	border-radius: var(--af-radius-full);
-	background: var(--af-gray-200, #E2E8F0);
+	background: var(--af-gray-200, #DCE5E3);
 	overflow: hidden;
 }
 
@@ -1171,7 +1171,7 @@
 	display: block;
 	height: 100%;
 	border-radius: var(--af-radius-full);
-	background: var(--af-success-500, #22C55E);
+	background: var(--af-success-500, #2F7D73);
 	transition: width var(--af-motion-slow, 0.35s);
 }
 
@@ -1184,9 +1184,9 @@
 	gap: var(--af-space-3);
 	margin-bottom: var(--af-space-3);
 	padding: var(--af-space-2) var(--af-space-3) var(--af-space-2) var(--af-space-4);
-	border: 1px solid var(--af-primary-200, #8FDBCA);
+	border: 1px solid var(--af-primary-200, #9CC3C0);
 	border-radius: var(--af-radius-full);
-	background: var(--af-primary-50, #E6F7F3);
+	background: var(--af-primary-50, #DDEEEB);
 }
 
 .af-cobranza-dayfilter__chip {
@@ -1208,7 +1208,7 @@
 	max-width: 260px;
 	padding: 6px 10px;
 	border-radius: var(--af-radius-md, 10px);
-	background: var(--af-gray-900, #0F172A);
+	background: var(--af-gray-900, #193238);
 	color: #fff;
 	font-size: 11.5px;
 	font-weight: 600;
@@ -1229,7 +1229,7 @@
 	font-weight: 700;
 	text-transform: uppercase;
 	letter-spacing: 0.05em;
-	color: var(--af-gray-500, #64748B);
+	color: var(--af-gray-500, #647579);
 }
 
 /* Totales de lo que la lista está mostrando ahora mismo (mes completo o el
@@ -1242,7 +1242,7 @@
 	font-weight: 700;
 	letter-spacing: 0;
 	text-transform: none;
-	color: var(--af-gray-500, #64748B);
+	color: var(--af-gray-500, #647579);
 }
 
 .af-cobranza-charges {
@@ -1259,7 +1259,7 @@
 	gap: var(--af-space-3);
 	padding: var(--af-space-3);
 	margin: 0 0 var(--af-space-2);
-	border: 1px solid var(--af-gray-200, #E2E8F0);
+	border: 1px solid var(--af-gray-200, #DCE5E3);
 	border-radius: var(--af-radius-md, 10px);
 	background: var(--af-gray-0, #fff);
 	cursor: pointer;
@@ -1274,7 +1274,7 @@
 
 .af-cobranza-charge.is-paid {
 	opacity: 0.68;
-	background: var(--af-gray-50, #F8FAFC);
+	background: var(--af-gray-50, #F7F8F6);
 }
 
 .af-cobranza-charge__icon {
@@ -1285,19 +1285,19 @@
 	align-items: center;
 	justify-content: center;
 	border-radius: var(--af-radius-md, 10px);
-	background: var(--af-gray-100, #F1F5F9);
-	color: var(--af-gray-600, #475569);
+	background: var(--af-gray-100, #EEF2F0);
+	color: var(--af-gray-600, #4a5c61);
 }
 
 .af-cobranza-charge.is-paid .af-cobranza-charge__icon {
-	background: var(--af-success-50, #F0FDF4);
+	background: var(--af-success-50, #EAF4F2);
 	color: var(--af-success-700);
 }
 
 /* Tono del borde según el estado del cargo. */
 
 .af-cobranza-charge.is-pending {
-	border-color: color-mix(in srgb, var(--af-info-500, #0EA5E9) 34%, transparent);
+	border-color: color-mix(in srgb, var(--af-info-500, #3882F6) 34%, transparent);
 }
 
 .af-cobranza-charge.is-pending .af-cobranza-charge__icon {
@@ -1306,11 +1306,11 @@
 }
 
 .af-cobranza-charge.is-overdue {
-	border-color: color-mix(in srgb, var(--af-danger-500, #E5484D) 42%, transparent);
+	border-color: color-mix(in srgb, var(--af-danger-500, #D9534F) 42%, transparent);
 }
 
 .af-cobranza-charge.is-overdue .af-cobranza-charge__icon {
-	background: var(--af-danger-50, #FFF5F5);
+	background: var(--af-danger-50, #FBECEB);
 	color: var(--af-danger-700);
 }
 
@@ -1325,18 +1325,18 @@
 .af-cobranza-charge__label {
 	font-size: 13.5px;
 	font-weight: 700;
-	color: var(--af-gray-900, #0F172A);
+	color: var(--af-gray-900, #193238);
 	line-height: 1.3;
 }
 
 .af-cobranza-charge__label small {
 	font-weight: 500;
-	color: var(--af-gray-500, #64748B);
+	color: var(--af-gray-500, #647579);
 }
 
 .af-cobranza-charge__meta {
 	font-size: var(--af-text-xs, 12px);
-	color: var(--af-gray-500, #64748B);
+	color: var(--af-gray-500, #647579);
 }
 
 .af-cobranza-charge__amount {
@@ -1353,7 +1353,7 @@
 	font-variant-numeric: tabular-nums;
 	font-size: 14px;
 	font-weight: 800;
-	color: var(--af-gray-900, #0F172A);
+	color: var(--af-gray-900, #193238);
 	white-space: nowrap;
 }
 
@@ -1362,11 +1362,11 @@
 	font-variant-numeric: tabular-nums;
 	font-size: var(--af-text-xs, 12px);
 	font-weight: 700;
-	color: var(--af-warning-700, #B45309);
+	color: var(--af-warning-700, #9A6128);
 }
 
 .af-cobranza-charge.is-paid .af-cobranza-charge__balance {
-	color: var(--af-success-700, #15803D);
+	color: var(--af-success-700, #2F7D73);
 }
 
 .af-cobranza-charge__actions {
@@ -1385,11 +1385,11 @@
 .af-cobranza-empty {
 	margin: 0 0 var(--af-space-4);
 	padding: var(--af-space-5);
-	border: 1px dashed var(--af-gray-300, #CBD5E1);
+	border: 1px dashed var(--af-gray-300, #C3D1CE);
 	border-radius: var(--af-radius-md, 10px);
 	text-align: center;
 	font-size: var(--af-text-sm, 14px);
-	color: var(--af-gray-500, #64748B);
+	color: var(--af-gray-500, #647579);
 }
 
 /* Panel "Anotar pago". */
@@ -1397,9 +1397,9 @@
 .af-cobranza-pay {
 	margin: var(--af-space-4) 0 0;
 	padding: var(--af-space-4);
-	border: 1px solid var(--af-primary-200, #8FDBCA);
+	border: 1px solid var(--af-primary-200, #9CC3C0);
 	border-radius: var(--af-radius-lg, 14px);
-	background: var(--af-primary-50, #E6F7F3);
+	background: var(--af-primary-50, #DDEEEB);
 }
 
 .af-cobranza-pay__title {
@@ -1412,7 +1412,7 @@
 .af-cobranza-pay__meta {
 	margin-bottom: var(--af-space-3);
 	font-size: var(--af-text-xs, 12px);
-	color: var(--af-gray-600, #475569);
+	color: var(--af-gray-600, #4a5c61);
 }
 
 .af-cobranza-pay .af-modal__field {

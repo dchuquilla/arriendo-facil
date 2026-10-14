@@ -104,9 +104,9 @@ class Arriendo_Facil_Accommodation_Featured_Admin {
 		$css = '.column-af_featured{width:90px;text-align:center;}'
 			. '.af-featured-toggle-wrap{display:inline-flex;align-items:center;gap:6px;cursor:pointer;}'
 			. '.af-featured-toggle-wrap input{margin:0;}'
-			. '.af-featured-toggle-state{font-size:12px;color:#6b7280;}'
+			. '.af-featured-toggle-state{font-size:12px;color:#647579;}'
 			. '.af-featured-toggle-wrap.is-loading{opacity:.5;pointer-events:none;}'
-			. '.af-featured-toggle-wrap.is-on .af-featured-toggle-state{color:#065f46;font-weight:600;}';
+			. '.af-featured-toggle-wrap.is-on .af-featured-toggle-state{color:#1f5a52;font-weight:600;}';
 		wp_register_style( 'af-featured-toggle', false, array(), ARRIENDO_FACIL_VERSION );
 		wp_enqueue_style( 'af-featured-toggle' );
 		wp_add_inline_style( 'af-featured-toggle', $css );

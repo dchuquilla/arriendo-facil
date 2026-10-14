@@ -196,8 +196,8 @@ $totals_platform = array(
 			data: {
 				labels: data.labels,
 				datasets: [
-					{ label: '<?php echo esc_js( __( 'Cobrado', 'arriendo-facil' ) ); ?>', data: data.collected, backgroundColor: '#00A884' },
-					{ label: '<?php echo esc_js( __( 'Pendiente', 'arriendo-facil' ) ); ?>', data: data.pending, backgroundColor: '#F59E0B' }
+					{ label: '<?php echo esc_js( __( 'Cobrado', 'arriendo-facil' ) ); ?>', data: data.collected, backgroundColor: '#164A55' },
+					{ label: '<?php echo esc_js( __( 'Pendiente', 'arriendo-facil' ) ); ?>', data: data.pending, backgroundColor: '#D89B5B' }
 				]
 			},
 			options: {
@@ -334,7 +334,7 @@ $totals_platform = array(
 	<div style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:9991; background:#fff; border-radius:12px; padding:24px; width:min(480px, 92vw); box-shadow:0 20px 50px rgba(0,0,0,.3);">
 		<h2 style="margin-top:0;" id="af-admin-review-title"><?php esc_html_e( 'Revisar verificación', 'arriendo-facil' ); ?></h2>
 		<p class="description"><?php esc_html_e( 'Revisa la documentación del gestor y aprueba, rechaza o reinicia su verificación.', 'arriendo-facil' ); ?></p>
-		<div id="af-admin-review-body" style="max-height:50vh; overflow:auto; margin-bottom:12px; border:1px solid #e5e7eb; border-radius:8px; padding:12px;">
+		<div id="af-admin-review-body" style="max-height:50vh; overflow:auto; margin-bottom:12px; border:1px solid #dce5e3; border-radius:8px; padding:12px;">
 			<p class="description" style="margin:0;"><?php esc_html_e( 'Cargando información...', 'arriendo-facil' ); ?></p>
 		</div>
 		<label style="display:block; margin-bottom:12px;">
@@ -352,14 +352,14 @@ $totals_platform = array(
 <style>
 		#af-admin-review-body h3 { margin: 14px 0 8px; font-size: 14px; }
 		.af-review-info { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; }
-		.af-review-info__row { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; border-bottom: 1px solid #f3f4f6; padding: 4px 0; }
-		.af-review-info__label { color: #6b7280; flex: 0 0 auto; }
+		.af-review-info__row { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; border-bottom: 1px solid #eef2f0; padding: 4px 0; }
+		.af-review-info__label { color: #647579; flex: 0 0 auto; }
 		.af-review-info__value { font-weight: 600; text-align: right; overflow-wrap: anywhere; }
-		.af-review-doc { display: flex; align-items: center; gap: 10px; font-size: 13px; padding: 8px 0; border-bottom: 1px solid #f3f4f6; flex-wrap: wrap; }
+		.af-review-doc { display: flex; align-items: center; gap: 10px; font-size: 13px; padding: 8px 0; border-bottom: 1px solid #eef2f0; flex-wrap: wrap; }
 		.af-review-doc.is-missing { opacity: .7; }
 		.af-review-doc__label { font-weight: 600; }
-		.af-review-doc__meta { color: #6b7280; font-size: 12px; }
-		.af-review-notes { margin-top: 10px; padding: 8px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; font-size: 13px; color: #8a6d1c; }
+		.af-review-doc__meta { color: #647579; font-size: 12px; }
+		.af-review-notes { margin-top: 10px; padding: 8px; background: #f5e9da; border: 1px solid #ebd3b3; border-radius: 6px; font-size: 13px; color: #8a6d1c; }
 	</style>
 </div>
 
@@ -511,7 +511,7 @@ $totals_platform = array(
 					if (res && res.success) {
 						reviewBody.innerHTML = renderReviewDetail(res.data);
 					} else {
-						reviewBody.innerHTML = '<p style="color:#b45309;">' + escHtml((res && res.data && res.data.message) ? res.data.message : '<?php echo esc_js( __( 'Error al cargar la información.', 'arriendo-facil' ) ); ?>') + '</p>';
+						reviewBody.innerHTML = '<p style="color:#9a6128;">' + escHtml((res && res.data && res.data.message) ? res.data.message : '<?php echo esc_js( __( 'Error al cargar la información.', 'arriendo-facil' ) ); ?>') + '</p>';
 					}
 				});
 			}

@@ -359,7 +359,7 @@ $any_storage_field_locked = $provider_locked || $access_key_locked || $secret_ke
 						<option value="direct_xml" <?php selected( $contract_method, 'direct_xml' ); ?>><?php esc_html_e( 'Direct XML (legacy)', 'arriendo-facil' ); ?></option>
 					</select>
 					<?php if ( ! $pandoc_available && 'markdown' === $contract_method ) : ?>
-						<p class="description" style="color: #d63638;">
+						<p class="description" style="color: #d9534f;">
 							<span class="dashicons dashicons-warning"></span>
 							<?php esc_html_e( 'Pandoc is not installed on this server. The markdown method will fall back to Direct XML automatically. Install pandoc to enable this feature.', 'arriendo-facil' ); ?>
 						</p>

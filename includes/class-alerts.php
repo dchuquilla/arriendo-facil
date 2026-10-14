@@ -732,6 +732,10 @@ class Arriendo_Facil_Alerts {
 			return array( 'sent' => 0, 'message' => __( 'Tu cuenta no tiene un correo configurado.', 'arriendo-facil' ) );
 		}
 
+		if ( Arriendo_Facil_Email::is_opted_out( $to ) ) {
+			return array( 'sent' => 0, 'message' => __( 'Este correo se dio de baja de los recordatorios. Puede reactivarlo desde el enlace al pie de cualquier correo anterior.', 'arriendo-facil' ) );
+		}
+
 		$alerts = self::get_for_user( $user_id, 20, true );
 		if ( empty( $alerts ) ) {
 			return array( 'sent' => 0, 'message' => __( 'No hay alertas pendientes por enviar.', 'arriendo-facil' ) );
@@ -761,7 +765,7 @@ class Arriendo_Facil_Alerts {
 			return array( 'sent' => 0, 'message' => __( 'El recordatorio diario ya fue enviado hoy.', 'arriendo-facil' ) );
 		}
 
-		$sent = wp_mail( $to, self::email_subject( count( $alerts ) ), self::build_email_html( $alerts, $from ), self::email_headers() );
+		$sent = Arriendo_Facil_Email::send( $to, self::email_subject( count( $alerts ) ), self::build_email_args( $alerts, $from ), Arriendo_Facil_Email::CAT_NOTIFICATION, self::email_headers() );
 
 		if ( $sent ) {
 			update_option( $daily_key, time(), false );
@@ -851,40 +855,44 @@ class Arriendo_Facil_Alerts {
 	 * @param string             $to     Destination address (unused placeholder for footer).
 	 * @return string
 	 */
-	private static function build_email_html( $alerts, $to = '' ) {
-		$html = '<div style="font-family:Arial,Helvetica,sans-serif;color:#1f2d3d;max-width:600px;margin:0 auto;">';
-		$html .= '<h2 style="margin:0 0 6px;">Arriendo Fácil</h2>';
-		$html .= '<p style="margin:0 0 18px;color:#52606d;">';
-		$html .= esc_html(
-			sprintf(
-				/* translators: %d: number of pending alerts */
-				_n( 'Tienes %d alerta operativa pendiente de revisión.', 'Tienes %d alertas operativas pendientes de revisión.', count( $alerts ), 'arriendo-facil' ),
-				count( $alerts )
-			)
+	private static function build_email_args( $alerts, $to = '' ) {
+		$count = count( $alerts );
+		$tones = array(
+			'danger'  => array( 'fg' => '#B03A36', 'bar' => '#D9534F', 'bg' => '#FBECEB' ),
+			'warning' => array( 'fg' => '#7A4B16', 'bar' => '#D89B5B', 'bg' => '#F5E9DA' ),
+			'info'    => array( 'fg' => '#1F5FC4', 'bar' => '#3882F6', 'bg' => '#E8F1FE' ),
 		);
-		$html .= '</p>';
 
-		$html .= '<div style="border:1px solid #e1e7ee;border-radius:8px;overflow:hidden;">';
+		$html = '';
 		foreach ( (array) $alerts as $alert ) {
-			$severity = isset( $alert->severity ) ? $alert->severity : 'info';
-			$color    = 'danger' === $severity ? '#b91c1c' : ( 'warning' === $severity ? '#b45309' : '#2563eb' );
-			$icon     = 'danger' === $severity ? '&#9888;' : ( 'warning' === $severity ? '&#9888;' : '&#9432;' );
+			$severity = isset( $alert->severity ) && isset( $tones[ $alert->severity ] ) ? $alert->severity : 'info';
+			$tone     = $tones[ $severity ];
 
-			$html .= '<div style="padding:12px 14px;border-bottom:1px solid #eef2f6;">';
-			$html .= '<div style="font-weight:700;color:' . $color . ';">' . $icon . ' ' . esc_html( (string) ( $alert->title ?? '' ) ) . '</div>';
-			$html .= '<div style="margin-top:4px;font-size:13px;color:#3c4856;line-height:1.5;">' . esc_html( (string) ( $alert->message ?? '' ) ) . '</div>';
-			if ( ! empty( $alert->url ) ) {
-				$html .= '<a href="' . esc_url( $alert->url ) . '" style="display:inline-block;margin-top:8px;font-size:13px;font-weight:600;color:#2563eb;text-decoration:none;">' . esc_html__( 'Ver en el sistema', 'arriendo-facil' ) . ' &rarr;</a>';
+			$html .= '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 12px;"><tr>';
+			$html .= '<td style="background:' . $tone['bg'] . ';border-left:4px solid ' . $tone['bar'] . ';border-radius:8px;padding:14px 16px;">';
+			$html .= '<div style="font-size:15px;font-weight:700;color:' . $tone['fg'] . ';">' . esc_html( (string) ( $alert->title ?? '' ) ) . '</div>';
+			if ( ! empty( $alert->message ) ) {
+				$html .= '<div style="margin-top:4px;font-size:14px;line-height:1.55;color:#193238;">' . esc_html( (string) $alert->message ) . '</div>';
 			}
-			$html .= '</div>';
+			if ( ! empty( $alert->url ) ) {
+				$html .= '<a href="' . esc_url( $alert->url ) . '" style="display:inline-block;margin-top:8px;font-size:14px;font-weight:700;color:#164A55;text-decoration:underline;">' . esc_html__( 'Ver en el sistema', 'arriendo-facil' ) . ' &rarr;</a>';
+			}
+			$html .= '</td></tr></table>';
 		}
-		$html .= '</div>';
 
-		$html .= '<p style="margin:18px 0 0;font-size:12px;color:#7a8694;">';
-		$html .= esc_html__( 'Este es un recordatorio automático del sistema de alertas de Arriendo Fácil.', 'arriendo-facil' );
-		$html .= '</p></div>';
-
-		return $html;
+		return array(
+			'preheader' => self::email_subject( $count ),
+			'eyebrow'   => __( 'Alertas operativas', 'arriendo-facil' ),
+			'title'     => sprintf(
+				/* translators: %d: number of pending alerts */
+				_n( 'Tienes %d alerta pendiente', 'Tienes %d alertas pendientes', $count, 'arriendo-facil' ),
+				$count
+			),
+			'status'    => array( 'type' => 'warning', 'label' => __( 'Requiere revisión', 'arriendo-facil' ) ),
+			'body_text' => __( 'Estas son las alertas operativas pendientes de revisión, ordenadas por urgencia.', 'arriendo-facil' ),
+			'content'   => $html,
+			'note'      => __( 'Este es un recordatorio automático del sistema de alertas de Arriendo Fácil.', 'arriendo-facil' ),
+		);
 	}
 
 	/**

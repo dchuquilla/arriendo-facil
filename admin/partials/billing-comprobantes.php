@@ -54,14 +54,14 @@ $billing_ajax_nonce = wp_create_nonce( 'af_billing_nonce' );
 $estado_labels = array(
 	'generada'   => array( 'label' => __( 'Generada', 'arriendo-facil' ),   'color' => '#757575', 'icon' => '○', 'grupo' => 'en_proceso' ),
 	'firmada'    => array( 'label' => __( 'Firmada', 'arriendo-facil' ),    'color' => '#455a64', 'icon' => '○', 'grupo' => 'en_proceso' ),
-	'enviada'    => array( 'label' => __( 'Enviada', 'arriendo-facil' ),    'color' => '#1565c0', 'icon' => '⟳', 'grupo' => 'en_proceso' ),
-	'autorizada' => array( 'label' => __( 'Autorizada', 'arriendo-facil' ), 'color' => '#2e7d32', 'icon' => '✓', 'grupo' => 'autorizadas' ),
-	'autorizada_sin_ride' => array( 'label' => __( 'Autorizada sin RIDE', 'arriendo-facil' ), 'color' => '#2e7d32', 'icon' => '✓', 'grupo' => 'autorizadas' ),
-	'error_envio' => array( 'label' => __( 'Error envío', 'arriendo-facil' ), 'color' => '#c62828', 'icon' => '✕', 'grupo' => 'error' ),
-	'error_autorizacion' => array( 'label' => __( 'Error autorización', 'arriendo-facil' ), 'color' => '#c62828', 'icon' => '✕', 'grupo' => 'error' ),
-	'devuelta'   => array( 'label' => __( 'Devuelta', 'arriendo-facil' ),   'color' => '#c62828', 'icon' => '↺', 'grupo' => 'error' ),
-	'no_autorizada' => array( 'label' => __( 'No autorizada', 'arriendo-facil' ), 'color' => '#c62828', 'icon' => '✕', 'grupo' => 'error' ),
-	'rechazada'  => array( 'label' => __( 'Rechazada', 'arriendo-facil' ),  'color' => '#c62828', 'icon' => '✕', 'grupo' => 'error' ),
+	'enviada'    => array( 'label' => __( 'Enviada', 'arriendo-facil' ),    'color' => '#3882f6', 'icon' => '⟳', 'grupo' => 'en_proceso' ),
+	'autorizada' => array( 'label' => __( 'Autorizada', 'arriendo-facil' ), 'color' => '#2f7d73', 'icon' => '✓', 'grupo' => 'autorizadas' ),
+	'autorizada_sin_ride' => array( 'label' => __( 'Autorizada sin RIDE', 'arriendo-facil' ), 'color' => '#2f7d73', 'icon' => '✓', 'grupo' => 'autorizadas' ),
+	'error_envio' => array( 'label' => __( 'Error envío', 'arriendo-facil' ), 'color' => '#b03a36', 'icon' => '✕', 'grupo' => 'error' ),
+	'error_autorizacion' => array( 'label' => __( 'Error autorización', 'arriendo-facil' ), 'color' => '#b03a36', 'icon' => '✕', 'grupo' => 'error' ),
+	'devuelta'   => array( 'label' => __( 'Devuelta', 'arriendo-facil' ),   'color' => '#b03a36', 'icon' => '↺', 'grupo' => 'error' ),
+	'no_autorizada' => array( 'label' => __( 'No autorizada', 'arriendo-facil' ), 'color' => '#b03a36', 'icon' => '✕', 'grupo' => 'error' ),
+	'rechazada'  => array( 'label' => __( 'Rechazada', 'arriendo-facil' ),  'color' => '#b03a36', 'icon' => '✕', 'grupo' => 'error' ),
 	'anulada'    => array( 'label' => __( 'Anulada', 'arriendo-facil' ),    'color' => '#e65100', 'icon' => '–', 'grupo' => 'error' ),
 );
 
@@ -266,7 +266,7 @@ foreach ( $invoices as $inv_row ) {
 			</label>
 			<div class="af-lease-search__row">
 				<input type="text" id="af-lease-search-input" placeholder="<?php esc_attr_e( 'Escribe al menos 2 caracteres…', 'arriendo-facil' ); ?>" class="regular-text" autocomplete="off" />
-				<span id="af-lease-search-spinner" hidden style="color: var(--af-gray-500, #7A7870);"><?php esc_html_e( 'Buscando…', 'arriendo-facil' ); ?></span>
+				<span id="af-lease-search-spinner" hidden style="color: var(--af-gray-500, #647579);"><?php esc_html_e( 'Buscando…', 'arriendo-facil' ); ?></span>
 			</div>
 			<ul id="af-lease-search-results" class="af-lease-search__list" style="display:none;"></ul>
 		</div>
@@ -298,8 +298,8 @@ foreach ( $invoices as $inv_row ) {
 			<button type="button" class="af-modal__close" data-af-close-billing-preview aria-label="<?php esc_attr_e( 'Cerrar', 'arriendo-facil' ); ?>">&times;</button>
 		</div>
 		<div class="af-modal__body">
-			<p id="af-billing-preview-summary" style="margin-top:0; color: var(--af-gray-600, #55556B);"></p>
-			<div id="af-billing-preview-warning" style="display:none; margin:8px 0; padding:10px; border-radius:6px; background: var(--af-warning-50, #FFF4E5); color: var(--af-warning-700, #7A4B00); border:1px solid var(--af-warning-200, #F3D2A2);"></div>
+			<p id="af-billing-preview-summary" style="margin-top:0; color: var(--af-gray-600, #647579);"></p>
+			<div id="af-billing-preview-warning" style="display:none; margin:8px 0; padding:10px; border-radius:6px; background: var(--af-warning-50, #F5E9DA); color: var(--af-warning-700, #7A4B00); border:1px solid var(--af-warning-200, #EBD3B3);"></div>
 
 			<div class="af-form-grid-2" style="margin-bottom:10px;">
 				<label>
@@ -332,7 +332,7 @@ foreach ( $invoices as $inv_row ) {
 				<div style="grid-column:1 / -1;"><?php esc_html_e( 'Total:', 'arriendo-facil' ); ?> <strong id="af-billing-preview-total">$0.00</strong></div>
 			</div>
 
-			<p id="af-billing-preview-feedback" aria-live="polite" style="min-height:20px; margin:0 0 10px; color: var(--af-gray-600, #55556B);"></p>
+			<p id="af-billing-preview-feedback" aria-live="polite" style="min-height:20px; margin:0 0 10px; color: var(--af-gray-600, #647579);"></p>
 
 			<div style="display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;">
 				<button type="button" class="button" data-af-close-billing-preview><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
@@ -477,7 +477,7 @@ foreach ( $invoices as $inv_row ) {
 									$tipo = strtoupper( (string) ( $msg['tipo'] ?? '' ) );
 									$texto = (string) ( $msg['mensaje'] ?? '' );
 									$info = (string) ( $msg['informacionAdicional'] ?? '' );
-									$color = 'ERROR' === $tipo ? 'var(--af-danger-600, #DC2626)' : 'var(--af-warning-600, #D97706)';
+									$color = 'ERROR' === $tipo ? 'var(--af-danger-600, #D9534F)' : 'var(--af-warning-600, #D89B5B)';
 								?>
 									<li class="af-error-details__msg" style="color:<?php echo esc_attr( $color ); ?>; margin:4px 0;">
 										<strong><?php echo esc_html( $tipo ); ?>:</strong>
@@ -539,7 +539,7 @@ foreach ( $invoices as $inv_row ) {
 				.then( function ( resp ) {
 					spinner.hidden = true;
 					if ( ! resp.success || ! resp.data.leases.length ) {
-						resultsList.innerHTML = '<li style="padding:8px 12px; color: var(--af-gray-500, #7A7870);"><?php echo esc_js( __( 'Sin resultados', 'arriendo-facil' ) ); ?></li>';
+						resultsList.innerHTML = '<li style="padding:8px 12px; color: var(--af-gray-500, #647579);"><?php echo esc_js( __( 'Sin resultados', 'arriendo-facil' ) ); ?></li>';
 						resultsList.style.display = 'block';
 						return;
 					}
@@ -608,7 +608,7 @@ foreach ( $invoices as $inv_row ) {
 			return;
 		}
 		feedback.textContent = text || '';
-		feedback.style.color = isError ? 'var(--af-danger-600, #DC2626)' : 'var(--af-gray-600, #55556B)';
+		feedback.style.color = isError ? 'var(--af-danger-600, #D9534F)' : 'var(--af-gray-600, #647579)';
 	}
 
 	function prefillFromSelectedLease() {
@@ -1058,7 +1058,7 @@ foreach ( $invoices as $inv_row ) {
 	if ( ! document.getElementById( 'af-billing-pulse-keyframes' ) ) {
 		var style = document.createElement( 'style' );
 		style.id = 'af-billing-pulse-keyframes';
-		style.textContent = '@keyframes pulse { 0% { background-color: var(--af-warning-50, #FFF4E5); } 50% { background-color: var(--af-gray-0, #fff); } 100% { background-color: var(--af-warning-50, #FFF4E5); } }';
+		style.textContent = '@keyframes pulse { 0% { background-color: var(--af-warning-50, #F5E9DA); } 50% { background-color: var(--af-gray-0, #fff); } 100% { background-color: var(--af-warning-50, #F5E9DA); } }';
 		document.head.appendChild( style );
 	}
 }());

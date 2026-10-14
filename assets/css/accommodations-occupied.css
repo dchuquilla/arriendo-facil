@@ -17,7 +17,7 @@
 
 .af-occupied-badge {
 	background-color: rgba(255, 255, 255, 0.95);
-	color: #dc2626;
+	color: #d9534f;
 	font-weight: 700;
 	font-size: 18px;
 	padding: 12px 24px;
@@ -25,7 +25,7 @@
 	text-transform: uppercase;
 	letter-spacing: 1px;
 	box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
-	border: 2px solid #dc2626;
+	border: 2px solid #d9534f;
 }
 
 /* Featured Accommodation with Occupied State */
@@ -39,7 +39,7 @@
 
 .af-featured-accommodation--occupied {
 	opacity: 0.85;
-	border: 2px solid #fecaca;
+	border: 2px solid #f2c4c2;
 }
 
 .af-featured-accommodation-image {
@@ -60,16 +60,16 @@
 /* Disabled state for occupied accommodations */
 
 .af-featured-accommodation--occupied .af-featured-accommodation-content {
-	background-color: #fef2f2;
-	border-top: 3px solid #fecaca;
+	background-color: #fbeceb;
+	border-top: 3px solid #f2c4c2;
 }
 
 .af-featured-accommodation--occupied h3 {
-	color: #7f1d1d;
+	color: #8a2f2b;
 }
 
 .af-featured-accommodation--occupied p {
-	color: #9ca3af;
+	color: #8a9799;
 }
 
 .af-featured-accommodation--occupied ul {
@@ -86,10 +86,10 @@
 }
 
 .af-occupied-accommodation {
-	border: 2px solid #fecaca;
+	border: 2px solid #f2c4c2;
 	border-radius: 8px;
 	overflow: hidden;
-	background-color: #fef2f2;
+	background-color: #fbeceb;
 	transition: transform 0.2s ease-in-out;
 	position: relative;
 }
@@ -103,7 +103,7 @@
 	width: 100%;
 	height: 200px;
 	overflow: hidden;
-	background-color: #e5e7eb;
+	background-color: #dce5e3;
 }
 
 .af-occupied-accommodation-image img {
@@ -121,13 +121,13 @@
 	margin: 0 0 8px;
 	font-size: 18px;
 	font-weight: 600;
-	color: #7f1d1d;
+	color: #8a2f2b;
 	line-height: 1.4;
 }
 
 .af-occupied-accommodation-content p {
 	margin: 0 0 12px;
-	color: #9ca3af;
+	color: #8a9799;
 	font-size: 14px;
 }
 
@@ -140,7 +140,7 @@
 
 .af-occupied-accommodation-content li {
 	padding: 4px 0;
-	color: #6b7280;
+	color: #647579;
 	font-size: 14px;
 }
 
@@ -148,9 +148,9 @@
 	width: 100%;
 	padding: 10px 16px;
 	text-align: center;
-	background-color: #fee2e2;
-	color: #991b1b;
-	border: 2px solid #dc2626;
+	background-color: #fbeceb;
+	color: #b03a36;
+	border: 2px solid #d9534f;
 	border-radius: 4px;
 	font-size: 14px;
 	font-weight: 600;

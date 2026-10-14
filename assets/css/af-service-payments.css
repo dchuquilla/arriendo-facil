@@ -13,10 +13,10 @@
 	flex-wrap: wrap;
 	padding: 16px 20px;
 	margin-bottom: var(--af-space-4);
-	border: 1px solid var(--af-warning-100, #fef0c7);
-	border-left: 4px solid var(--af-warning-500, #f79009);
+	border: 1px solid var(--af-warning-100, #f5e9da);
+	border-left: 4px solid var(--af-warning-500, #d89b5b);
 	border-radius: 12px;
-	background: linear-gradient(90deg, #fffaeb, #fffdf7);
+	background: linear-gradient(90deg, #f5e9da, #f7f8f6);
 }
 
 .af-service-callout--warning .af-service-callout__icon {
@@ -27,8 +27,8 @@
 	height: 36px;
 	flex: 0 0 36px;
 	border-radius: 50%;
-	color: #b54708;
-	background: #fef0c7;
+	color: #9a6128;
+	background: #f5e9da;
 }
 
 .af-service-callout__body {
@@ -45,7 +45,7 @@
 
 .af-service-callout__body p {
 	margin: 4px 0 0;
-	color: #93370d;
+	color: #9a6128;
 	font-size: 13px;
 	line-height: 1.5;
 }
@@ -53,10 +53,10 @@
 /* ── Service palette ─────────────────────────────────────────────────── */
 
 .af-sp-icon--agua,     .af-sp-chip--agua     { --sp-c: #0284c7; --sp-bg: #e0f2fe; }
-.af-sp-icon--luz,      .af-sp-chip--luz      { --sp-c: #b45309; --sp-bg: #fef3c7; }
+.af-sp-icon--luz,      .af-sp-chip--luz      { --sp-c: #9a6128; --sp-bg: #f5e9da; }
 .af-sp-icon--gas,      .af-sp-chip--gas      { --sp-c: #c2410c; --sp-bg: #ffedd5; }
 .af-sp-icon--internet, .af-sp-chip--internet { --sp-c: #7c3aed; --sp-bg: #ede9fe; }
-.af-sp-icon--telefono, .af-sp-chip--telefono { --sp-c: #0f766e; --sp-bg: #ccfbf1; }
+.af-sp-icon--telefono, .af-sp-chip--telefono { --sp-c: #2f7d73; --sp-bg: #ccfbf1; }
 
 .af-sp-icon {
 	display: inline-flex;
@@ -177,7 +177,7 @@
 
 .af-sp-tab--overdue  { --tab-c: var(--af-danger-500);  --tab-bg: var(--af-danger-50); }
 .af-sp-tab--due_soon { --tab-c: var(--af-warning-700); --tab-bg: var(--af-warning-50); }
-.af-sp-tab--upcoming { --tab-c: #2563eb;               --tab-bg: #eff6ff; }
+.af-sp-tab--upcoming { --tab-c: #3882f6;               --tab-bg: #e8f1fe; }
 .af-sp-tab--paid     { --tab-c: var(--af-success-500); --tab-bg: var(--af-success-50); }
 
 .af-sp-tab.is-active {
@@ -335,7 +335,7 @@
 .af-sp-property.is-unconfigured {
 	border-style: dashed;
 	border-color: var(--af-warning-500);
-	background: #fffdf7;
+	background: #f7f8f6;
 }
 
 @keyframes af-sp-in {
@@ -449,7 +449,7 @@
 }
 
 .af-sp-tile.is-overdue {
-	background: linear-gradient(180deg, #fff5f5, #fff 60%);
+	background: linear-gradient(180deg, #fbeceb, #fff 60%);
 }
 
 .af-sp-tile__top {
@@ -735,7 +735,7 @@
 	margin: 0;
 	padding: 10px 12px;
 	border-radius: 8px;
-	background: #f6f7f7;
+	background: #f7f8f6;
 	font-weight: 600;
 }
 
@@ -754,7 +754,7 @@
 	margin-bottom: 6px;
 	font-size: 13px;
 	font-weight: 600;
-	color: #1d2327;
+	color: #193238;
 }
 
 .af-sp-picker__grid {
@@ -771,7 +771,7 @@
 	gap: 6px;
 	margin: 0;
 	padding: 12px 6px 10px;
-	border: 1.5px solid #dcdcde;
+	border: 1.5px solid #dce5e3;
 	border-radius: 12px;
 	background: #fff;
 	cursor: pointer;
@@ -809,7 +809,7 @@
 .af-sp-picker__label {
 	font-size: 13px;
 	font-weight: 600;
-	color: #1d2327;
+	color: #193238;
 }
 
 .af-sp-picker__badge {
@@ -819,7 +819,7 @@
 	right: -4px;
 	padding: 1px 6px;
 	border-radius: 999px;
-	background: #1d2327;
+	background: #193238;
 	color: #fff;
 	font-size: 10px;
 	font-weight: 600;
@@ -853,18 +853,18 @@
 	min-width: 34px;
 	height: 34px;
 	padding: 0 6px;
-	border: 1px solid #dcdcde;
+	border: 1px solid #dce5e3;
 	border-radius: 8px;
 	background: #fff;
-	color: #50575e;
+	color: #4a5c61;
 	font-weight: 600;
 	cursor: pointer;
 }
 
 .af-sp-daypicks button:hover,
 .af-sp-daypicks button.is-active {
-	border-color: #1d2327;
-	background: #1d2327;
+	border-color: #193238;
+	background: #193238;
 	color: #fff;
 }
 
@@ -872,8 +872,8 @@
 	margin: 8px 0 0;
 	padding: 8px 10px;
 	border-radius: 8px;
-	background: #ecfdf5;
-	color: #065f46;
+	background: #eaf4f2;
+	color: #1f5a52;
 	font-size: 13px;
 }
 
@@ -882,8 +882,8 @@
 }
 
 .af-sp-preview.is-error {
-	background: #fef2f2;
-	color: #991b1b;
+	background: #fbeceb;
+	color: #b03a36;
 }
 
 @media (max-width: 782px) {

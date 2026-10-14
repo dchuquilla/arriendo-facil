@@ -131,6 +131,7 @@ class Arriendo_Facil_Tenant_Signup {
 			</form>
 		</div>
 
+		<?php echo Arriendo_Facil_Toast::inline_assets(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static, escaped markup. ?>
 		<script>
 		(function(){
 			const app = document.getElementById(<?php echo wp_json_encode( $instance_id ); ?>);
@@ -150,14 +151,28 @@ class Arriendo_Facil_Tenant_Signup {
 				alertBox.style.display = 'block';
 				alertBox.textContent = String(message || '');
 				if(type === 'success'){
-					alertBox.style.background = '#ecfdf5';
-					alertBox.style.border = '1px solid #86efac';
-					alertBox.style.color = '#166534';
+					alertBox.style.background = '#eaf4f2';
+					alertBox.style.border = '1px solid #9cc3c0';
+					alertBox.style.color = '#1f5a52';
 				} else {
-					alertBox.style.background = '#fef2f2';
-					alertBox.style.border = '1px solid #fca5a5';
-					alertBox.style.color = '#991b1b';
+					alertBox.style.background = '#fbeceb';
+					alertBox.style.border = '1px solid #eba8a5';
+					alertBox.style.color = '#b03a36';
 				}
+			}
+
+			function rejectRegistration(message){
+				showAlert(message, 'error');
+				notifyRegistration(false, message);
+			}
+
+			function notifyRegistration(approved, message){
+				if(typeof window.afToast !== 'function'){ return; }
+				window.afToast({
+					type: approved ? 'approved' : 'rejected',
+					title: approved ? <?php echo wp_json_encode( __( '¡Registro aprobado!', 'arriendo-facil' ) ); ?> : <?php echo wp_json_encode( __( 'Registro rechazado', 'arriendo-facil' ) ); ?>,
+					message: String(message || '')
+				});
 			}
 
 			function validatePasswordClientSide(password){
@@ -178,12 +193,12 @@ class Arriendo_Facil_Tenant_Signup {
 				e.preventDefault();
 
 				if(!validatePasswordClientSide(String(passwordInput && passwordInput.value ? passwordInput.value : ''))){
-					showAlert(<?php echo wp_json_encode( __( 'La contrasena no cumple los requisitos: minimo 10 caracteres, mayuscula, minuscula, numero y simbolo.', 'arriendo-facil' ) ); ?>, 'error');
+					rejectRegistration(<?php echo wp_json_encode( __( 'La contrasena no cumple los requisitos: minimo 10 caracteres, mayuscula, minuscula, numero y simbolo.', 'arriendo-facil' ) ); ?>);
 					return;
 				}
 
 				if(String(passwordInput.value || '') !== String(passwordConfirmInput.value || '')){
-					showAlert(<?php echo wp_json_encode( __( 'Las contrasenas no coinciden.', 'arriendo-facil' ) ); ?>, 'error');
+					rejectRegistration(<?php echo wp_json_encode( __( 'Las contrasenas no coinciden.', 'arriendo-facil' ) ); ?>);
 					return;
 				}
 
@@ -205,18 +220,20 @@ class Arriendo_Facil_Tenant_Signup {
 					json = await response.json();
 				} catch (err) {
 					submitBtn.disabled = false;
-					showAlert(<?php echo wp_json_encode( __( 'No se pudo conectar con el servidor. Intenta nuevamente.', 'arriendo-facil' ) ); ?>, 'error');
+					rejectRegistration(<?php echo wp_json_encode( __( 'No se pudo conectar con el servidor. Intenta nuevamente.', 'arriendo-facil' ) ); ?>);
 					return;
 				}
 
 				submitBtn.disabled = false;
 				if(!json || !json.success){
 					const message = json && json.data && json.data.message ? json.data.message : <?php echo wp_json_encode( __( 'No se pudo crear la cuenta.', 'arriendo-facil' ) ); ?>;
-					showAlert(message, 'error');
+					rejectRegistration(message);
 					return;
 				}
 
-				showAlert((json.data && json.data.message) ? json.data.message : <?php echo wp_json_encode( __( 'Cuenta creada correctamente.', 'arriendo-facil' ) ); ?>, 'success');
+				const okMessage = (json.data && json.data.message) ? json.data.message : <?php echo wp_json_encode( __( 'Cuenta creada correctamente.', 'arriendo-facil' ) ); ?>;
+				showAlert(okMessage, 'success');
+				notifyRegistration(true, okMessage);
 				form.reset();
 				if(json.data && json.data.should_redirect && json.data.login_url){
 					setTimeout(function(){ window.location.href = String(json.data.login_url); }, 900);
@@ -843,24 +860,28 @@ class Arriendo_Facil_Tenant_Signup {
 
 		$subject = __( '[Arriendo Facil] Tu cuenta de inquilino fue creada', 'arriendo-facil' );
 
-		$message = '<div style="margin:0;padding:24px;background:#f8fafc;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#0f172a;">';
-		$message .= '<div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">';
-		$message .= '<div style="padding:18px 22px;background:linear-gradient(135deg,#0f766e,#0ea5a4);color:#ffffff;">';
-		$message .= '<h2 style="margin:0;font-size:20px;line-height:1.3;">' . esc_html__( 'Cuenta creada con exito', 'arriendo-facil' ) . '</h2>';
-		$message .= '</div>';
-		$message .= '<div style="padding:22px;">';
-		$message .= '<p style="margin:0 0 12px;line-height:1.6;">' . sprintf( esc_html__( 'Hola %s, tu cuenta de inquilino ya esta activa.', 'arriendo-facil' ), esc_html( '' !== $display ? $display : __( 'inquilino', 'arriendo-facil' ) ) ) . '</p>';
-		$message .= '<p style="margin:0 0 16px;line-height:1.6;color:#334155;">' . esc_html__( 'Desde ahora puedes iniciar sesion para gestionar tus visitas, reservas y documentos del proceso de arriendo.', 'arriendo-facil' ) . '</p>';
-		$message .= '<p style="margin:0 0 16px;">';
-		$message .= '<a href="' . esc_url( $login_url ) . '" style="display:inline-block;padding:11px 16px;background:#1d4ed8;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;">' . esc_html__( 'Iniciar sesion', 'arriendo-facil' ) . '</a>';
-		$message .= '</p>';
-		$message .= '<p style="margin:0;color:#475569;line-height:1.6;">' . esc_html__( 'Si olvidaste tu contrasena, puedes restablecerla aqui:', 'arriendo-facil' ) . ' <a href="' . esc_url( $recover_url ) . '">' . esc_html__( 'Recuperar contrasena', 'arriendo-facil' ) . '</a></p>';
-		$message .= '</div>';
-		$message .= '</div>';
-		$message .= '<p style="max-width:640px;margin:12px auto 0;font-size:12px;color:#64748b;text-align:center;">Arriendo Facil</p>';
-		$message .= '</div>';
-
-		wp_mail( $recipient, $subject, $message, array( 'Content-Type: text/html; charset=UTF-8' ) );
+		Arriendo_Facil_Email::send(
+			$recipient,
+			$subject,
+			array(
+				'preheader' => __( 'Tu cuenta de inquilino ya está activa.', 'arriendo-facil' ),
+				'eyebrow'   => __( 'Cuenta de inquilino', 'arriendo-facil' ),
+				'title'     => __( 'Cuenta creada con éxito', 'arriendo-facil' ),
+				'status'    => array( 'type' => 'success', 'label' => __( 'Cuenta activa', 'arriendo-facil' ) ),
+				'greeting'  => sprintf(
+					/* translators: %s: user display name */
+					__( 'Hola %s,', 'arriendo-facil' ),
+					'' !== $display ? $display : __( 'inquilino', 'arriendo-facil' )
+				),
+				'body_text' => __( 'Tu cuenta de inquilino ya está activa. Desde ahora puedes iniciar sesión para gestionar tus visitas, reservas y documentos del proceso de arriendo.', 'arriendo-facil' ),
+				'button'    => array(
+					'label' => __( 'Iniciar sesión', 'arriendo-facil' ),
+					'url'   => $login_url,
+				),
+				'content'   => '<p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#647579;">' . esc_html__( 'Si olvidaste tu contraseña, puedes restablecerla aquí:', 'arriendo-facil' ) . ' <a href="' . esc_url( $recover_url ) . '" style="color:#164A55;">' . esc_html__( 'Recuperar contraseña', 'arriendo-facil' ) . '</a></p>',
+			),
+			Arriendo_Facil_Email::CAT_TRANSACTIONAL
+		);
 	}
 
 	/**
@@ -945,24 +966,30 @@ class Arriendo_Facil_Tenant_Signup {
 
 		$subject = __( '[Arriendo Facil] Verifica tu correo para activar tu cuenta', 'arriendo-facil' );
 
-		$message = '<div style="margin:0;padding:24px;background:#f8fafc;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#0f172a;">';
-		$message .= '<div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">';
-		$message .= '<div style="padding:18px 22px;background:linear-gradient(135deg,#1d4ed8,#0ea5e9);color:#ffffff;">';
-		$message .= '<h2 style="margin:0;font-size:20px;line-height:1.3;">' . esc_html__( 'Verifica tu correo para activar tu cuenta', 'arriendo-facil' ) . '</h2>';
-		$message .= '</div>';
-		$message .= '<div style="padding:22px;">';
-		$message .= '<p style="margin:0 0 12px;line-height:1.6;">' . sprintf( esc_html__( 'Hola %s, recibimos tu solicitud de registro como inquilino.', 'arriendo-facil' ), esc_html( '' !== $display ? $display : __( 'inquilino', 'arriendo-facil' ) ) ) . '</p>';
-		$message .= '<p style="margin:0 0 16px;line-height:1.6;color:#334155;">' . esc_html__( 'Por seguridad, confirma que este correo te pertenece para activar la cuenta y poder iniciar sesion.', 'arriendo-facil' ) . '</p>';
-		$message .= '<p style="margin:0 0 16px;">';
-		$message .= '<a href="' . esc_url( $verify_url ) . '" style="display:inline-block;padding:11px 16px;background:#1d4ed8;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;">' . esc_html__( 'Verificar mi correo', 'arriendo-facil' ) . '</a>';
-		$message .= '</p>';
-		$message .= '<p style="margin:0;color:#475569;line-height:1.6;">' . esc_html__( 'Este enlace vence en 24 horas. Si no solicitaste esta cuenta, ignora este mensaje.', 'arriendo-facil' ) . '</p>';
-		$message .= '</div>';
-		$message .= '</div>';
-		$message .= '<p style="max-width:640px;margin:12px auto 0;font-size:12px;color:#64748b;text-align:center;">Arriendo Facil</p>';
-		$message .= '</div>';
-
-		return (bool) wp_mail( $recipient, $subject, $message, array( 'Content-Type: text/html; charset=UTF-8' ) );
+		return Arriendo_Facil_Email::send(
+			$recipient,
+			$subject,
+			array(
+				'preheader' => __( 'Confirma tu correo para activar tu cuenta.', 'arriendo-facil' ),
+				'eyebrow'   => __( 'Cuenta de inquilino', 'arriendo-facil' ),
+				'title'     => __( 'Verifica tu correo para activar tu cuenta', 'arriendo-facil' ),
+				'greeting'  => sprintf(
+					/* translators: %s: user display name */
+					__( 'Hola %s,', 'arriendo-facil' ),
+					'' !== $display ? $display : __( 'inquilino', 'arriendo-facil' )
+				),
+				'body_text' => __( 'Recibimos tu solicitud de registro como inquilino.', 'arriendo-facil' ) . "\n\n" . __( 'Por seguridad, confirma que este correo te pertenece para activar la cuenta y poder iniciar sesión.', 'arriendo-facil' ),
+				'button'    => array(
+					'label' => __( 'Verificar mi correo', 'arriendo-facil' ),
+					'url'   => $verify_url,
+				),
+				'notice'    => array(
+					'type' => 'info',
+					'text' => __( 'Este enlace vence en 24 horas. Si no solicitaste esta cuenta, ignora este mensaje: no se activará nada.', 'arriendo-facil' ),
+				),
+			),
+			Arriendo_Facil_Email::CAT_TRANSACTIONAL
+		);
 	}
 
 	/**
@@ -1087,7 +1114,7 @@ class Arriendo_Facil_Tenant_Signup {
 		if ( 'ok' === $status ) {
 			$message .= '<p class="message" style="border-left-color:#16a34a;">' . esc_html__( 'Tu correo fue verificado correctamente. Ya puedes iniciar sesion.', 'arriendo-facil' ) . '</p>';
 		} elseif ( 'failed' === $status || 'invalid' === $status ) {
-			$message .= '<p class="message" style="border-left-color:#dc2626;">' . esc_html__( 'No se pudo verificar el enlace. Solicita un nuevo registro o contacta soporte.', 'arriendo-facil' ) . '</p>';
+			$message .= '<p class="message" style="border-left-color:#d9534f;">' . esc_html__( 'No se pudo verificar el enlace. Solicita un nuevo registro o contacta soporte.', 'arriendo-facil' ) . '</p>';
 		}
 
 		return $message;

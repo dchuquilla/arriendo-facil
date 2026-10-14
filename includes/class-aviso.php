@@ -158,29 +158,21 @@ class Arriendo_Facil_Aviso {
 	private static function deliver_email( $notice_id, $selector, $token, $email, $subject, $body ) {
 		$confirm_url = home_url( '/?' . self::QUERY_CONFIRM . '=1&sid=' . rawurlencode( $selector ) . '&t=' . rawurlencode( $token ) );
 
-		$body_html = wpautop( $body );
-
-		$message_html = '<!DOCTYPE html><html><body style="margin:0;background:#f5f7fa;font-family:Arial,Helvetica,sans-serif;">
-			<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f5f7fa;padding:24px 0;">
-			<tr><td align="center">
-			<table role="presentation" width="560" cellspacing="0" cellpadding="0" style="background:#ffffff;border:1px solid #e4e7ec;border-radius:12px;overflow:hidden;">
-			<tr><td style="padding:28px 32px;">
-			<h2 style="margin:0 0 8px;color:#17202a;font-size:20px;">' . esc_html( $subject ) . '</h2>
-			<p style="margin:0 0 16px;color:#667085;font-size:13px;">' . esc_html__( 'Aviso de tu administración de arriendos', 'arriendo-facil' ) . '</p>
-			<div style="color:#344054;font-size:15px;line-height:1.6;">' . $body_html . '</div>
-			<p style="margin:24px 0 0;">
-				<a href="' . esc_url( $confirm_url ) . '" style="display:inline-block;background:#1d4ed8;color:#ffffff;text-decoration:none;font-weight:600;font-size:14px;padding:12px 20px;border-radius:8px;">' . esc_html__( 'Confirmo que recibí y leí este aviso', 'arriendo-facil' ) . '</a>
-			</p>
-			<p style="margin:8px 0 0;font-size:12px;color:#98a2b3;">' . esc_html__( 'Si el botón no funciona, copia este enlace:', 'arriendo-facil' ) . '<br />
-			<a href="' . esc_url( $confirm_url ) . '" style="color:#1d4ed8;word-break:break-all;">' . esc_html( $confirm_url ) . '</a></p>
-			</td></tr></table>
-			</td></tr></table></body></html>';
-
-		wp_mail(
+		Arriendo_Facil_Email::send(
 			$email,
 			'[Arriendo Fácil] ' . $subject,
-			$message_html,
-			array( 'Content-Type: text/html; charset=UTF-8' )
+			array(
+				'preheader' => wp_strip_all_tags( wp_trim_words( $body, 20, '…' ) ),
+				'eyebrow'   => __( 'Aviso de tu administración de arriendos', 'arriendo-facil' ),
+				'title'     => $subject,
+				'content'   => '<div style="font-size:16px;line-height:1.65;color:#193238;">' . wpautop( wp_kses_post( $body ) ) . '</div>',
+				'button'    => array(
+					'label' => __( 'Confirmo que recibí y leí este aviso', 'arriendo-facil' ),
+					'url'   => $confirm_url,
+				),
+				'note'      => __( 'Al confirmar, tu administración queda notificada de que leíste este aviso.', 'arriendo-facil' ),
+			),
+			Arriendo_Facil_Email::CAT_TRANSACTIONAL
 		);
 	}
 
@@ -299,11 +291,11 @@ class Arriendo_Facil_Aviso {
 
 		echo '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">';
 		echo '<title>' . esc_html( $title ) . '</title>';
-		echo '<style>body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f5f7fa;display:flex;min-height:100vh;align-items:center;justify-content:center;}';
-		echo '.afc{text-align:center;background:#fff;border:1px solid #e4e7ec;border-radius:16px;padding:40px 32px;max-width:420px;margin:24px;box-shadow:0 10px 30px rgba(16,24,40,.06);}';
+		echo '<style>body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f7f8f6;display:flex;min-height:100vh;align-items:center;justify-content:center;}';
+		echo '.afc{text-align:center;background:#fff;border:1px solid #dce5e3;border-radius:16px;padding:40px 32px;max-width:420px;margin:24px;box-shadow:0 10px 30px rgba(16,24,40,.06);}';
 		echo '.afc_icon{font-size:52px;line-height:1;margin-bottom:12px;}';
-		echo '.afc_h{margin:0 0 8px;font-size:20px;color:#17202a;}';
-		echo '.afc_p{margin:0;color:#667085;font-size:14px;line-height:1.6;}</style></head><body>';
+		echo '.afc_h{margin:0 0 8px;font-size:20px;color:#193238;}';
+		echo '.afc_p{margin:0;color:#647579;font-size:14px;line-height:1.6;}</style></head><body>';
 		echo '<div class="afc"><div class="afc_icon" aria-hidden="true">' . $img . '</div>';
 		echo '<h1 class="afc_h">' . esc_html( $heading ) . '</h1>';
 		echo '<p class="afc_p">' . esc_html( $message ) . '</p></div></body></html>';

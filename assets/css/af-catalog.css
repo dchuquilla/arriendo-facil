@@ -16,8 +16,8 @@
 }
 
 .af-catalog-page .af-property-card:hover {
-	border-color: var(--af-primary-200, #8FDBCA);
-	box-shadow: 0 12px 28px -10px rgba(0, 168, 132, 0.22);
+	border-color: var(--af-primary-200, #9CC3C0);
+	box-shadow: 0 12px 28px -10px rgba(22, 74, 85, 0.22);
 }
 
 /* ── Media: degradado inferior para legibilidad del badge ────────────────── */
@@ -38,13 +38,13 @@
 }
 
 .af-catalog-page .af-property-card__placeholder {
-	background: linear-gradient(135deg, var(--af-primary-50, #E6F7F3), var(--af-gray-50, #F8FAFC));
-	color: var(--af-primary-600, #00926F);
+	background: linear-gradient(135deg, var(--af-primary-50, #DDEEEB), var(--af-gray-50, #F7F8F6));
+	color: var(--af-primary-600, #0F3D47);
 }
 
 .af-catalog-page .af-property-card:hover .af-property-card__placeholder {
-	background: linear-gradient(135deg, var(--af-primary-100, #D5F3E9), var(--af-primary-50, #E6F7F3));
-	color: var(--af-primary-700, #007058);
+	background: linear-gradient(135deg, var(--af-primary-100, #DDEEEB), var(--af-primary-50, #DDEEEB));
+	color: var(--af-primary-700, #0b2f37);
 }
 
 /* ── Tipografía del cuerpo ──────────────────────────────────────────────── */
@@ -57,8 +57,8 @@
 	white-space: nowrap;
 	padding: 3px 10px;
 	border-radius: var(--af-radius-full);
-	background: var(--af-primary-50, #E6F7F3);
-	color: var(--af-primary-700, #007058);
+	background: var(--af-primary-50, #DDEEEB);
+	color: var(--af-primary-700, #0b2f37);
 	font-size: 11px;
 	font-weight: 700;
 	text-transform: uppercase;
@@ -88,7 +88,7 @@
 	gap: 6px;
 	margin: 0;
 	font-size: var(--af-text-xs);
-	color: var(--af-gray-500, #64748B);
+	color: var(--af-gray-500, #647579);
 }
 
 .af-catalog-page .af-catalog-card__address-text {
@@ -103,14 +103,14 @@
 	display: inline-flex;
 	flex: 0 0 auto;
 	margin-top: 1px;
-	color: var(--af-gray-400, #94A3B8);
+	color: var(--af-gray-400, #8A9799);
 }
 
 .af-catalog-page .af-catalog-card__specs {
 	gap: 6px 14px;
 	margin: 0;
 	font-size: var(--af-text-xs);
-	color: var(--af-gray-600, #475569);
+	color: var(--af-gray-600, #4a5c61);
 }
 
 .af-catalog-page .af-catalog-card__spec {
@@ -123,11 +123,11 @@
 .af-catalog-page .af-catalog-card__spec-icon {
 	display: inline-flex;
 	flex: 0 0 auto;
-	color: var(--af-gray-400, #94A3B8);
+	color: var(--af-gray-400, #8A9799);
 }
 
 .af-catalog-page .af-catalog-card__owner {
-	color: var(--af-gray-500, #64748B);
+	color: var(--af-gray-500, #647579);
 	max-width: 100%;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -146,7 +146,7 @@
 
 .af-catalog-page .af-property-card__price small {
 	font-size: var(--af-text-xs);
-	color: var(--af-gray-500, #64748B);
+	color: var(--af-gray-500, #647579);
 	font-weight: 500;
 }
 
@@ -156,15 +156,15 @@
 	gap: 4px;
 	padding: 5px 10px;
 	border-radius: var(--af-radius-full);
-	background: var(--af-primary-50, #E6F7F3);
-	color: var(--af-primary-700, #007058);
+	background: var(--af-primary-50, #DDEEEB);
+	color: var(--af-primary-700, #0b2f37);
 	font-size: var(--af-text-xs);
 	font-weight: 700;
 	transition: background var(--af-motion-fast), color var(--af-motion-fast);
 }
 
 .af-catalog-page .af-property-card:hover .af-catalog-card__hint {
-	background: var(--af-primary-500, #00A884);
+	background: var(--af-primary-500, #164A55);
 	color: #fff;
 }
 
@@ -182,8 +182,8 @@
 .af-catalog-page .af-catalog-filters {
 	padding: var(--af-space-5);
 	padding-bottom: 0;
-	background: var(--af-gray-50, #F8FAFC);
-	border-color: var(--af-gray-200, #E2E8F0);
+	background: var(--af-gray-50, #F7F8F6);
+	border-color: var(--af-gray-200, #DCE5E3);
 	box-shadow: none;
 }
 
@@ -196,7 +196,7 @@
 	font-weight: 700;
 	text-transform: uppercase;
 	letter-spacing: 0.05em;
-	color: var(--af-gray-500, #64748B);
+	color: var(--af-gray-500, #647579);
 }
 
 .af-catalog-page .af-input-with-icon {
@@ -210,7 +210,7 @@
 	top: 50%;
 	transform: translateY(-50%);
 	display: inline-flex;
-	color: var(--af-gray-400, #94A3B8);
+	color: var(--af-gray-400, #8A9799);
 	pointer-events: none;
 }
 

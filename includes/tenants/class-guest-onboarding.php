@@ -358,27 +358,39 @@ class Arriendo_Facil_Guest_Onboarding {
 		$title   = (string) get_the_title( absint( $accommodation_id ) );
 		$subject = sprintf( __( '[Arriendo Facil] Completa tu perfil legal para %s', 'arriendo-facil' ), $title ? $title : __( 'tu arriendo', 'arriendo-facil' ) );
 
-		$expires_line = '';
-		if ( '' !== trim( (string) $expires_at ) ) {
-			$expires_line = '<p style="margin:0 0 14px;color:#334155;line-height:1.6;">' . sprintf( esc_html__( 'Este enlace estara disponible hasta: %s', 'arriendo-facil' ), esc_html( $expires_at ) ) . '</p>';
-		}
+		$expires_note = '' !== trim( (string) $expires_at )
+			? sprintf(
+				/* translators: %s: expiration date */
+				__( 'Este enlace estará disponible hasta: %s', 'arriendo-facil' ),
+				$expires_at
+			)
+			: '';
 
-		$message = '<div style="margin:0;padding:24px;background:#f8fafc;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#0f172a;">';
-		$message .= '<div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">';
-		$message .= '<div style="padding:18px 22px;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#ffffff;">';
-		$message .= '<h2 style="margin:0;font-size:20px;line-height:1.3;">' . esc_html__( 'Completa tu perfil legal de arriendo', 'arriendo-facil' ) . '</h2>';
-		$message .= '</div>';
-		$message .= '<div style="padding:22px;">';
-		$message .= '<p style="margin:0 0 12px;line-height:1.6;">' . sprintf( esc_html__( 'Hola %s, para continuar con tu proceso necesitamos tu informacion legal y documentos.', 'arriendo-facil' ), esc_html( $tenant_name ) ) . '</p>';
-		$message .= '<p style="margin:0 0 16px;line-height:1.6;">' . esc_html__( 'Haz clic en el siguiente boton para completar el formulario seguro:', 'arriendo-facil' ) . '</p>';
-		$message .= '<p style="margin:0 0 18px;"><a href="' . esc_url( (string) $form_url ) . '" style="display:inline-block;padding:12px 18px;border-radius:8px;background:#2563eb;color:#ffffff;text-decoration:none;font-weight:600;">' . esc_html__( 'Completar perfil legal', 'arriendo-facil' ) . '</a></p>';
-		$message .= $expires_line;
-		$message .= '<p style="margin:0;line-height:1.6;color:#475569;">' . esc_html__( 'Si el enlace expira, solicita uno nuevo al propietario o soporte.', 'arriendo-facil' ) . '</p>';
-		$message .= '</div></div>';
-		$message .= '<p style="max-width:640px;margin:12px auto 0;font-size:12px;color:#64748b;text-align:center;">Arriendo Facil</p>';
-		$message .= '</div>';
-
-		return (bool) wp_mail( $tenant_email, $subject, $message, array( 'Content-Type: text/html; charset=UTF-8' ) );
+		return Arriendo_Facil_Email::send(
+			$tenant_email,
+			$subject,
+			array(
+				'preheader' => __( 'Necesitamos tu información legal y documentos para continuar con tu arriendo.', 'arriendo-facil' ),
+				'eyebrow'   => $title ? $title : __( 'Tu arriendo', 'arriendo-facil' ),
+				'title'     => __( 'Completa tu perfil legal de arriendo', 'arriendo-facil' ),
+				'status'    => array( 'type' => 'warning', 'label' => __( 'Pendiente', 'arriendo-facil' ) ),
+				'greeting'  => sprintf(
+					/* translators: %s: tenant name */
+					__( 'Hola %s,', 'arriendo-facil' ),
+					$tenant_name
+				),
+				'body_text' => __( 'Para continuar con tu proceso necesitamos tu información legal y documentos. Haz clic en el siguiente botón para completar el formulario seguro.', 'arriendo-facil' ),
+				'button'    => array(
+					'label' => __( 'Completar perfil legal', 'arriendo-facil' ),
+					'url'   => (string) $form_url,
+				),
+				'notice'    => array(
+					'type' => 'info',
+					'text' => trim( $expires_note . "\n" . __( 'Si el enlace expira, solicita uno nuevo al propietario o a soporte.', 'arriendo-facil' ) ),
+				),
+			),
+			Arriendo_Facil_Email::CAT_TRANSACTIONAL
+		);
 	}
 
 	/**
@@ -480,14 +492,31 @@ class Arriendo_Facil_Guest_Onboarding {
 		}
 
 		$subject = __( 'Estamos procesando tu solicitud de arriendo', 'arriendo-facil' );
-		$message = sprintf(
-			/* translators: 1: tenant name, 2: accommodation title, 3: lease ID */
-			__( "Hola %1$s,\n\nRecibimos tu solicitud de arriendo para %2$s.\n\nTu contrato se encuentra en procesamiento y nuestro equipo revisara la informacion pronto.\n\nNumero de solicitud: %3$d\n\nGracias por usar Arriendo Facil.", 'arriendo-facil' ),
-			$tenant_name,
-			$accommodation_title,
-			absint( $lease_id )
-		);
 
-		wp_mail( $tenant_email, $subject, $message );
+		Arriendo_Facil_Email::send(
+			$tenant_email,
+			$subject,
+			array(
+				'preheader' => __( 'Recibimos tu solicitud de arriendo y ya la estamos procesando.', 'arriendo-facil' ),
+				'title'     => __( 'Estamos procesando tu solicitud', 'arriendo-facil' ),
+				'status'    => array( 'type' => 'review', 'label' => __( 'En revisión', 'arriendo-facil' ) ),
+				'greeting'  => sprintf(
+					/* translators: %s: tenant name */
+					__( 'Hola %s,', 'arriendo-facil' ),
+					$tenant_name
+				),
+				'body_text' => sprintf(
+					/* translators: %s: accommodation title */
+					__( 'Recibimos tu solicitud de arriendo para %s. Tu contrato se encuentra en procesamiento y nuestro equipo revisará la información pronto.', 'arriendo-facil' ),
+					$accommodation_title
+				),
+				'details'   => array(
+					__( 'Número de solicitud', 'arriendo-facil' ) => (string) absint( $lease_id ),
+					__( 'Propiedad', 'arriendo-facil' )           => $accommodation_title,
+				),
+				'note'      => __( 'Gracias por usar Arriendo Fácil.', 'arriendo-facil' ),
+			),
+			Arriendo_Facil_Email::CAT_TRANSACTIONAL
+		);
 	}
 }

@@ -1311,21 +1311,35 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 			? __( '[Arriendo Facil] Tu cuenta fue verificada', 'arriendo-facil' )
 			: __( '[Arriendo Facil] Necesitamos revisar tus documentos', 'arriendo-facil' );
 
-		$message  = '<p style="margin:0 0 12px;line-height:1.6;">';
-		if ( $approved ) {
-			$message .= esc_html__( 'Tus documentos fueron verificados correctamente. Ya puedes usar Arriendo Facil con datos reales.', 'arriendo-facil' );
-		} else {
-			$message .= esc_html__( 'Tus documentos no pudieron ser verificados. Revisa la informacion y vuelve a intentarlo.', 'arriendo-facil' );
-		}
-		$message .= '</p>';
-
-		if ( '' !== trim( $notes ) ) {
-			$message .= '<p style="margin:0 0 12px;color:#334155;">' . esc_html__( 'Observaciones del equipo:', 'arriendo-facil' ) . ' ' . esc_html( $notes ) . '</p>';
-		}
-
-		$message .= '<p style="margin:0;"><a href="' . esc_url( admin_url( 'admin.php?page=' . self::PAGE_SLUG ) ) . '" style="display:inline-block;padding:10px 16px;background:#1d4ed8;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;">' . esc_html__( 'Ir a mi perfil', 'arriendo-facil' ) . '</a></p>';
-
-		wp_mail( sanitize_email( (string) $user->user_email ), $subject, $message, array( 'Content-Type: text/html; charset=UTF-8' ) );
+		Arriendo_Facil_Email::send(
+			sanitize_email( (string) $user->user_email ),
+			$subject,
+			array(
+				'preheader' => $approved
+					? __( 'Tus documentos fueron verificados.', 'arriendo-facil' )
+					: __( 'Necesitamos que revises la información enviada.', 'arriendo-facil' ),
+				'title'     => $approved
+					? __( 'Tu cuenta fue verificada', 'arriendo-facil' )
+					: __( 'Necesitamos revisar tus documentos', 'arriendo-facil' ),
+				'status'    => $approved
+					? array( 'type' => 'success', 'label' => __( 'Aprobado', 'arriendo-facil' ) )
+					: array( 'type' => 'error', 'label' => __( 'Rechazado', 'arriendo-facil' ) ),
+				'greeting'  => sprintf(
+					/* translators: %s: user display name */
+					__( 'Hola %s,', 'arriendo-facil' ),
+					sanitize_text_field( (string) $user->display_name )
+				),
+				'body_text' => $approved
+					? __( 'Tus documentos fueron verificados correctamente. Ya puedes usar Arriendo Fácil con datos reales.', 'arriendo-facil' )
+					: __( 'Tus documentos no pudieron ser verificados. Revisa la información y vuelve a intentarlo.', 'arriendo-facil' ),
+				'details'   => '' !== trim( $notes ) ? array( __( 'Observaciones del equipo', 'arriendo-facil' ) => $notes ) : array(),
+				'button'    => array(
+					'label' => __( 'Ir a mi perfil', 'arriendo-facil' ),
+					'url'   => admin_url( 'admin.php?page=' . self::PAGE_SLUG ),
+				),
+			),
+			Arriendo_Facil_Email::CAT_TRANSACTIONAL
+		);
 	}
 
 	/**

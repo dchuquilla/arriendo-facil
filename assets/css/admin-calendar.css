@@ -21,7 +21,7 @@
 
 .af-calendar-col {
   background: #fff !important;
-  border: 1px solid #e5e7eb !important;
+  border: 1px solid #dce5e3 !important;
   border-radius: 8px !important;
   overflow: hidden !important;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
@@ -32,12 +32,12 @@
 
 .af-calendar-col:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12) !important;
-  border-color: #d1d5db !important;
+  border-color: #c3d1ce !important;
 }
 
 /* Type-specific styling */
 .af-calendar-col--in {
-  border-left: 4px solid #10b981 !important;
+  border-left: 4px solid #2f7d73 !important;
 }
 
 .af-calendar-col--in:hover {
@@ -45,28 +45,28 @@
 }
 
 .af-calendar-col--out {
-  border-left: 4px solid #ef4444 !important;
+  border-left: 4px solid #d9534f !important;
 }
 
 .af-calendar-col--out:hover {
-  border-left-color: #dc2626 !important;
+  border-left-color: #d9534f !important;
 }
 
 .af-calendar-col__head {
   padding: 14px 16px !important;
-  background: linear-gradient(to right, #f9fafb, #f3f4f6) !important;
-  border-bottom: 1px solid #e5e7eb !important;
+  background: linear-gradient(to right, #f7f8f6, #eef2f0) !important;
+  border-bottom: 1px solid #dce5e3 !important;
   display: flex !important;
   gap: var(--af-space-2) !important;
   align-items: flex-start !important;
 }
 
 .af-cal-icon--checkin {
-  color: #10b981 !important;
+  color: #2f7d73 !important;
 }
 
 .af-cal-icon--checkout {
-  color: #ef4444 !important;
+  color: #d9534f !important;
 }
 
 .af-calendar-col__title {
@@ -85,22 +85,22 @@
   display: inline-block !important;
   margin-top: 4px !important;
   padding: 4px 10px !important;
-  background: #f0f0f0 !important;
+  background: #eef2f0 !important;
   border-radius: 10px !important;
   font-size: 11px !important;
-  color: #6b7280 !important;
+  color: #647579 !important;
   font-weight: 600 !important;
   letter-spacing: 0.3px !important;
 }
 
 .af-calendar-col__count--checkin {
-  background: #ecfdf5 !important;
-  color: #047857 !important;
+  background: #eaf4f2 !important;
+  color: #1f5a52 !important;
 }
 
 .af-calendar-col__count--checkout {
-  background: #fef2f2 !important;
-  color: #991b1b !important;
+  background: #fbeceb !important;
+  color: #b03a36 !important;
 }
 
 /* Semaforo table (timeline list) */
@@ -117,16 +117,16 @@
 }
 
 .af-semaforo__table::-webkit-scrollbar-track {
-  background: #f3f4f6 !important;
+  background: #eef2f0 !important;
 }
 
 .af-semaforo__table::-webkit-scrollbar-thumb {
-  background: #d1d5db !important;
+  background: #c3d1ce !important;
   border-radius: 3px !important;
 }
 
 .af-semaforo__table::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af !important;
+  background: #8a9799 !important;
 }
 
 .af-semaforo__row {
@@ -134,14 +134,14 @@
   align-items: center !important;
   gap: var(--af-space-2) !important;
   padding: 10px 12px !important;
-  border-bottom: 1px solid #f0f0f0 !important;
+  border-bottom: 1px solid #eef2f0 !important;
   transition: background-color 150ms ease !important;
   cursor: pointer !important;
   text-decoration: none !important;
 }
 
 .af-semaforo__row:hover {
-  background-color: #f9fafb !important;
+  background-color: #f7f8f6 !important;
 }
 
 .af-semaforo__row:last-child {
@@ -150,27 +150,27 @@
 
 /* Row state styling */
 .af-semaforo__row--success {
-  border-left: 3px solid #10b981 !important;
+  border-left: 3px solid #2f7d73 !important;
 }
 
 .af-semaforo__row--success:hover {
-  background-color: #ecfdf5 !important;
+  background-color: #eaf4f2 !important;
 }
 
 .af-semaforo__row--danger {
-  border-left: 3px solid #ef4444 !important;
+  border-left: 3px solid #d9534f !important;
 }
 
 .af-semaforo__row--danger:hover {
-  background-color: #fef2f2 !important;
+  background-color: #fbeceb !important;
 }
 
 .af-semaforo__row--warning {
-  border-left: 3px solid #f59e0b !important;
+  border-left: 3px solid #d89b5b !important;
 }
 
 .af-semaforo__row--warning:hover {
-  background-color: #fef3c7 !important;
+  background-color: #f5e9da !important;
 }
 
 .af-semaforo__tenant {
@@ -194,7 +194,7 @@
 .af-semaforo__tenant small {
   display: block !important;
   font-size: 11px !important;
-  color: #6b7280 !important;
+  color: #647579 !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
   white-space: nowrap !important;
@@ -204,7 +204,7 @@
   display: block !important;
   flex-shrink: 0 !important;
   font-size: 12px !important;
-  color: #6b7280 !important;
+  color: #647579 !important;
   font-weight: 500 !important;
   min-width: 60px !important;
   text-align: right !important;
@@ -222,23 +222,23 @@
 }
 
 .af-pill--success {
-  background-color: #ecfdf5 !important;
-  color: #047857 !important;
+  background-color: #eaf4f2 !important;
+  color: #1f5a52 !important;
 }
 
 .af-pill--danger {
-  background-color: #fee2e2 !important;
-  color: #991b1b !important;
+  background-color: #fbeceb !important;
+  color: #b03a36 !important;
 }
 
 .af-pill--warning {
-  background-color: #fef3c7 !important;
+  background-color: #f5e9da !important;
   color: #a16207 !important;
 }
 
 .af-pill--info {
-  background-color: #eff6ff !important;
-  color: #1e40af !important;
+  background-color: #e8f1fe !important;
+  color: #0f3d47 !important;
 }
 
 /* Exit row actions */
@@ -256,7 +256,7 @@
   padding: 4px 8px !important;
   font-size: 11px !important;
   font-weight: 500 !important;
-  color: #0891b2 !important;
+  color: #2f7d73 !important;
   background: none !important;
   border: none !important;
   cursor: pointer !important;
@@ -273,7 +273,7 @@
 .af-empty__text {
   padding: var(--af-space-3) !important;
   text-align: center !important;
-  color: #9ca3af !important;
+  color: #8a9799 !important;
   font-size: 13px !important;
   margin: 0 !important;
 }
@@ -286,9 +286,9 @@
   align-items: flex-end !important;
   margin: var(--af-space-4) 0 !important;
   padding: var(--af-space-3) !important;
-  background: linear-gradient(to right, #f9fafb, #f3f4f6) !important;
+  background: linear-gradient(to right, #f7f8f6, #eef2f0) !important;
   border-radius: 6px !important;
-  border: 1px solid #e5e7eb !important;
+  border: 1px solid #dce5e3 !important;
 }
 
 .af-calendar-filters__group {
@@ -308,7 +308,7 @@
 .af-calendar-filters__field span {
   font-weight: 600 !important;
   font-size: 12px !important;
-  color: #374151 !important;
+  color: #2e4046 !important;
   text-transform: uppercase !important;
   letter-spacing: 0.3px !important;
 }
@@ -316,7 +316,7 @@
 .af-calendar-filters__field input,
 .af-calendar-filters__field select {
   padding: 6px 8px !important;
-  border: 1px solid #d1d5db !important;
+  border: 1px solid #c3d1ce !important;
   border-radius: 4px !important;
   font-size: 13px !important;
   background: #fff !important;

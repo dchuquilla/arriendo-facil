@@ -184,21 +184,34 @@ class Arriendo_Facil_OTA_Notifications {
 			ucfirst( $source )
 		);
 
-		$message = sprintf(
-			__( "Hola %s,\n\nTu acomodación \"%s\" ha sido sincronizada con %s y aparece como ocupada.\n\nDates ocupadas: %s\n\nPuedes revisar el estado en:\n%s\n\n---\nArriendoFácil", 'arriendo-facil' ),
-			$owner->display_name,
-			$post->post_title,
-			ucfirst( $source ),
-			$booked_dates ?: __( 'No especificadas', 'arriendo-facil' ),
-			admin_url( 'edit.php?post_type=accommodation&p=' . $post->ID )
+		return Arriendo_Facil_Email::send(
+			$to,
+			$subject,
+			array(
+				'preheader' => $subject,
+				'eyebrow'   => ucfirst( $source ),
+				'title'     => __( 'Acomodación marcada como ocupada', 'arriendo-facil' ),
+				'status'    => array( 'type' => 'neutral', 'label' => __( 'Ocupada', 'arriendo-facil' ) ),
+				'greeting'  => sprintf(
+					/* translators: %s: owner name */
+					__( 'Hola %s,', 'arriendo-facil' ),
+					$owner->display_name
+				),
+				'body_text' => sprintf(
+					/* translators: 1: accommodation title, 2: OTA platform */
+					__( 'Tu acomodación "%1$s" ha sido sincronizada con %2$s y aparece como ocupada.', 'arriendo-facil' ),
+					$post->post_title,
+					ucfirst( $source )
+				),
+				'details'   => array( __( 'Fechas ocupadas', 'arriendo-facil' ) => $booked_dates ? $booked_dates : __( 'No especificadas', 'arriendo-facil' ) ),
+				'button'    => array(
+					'label' => __( 'Revisar estado', 'arriendo-facil' ),
+					'url'   => admin_url( 'edit.php?post_type=accommodation&p=' . $post->ID ),
+				),
+			),
+			Arriendo_Facil_Email::CAT_NOTIFICATION,
+			array( 'From: ' . get_bloginfo( 'name' ) . ' <' . get_option( 'admin_email' ) . '>' )
 		);
-
-		$headers = array(
-			'Content-Type: text/plain; charset=UTF-8',
-			'From: ' . get_bloginfo( 'name' ) . ' <' . get_option( 'admin_email' ) . '>',
-		);
-
-		return wp_mail( $to, $subject, $message, $headers );
 	}
 
 	/**
@@ -216,20 +229,36 @@ class Arriendo_Facil_OTA_Notifications {
 			$post->post_title
 		);
 
-		$message = sprintf(
-			__( "Hola %s,\n\nHemos detectado un desacuerdo en la disponibilidad de \"%s\":\n- En %s: Disponible (sin reservas)\n- En ArriendoFácil: Ocupada\n\nPor favor revisa manualmente y actualiza el estado si es necesario.\n\nURL: %s\n\n---\nArriendoFácil", 'arriendo-facil' ),
-			$owner->display_name,
-			$post->post_title,
-			ucfirst( $source ),
-			admin_url( 'edit.php?post_type=accommodation&p=' . $post->ID )
+		return Arriendo_Facil_Email::send(
+			$to,
+			$subject,
+			array(
+				'preheader' => $subject,
+				'eyebrow'   => ucfirst( $source ),
+				'title'     => __( 'Desacuerdo de disponibilidad', 'arriendo-facil' ),
+				'status'    => array( 'type' => 'warning', 'label' => __( 'Pendiente', 'arriendo-facil' ) ),
+				'greeting'  => sprintf(
+					/* translators: %s: owner name */
+					__( 'Hola %s,', 'arriendo-facil' ),
+					$owner->display_name
+				),
+				'body_text' => sprintf(
+					/* translators: %s: accommodation title */
+					__( 'Hemos detectado un desacuerdo en la disponibilidad de "%s". Por favor revisa manualmente y actualiza el estado si es necesario.', 'arriendo-facil' ),
+					$post->post_title
+				),
+				'details'   => array(
+					ucfirst( $source )  => __( 'Disponible (sin reservas)', 'arriendo-facil' ),
+					'Arriendo Fácil'    => __( 'Ocupada', 'arriendo-facil' ),
+				),
+				'button'    => array(
+					'label' => __( 'Revisar acomodación', 'arriendo-facil' ),
+					'url'   => admin_url( 'edit.php?post_type=accommodation&p=' . $post->ID ),
+				),
+			),
+			Arriendo_Facil_Email::CAT_NOTIFICATION,
+			array( 'From: ' . get_bloginfo( 'name' ) . ' <' . get_option( 'admin_email' ) . '>' )
 		);
-
-		$headers = array(
-			'Content-Type: text/plain; charset=UTF-8',
-			'From: ' . get_bloginfo( 'name' ) . ' <' . get_option( 'admin_email' ) . '>',
-		);
-
-		return wp_mail( $to, $subject, $message, $headers );
 	}
 
 	/**
@@ -248,21 +277,38 @@ class Arriendo_Facil_OTA_Notifications {
 			ucfirst( $source )
 		);
 
-		$message = sprintf(
-			__( "Hola %s,\n\nNo hemos podido sincronizar la disponibilidad de \"%s\" con %s después de varios intentos.\n\nError: %s\n\nPor favor verifica:\n1. Que tus credenciales de API sigan siendo válidas\n2. Que el ID de propiedad sea correcto\n3. Que tengas conexión a internet\n\nURL de configuración: %s\n\n---\nArriendoFácil", 'arriendo-facil' ),
-			$owner->display_name,
-			$post->post_title,
-			ucfirst( $source ),
-			$error->getMessage(),
-			admin_url( 'admin.php?page=af-ota-integrations' )
+		return Arriendo_Facil_Email::send(
+			$to,
+			$subject,
+			array(
+				'preheader' => $subject,
+				'eyebrow'   => ucfirst( $source ),
+				'title'     => __( 'Error de sincronización', 'arriendo-facil' ),
+				'status'    => array( 'type' => 'error', 'label' => __( 'Acción requerida', 'arriendo-facil' ) ),
+				'greeting'  => sprintf(
+					/* translators: %s: owner name */
+					__( 'Hola %s,', 'arriendo-facil' ),
+					$owner->display_name
+				),
+				'body_text' => sprintf(
+					/* translators: 1: accommodation title, 2: OTA platform */
+					__( 'No hemos podido sincronizar la disponibilidad de "%1$s" con %2$s después de varios intentos.', 'arriendo-facil' ),
+					$post->post_title,
+					ucfirst( $source )
+				),
+				'details'   => array( __( 'Error', 'arriendo-facil' ) => $error->getMessage() ),
+				'notice'    => array(
+					'type' => 'warning',
+					'text' => __( "Por favor verifica:\n1. Que tus credenciales de API sigan siendo válidas\n2. Que el ID de propiedad sea correcto\n3. Que tengas conexión a internet", 'arriendo-facil' ),
+				),
+				'button'    => array(
+					'label' => __( 'Abrir configuración', 'arriendo-facil' ),
+					'url'   => admin_url( 'admin.php?page=af-ota-integrations' ),
+				),
+			),
+			Arriendo_Facil_Email::CAT_NOTIFICATION,
+			array( 'From: ' . get_bloginfo( 'name' ) . ' <' . get_option( 'admin_email' ) . '>' )
 		);
-
-		$headers = array(
-			'Content-Type: text/plain; charset=UTF-8',
-			'From: ' . get_bloginfo( 'name' ) . ' <' . get_option( 'admin_email' ) . '>',
-		);
-
-		return wp_mail( $to, $subject, $message, $headers );
 	}
 
 	/**

@@ -116,7 +116,7 @@ class Arriendo_Facil_Property_Admin_Registration {
 					<label class="af-admin-signup__field">
 						<span class="af-admin-signup__label"><?php echo esc_html__( 'Numero de identificacion', 'arriendo-facil' ); ?></span>
 						<input type="text" name="id_number" required maxlength="20" pattern="[A-Za-z0-9-]{5,20}" class="af-admin-signup__input" />
-						<span class="af-admin-signup__hint" style="display:block;font-size:12px;line-height:1.4;color:#64748b;margin-top:4px;"><?php echo esc_html__( 'Cedula (10 digitos), RUC (13 digitos) o Pasaporte (6 a 12 caracteres alfanumericos).', 'arriendo-facil' ); ?></span>
+						<span class="af-admin-signup__hint" style="display:block;font-size:12px;line-height:1.4;color:#647579;margin-top:4px;"><?php echo esc_html__( 'Cedula (10 digitos), RUC (13 digitos) o Pasaporte (6 a 12 caracteres alfanumericos).', 'arriendo-facil' ); ?></span>
 					</label>
 					<label class="af-admin-signup__field">
 						<span class="af-admin-signup__label"><?php echo esc_html__( 'Nacionalidad', 'arriendo-facil' ); ?></span>
@@ -186,6 +186,7 @@ class Arriendo_Facil_Property_Admin_Registration {
 			</form>
 		</div>
 
+		<?php echo Arriendo_Facil_Toast::inline_assets(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static, escaped markup. ?>
 		<script>
 		(function(){
 			const app = document.getElementById(<?php echo wp_json_encode( $instance_id ); ?>);
@@ -203,14 +204,28 @@ class Arriendo_Facil_Property_Admin_Registration {
 				alertBox.style.display = 'block';
 				alertBox.textContent = String(message || '');
 				if(type === 'success'){
-					alertBox.style.background = '#ecfdf5';
-					alertBox.style.border = '1px solid #86efac';
-					alertBox.style.color = '#166534';
+					alertBox.style.background = '#eaf4f2';
+					alertBox.style.border = '1px solid #9cc3c0';
+					alertBox.style.color = '#1f5a52';
 				} else {
-					alertBox.style.background = '#fef2f2';
-					alertBox.style.border = '1px solid #fca5a5';
-					alertBox.style.color = '#991b1b';
+					alertBox.style.background = '#fbeceb';
+					alertBox.style.border = '1px solid #eba8a5';
+					alertBox.style.color = '#b03a36';
 				}
+			}
+
+			function rejectRegistration(message){
+				showAlert(message, 'error');
+				notifyRegistration(false, message);
+			}
+
+			function notifyRegistration(approved, message){
+				if(typeof window.afToast !== 'function'){ return; }
+				window.afToast({
+					type: approved ? 'approved' : 'rejected',
+					title: approved ? <?php echo wp_json_encode( __( '¡Registro aprobado!', 'arriendo-facil' ) ); ?> : <?php echo wp_json_encode( __( 'Registro rechazado', 'arriendo-facil' ) ); ?>,
+					message: String(message || '')
+				});
 			}
 
 			function validatePasswordClientSide(password){
@@ -235,11 +250,11 @@ class Arriendo_Facil_Property_Admin_Registration {
 			const strengthLabel = app.querySelector('[data-af-strength-label]');
 			const matchBox = app.querySelector('[data-af-match]');
 			const strengthLevels = [
-				{ label: <?php echo wp_json_encode( __( 'Muy debil', 'arriendo-facil' ) ); ?>, color: '#ef4444' },
+				{ label: <?php echo wp_json_encode( __( 'Muy debil', 'arriendo-facil' ) ); ?>, color: '#d9534f' },
 				{ label: <?php echo wp_json_encode( __( 'Debil', 'arriendo-facil' ) ); ?>, color: '#f97316' },
 				{ label: <?php echo wp_json_encode( __( 'Media', 'arriendo-facil' ) ); ?>, color: '#eab308' },
 				{ label: <?php echo wp_json_encode( __( 'Buena', 'arriendo-facil' ) ); ?>, color: '#84cc16' },
-				{ label: <?php echo wp_json_encode( __( 'Fuerte', 'arriendo-facil' ) ); ?>, color: '#22c55e' }
+				{ label: <?php echo wp_json_encode( __( 'Fuerte', 'arriendo-facil' ) ); ?>, color: '#2f7d73' }
 			];
 
 			function updatePasswordUi(){
@@ -293,12 +308,12 @@ class Arriendo_Facil_Property_Admin_Registration {
 				const passwordConfirmInput = form.querySelector('input[name="password_confirm"]');
 
 				if(!validatePasswordClientSide(String(passwordInput && passwordInput.value ? passwordInput.value : ''))){
-					showAlert(<?php echo wp_json_encode( __( 'La contrasena no cumple los requisitos: minimo 10 caracteres, mayuscula, minuscula, numero y simbolo.', 'arriendo-facil' ) ); ?>, 'error');
+					rejectRegistration(<?php echo wp_json_encode( __( 'La contrasena no cumple los requisitos: minimo 10 caracteres, mayuscula, minuscula, numero y simbolo.', 'arriendo-facil' ) ); ?>);
 					return;
 				}
 
 				if(String(passwordInput.value || '') !== String(passwordConfirmInput.value || '')){
-					showAlert(<?php echo wp_json_encode( __( 'Las contrasenas no coinciden.', 'arriendo-facil' ) ); ?>, 'error');
+					rejectRegistration(<?php echo wp_json_encode( __( 'Las contrasenas no coinciden.', 'arriendo-facil' ) ); ?>);
 					return;
 				}
 
@@ -319,18 +334,20 @@ class Arriendo_Facil_Property_Admin_Registration {
 					json = await response.json();
 				} catch (err) {
 					submitBtn.disabled = false;
-					showAlert(<?php echo wp_json_encode( __( 'No se pudo conectar con el servidor. Intenta nuevamente.', 'arriendo-facil' ) ); ?>, 'error');
+					rejectRegistration(<?php echo wp_json_encode( __( 'No se pudo conectar con el servidor. Intenta nuevamente.', 'arriendo-facil' ) ); ?>);
 					return;
 				}
 
 				submitBtn.disabled = false;
 				if(!json || !json.success){
 					const message = json && json.data && json.data.message ? json.data.message : <?php echo wp_json_encode( __( 'No se pudo crear la cuenta.', 'arriendo-facil' ) ); ?>;
-					showAlert(message, 'error');
+					rejectRegistration(message);
 					return;
 				}
 
-				showAlert((json.data && json.data.message) ? json.data.message : <?php echo wp_json_encode( __( 'Cuenta creada correctamente.', 'arriendo-facil' ) ); ?>, 'success');
+				const okMessage = (json.data && json.data.message) ? json.data.message : <?php echo wp_json_encode( __( 'Cuenta creada correctamente.', 'arriendo-facil' ) ); ?>;
+				showAlert(okMessage, 'success');
+				notifyRegistration(true, okMessage);
 				form.reset();
 				if(json.data && json.data.should_redirect && json.data.login_url){
 					setTimeout(function(){ window.location.href = String(json.data.login_url); }, 900);
@@ -852,24 +869,30 @@ class Arriendo_Facil_Property_Admin_Registration {
 
 		$subject = __( '[Arriendo Facil] Verifica tu correo para activar tu demo', 'arriendo-facil' );
 
-		$message = '<div style="margin:0;padding:24px;background:#f8fafc;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#0f172a;">';
-		$message .= '<div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">';
-		$message .= '<div style="padding:18px 22px;background:linear-gradient(135deg,#1d4ed8,#0ea5e9);color:#ffffff;">';
-		$message .= '<h2 style="margin:0;font-size:20px;line-height:1.3;">' . esc_html__( 'Verifica tu correo para activar tu demo', 'arriendo-facil' ) . '</h2>';
-		$message .= '</div>';
-		$message .= '<div style="padding:22px;">';
-		$message .= '<p style="margin:0 0 12px;line-height:1.6;">' . sprintf( esc_html__( 'Hola %s, recibimos tu solicitud de demo como gestor de propiedades.', 'arriendo-facil' ), esc_html( '' !== $display ? $display : __( 'gestor', 'arriendo-facil' ) ) ) . '</p>';
-		$message .= '<p style="margin:0 0 16px;line-height:1.6;color:#334155;">' . esc_html__( 'Por seguridad, confirma que este correo te pertenece para activar tu cuenta y preparar tu area de demostracion.', 'arriendo-facil' ) . '</p>';
-		$message .= '<p style="margin:0 0 16px;">';
-		$message .= '<a href="' . esc_url( $verify_url ) . '" style="display:inline-block;padding:11px 16px;background:#1d4ed8;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;">' . esc_html__( 'Verificar mi correo', 'arriendo-facil' ) . '</a>';
-		$message .= '</p>';
-		$message .= '<p style="margin:0;color:#475569;line-height:1.6;">' . esc_html__( 'Este enlace vence en 24 horas. Si no solicitaste esta cuenta, ignora este mensaje.', 'arriendo-facil' ) . '</p>';
-		$message .= '</div>';
-		$message .= '</div>';
-		$message .= '<p style="max-width:640px;margin:12px auto 0;font-size:12px;color:#64748b;text-align:center;">Arriendo Facil</p>';
-		$message .= '</div>';
-
-		return (bool) wp_mail( $recipient, $subject, $message, array( 'Content-Type: text/html; charset=UTF-8' ) );
+		return Arriendo_Facil_Email::send(
+			$recipient,
+			$subject,
+			array(
+				'preheader' => __( 'Confirma tu correo para activar tu cuenta y tu demo.', 'arriendo-facil' ),
+				'eyebrow'   => __( 'Gestor de propiedades', 'arriendo-facil' ),
+				'title'     => __( 'Verifica tu correo para activar tu demo', 'arriendo-facil' ),
+				'greeting'  => sprintf(
+					/* translators: %s: user display name */
+					__( 'Hola %s,', 'arriendo-facil' ),
+					'' !== $display ? $display : __( 'gestor', 'arriendo-facil' )
+				),
+				'body_text' => __( 'Recibimos tu solicitud de demo como gestor de propiedades.', 'arriendo-facil' ) . "\n\n" . __( 'Por seguridad, confirma que este correo te pertenece para activar tu cuenta y preparar tu área de demostración.', 'arriendo-facil' ),
+				'button'    => array(
+					'label' => __( 'Verificar mi correo', 'arriendo-facil' ),
+					'url'   => $verify_url,
+				),
+				'notice'    => array(
+					'type' => 'info',
+					'text' => __( 'Este enlace vence en 24 horas. Si no solicitaste esta cuenta, ignora este mensaje: no se activará nada.', 'arriendo-facil' ),
+				),
+			),
+			Arriendo_Facil_Email::CAT_TRANSACTIONAL
+		);
 	}
 
 	/**
@@ -895,11 +918,22 @@ class Arriendo_Facil_Property_Admin_Registration {
 		$admin_url = admin_url( 'admin.php?page=af-property-admins' );
 		$subject   = __( '[Arriendo Facil] Nuevo registro: ' . sanitize_text_field( $email ), 'arriendo-facil' );
 
-		$message = '<p style="margin:0 0 12px;line-height:1.6;">' . esc_html__( 'Se registro una nueva cuenta de gestor de propiedades:', 'arriendo-facil' ) . '</p>';
-		$message .= '<p style="margin:0 0 16px;"><a href="' . esc_url( $admin_url ) . '" style="display:inline-block;padding:10px 16px;background:#1d4ed8;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;">' . esc_html__( 'Revisar gestores', 'arriendo-facil' ) . '</a></p>';
-
 		foreach ( array_unique( array_filter( $admins ) ) as $admin_email ) {
-			wp_mail( sanitize_email( $admin_email ), $subject, $message, array( 'Content-Type: text/html; charset=UTF-8' ) );
+			Arriendo_Facil_Email::send(
+				sanitize_email( $admin_email ),
+				$subject,
+				array(
+					'title'     => __( 'Nuevo registro de gestor', 'arriendo-facil' ),
+					'status'    => array( 'type' => 'review', 'label' => __( 'Por revisar', 'arriendo-facil' ) ),
+					'body_text' => __( 'Se registró una nueva cuenta de gestor de propiedades.', 'arriendo-facil' ),
+					'details'   => array( __( 'Correo', 'arriendo-facil' ) => sanitize_text_field( $email ) ),
+					'button'    => array(
+						'label' => __( 'Revisar gestores', 'arriendo-facil' ),
+						'url'   => $admin_url,
+					),
+				),
+				Arriendo_Facil_Email::CAT_INTERNAL
+			);
 		}
 	}
 
@@ -916,12 +950,24 @@ class Arriendo_Facil_Property_Admin_Registration {
 		}
 
 		$subject = __( '[Arriendo Facil] Falta verificar tu correo para activar tu demo', 'arriendo-facil' );
-		$message = sprintf(
-			// phpcs:ignore WordPress.WP.I18n.MissingTranslatorsComment
-			__( 'Hola %1$s, tu cuenta de demo esta creada pero aun falta verificar tu correo. Busca el enlace que te enviamos (vence en 24 horas) o solicita un reenvio en la pagina de registro.', 'arriendo-facil' ),
-			esc_html( sanitize_text_field( (string) $user->display_name ) )
+		Arriendo_Facil_Email::send(
+			sanitize_email( (string) $user->user_email ),
+			$subject,
+			array(
+				'title'     => __( 'Falta verificar tu correo', 'arriendo-facil' ),
+				'greeting'  => sprintf(
+					/* translators: %s: user display name */
+					__( 'Hola %s,', 'arriendo-facil' ),
+					sanitize_text_field( (string) $user->display_name )
+				),
+				'body_text' => __( 'Tu cuenta de demo está creada, pero aún falta verificar tu correo. Busca el enlace que te enviamos (vence en 24 horas) o solicita un reenvío en la página de registro.', 'arriendo-facil' ),
+				'button'    => array(
+					'label' => __( 'Ir al registro', 'arriendo-facil' ),
+					'url'   => wp_login_url( admin_url() ),
+				),
+			),
+			Arriendo_Facil_Email::CAT_NOTIFICATION
 		);
-		wp_mail( sanitize_email( (string) $user->user_email ), $subject, $message, array( 'Content-Type: text/html; charset=UTF-8' ) );
 	}
 
 	/**
@@ -940,10 +986,24 @@ class Arriendo_Facil_Property_Admin_Registration {
 		$profile_url = admin_url( 'admin.php?page=af-admin-profile' );
 		$subject     = __( '[Arriendo Facil] Completa tu perfil para usar la demo', 'arriendo-facil' );
 
-		$message = '<p style="margin:0 0 12px;line-height:1.6;">' . sprintf( esc_html__( 'Hola %s, para aprovechar tu demo de Arriendo Facil completa tu perfil y sube tus documentos de identificacion.', 'arriendo-facil' ), esc_html( sanitize_text_field( (string) $user->display_name ) ) ) . '</p>';
-		$message .= '<p style="margin:0 0 16px;"><a href="' . esc_url( $profile_url ) . '" style="display:inline-block;padding:10px 16px;background:#1d4ed8;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;">' . esc_html__( 'Completar perfil', 'arriendo-facil' ) . '</a></p>';
-
-		wp_mail( sanitize_email( (string) $user->user_email ), $subject, $message, array( 'Content-Type: text/html; charset=UTF-8' ) );
+		Arriendo_Facil_Email::send(
+			sanitize_email( (string) $user->user_email ),
+			$subject,
+			array(
+				'title'     => __( 'Completa tu perfil para usar la demo', 'arriendo-facil' ),
+				'greeting'  => sprintf(
+					/* translators: %s: user display name */
+					__( 'Hola %s,', 'arriendo-facil' ),
+					sanitize_text_field( (string) $user->display_name )
+				),
+				'body_text' => __( 'Para aprovechar tu demo de Arriendo Fácil completa tu perfil y sube tus documentos de identificación.', 'arriendo-facil' ),
+				'button'    => array(
+					'label' => __( 'Completar perfil', 'arriendo-facil' ),
+					'url'   => $profile_url,
+				),
+			),
+			Arriendo_Facil_Email::CAT_NOTIFICATION
+		);
 	}
 
 	/**
@@ -966,11 +1026,21 @@ class Arriendo_Facil_Property_Admin_Registration {
 		}
 
 		$subject = __( '[Arriendo Facil] Documentos de gestores pendientes de revision', 'arriendo-facil' );
-		$message = '<p style="margin:0 0 12px;line-height:1.6;">' . esc_html__( 'Hay cuentas auto-registradas que estan esperando que su documentacion sea revisada.', 'arriendo-facil' ) . '</p>';
-		$message .= '<p style="margin:0 0 16px;"><a href="' . esc_url( admin_url( 'admin.php?page=af-property-admins' ) ) . '">' . esc_html__( 'Ir a Gestores', 'arriendo-facil' ) . '</a></p>';
-
 		foreach ( array_unique( array_filter( $admins ) ) as $admin_email ) {
-			wp_mail( sanitize_email( $admin_email ), $subject, $message, array( 'Content-Type: text/html; charset=UTF-8' ) );
+			Arriendo_Facil_Email::send(
+				sanitize_email( $admin_email ),
+				$subject,
+				array(
+					'title'     => __( 'Documentos de gestores por revisar', 'arriendo-facil' ),
+					'status'    => array( 'type' => 'review', 'label' => __( 'En revisión', 'arriendo-facil' ) ),
+					'body_text' => __( 'Hay cuentas auto-registradas esperando que su documentación sea revisada.', 'arriendo-facil' ),
+					'button'    => array(
+						'label' => __( 'Ir a Gestores', 'arriendo-facil' ),
+						'url'   => admin_url( 'admin.php?page=af-property-admins' ),
+					),
+				),
+				Arriendo_Facil_Email::CAT_INTERNAL
+			);
 		}
 	}
 

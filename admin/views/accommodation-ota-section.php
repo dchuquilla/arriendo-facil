@@ -189,13 +189,13 @@ wp_nonce_field( 'af_ota_sync_nonce', '_wpnonce_ota_sync' );
 .af-ota-section h3 {
 	margin-top: 0;
 	color: #333;
-	border-bottom: 2px solid #0073aa;
+	border-bottom: 2px solid #164a55;
 	padding-bottom: 10px;
 }
 
 .af-ota-info {
 	background: #e7f3ff;
-	border-left: 4px solid #0073aa;
+	border-left: 4px solid #164a55;
 	padding: 12px;
 	margin-bottom: 20px;
 	border-radius: 2px;
@@ -204,7 +204,7 @@ wp_nonce_field( 'af_ota_sync_nonce', '_wpnonce_ota_sync' );
 
 .af-ota-info p {
 	margin: 0;
-	color: #0073aa;
+	color: #164a55;
 }
 
 .af-ota-platform {
@@ -311,12 +311,12 @@ wp_nonce_field( 'af_ota_sync_nonce', '_wpnonce_ota_sync' );
 
 .status-badge.occupied {
 	background: #fee;
-	color: #d32f2f;
+	color: #d9534f;
 }
 
 .status-badge.available {
 	background: #efe;
-	color: #2e7d32;
+	color: #2f7d73;
 }
 
 .af-test-ical-btn,
@@ -335,25 +335,25 @@ wp_nonce_field( 'af_ota_sync_nonce', '_wpnonce_ota_sync' );
 
 .af-test-result.success,
 .af-sync-message.success {
-	color: #2e7d32;
-	background: #e8f5e9;
+	color: #2f7d73;
+	background: #eaf4f2;
 	border: 1px solid #a5d6a7;
 	display: inline-block;
 }
 
 .af-test-result.error,
 .af-sync-message.error {
-	color: #d32f2f;
-	background: #ffebee;
-	border: 1px solid #ef9a9a;
+	color: #d9534f;
+	background: #fbeceb;
+	border: 1px solid #eba8a5;
 	display: inline-block;
 }
 
 .af-test-result.loading,
 .af-sync-message.loading {
 	color: #856404;
-	background: #fff3cd;
-	border: 1px solid #ffeaa7;
+	background: #f5e9da;
+	border: 1px solid #ebd3b3;
 	display: inline-block;
 }
 </style>

@@ -571,7 +571,7 @@ $af_points_ready     = ! empty( $emission_points );
 						<?php echo af_lucide( 'search', 15 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
 						<?php esc_html_e( 'Consultar en SRI', 'arriendo-facil' ); ?>
 					</button>
-					<span id="af-ruc-lookup-status" style="font-style:italic; color: var(--af-gray-500, #7A7870);"></span>
+					<span id="af-ruc-lookup-status" style="font-style:italic; color: var(--af-gray-500, #647579);"></span>
 				</div>
 			</div>
 
@@ -617,7 +617,7 @@ $af_points_ready     = ! empty( $emission_points );
 					class="large-text" maxlength="300" <?php echo esc_attr( $af_readonly_attr ); ?> />
 				<span class="af-form-field__hint" id="af-dir-matriz-desc">
 					<?php if ( $af_dir_match ) : ?>
-						<span style="color:var(--af-success-700, #2E7D32); font-weight:500;">✓ <?php esc_html_e( 'Igual a la dirección del establecimiento.', 'arriendo-facil' ); ?></span>
+						<span style="color:var(--af-success-700, #2F7D73); font-weight:500;">✓ <?php esc_html_e( 'Igual a la dirección del establecimiento.', 'arriendo-facil' ); ?></span>
 					<?php else : ?>
 						<?php esc_html_e( 'Opcional. Solo si es diferente a la dirección del establecimiento.', 'arriendo-facil' ); ?>
 					<?php endif; ?>
@@ -653,7 +653,7 @@ $af_points_ready     = ! empty( $emission_points );
 					value="<?php echo esc_attr( $cfg['email_notificacion'] ); ?>"
 					class="regular-text" required
 					pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$" />
-				<span class="af-form-field__hint" style="color:var(--af-danger-700, #C62828); font-weight:500;">
+				<span class="af-form-field__hint" style="color:var(--af-danger-700, #B03A36); font-weight:500;">
 					<?php esc_html_e( '⚠️ CRÍTICO: El SRI envía las autorizaciones de comprobantes a este email. Sin él, no recibirás los documentos autorizados.', 'arriendo-facil' ); ?>
 				</span>
 				<span id="af-email-error" class="af-form-field__error" style="display:none;"></span>
@@ -849,9 +849,9 @@ $af_points_ready     = ! empty( $emission_points );
 					<td data-label="<?php esc_attr_e( 'Secuencial actual', 'arriendo-facil' ); ?>"><?php echo esc_html( number_format( (int) $pt->secuencial_actual, 0, '', '' ) ); ?></td>
 					<td data-label="<?php esc_attr_e( 'Activo', 'arriendo-facil' ); ?>">
 						<?php if ( $pt->activo ) : ?>
-							<span style="color:var(--af-success-700, #2E7D32);">&#10003;</span>
+							<span style="color:var(--af-success-700, #2F7D73);">&#10003;</span>
 						<?php else : ?>
-							<span style="color:var(--af-danger-700, #C62828);">&#10007;</span>
+							<span style="color:var(--af-danger-700, #B03A36);">&#10007;</span>
 						<?php endif; ?>
 					</td>
 				</tr>
@@ -924,11 +924,11 @@ $af_points_ready     = ! empty( $emission_points );
 		// Normalizar: cédula 10 dígitos → RUC 13 dígitos (persona natural).
 		if ( ruc.length === 10 ) { ruc = ruc + '001'; }
 		if ( ruc.length !== 13 ) {
-			status.innerHTML = '<span style="color:var(--af-danger-700, #C62828);">Ingresa el RUC (13 dígitos) o tu cédula (10 dígitos).</span>';
+			status.innerHTML = '<span style="color:var(--af-danger-700, #B03A36);">Ingresa el RUC (13 dígitos) o tu cédula (10 dígitos).</span>';
 			return;
 		}
 		btn.disabled = true;
-		status.innerHTML = '<span style="color:var(--af-gray-600, #55556B);">Consultando SRI…</span>';
+		status.innerHTML = '<span style="color:var(--af-gray-600, #647579);">Consultando SRI…</span>';
 
 		var data = new FormData();
 		data.append( 'action', 'af_sri_ruc_lookup' );
@@ -963,14 +963,14 @@ $af_points_ready     = ! empty( $emission_points );
 					var radios = document.querySelectorAll( 'input[name="af_obligado_contabilidad"]' );
 					radios.forEach( function ( r ) { r.checked = ( r.value === d.obligado_contabilidad ); } );
 				}
-				status.innerHTML = '<span style="color:var(--af-success-700, #2E7D32);">✓ Datos cargados desde el SRI. Revisa y guarda.</span>';
+				status.innerHTML = '<span style="color:var(--af-success-700, #2F7D73);">✓ Datos cargados desde el SRI. Revisa y guarda.</span>';
 			} else {
 				var msg = ( resp.data && resp.data.message ) ? resp.data.message : 'No se encontró información.';
-				status.innerHTML = '<span style="color:var(--af-danger-700, #C62828);">' + msg + '</span>';
+				status.innerHTML = '<span style="color:var(--af-danger-700, #B03A36);">' + msg + '</span>';
 			}
 		} )
 		.catch( function ( err ) {
-			status.innerHTML = '<span style="color:var(--af-danger-700, #C62828);" title="' + ( err.message || '' ).replace( /"/g, '&quot;' ) + '">Error al consultar el SRI. Detalle: ' + ( err.message ? err.message.substring( 0, 120 ) : 'Error de red' ) + '</span>';
+			status.innerHTML = '<span style="color:var(--af-danger-700, #B03A36);" title="' + ( err.message || '' ).replace( /"/g, '&quot;' ) + '">Error al consultar el SRI. Detalle: ' + ( err.message ? err.message.substring( 0, 120 ) : 'Error de red' ) + '</span>';
 		} )
 		.finally( function () { btn.disabled = false; } );
 	} );

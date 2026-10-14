@@ -14,8 +14,8 @@
 }
 
 .af-leases-table thead tr {
-  background: linear-gradient(to right, #f9fafb, #f3f4f6) !important;
-  border-bottom: 2px solid #e5e7eb !important;
+  background: linear-gradient(to right, #f7f8f6, #eef2f0) !important;
+  border-bottom: 2px solid #dce5e3 !important;
 }
 
 .af-leases-table thead th {
@@ -24,17 +24,17 @@
   font-size: 13px !important;
   text-transform: uppercase !important;
   letter-spacing: 0.3px !important;
-  color: #374151 !important;
+  color: #2e4046 !important;
   white-space: nowrap !important;
 }
 
 .af-leases-table tbody tr {
-  border-bottom: 1px solid #f0f0f0 !important;
+  border-bottom: 1px solid #eef2f0 !important;
   transition: background-color 150ms ease !important;
 }
 
 .af-leases-table tbody tr:hover {
-  background-color: #f9fafb !important;
+  background-color: #f7f8f6 !important;
 }
 
 .af-leases-table td {
@@ -53,7 +53,7 @@
 .af-leases-table td small {
   display: block !important;
   font-size: 11px !important;
-  color: #6b7280 !important;
+  color: #647579 !important;
   margin-top: 2px !important;
 }
 
@@ -68,17 +68,17 @@
 }
 
 .af-pill--success {
-  background-color: #ecfdf5 !important;
-  color: #047857 !important;
+  background-color: #eaf4f2 !important;
+  color: #1f5a52 !important;
 }
 
 .af-pill--attention {
-  background-color: #fef2f2 !important;
-  color: #991b1b !important;
+  background-color: #fbeceb !important;
+  color: #b03a36 !important;
 }
 
 .af-pill--pending {
-  background-color: #fef3c7 !important;
+  background-color: #f5e9da !important;
   color: #a16207 !important;
 }
 
@@ -95,10 +95,10 @@
   align-items: center;
   gap: 6px;
   padding: 6px 12px !important;
-  border: 1px solid #d1d5db !important;
+  border: 1px solid #c3d1ce !important;
   border-radius: 4px !important;
   background: #fff !important;
-  color: #374151 !important;
+  color: #2e4046 !important;
   font-size: 13px !important;
   font-weight: 500 !important;
   cursor: pointer;
@@ -108,25 +108,25 @@
 }
 
 .af-lease-actions-menu summary:hover {
-  background: #f3f4f6 !important;
-  border-color: #9ca3af !important;
+  background: #eef2f0 !important;
+  border-color: #8a9799 !important;
 }
 
 .af-lease-actions-menu summary:focus {
-  outline: 2px solid #3b82f6;
+  outline: 2px solid #3882f6;
   outline-offset: 2px;
 }
 
 .af-lease-actions-menu[open] summary {
-  background: #f9fafb !important;
-  border-color: #6b7280 !important;
+  background: #f7f8f6 !important;
+  border-color: #647579 !important;
   color: #111 !important;
 }
 
 .af-lease-actions-dropdown {
   position: fixed;
   background: #fff !important;
-  border: 1px solid #e5e7eb !important;
+  border: 1px solid #dce5e3 !important;
   border-radius: 6px !important;
   padding: 8px !important;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15) !important;
@@ -157,7 +157,7 @@ details.af-lease-actions-menu[open] > .af-lease-actions-dropdown {
   border: 1px solid transparent !important;
   border-radius: 4px !important;
   background: #fff !important;
-  color: #374151 !important;
+  color: #2e4046 !important;
   cursor: pointer !important;
   transition: all 150ms ease !important;
   white-space: normal !important;
@@ -165,13 +165,13 @@ details.af-lease-actions-menu[open] > .af-lease-actions-dropdown {
 }
 
 .af-lease-actions-dropdown button:hover {
-  background-color: #f3f4f6 !important;
-  border-color: #e5e7eb !important;
+  background-color: #eef2f0 !important;
+  border-color: #dce5e3 !important;
   color: #111 !important;
 }
 
 .af-lease-actions-dropdown button:active {
-  background-color: #e5e7eb !important;
+  background-color: #dce5e3 !important;
 }
 
 .af-lease-actions-dropdown button:disabled {
@@ -180,25 +180,25 @@ details.af-lease-actions-menu[open] > .af-lease-actions-dropdown {
 }
 
 .af-lease-actions-dropdown button.button-primary {
-  background-color: #3b82f6 !important;
+  background-color: #3882f6 !important;
   color: #fff !important;
-  border-color: #3b82f6 !important;
+  border-color: #3882f6 !important;
 }
 
 .af-lease-actions-dropdown button.button-primary:hover {
-  background-color: #2563eb !important;
-  border-color: #2563eb !important;
+  background-color: #3882f6 !important;
+  border-color: #3882f6 !important;
 }
 
 .af-lease-actions-dropdown button.button-secondary {
   background-color: #fff !important;
-  color: #374151 !important;
-  border-color: #d1d5db !important;
+  color: #2e4046 !important;
+  border-color: #c3d1ce !important;
 }
 
 .af-lease-actions-dropdown button.button-secondary:hover {
-  background-color: #f3f4f6 !important;
-  border-color: #9ca3af !important;
+  background-color: #eef2f0 !important;
+  border-color: #8a9799 !important;
 }
 
 /* Actions cell positioning */
@@ -219,7 +219,7 @@ details.af-lease-actions-menu[open] > .af-lease-actions-dropdown {
 .af-table-scroll {
   overflow-x: auto;
   overflow-y: visible;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #dce5e3;
   border-radius: 6px;
   background: #fff;
   -webkit-overflow-scrolling: touch;
@@ -238,14 +238,14 @@ details.af-lease-actions-menu[open] > .af-lease-actions-dropdown {
 
 /* Button styles in dropdown - danger button */
 .af-lease-actions-dropdown button.af-btn--danger {
-  background-color: #dc2626 !important;
+  background-color: #d9534f !important;
   color: #fff !important;
-  border-color: #991b1b !important;
+  border-color: #b03a36 !important;
 }
 
 .af-lease-actions-dropdown button.af-btn--danger:hover {
-  background-color: #b91c1c !important;
-  border-color: #7f1d1d !important;
+  background-color: #b03a36 !important;
+  border-color: #8a2f2b !important;
 }
 /* ── Responsive column strategy ───────────────────────────────────────────
    Column order: 1 ID · 2 Inmueble · 3 Unidad · 4 Inquilino · 5 Inicio ·
@@ -288,7 +288,7 @@ details.af-lease-actions-menu[open] > .af-lease-actions-dropdown {
 @media (max-width: 768px) {
   /* Stacked cards: every value comes back, labeled — actions included. */
   .af-leases-table {
-    border: 1px solid #e5e7eb !important;
+    border: 1px solid #dce5e3 !important;
   }
 
   .af-leases-table thead {
@@ -315,7 +315,7 @@ details.af-lease-actions-menu[open] > .af-lease-actions-dropdown {
 
   .af-leases-table tr {
     margin-bottom: 16px !important;
-    border: 1px solid #e5e7eb !important;
+    border: 1px solid #dce5e3 !important;
     border-radius: 6px !important;
     padding: 12px !important;
     background: #fff !important;
@@ -338,7 +338,7 @@ details.af-lease-actions-menu[open] > .af-lease-actions-dropdown {
     font-weight: 600 !important;
     text-transform: uppercase !important;
     font-size: 11px !important;
-    color: #6b7280 !important;
+    color: #647579 !important;
     padding-right: 8px !important;
     box-sizing: border-box !important;
     white-space: normal !important;
@@ -349,7 +349,7 @@ details.af-lease-actions-menu[open] > .af-lease-actions-dropdown {
     padding-left: 0 !important;
     padding-top: 10px !important;
     margin-top: 8px;
-    border-top: 1px dashed #e5e7eb !important;
+    border-top: 1px dashed #dce5e3 !important;
     white-space: normal !important;
   }
 
@@ -384,25 +384,25 @@ details.af-lease-actions-menu[open] > .af-lease-actions-dropdown {
 }
 
 .af-modal__status.is-success {
-  background-color: #ecfdf5 !important;
-  color: #047857 !important;
-  border: 1px solid #a7f3d0 !important;
+  background-color: #eaf4f2 !important;
+  color: #1f5a52 !important;
+  border: 1px solid #c5ddd9 !important;
 }
 
 .af-modal__status.is-error {
-  background-color: #fef2f2 !important;
-  color: #991b1b !important;
-  border: 1px solid #fecaca !important;
+  background-color: #fbeceb !important;
+  color: #b03a36 !important;
+  border: 1px solid #f2c4c2 !important;
 }
 
 .af-modal__hint {
   font-size: 12px !important;
-  color: #6b7280 !important;
+  color: #647579 !important;
   line-height: 1.5 !important;
 }
 
 .af-modal__hint a {
-  color: #0891b2 !important;
+  color: #2f7d73 !important;
   text-decoration: none !important;
   font-weight: 500 !important;
 }
@@ -432,14 +432,14 @@ details.af-lease-actions-menu[open] > .af-lease-actions-dropdown {
   min-width: 0;
   font-size: 13px;
   font-weight: 600;
-  color: #1d2327;
+  color: #193238;
 }
 
 .af-cwiz__progress-pct {
   margin-left: auto;
   font-size: 12px;
   font-weight: 700;
-  color: #4caf88;
+  color: #2f7d73;
   font-variant-numeric: tabular-nums;
 }
 
@@ -459,7 +459,7 @@ details.af-lease-actions-menu[open] > .af-lease-actions-dropdown {
   left: 0;
   width: 20%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #4caf88, #0f9d58);
+  background: linear-gradient(90deg, #2f7d73, #2f7d73);
   transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -484,10 +484,10 @@ details.af-lease-actions-menu[open] > .af-lease-actions-dropdown {
   align-items: center;
   gap: 8px;
   padding: 6px 14px 6px 6px;
-  border: 1px solid #e2e5ea;
+  border: 1px solid #dce5e3;
   border-radius: 999px;
   background: #fff;
-  color: #50575e;
+  color: #4a5c61;
   font-size: 13px;
   cursor: default;
 }
@@ -498,8 +498,8 @@ details.af-lease-actions-menu[open] > .af-lease-actions-dropdown {
 
 .af-cwiz__step.is-clickable:hover,
 .af-cwiz__step.is-clickable:focus-visible {
-  border-color: #4caf88;
-  color: #1d2327;
+  border-color: #2f7d73;
+  color: #193238;
 }
 
 .af-cwiz__num {
@@ -508,32 +508,32 @@ details.af-lease-actions-menu[open] > .af-lease-actions-dropdown {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: #f0f2f4;
+  background: #eef2f0;
   font-weight: 600;
   font-size: 12px;
 }
 
 .af-cwiz__steps li.is-current .af-cwiz__step {
-  border-color: #4caf88;
-  background: #ecf7f2;
-  color: #14532d;
+  border-color: #2f7d73;
+  background: #eaf4f2;
+  color: #1f5a52;
   font-weight: 600;
 }
 
 .af-cwiz__steps li.is-current .af-cwiz__num {
-  background: #4caf88;
+  background: #2f7d73;
   color: #fff;
 }
 
 .af-cwiz__steps li.is-done .af-cwiz__num {
-  background: #0f9d58;
+  background: #2f7d73;
   color: #fff;
 }
 
 .af-cwiz__steps li + li::before {
   content: "\2192";
   margin-right: 4px;
-  color: #a7aaad;
+  color: #8a9799;
 }
 
 .af-cwiz__panel[hidden] {
@@ -551,7 +551,7 @@ details.af-lease-actions-menu[open] > .af-lease-actions-dropdown {
   margin: 0 0 var(--af-space-3);
   font-size: 12px;
   font-weight: 700;
-  color: #6b7280;
+  color: #647579;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -560,7 +560,7 @@ details.af-lease-actions-menu[open] > .af-lease-actions-dropdown {
   content: "";
   flex: 1;
   height: 1px;
-  background: #e5e7eb;
+  background: #dce5e3;
 }
 
 /* Auto-completed fields: readable but obviously "already handled". */
@@ -570,9 +570,9 @@ details.af-lease-actions-menu[open] > .af-lease-actions-dropdown {
   gap: 4px;
   padding: 1px 7px;
   border-radius: 999px;
-  background: #e6f7f3;
-  border: 1px solid #c1ebe2;
-  color: #007058;
+  background: #ddeeeb;
+  border: 1px solid #c5ddd9;
+  color: #0b2f37;
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
@@ -594,12 +594,12 @@ details.af-lease-actions-menu[open] > .af-lease-actions-dropdown {
   flex-wrap: wrap;
   padding: var(--af-space-3) var(--af-space-4);
   margin: 0 0 var(--af-space-4);
-  background: #ecf7f2;
+  background: #eaf4f2;
   border: 1px solid #cbe9dd;
-  border-left: 4px solid #4caf88;
+  border-left: 4px solid #2f7d73;
   border-radius: 8px;
   font-size: 13px;
-  color: #14532d;
+  color: #1f5a52;
 }
 
 .af-cwiz__autofill strong {
@@ -610,7 +610,7 @@ details.af-lease-actions-menu[open] > .af-lease-actions-dropdown {
   background: none;
   border: none;
   padding: 0;
-  color: #007058;
+  color: #0b2f37;
   font-size: 13px;
   font-weight: 600;
   text-decoration: underline;
@@ -624,8 +624,8 @@ details.af-lease-actions-menu[open] > .af-lease-actions-dropdown {
   gap: var(--af-space-3) var(--af-space-5);
   margin: 0 0 var(--af-space-4);
   padding: var(--af-space-4);
-  background: #fafafa;
-  border: 1px solid #e5e7eb;
+  background: #f7f8f6;
+  border: 1px solid #dce5e3;
   border-radius: 8px;
 }
 
@@ -639,14 +639,14 @@ details.af-lease-actions-menu[open] > .af-lease-actions-dropdown {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.4px;
-  color: #6b7280;
+  color: #647579;
   margin-bottom: 2px;
 }
 
 .af-cwiz__review-value {
   display: block;
   font-size: 14px;
-  color: #111827;
+  color: #193238;
   overflow-wrap: anywhere;
 }
 
@@ -663,13 +663,13 @@ details.af-lease-actions-menu[open] > .af-lease-actions-dropdown {
 }
 
 .af-cwiz__link.is-linked {
-  background: #ecf7f2;
+  background: #eaf4f2;
   border: 1px solid #b7e2d1;
-  color: #14532d;
+  color: #1f5a52;
 }
 
 .af-cwiz__link.is-unlinked {
-  background: #fffbeb;
+  background: #f5e9da;
   border: 1px solid #fde3a3;
   color: #92400e;
 }
@@ -683,7 +683,7 @@ details.af-lease-actions-menu[open] > .af-lease-actions-dropdown {
   gap: var(--af-space-3);
   align-items: center;
   padding-top: var(--af-space-4);
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid #dce5e3;
 }
 
 .af-cwiz__nav .af-cwiz__spacer {
@@ -694,10 +694,10 @@ details.af-lease-actions-menu[open] > .af-lease-actions-dropdown {
   display: none;
   margin: 0 0 var(--af-space-3);
   padding: 8px 12px;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
+  background: #fbeceb;
+  border: 1px solid #f2c4c2;
   border-radius: 6px;
-  color: #991b1b;
+  color: #b03a36;
   font-size: 13px;
   font-weight: 500;
 }

@@ -889,7 +889,7 @@ $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data[
 }
 
 .af-form-input:focus {
-	border-color: #0073aa;
+	border-color: #164a55;
 	outline: none;
 	box-shadow: 0 0 0 2px rgba(0, 115, 170, 0.2);
 }
@@ -916,29 +916,29 @@ $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data[
 }
 
 .af-test-result.success {
-	background: #e8f5e9;
-	color: #2e7d32;
+	background: #eaf4f2;
+	color: #2f7d73;
 	border: 1px solid #a5d6a7;
 	display: inline-block;
 }
 
 .af-test-result.error {
-	background: #ffebee;
-	color: #d32f2f;
-	border: 1px solid #ef9a9a;
+	background: #fbeceb;
+	color: #d9534f;
+	border: 1px solid #eba8a5;
 	display: inline-block;
 }
 
 .af-test-result.loading {
-	background: #fff3cd;
+	background: #f5e9da;
 	color: #856404;
-	border: 1px solid #ffeaa7;
+	border: 1px solid #ebd3b3;
 	display: inline-block;
 }
 
 .af-ota-info-box {
 	background: #e7f3ff;
-	border-left: 4px solid #0073aa;
+	border-left: 4px solid #164a55;
 	padding: 15px;
 	border-radius: 2px;
 	margin-top: 20px;
@@ -947,7 +947,7 @@ $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data[
 
 .af-ota-info-box p {
 	margin: 0;
-	color: #0073aa;
+	color: #164a55;
 	line-height: 1.6;
 }
 </style>

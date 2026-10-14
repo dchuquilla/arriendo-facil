@@ -1078,29 +1078,30 @@ class Arriendo_Facil_Owner_Contact {
 	public function send_owner_activation_email( $owner_email, $owner_name, $reset_url ) {
 		$mail_subject = __( 'Activa tu cuenta en Arriendo Facil', 'arriendo-facil' );
 
-		$safe_name     = esc_html( $owner_name );
-		$safe_email    = esc_html( $owner_email );
-		$safe_reset    = esc_url( $reset_url );
-
-		$mail_body =
-			'<div style="font-family:Arial,Helvetica,sans-serif;line-height:1.6;color:#111;max-width:640px">'
-			. '<p>Hola ' . $safe_name . ',</p>'
-			. '<p>Te damos la bienvenida a Arriendo Facil.</p>'
-			. '<p>Hemos creado tu cuenta exitosamente. Para comenzar a utilizar el sistema, es necesario que actives tu cuenta y establezcas tu contrasena.</p>'
-			. '<p><strong>Usuario:</strong> ' . $safe_email . '</p>'
-			. '<p>Por favor, haz clic en el siguiente enlace:</p>'
-			. '<p><a href="' . $safe_reset . '" style="display:inline-block;background:#0f766e;color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:700">Activar mi cuenta</a></p>'
-			. '<p>Si el boton no funciona, copia y pega este enlace en tu navegador:<br><a href="' . $safe_reset . '">' . $safe_reset . '</a></p>'
-			. '<p>Por seguridad, este enlace es de uso unico y puede tener un tiempo de expiracion.</p>'
-			. '<p>Si no solicitaste la creacion de esta cuenta, puedes ignorar este mensaje sin ningun problema.</p>'
-			. '<p>Saludos cordiales,<br>Equipo de Arriendo Facil</p>'
-			. '</div>';
-
-		$headers = array( 'Content-Type: text/html; charset=UTF-8' );
+		$email_args = array(
+			'preheader' => __( 'Activa tu cuenta y establece tu contraseña.', 'arriendo-facil' ),
+			'eyebrow'   => __( 'Bienvenido', 'arriendo-facil' ),
+			'title'     => __( 'Activa tu cuenta en Arriendo Fácil', 'arriendo-facil' ),
+			'greeting'  => sprintf(
+				/* translators: %s: owner name */
+				__( 'Hola %s,', 'arriendo-facil' ),
+				$owner_name
+			),
+			'body_text' => __( 'Te damos la bienvenida a Arriendo Fácil. Hemos creado tu cuenta exitosamente. Para comenzar a utilizar el sistema, activa tu cuenta y establece tu contraseña.', 'arriendo-facil' ),
+			'details'   => array( __( 'Usuario', 'arriendo-facil' ) => $owner_email ),
+			'button'    => array(
+				'label' => __( 'Activar mi cuenta', 'arriendo-facil' ),
+				'url'   => $reset_url,
+			),
+			'notice'    => array(
+				'type' => 'info',
+				'text' => __( 'Por seguridad, este enlace es de uso único y puede tener un tiempo de expiración. Si no solicitaste la creación de esta cuenta, puedes ignorar este mensaje sin ningún problema.', 'arriendo-facil' ),
+			),
+		);
 
 		$max_attempts = 3;
 		for ( $attempt = 1; $attempt <= $max_attempts; $attempt++ ) {
-			$sent = wp_mail( $owner_email, $mail_subject, $mail_body, $headers );
+			$sent = Arriendo_Facil_Email::send( $owner_email, $mail_subject, $email_args, Arriendo_Facil_Email::CAT_TRANSACTIONAL );
 			if ( true === $sent ) {
 				return true;
 			}

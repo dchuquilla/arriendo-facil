@@ -222,7 +222,7 @@ $current_user_id = (int) get_current_user_id();
                             <span class="spinner is-active" style="float:none;"></span>
                             <span><?php esc_html_e( 'Analizando plantilla...', 'arriendo-facil' ); ?></span>
                         </div>
-                        <div id="af-template-approved-status" style="display:none; margin-top: 8px; color: #1d6c00; font-weight: 600;">
+                        <div id="af-template-approved-status" style="display:none; margin-top: 8px; color: #1f5a52; font-weight: 600;">
                             &#10003; <?php esc_html_e( 'Campos identificados automáticamente', 'arriendo-facil' ); ?>
                             <a href="#" id="af-template-review-link" style="font-weight: normal; margin-left: 8px;"><?php esc_html_e( '(Revisar campos)', 'arriendo-facil' ); ?></a>
                         </div>

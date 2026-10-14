@@ -233,32 +233,32 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 	?>
 
 	<!-- Contract Process Steps -->
-	<div class="af-section" style="padding: var(--af-space-4); margin-bottom: var(--af-space-5); background:#f9fafb; border-radius: 8px;">
-		<h3 style="margin: 0 0 var(--af-space-3); font-size: 14px; font-weight: 600; text-transform: uppercase; color: #6b7280;">
+	<div class="af-section" style="padding: var(--af-space-4); margin-bottom: var(--af-space-5); background:#f7f8f6; border-radius: 8px;">
+		<h3 style="margin: 0 0 var(--af-space-3); font-size: 14px; font-weight: 600; text-transform: uppercase; color: #647579;">
 			<?php esc_html_e( 'Flujo de Contratos', 'arriendo-facil' ); ?>
 		</h3>
 		<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--af-space-3);">
-			<div style="padding: var(--af-space-3); background: #fff; border-radius: 6px; border-left: 3px solid #10b981;">
+			<div style="padding: var(--af-space-3); background: #fff; border-radius: 6px; border-left: 3px solid #2f7d73;">
 				<div style="font-weight: 600; font-size: 13px; color: #111; margin-bottom: 4px;">1. <?php esc_html_e( 'Registrar Inquilino', 'arriendo-facil' ); ?></div>
-				<p style="margin: 0; font-size: 12px; color: #6b7280;">
+				<p style="margin: 0; font-size: 12px; color: #647579;">
 					<?php esc_html_e( 'Completa datos de identidad y referencias.', 'arriendo-facil' ); ?>
 				</p>
-				<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-guests' ) ); ?>" style="display: inline-block; margin-top: 6px; font-size: 12px; color: #0891b2; text-decoration: none; font-weight: 500;">
+				<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-guests' ) ); ?>" style="display: inline-block; margin-top: 6px; font-size: 12px; color: #2f7d73; text-decoration: none; font-weight: 500;">
 					<?php esc_html_e( 'Ir a Inquilinos →', 'arriendo-facil' ); ?>
 				</a>
 			</div>
-			<div style="padding: var(--af-space-3); background: #fff; border-radius: 6px; border-left: 3px solid #3b82f6;">
+			<div style="padding: var(--af-space-3); background: #fff; border-radius: 6px; border-left: 3px solid #3882f6;">
 				<div style="font-weight: 600; font-size: 13px; color: #111; margin-bottom: 4px;">2. <?php esc_html_e( 'Crear Contrato', 'arriendo-facil' ); ?></div>
-				<p style="margin: 0; font-size: 12px; color: #6b7280;">
+				<p style="margin: 0; font-size: 12px; color: #647579;">
 					<?php esc_html_e( 'Vincula inmueble + inquilino + datos financieros.', 'arriendo-facil' ); ?>
 				</p>
-				<button type="button" id="af-new-lease-from-steps" style="display: inline-block; margin-top: 6px; font-size: 12px; background: none; border: none; color: #0891b2; text-decoration: none; font-weight: 500; cursor: pointer; padding: 0;">
+				<button type="button" id="af-new-lease-from-steps" style="display: inline-block; margin-top: 6px; font-size: 12px; background: none; border: none; color: #2f7d73; text-decoration: none; font-weight: 500; cursor: pointer; padding: 0;">
 					<?php esc_html_e( 'Crear Contrato →', 'arriendo-facil' ); ?>
 				</button>
 			</div>
 			<div style="padding: var(--af-space-3); background: #fff; border-radius: 6px; border-left: 3px solid #8b5cf6;">
 				<div style="font-weight: 600; font-size: 13px; color: #111; margin-bottom: 4px;">3. <?php esc_html_e( 'Activar', 'arriendo-facil' ); ?></div>
-				<p style="margin: 0; font-size: 12px; color: #6b7280;">
+				<p style="margin: 0; font-size: 12px; color: #647579;">
 					<?php esc_html_e( 'Sube documento y activa para emitir facturas.', 'arriendo-facil' ); ?>
 				</p>
 			</div>
@@ -268,7 +268,7 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 	<div id="af-lease-form-card" class="af-section" style="padding: var(--af-space-5); margin-bottom: var(--af-space-4); display:none;">
 		<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--af-space-3);">
 			<h2 class="af-section__title" style="margin:0;"><?php esc_html_e( 'Nuevo Contrato', 'arriendo-facil' ); ?></h2>
-			<button type="button" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #9ca3af; padding: 0;" id="af-lease-form-close" aria-label="<?php esc_attr_e( 'Cerrar', 'arriendo-facil' ); ?>">&times;</button>
+			<button type="button" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #8a9799; padding: 0;" id="af-lease-form-close" aria-label="<?php esc_attr_e( 'Cerrar', 'arriendo-facil' ); ?>">&times;</button>
 		</div>
 		<p class="af-modal__hint" style="margin:0 0 var(--af-space-4);">
 			<?php esc_html_e( 'Selecciona el inmueble e inquilino ya registrados. El sistema generará automáticamente el contrato con los datos.', 'arriendo-facil' ); ?>
@@ -1357,16 +1357,16 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 						<td class="af-lease-status-cell" data-label="<?php esc_attr_e( 'Estado', 'arriendo-facil' ); ?>"><?php echo af_pill( (string) $lease->status ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></td>					<?php
 					$binfo  = isset( $billing_status_map[ (int) $lease->id ] ) ? $billing_status_map[ (int) $lease->id ] : null;
 					$estado_colores = array(
-						'autorizada'          => array( 'label' => 'Autorizada', 'color' => '#2e7d32' ),
-						'autorizada_sin_ride' => array( 'label' => 'Autorizada', 'color' => '#2e7d32' ),
-						'firmada'             => array( 'label' => 'Firmada',    'color' => '#1565c0' ),
-						'enviada'             => array( 'label' => 'Enviada',    'color' => '#1565c0' ),
+						'autorizada'          => array( 'label' => 'Autorizada', 'color' => '#2f7d73' ),
+						'autorizada_sin_ride' => array( 'label' => 'Autorizada', 'color' => '#2f7d73' ),
+						'firmada'             => array( 'label' => 'Firmada',    'color' => '#3882f6' ),
+						'enviada'             => array( 'label' => 'Enviada',    'color' => '#3882f6' ),
 						'generada'            => array( 'label' => 'Generada',   'color' => '#555' ),
-						'devuelta'            => array( 'label' => 'Devuelta',   'color' => '#c62828' ),
-						'error_envio'         => array( 'label' => 'Error',      'color' => '#c62828' ),
-						'error_autorizacion'  => array( 'label' => 'Error',      'color' => '#c62828' ),
-						'no_autorizada'       => array( 'label' => 'No Aut.',    'color' => '#c62828' ),
-						'rechazada'           => array( 'label' => 'Rechazada',  'color' => '#c62828' ),
+						'devuelta'            => array( 'label' => 'Devuelta',   'color' => '#b03a36' ),
+						'error_envio'         => array( 'label' => 'Error',      'color' => '#b03a36' ),
+						'error_autorizacion'  => array( 'label' => 'Error',      'color' => '#b03a36' ),
+						'no_autorizada'       => array( 'label' => 'No Aut.',    'color' => '#b03a36' ),
+						'rechazada'           => array( 'label' => 'Rechazada',  'color' => '#b03a36' ),
 						'anulada'             => array( 'label' => 'Anulada',    'color' => '#e65100' ),
 					);
 					?>
@@ -1454,7 +1454,7 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 												data-lease-id="<?php echo esc_attr( $lease->id ); ?>"
 												data-nonce="<?php echo esc_attr( wp_create_nonce( 'af_lease_nonce' ) ); ?>"
 												id="af-early-terminate-lease-btn-<?php echo esc_attr( $lease->id ); ?>"
-												style="background:#b91c1c !important;border-color:#991b1b !important;color:#fff !important;">
+												style="background:#b03a36 !important;border-color:#b03a36 !important;color:#fff !important;">
 												<?php esc_html_e( 'Terminar anticipadamente', 'arriendo-facil' ); ?>
 											</button>
 										<?php endif; ?>
@@ -1477,10 +1477,10 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 		<div class="af-modal__backdrop" id="af-early-terminate-backdrop" style="position:absolute;inset:0;background:rgba(0,0,0,.55);"></div>
 		<div class="af-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="af-early-terminate-modal-title"
 			style="position:relative;background:#fff;border-radius:10px;max-width:480px;width:92%;padding:28px 28px 22px;box-shadow:0 8px 32px rgba(0,0,0,.22);">
-			<h2 id="af-early-terminate-modal-title" style="margin:0 0 6px;font-size:18px;color:#b91c1c;">
+			<h2 id="af-early-terminate-modal-title" style="margin:0 0 6px;font-size:18px;color:#b03a36;">
 				<?php esc_html_e( 'Terminar contrato anticipadamente', 'arriendo-facil' ); ?>
 			</h2>
-			<p style="margin:0 0 16px;color:#374151;font-size:14px;line-height:1.5;">
+			<p style="margin:0 0 16px;color:#2e4046;font-size:14px;line-height:1.5;">
 				<?php esc_html_e( 'Esta accion terminara el contrato antes de la fecha acordada, liberara el inmueble, cancelara reservas activas y notificara al arrendatario y a los interesados en cola.', 'arriendo-facil' ); ?>
 			</p>
 			<label for="af-early-terminate-reason" style="display:block;font-weight:600;margin-bottom:6px;font-size:13px;">
@@ -1488,14 +1488,14 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 			</label>
 			<textarea id="af-early-terminate-reason" rows="4"
 				placeholder="<?php esc_attr_e( 'Ej: Acuerdo mutuo, incumplimiento de contrato, venta del inmueble...', 'arriendo-facil' ); ?>"
-				style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;resize:vertical;"></textarea>
-			<p id="af-early-terminate-feedback" style="margin:8px 0 0;font-size:13px;color:#b91c1c;" aria-live="polite"></p>
+				style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #c3d1ce;border-radius:6px;font-size:13px;resize:vertical;"></textarea>
+			<p id="af-early-terminate-feedback" style="margin:8px 0 0;font-size:13px;color:#b03a36;" aria-live="polite"></p>
 			<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px;">
 				<button type="button" id="af-early-terminate-cancel" class="button">
 					<?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?>
 				</button>
 				<button type="button" id="af-early-terminate-confirm" class="button"
-					style="background:#b91c1c;border-color:#991b1b;color:#fff;">
+					style="background:#b03a36;border-color:#b03a36;color:#fff;">
 					<?php esc_html_e( 'Confirmar terminacion', 'arriendo-facil' ); ?>
 				</button>
 			</div>
@@ -1590,8 +1590,8 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 		.then( function ( resp ) {
 			if ( resp.success ) {
 				var estado = ( resp.data && resp.data.estado ) ? resp.data.estado : 'generada';
-				var color  = ( 'autorizada' === estado || 'autorizada_sin_ride' === estado ) ? '#2e7d32'
-				           : ( 'error_envio' === estado || 'error_autorizacion' === estado ? '#c62828' : '#1565c0' );
+				var color  = ( 'autorizada' === estado || 'autorizada_sin_ride' === estado ) ? '#2f7d73'
+				           : ( 'error_envio' === estado || 'error_autorizacion' === estado ? '#b03a36' : '#3882f6' );
 				var invId  = ( resp.data && resp.data.invoice_id ) ? '#' + resp.data.invoice_id : '';
 				var period = ( resp.data && resp.data.billing_period ) ? ' (' + resp.data.billing_period + ')' : '';
 				cell.innerHTML = '<span style="font-weight:600;color:' + color + ';font-size:12px;">' + estado + period + '</span><br><small style="color:#888;">' + invId + '</small>';
@@ -1603,7 +1603,7 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 				cell.querySelector( '.af-issue-error' ) && cell.querySelector( '.af-issue-error' ).remove();
 				var errSpan = document.createElement( 'span' );
 				errSpan.className = 'af-issue-error';
-				errSpan.style.cssText = 'display:block;color:#c62828;font-size:11px;margin-top:2px;';
+				errSpan.style.cssText = 'display:block;color:#b03a36;font-size:11px;margin-top:2px;';
 				errSpan.title = msg;
 				errSpan.textContent = '⚠ ' + msg.substring( 0, 60 ) + ( msg.length > 60 ? '…' : '' );
 				cell.appendChild( errSpan );
@@ -1614,7 +1614,7 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 			btn.textContent = origLabel;
 			var errSpan = document.createElement( 'span' );
 			errSpan.className = 'af-issue-error';
-			errSpan.style.cssText = 'display:block;color:#c62828;font-size:11px;margin-top:2px;';
+			errSpan.style.cssText = 'display:block;color:#b03a36;font-size:11px;margin-top:2px;';
 			errSpan.textContent = '⚠ <?php echo esc_js( __( 'Error de red', 'arriendo-facil' ) ); ?>';
 			cell.appendChild( errSpan );
 		} );
@@ -1622,7 +1622,7 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 
 	// Style for armed state.
 	var style = document.createElement( 'style' );
-	style.textContent = '.af-confirm-armed{background:#c62828!important;border-color:#b71c1c!important;color:#fff!important;}';
+	style.textContent = '.af-confirm-armed{background:#b03a36!important;border-color:#b71c1c!important;color:#fff!important;}';
 	document.head.appendChild( style );
 
 	// ── Early termination modal ──────────────────────────────────────────────

@@ -147,10 +147,10 @@ $severity_icons = array(
 				<p id="af-alerts-settings-status" class="af-alerts-center__status" aria-live="polite"></p>
 			</form>
 
-			<hr style="border:0;border-top:1px solid var(--af-gray-200,#E2E1DB);margin:20px 0;" />
+			<hr style="border:0;border-top:1px solid var(--af-gray-200,#DCE5E3);margin:20px 0;" />
 
 			<h3 style="margin:0 0 6px;font-size:14px;font-weight:700;"><?php esc_html_e( 'Enviar recordatorio ahora', 'arriendo-facil' ); ?></h3>
-			<p style="margin:0 0 12px;font-size:13px;color:#5B594F;">
+			<p style="margin:0 0 12px;font-size:13px;color:#4A5C61;">
 				<?php esc_html_e( 'Envía de inmediato las alertas pendientes al correo configurado.', 'arriendo-facil' ); ?>
 			</p>
 			<button type="button" class="button" id="af-alerts-send-reminder">
@@ -158,9 +158,9 @@ $severity_icons = array(
 			</button>
 			<p id="af-alerts-send-status" class="af-alerts-center__status" aria-live="polite"></p>
 
-			<hr style="border:0;border-top:1px solid var(--af-gray-200,#E2E1DB);margin:20px 0;" />
+			<hr style="border:0;border-top:1px solid var(--af-gray-200,#DCE5E3);margin:20px 0;" />
 
-			<p style="margin:0;font-size:12px;color:#7A7870;line-height:1.6;">
+			<p style="margin:0;font-size:12px;color:#647579;line-height:1.6;">
 				<?php esc_html_e( 'Las alertas operativas se generan todos los días: contratos por vencer o vencidos, cargos de pago vencidos y lecturas de medidor faltantes del período. Siempre aparecen en el ícono de campana del panel.', 'arriendo-facil' ); ?>
 			</p>
 		</aside>

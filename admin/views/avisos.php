@@ -218,8 +218,8 @@ foreach ( (array) $avisos as $av ) {
 		</div>
 		<div class="af-modal__body">
 			<p class="af-modal__status" id="af-aviso-view-subject" style="font-weight:700; margin:0 0 12px;"></p>
-			<div id="af-aviso-view-body" style="white-space:pre-wrap; color:#344054; font-size:14px; line-height:1.6;"></div>
-			<p id="af-aviso-view-read" class="af-aviso-read" style="margin:16px 0 0; color:#027a48; font-weight:600;"></p>
+			<div id="af-aviso-view-body" style="white-space:pre-wrap; color:#2e4046; font-size:14px; line-height:1.6;"></div>
+			<p id="af-aviso-view-read" class="af-aviso-read" style="margin:16px 0 0; color:#1f5a52; font-weight:600;"></p>
 		</div>
 		<div class="af-modal__footer">
 			<button type="button" class="button" data-af-aviso-modal-close><?php esc_html_e( 'Cerrar', 'arriendo-facil' ); ?></button>

@@ -4,20 +4,20 @@
   padding: 22px;
   border: 1px solid #dbe3ef;
   border-radius: 14px;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  background: linear-gradient(180deg, #ffffff 0%, #f7f8f6 100%);
   box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
 }
 
 .af-tenant-signup__title {
   margin: 0 0 8px;
-  color: #0f172a;
+  color: #193238;
   font-size: 26px;
   line-height: 1.2;
 }
 
 .af-tenant-signup__subtitle {
   margin: 0;
-  color: #475569;
+  color: #4a5c61;
   line-height: 1.6;
 }
 
@@ -51,12 +51,12 @@
 
 .af-tenant-signup__label {
   font-weight: 600;
-  color: #0f172a;
+  color: #193238;
 }
 
 .af-tenant-signup__input {
   padding: 10px 12px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid #c3d1ce;
   border-radius: 8px;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
@@ -72,8 +72,8 @@
   padding: 10px 12px;
   border: 1px solid #dbeafe;
   border-radius: 10px;
-  background: #eff6ff;
-  color: #1e3a8a;
+  background: #e8f1fe;
+  color: #0f3d47;
   font-size: 13px;
   line-height: 1.55;
 }
@@ -92,12 +92,12 @@
   align-items: flex-start;
   gap: 8px;
   margin-top: 12px;
-  color: #334155;
+  color: #2e4046;
   line-height: 1.5;
 }
 
 .af-tenant-signup__legal a {
-  color: #1d4ed8;
+  color: #164a55;
   text-decoration: underline;
 }
 
@@ -117,7 +117,7 @@
   padding: 11px 16px;
   border: 0;
   border-radius: 10px;
-  background: #1d4ed8;
+  background: #164a55;
   color: #fff;
   font-weight: 700;
   cursor: pointer;
@@ -128,11 +128,11 @@
 }
 
 .af-tenant-signup__link--primary {
-  color: #1d4ed8;
+  color: #164a55;
 }
 
 .af-tenant-signup__link--secondary {
-  color: #475569;
+  color: #4a5c61;
 }
 
 @media (max-width: 760px) {

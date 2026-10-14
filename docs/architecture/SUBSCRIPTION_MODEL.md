@@ -141,17 +141,18 @@ construido y operativo**. Ambos flujos coexisten:
     el login se bloquea hasta verificarla
     (`enforce_email_verification_on_login`). Confirma la pregunta abierta 2
     de §6: **sí se requiere verificación de correo**.
-  - Al verificar el token se siembra un **dataset demo aislado** por cuenta
-    (`Arriendo_Facil_Property_Admin_Demo::seed_demo`, guardado en
-    `af_demo_seeded` / `af_demo_dataset`): edificio, unidades, inquilino,
-    contrato y cobros, todos con `_af_owner_id = user_id` para que nunca se
-    mezclen con datos reales.
+  - Al verificar el token **ya no se siembra** dataset demo: el gestor opera
+    desde el inicio con datos reales, aunque no haya completado el perfil.
+    `Arriendo_Facil_Property_Admin_Demo` se conserva solo para que cuentas
+    previas con datos de ejemplo (`af_demo_seeded` / `af_demo_dataset`)
+    puedan limpiarlos desde "Mi perfil".
   - Onboarding supervisado (`includes/class-property-admin-onboarding.php`):
     la cuenta sigue con `af_admin_doc_status = 'pendiente'`; las páginas
     operativas (`GATED_SLUGS`, 17 slugs de negocio) quedan ocultas hasta
     que el prospecto completa perfil/documentos y el super admin aprueba
     desde Administradores. El Panel (`arriendo-facil`) y "Mi perfil"
-    (`af-admin-profile`) sí quedan accesibles para que explore la demo.
+    (`af-admin-profile`) siempre quedan accesibles. El gate está desactivado
+    por defecto (filtro `af_property_admin_gate_operational_menus`).
   - Cron diario `af_admin_profile_reminders_cron` recuerda al prospecto los
     pasos pendientes (verificar correo, completar perfil) y alerta al
     equipo cuando hay documentos por revisar.

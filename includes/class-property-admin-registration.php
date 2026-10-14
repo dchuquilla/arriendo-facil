@@ -13,11 +13,10 @@
  *     cifra los datos sensibles.
  *  3. Se crea la cuenta en estado "correo sin verificar" y se envía un
  *     correo con enlace de verificación (vence en 24 h).
- *  4. Al verificar el correo se activa la cuenta y se siembra un dataset
- *     de datos de ejemplo aislado por prospecto (ver
- *     Arriendo_Facil_Property_Admin_Demo) para que explore el sistema.
+ *  4. Al verificar el correo se activa la cuenta. No se siembran datos de
+ *     ejemplo: el gestor opera desde el inicio con sus datos reales.
  *  5. El prospecto completa su perfil (identidad y documentos), que el
- *     super admin debe revisar antes de dar acceso a datos reales.
+ *     super admin revisa de forma informativa (no bloquea la operación).
  *  6. Un cron diario (af_admin_profile_reminders_cron) recuerda al
  *     prospecto y al equipo los pasos pendientes.
  *
@@ -666,7 +665,7 @@ class Arriendo_Facil_Property_Admin_Registration {
 	}
 
 	/**
-	 * Marks email as verified when the token matches and seeds the demo.
+	 * Marks email as verified when the token matches.
 	 *
 	 * @param int    $user_id Admin user ID.
 	 * @param string $token Raw verification token.
@@ -704,12 +703,6 @@ class Arriendo_Facil_Property_Admin_Registration {
 		update_user_meta( $user_id, 'af_admin_email_verified', 1 );
 		delete_user_meta( $user_id, 'af_admin_email_verify_hash' );
 		delete_user_meta( $user_id, 'af_admin_email_verify_expires' );
-
-		if ( ! get_user_meta( $user_id, 'af_demo_seeded', true )
-			&& class_exists( 'Arriendo_Facil_Property_Admin_Demo' ) ) {
-			$user_id_int = (int) $user_id;
-			Arriendo_Facil_Property_Admin_Demo::seed_demo( $user_id_int );
-		}
 
 		update_user_meta( $user_id, 'af_admin_onboarding_step', 'profile' );
 
@@ -867,21 +860,21 @@ class Arriendo_Facil_Property_Admin_Registration {
 			wp_login_url( admin_url() )
 		);
 
-		$subject = __( '[Arriendo Facil] Verifica tu correo para activar tu demo', 'arriendo-facil' );
+		$subject = __( '[Arriendo Facil] Verifica tu correo para activar tu cuenta', 'arriendo-facil' );
 
 		return Arriendo_Facil_Email::send(
 			$recipient,
 			$subject,
 			array(
-				'preheader' => __( 'Confirma tu correo para activar tu cuenta y tu demo.', 'arriendo-facil' ),
+				'preheader' => __( 'Confirma tu correo para activar tu cuenta.', 'arriendo-facil' ),
 				'eyebrow'   => __( 'Gestor de propiedades', 'arriendo-facil' ),
-				'title'     => __( 'Verifica tu correo para activar tu demo', 'arriendo-facil' ),
+				'title'     => __( 'Verifica tu correo para activar tu cuenta', 'arriendo-facil' ),
 				'greeting'  => sprintf(
 					/* translators: %s: user display name */
 					__( 'Hola %s,', 'arriendo-facil' ),
 					'' !== $display ? $display : __( 'gestor', 'arriendo-facil' )
 				),
-				'body_text' => __( 'Recibimos tu solicitud de demo como gestor de propiedades.', 'arriendo-facil' ) . "\n\n" . __( 'Por seguridad, confirma que este correo te pertenece para activar tu cuenta y preparar tu área de demostración.', 'arriendo-facil' ),
+				'body_text' => __( 'Recibimos tu solicitud de registro como gestor de propiedades.', 'arriendo-facil' ) . "\n\n" . __( 'Por seguridad, confirma que este correo te pertenece para activar tu cuenta.', 'arriendo-facil' ),
 				'button'    => array(
 					'label' => __( 'Verificar mi correo', 'arriendo-facil' ),
 					'url'   => $verify_url,
@@ -949,7 +942,7 @@ class Arriendo_Facil_Property_Admin_Registration {
 			return;
 		}
 
-		$subject = __( '[Arriendo Facil] Falta verificar tu correo para activar tu demo', 'arriendo-facil' );
+		$subject = __( '[Arriendo Facil] Falta verificar tu correo para activar tu cuenta', 'arriendo-facil' );
 		Arriendo_Facil_Email::send(
 			sanitize_email( (string) $user->user_email ),
 			$subject,
@@ -960,7 +953,7 @@ class Arriendo_Facil_Property_Admin_Registration {
 					__( 'Hola %s,', 'arriendo-facil' ),
 					sanitize_text_field( (string) $user->display_name )
 				),
-				'body_text' => __( 'Tu cuenta de demo está creada, pero aún falta verificar tu correo. Busca el enlace que te enviamos (vence en 24 horas) o solicita un reenvío en la página de registro.', 'arriendo-facil' ),
+				'body_text' => __( 'Tu cuenta está creada, pero aún falta verificar tu correo. Busca el enlace que te enviamos (vence en 24 horas) o solicita un reenvío en la página de registro.', 'arriendo-facil' ),
 				'button'    => array(
 					'label' => __( 'Ir al registro', 'arriendo-facil' ),
 					'url'   => wp_login_url( admin_url() ),
@@ -984,19 +977,19 @@ class Arriendo_Facil_Property_Admin_Registration {
 		}
 
 		$profile_url = admin_url( 'admin.php?page=af-admin-profile' );
-		$subject     = __( '[Arriendo Facil] Completa tu perfil para usar la demo', 'arriendo-facil' );
+		$subject     = __( '[Arriendo Facil] Completa tu perfil de gestor', 'arriendo-facil' );
 
 		Arriendo_Facil_Email::send(
 			sanitize_email( (string) $user->user_email ),
 			$subject,
 			array(
-				'title'     => __( 'Completa tu perfil para usar la demo', 'arriendo-facil' ),
+				'title'     => __( 'Completa tu perfil de gestor', 'arriendo-facil' ),
 				'greeting'  => sprintf(
 					/* translators: %s: user display name */
 					__( 'Hola %s,', 'arriendo-facil' ),
 					sanitize_text_field( (string) $user->display_name )
 				),
-				'body_text' => __( 'Para aprovechar tu demo de Arriendo Fácil completa tu perfil y sube tus documentos de identificación.', 'arriendo-facil' ),
+				'body_text' => __( 'Completa tu perfil y sube tus documentos de identificación para verificar tu cuenta de Arriendo Fácil.', 'arriendo-facil' ),
 				'button'    => array(
 					'label' => __( 'Completar perfil', 'arriendo-facil' ),
 					'url'   => $profile_url,

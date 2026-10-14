@@ -12,8 +12,8 @@
  *     Los certificados laboral y bancario solo aplican a inquilinos; al
  *     administrador de propiedades solo se le exige identidad.
  *  2. Banner contextual en wp-admin recordando completar el perfil y
- *     avisando que los datos de la demo son de ejemplo; permite limpiar
- *     el dataset de ejemplo.
+ *     recordando completar la verificación de identidad. Las cuentas que
+ *     aún conservan un dataset de ejemplo heredado pueden limpiarlo.
  *  3. Revisión supervisada del super admin (aprobar/rechazar/reiniciar)
  *     desde la pantalla de Administradores (af-property-admins).
  *
@@ -443,7 +443,7 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 									<h2 class="af-section__title"><?php esc_html_e( 'Estás viendo datos de ejemplo', 'arriendo-facil' ); ?></h2>
 								</div>
 							</div>
-							<p class="af-section__subtitle"><?php esc_html_e( 'La demo incluye un edificio, unidades, un contrato y cobros ficticios. Puedes limpiarlos cuando quieras para empezar con tus datos reales.', 'arriendo-facil' ); ?></p>
+							<p class="af-section__subtitle"><?php esc_html_e( 'Los datos de ejemplo incluyen un edificio, unidades, un contrato y cobros ficticios. Puedes limpiarlos cuando quieras para empezar con tus datos reales.', 'arriendo-facil' ); ?></p>
 							<p><button type="button" class="button af-btn af-btn--danger" data-af-purge-demo><?php esc_html_e( 'Limpiar datos de ejemplo', 'arriendo-facil' ); ?></button></p>
 						</section>
 					<?php endif; ?>
@@ -1103,9 +1103,9 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 		$message = '';
 
 		if ( $is_demo ) {
-			$message = __( 'Estas en tu demo, con datos de ejemplo aislados. Completa tu perfil para que el equipo habilite el uso con datos reales.', 'arriendo-facil' );
+			$message = __( 'Tu cuenta conserva datos de ejemplo. Puedes limpiarlos desde tu perfil y registrar tus datos reales; completa tu perfil para verificar tu identidad.', 'arriendo-facil' );
 		} else {
-			$message = __( 'Bienvenido. Completa tu perfil para activar tu cuenta.', 'arriendo-facil' );
+			$message = __( 'Bienvenido. Puedes registrar tus datos reales desde ya; completa tu perfil para verificar tu identidad.', 'arriendo-facil' );
 		}
 
 		echo '<div class="notice notice-info is-dismissible"><p>'

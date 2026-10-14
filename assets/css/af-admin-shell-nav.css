@@ -359,8 +359,11 @@ body.af-sidebar-collapsed .af-app-sidebar__toggle .af-icon {
 	transition: transform var(--af-motion-fast), color var(--af-motion-fast);
 }
 
-.af-app-sidebar__group.is-active .af-app-sidebar__group-chevron {
+.af-app-sidebar__group.is-open .af-app-sidebar__group-chevron {
 	transform: rotate(180deg);
+}
+
+.af-app-sidebar__group.is-active .af-app-sidebar__group-chevron {
 	color: #fff;
 }
 
@@ -368,6 +371,11 @@ body.af-sidebar-collapsed .af-app-sidebar__toggle .af-icon {
 	list-style: none;
 	margin: 0 0 var(--af-space-2);
 	padding: 0;
+	display: none;
+}
+
+.af-app-sidebar__group.is-open .af-app-sidebar__subnav {
+	display: block;
 }
 
 .af-app-sidebar__subnav .af-app-sidebar__item a {
@@ -509,4 +517,116 @@ body.af-sidebar-collapsed .af-app-sidebar__section-label {
 
 .af-app-sidebar .af-app-sidebar__logout:hover {
 	color: #fff;
+}
+
+body.af-sidebar-collapsed .af-app-sidebar__group.is-open .af-app-sidebar__subnav {
+	display: none;
+}
+
+/* ── User dropdown (top bar) ───────────────────────────────────────────── */
+
+.af-user-menu {
+	position: relative;
+}
+
+.af-user-menu__toggle {
+	border: 0;
+	background: transparent;
+	cursor: pointer;
+	font-family: inherit;
+	padding: 4px 6px;
+	border-radius: var(--af-radius-md);
+}
+
+.af-user-menu__toggle:hover,
+.af-user-menu__toggle[aria-expanded="true"] {
+	background: var(--af-gray-50, #F7F8F6);
+}
+
+.af-user-menu__toggle:focus-visible {
+	outline: 2px solid var(--af-primary-500, #00a87f);
+	outline-offset: 2px;
+}
+
+.af-user-menu__toggle .af-icon {
+	transition: transform var(--af-motion-fast, 120ms ease);
+}
+
+.af-user-menu__toggle[aria-expanded="true"] .af-icon {
+	transform: rotate(180deg);
+}
+
+.af-user-menu__panel {
+	position: absolute;
+	top: calc(100% + 10px);
+	right: 0;
+	z-index: 100060;
+	min-width: 240px;
+	padding: 6px;
+	background: var(--af-gray-0, #fff);
+	border: 1px solid var(--af-gray-200, #dce5e3);
+	border-radius: 14px;
+	box-shadow: 0 18px 40px -12px rgba(15, 23, 42, 0.28);
+	font-family: var(--af-font-family, inherit);
+}
+
+.af-user-menu__panel[hidden] {
+	display: none;
+}
+
+.af-user-menu__head {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 10px 12px 12px;
+	margin-bottom: 4px;
+	border-bottom: 1px solid var(--af-gray-100, #eef2f0);
+}
+
+.af-user-menu__name {
+	font-size: var(--af-text-sm, 13px);
+	font-weight: 700;
+	color: var(--af-gray-900, #193238);
+}
+
+.af-user-menu__email {
+	font-size: 12px;
+	color: var(--af-gray-500, #647579);
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.af-app-topbar .af-user-menu__item {
+	display: flex;
+	align-items: center;
+	gap: var(--af-space-3, 12px);
+	padding: 9px 12px;
+	border-radius: var(--af-radius-md, 10px);
+	color: var(--af-gray-900, #193238);
+	font-size: var(--af-text-sm, 13px);
+	font-weight: 500;
+	text-decoration: none;
+}
+
+.af-app-topbar .af-user-menu__item:hover,
+.af-app-topbar .af-user-menu__item:focus-visible {
+	background: var(--af-gray-50, #F7F8F6);
+	color: var(--af-primary-600, #0F3D47);
+	outline: none;
+}
+
+.af-app-topbar .af-user-menu__item .af-icon {
+	width: 16px;
+	height: 16px;
+	color: var(--af-gray-500, #647579);
+}
+
+.af-app-topbar .af-user-menu__item--logout,
+.af-app-topbar .af-user-menu__item--logout .af-icon {
+	color: var(--af-danger-600, #d0342c);
+}
+
+.af-app-topbar .af-user-menu__item--logout:hover {
+	background: rgba(208, 52, 44, 0.08);
+	color: var(--af-danger-600, #d0342c);
 }

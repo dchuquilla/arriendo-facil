@@ -33,5 +33,50 @@
 				mobileToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
 			});
 		}
+
+		// Accordion: clicking a group header expands/collapses its sub-items.
+		// When the sidebar is collapsed to icons the header keeps navigating.
+		var groupLinks = document.querySelectorAll('.af-app-sidebar__group-link');
+		Array.prototype.forEach.call(groupLinks, function (link) {
+			link.addEventListener('click', function (event) {
+				if (body.classList.contains('af-sidebar-collapsed')) {
+					return;
+				}
+				event.preventDefault();
+				var group = link.parentNode;
+				var open  = group.classList.toggle('is-open');
+				link.setAttribute('aria-expanded', open ? 'true' : 'false');
+			});
+		});
+
+		// User dropdown (top bar).
+		var userMenu   = document.getElementById('af-user-menu');
+		var userToggle = document.getElementById('af-user-menu-toggle');
+		var userPanel  = document.getElementById('af-user-menu-panel');
+
+		if (userMenu && userToggle && userPanel) {
+			var setUserMenu = function (open) {
+				userPanel.hidden = !open;
+				userToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+			};
+
+			userToggle.addEventListener('click', function (event) {
+				event.stopPropagation();
+				setUserMenu(userPanel.hidden);
+			});
+
+			document.addEventListener('click', function (event) {
+				if (!userPanel.hidden && !userMenu.contains(event.target)) {
+					setUserMenu(false);
+				}
+			});
+
+			document.addEventListener('keydown', function (event) {
+				if (event.key === 'Escape' && !userPanel.hidden) {
+					setUserMenu(false);
+					userToggle.focus();
+				}
+			});
+		}
 	});
 })();

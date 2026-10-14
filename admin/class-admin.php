@@ -662,8 +662,10 @@ class Arriendo_Facil_Admin {
 	 */
 	/**
 	 * Module definitions for the custom app shell sidebar, mirroring the
-	 * product prototype: Panel, Propiedades, Contratos, Huéspedes,
-	 * Pagos y dispersión, Reviews, Facturación SRI y Configuración.
+	 * product prototype. Related screens share a group: Panel (+ Calendario),
+	 * Propiedades (+ Catálogo, Mantenimiento, Reviews), Contratos e inquilinos,
+	 * Cobranza y facturación (+ Pagos de servicios, Facturación SRI) y
+	 * Configuración.
 	 *
 	 * @return array<string, array<string, string>>
 	 */
@@ -678,24 +680,12 @@ class Arriendo_Facil_Admin {
 				'icon'  => 'building-2',
 			),
 			'contratos'   => array(
-				'label' => __( 'Contratos', 'arriendo-facil' ),
+				'label' => __( 'Contratos e inquilinos', 'arriendo-facil' ),
 				'icon'  => 'file-text',
 			),
-			'huespedes'   => array(
-				'label' => __( 'Huéspedes', 'arriendo-facil' ),
-				'icon'  => 'users',
-			),
 			'pagos'       => array(
-				'label' => __( 'Cobranza y pagos', 'arriendo-facil' ),
+				'label' => __( 'Cobranza y facturación', 'arriendo-facil' ),
 				'icon'  => 'credit-card',
-			),
-			'reviews'     => array(
-				'label' => __( 'Reviews', 'arriendo-facil' ),
-				'icon'  => 'star',
-			),
-			'facturacion' => array(
-				'label' => __( 'Facturación SRI', 'arriendo-facil' ),
-				'icon'  => 'receipt',
 			),
 			'config'      => array(
 				'label' => __( 'Configuración', 'arriendo-facil' ),
@@ -769,7 +759,7 @@ array(
 			'label' => __( 'Cobranza de inmuebles', 'arriendo-facil' ),
 			'url'   => admin_url( 'admin.php?page=af-buildings' ),
 			'icon'  => 'building',
-			'group' => 'propiedades',
+			'group' => 'pagos',
 			'cap'   => Arriendo_Facil_Tenancy::CAP,
 			'gate'  => true,
 		),
@@ -787,7 +777,7 @@ array(
 			'label' => __( 'Inquilinos', 'arriendo-facil' ),
 			'url'   => admin_url( 'admin.php?page=af-guests' ),
 			'icon'  => 'users',
-			'group' => 'huespedes',
+			'group' => 'contratos',
 			'cap'   => 'edit_posts',
 			'gate'  => true,
 		),
@@ -805,7 +795,7 @@ array(
 				'label' => __( 'Reviews', 'arriendo-facil' ),
 				'url'   => admin_url( 'admin.php?page=af-reviews' ),
 				'icon'  => 'star',
-				'group' => 'reviews',
+				'group' => 'propiedades',
 				'cap'   => 'edit_posts',
 				'gate'  => true,
 			),
@@ -814,7 +804,7 @@ array(
 				'label' => __( 'Facturación', 'arriendo-facil' ),
 				'url'   => admin_url( 'admin.php?page=af-billing' ),
 				'icon'  => 'receipt',
-				'group' => 'facturacion',
+				'group' => 'pagos',
 				'cap'   => $billing_cap,
 				'gate'  => true,
 			),
@@ -987,8 +977,8 @@ array(
 							}
 						}
 						?>
-						<li class="af-app-sidebar__group<?php echo $group_active ? ' is-active' : ''; ?>">
-							<a class="af-app-sidebar__group-link" href="<?php echo esc_url( $grouped[ $group_slug ][0]['url'] ); ?>">
+						<li class="af-app-sidebar__group<?php echo $group_active ? ' is-active is-open' : ''; ?>">
+							<a class="af-app-sidebar__group-link" href="<?php echo esc_url( $grouped[ $group_slug ][0]['url'] ); ?>" aria-expanded="<?php echo $group_active ? 'true' : 'false'; ?>">
 								<?php echo af_lucide( $group_meta['icon'], 20 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
 								<span class="af-app-sidebar__group-label"><?php echo esc_html( $group_meta['label'] ); ?></span>
 								<span class="af-app-sidebar__group-chevron"><?php echo af_lucide( 'chevron-down', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
@@ -1086,11 +1076,35 @@ array(
 					</a>
 				</div>
 			</div>
-			<a class="af-app-topbar__user" href="<?php echo esc_url( admin_url( 'admin.php?page=af-admin-profile' ) ); ?>">
-				<?php echo get_avatar( $current_user->ID, 28 ); ?>
-				<span class="af-app-topbar__user-name"><?php echo esc_html( $this->get_user_display_name( $current_user ) ); ?></span>
-				<?php echo af_lucide( 'chevron-down', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
-			</a>
+			<div class="af-user-menu" id="af-user-menu">
+				<button type="button" class="af-app-topbar__user af-user-menu__toggle" id="af-user-menu-toggle" aria-expanded="false" aria-haspopup="true" aria-controls="af-user-menu-panel">
+					<?php echo get_avatar( $current_user->ID, 28 ); ?>
+					<span class="af-app-topbar__user-name"><?php echo esc_html( $this->get_user_display_name( $current_user ) ); ?></span>
+					<?php echo af_lucide( 'chevron-down', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
+				</button>
+				<div class="af-user-menu__panel" id="af-user-menu-panel" role="menu" hidden>
+					<div class="af-user-menu__head">
+						<span class="af-user-menu__name"><?php echo esc_html( $this->get_user_display_name( $current_user ) ); ?></span>
+						<span class="af-user-menu__email"><?php echo esc_html( $current_user->user_email ); ?></span>
+					</div>
+					<a class="af-user-menu__item" role="menuitem" href="<?php echo esc_url( admin_url( 'admin.php?page=af-admin-profile' ) ); ?>">
+						<?php echo af_lucide( 'user', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
+						<span><?php esc_html_e( 'Ver perfil', 'arriendo-facil' ); ?></span>
+					</a>
+					<a class="af-user-menu__item" role="menuitem" href="<?php echo esc_url( admin_url( 'admin.php?page=af-alerts-center' ) ); ?>">
+						<?php echo af_lucide( 'bell', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
+						<span><?php esc_html_e( 'Alertas', 'arriendo-facil' ); ?></span>
+					</a>
+					<a class="af-user-menu__item" role="menuitem" href="<?php echo esc_url( home_url( '/' ) ); ?>">
+						<?php echo af_lucide( 'globe', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
+						<span><?php esc_html_e( 'Ir al sitio', 'arriendo-facil' ); ?></span>
+					</a>
+					<a class="af-user-menu__item af-user-menu__item--logout" role="menuitem" href="<?php echo esc_url( wp_logout_url( home_url( '/' ) ) ); ?>">
+						<?php echo af_lucide( 'log-out', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
+						<span><?php esc_html_e( 'Cerrar sesión', 'arriendo-facil' ); ?></span>
+					</a>
+				</div>
+			</div>
 		</div>
 	</div>
 		<?php

@@ -698,7 +698,7 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 
 		if ( in_array( $id_type, array( 'cedula', 'ruc', 'pasaporte' ), true ) && '' !== $id_number ) {
 			if ( ! class_exists( 'Arriendo_Facil_Identity_Validator' )
-				|| ! Arriendo_Facil_Identity_Validator::validate( $id_type, $id_number ) ) {
+				|| ! Arriendo_Facil_Identity_Validator::validate_format( $id_type, $id_number ) ) {
 				wp_send_json_error( array( 'message' => __( 'El numero de identificacion no es valido para el tipo seleccionado.', 'arriendo-facil' ) ), 400 );
 			}
 

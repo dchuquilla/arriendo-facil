@@ -123,6 +123,26 @@ class Arriendo_Facil_Identity_Validator {
 	}
 
 	/**
+	 * Validates only the format (length/characters) of a document number,
+	 * without the check-digit algorithm, which rejects some genuine documents.
+	 *
+	 * @param string $type   'cedula', 'ruc', or 'pasaporte'.
+	 * @param string $number Raw document number.
+	 * @return bool
+	 */
+	public static function validate_format( $type, $number ) {
+		$type = strtolower( trim( (string) $type ) );
+
+		if ( 'pasaporte' === $type ) {
+			return self::validate_pasaporte( $number );
+		}
+
+		$number = preg_replace( '/\D/', '', (string) $number );
+
+		return strlen( $number ) === ( 'ruc' === $type ? 13 : 10 );
+	}
+
+	/**
 	 * Modulus 10 check-digit algorithm used for cédula validation.
 	 *
 	 * @param string $number 10-digit number.

@@ -698,7 +698,6 @@ class Arriendo_Facil_Admin {
 			'users.php',
 			'user-new.php',
 			'user-edit.php',
-			'profile.php',
 			'options-general.php',
 			'options-writing.php',
 			'options-reading.php',
@@ -726,6 +725,11 @@ class Arriendo_Facil_Admin {
 			return false;
 		}
 
+		// El perfil propio (profile.php) usa el shell de Arriendo Fácil.
+		if ( 'profile.php' === $pagenow ) {
+			return true;
+		}
+
 		if ( 'admin.php' === $pagenow ) {
 			$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
 			return 'arriendo-facil' === $page || 0 === strpos( $page, 'af-' );
@@ -748,6 +752,10 @@ class Arriendo_Facil_Admin {
 
 		if ( in_array( $pagenow, array( 'edit.php', 'post.php', 'post-new.php' ), true ) && 'accommodation' === $typenow ) {
 			return 'edit-accommodation';
+		}
+
+		if ( 'profile.php' === $pagenow ) {
+			return 'af-admin-profile';
 		}
 
 		return isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';

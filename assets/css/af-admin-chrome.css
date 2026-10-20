@@ -699,3 +699,180 @@ body.af-native-profile.af-tenant-view .user-display-name-wrap {
     body.af-native-profile .wrap > p.submit { text-align: center; }
     body.af-native-profile .wrap > p.submit .button.button-primary { width: 100%; }
 }
+
+/* ───────────────────────────────────────────────────────────────────────
+   PROFILE v2 — los bloques viven dentro de form#your-profile (no son hijos
+   directos de .wrap), por eso se estilizan aquí como tarjetas modernas.
+   ─────────────────────────────────────────────────────────────────────── */
+body.af-native-profile #dolly,
+body.af-native-profile .wrap > .notice-info.hello-dolly { display: none; }
+
+body.af-native-profile #your-profile {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+body.af-native-profile #your-profile > h2 {
+    margin: 0 !important;
+    padding: 22px 24px 0;
+    background: #fff;
+    border: 1px solid #DCE5E3;
+    border-bottom: none;
+    border-radius: 16px 16px 0 0;
+    font-size: 17px;
+    font-weight: 700;
+    color: #193238;
+    box-shadow: 0 2px 10px rgba(16, 24, 40, 0.05);
+}
+body.af-native-profile #your-profile > h2 + .form-table {
+    margin: -20px 0 0 !important;
+    padding: 12px 24px 24px;
+    background: #fff;
+    border: 1px solid #DCE5E3;
+    border-top: none;
+    border-radius: 0 0 16px 16px;
+    box-shadow: 0 6px 14px rgba(16, 24, 40, 0.05);
+}
+body.af-native-profile #your-profile > h2:has(+ .form-table .user-description-wrap),
+body.af-native-profile #your-profile > h2:has(+ .form-table .user-profile-picture) { display: none; }
+body.af-native-profile #your-profile > h2:has(+ .form-table .user-description-wrap) + .form-table,
+body.af-native-profile #your-profile > h2:has(+ .form-table .user-profile-picture) + .form-table { display: none; }
+
+body.af-native-profile #your-profile .form-table,
+body.af-native-profile #your-profile .form-table tbody { display: block; width: 100%; }
+body.af-native-profile #your-profile .form-table tbody {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px 20px;
+}
+body.af-native-profile #your-profile .form-table tr {
+    display: block;
+    grid-column: 1 / -1;
+    padding: 10px 0;
+    border: none;
+}
+body.af-native-profile #your-profile .form-table tr.user-first-name-wrap,
+body.af-native-profile #your-profile .form-table tr.user-last-name-wrap { grid-column: auto; }
+body.af-native-profile #your-profile .form-table th {
+    display: block;
+    width: auto;
+    padding: 0 0 6px !important;
+    font-size: 13px;
+    font-weight: 600;
+    color: #2E4046;
+}
+body.af-native-profile #your-profile .form-table td { display: block; padding: 0 !important; }
+body.af-native-profile #your-profile .form-table td input[type="text"],
+body.af-native-profile #your-profile .form-table td input[type="email"],
+body.af-native-profile #your-profile .form-table td input[type="url"],
+body.af-native-profile #your-profile .form-table td input[type="password"],
+body.af-native-profile #your-profile .form-table td select,
+body.af-native-profile #your-profile .form-table td textarea {
+    width: 100%;
+    max-width: 100%;
+    min-height: 44px;
+    box-sizing: border-box;
+    padding: 10px 14px;
+    font-size: 14px;
+    background: #fff;
+    border: 1px solid #C3D1CE;
+    border-radius: 10px;
+    transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+body.af-native-profile #your-profile .form-table td input[readonly],
+body.af-native-profile #your-profile .form-table td input:disabled {
+    background: #F1F5F4;
+    color: #647579;
+}
+body.af-native-profile #your-profile .form-table td input:focus,
+body.af-native-profile #your-profile .form-table td select:focus,
+body.af-native-profile #your-profile .form-table td textarea:focus {
+    border-color: #164A55;
+    box-shadow: 0 0 0 3px rgba(22, 74, 85, 0.15);
+    outline: none;
+}
+body.af-native-profile #your-profile .form-table td .description,
+body.af-native-profile #your-profile .form-table td p.description {
+    margin: 6px 0 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #647579;
+}
+body.af-native-profile #your-profile .wp-pwd { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+body.af-native-profile #your-profile .wp-pwd .button {
+    min-height: 44px;
+    padding: 0 18px !important;
+    border-radius: 10px !important;
+}
+body.af-native-profile #your-profile .wp-pwd input[type="password"] { flex: 1 1 220px; width: auto; }
+body.af-native-profile #your-profile .wp-pwd .button.wp-hide-pw { background: #fff; color: #164A55; border-color: #C3D1CE; }
+body.af-native-profile #your-profile #pass-strength-result { margin: 8px 0 0; width: 100%; box-sizing: border-box; }
+
+/* Tarjeta de foto */
+body.af-native-profile .af-avatar-card { margin: 0; padding: 22px 24px; border-radius: 16px; }
+body.af-native-profile .af-avatar-card h2 { display: block !important; }
+body.af-native-profile .af-avatar-card__body { gap: 24px; }
+body.af-native-profile .af-avatar-card__body img {
+    flex: none;
+    border: 3px solid #fff;
+    box-shadow: 0 0 0 2px #DCE5E3, 0 6px 16px rgba(16, 24, 40, 0.12);
+}
+body.af-native-profile .af-avatar-card input[type="file"] {
+    max-width: 100%;
+    font-size: 13px;
+    color: #647579;
+}
+body.af-native-profile .af-avatar-card input[type="file"]::file-selector-button {
+    margin-right: 12px;
+    padding: 10px 18px;
+    font: inherit;
+    font-weight: 600;
+    color: #164A55;
+    background: #EAF2F0;
+    border: 1px dashed #164A55;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 140ms ease;
+}
+body.af-native-profile .af-avatar-card input[type="file"]::file-selector-button:hover { background: #DDEEEB; }
+body.af-native-profile .af-avatar-card .description { margin: 8px 0 0; font-size: 12px; color: #647579; }
+
+/* Botón guardar */
+body.af-native-profile #your-profile > p.submit {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    margin: 0 !important;
+    padding: 16px 0 !important;
+    text-align: right;
+    background: linear-gradient(180deg, rgba(247, 248, 246, 0) 0%, #F7F8F6 45%);
+}
+body.af-native-profile #your-profile > p.submit .button-primary {
+    min-height: 46px;
+    padding: 0 32px !important;
+    font-size: 14px;
+    font-weight: 600;
+    background: #164A55;
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(22, 74, 85, 0.28);
+    transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+body.af-native-profile #your-profile > p.submit .button-primary:hover {
+    background: #0F3D47;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 20px rgba(22, 74, 85, 0.35);
+}
+
+@media (max-width: 782px) {
+    body.af-native-profile .wrap > h1 { font-size: 24px !important; }
+    body.af-native-profile #your-profile > h2 { padding: 18px 16px 0; }
+    body.af-native-profile #your-profile > h2 + .form-table { padding: 10px 16px 18px; }
+    body.af-native-profile #your-profile .form-table tbody { grid-template-columns: 1fr; }
+    body.af-native-profile #your-profile .form-table tr.user-first-name-wrap,
+    body.af-native-profile #your-profile .form-table tr.user-last-name-wrap { grid-column: 1 / -1; }
+    body.af-native-profile .af-avatar-card { padding: 18px 16px; }
+    body.af-native-profile .af-avatar-card__body { flex-direction: column; align-items: flex-start; gap: 16px; }
+    body.af-native-profile #your-profile > p.submit { text-align: center; }
+    body.af-native-profile #your-profile > p.submit .button-primary { width: 100%; }
+}

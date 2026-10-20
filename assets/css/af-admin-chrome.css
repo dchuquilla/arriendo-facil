@@ -1122,3 +1122,36 @@ body.af-native-profile .notice .notice-dismiss { top: 4px; right: 4px; }
 .af-danger-dialog .af-danger-card__cancel { min-height: 44px; padding: 0 20px; font: inherit; font-weight: 600; border-radius: 10px; cursor: pointer; }
 .af-danger-dialog .af-danger-card__submit { color: #fff; background: #B4443F; border: none; }
 .af-danger-dialog .af-danger-card__cancel { color: #164A55; background: #fff; border: 1px solid #C3D1CE; }
+
+/* Pestañas compartidas de Mi perfil */
+.af-profile-tabs {
+    display: flex;
+    gap: 4px;
+    max-width: 1100px;
+    margin: 0 0 20px;
+    padding: 4px;
+    overflow-x: auto;
+    background: #EAF2F0;
+    border-radius: 12px;
+    box-sizing: border-box;
+    -webkit-overflow-scrolling: touch;
+}
+.af-profile-tabs__tab {
+    flex: 1 1 auto;
+    min-height: 40px;
+    padding: 0 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    color: #2E4046;
+    text-decoration: none;
+    border-radius: 9px;
+    transition: background 140ms ease, color 140ms ease;
+}
+.af-profile-tabs__tab:hover { color: #164A55; background: rgba(255, 255, 255, 0.6); }
+.af-profile-tabs__tab.is-active { color: #164A55; background: #fff; box-shadow: 0 1px 3px rgba(16, 24, 40, 0.12); }
+.af-profile-tabs__tab:focus-visible { outline: 3px solid rgba(22, 74, 85, 0.3); outline-offset: 1px; }
+@media (min-width: 783px) { .af-profile-tabs { width: fit-content; min-width: 360px; } }

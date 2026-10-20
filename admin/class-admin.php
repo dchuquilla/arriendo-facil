@@ -610,7 +610,7 @@ class Arriendo_Facil_Admin {
 	 */
 	private function get_profile_translations() {
 		return array(
-			'Profile'                                    => 'Editar mi perfil',
+			'Profile'                                    => 'Cuenta y seguridad',
 			'Name'                                       => 'Nombre',
 			'Username'                                   => 'Usuario',
 			'Usernames cannot be changed.'               => 'El nombre de usuario no se puede cambiar.',
@@ -718,6 +718,10 @@ class Arriendo_Facil_Admin {
 	public function render_profile_back_link() {
 		global $pagenow;
 		if ( 'profile.php' !== $pagenow || ! $this->should_use_custom_shell() ) {
+			return;
+		}
+		if ( Arriendo_Facil_Tenancy::is_property_manager() && ! current_user_can( 'manage_options' ) ) {
+			Arriendo_Facil_Property_Admin_Onboarding::render_profile_tabs( 'account' );
 			return;
 		}
 		?>

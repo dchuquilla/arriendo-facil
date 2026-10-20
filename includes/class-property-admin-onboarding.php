@@ -83,6 +83,31 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 	}
 
 	/**
+	 * Tabs shared by "Mi perfil" and the account/security screen so both
+	 * read as a single profile section.
+	 *
+	 * @param string $active data|account.
+	 * @return void
+	 */
+	public static function render_profile_tabs( $active ) {
+		$tabs = array(
+			'data'    => array( __( 'Datos y verificación', 'arriendo-facil' ), admin_url( 'admin.php?page=' . self::PAGE_SLUG ) ),
+			'account' => array( __( 'Cuenta y seguridad', 'arriendo-facil' ), admin_url( 'profile.php' ) ),
+		);
+		echo '<nav class="af-profile-tabs" aria-label="' . esc_attr__( 'Secciones de mi perfil', 'arriendo-facil' ) . '">';
+		foreach ( $tabs as $key => $tab ) {
+			printf(
+				'<a class="af-profile-tabs__tab%1$s" href="%2$s"%3$s>%4$s</a>',
+				$key === $active ? ' is-active' : '',
+				esc_url( $tab[1] ),
+				$key === $active ? ' aria-current="page"' : '',
+				esc_html( $tab[0] )
+			);
+		}
+		echo '</nav>';
+	}
+
+	/**
 	 * Registers the "Mi perfil" page for property admins.
 	 *
 	 * Access fallback: the page is gated by `af_manage_properties`, but if a
@@ -228,16 +253,10 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 					'eyebrow'  => __( 'Arriendo Fácil', 'arriendo-facil' ),
 					'title'    => __( 'Mi perfil', 'arriendo-facil' ),
 					'subtitle' => __( 'Revisa el estado de tu cuenta y completa los datos de tu empresa para activar tu espacio de administración.', 'arriendo-facil' ),
-					'actions'  => array(
-						array(
-							'label'   => __( 'Nombre, foto y contraseña', 'arriendo-facil' ),
-							'url'     => $profile_url,
-							'variant' => 'ghost',
-							'icon'    => af_lucide( 'user' ),
-						),
-					),
 				)
 			);
+
+			self::render_profile_tabs( 'data' );
 			?>
 
 			<div id="af-profile-alert" class="af-profile-alert" role="status" aria-live="polite" hidden></div>
@@ -394,14 +413,6 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 							<p class="af-account__hint"><?php esc_html_e( 'Tu cuenta fue creada por el administrador de la plataforma. El correo figurará como verificado una vez actives la cuenta.', 'arriendo-facil' ); ?></p>
 						<?php endif; ?>
 						<ul class="af-account__links">
-							<li>
-								<a href="<?php echo esc_url( $profile_url ); ?>"><?php echo af_lucide( 'user', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?><span><?php esc_html_e( 'Editar nombre, foto y contraseña', 'arriendo-facil' ); ?></span></a>
-							</li>
-							<?php if ( Arriendo_Facil_Account_Deletion::can_delete( get_current_user_id() ) ) : ?>
-							<li>
-								<a href="<?php echo esc_url( $profile_url . '#af-danger-zone' ); ?>"><?php echo af_lucide( 'trash-2', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?><span><?php esc_html_e( 'Dar de baja mi cuenta', 'arriendo-facil' ); ?></span></a>
-							</li>
-							<?php endif; ?>
 							<li>
 								<a href="<?php echo esc_url( wp_logout_url( admin_url( 'admin.php?page=' . self::PAGE_SLUG ) ) ); ?>"><?php echo af_lucide( 'log-out', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?><span><?php esc_html_e( 'Cerrar sesión', 'arriendo-facil' ); ?></span></a>
 							</li>

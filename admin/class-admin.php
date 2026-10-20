@@ -37,6 +37,12 @@ class Arriendo_Facil_Admin {
 		add_filter( 'screen_options_show_screen', array( $this, 'owner_hide_screen_options' ), 999 );
 		add_filter( 'admin_body_class', array( $this, 'tag_native_pages_body_class' ) );
 		add_filter( 'locale', array( $this, 'force_spanish_for_portal_users' ), 20 );
+		add_action( 'user_edit_form_tag', array( $this, 'profile_form_multipart' ) );
+		add_action( 'show_user_profile', array( $this, 'render_avatar_upload_field' ) );
+		add_action( 'edit_user_profile', array( $this, 'render_avatar_upload_field' ) );
+		add_action( 'personal_options_update', array( $this, 'save_avatar_upload' ) );
+		add_action( 'edit_user_profile_update', array( $this, 'save_avatar_upload' ) );
+		add_filter( 'pre_get_avatar_data', array( $this, 'filter_local_avatar' ), 10, 2 );
 		add_action( 'in_admin_header', array( $this, 'render_custom_shell_nav' ) );
 		add_action( 'pre_get_posts', array( $this, 'restrict_accommodation_list_to_owner' ) );
 		add_filter( 'views_edit-accommodation', array( $this, 'filter_accommodation_status_views_for_owner' ) );
@@ -367,6 +373,115 @@ class Arriendo_Facil_Admin {
 	 */
 	private function is_restricted_owner() {
 		return Arriendo_Facil_Accommodation::user_is_owner() && ! current_user_can( 'manage_options' );
+	}
+
+	public function profile_form_multipart() {
+		echo ' enctype="multipart/form-data"';
+	}
+
+	/**
+	 * Renders the profile photo upload card.
+	 *
+	 * @param WP_User $user Profile user.
+	 */
+	public function render_avatar_upload_field( $user ) {
+		wp_nonce_field( 'af_avatar_upload_' . $user->ID, 'af_avatar_nonce' );
+		$has_local = (int) get_user_meta( $user->ID, 'af_avatar_id', true ) > 0;
+		?>
+		<div class="af-avatar-card">
+			<h2><?php esc_html_e( 'Foto de perfil', 'arriendo-facil' ); ?></h2>
+			<div class="af-avatar-card__body">
+				<?php echo get_avatar( $user->ID, 96 ); ?>
+				<div>
+					<input type="file" name="af_avatar_file" accept="image/jpeg,image/png,image/webp" />
+					<p class="description"><?php esc_html_e( 'JPG, PNG o WebP, máximo 2 MB. Se mostrará en todas las secciones.', 'arriendo-facil' ); ?></p>
+					<?php if ( $has_local ) : ?>
+						<label><input type="checkbox" name="af_avatar_remove" value="1" /> <?php esc_html_e( 'Eliminar foto actual', 'arriendo-facil' ); ?></label>
+					<?php endif; ?>
+				</div>
+			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Saves or removes the uploaded profile photo.
+	 *
+	 * @param int $user_id User ID.
+	 */
+	public function save_avatar_upload( $user_id ) {
+		if ( ! current_user_can( 'edit_user', $user_id ) ) {
+			return;
+		}
+		if ( ! isset( $_POST['af_avatar_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['af_avatar_nonce'] ) ), 'af_avatar_upload_' . $user_id ) ) {
+			return;
+		}
+
+		if ( ! empty( $_POST['af_avatar_remove'] ) ) {
+			delete_user_meta( $user_id, 'af_avatar_id' );
+		}
+
+		if ( empty( $_FILES['af_avatar_file']['name'] ) || ! empty( $_FILES['af_avatar_file']['error'] ) ) {
+			return;
+		}
+		if ( (int) $_FILES['af_avatar_file']['size'] > 2 * MB_IN_BYTES ) {
+			return;
+		}
+
+		$check = wp_check_filetype_and_ext(
+			$_FILES['af_avatar_file']['tmp_name'], // phpcs:ignore WordPress.Security
+			sanitize_file_name( $_FILES['af_avatar_file']['name'] ), // phpcs:ignore WordPress.Security
+			array(
+				'jpg|jpeg' => 'image/jpeg',
+				'png'      => 'image/png',
+				'webp'     => 'image/webp',
+			)
+		);
+		if ( empty( $check['type'] ) ) {
+			return;
+		}
+
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		require_once ABSPATH . 'wp-admin/includes/image.php';
+		require_once ABSPATH . 'wp-admin/includes/media.php';
+
+		$attachment_id = media_handle_upload( 'af_avatar_file', 0 );
+		if ( ! is_wp_error( $attachment_id ) ) {
+			update_user_meta( $user_id, 'af_avatar_id', (int) $attachment_id );
+		}
+	}
+
+	/**
+	 * Uses the uploaded photo as the avatar everywhere get_avatar() is used.
+	 *
+	 * @param array $args        Avatar data.
+	 * @param mixed $id_or_email User ID, email, WP_User or WP_Post/Comment.
+	 * @return array
+	 */
+	public function filter_local_avatar( $args, $id_or_email ) {
+		$user_id = 0;
+		if ( is_numeric( $id_or_email ) ) {
+			$user_id = (int) $id_or_email;
+		} elseif ( $id_or_email instanceof WP_User ) {
+			$user_id = (int) $id_or_email->ID;
+		} elseif ( is_string( $id_or_email ) && is_email( $id_or_email ) ) {
+			$user = get_user_by( 'email', $id_or_email );
+			$user_id = $user ? (int) $user->ID : 0;
+		}
+		if ( ! $user_id ) {
+			return $args;
+		}
+
+		$attachment_id = (int) get_user_meta( $user_id, 'af_avatar_id', true );
+		if ( $attachment_id ) {
+			$size = isset( $args['size'] ) ? (int) $args['size'] : 96;
+			$url  = wp_get_attachment_image_url( $attachment_id, array( $size * 2, $size * 2 ) );
+			if ( $url ) {
+				$args['url']          = $url;
+				$args['found_avatar'] = true;
+			}
+		}
+		return $args;
 	}
 
 	/**

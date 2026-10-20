@@ -685,6 +685,12 @@ body.af-native-profile.af-tenant-view .user-display-name-wrap {
     display: none !important;
 }
 
+/* Tarjeta de foto de perfil */
+.af-avatar-card { background: #fff; border: 1px solid #DCE5E3; border-radius: 14px; padding: 20px; margin: 0 0 20px; box-shadow: 0 2px 10px rgba(16, 24, 40, 0.05); }
+.af-avatar-card h2 { margin: 0 0 12px; padding: 0; font-size: 16px; font-weight: 700; color: #193238; }
+.af-avatar-card__body { display: flex; align-items: center; gap: 20px; }
+.af-avatar-card__body img { border-radius: 50%; width: 96px; height: 96px; object-fit: cover; }
+
 /* Responsive */
 @media (max-width: 782px) {
     body.af-native-profile .wrap { padding: 0 8px; }

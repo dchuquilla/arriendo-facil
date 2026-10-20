@@ -40,6 +40,7 @@ class Arriendo_Facil_Admin {
 		add_filter( 'gettext', array( $this, 'translate_profile_strings' ), 20, 2 );
 		add_filter( 'gettext_with_context', array( $this, 'translate_profile_strings' ), 20, 2 );
 		add_action( 'admin_notices', array( $this, 'render_profile_back_link' ) );
+		add_action( 'admin_notices', array( $this, 'render_avatar_notice' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'translate_profile_script_strings' ), 99 );
 		add_action( 'user_edit_form_tag', array( $this, 'profile_form_multipart' ) );
 		add_action( 'show_user_profile', array( $this, 'render_avatar_upload_field' ) );
@@ -392,19 +393,57 @@ class Arriendo_Facil_Admin {
 		wp_nonce_field( 'af_avatar_upload_' . $user->ID, 'af_avatar_nonce' );
 		$has_local = (int) get_user_meta( $user->ID, 'af_avatar_id', true ) > 0;
 		?>
-		<div class="af-avatar-card">
+		<div class="af-avatar-card" id="af-avatar-card">
 			<h2><?php esc_html_e( 'Foto de perfil', 'arriendo-facil' ); ?></h2>
 			<div class="af-avatar-card__body">
-				<?php echo get_avatar( $user->ID, 96 ); ?>
-				<div>
-					<input type="file" name="af_avatar_file" accept="image/jpeg,image/png,image/webp" />
-					<p class="description"><?php esc_html_e( 'JPG, PNG o WebP, máximo 2 MB. Se mostrará en todas las secciones.', 'arriendo-facil' ); ?></p>
+				<div class="af-avatar-card__preview"><?php echo get_avatar( $user->ID, 96, '', '', array( 'class' => 'af-avatar-card__img' ) ); ?></div>
+				<div class="af-avatar-card__controls">
+					<label class="af-avatar-card__pick" for="af_avatar_file"><?php esc_html_e( 'Elegir foto', 'arriendo-facil' ); ?></label>
+					<input type="file" id="af_avatar_file" name="af_avatar_file" accept="image/jpeg,image/png,image/webp" class="af-avatar-card__input" />
+					<span class="af-avatar-card__filename" id="af-avatar-filename" aria-live="polite"><?php esc_html_e( 'Ninguna foto seleccionada', 'arriendo-facil' ); ?></span>
+					<p class="af-avatar-card__status" id="af-avatar-status" role="status" hidden></p>
+					<p class="description"><?php esc_html_e( 'JPG, PNG o WebP, máximo 2 MB. La foto se guarda al presionar «Guardar cambios».', 'arriendo-facil' ); ?></p>
 					<?php if ( $has_local ) : ?>
-						<label><input type="checkbox" name="af_avatar_remove" value="1" /> <?php esc_html_e( 'Eliminar foto actual', 'arriendo-facil' ); ?></label>
+						<label class="af-avatar-card__remove"><input type="checkbox" name="af_avatar_remove" value="1" /> <?php esc_html_e( 'Eliminar foto actual', 'arriendo-facil' ); ?></label>
 					<?php endif; ?>
 				</div>
 			</div>
 		</div>
+		<script>
+		( function () {
+			var input = document.getElementById( 'af_avatar_file' );
+			if ( ! input ) { return; }
+			var img = document.querySelector( '#af-avatar-card .af-avatar-card__img' );
+			var name = document.getElementById( 'af-avatar-filename' );
+			var status = document.getElementById( 'af-avatar-status' );
+			var original = img ? img.getAttribute( 'src' ) : '';
+			var srcset = img ? img.getAttribute( 'srcset' ) : null;
+			input.addEventListener( 'change', function () {
+				var file = input.files && input.files[0];
+				status.hidden = true;
+				status.className = 'af-avatar-card__status';
+				if ( ! file ) {
+					name.textContent = <?php echo wp_json_encode( __( 'Ninguna foto seleccionada', 'arriendo-facil' ) ); ?>;
+					if ( img ) { img.src = original; if ( srcset ) { img.srcset = srcset; } }
+					return;
+				}
+				var okType = /^image\/(jpeg|png|webp)$/.test( file.type );
+				if ( ! okType || file.size > 2 * 1024 * 1024 ) {
+					input.value = '';
+					name.textContent = <?php echo wp_json_encode( __( 'Ninguna foto seleccionada', 'arriendo-facil' ) ); ?>;
+					status.textContent = okType ? <?php echo wp_json_encode( __( 'La imagen supera los 2 MB.', 'arriendo-facil' ) ); ?> : <?php echo wp_json_encode( __( 'Formato no válido. Usa JPG, PNG o WebP.', 'arriendo-facil' ) ); ?>;
+					status.className = 'af-avatar-card__status is-error';
+					status.hidden = false;
+					return;
+				}
+				name.textContent = file.name;
+				if ( img ) { img.removeAttribute( 'srcset' ); img.src = URL.createObjectURL( file ); }
+				status.textContent = <?php echo wp_json_encode( __( 'Vista previa lista. Presiona «Guardar cambios» para subir la foto.', 'arriendo-facil' ) ); ?>;
+				status.className = 'af-avatar-card__status is-ok';
+				status.hidden = false;
+			} );
+		}() );
+		</script>
 		<?php
 	}
 
@@ -425,10 +464,15 @@ class Arriendo_Facil_Admin {
 			delete_user_meta( $user_id, 'af_avatar_id' );
 		}
 
-		if ( empty( $_FILES['af_avatar_file']['name'] ) || ! empty( $_FILES['af_avatar_file']['error'] ) ) {
+		if ( empty( $_FILES['af_avatar_file']['name'] ) ) {
+			return;
+		}
+		if ( ! empty( $_FILES['af_avatar_file']['error'] ) ) {
+			$this->set_avatar_notice( $user_id, 'error', __( 'No se pudo subir la foto. Intenta con una imagen más pequeña.', 'arriendo-facil' ) );
 			return;
 		}
 		if ( (int) $_FILES['af_avatar_file']['size'] > 2 * MB_IN_BYTES ) {
+			$this->set_avatar_notice( $user_id, 'error', __( 'La imagen supera los 2 MB.', 'arriendo-facil' ) );
 			return;
 		}
 
@@ -442,6 +486,7 @@ class Arriendo_Facil_Admin {
 			)
 		);
 		if ( empty( $check['type'] ) ) {
+			$this->set_avatar_notice( $user_id, 'error', __( 'Formato no válido. Usa JPG, PNG o WebP.', 'arriendo-facil' ) );
 			return;
 		}
 
@@ -449,10 +494,63 @@ class Arriendo_Facil_Admin {
 		require_once ABSPATH . 'wp-admin/includes/image.php';
 		require_once ABSPATH . 'wp-admin/includes/media.php';
 
+		// Owners/tenants do not have upload_files; allow it only for this validated upload.
+		$grant_upload = static function ( $allcaps ) {
+			$allcaps['upload_files'] = true;
+			return $allcaps;
+		};
+		add_filter( 'user_has_cap', $grant_upload );
 		$attachment_id = media_handle_upload( 'af_avatar_file', 0 );
-		if ( ! is_wp_error( $attachment_id ) ) {
-			update_user_meta( $user_id, 'af_avatar_id', (int) $attachment_id );
+		remove_filter( 'user_has_cap', $grant_upload );
+
+		if ( is_wp_error( $attachment_id ) ) {
+			$this->set_avatar_notice( $user_id, 'error', $attachment_id->get_error_message() );
+			return;
 		}
+		update_user_meta( $user_id, 'af_avatar_id', (int) $attachment_id );
+		$this->set_avatar_notice( $user_id, 'success', __( 'Tu foto de perfil se actualizó.', 'arriendo-facil' ) );
+	}
+
+	/**
+	 * Stores a one-time avatar upload result for the next profile load.
+	 *
+	 * @param int    $user_id User ID.
+	 * @param string $type    success|error.
+	 * @param string $message Message.
+	 * @return void
+	 */
+	private function set_avatar_notice( $user_id, $type, $message ) {
+		set_transient(
+			'af_avatar_notice_' . (int) $user_id,
+			array(
+				'type'    => $type,
+				'message' => $message,
+			),
+			5 * MINUTE_IN_SECONDS
+		);
+	}
+
+	/**
+	 * Prints the avatar upload result on the profile screen.
+	 *
+	 * @return void
+	 */
+	public function render_avatar_notice() {
+		global $pagenow;
+		if ( 'profile.php' !== $pagenow ) {
+			return;
+		}
+		$key    = 'af_avatar_notice_' . get_current_user_id();
+		$notice = get_transient( $key );
+		if ( ! is_array( $notice ) ) {
+			return;
+		}
+		delete_transient( $key );
+		printf(
+			'<div class="notice notice-%1$s is-dismissible"><p>%2$s</p></div>',
+			'success' === $notice['type'] ? 'success' : 'error',
+			esc_html( $notice['message'] )
+		);
 	}
 
 	/**
@@ -538,7 +636,7 @@ class Arriendo_Facil_Admin {
 			'Biographical Info'                          => 'Información biográfica',
 			'Account Management'                         => 'Seguridad de la cuenta',
 			'New Password'                               => 'Nueva contraseña',
-			'Set New Password'                           => 'Establecer nueva contraseña',
+			'Set New Password'                           => 'Cambiar contraseña',
 			'Confirm Password'                           => 'Confirmar contraseña',
 			'Confirm use of weak password'               => 'Confirmo el uso de una contraseña débil',
 			'Hide'                                       => 'Ocultar',

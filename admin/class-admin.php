@@ -611,7 +611,7 @@ class Arriendo_Facil_Admin {
 	private function get_profile_translations() {
 		return array(
 			'Profile'                                    => 'Cuenta y seguridad',
-			'Name'                                       => 'Nombre',
+			'Name'                                       => 'Acceso',
 			'Username'                                   => 'Usuario',
 			'Usernames cannot be changed.'               => 'El nombre de usuario no se puede cambiar.',
 			'First Name'                                 => 'Nombre',

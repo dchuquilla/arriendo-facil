@@ -1155,3 +1155,14 @@ body.af-native-profile .notice .notice-dismiss { top: 4px; right: 4px; }
 .af-profile-tabs__tab.is-active { color: #164A55; background: #fff; box-shadow: 0 1px 3px rgba(16, 24, 40, 0.12); }
 .af-profile-tabs__tab:focus-visible { outline: 3px solid rgba(22, 74, 85, 0.3); outline-offset: 1px; }
 @media (min-width: 783px) { .af-profile-tabs { width: fit-content; min-width: 360px; } }
+
+/* Cuenta y seguridad: el nombre se edita en "Datos y verificación" */
+body.af-native-profile.af-owner-view #your-profile .user-first-name-wrap,
+body.af-native-profile.af-owner-view #your-profile .user-last-name-wrap { display: none !important; }
+body.af-native-profile.af-owner-view #your-profile .user-user-login-wrap td::after {
+    content: "Tu nombre, teléfono y empresa se editan en la pestaña «Datos y verificación».";
+    display: block;
+    margin-top: 6px;
+    font-size: 12px;
+    color: #647579;
+}

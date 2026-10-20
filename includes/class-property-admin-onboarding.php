@@ -736,6 +736,14 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 
 		update_user_meta( $user_id, 'af_company_name', $company_name );
 		update_user_meta( $user_id, 'af_contact_name', $contact_name );
+		// Mantiene el nombre nativo de WordPress alineado con el responsable.
+		wp_update_user(
+			array(
+				'ID'         => $user_id,
+				'first_name' => $contact_name,
+				'last_name'  => '',
+			)
+		);
 		update_user_meta( $user_id, 'af_contact_phone', $phone );
 		update_user_meta( $user_id, 'af_admin_id_type', $id_type );
 		update_user_meta( $user_id, 'af_admin_nationality', $nationality );

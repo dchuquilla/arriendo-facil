@@ -76,6 +76,7 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-guest-onboardin
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-guest-admin-controller.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-property-admin-registration.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-property-admin-demo.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-account-deletion.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-property-admin-onboarding.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-review.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ai-service.php';
@@ -256,6 +257,8 @@ function arriendo_facil_init() {
 
 	// Register cron jobs
 	arriendo_facil_register_cron_jobs();
+
+	Arriendo_Facil_Account_Deletion::init();
 
 	// Instantiate each component defensively so a missing/renamed class does
 	// not tumble the entire site with a fatal error during plugin_loaded.

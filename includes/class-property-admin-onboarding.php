@@ -397,6 +397,11 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 							<li>
 								<a href="<?php echo esc_url( $profile_url ); ?>"><?php echo af_lucide( 'user', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?><span><?php esc_html_e( 'Editar nombre, foto y contraseña', 'arriendo-facil' ); ?></span></a>
 							</li>
+							<?php if ( Arriendo_Facil_Account_Deletion::can_delete( get_current_user_id() ) ) : ?>
+							<li>
+								<a href="<?php echo esc_url( $profile_url . '#af-danger-zone' ); ?>"><?php echo af_lucide( 'trash-2', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?><span><?php esc_html_e( 'Dar de baja mi cuenta', 'arriendo-facil' ); ?></span></a>
+							</li>
+							<?php endif; ?>
 							<li>
 								<a href="<?php echo esc_url( wp_logout_url( admin_url( 'admin.php?page=' . self::PAGE_SLUG ) ) ); ?>"><?php echo af_lucide( 'log-out', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?><span><?php esc_html_e( 'Cerrar sesión', 'arriendo-facil' ); ?></span></a>
 							</li>

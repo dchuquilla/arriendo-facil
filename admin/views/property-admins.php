@@ -327,6 +327,8 @@ $totals_platform = array(
 			</tbody>
 		</table>
 	</div>
+
+	<?php Arriendo_Facil_Account_Deletion::render_admin_section(); ?>
 </div>
 
 <div id="af-admin-review-modal" style="display:none;">

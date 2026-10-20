@@ -37,6 +37,10 @@ class Arriendo_Facil_Admin {
 		add_filter( 'screen_options_show_screen', array( $this, 'owner_hide_screen_options' ), 999 );
 		add_filter( 'admin_body_class', array( $this, 'tag_native_pages_body_class' ) );
 		add_filter( 'locale', array( $this, 'force_spanish_for_portal_users' ), 20 );
+		add_filter( 'gettext', array( $this, 'translate_profile_strings' ), 20, 2 );
+		add_filter( 'gettext_with_context', array( $this, 'translate_profile_strings' ), 20, 2 );
+		add_action( 'admin_notices', array( $this, 'render_profile_back_link' ) );
+		add_action( 'admin_enqueue_scripts', array( $this, 'translate_profile_script_strings' ), 99 );
 		add_action( 'user_edit_form_tag', array( $this, 'profile_form_multipart' ) );
 		add_action( 'show_user_profile', array( $this, 'render_avatar_upload_field' ) );
 		add_action( 'edit_user_profile', array( $this, 'render_avatar_upload_field' ) );
@@ -498,6 +502,116 @@ class Arriendo_Facil_Admin {
 			return $locale;
 		}
 		return 'es_ES';
+	}
+
+	/**
+	 * Spanish strings for the native profile screen (the es_ES core language
+	 * pack is not installed on every environment).
+	 *
+	 * @return array<string, string>
+	 */
+	private function get_profile_translations() {
+		return array(
+			'Profile'                                    => 'Editar mi perfil',
+			'Name'                                       => 'Nombre',
+			'Username'                                   => 'Usuario',
+			'Usernames cannot be changed.'               => 'El nombre de usuario no se puede cambiar.',
+			'First Name'                                 => 'Nombre',
+			'Last Name'                                  => 'Apellido',
+			'Nickname (required)'                        => 'Apodo (obligatorio)',
+			'Display name publicly as'                   => 'Mostrar públicamente como',
+			'Contact Info'                               => 'Información de contacto',
+			'Email (required)'                           => 'Correo electrónico (obligatorio)',
+			'If you change this, an email will be sent at your new address to confirm it.' => 'Si lo cambias, enviaremos un correo a la nueva dirección para confirmarlo.',
+			'The new address will not become active until confirmed.' => 'La nueva dirección no se activará hasta que la confirmes.',
+			'Website'                                    => 'Sitio web',
+			'About Yourself'                             => 'Sobre ti',
+			'About the user'                             => 'Sobre el usuario',
+			'Biographical Info'                          => 'Información biográfica',
+			'Account Management'                         => 'Seguridad de la cuenta',
+			'New Password'                               => 'Nueva contraseña',
+			'Set New Password'                           => 'Establecer nueva contraseña',
+			'Confirm Password'                           => 'Confirmar contraseña',
+			'Confirm use of weak password'               => 'Confirmo el uso de una contraseña débil',
+			'Hide'                                       => 'Ocultar',
+			'Show'                                       => 'Mostrar',
+			'Cancel'                                     => 'Cancelar',
+			'Hide password'                              => 'Ocultar contraseña',
+			'Show password'                              => 'Mostrar contraseña',
+			'Cancel password change'                     => 'Cancelar cambio de contraseña',
+			'Generate Password'                          => 'Generar contraseña',
+			'Update Profile'                             => 'Guardar cambios',
+			'Sessions'                                   => 'Sesiones',
+			'Log Out of All Other Sessions'              => 'Cerrar las demás sesiones',
+			'Application Passwords'                      => 'Contraseñas de aplicación',
+		);
+	}
+
+	/**
+	 * Translates the native profile screen strings.
+	 *
+	 * @param string $translation Translated text.
+	 * @param string $text        Original text.
+	 * @return string
+	 */
+	public function translate_profile_strings( $translation, $text ) {
+		global $pagenow;
+		if ( 'profile.php' !== $pagenow || ! is_admin() ) {
+			return $translation;
+		}
+		$map = $this->get_profile_translations();
+		return isset( $map[ $text ] ) ? $map[ $text ] : $translation;
+	}
+
+	/**
+	 * Translates the JS strings of the password widgets on the profile screen.
+	 *
+	 * @param string $hook Current admin page hook.
+	 * @return void
+	 */
+	public function translate_profile_script_strings( $hook ) {
+		if ( 'profile.php' !== $hook ) {
+			return;
+		}
+		$strength = array(
+			'unknown'  => 'Fortaleza desconocida',
+			'empty'    => 'Escribe una contraseña',
+			'short'    => 'Muy débil',
+			'bad'      => 'Débil',
+			'good'     => 'Media',
+			'strong'   => 'Fuerte',
+			'mismatch' => 'No coinciden',
+		);
+		$profile  = array(
+			'warn'     => 'Tu nueva contraseña no se ha guardado.',
+			'warnWeak' => 'Confirma el uso de una contraseña débil.',
+			'show'     => 'Mostrar',
+			'hide'     => 'Ocultar',
+			'cancel'   => 'Cancelar',
+			'ariaShow' => 'Mostrar contraseña',
+			'ariaHide' => 'Ocultar contraseña',
+		);
+		wp_add_inline_script( 'password-strength-meter', 'window.pwsL10n = Object.assign( window.pwsL10n || {}, ' . wp_json_encode( $strength ) . ' );', 'after' );
+		wp_add_inline_script( 'user-profile', 'window.userProfileL10n = Object.assign( window.userProfileL10n || {}, ' . wp_json_encode( $profile ) . ' );', 'before' );
+	}
+
+	/**
+	 * Prints a "back to My profile" link on the native profile screen.
+	 *
+	 * @return void
+	 */
+	public function render_profile_back_link() {
+		global $pagenow;
+		if ( 'profile.php' !== $pagenow || ! $this->should_use_custom_shell() ) {
+			return;
+		}
+		?>
+		<div class="af-profile-back">
+			<a class="af-profile-back__link" href="<?php echo esc_url( admin_url( 'admin.php?page=af-admin-profile' ) ); ?>">
+				<span aria-hidden="true">←</span> <?php esc_html_e( 'Volver a Mi perfil', 'arriendo-facil' ); ?>
+			</a>
+		</div>
+		<?php
 	}
 
 	/**

@@ -876,3 +876,53 @@ body.af-native-profile #your-profile > p.submit .button-primary:hover {
     body.af-native-profile #your-profile > p.submit { text-align: center; }
     body.af-native-profile #your-profile > p.submit .button-primary { width: 100%; }
 }
+
+/* Perfil nativo: sin opciones de WordPress irrelevantes + enlace de regreso */
+body.af-native-profile #your-profile > h2:has(+ .form-table .user-admin-color-wrap),
+body.af-native-profile #your-profile > h2:has(+ .form-table .show-admin-bar),
+body.af-native-profile #your-profile > .form-table:has(.user-admin-color-wrap),
+body.af-native-profile #your-profile > .form-table:has(.show-admin-bar),
+body.af-native-profile .user-admin-color-wrap,
+body.af-native-profile .user-comment-shortcuts-wrap,
+body.af-native-profile .show-admin-bar { display: none !important; }
+
+body.af-native-profile .af-profile-back { max-width: 900px; margin: 8px auto 0; padding: 0 4px; }
+body.af-native-profile .af-profile-back__link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 0 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #164A55;
+    text-decoration: none;
+    background: #fff;
+    border: 1px solid #C3D1CE;
+    border-radius: 10px;
+    transition: background 140ms ease, border-color 140ms ease;
+}
+body.af-native-profile .af-profile-back__link:hover { background: #EAF2F0; border-color: #164A55; color: #0F3D47; }
+body.af-native-profile .af-profile-back__link:focus-visible { outline: 3px solid rgba(22, 74, 85, 0.3); outline-offset: 2px; }
+@media (max-width: 782px) {
+    body.af-native-profile .af-profile-back { padding: 0 8px; }
+}
+
+/* Alineación con "Mi perfil": mismo borde izquierdo y ancho contenido */
+body.af-native-profile.af-custom-shell .wrap,
+body.af-native-profile.af-custom-shell .af-profile-back {
+    max-width: 1100px;
+    margin-left: 0 !important;
+    margin-right: auto !important;
+    padding: 0 24px 0 0;
+    box-sizing: border-box;
+}
+body.af-native-profile.af-custom-shell .af-profile-back { margin-top: 8px !important; }
+body.af-native-profile.af-custom-shell #your-profile,
+body.af-native-profile.af-custom-shell #your-profile > h2,
+body.af-native-profile.af-custom-shell #your-profile > .form-table,
+body.af-native-profile.af-custom-shell .af-avatar-card { box-sizing: border-box; max-width: 100%; }
+@media (max-width: 782px) {
+    body.af-native-profile.af-custom-shell .wrap,
+    body.af-native-profile.af-custom-shell .af-profile-back { padding: 0 12px; }
+}

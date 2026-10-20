@@ -36,6 +36,7 @@ class Arriendo_Facil_Admin {
 		add_filter( 'update_footer', array( $this, 'owner_admin_footer_text' ), 999 );
 		add_filter( 'screen_options_show_screen', array( $this, 'owner_hide_screen_options' ), 999 );
 		add_filter( 'admin_body_class', array( $this, 'tag_native_pages_body_class' ) );
+		add_filter( 'locale', array( $this, 'force_spanish_for_portal_users' ), 20 );
 		add_action( 'in_admin_header', array( $this, 'render_custom_shell_nav' ) );
 		add_action( 'pre_get_posts', array( $this, 'restrict_accommodation_list_to_owner' ) );
 		add_filter( 'views_edit-accommodation', array( $this, 'filter_accommodation_status_views_for_owner' ) );
@@ -366,6 +367,22 @@ class Arriendo_Facil_Admin {
 	 */
 	private function is_restricted_owner() {
 		return Arriendo_Facil_Accommodation::user_is_owner() && ! current_user_can( 'manage_options' );
+	}
+
+	/**
+	 * Forces es_ES in wp-admin for owner/tenant users.
+	 *
+	 * @param string $locale Current locale.
+	 * @return string
+	 */
+	public function force_spanish_for_portal_users( $locale ) {
+		if ( ! is_admin() || ! is_user_logged_in() ) {
+			return $locale;
+		}
+		if ( current_user_can( 'manage_options' ) ) {
+			return $locale;
+		}
+		return 'es_ES';
 	}
 
 	/**

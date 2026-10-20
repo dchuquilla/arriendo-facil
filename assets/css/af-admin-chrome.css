@@ -657,6 +657,34 @@ body.af-native-profile.af-owner-view .show-admin-bar {
     display: none;
 }
 
+/* Campos propios de WordPress sin sentido para owners/tenants */
+body.af-native-profile.af-owner-view .user-language-wrap,
+body.af-native-profile.af-owner-view .user-nickname-wrap,
+body.af-native-profile.af-owner-view .user-url-wrap,
+body.af-native-profile.af-owner-view .user-description-wrap,
+body.af-native-profile.af-owner-view .user-profile-picture,
+body.af-native-profile.af-owner-view #application-passwords-section,
+body.af-native-profile.af-owner-view .user-sessions-wrap,
+body.af-native-profile.af-owner-view .user-generate-reset-link-wrap,
+body.af-native-profile.af-owner-view .user-display-name-wrap,
+body.af-native-profile.af-tenant-view h2:first-of-type,
+body.af-native-profile.af-tenant-view .user-rich-editing-wrap,
+body.af-native-profile.af-tenant-view .user-syntax-highlighting-wrap,
+body.af-native-profile.af-tenant-view .user-admin-color-wrap,
+body.af-native-profile.af-tenant-view .user-comment-shortcuts-wrap,
+body.af-native-profile.af-tenant-view .show-admin-bar,
+body.af-native-profile.af-tenant-view .user-language-wrap,
+body.af-native-profile.af-tenant-view .user-nickname-wrap,
+body.af-native-profile.af-tenant-view .user-url-wrap,
+body.af-native-profile.af-tenant-view .user-description-wrap,
+body.af-native-profile.af-tenant-view .user-profile-picture,
+body.af-native-profile.af-tenant-view #application-passwords-section,
+body.af-native-profile.af-tenant-view .user-sessions-wrap,
+body.af-native-profile.af-tenant-view .user-generate-reset-link-wrap,
+body.af-native-profile.af-tenant-view .user-display-name-wrap {
+    display: none !important;
+}
+
 /* Responsive */
 @media (max-width: 782px) {
     body.af-native-profile .wrap { padding: 0 8px; }

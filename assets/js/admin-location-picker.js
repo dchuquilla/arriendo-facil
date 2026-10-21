@@ -41,24 +41,11 @@
 		var mapEl = document.getElementById('af-location-map');
 		mapEl.removeAttribute('tabindex');
 
-		var cartoLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-			attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
-			subdomains: 'abcd',
+		// CARTO's free raster tiles now return an "API KEY REQUIRED" watermark, so use OSM tiles.
+		L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+			attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
 			maxZoom: 19
 		}).addTo(map);
-
-		// Fall back to standard OSM tiles if CARTO tiles fail (blank gray map).
-		var tileErrors = 0;
-		cartoLayer.on('tileerror', function () {
-			tileErrors++;
-			if (tileErrors === 3 && map.hasLayer(cartoLayer)) {
-				map.removeLayer(cartoLayer);
-				L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-					attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-					maxZoom: 19
-				}).addTo(map);
-			}
-		});
 
 		marker = L.marker([startLat, startLng], { draggable: true }).addTo(map);
 
@@ -276,8 +263,10 @@
 			e.preventDefault();
 			if (suggestions.length && activeIndex >= 0) {
 				selectSuggestion(suggestions[activeIndex]);
-			} else if (suggestions.length) {
+			} else if (suggestions.length === 1) {
 				selectSuggestion(suggestions[0]);
+			} else if (suggestions.length) {
+				return;
 			} else {
 				// Force search immediately on Enter.
 				var query = searchInput.value.trim();
@@ -358,7 +347,8 @@
 				});
 
 				if (suggestions.length) {
-					if (autoSelect) {
+					// Only auto-pick when unambiguous; otherwise let the user choose.
+					if (autoSelect && suggestions.length === 1) {
 						selectSuggestion(suggestions[0]);
 					} else {
 						renderSuggestions();

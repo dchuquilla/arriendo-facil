@@ -4,7 +4,7 @@
 	var config = window.afLocationPicker || {};
 	var defaultLat = config.defaultLat || -0.1807;
 	var defaultLng = config.defaultLng || -78.4678;
-	var bounds = config.ecuadorBounds || { latMin: -5, latMax: 2, lngMin: -81, lngMax: -75 };
+	var bounds = config.ecuadorBounds || { latMin: -5.1, latMax: 1.7, lngMin: -92.2, lngMax: -75 };
 
 	var map, marker;
 	var searchInput, suggestionsEl, latInput, lngInput, addressInput, locationTextInput, cityInput;
@@ -41,20 +41,35 @@
 		var mapEl = document.getElementById('af-location-map');
 		mapEl.removeAttribute('tabindex');
 
-		L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+		var cartoLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
 			attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
 			subdomains: 'abcd',
 			maxZoom: 19
 		}).addTo(map);
 
+		// Fall back to standard OSM tiles if CARTO tiles fail (blank gray map).
+		var tileErrors = 0;
+		cartoLayer.on('tileerror', function () {
+			tileErrors++;
+			if (tileErrors === 3 && map.hasLayer(cartoLayer)) {
+				map.removeLayer(cartoLayer);
+				L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+					attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+					maxZoom: 19
+				}).addTo(map);
+			}
+		});
+
 		marker = L.marker([startLat, startLng], { draggable: true }).addTo(map);
 
+		var lastValid = [startLat, startLng];
 		marker.on('dragend', function () {
 			var pos = marker.getLatLng();
 			if (!isInEcuador(pos.lat, pos.lng)) {
-				marker.setLatLng([startLat, startLng]);
+				marker.setLatLng(lastValid);
 				return;
 			}
+			lastValid = [pos.lat, pos.lng];
 			updateCoords(pos.lat, pos.lng);
 			reverseGeocode(pos.lat, pos.lng);
 		});
@@ -71,6 +86,17 @@
 				map.invalidateSize();
 			});
 			ro.observe(mapContainer);
+		}
+
+		// Wizard steps: re-measure when the step containing the map becomes visible.
+		var stepEl = mapContainer.closest('.af-wizard__step');
+		if (stepEl && window.MutationObserver) {
+			new MutationObserver(function () {
+				setTimeout(function () {
+					map.invalidateSize();
+					map.setView(marker.getLatLng(), map.getZoom());
+				}, 50);
+			}).observe(stepEl, { attributes: true, attributeFilter: ['class', 'style', 'hidden'] });
 		}
 
 		// Observe parent visibility changes (meta box toggle, tabs, etc.).
@@ -141,6 +167,12 @@
 	function isInEcuador(lat, lng) {
 		return lat >= bounds.latMin && lat <= bounds.latMax &&
 			lng >= bounds.lngMin && lng <= bounds.lngMax;
+	}
+
+	function isEcuadorResult(r) {
+		var code = r.address && r.address.country_code;
+		if (code && code.toLowerCase() !== 'ec') return false;
+		return isInEcuador(parseFloat(r.lat), parseFloat(r.lon));
 	}
 
 	function updateCoords(lat, lng) {
@@ -311,16 +343,18 @@
 	function searchWithFallback(queries, index, autoSelect) {
 		if (index >= queries.length) {
 			closeSuggestions();
+			showNoResults();
 			return;
 		}
 
-		var url = 'https://nominatim.openstreetmap.org/search?format=json&countrycodes=ec&limit=5&addressdetails=1&q=' + encodeURIComponent(queries[index]);
+		var viewbox = [bounds.lngMin, bounds.latMax, bounds.lngMax, bounds.latMin].join(',');
+		var url = 'https://nominatim.openstreetmap.org/search?format=json&countrycodes=ec&limit=5&addressdetails=1&bounded=1&viewbox=' + viewbox + '&q=' + encodeURIComponent(queries[index]);
 
 		fetch(url, { headers: { 'Accept-Language': 'es' } })
 			.then(function (r) { return r.json(); })
 			.then(function (results) {
 				suggestions = results.filter(function (r) {
-					return isInEcuador(parseFloat(r.lat), parseFloat(r.lon));
+					return isEcuadorResult(r);
 				});
 
 				if (suggestions.length) {
@@ -336,6 +370,14 @@
 			.catch(function () {
 				searchWithFallback(queries, index + 1, autoSelect);
 			});
+	}
+
+	function showNoResults() {
+		var div = document.createElement('div');
+		div.className = 'af-suggestion-item';
+		div.textContent = 'No se encontró la ubicación en Ecuador. Añada ciudad/sector (ej. "La Regina, Quito"), pegue un enlace de Google Maps o mueva el marcador en el mapa.';
+		suggestionsEl.appendChild(div);
+		setAddressFieldsDisabled(false);
 	}
 
 	function renderSuggestions() {
@@ -404,7 +446,7 @@
 		fetch(url, { headers: { 'Accept-Language': 'es' } })
 			.then(function (r) { return r.json(); })
 			.then(function (result) {
-				if (result && result.address) {
+				if (result && result.address && isEcuadorResult(result)) {
 					fillAddressFields(result);
 					searchInput.value = result.display_name || '';
 				}

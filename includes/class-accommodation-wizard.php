@@ -141,7 +141,7 @@ class Arriendo_Facil_Accommodation_Wizard {
 			array(
 				'defaultLat'    => -0.1807,
 				'defaultLng'    => -78.4678,
-				'ecuadorBounds' => array( 'latMin' => -5, 'latMax' => 2, 'lngMin' => -81, 'lngMax' => -75 ),
+				'ecuadorBounds' => array( 'latMin' => -5.1, 'latMax' => 1.7, 'lngMin' => -92.2, 'lngMax' => -75 ),
 				'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
 				'nonce'         => wp_create_nonce( 'af_location_nonce' ),
 			)

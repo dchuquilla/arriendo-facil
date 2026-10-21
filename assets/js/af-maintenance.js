@@ -603,19 +603,13 @@
 						return;
 					}
 
-					var providerId = editing ? idField.value : json.data.id;
-					var photoInput = document.getElementById( 'af-prov-photo' );
-					var photo = photoInput && photoInput.files ? photoInput.files[ 0 ] : null;
-
-					return uploadPhoto( providerId, photo ).then( function ( photoError ) {
-						if ( status ) {
-							status.textContent = photoError ? afMaintenance.i18n.savedPhotoFailed + photoError : json.data.message;
-							status.className = 'af-modal__status ' + ( photoError ? 'is-error' : 'is-success' );
-						}
-						window.setTimeout( function () {
-							window.location.reload();
-						}, photoError ? 2500 : 700 );
-					} );
+					if ( status ) {
+						status.textContent = json.data.message;
+						status.className = 'af-modal__status is-success';
+					}
+					window.setTimeout( function () {
+						window.location.reload();
+					}, 700 );
 				} )
 				.catch( function () {
 					if ( btn ) {
@@ -880,6 +874,7 @@
 			var editing = idField && idField.value;
 
 			var body = new URLSearchParams( new FormData( form ) );
+			body.delete( 'photo' );
 			body.append( 'action', editing ? 'af_sp_update' : 'af_sp_create' );
 			body.append( 'nonce', afMaintenance.providerNonce );
 
@@ -897,13 +892,19 @@
 						return;
 					}
 
-					if ( status ) {
-						status.textContent = json.data.message;
-						status.className = 'af-modal__status is-success';
-					}
-					window.setTimeout( function () {
-						window.location.reload();
-					}, 700 );
+					var providerId = editing ? idField.value : json.data.id;
+					var photoInput = document.getElementById( 'af-prov-photo' );
+					var photo = photoInput && photoInput.files ? photoInput.files[ 0 ] : null;
+
+					return uploadPhoto( providerId, photo ).then( function ( photoError ) {
+						if ( status ) {
+							status.textContent = photoError ? afMaintenance.i18n.savedPhotoFailed + photoError : json.data.message;
+							status.className = 'af-modal__status ' + ( photoError ? 'is-error' : 'is-success' );
+						}
+						window.setTimeout( function () {
+							window.location.reload();
+						}, photoError ? 2500 : 700 );
+					} );
 				} )
 				.catch( function () {
 					if ( btn ) {

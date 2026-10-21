@@ -214,9 +214,11 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 	} elseif ( ! empty( $accessible_acc_ids ) ) {
 		// Propietario/gestor: los de sus inmuebles, más cualquier inquilino
 		// que ya tenga un contrato suyo (vínculo anterior a la auto-vínculo).
+		Arriendo_Facil_Guest::ensure_guest_extra_columns();
 		$lease_guests = $wpdb->get_results(
 			$af_guest_columns . "
 			 WHERE g.accommodation_id IN ($ids_sql)
+			    OR g.created_by = " . (int) get_current_user_id() . "
 			    OR EXISTS (
 			        SELECT 1 FROM {$wpdb->prefix}af_leases l
 			         WHERE l.guest_id = g.id

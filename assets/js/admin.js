@@ -1256,8 +1256,26 @@
 	} );
 
 	$( document ).on( 'input', '#af_guest_phone, #af_guest_id_number', function () {
-		var sanitized = String( $( this ).val() || '' ).replace( /\D+/g, '' ).slice( 0, 10 );
+		var maxLen = 'af_guest_id_number' === this.id ? 13 : 10;
+		var sanitized = String( $( this ).val() || '' ).replace( /\D+/g, '' ).slice( 0, maxLen );
 		$( this ).val( sanitized );
+	} );
+
+	// Vincular inmueble: muestra vigencia/canon/garantía y precarga el canon del inmueble.
+	$( document ).on( 'change', '#af_guest_accommodation_id', function () {
+		var $opt = $( this ).find( 'option:selected' );
+		var linked = !! $( this ).val();
+		var $rows = $( '.af-guest-link-field' );
+
+		$rows.prop( 'hidden', ! linked );
+		$( '#af_guest_rental_start_date, #af_guest_rental_end_date' ).prop( 'required', linked );
+		if ( linked && ! $( '#af_guest_desired_price' ).val() ) {
+			$( '#af_guest_desired_price' ).val( $opt.data( 'rent' ) || '' );
+		}
+	} );
+
+	$( document ).on( 'click', '#af-cancel-new-guest', function () {
+		$( '.af-guest-link-field' ).prop( 'hidden', true );
 	} );
 
 	$( document ).on( 'submit', '#af-guest-form', function ( event ) {

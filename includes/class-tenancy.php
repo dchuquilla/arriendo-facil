@@ -213,12 +213,24 @@ class Arriendo_Facil_Tenancy {
 
 		global $wpdb;
 
-		$accommodation_id = (int) $wpdb->get_var(
+		$row = $wpdb->get_row(
 			$wpdb->prepare(
-				"SELECT accommodation_id FROM {$wpdb->prefix}af_guests WHERE id = %d",
+				"SELECT * FROM {$wpdb->prefix}af_guests WHERE id = %d",
 				absint( $guest_id )
 			)
 		);
+
+		if ( ! $row ) {
+			return false;
+		}
+
+		// El inquilino que el propio usuario registró sin inmueble sigue siendo suyo.
+		$user_id = $user_id ? absint( $user_id ) : get_current_user_id();
+		if ( ! empty( $row->created_by ) && (int) $row->created_by === $user_id ) {
+			return true;
+		}
+
+		$accommodation_id = (int) $row->accommodation_id;
 
 		return $accommodation_id > 0 && self::can_access_accommodation( $accommodation_id, $user_id );
 	}

@@ -186,11 +186,16 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['af_queue_action'], 
 }
 
 if ( $is_owner ) {
+	// Incluye a los inquilinos que el propio usuario registró aún sin inmueble.
+	Arriendo_Facil_Guest::ensure_guest_extra_columns();
+	$guests = $wpdb->get_results(
+		$wpdb->prepare(
+			"SELECT * FROM {$wpdb->prefix}af_guests WHERE accommodation_id IN (" . ( $owner_ids ? implode( ',', array_map( 'intval', $owner_ids ) ) : '0' ) . ') OR created_by = %d ORDER BY created_at DESC LIMIT 100', // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- ids casteados a int.
+			get_current_user_id()
+		)
+	);
 	if ( ! empty( $owner_ids ) ) {
 		$ids_sql = implode( ',', array_map( 'intval', $owner_ids ) );
-		$guests = $wpdb->get_results(
-			"SELECT * FROM {$wpdb->prefix}af_guests WHERE accommodation_id IN ($ids_sql) ORDER BY created_at DESC LIMIT 100"
-		);
 		$visit_requests = $wpdb->get_results(
 			"SELECT q.id, q.accommodation_id, q.name, q.email, q.phone, q.message, q.status, q.created_at,
 					p.post_title AS accommodation_title
@@ -201,7 +206,6 @@ if ( $is_owner ) {
 			 LIMIT 200"
 		);
 	} else {
-		$guests = array();
 		$visit_requests = array();
 	}
 } else {
@@ -296,7 +300,7 @@ if ( $is_owner ) {
 								'posts_per_page' => 300,
 								'orderby'        => 'title',
 								'order'          => 'ASC',
-								'post_status'    => 'any',
+								'post_status'    => array( 'publish', 'draft', 'private' ),
 							);
 							if ( $is_owner ) {
 								$guest_form_accommodation_args['post__in'] = $owner_ids ? $owner_ids : array( 0 );
@@ -304,20 +308,30 @@ if ( $is_owner ) {
 							$guest_form_accommodations = get_posts( $guest_form_accommodation_args );
 							foreach ( $guest_form_accommodations as $guest_form_accommodation ) :
 								?>
-								<option value="<?php echo esc_attr( (int) $guest_form_accommodation->ID ); ?>">
+								<option value="<?php echo esc_attr( (int) $guest_form_accommodation->ID ); ?>"
+									data-rent="<?php echo esc_attr( (string) get_post_meta( $guest_form_accommodation->ID, '_af_monthly_rent', true ) ); ?>">
 									<?php echo esc_html( $guest_form_accommodation->post_title ); ?>
 								</option>
 							<?php endforeach; ?>
 						</select>
+						<p class="description"><?php esc_html_e( 'Al elegir el inmueble se completa el canon y se piden las fechas de vigencia, igual que en Contratos.', 'arriendo-facil' ); ?></p>
 					</td>
 				</tr>
-				<tr>
-					<th scope="row"><label for="af_guest_rental_start_date"><?php esc_html_e( 'Inicio del arriendo', 'arriendo-facil' ); ?></label></th>
+				<tr class="af-guest-link-field" hidden>
+					<th scope="row"><label for="af_guest_rental_start_date"><?php esc_html_e( 'Inicio del arriendo', 'arriendo-facil' ); ?> *</label></th>
 					<td><input type="date" id="af_guest_rental_start_date" name="rental_start_date" /></td>
 				</tr>
-				<tr>
-					<th scope="row"><label for="af_guest_rental_end_date"><?php esc_html_e( 'Fin del arriendo', 'arriendo-facil' ); ?></label></th>
+				<tr class="af-guest-link-field" hidden>
+					<th scope="row"><label for="af_guest_rental_end_date"><?php esc_html_e( 'Fin del arriendo', 'arriendo-facil' ); ?> *</label></th>
 					<td><input type="date" id="af_guest_rental_end_date" name="rental_end_date" /></td>
+				</tr>
+				<tr class="af-guest-link-field" hidden>
+					<th scope="row"><label for="af_guest_desired_price"><?php esc_html_e( 'Canon mensual (USD)', 'arriendo-facil' ); ?></label></th>
+					<td><input type="number" id="af_guest_desired_price" name="desired_price" step="0.01" min="0" placeholder="0.00" /></td>
+				</tr>
+				<tr class="af-guest-link-field" hidden>
+					<th scope="row"><label for="af_guest_guarantee_text"><?php esc_html_e( 'Garantía (USD)', 'arriendo-facil' ); ?></label></th>
+					<td><input type="number" id="af_guest_guarantee_text" name="guarantee_text" step="0.01" min="0" placeholder="0.00" /></td>
 				</tr>
 			</table>
 
@@ -325,7 +339,14 @@ if ( $is_owner ) {
 			<table class="form-table" role="presentation">
 				<tr>
 					<th scope="row"><label for="af_guest_nationality"><?php esc_html_e( 'Nacionalidad', 'arriendo-facil' ); ?></label></th>
-					<td><input type="text" id="af_guest_nationality" name="nationality" class="regular-text" maxlength="100" placeholder="<?php esc_attr_e( 'Ej: Ecuatoriana', 'arriendo-facil' ); ?>" /></td>
+					<td>
+						<select id="af_guest_nationality" name="nationality" class="regular-text">
+							<option value=""><?php esc_html_e( '— Seleccionar —', 'arriendo-facil' ); ?></option>
+							<?php foreach ( Arriendo_Facil_Guest::get_nationality_options() as $nat_value => $nat_label ) : ?>
+								<option value="<?php echo esc_attr( $nat_value ); ?>"><?php echo esc_html( $nat_label ); ?></option>
+							<?php endforeach; ?>
+						</select>
+					</td>
 				</tr>
 				<tr>
 					<th scope="row"><label for="af_guest_birth_city"><?php esc_html_e( 'Ciudad de nacimiento', 'arriendo-facil' ); ?></label></th>

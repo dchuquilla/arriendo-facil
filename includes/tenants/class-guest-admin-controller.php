@@ -76,6 +76,39 @@ class Arriendo_Facil_Guest_Admin_Controller {
 			wp_send_json_error( array( 'message' => __( 'Correo electronico invalido.', 'arriendo-facil' ) ) );
 		}
 
+		if ( $nationality && ! array_key_exists( $nationality, Arriendo_Facil_Guest::get_nationality_options() ) ) {
+			wp_send_json_error( array( 'message' => __( 'Selecciona una nacionalidad de la lista.', 'arriendo-facil' ) ) );
+		}
+
+		// Mismo criterio que el contrato: al vincular un inmueble se necesita la vigencia.
+		if ( $accommodation_id ) {
+			$date_ok = static function ( $value ) {
+				$parsed = DateTime::createFromFormat( 'Y-m-d', $value );
+				return $parsed && $parsed->format( 'Y-m-d' ) === $value;
+			};
+
+			if ( ! $date_ok( $rental_start_date ) || ! $date_ok( $rental_end_date ) ) {
+				wp_send_json_error( array( 'message' => __( 'Indica las fechas de inicio y fin del arriendo para vincular el inmueble.', 'arriendo-facil' ) ) );
+			}
+
+			if ( $rental_end_date <= $rental_start_date ) {
+				wp_send_json_error( array( 'message' => __( 'La fecha de fin debe ser posterior a la de inicio.', 'arriendo-facil' ) ) );
+			}
+
+			if ( '' !== $desired_price && ( ! is_numeric( $desired_price ) || (float) $desired_price < 0 ) ) {
+				wp_send_json_error( array( 'message' => __( 'El canon mensual debe ser un numero valido.', 'arriendo-facil' ) ) );
+			}
+
+			if ( '' !== $guarantee_text && ( ! is_numeric( $guarantee_text ) || (float) $guarantee_text < 0 ) ) {
+				wp_send_json_error( array( 'message' => __( 'La garantia debe ser un numero valido.', 'arriendo-facil' ) ) );
+			}
+		} else {
+			$rental_start_date = '';
+			$rental_end_date   = '';
+			$desired_price     = '';
+			$guarantee_text    = '';
+		}
+
 		if ( 1 !== preg_match( '/^[0-9]{1,10}$/', $phone ) ) {
 			wp_send_json_error( array( 'message' => __( 'El telefono debe contener solo numeros, maximo 10 digitos.', 'arriendo-facil' ) ) );
 		}
@@ -113,6 +146,14 @@ class Arriendo_Facil_Guest_Admin_Controller {
 		}
 
 		global $wpdb;
+
+		$email_taken = (int) $wpdb->get_var(
+			$wpdb->prepare( "SELECT id FROM {$wpdb->prefix}af_guests WHERE email = %s LIMIT 1", $email )
+		);
+		if ( $email_taken ) {
+			wp_send_json_error( array( 'message' => __( 'Ya existe un inquilino registrado con ese correo.', 'arriendo-facil' ) ), 409 );
+		}
+
 		$inserted = $wpdb->insert(
 			$wpdb->prefix . 'af_guests',
 			array(
@@ -135,8 +176,9 @@ class Arriendo_Facil_Guest_Admin_Controller {
 				'personas_viviran'      => $personas_viviran,
 				'nationality'           => $nationality ? $nationality : null,
 				'birth_city'            => $birth_city ? $birth_city : null,
+				'created_by'            => get_current_user_id(),
 			),
-			array( '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%d', '%s', '%s', '%d', '%s', '%s' )
+			array( '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%d', '%s', '%s', '%d', '%s', '%s', '%d' )
 		);
 
 		if ( $inserted ) {
@@ -154,6 +196,7 @@ class Arriendo_Facil_Guest_Admin_Controller {
 				)
 			);
 		} else {
+			error_log( 'Arriendo Facil: no se pudo crear el inquilino: ' . $wpdb->last_error ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 			wp_send_json_error( array( 'message' => __( 'No se pudo crear el huesped.', 'arriendo-facil' ) ) );
 		}
 	}
@@ -373,19 +416,17 @@ class Arriendo_Facil_Guest_Admin_Controller {
 		global $wpdb;
 
 		if ( Arriendo_Facil_Accommodation::user_is_owner() ) {
+			Arriendo_Facil_Guest::ensure_guest_extra_columns();
 			$owner_ids = Arriendo_Facil_Accommodation::get_owner_accommodation_ids( get_current_user_id() );
-			if ( ! empty( $owner_ids ) ) {
-				$ids_sql = implode( ',', array_map( 'intval', $owner_ids ) );
-				$guests = $wpdb->get_results(
-					$wpdb->prepare(
-						"SELECT * FROM {$wpdb->prefix}af_guests WHERE accommodation_id IN ($ids_sql) ORDER BY created_at DESC LIMIT %d OFFSET %d",
-						$per_page,
-						$offset
-					)
-				);
-			} else {
-				$guests = array();
-			}
+			$ids_sql   = $owner_ids ? implode( ',', array_map( 'intval', $owner_ids ) ) : '0';
+			$guests    = $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT * FROM {$wpdb->prefix}af_guests WHERE accommodation_id IN ($ids_sql) OR created_by = %d ORDER BY created_at DESC LIMIT %d OFFSET %d",
+					get_current_user_id(),
+					$per_page,
+					$offset
+				)
+			);
 		} else {
 			$guests = $wpdb->get_results(
 				$wpdb->prepare(

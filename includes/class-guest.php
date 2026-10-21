@@ -214,7 +214,18 @@ class Arriendo_Facil_Guest {
 	}
 
 	/**
-	 * Ensures required extra columns exist on guests table.
+	 * Nationality choices (value => label), shared with the contract form.
+	 *
+	 * @return array
+	 */
+	public static function get_nationality_options() {
+		$schema = Arriendo_Facil_Contract_Storage::get_placeholders_schema();
+
+		return isset( $schema['nacionalidad_inquilino']['options'] ) ? (array) $schema['nacionalidad_inquilino']['options'] : array();
+	}
+
+	/**
+	 * Adds any missing optional guest columns.
 	 *
 	 * @return true|WP_Error
 	 */
@@ -239,6 +250,7 @@ class Arriendo_Facil_Guest {
 			'id_number_encrypted'  => 'ALTER TABLE ' . $table . ' ADD COLUMN id_number_encrypted LONGTEXT DEFAULT NULL',
 			'nationality'          => 'ALTER TABLE ' . $table . ' ADD COLUMN nationality VARCHAR(100) DEFAULT NULL',
 			'birth_city'           => 'ALTER TABLE ' . $table . ' ADD COLUMN birth_city VARCHAR(150) DEFAULT NULL',
+			'created_by'           => 'ALTER TABLE ' . $table . ' ADD COLUMN created_by BIGINT(20) UNSIGNED DEFAULT NULL',
 		);
 
 		foreach ( $columns as $column_name => $sql ) {

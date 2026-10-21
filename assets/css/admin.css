@@ -716,33 +716,48 @@ body.post-type-cleaning_service .page-title-action:focus {
 	align-items: center;
 }
 
+.af-location-search-wrap {
+	position: relative;
+}
+
 #af_location_search {
 	flex: 1;
-	max-width: 400px;
-	padding: 8px 12px;
-	border: 1px solid #8a9799;
-	border-radius: 4px;
-	font-size: 14px;
+	max-width: none;
+	padding: 10px 14px;
+	border: 1.5px solid #8a9799;
+	border-radius: 8px;
+	font-size: 15px;
+}
+
+#af_location_search:focus {
+	border-color: #4f46e5;
+	box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+	outline: none;
 }
 
 .af-location-suggestions {
 	position: absolute;
-	z-index: 1000;
-	width: 100%;
-	max-width: 400px;
-	max-height: 240px;
+	top: 100%;
+	left: 0;
+	right: 0;
+	margin-top: 4px;
+	z-index: 10000;
+	max-height: 260px;
 	overflow-y: auto;
 	background: #fff;
-	border: 1px solid #dce5e3;
-	border-top: none;
-	border-radius: 0 0 4px 4px;
-	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+	border-radius: 8px;
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.af-location-suggestions:empty {
+	display: none;
 }
 
 .af-suggestion-item {
-	padding: 10px 12px;
+	padding: 10px 14px;
 	cursor: pointer;
 	font-size: 13px;
+	line-height: 1.4;
 	border-bottom: 1px solid #eef2f0;
 }
 
@@ -752,7 +767,50 @@ body.post-type-cleaning_service .page-title-action:focus {
 
 .af-suggestion-item:hover,
 .af-suggestion-item--active {
-	background: #e8f0fe;
+	background: #eef0ff;
+}
+
+.af-map-wrap {
+	position: relative;
+	margin-top: 10px;
+}
+
+.af-map-wrap .af-map {
+	margin-top: 0;
+	height: 340px;
+	isolation: isolate;
+}
+
+.af-map-hint {
+	position: absolute;
+	left: 50%;
+	bottom: 28px;
+	transform: translateX(-50%);
+	z-index: 500;
+	padding: 6px 12px;
+	background: rgba(30, 58, 70, 0.9);
+	color: #fff;
+	font-size: 13px;
+	border-radius: 999px;
+	pointer-events: none;
+	white-space: nowrap;
+	transition: opacity 0.4s;
+}
+
+.af-map-hint.is-hidden {
+	opacity: 0;
+}
+
+.af-map-wrap .leaflet-marker-draggable {
+	cursor: grab;
+}
+
+.af-map-wrap .leaflet-marker-draggable:active {
+	cursor: grabbing;
+}
+
+.af-field__hint--top {
+	margin: 0 0 8px;
 }
 
 #af-location-map {

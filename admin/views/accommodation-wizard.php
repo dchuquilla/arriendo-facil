@@ -176,6 +176,36 @@ $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data[
 					</div>
 				</div>
 
+				<div class="af-field">
+					<label class="af-field__label" for="af_location_search"><?php esc_html_e( 'Busca el inmueble en el mapa', 'arriendo-facil' ); ?></label>
+					<p class="af-field__hint af-field__hint--top"><?php esc_html_e( 'Escribe el sector o la calle (ej. "La Regina, Quito") o pega un enlace de Google Maps. Solo se buscan lugares en Ecuador.', 'arriendo-facil' ); ?></p>
+					<div class="af-location-picker">
+						<div class="af-location-search-wrap">
+						<div class="af-location-search-row">
+							<input type="text" id="af_location_search" autocomplete="off"
+								class="af-input af-input--full"
+								placeholder="<?php esc_attr_e( 'Buscar dirección o pegar URL de Google Maps...', 'arriendo-facil' ); ?>" />
+							<button type="button" id="af_location_search_btn" class="button button-secondary">
+								<?php esc_html_e( 'Buscar', 'arriendo-facil' ); ?>
+							</button>
+						</div>
+						<div id="af-location-suggestions" class="af-location-suggestions" role="listbox"></div>
+						</div>
+						<div class="af-map-wrap">
+							<div id="af-location-map" class="af-map" tabindex="-1"></div>
+							<div class="af-map-hint" id="af-map-hint">&#x1F4CD; <?php esc_html_e( 'Arrastra el pin o haz clic en el mapa para ajustar la ubicación', 'arriendo-facil' ); ?></div>
+						</div>
+						<input type="hidden" id="af_latitude" name="af_latitude" value="<?php echo esc_attr( $data['latitude'] ); ?>" />
+						<input type="hidden" id="af_longitude" name="af_longitude" value="<?php echo esc_attr( $data['longitude'] ); ?>" />
+						<?php if ( $data['latitude'] && $data['longitude'] ) : ?>
+							<p class="af-field__hint af-coords-display">
+								&#x1F4CC; <?php printf( esc_html__( 'Lat: %1$s, Lng: %2$s', 'arriendo-facil' ), esc_html( (string) $data['latitude'] ), esc_html( (string) $data['longitude'] ) ); ?>
+							</p>
+						<?php endif; ?>
+					</div>
+				</div>
+
+				<p class="af-field__hint af-field__hint--top"><?php esc_html_e( 'Revisa y completa los datos; se llenan solos al elegir una ubicación.', 'arriendo-facil' ); ?></p>
 				<div class="af-field-group af-field-group--two-col">
 					<div class="af-field">
 						<label class="af-field__label" for="af_address"><?php esc_html_e( 'Dirección completa', 'arriendo-facil' ); ?> <span class="af-required">*</span></label>
@@ -197,29 +227,6 @@ $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data[
 						value="<?php echo esc_attr( $data['location_text'] ); ?>"
 						class="af-input af-input--full"					data-normalize="address"						placeholder="<?php esc_attr_e( 'Ej: La Carolina', 'arriendo-facil' ); ?>" />
 					<p class="af-field__hint"><?php esc_html_e( 'Se usa en las búsquedas del sitio.', 'arriendo-facil' ); ?></p>
-				</div>
-
-				<div class="af-field">
-					<label class="af-field__label"><?php esc_html_e( 'Ubicación en el mapa', 'arriendo-facil' ); ?></label>
-					<div class="af-location-picker">
-						<div class="af-location-search-row">
-							<input type="text" id="af_location_search" autocomplete="off"
-								class="af-input af-input--full"
-								placeholder="<?php esc_attr_e( 'Buscar dirección o pegar URL de Google Maps...', 'arriendo-facil' ); ?>" />
-							<button type="button" id="af_location_search_btn" class="button button-secondary">
-								<?php esc_html_e( 'Buscar', 'arriendo-facil' ); ?>
-							</button>
-						</div>
-						<div id="af-location-suggestions" class="af-location-suggestions"></div>
-						<div id="af-location-map" class="af-map" tabindex="-1"></div>
-						<input type="hidden" id="af_latitude" name="af_latitude" value="<?php echo esc_attr( $data['latitude'] ); ?>" />
-						<input type="hidden" id="af_longitude" name="af_longitude" value="<?php echo esc_attr( $data['longitude'] ); ?>" />
-						<?php if ( $data['latitude'] && $data['longitude'] ) : ?>
-							<p class="af-field__hint af-coords-display">
-								&#x1F4CC; <?php printf( esc_html__( 'Lat: %1$s, Lng: %2$s', 'arriendo-facil' ), esc_html( (string) $data['latitude'] ), esc_html( (string) $data['longitude'] ) ); ?>
-							</p>
-						<?php endif; ?>
-					</div>
 				</div>
 			</section>
 

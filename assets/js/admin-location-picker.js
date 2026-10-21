@@ -28,10 +28,6 @@
 		var hasSavedCoords = latInput.value && lngInput.value &&
 			parseFloat(latInput.value) !== 0 && parseFloat(lngInput.value) !== 0;
 
-		// Disable address fields until location is set.
-		if (!hasSavedCoords) {
-			setAddressFieldsDisabled(true);
-		}
 		var startLat = hasSavedCoords ? parseFloat(latInput.value) : defaultLat;
 		var startLng = hasSavedCoords ? parseFloat(lngInput.value) : defaultLng;
 
@@ -47,7 +43,17 @@
 			maxZoom: 19
 		}).addTo(map);
 
-		marker = L.marker([startLat, startLng], { draggable: true }).addTo(map);
+		marker = L.marker([startLat, startLng], { draggable: true, title: 'Arrastra para ajustar la ubicación' }).addTo(map);
+		marker.on('dragstart', function () {
+			var hint = document.getElementById('af-map-hint');
+			if (hint) hint.classList.add('is-hidden');
+		});
+		map.on('click', function (e) {
+			if (!isInEcuador(e.latlng.lat, e.latlng.lng)) return;
+			marker.setLatLng(e.latlng);
+			updateCoords(e.latlng.lat, e.latlng.lng);
+			reverseGeocode(e.latlng.lat, e.latlng.lng);
+		});
 
 		var lastValid = [startLat, startLng];
 		marker.on('dragend', function () {

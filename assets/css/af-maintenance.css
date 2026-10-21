@@ -371,8 +371,9 @@
 .af-maint-segment__opt:has(input:focus-visible) { outline: 2px solid var(--af-accent-500); outline-offset: 2px; }
 
 .af-maint-money { position: relative; display: flex; align-items: center; }
-.af-maint-money > span { position: absolute; left: 10px; color: var(--af-gray-500); pointer-events: none; }
-.af-maint .af-maint-money input { width: 100%; padding-left: 22px; }
+.af-maint-money { width: 100%; }
+.af-maint-money > span { position: absolute; left: 14px; color: var(--af-gray-500); font-weight: 600; pointer-events: none; }
+body.wp-admin .af-maint .af-maint-money input[type="number"] { width: 100%; padding-left: 30px; }
 
 .af-maint-formcard__foot {
 	display: flex;

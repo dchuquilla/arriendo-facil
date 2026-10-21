@@ -603,13 +603,19 @@
 						return;
 					}
 
-					if ( status ) {
-						status.textContent = json.data.message;
-						status.className = 'af-modal__status is-success';
-					}
-					window.setTimeout( function () {
-						window.location.reload();
-					}, 700 );
+					var providerId = editing ? idField.value : json.data.id;
+					var photoInput = document.getElementById( 'af-prov-photo' );
+					var photo = photoInput && photoInput.files ? photoInput.files[ 0 ] : null;
+
+					return uploadPhoto( providerId, photo ).then( function ( photoError ) {
+						if ( status ) {
+							status.textContent = photoError ? afMaintenance.i18n.savedPhotoFailed + photoError : json.data.message;
+							status.className = 'af-modal__status ' + ( photoError ? 'is-error' : 'is-success' );
+						}
+						window.setTimeout( function () {
+							window.location.reload();
+						}, photoError ? 2500 : 700 );
+					} );
 				} )
 				.catch( function () {
 					if ( btn ) {
@@ -782,6 +788,80 @@
 			form.elements.name.focus( { preventScroll: true } );
 		} );
 
+		/**
+		 * Uploads the technician photo after the contact is saved.
+		 *
+		 * @param {string|number} providerId Saved provider id.
+		 * @param {File|null}     photo      Selected file, if any.
+		 * @return {Promise<string>} Resolves with an error message, or '' on success.
+		 */
+		function uploadPhoto( providerId, photo ) {
+			if ( ! photo ) {
+				return Promise.resolve( '' );
+			}
+
+			var data = new FormData();
+			data.append( 'action', 'af_sp_upload_photo' );
+			data.append( 'nonce', afMaintenance.providerNonce );
+			data.append( 'id', providerId );
+			data.append( 'photo', photo );
+
+			return fetch( afMaintenance.ajaxUrl, { method: 'POST', body: data } )
+				.then( function ( res ) {
+					return res.json();
+				} )
+				.then( function ( json ) {
+					return json && json.success ? '' : ( ( json && json.data && json.data.message ) || afMaintenance.i18n.genericError );
+				} )
+				.catch( function () {
+					return afMaintenance.i18n.networkError;
+				} );
+		}
+
+		// Client-side photo check: size, and a face must be present where the
+		// browser exposes the FaceDetector API (Chromium). Other browsers skip
+		// the face check; the server and the Arriendo Facil team still review it.
+		var photoField = document.getElementById( 'af-prov-photo' );
+		var photoMsg = document.getElementById( 'af-prov-photo-msg' );
+		if ( photoField ) {
+			photoField.addEventListener( 'change', function () {
+				var file = photoField.files && photoField.files[ 0 ];
+				if ( photoMsg ) {
+					photoMsg.textContent = '';
+				}
+				if ( ! file ) {
+					return;
+				}
+
+				function reject( message ) {
+					photoField.value = '';
+					if ( photoMsg ) {
+						photoMsg.textContent = message;
+					}
+				}
+
+				if ( file.size > 5 * 1024 * 1024 ) {
+					reject( afMaintenance.i18n.photoTooBig );
+					return;
+				}
+
+				if ( ! ( 'FaceDetector' in window ) || ! window.createImageBitmap ) {
+					return;
+				}
+
+				window.createImageBitmap( file )
+					.then( function ( bitmap ) {
+						return new window.FaceDetector( { fastMode: true } ).detect( bitmap );
+					} )
+					.then( function ( faces ) {
+						if ( ! faces.length ) {
+							reject( afMaintenance.i18n.noFace );
+						}
+					} )
+					.catch( function () {} );
+			} );
+		}
+
 		form.addEventListener( 'submit', function ( e ) {
 			e.preventDefault();
 
@@ -834,6 +914,34 @@
 						status.className = 'af-modal__status is-error';
 					}
 				} );
+		} );
+
+		// Platform team review: approve/reject photo, recommend/unrecommend.
+		root.addEventListener( 'click', function ( e ) {
+			var btn = e.target.closest( '.af-prov-review-btn' );
+			if ( ! btn ) {
+				return;
+			}
+
+			btn.disabled = true;
+
+			post( {
+				action: 'af_sp_review',
+				nonce: afMaintenance.providerNonce,
+				id: btn.getAttribute( 'data-id' ),
+				review: btn.getAttribute( 'data-review' )
+			} ).then( function ( json ) {
+				if ( json && json.success ) {
+					window.location.reload();
+					return;
+				}
+
+				btn.disabled = false;
+				window.alert( ( json && json.data && json.data.message ) || afMaintenance.i18n.genericError );
+			} ).catch( function () {
+				btn.disabled = false;
+				window.alert( afMaintenance.i18n.networkError );
+			} );
 		} );
 
 		// Delete (delegated: the grid is re-rendered on every page load).

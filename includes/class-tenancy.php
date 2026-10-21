@@ -273,6 +273,29 @@ class Arriendo_Facil_Tenancy {
 	}
 
 	/**
+	 * Whether the user may ASSIGN a provider to a request: their own contacts
+	 * plus the active providers Arriendo Facil recommends (read-only).
+	 *
+	 * @param int $provider_id Provider ID.
+	 * @param int $user_id     User ID. Defaults to current user.
+	 * @return bool
+	 */
+	public static function can_use_service_provider( $provider_id, $user_id = 0 ) {
+		if ( self::can_access_service_provider( $provider_id, $user_id ) ) {
+			return true;
+		}
+
+		global $wpdb;
+
+		return (bool) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT id FROM {$wpdb->prefix}af_service_providers WHERE id = %d AND is_recommended = 1 AND status = 'active'",
+				absint( $provider_id )
+			)
+		);
+	}
+
+	/**
 	 * Whether the given user can operate on a maintenance request.
 	 *
 	 * @param int $request_id Maintenance request ID.

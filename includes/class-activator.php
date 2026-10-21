@@ -529,11 +529,18 @@ class Arriendo_Facil_Activator {
 				rating      TINYINT(3) UNSIGNED NOT NULL DEFAULT 0 COMMENT '0 = sin calificar, 1-5 estrellas',
 				notes       TEXT DEFAULT NULL,
 				status      VARCHAR(20) NOT NULL DEFAULT 'active',
+				photo_id    BIGINT(20) UNSIGNED DEFAULT NULL COMMENT 'Adjunto de la foto del tecnico',
+				photo_hash  CHAR(64) DEFAULT NULL COMMENT 'SHA-256 de la foto, evita fotos repetidas',
+				photo_status VARCHAR(20) NOT NULL DEFAULT 'none' COMMENT 'none, pending, verified, rejected',
+				is_recommended TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'Recomendado y verificado por Arriendo Facil',
+				verified_at DATETIME DEFAULT NULL,
+				verified_by BIGINT(20) UNSIGNED DEFAULT NULL,
 				created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 				updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 				PRIMARY KEY (id),
 				KEY owner_status (owner_id, status),
-				KEY trade (trade)
+				KEY trade (trade),
+				KEY recommended (is_recommended)
 			) $charset_collate;",
 
 			"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_owner_contacts (
@@ -1009,6 +1016,7 @@ class Arriendo_Facil_Activator {
 		}
 
 		self::maybe_add_maintenance_repair_columns();
+		self::maybe_add_service_provider_columns();
 
 		$meter_readings_table = $wpdb->prefix . 'af_meter_readings';
 
@@ -1746,6 +1754,43 @@ class Arriendo_Facil_Activator {
 
 			if ( ! $exists ) {
 				$wpdb->query( "ALTER TABLE {$table} ADD INDEX {$name} ({$columns_spec})" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			}
+		}
+	}
+
+	/**
+	 * Adds the photo / verification columns to af_service_providers on installs
+	 * that predate the "técnicos recomendados" catalog.
+	 *
+	 * @return void
+	 */
+	private static function maybe_add_service_provider_columns() {
+		global $wpdb;
+
+		$table   = $wpdb->prefix . 'af_service_providers';
+		$columns = array(
+			'photo_id'       => 'BIGINT(20) UNSIGNED DEFAULT NULL',
+			'photo_hash'     => 'CHAR(64) DEFAULT NULL',
+			'photo_status'   => "VARCHAR(20) NOT NULL DEFAULT 'none'",
+			'is_recommended' => 'TINYINT(1) NOT NULL DEFAULT 0',
+			'verified_at'    => 'DATETIME DEFAULT NULL',
+			'verified_by'    => 'BIGINT(20) UNSIGNED DEFAULT NULL',
+		);
+
+		$existing = array_map(
+			'strtolower',
+			(array) $wpdb->get_col(
+				$wpdb->prepare(
+					'SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s',
+					DB_NAME,
+					$table
+				)
+			)
+		);
+
+		foreach ( $columns as $column => $definition ) {
+			if ( ! in_array( $column, $existing, true ) ) {
+				$wpdb->query( "ALTER TABLE {$table} ADD COLUMN {$column} {$definition}" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			}
 		}
 	}

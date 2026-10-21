@@ -265,7 +265,7 @@ class Arriendo_Facil_Maintenance {
 			return false;
 		}
 
-		return (bool) Arriendo_Facil_Tenancy::can_access_service_provider( $provider_id );
+		return (bool) Arriendo_Facil_Tenancy::can_use_service_provider( $provider_id );
 	}
 
 	/**

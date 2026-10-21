@@ -25,6 +25,13 @@ $categories  = Arriendo_Facil_Maintenance::asset_categories();
 $requests   = Arriendo_Facil_Maintenance::get_requests_for_current_user();
 $providers  = class_exists( 'Arriendo_Facil_Service_Providers' ) ? Arriendo_Facil_Service_Providers::list() : array();
 $trades     = class_exists( 'Arriendo_Facil_Service_Providers' ) ? Arriendo_Facil_Service_Providers::trades() : array();
+$recommended = class_exists( 'Arriendo_Facil_Service_Providers' ) ? Arriendo_Facil_Service_Providers::list_recommended() : array();
+$is_platform_admin = Arriendo_Facil_Tenancy::can_manage_all();
+$photo_labels = array(
+	'pending'  => __( 'Foto en revisión', 'arriendo-facil' ),
+	'verified' => __( 'Foto verificada', 'arriendo-facil' ),
+	'rejected' => __( 'Foto rechazada', 'arriendo-facil' ),
+);
 
 $open_count   = 0;
 $urgent_count = 0;
@@ -99,7 +106,7 @@ $active_providers = array_values(
 		array(
 			'eyebrow'  => __( 'Operación', 'arriendo-facil' ),
 			'title'    => __( 'Mantenimiento', 'arriendo-facil' ),
-			'subtitle' => __( 'Registra qué hay que reparar en cada inmueble, vincúlalo a tu catálogo de personal y lleva las fechas y costos al día.', 'arriendo-facil' ),
+			'subtitle' => __( 'Pide reparaciones para tus inmuebles, asigna un técnico y sigue el estado y el costo de cada una.', 'arriendo-facil' ),
 		)
 	);
 	?>
@@ -107,19 +114,25 @@ $active_providers = array_values(
 	<div class="af-tabs">
 		<input type="radio" class="af-tabs__radio" id="af-tab-solicitudes" name="af-maint-tabs" checked />
 		<input type="radio" class="af-tabs__radio" id="af-tab-personal" name="af-maint-tabs" />
+		<input type="radio" class="af-tabs__radio" id="af-tab-recomendados" name="af-maint-tabs" />
 
 		<div class="af-tabs__nav" role="tablist" aria-label="<?php esc_attr_e( 'Secciones de mantenimiento', 'arriendo-facil' ); ?>">
 			<label class="af-tabs__tab" for="af-tab-solicitudes" role="tab">
 				<span class="af-tabs__icon" aria-hidden="true"><?php echo af_lucide( 'wrench', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-				<span class="af-tabs__label"><?php esc_html_e( 'Solicitudes', 'arriendo-facil' ); ?></span>
+				<span class="af-tabs__label"><?php esc_html_e( 'Solicitudes de reparación', 'arriendo-facil' ); ?></span>
 				<?php if ( $open_count > 0 ) : ?>
 					<span class="af-tabs__badge af-tabs__badge--attention"><?php echo esc_html( number_format_i18n( $open_count ) ); ?></span>
 				<?php endif; ?>
 			</label>
 			<label class="af-tabs__tab" for="af-tab-personal" role="tab">
 				<span class="af-tabs__icon" aria-hidden="true"><?php echo af_lucide( 'users', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-				<span class="af-tabs__label"><?php esc_html_e( 'Personal', 'arriendo-facil' ); ?></span>
+				<span class="af-tabs__label"><?php esc_html_e( 'Mis técnicos', 'arriendo-facil' ); ?></span>
 				<span class="af-tabs__badge"><?php echo esc_html( number_format_i18n( count( $providers ) ) ); ?></span>
+			</label>
+			<label class="af-tabs__tab" for="af-tab-recomendados" role="tab">
+				<span class="af-tabs__icon" aria-hidden="true"><?php echo af_lucide( 'shield-check', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+				<span class="af-tabs__label"><?php esc_html_e( 'Recomendados', 'arriendo-facil' ); ?></span>
+				<span class="af-tabs__badge"><?php echo esc_html( number_format_i18n( count( $recommended ) ) ); ?></span>
 			</label>
 		</div>
 
@@ -132,7 +145,7 @@ $active_providers = array_values(
 
 				<header class="af-maint-panelhead">
 					<div>
-						<h2 class="af-maint-panelhead__title"><?php esc_html_e( 'Solicitudes de reparación', 'arriendo-facil' ); ?></h2>
+						<h2 class="af-maint-panelhead__title"><?php esc_html_e( 'Tus solicitudes de reparación', 'arriendo-facil' ); ?></h2>
 						<p class="af-maint-panelhead__sub">
 							<?php
 							echo esc_html(
@@ -148,6 +161,16 @@ $active_providers = array_values(
 					</div>
 					<button type="button" class="button af-btn af-btn--primary" id="af-maint-new-request">+ <?php esc_html_e( 'Nueva solicitud', 'arriendo-facil' ); ?></button>
 				</header>
+
+				<details class="af-maint-guide" <?php echo empty( $requests ) ? 'open' : ''; ?>>
+					<summary><?php esc_html_e( '¿Qué es una solicitud y cómo funciona?', 'arriendo-facil' ); ?></summary>
+					<p><?php esc_html_e( 'Una solicitud es el aviso de algo que hay que arreglar en uno de tus inmuebles (una fuga, una puerta dañada, un electrodoméstico). Aquí abajo aparecen todas, una tarjeta por reparación.', 'arriendo-facil' ); ?></p>
+					<ol class="af-maint-guide__steps">
+						<li><strong><?php esc_html_e( 'Crea la solicitud', 'arriendo-facil' ); ?></strong> <?php esc_html_e( 'con el botón “Nueva solicitud”: elige el inmueble y di qué hay que reparar.', 'arriendo-facil' ); ?></li>
+						<li><strong><?php esc_html_e( 'Asigna un técnico', 'arriendo-facil' ); ?></strong> <?php esc_html_e( 'de “Mis técnicos” o de los “Recomendados” por Arriendo Fácil.', 'arriendo-facil' ); ?></li>
+						<li><strong><?php esc_html_e( 'Sigue el avance', 'arriendo-facil' ); ?></strong> <?php esc_html_e( 'cambiando el estado de la tarjeta: Pendiente → En proceso → Completada.', 'arriendo-facil' ); ?></li>
+					</ol>
+				</details>
 
 				<div class="af-section af-maint-formcard" id="af-maint-request-form-card" hidden>
 					<header class="af-maint-formcard__head">
@@ -273,6 +296,22 @@ $active_providers = array_values(
 												</optgroup>
 											<?php endif; ?>
 										<?php endforeach; ?>
+										<?php
+										$own_ids      = wp_list_pluck( $active_providers, 'id' );
+										$rec_to_offer = array_filter(
+											$recommended,
+											static function ( $rec ) use ( $own_ids ) {
+												return ! in_array( $rec->id, $own_ids, true );
+											}
+										);
+										?>
+										<?php if ( ! empty( $rec_to_offer ) ) : ?>
+											<optgroup label="<?php esc_attr_e( '★ Recomendados por Arriendo Fácil', 'arriendo-facil' ); ?>">
+												<?php foreach ( $rec_to_offer as $rec ) : ?>
+													<option value="<?php echo esc_attr( (int) $rec->id ); ?>"><?php echo esc_html( $rec->name . ' — ' . ( $trades[ $rec->trade ] ?? $rec->trade ) ); ?></option>
+												<?php endforeach; ?>
+											</optgroup>
+										<?php endif; ?>
 										<option value="manual"><?php esc_html_e( '✍️ Escribir un contacto nuevo…', 'arriendo-facil' ); ?></option>
 									</select>
 								</label>
@@ -407,8 +446,8 @@ $active_providers = array_values(
 					<?php if ( empty( $requests ) ) : ?>
 						<div class="af-empty" id="af-maint-empty">
 							<span class="af-empty__icon" aria-hidden="true"><?php echo af_lucide( 'wrench', 28 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-							<h3 class="af-empty__title"><?php esc_html_e( 'Sin solicitudes', 'arriendo-facil' ); ?></h3>
-							<p class="af-empty__text"><?php esc_html_e( 'Crea la primera solicitud de reparación para un inmueble de tu cartera.', 'arriendo-facil' ); ?></p>
+							<h3 class="af-empty__title"><?php esc_html_e( 'Aún no tienes solicitudes de reparación', 'arriendo-facil' ); ?></h3>
+							<p class="af-empty__text"><?php esc_html_e( 'Cuando algo se dañe en un inmueble, regístralo aquí y aparecerá como una tarjeta que podrás asignar a un técnico y seguir hasta que esté resuelto.', 'arriendo-facil' ); ?></p>
 							<button type="button" class="button af-btn af-btn--primary" data-af-open-request><?php esc_html_e( 'Registrar primera solicitud', 'arriendo-facil' ); ?></button>
 						</div>
 					<?php else : ?>
@@ -601,10 +640,10 @@ $active_providers = array_values(
 
 				<header class="af-maint-panelhead">
 					<div>
-						<h2 class="af-maint-panelhead__title"><?php esc_html_e( 'Catálogo de personal', 'arriendo-facil' ); ?></h2>
-						<p class="af-maint-panelhead__sub"><?php esc_html_e( 'Tus técnicos de confianza. Aparecen al crear una solicitud para asignarlos en un clic.', 'arriendo-facil' ); ?></p>
+						<h2 class="af-maint-panelhead__title"><?php esc_html_e( 'Mis técnicos', 'arriendo-facil' ); ?></h2>
+						<p class="af-maint-panelhead__sub"><?php esc_html_e( 'Tu catálogo de técnicos de confianza. Aparecen al crear una solicitud para asignarlos en un clic.', 'arriendo-facil' ); ?></p>
 					</div>
-					<button type="button" class="button af-btn af-btn--primary" id="af-prov-new">+ <?php esc_html_e( 'Nuevo contacto', 'arriendo-facil' ); ?></button>
+					<button type="button" class="button af-btn af-btn--primary" id="af-prov-new">+ <?php esc_html_e( 'Nuevo técnico', 'arriendo-facil' ); ?></button>
 				</header>
 
 				<div class="af-section af-maint-formcard" id="af-prov-form-card" hidden>
@@ -638,6 +677,12 @@ $active_providers = array_values(
 								<label>
 									<span class="af-maint-label"><?php esc_html_e( 'Empresa', 'arriendo-facil' ); ?></span>
 									<input type="text" name="company" placeholder="<?php esc_attr_e( 'Si trabaja para una', 'arriendo-facil' ); ?>" />
+								</label>
+								<label class="af-maint-form__full">
+									<span class="af-maint-label"><?php esc_html_e( 'Foto del técnico', 'arriendo-facil' ); ?></span>
+									<input type="file" name="photo" id="af-prov-photo" accept="image/jpeg,image/png,image/webp" />
+									<span class="af-maint-help"><?php esc_html_e( 'Opcional. Foto real con el rostro visible (mín. 300 × 300 px, máx. 5 MB). Solo los técnicos “Recomendados” por Arriendo Fácil exigen foto verificada.', 'arriendo-facil' ); ?></span>
+									<span class="af-maint-help af-prov-photo-msg" id="af-prov-photo-msg" aria-live="polite"></span>
 								</label>
 							</div>
 						</fieldset>
@@ -735,6 +780,8 @@ $active_providers = array_values(
 								$prov_name    = (string) $provider->name;
 								$prov_phone   = (string) $provider->phone;
 								$prov_wa      = (string) $provider->whatsapp;
+								$prov_photo   = Arriendo_Facil_Service_Providers::photo_url( $provider, true );
+								$prov_pstatus = (string) $provider->photo_status;
 								$prov_search  = strtolower(
 									implode(
 										' ',
@@ -769,7 +816,14 @@ $active_providers = array_values(
 								data-notes="<?php echo esc_attr( (string) $provider->notes ); ?>">
 
 									<header class="af-prov-card__head">
-										<div>
+										<span class="af-prov-avatar">
+											<?php if ( $prov_photo ) : ?>
+												<img src="<?php echo esc_url( $prov_photo ); ?>" alt="<?php echo esc_attr( $prov_name ); ?>" loading="lazy" />
+											<?php else : ?>
+												<?php echo esc_html( mb_strtoupper( mb_substr( $prov_name, 0, 1 ) ) ); ?>
+											<?php endif; ?>
+										</span>
+										<div class="af-prov-card__id">
 											<h3 class="af-prov-card__name"><?php echo esc_html( $prov_name ); ?></h3>
 											<?php if ( ! empty( $provider->company ) ) : ?>
 												<p class="af-prov-card__company"><?php echo esc_html( (string) $provider->company ); ?></p>
@@ -782,6 +836,15 @@ $active_providers = array_values(
 										<span class="dashicons dashicons-admin-tools" aria-hidden="true"></span>
 										<span class="af-prov-card__trade-label"><?php echo esc_html( $trades[ $prov_trade ] ?? $prov_trade ); ?></span>
 									</p>
+
+									<div class="af-prov-badges">
+										<?php if ( ! empty( $provider->is_recommended ) ) : ?>
+											<span class="af-prov-badge af-prov-badge--reco">★ <?php esc_html_e( 'Recomendado por Arriendo Fácil', 'arriendo-facil' ); ?></span>
+										<?php endif; ?>
+										<?php if ( $is_platform_admin && isset( $photo_labels[ $prov_pstatus ] ) ) : ?>
+											<span class="af-prov-badge af-prov-badge--<?php echo esc_attr( $prov_pstatus ); ?>"><?php echo esc_html( $photo_labels[ $prov_pstatus ] ); ?></span>
+										<?php endif; ?>
+									</div>
 
 									<?php if ( ! empty( $provider->city ) || ! empty( $provider->zone ) ) : ?>
 										<div class="af-prov-card__meta">
@@ -827,6 +890,22 @@ $active_providers = array_values(
 										<p class="af-maint-table__sub"><?php echo esc_html( (string) $provider->notes ); ?></p>
 									<?php endif; ?>
 
+									<?php if ( $is_platform_admin ) : ?>
+										<div class="af-prov-review">
+											<?php if ( 'pending' === $prov_pstatus || 'rejected' === $prov_pstatus ) : ?>
+												<button type="button" class="button af-btn af-btn--sm af-prov-review-btn" data-id="<?php echo esc_attr( (int) $provider->id ); ?>" data-review="approve_photo"><?php esc_html_e( 'Aprobar foto', 'arriendo-facil' ); ?></button>
+											<?php endif; ?>
+											<?php if ( 'pending' === $prov_pstatus ) : ?>
+												<button type="button" class="button af-btn af-btn--sm af-prov-review-btn" data-id="<?php echo esc_attr( (int) $provider->id ); ?>" data-review="reject_photo"><?php esc_html_e( 'Rechazar foto', 'arriendo-facil' ); ?></button>
+											<?php endif; ?>
+											<?php if ( 'verified' === $prov_pstatus && empty( $provider->is_recommended ) ) : ?>
+												<button type="button" class="button af-btn af-btn--sm af-btn--primary af-prov-review-btn" data-id="<?php echo esc_attr( (int) $provider->id ); ?>" data-review="recommend">★ <?php esc_html_e( 'Recomendar', 'arriendo-facil' ); ?></button>
+											<?php elseif ( ! empty( $provider->is_recommended ) ) : ?>
+												<button type="button" class="button af-btn af-btn--sm af-prov-review-btn" data-id="<?php echo esc_attr( (int) $provider->id ); ?>" data-review="unrecommend"><?php esc_html_e( 'Quitar recomendación', 'arriendo-facil' ); ?></button>
+											<?php endif; ?>
+										</div>
+									<?php endif; ?>
+
 									<footer class="af-prov-card__actions">
 										<button type="button" class="button af-btn af-btn--sm af-prov-edit" data-id="<?php echo esc_attr( (int) $provider->id ); ?>">
 											<?php esc_html_e( 'Editar', 'arriendo-facil' ); ?>
@@ -835,6 +914,75 @@ $active_providers = array_values(
 											<?php esc_html_e( 'Eliminar', 'arriendo-facil' ); ?>
 										</button>
 									</footer>
+								</article>
+							<?php endforeach; ?>
+						</div>
+					<?php endif; ?>
+				</div>
+			</section>
+
+			<!-- ══════════════════════════════════════════════════════════════
+			     PANEL 3 — Técnicos recomendados y verificados por Arriendo Fácil
+			     ══════════════════════════════════════════════════════════════ -->
+			<section class="af-tabs__panel af-tabs__panel--recomendados" role="tabpanel" aria-labelledby="af-tab-recomendados">
+
+				<header class="af-maint-panelhead">
+					<div>
+						<h2 class="af-maint-panelhead__title"><?php esc_html_e( 'Técnicos recomendados', 'arriendo-facil' ); ?></h2>
+						<p class="af-maint-panelhead__sub"><?php esc_html_e( 'Profesionales con identidad y foto verificadas por el equipo de Arriendo Fácil. Puedes asignarlos al crear una solicitud.', 'arriendo-facil' ); ?></p>
+					</div>
+				</header>
+
+				<div class="af-section">
+					<?php if ( empty( $recommended ) ) : ?>
+						<div class="af-empty">
+							<span class="af-empty__icon" aria-hidden="true"><?php echo af_lucide( 'shield-check', 28 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+							<h3 class="af-empty__title"><?php esc_html_e( 'Aún no hay técnicos recomendados', 'arriendo-facil' ); ?></h3>
+							<p class="af-empty__text"><?php esc_html_e( 'Estamos verificando técnicos de confianza. Mientras tanto, registra los tuyos en “Mis técnicos”.', 'arriendo-facil' ); ?></p>
+						</div>
+					<?php else : ?>
+						<div class="af-prov-grid">
+							<?php foreach ( $recommended as $rec ) : ?>
+								<?php
+								$rec_photo = Arriendo_Facil_Service_Providers::photo_url( $rec );
+								$rec_phone = (string) ( $rec->whatsapp ? $rec->whatsapp : $rec->phone );
+								?>
+								<article class="af-prov-card af-prov-card--reco">
+									<header class="af-prov-card__head">
+										<span class="af-prov-avatar">
+											<?php if ( $rec_photo ) : ?>
+												<img src="<?php echo esc_url( $rec_photo ); ?>" alt="<?php echo esc_attr( $rec->name ); ?>" loading="lazy" />
+											<?php else : ?>
+												<?php echo esc_html( mb_strtoupper( mb_substr( (string) $rec->name, 0, 1 ) ) ); ?>
+											<?php endif; ?>
+										</span>
+										<div class="af-prov-card__id">
+											<h3 class="af-prov-card__name"><?php echo esc_html( $rec->name ); ?></h3>
+											<?php if ( ! empty( $rec->company ) ) : ?>
+												<p class="af-prov-card__company"><?php echo esc_html( (string) $rec->company ); ?></p>
+											<?php endif; ?>
+										</div>
+									</header>
+									<p class="af-prov-card__trade">
+										<span class="dashicons dashicons-admin-tools" aria-hidden="true"></span>
+										<span class="af-prov-card__trade-label"><?php echo esc_html( $trades[ $rec->trade ] ?? $rec->trade ); ?></span>
+									</p>
+									<div class="af-prov-badges">
+										<span class="af-prov-badge af-prov-badge--reco">★ <?php esc_html_e( 'Recomendado y verificado', 'arriendo-facil' ); ?></span>
+									</div>
+									<?php if ( ! empty( $rec->city ) || ! empty( $rec->zone ) ) : ?>
+										<div class="af-prov-card__meta">
+											<?php foreach ( array_filter( array( $rec->city, $rec->zone ) ) as $place ) : ?>
+												<span><?php echo esc_html( (string) $place ); ?></span>
+											<?php endforeach; ?>
+										</div>
+									<?php endif; ?>
+									<?php if ( $rec_phone ) : ?>
+										<div class="af-prov-card__contacts">
+											<a class="af-prov-card__contact" href="tel:<?php echo esc_attr( $rec_phone ); ?>"><span class="dashicons dashicons-phone" aria-hidden="true"></span><?php echo esc_html( $rec_phone ); ?></a>
+											<a class="af-prov-card__contact" href="https://wa.me/<?php echo esc_attr( preg_replace( '/\D+/', '', $rec_phone ) ); ?>" target="_blank" rel="noopener noreferrer"><span class="dashicons dashicons-format-chat" aria-hidden="true"></span><?php esc_html_e( 'WhatsApp', 'arriendo-facil' ); ?></a>
+										</div>
+									<?php endif; ?>
 								</article>
 							<?php endforeach; ?>
 						</div>
@@ -873,6 +1021,9 @@ wp_localize_script(
 			'saveContact' => __( 'Guardar contacto', 'arriendo-facil' ),
 			'saveChanges' => __( 'Guardar cambios', 'arriendo-facil' ),
 			'genericError'  => __( 'Ocurrió un error. Intenta de nuevo.', 'arriendo-facil' ),
+			'noFace'        => __( 'No detectamos un rostro en la foto. Sube una foto real donde se vea claramente la cara.', 'arriendo-facil' ),
+			'photoTooBig'   => __( 'La foto pesa más de 5 MB.', 'arriendo-facil' ),
+			'savedPhotoFailed' => __( 'El técnico se guardó, pero la foto falló: ', 'arriendo-facil' ),
 			'networkError'  => __( 'No se pudo conectar con el servidor.', 'arriendo-facil' ),
 		),
 	)

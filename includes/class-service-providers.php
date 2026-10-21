@@ -23,7 +23,12 @@ class Arriendo_Facil_Service_Providers {
 		add_action( 'wp_ajax_af_sp_create', array( $this, 'ajax_create' ) );
 		add_action( 'wp_ajax_af_sp_update', array( $this, 'ajax_update' ) );
 		add_action( 'wp_ajax_af_sp_delete', array( $this, 'ajax_delete' ) );
+		add_action( 'wp_ajax_af_sp_upload_photo', array( $this, 'ajax_upload_photo' ) );
+		add_action( 'wp_ajax_af_sp_review', array( $this, 'ajax_review' ) );
 	}
+
+	const PHOTO_MAX_BYTES = 5242880;
+	const PHOTO_MIN_SIDE  = 300;
 
 	/**
 	 * Returns the table name.
@@ -238,7 +243,181 @@ class Arriendo_Facil_Service_Providers {
 		if ( ! $id || ! Arriendo_Facil_Tenancy::can_access_service_provider( $id ) ) {
 			return new WP_Error( 'af_sp_not_found', __( 'Contacto no encontrado o sin permiso.', 'arriendo-facil' ) );
 		}
+		$photo_id = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT photo_id FROM ' . self::table() . ' WHERE id = %d', $id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		$wpdb->delete( self::table(), array( 'id' => $id ), array( '%d' ) );
+		if ( $photo_id ) {
+			wp_delete_attachment( $photo_id, true );
+		}
+		return true;
+	}
+
+	/**
+	 * Providers Arriendo Facil recommends (verified by the platform team).
+	 * Visible to every property manager, read-only for them.
+	 *
+	 * @return array
+	 */
+	public static function list_recommended() {
+		global $wpdb;
+
+		return (array) $wpdb->get_results(
+			'SELECT * FROM ' . self::table() . " WHERE is_recommended = 1 AND status = 'active' ORDER BY trade ASC, name ASC" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		);
+	}
+
+	/**
+	 * Public URL of the provider's photo, only when the platform verified it.
+	 *
+	 * @param object $provider Provider row.
+	 * @param bool   $any      Also return photos still pending review (owner/admin views).
+	 * @return string
+	 */
+	public static function photo_url( $provider, $any = false ) {
+		if ( empty( $provider->photo_id ) ) {
+			return '';
+		}
+		if ( ! $any && 'verified' !== (string) $provider->photo_status ) {
+			return '';
+		}
+
+		$url = wp_get_attachment_image_url( (int) $provider->photo_id, 'thumbnail' );
+
+		return $url ? $url : '';
+	}
+
+	/**
+	 * Validates and stores the provider's photo. It stays "pending" until the
+	 * Arriendo Facil team reviews it.
+	 *
+	 * @param int   $id   Provider ID.
+	 * @param array $file Entry of $_FILES.
+	 * @return true|WP_Error
+	 */
+	public static function set_photo( $id, $file ) {
+		global $wpdb;
+
+		$id = absint( $id );
+		if ( ! $id || ! Arriendo_Facil_Tenancy::can_access_service_provider( $id ) ) {
+			return new WP_Error( 'af_sp_not_found', __( 'Contacto no encontrado o sin permiso.', 'arriendo-facil' ) );
+		}
+		if ( empty( $file['tmp_name'] ) || ! empty( $file['error'] ) || ! is_uploaded_file( $file['tmp_name'] ) ) {
+			return new WP_Error( 'af_sp_photo_upload', __( 'No se pudo recibir la foto. Intenta de nuevo.', 'arriendo-facil' ) );
+		}
+		if ( (int) $file['size'] > self::PHOTO_MAX_BYTES ) {
+			return new WP_Error( 'af_sp_photo_size', __( 'La foto pesa más de 5 MB.', 'arriendo-facil' ) );
+		}
+
+		$info = @getimagesize( $file['tmp_name'] ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		$mime = $info ? (string) $info['mime'] : '';
+		if ( ! in_array( $mime, array( 'image/jpeg', 'image/png', 'image/webp' ), true ) ) {
+			return new WP_Error( 'af_sp_photo_type', __( 'Sube una foto JPG, PNG o WebP.', 'arriendo-facil' ) );
+		}
+		if ( min( (int) $info[0], (int) $info[1] ) < self::PHOTO_MIN_SIDE ) {
+			return new WP_Error( 'af_sp_photo_small', __( 'La foto es muy pequeña. Usa una de al menos 300 × 300 px, donde se vea claramente el rostro.', 'arriendo-facil' ) );
+		}
+
+		$hash      = hash_file( 'sha256', $file['tmp_name'] );
+		$duplicate = (int) $wpdb->get_var(
+			$wpdb->prepare( 'SELECT id FROM ' . self::table() . ' WHERE photo_hash = %s AND id <> %d LIMIT 1', $hash, $id ) // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		);
+		if ( $duplicate ) {
+			return new WP_Error( 'af_sp_photo_duplicate', __( 'Esta foto ya está usada en otro técnico. Cada técnico debe tener su propia foto real.', 'arriendo-facil' ) );
+		}
+
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		require_once ABSPATH . 'wp-admin/includes/image.php';
+		require_once ABSPATH . 'wp-admin/includes/media.php';
+
+		$_FILES['af_sp_photo'] = $file;
+		$attachment_id         = media_handle_upload( 'af_sp_photo', 0 );
+		if ( is_wp_error( $attachment_id ) ) {
+			return $attachment_id;
+		}
+
+		$old = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT photo_id FROM ' . self::table() . ' WHERE id = %d', $id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+
+		// A new photo always invalidates the previous verification.
+		$wpdb->update(
+			self::table(),
+			array(
+				'photo_id'       => (int) $attachment_id,
+				'photo_hash'     => $hash,
+				'photo_status'   => 'pending',
+				'is_recommended' => 0,
+				'verified_at'    => null,
+				'verified_by'    => null,
+			),
+			array( 'id' => $id )
+		);
+
+		if ( $old && $old !== (int) $attachment_id ) {
+			wp_delete_attachment( $old, true );
+		}
+
+		return true;
+	}
+
+	/**
+	 * Platform-team review: approve/reject the photo, or toggle "recommended".
+	 * A provider can only be recommended once its photo is verified.
+	 *
+	 * @param int    $id     Provider ID.
+	 * @param string $action approve_photo | reject_photo | recommend | unrecommend.
+	 * @return true|WP_Error
+	 */
+	public static function review( $id, $action ) {
+		global $wpdb;
+
+		$id = absint( $id );
+		if ( ! Arriendo_Facil_Tenancy::can_manage_all() ) {
+			return new WP_Error( 'af_sp_permission', __( 'Permiso denegado.', 'arriendo-facil' ) );
+		}
+
+		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT id, photo_status FROM ' . self::table() . ' WHERE id = %d', $id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( ! $row ) {
+			return new WP_Error( 'af_sp_not_found', __( 'Contacto no encontrado.', 'arriendo-facil' ) );
+		}
+
+		$now = current_time( 'mysql' );
+
+		switch ( $action ) {
+			case 'approve_photo':
+				if ( 'none' === $row->photo_status ) {
+					return new WP_Error( 'af_sp_no_photo', __( 'Este técnico no tiene foto.', 'arriendo-facil' ) );
+				}
+				$data = array( 'photo_status' => 'verified' );
+				break;
+			case 'reject_photo':
+				$data = array(
+					'photo_status'   => 'rejected',
+					'is_recommended' => 0,
+					'verified_at'    => null,
+					'verified_by'    => null,
+				);
+				break;
+			case 'recommend':
+				if ( 'verified' !== $row->photo_status ) {
+					return new WP_Error( 'af_sp_not_verified', __( 'Verifica primero la foto del técnico para recomendarlo.', 'arriendo-facil' ) );
+				}
+				$data = array(
+					'is_recommended' => 1,
+					'verified_at'    => $now,
+					'verified_by'    => get_current_user_id(),
+				);
+				break;
+			case 'unrecommend':
+				$data = array(
+					'is_recommended' => 0,
+					'verified_at'    => null,
+					'verified_by'    => null,
+				);
+				break;
+			default:
+				return new WP_Error( 'af_sp_bad_action', __( 'Acción no válida.', 'arriendo-facil' ) );
+		}
+
+		$wpdb->update( self::table(), $data, array( 'id' => $id ) );
+
 		return true;
 	}
 
@@ -278,5 +457,32 @@ class Arriendo_Facil_Service_Providers {
 			wp_send_json_error( array( 'message' => $res->get_error_message() ), 400 );
 		}
 		wp_send_json_success( array( 'message' => __( 'Contacto eliminado.', 'arriendo-facil' ) ) );
+	}
+
+	public function ajax_upload_photo() {
+		check_ajax_referer( self::NONCE, 'nonce' );
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+		$id  = isset( $_POST['id'] ) ? absint( wp_unslash( $_POST['id'] ) ) : 0;
+		$res = self::set_photo( $id, isset( $_FILES['photo'] ) ? $_FILES['photo'] : array() ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+		if ( is_wp_error( $res ) ) {
+			wp_send_json_error( array( 'message' => $res->get_error_message() ), 400 );
+		}
+		wp_send_json_success( array( 'message' => __( 'Foto guardada.', 'arriendo-facil' ) ) );
+	}
+
+	public function ajax_review() {
+		check_ajax_referer( self::NONCE, 'nonce' );
+		if ( ! Arriendo_Facil_Tenancy::can_manage_all() ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+		$id     = isset( $_POST['id'] ) ? absint( wp_unslash( $_POST['id'] ) ) : 0;
+		$action = isset( $_POST['review'] ) ? sanitize_key( wp_unslash( $_POST['review'] ) ) : '';
+		$res    = self::review( $id, $action );
+		if ( is_wp_error( $res ) ) {
+			wp_send_json_error( array( 'message' => $res->get_error_message() ), 400 );
+		}
+		wp_send_json_success( array( 'message' => __( 'Listo.', 'arriendo-facil' ) ) );
 	}
 }

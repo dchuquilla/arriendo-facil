@@ -70,14 +70,16 @@
 /* ── Tabs (CSS-only radio switcher, following the af-buildings pattern) ──── */
 
 #af-tab-solicitudes:checked ~ .af-tabs__nav > label[for="af-tab-solicitudes"],
-#af-tab-personal:checked ~ .af-tabs__nav > label[for="af-tab-personal"] {
+#af-tab-personal:checked ~ .af-tabs__nav > label[for="af-tab-personal"],
+#af-tab-recomendados:checked ~ .af-tabs__nav > label[for="af-tab-recomendados"] {
 	background: var(--af-gray-0, #fff);
 	color: var(--af-gray-900);
 	box-shadow: var(--af-shadow-sm);
 }
 
 #af-tab-solicitudes:checked ~ .af-tabs__panels > .af-tabs__panel--solicitudes,
-#af-tab-personal:checked ~ .af-tabs__panels > .af-tabs__panel--personal {
+#af-tab-personal:checked ~ .af-tabs__panels > .af-tabs__panel--personal,
+#af-tab-recomendados:checked ~ .af-tabs__panels > .af-tabs__panel--recomendados {
 	display: block;
 }
 
@@ -881,3 +883,55 @@ body.wp-admin .af-maint .af-maint-money input[type="number"] { width: 100%; padd
 	.af-maint-card__notes { display: block; }
 	.af-maint-card__notes:not([open]) > p { display: block; }
 }
+/* ── Guía de solicitudes ─────────────────────────────────────────────────── */
+
+.af-maint-guide {
+	background: var(--af-primary-50);
+	border: 1px solid var(--af-gray-200);
+	border-radius: var(--af-radius-lg);
+	padding: var(--af-space-3) var(--af-space-4);
+	margin-bottom: var(--af-space-3);
+}
+.af-maint-guide summary { cursor: pointer; font-weight: 600; color: var(--af-gray-900); }
+.af-maint-guide p { margin: var(--af-space-2) 0; color: var(--af-gray-700); }
+.af-maint-guide__steps { margin: 0; padding-left: 20px; color: var(--af-gray-700); display: grid; gap: 4px; }
+
+/* ── Técnicos: foto, verificación y recomendados ─────────────────────────── */
+
+.af-prov-card__head { align-items: center; }
+.af-prov-card__id { flex: 1; min-width: 0; }
+.af-prov-avatar {
+	flex: 0 0 48px;
+	width: 48px;
+	height: 48px;
+	border-radius: 50%;
+	overflow: hidden;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--af-primary-50);
+	color: var(--af-primary-500);
+	font-weight: 700;
+	font-size: var(--af-text-lg);
+}
+.af-prov-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.af-prov-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.af-prov-badge {
+	display: inline-flex;
+	align-items: center;
+	padding: 2px 10px;
+	border-radius: 999px;
+	font-size: var(--af-text-xs);
+	font-weight: 600;
+	background: var(--af-gray-100);
+	color: var(--af-gray-700);
+}
+.af-prov-badge--reco { background: #FFF4D6; color: #7A5200; }
+.af-prov-badge--verified { background: #DDF3E4; color: #1B6B3A; }
+.af-prov-badge--pending { background: #FFF0D9; color: #8A5300; }
+.af-prov-badge--rejected { background: #FBE1E1; color: #A12727; }
+
+.af-prov-card--reco { border-color: #E8C96A; }
+.af-prov-review { display: flex; flex-wrap: wrap; gap: var(--af-space-2); padding-top: var(--af-space-2); border-top: 1px dashed var(--af-gray-200); }
+.af-prov-photo-msg { color: var(--af-danger-500); }

@@ -162,14 +162,9 @@ $active_providers = array_values(
 					<button type="button" class="button af-btn af-btn--primary" id="af-maint-new-request">+ <?php esc_html_e( 'Nueva solicitud', 'arriendo-facil' ); ?></button>
 				</header>
 
-				<details class="af-maint-guide" <?php echo empty( $requests ) ? 'open' : ''; ?>>
+				<details class="af-maint-guide">
 					<summary><?php esc_html_e( '¿Qué es una solicitud y cómo funciona?', 'arriendo-facil' ); ?></summary>
-					<p><?php esc_html_e( 'Una solicitud es el aviso de algo que hay que arreglar en uno de tus inmuebles (una fuga, una puerta dañada, un electrodoméstico). Aquí abajo aparecen todas, una tarjeta por reparación.', 'arriendo-facil' ); ?></p>
-					<ol class="af-maint-guide__steps">
-						<li><strong><?php esc_html_e( 'Crea la solicitud', 'arriendo-facil' ); ?></strong> <?php esc_html_e( 'con el botón “Nueva solicitud”: elige el inmueble y di qué hay que reparar.', 'arriendo-facil' ); ?></li>
-						<li><strong><?php esc_html_e( 'Asigna un técnico', 'arriendo-facil' ); ?></strong> <?php esc_html_e( 'de “Mis técnicos” o de los “Recomendados” por Arriendo Fácil.', 'arriendo-facil' ); ?></li>
-						<li><strong><?php esc_html_e( 'Sigue el avance', 'arriendo-facil' ); ?></strong> <?php esc_html_e( 'cambiando el estado de la tarjeta: Pendiente → En proceso → Completada.', 'arriendo-facil' ); ?></li>
-					</ol>
+					<p><?php esc_html_e( 'Es el aviso de algo que hay que reparar en un inmueble. Créala, asigna un técnico y cambia su estado hasta que esté completada.', 'arriendo-facil' ); ?></p>
 				</details>
 
 				<div class="af-section af-maint-formcard" id="af-maint-request-form-card" hidden>

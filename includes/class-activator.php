@@ -1764,7 +1764,7 @@ class Arriendo_Facil_Activator {
 	 *
 	 * @return void
 	 */
-	private static function maybe_add_service_provider_columns() {
+	public static function maybe_add_service_provider_columns() {
 		global $wpdb;
 
 		$table   = $wpdb->prefix . 'af_service_providers';

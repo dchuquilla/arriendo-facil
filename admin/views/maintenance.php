@@ -781,7 +781,7 @@ $active_providers = array_values(
 								$prov_phone   = (string) $provider->phone;
 								$prov_wa      = (string) $provider->whatsapp;
 								$prov_photo   = Arriendo_Facil_Service_Providers::photo_url( $provider, true );
-								$prov_pstatus = (string) $provider->photo_status;
+								$prov_pstatus = (string) ( $provider->photo_status ?? 'none' );
 								$prov_search  = strtolower(
 									implode(
 										' ',

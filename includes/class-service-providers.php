@@ -20,6 +20,7 @@ class Arriendo_Facil_Service_Providers {
 	 * Hook AJAX actions.
 	 */
 	public function __construct() {
+		add_action( 'admin_init', array( __CLASS__, 'maybe_migrate' ) );
 		add_action( 'wp_ajax_af_sp_create', array( $this, 'ajax_create' ) );
 		add_action( 'wp_ajax_af_sp_update', array( $this, 'ajax_update' ) );
 		add_action( 'wp_ajax_af_sp_delete', array( $this, 'ajax_delete' ) );
@@ -29,6 +30,19 @@ class Arriendo_Facil_Service_Providers {
 
 	const PHOTO_MAX_BYTES = 5242880;
 	const PHOTO_MIN_SIDE  = 300;
+
+	/**
+	 * Adds the photo/verification columns once, for any admin-area user, so the
+	 * catalog never queries columns an older install does not have yet.
+	 */
+	public static function maybe_migrate() {
+		if ( '1' === get_option( 'af_sp_photo_schema' ) ) {
+			return;
+		}
+
+		Arriendo_Facil_Activator::maybe_add_service_provider_columns();
+		update_option( 'af_sp_photo_schema', '1', false );
+	}
 
 	/**
 	 * Returns the table name.

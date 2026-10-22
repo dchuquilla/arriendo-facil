@@ -467,9 +467,9 @@ namespace ArriendoFacil\Tests\Security {
 		}
 
 		/**
-		 * An invalid check digit is refused even when editing.
+		 * Ids whose check digit does not match the legacy algorithm are accepted (many current cedulas no longer follow it).
 		 */
-		public function test_rejects_invalid_check_digit() {
+		public function test_accepts_id_without_valid_check_digit() {
 			$this->givenStoredTenant( array( 'id_number' => '1700000002' ) );
 
 			$response = $this->callEndpoint(
@@ -481,8 +481,7 @@ namespace ArriendoFacil\Tests\Security {
 				)
 			);
 
-			$this->assertFalse( $response->success );
-			$this->assertCount( 0, $this->db->updates );
+			$this->assertTrue( $response->success );
 		}
 
 		/**

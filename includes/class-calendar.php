@@ -972,8 +972,7 @@ class Arriendo_Facil_Calendar {
 		if ( 1 !== preg_match( '/^[0-9]{7,10}$/', $phone ) ) {
 			wp_send_json_error( array( 'message' => __( 'El teléfono debe tener entre 7 y 10 dígitos.', 'arriendo-facil' ) ) );
 		}
-		$doc_type = 13 === strlen( $id_number ) ? 'ruc' : 'cedula';
-		if ( 1 !== preg_match( '/^[0-9]{10}([0-9]{3})?$/', $id_number ) || ! Arriendo_Facil_Identity_Validator::validate( $doc_type, $id_number ) ) {
+		if ( 1 !== preg_match( '/^[0-9]{10}([0-9]{3})?$/', $id_number ) ) {
 			wp_send_json_error( array( 'message' => __( 'La cédula o RUC no es válido.', 'arriendo-facil' ) ) );
 		}
 

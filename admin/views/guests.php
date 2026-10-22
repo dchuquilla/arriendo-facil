@@ -266,7 +266,7 @@ if ( $is_owner ) {
 					<th scope="row"><label for="af_guest_id_number"><?php esc_html_e( 'Cédula / RUC', 'arriendo-facil' ); ?> *</label></th>
 					<td>
 						<input type="text" required id="af_guest_id_number" name="id_number" class="regular-text" inputmode="numeric" pattern="^[0-9]{10,13}$" maxlength="13" title="<?php esc_attr_e( 'Solo números (10 dígitos para cédula, 13 para RUC)', 'arriendo-facil' ); ?>" />
-						<p class="description"><?php esc_html_e( 'Se valida con el dígito verificador y con el documento que subas.', 'arriendo-facil' ); ?></p>
+						<p class="description"><?php esc_html_e( 'Solo números: 10 dígitos para cédula, 13 para RUC.', 'arriendo-facil' ); ?></p>
 					</td>
 				</tr>
 				<tr>

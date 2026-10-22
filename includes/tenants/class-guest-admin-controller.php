@@ -117,13 +117,6 @@ class Arriendo_Facil_Guest_Admin_Controller {
 			wp_send_json_error( array( 'message' => __( 'La cedula debe tener 10 digitos y el RUC 13.', 'arriendo-facil' ) ) );
 		}
 
-		// Verifica el digito verificador real (algoritmo modulo 10/11 de Ecuador),
-		// no solo el largo del numero, para bloquear identificaciones inventadas.
-		$id_doc_type = 13 === strlen( $id_number ) ? 'ruc' : 'cedula';
-		if ( ! Arriendo_Facil_Identity_Validator::validate( $id_doc_type, $id_number ) ) {
-			wp_send_json_error( array( 'message' => __( 'El numero de cedula o RUC no es valido (digito verificador incorrecto).', 'arriendo-facil' ) ) );
-		}
-
 		// El operador registra lo basico y los documentos; el flujo por token se
 		// mantiene solo como compatibilidad para el enlace legado.
 		if ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) {
@@ -255,15 +248,6 @@ class Arriendo_Facil_Guest_Admin_Controller {
 
 		if ( $id_number && 1 !== preg_match( '/^[0-9]{10,13}$/', $id_number ) ) {
 			wp_send_json_error( array( 'message' => __( 'La cedula debe tener 10 digitos y el RUC 13.', 'arriendo-facil' ) ) );
-		}
-
-		// El digito verificador se revalida igual que en el alta: una cedula
-		// inventada no debe quedar guardada por un descuido del operador.
-		if ( $id_number ) {
-			$id_doc_type = 13 === strlen( $id_number ) ? 'ruc' : 'cedula';
-			if ( ! Arriendo_Facil_Identity_Validator::validate( $id_doc_type, $id_number ) ) {
-				wp_send_json_error( array( 'message' => __( 'El numero de cedula o RUC no es valido (digito verificador incorrecto).', 'arriendo-facil' ) ) );
-			}
 		}
 
 		$email_owner = (int) $wpdb->get_var(

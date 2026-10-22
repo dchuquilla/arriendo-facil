@@ -461,7 +461,7 @@ if ( $can_manage ) {
 						<th scope="row"><label for="af-profile-id-number"><?php esc_html_e( 'Cédula / RUC', 'arriendo-facil' ); ?></label></th>
 						<td>
 							<input type="text" id="af-profile-id-number" name="id_number" class="regular-text" inputmode="numeric" pattern="^[0-9]{10,13}$" maxlength="13" value="<?php echo esc_attr( (string) $guest->id_number ); ?>" />
-							<p class="description"><?php esc_html_e( '10 dígitos para cédula, 13 para RUC. Se valida el dígito verificador.', 'arriendo-facil' ); ?></p>
+							<p class="description"><?php esc_html_e( '10 dígitos para cédula, 13 para RUC.', 'arriendo-facil' ); ?></p>
 						</td>
 					</tr>
 					<tr>

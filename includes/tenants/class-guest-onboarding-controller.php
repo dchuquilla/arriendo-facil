@@ -235,12 +235,6 @@ class Arriendo_Facil_Guest_Onboarding_Controller {
 			wp_send_json_error( array( 'message' => __( 'Cedula invalida. Debe tener exactamente 10 digitos.', 'arriendo-facil' ) ), 400 );
 		}
 
-		// Verifica el digito verificador real, no solo el formato, para evitar
-		// que se registre una identificacion inventada o mal transcrita.
-		if ( ! Arriendo_Facil_Identity_Validator::validate_cedula( $id_number ) ) {
-			wp_send_json_error( array( 'message' => __( 'El numero de cedula no es valido (digito verificador incorrecto). Verificalo e intenta nuevamente.', 'arriendo-facil' ) ), 400 );
-		}
-
 		if ( 1 !== preg_match( '/^\d{4}-\d{2}-\d{2}$/', (string) $rental_start_date ) ) {
 			wp_send_json_error( array( 'message' => __( 'La fecha de inicio debe tener formato YYYY-MM-DD.', 'arriendo-facil' ) ), 400 );
 		}

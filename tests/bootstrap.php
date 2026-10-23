@@ -223,6 +223,12 @@ if ( ! function_exists( 'update_option' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wp_delete_attachment' ) ) {
+	function wp_delete_attachment( $id, $force = false ) {
+		return true;
+	}
+}
+
 if ( ! function_exists( 'wp_mkdir_p' ) ) {
 	function wp_mkdir_p( $dir ) {
 		return is_dir( $dir ) || mkdir( $dir, 0755, true );

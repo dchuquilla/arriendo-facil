@@ -33,7 +33,7 @@ class SRIPhase4Test extends TestCase {
 	 */
 	private function make_test_cert_pem(): array {
 		$key = openssl_pkey_new( array( 'private_key_bits' => 1024, 'private_key_type' => OPENSSL_KEYTYPE_RSA ) );
-		$csr  = openssl_csr_new( array( 'CN' => 'Test SRI', 'C' => 'EC' ), $key, array( 'digest_alg' => 'sha256' ) );
+		$csr  = openssl_csr_new( array( 'CN' => 'Test SRI 0912345678001', 'C' => 'EC' ), $key, array( 'digest_alg' => 'sha256' ) );
 		$cert = openssl_csr_sign( $csr, null, $key, 1, array( 'digest_alg' => 'sha256' ), 1 );
 		$cert_pem = '';
 		openssl_x509_export( $cert, $cert_pem );

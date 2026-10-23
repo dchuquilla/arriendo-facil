@@ -157,9 +157,10 @@ class Arriendo_Facil_Contract_Generator {
 		);
 		$has_template   = ! empty( $owner_template['attachment_id'] );
 		$payload        = $this->build_payload( $lease, $owner_template );
+		$use_base       = ! $has_template && class_exists( 'Arriendo_Facil_Contract_Storage' ) && Arriendo_Facil_Contract_Storage::has_base_contract();
 
 		$document_url = '';
-		if ( $has_template ) {
+		if ( $has_template || $use_base ) {
 			$document_url = $this->create_filled_contract_from_owner_template( $lease_id, $owner_template, $payload );
 			if ( '' === $document_url && ! empty( $owner_template['url'] ) ) {
 				// Unfilled template is still better than no document for the operator to edit.
@@ -179,7 +180,7 @@ class Arriendo_Facil_Contract_Generator {
 
 		$result['generated']              = '' !== $document_url;
 		$result['document_url']           = $document_url;
-		$result['template_used']          = $has_template;
+		$result['template_used']          = $has_template || $use_base;
 		$result['template_attachment_id'] = $has_template ? (int) $owner_template['attachment_id'] : 0;
 
 		return $result;
@@ -382,13 +383,24 @@ class Arriendo_Facil_Contract_Generator {
 		$template_ext   = strtolower( (string) pathinfo( (string) $template_path, PATHINFO_EXTENSION ) );
 		$tmp_downloaded  = false;
 
+		// No owner template: use the base contract bundled with the plugin.
+		if ( $lease_id && ! $attachment_id && class_exists( 'Arriendo_Facil_Contract_Storage' ) ) {
+			$base_path = Arriendo_Facil_Contract_Storage::get_base_contract_path();
+			if ( $base_path ) {
+				$template_path = $base_path;
+				$template_ext  = 'docx';
+				$template_mime = '';
+				$attachment_id = -1;
+			}
+		}
+
 		if ( ! $lease_id || ! $attachment_id ) {
 			error_log( 'Arriendo Facil owner-template generation skipped: missing lease_id or attachment_id.' );
 			return '';
 		}
 
 		// If local file is missing, download from R2.
-		if ( ! $template_path || ! file_exists( $template_path ) ) {
+		if ( ( ! $template_path || ! file_exists( $template_path ) ) && $attachment_id > 0 ) {
 			$template_path = Arriendo_Facil_Contract_File_Store::fetch_owner_template( $attachment_id );
 			if ( ! $template_path ) {
 				error_log( 'Arriendo Facil owner-template generation failed: template file not found locally and R2 download failed. attachment_id=' . $attachment_id );
@@ -424,11 +436,32 @@ class Arriendo_Facil_Contract_Generator {
 			return '';
 		}
 
-		$file_name = sprintf( 'lease-%d-owner-template-%s.docx', $lease_id, gmdate( 'Ymd-His' ) );
+		$name_parts = array_filter(
+			array(
+				'Contrato-Arriendo',
+				sanitize_title( (string) ( $payload['guest_name'] ?? '' ) ),
+				sanitize_title( (string) ( $payload['accommodation_title'] ?? '' ) ),
+				$lease_id,
+				gmdate( 'Ymd-His' ),
+			),
+			'strlen'
+		);
+		$file_name = sanitize_file_name( implode( '-', $name_parts ) . '.docx' );
 		$file_path = trailingslashit( $contracts_dir ) . $file_name;
 
-		// PRIMARY PATH: AI-driven direct fill (works with any template format).
 		$phpword_success = false;
+
+		// PRIMARY PATH: deterministic {{placeholder}} replacement keeping the template layout.
+		if ( class_exists( 'Arriendo_Facil_DOCX_Template_Processor' ) ) {
+			try {
+				$tpl_proc = new Arriendo_Facil_DOCX_Template_Processor();
+				if ( $tpl_proc->fill_template_with_tokens( $template_path, $file_path, $payload ) ) {
+					$phpword_success = true;
+				}
+			} catch ( \Throwable $e ) {
+				error_log( 'Arriendo Facil owner-template generation: fill_template_with_tokens exception for lease_id=' . $lease_id . ': ' . $e->getMessage() );
+			}
+		}
 
 		// Check configured processing method (markdown is primary, direct_xml is fallback).
 		$processing_method = defined( 'AF_CONTRACT_PROCESSING_METHOD' )
@@ -436,7 +469,8 @@ class Arriendo_Facil_Contract_Generator {
 			: (string) get_option( 'af_contract_processing_method', 'markdown' );
 
 		// MARKDOWN PATH: try pandoc-based flow first.
-		if ( 'markdown' === $processing_method
+		if ( ! $phpword_success
+			&& 'markdown' === $processing_method
 			&& class_exists( 'Arriendo_Facil_DOCX_Template_Processor' )
 			&& Arriendo_Facil_DOCX_Template_Processor::is_pandoc_available()
 		) {

@@ -2827,6 +2827,210 @@ class Arriendo_Facil_DOCX_Template_Processor {
 		return $md_path;
 	}
 
+	/**
+	 * Replaces {{token}} placeholders directly in the DOCX XML, keeping the
+	 * template layout, styles, headers and footers untouched.
+	 *
+	 * Tokens may be split across several runs by Word; they are rebuilt per paragraph.
+	 *
+	 * @param string $source_path Template DOCX.
+	 * @param string $output_path Destination DOCX.
+	 * @param array  $payload     Contract payload.
+	 * @return bool True when at least one token was replaced.
+	 */
+	public function fill_template_with_tokens( $source_path, $output_path, array $payload ) {
+		if ( ! class_exists( 'ZipArchive' ) || ! @copy( $source_path, $output_path ) ) {
+			return false;
+		}
+
+		$zip = new ZipArchive();
+		if ( true !== $zip->open( $output_path ) ) {
+			@unlink( $output_path );
+			return false;
+		}
+
+		$values = $this->build_token_values( $payload );
+		$count  = 0;
+
+		$parts = array( 'word/document.xml' );
+		for ( $i = 0; $i < $zip->numFiles; $i++ ) {
+			$name = (string) $zip->getNameIndex( $i );
+			if ( preg_match( '#^word/(header|footer)\d*\.xml$#', $name ) ) {
+				$parts[] = $name;
+			}
+		}
+
+		foreach ( $parts as $part ) {
+			$xml = $zip->getFromName( $part );
+			if ( false === $xml || false === strpos( (string) $xml, '{' ) ) {
+				continue;
+			}
+			$replaced = 0;
+			$new_xml  = preg_replace_callback(
+				'#<w:p[ >].*?</w:p>#s',
+				function ( $m ) use ( $values, &$replaced ) {
+					return $this->replace_tokens_in_paragraph( $m[0], $values, $replaced );
+				},
+				$xml
+			);
+			if ( null !== $new_xml && $replaced > 0 ) {
+				$zip->addFromString( $part, $new_xml );
+				$count += $replaced;
+			}
+		}
+
+		if ( $count > 0 ) {
+			$this->strip_docx_protection( $zip );
+		}
+
+		$closed = $zip->close();
+		if ( ! $closed || 0 === $count ) {
+			@unlink( $output_path );
+			return false;
+		}
+
+		return true;
+	}
+
+	private function replace_tokens_in_paragraph( $p_xml, array $values, &$replaced ) {
+		if ( ! preg_match_all( '#<w:t(?:\s[^>]*)?>([^<]*)</w:t>#', $p_xml, $nodes, PREG_OFFSET_CAPTURE | PREG_SET_ORDER ) ) {
+			return $p_xml;
+		}
+
+		$chars = array();
+		foreach ( $nodes as $idx => $node ) {
+			$text = html_entity_decode( $node[1][0], ENT_QUOTES | ENT_XML1, 'UTF-8' );
+			foreach ( preg_split( '//u', $text, -1, PREG_SPLIT_NO_EMPTY ) as $ch ) {
+				$chars[] = array( $ch, $idx );
+			}
+		}
+
+		$flat = implode( '', array_column( $chars, 0 ) );
+		if ( false === strpos( $flat, '{{' ) || ! preg_match_all( '/\{\{([^{}]*)\}\}?/u', $flat, $tokens, PREG_OFFSET_CAPTURE | PREG_SET_ORDER ) ) {
+			return $p_xml;
+		}
+
+		$out = array();
+		foreach ( $nodes as $idx => $node ) {
+			$out[ $idx ] = '';
+		}
+
+		$token_at = array();
+		foreach ( $tokens as $token ) {
+			$start = mb_strlen( substr( $flat, 0, $token[0][1] ), 'UTF-8' );
+			$len   = mb_strlen( $token[0][0], 'UTF-8' );
+			$key   = $this->normalize_token_key( $token[1][0] );
+			if ( ! array_key_exists( $key, $values ) ) {
+				continue;
+			}
+			$token_at[ $start ] = array( $len, $values[ $key ] );
+			$replaced++;
+		}
+
+		$total = count( $chars );
+		for ( $pos = 0; $pos < $total; $pos++ ) {
+			if ( isset( $token_at[ $pos ] ) ) {
+				list( $len, $value ) = $token_at[ $pos ];
+				$out[ $chars[ $pos ][1] ] .= $value;
+				$pos                      += $len - 1;
+				continue;
+			}
+			$out[ $chars[ $pos ][1] ] .= $chars[ $pos ][0];
+		}
+
+		for ( $idx = count( $nodes ) - 1; $idx >= 0; $idx-- ) {
+			$full = $nodes[ $idx ][0][0];
+			$off  = $nodes[ $idx ][0][1];
+			$new  = '<w:t xml:space="preserve">' . htmlspecialchars( $out[ $idx ], ENT_XML1 | ENT_QUOTES, 'UTF-8' ) . '</w:t>';
+			$p_xml = substr_replace( $p_xml, $new, $off, strlen( $full ) );
+		}
+
+		return $p_xml;
+	}
+
+	private function normalize_token_key( $key ) {
+		$key = strtolower( remove_accents( (string) $key ) );
+		return preg_replace( '/[^a-z0-9]/', '', $key );
+	}
+
+	/**
+	 * Values for every placeholder of the contract template, keyed by normalized name.
+	 *
+	 * @param array $payload Contract payload.
+	 * @return array<string,string>
+	 */
+	private function build_token_values( array $payload ) {
+		$blank  = '______________';
+		$stored = isset( $payload['contract_placeholders'] ) && is_array( $payload['contract_placeholders'] ) ? $payload['contract_placeholders'] : array();
+		$rent   = isset( $payload['monthly_rent'] ) ? (float) $payload['monthly_rent'] : 0.0;
+		$deposit = isset( $payload['deposit_amount'] ) ? (float) $payload['deposit_amount'] : 0.0;
+		$months = array( 1 => 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre' );
+
+		$fmt_date = function ( $date ) use ( $months ) {
+			if ( preg_match( '/^(\d{4})-(\d{2})-(\d{2})/', (string) $date, $d ) ) {
+				return (int) $d[3] . ' de ' . $months[ (int) $d[2] ] . ' de ' . $d[1];
+			}
+			return (string) $date;
+		};
+
+		$base = array(
+			'nombrespropietario'    => $this->val( $payload, 'owner_name' ),
+			'cedulapropietario'     => $this->val( $payload, 'owner_id_number' ),
+			'nombresinquilino'      => $this->val( $payload, 'guest_name' ),
+			'cedulainquilino'       => $this->val( $payload, 'guest_id_number' ),
+			'direccioninmueble'     => $this->val( $payload, 'accommodation_address' ),
+			'tipoinmueble'          => $this->val( $payload, 'accommodation_property_type' ),
+			'nhabitacion'           => $this->val( $payload, 'accommodation_bedrooms' ),
+			'nbanos'                => $this->val( $payload, 'accommodation_bathrooms' ),
+			'dimensionesinmueble'   => $this->val( $payload, 'accommodation_square_meters' ),
+			'canonmensual'          => $rent > 0 ? number_format( $rent, 2, '.', '' ) : '',
+			'canonletra'            => $rent > 0 ? $this->number_to_spanish_words( $rent ) : '',
+			'montonumero'           => $deposit > 0 ? number_format( $deposit, 2, '.', '' ) : '',
+			'montoletra'            => $deposit > 0 ? $this->number_to_spanish_words( $deposit ) : '',
+			'fechaincio'            => $fmt_date( $this->val( $payload, 'start_date' ) ),
+			'fechafin'              => $fmt_date( $this->val( $payload, 'end_date' ) ),
+			'diasnotificacion'      => '30',
+		);
+
+		$values = array();
+		foreach ( $base as $key => $value ) {
+			$values[ $key ] = (string) $value;
+		}
+
+		foreach ( $stored as $key => $value ) {
+			$norm  = $this->normalize_token_key( $key );
+			$value = trim( (string) $value );
+			if ( '' === $value ) {
+				continue;
+			}
+			if ( in_array( $norm, array( 'fechaincio', 'fechafin', 'fechapagogarantia1', 'fechapagogarantia2' ), true ) ) {
+				$value = $fmt_date( $value );
+			} elseif ( 'mes' === $norm && ctype_digit( $value ) && (int) $value >= 1 && (int) $value <= 12 ) {
+				$value = $months[ (int) $value ];
+			} elseif ( in_array( $norm, array( 'canonletra', 'montoletra' ), true ) ) {
+				$value = strtoupper( $value );
+			}
+			$values[ $norm ] = $value;
+		}
+
+		$values['fechainicio'] = $values['fechaincio'];
+
+		foreach ( $values as $key => $value ) {
+			if ( '' === trim( $value ) ) {
+				$values[ $key ] = $blank;
+			}
+		}
+
+		// Any other placeholder of the schema that has no data stays as a blank line.
+		foreach ( array( 'dianumero', 'mes', 'ano', 'nacionalidadinquilino', 'estadomobiliario', 'nbsocial', 'parqueadero', 'plazocontrato', 'identificacion', 'numerocuenta', 'nombrebanco', 'nombretitular', 'fechapagogarantia1', 'fechapagogarantia2' ) as $key ) {
+			if ( ! isset( $values[ $key ] ) ) {
+				$values[ $key ] = $blank;
+			}
+		}
+
+		return $values;
+	}
+
 	private function build_markdown_ai_payload( array $payload ) {
 		$months_es = array(
 			1 => 'enero', 2 => 'febrero', 3 => 'marzo', 4 => 'abril',

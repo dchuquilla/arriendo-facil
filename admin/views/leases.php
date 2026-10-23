@@ -525,9 +525,8 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 						<div class="af-form-field">
 							<label class="af-form-field__label" for="af-lease-due-day"><?php esc_html_e( 'Día Límite de Pago', 'arriendo-facil' ); ?></label>
 							<select name="payment_due_day" id="af-lease-due-day">
-								<option value=""><?php esc_html_e( 'Día 5 (predeterminado)', 'arriendo-facil' ); ?></option>
 								<?php for ( $day = 1; $day <= 28; $day++ ) : ?>
-									<option value="<?php echo esc_attr( $day ); ?>"><?php echo esc_html( sprintf( __( 'Día %d', 'arriendo-facil' ), $day ) ); ?></option>
+									<option value="<?php echo esc_attr( $day ); ?>" <?php selected( 5, $day ); ?>><?php echo esc_html( sprintf( __( 'Día %d', 'arriendo-facil' ), $day ) ); ?></option>
 								<?php endfor; ?>
 							</select>
 						</div>
@@ -1122,37 +1121,57 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 		if (closeBtn) { closeBtn.addEventListener('click', closeForm); }
 
 		/* ── Prefill agreement from what the operator already captured ─────── */
+		// Valores puestos por el autocompletado (no por el operador): se limpian al
+		// cambiar de inquilino para que nunca queden datos del anterior.
+		function setAuto(control, value) {
+			control.value = value;
+			control.dataset.leaseAuto = String(value);
+		}
+
+		function clearStaleAuto(control) {
+			if (control && control.dataset.leaseAuto !== undefined && control.value === control.dataset.leaseAuto) {
+				control.value = '';
+			}
+			if (control) { delete control.dataset.leaseAuto; }
+		}
+
 		guestSelect.addEventListener('change', function () {
 			const opt = selectedOption(this);
-			if (!opt || !opt.value) { return; }
+
+			[form.start_date, form.end_date, form.monthly_rent, form.deposit_amount, form.accommodation_id].forEach(clearStaleAuto);
+
+			if (!opt || !opt.value) {
+				applyAutofill();
+				updateLinkNote();
+				return;
+			}
 
 			const start = opt.getAttribute('data-start') || '';
 			const end = opt.getAttribute('data-end') || '';
 
-			if (start && !form.start_date.value) { form.start_date.value = start; }
-			if (end && !form.end_date.value) { form.end_date.value = end; }
+			if (start && !form.start_date.value) { setAuto(form.start_date, start); }
+			if (end && !form.end_date.value) { setAuto(form.end_date, end); }
 			if (!form.end_date.value && form.start_date.value) {
-				form.end_date.value = addMonths(form.start_date.value, 12);
-			}
-
-			const rent = parseFloat(form.monthly_rent.value || '0');
-			if (!form.deposit_amount.value && rent > 0) {
-				form.deposit_amount.value = (rent * 2).toFixed(2);
-			}
-
-			if (form.start_date.value && form.payment_due_day) {
-				const day = Number(String(form.start_date.value).split('-')[2]);
-				if (day >= 1) { form.payment_due_day.value = String(Math.min(28, day)); }
+				setAuto(form.end_date, addMonths(form.start_date.value, 12));
 			}
 
 			const linkedId = opt.getAttribute('data-accommodation');
-			if (linkedId && linkedId !== '0' && form.accommodation_id.value !== linkedId) {
-				const exists = Array.prototype.some.call(form.accommodation_id.options, function (o) { return o.value === linkedId; });
-				if (exists) {
-					form.accommodation_id.value = linkedId;
-					form.accommodation_id.dispatchEvent(new Event('change'));
-				}
+			const linkedExists = !!linkedId && linkedId !== '0' && Array.prototype.some.call(form.accommodation_id.options, function (o) { return o.value === linkedId; });
+			if (linkedExists) {
+				if (form.accommodation_id.value !== linkedId) { form.accommodation_id.value = linkedId; }
+				form.accommodation_id.dataset.leaseAuto = linkedId;
+			} else if (form.accommodation_id.value) {
+				// Sin inmueble vinculado: queda vacío para que el operador elija.
+				form.accommodation_id.value = '';
 			}
+			// Se dispara siempre: rellena (o limpia) canon y garantía según el inmueble.
+			form.accommodation_id.dispatchEvent(new Event('change'));
+
+			const rent = parseFloat(form.monthly_rent.value || '0');
+			if (!form.deposit_amount.value && rent > 0) {
+				setAuto(form.deposit_amount, (rent * 2).toFixed(2));
+			}
+
 			applyAutofill();
 			updateLinkNote();
 		});
@@ -1160,13 +1179,10 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 		form.accommodation_id.addEventListener('change', function () {
 			const opt = selectedOption(this);
 			const rent = opt ? opt.getAttribute('data-rent') : '';
-			if (rent && !form.monthly_rent.value) {
-				const parsed = parseFloat(rent);
-				if (!isNaN(parsed)) { form.monthly_rent.value = parsed.toFixed(2); }
-			}
-			if (rent && !form.deposit_amount.value) {
-				const parsed = parseFloat(rent);
-				if (parsed > 0) { form.deposit_amount.value = (parsed * 2).toFixed(2); }
+			const parsed = parseFloat(rent);
+			if (rent && !isNaN(parsed)) {
+				if (!form.monthly_rent.value) { setAuto(form.monthly_rent, parsed.toFixed(2)); }
+				if (!form.deposit_amount.value && parsed > 0) { setAuto(form.deposit_amount, (parsed * 2).toFixed(2)); }
 			}
 			applyAutofill();
 			updateLinkNote();

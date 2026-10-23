@@ -263,10 +263,20 @@ if ( $is_owner ) {
 					</td>
 				</tr>
 				<tr>
-					<th scope="row"><label for="af_guest_id_number"><?php esc_html_e( 'Cédula / RUC', 'arriendo-facil' ); ?> *</label></th>
+					<th scope="row"><label for="af_guest_id_type"><?php esc_html_e( 'Tipo de identificación', 'arriendo-facil' ); ?> *</label></th>
 					<td>
-						<input type="text" required id="af_guest_id_number" name="id_number" class="regular-text" inputmode="numeric" pattern="^[0-9]{10,13}$" maxlength="13" title="<?php esc_attr_e( 'Solo números (10 dígitos para cédula, 13 para RUC)', 'arriendo-facil' ); ?>" />
-						<p class="description"><?php esc_html_e( 'Solo números: 10 dígitos para cédula, 13 para RUC.', 'arriendo-facil' ); ?></p>
+						<select id="af_guest_id_type" name="id_type" required>
+							<option value="cedula"><?php esc_html_e( 'Cédula', 'arriendo-facil' ); ?></option>
+							<option value="ruc"><?php esc_html_e( 'RUC', 'arriendo-facil' ); ?></option>
+							<option value="pasaporte"><?php esc_html_e( 'Pasaporte', 'arriendo-facil' ); ?></option>
+						</select>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="af_guest_id_number"><?php esc_html_e( 'Número de identificación', 'arriendo-facil' ); ?> *</label></th>
+					<td>
+						<input type="text" required id="af_guest_id_number" name="id_number" class="regular-text" maxlength="13" />
+						<p class="description" id="af_guest_id_hint"><?php esc_html_e( 'Solo números: 10 dígitos para cédula.', 'arriendo-facil' ); ?></p>
 					</td>
 				</tr>
 				<tr>

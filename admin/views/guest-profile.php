@@ -458,10 +458,24 @@ if ( $can_manage ) {
 						<td><input type="text" id="af-profile-phone" name="phone" class="regular-text" inputmode="numeric" pattern="^[0-9]{1,10}$" maxlength="10" value="<?php echo esc_attr( (string) $guest->phone ); ?>" /></td>
 					</tr>
 					<tr>
-						<th scope="row"><label for="af-profile-id-number"><?php esc_html_e( 'Cédula / RUC', 'arriendo-facil' ); ?></label></th>
+						<th scope="row"><label for="af-profile-id-type"><?php esc_html_e( 'Tipo de identificación', 'arriendo-facil' ); ?></label></th>
 						<td>
-							<input type="text" id="af-profile-id-number" name="id_number" class="regular-text" inputmode="numeric" pattern="^[0-9]{10,13}$" maxlength="13" value="<?php echo esc_attr( (string) $guest->id_number ); ?>" />
-							<p class="description"><?php esc_html_e( '10 dígitos para cédula, 13 para RUC.', 'arriendo-facil' ); ?></p>
+							<?php
+							$af_current_id  = (string) $guest->id_number;
+							$af_current_typ = ctype_digit( $af_current_id ) ? ( 13 === strlen( $af_current_id ) ? 'ruc' : 'cedula' ) : 'pasaporte';
+							?>
+							<select id="af-profile-id-type" name="id_type">
+								<option value="cedula" <?php selected( $af_current_typ, 'cedula' ); ?>><?php esc_html_e( 'Cédula', 'arriendo-facil' ); ?></option>
+								<option value="ruc" <?php selected( $af_current_typ, 'ruc' ); ?>><?php esc_html_e( 'RUC', 'arriendo-facil' ); ?></option>
+								<option value="pasaporte" <?php selected( $af_current_typ, 'pasaporte' ); ?>><?php esc_html_e( 'Pasaporte', 'arriendo-facil' ); ?></option>
+							</select>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="af-profile-id-number"><?php esc_html_e( 'Número de identificación', 'arriendo-facil' ); ?></label></th>
+						<td>
+							<input type="text" id="af-profile-id-number" name="id_number" class="regular-text" maxlength="13" value="<?php echo esc_attr( $af_current_id ); ?>" />
+							<p class="description"><?php esc_html_e( '10 dígitos para cédula, 13 para RUC, 6-12 caracteres para pasaporte.', 'arriendo-facil' ); ?></p>
 						</td>
 					</tr>
 					<tr>

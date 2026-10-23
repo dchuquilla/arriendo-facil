@@ -38,6 +38,7 @@ class Arriendo_Facil_Guest_Admin_Controller {
 		$name       = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
 		$email      = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
 		$phone      = isset( $_POST['phone'] ) ? sanitize_text_field( wp_unslash( $_POST['phone'] ) ) : '';
+		$id_type    = isset( $_POST['id_type'] ) ? sanitize_key( wp_unslash( $_POST['id_type'] ) ) : '';
 		$id_number  = isset( $_POST['id_number'] ) ? sanitize_text_field( wp_unslash( $_POST['id_number'] ) ) : '';
 		$accommodation_id = isset( $_POST['accommodation_id'] ) ? absint( wp_unslash( $_POST['accommodation_id'] ) ) : 0;
 		$rental_mode = isset( $_POST['rental_mode'] ) ? sanitize_key( wp_unslash( $_POST['rental_mode'] ) ) : '';
@@ -113,8 +114,9 @@ class Arriendo_Facil_Guest_Admin_Controller {
 			wp_send_json_error( array( 'message' => __( 'El telefono debe contener solo numeros, maximo 10 digitos.', 'arriendo-facil' ) ) );
 		}
 
-		if ( 1 !== preg_match( '/^[0-9]{10,13}$/', $id_number ) ) {
-			wp_send_json_error( array( 'message' => __( 'La cedula debe tener 10 digitos y el RUC 13.', 'arriendo-facil' ) ) );
+		$id_number = $this->normalize_id_number( $id_type, $id_number );
+		if ( ! $this->is_valid_id_number( $id_type, $id_number ) ) {
+			wp_send_json_error( array( 'message' => $this->id_number_error_message( $id_type ) ) );
 		}
 
 		// El operador registra lo basico y los documentos; el flujo por token se
@@ -229,6 +231,7 @@ class Arriendo_Facil_Guest_Admin_Controller {
 		$last_name  = isset( $_POST['last_name'] ) ? sanitize_text_field( wp_unslash( $_POST['last_name'] ) ) : '';
 		$email      = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
 		$phone      = isset( $_POST['phone'] ) ? sanitize_text_field( wp_unslash( $_POST['phone'] ) ) : '';
+		$id_type    = isset( $_POST['id_type'] ) ? sanitize_key( wp_unslash( $_POST['id_type'] ) ) : '';
 		$id_number  = isset( $_POST['id_number'] ) ? sanitize_text_field( wp_unslash( $_POST['id_number'] ) ) : '';
 		$nationality = isset( $_POST['nationality'] ) ? sanitize_text_field( wp_unslash( $_POST['nationality'] ) ) : '';
 		$birth_city  = isset( $_POST['birth_city'] ) ? sanitize_text_field( wp_unslash( $_POST['birth_city'] ) ) : '';
@@ -246,8 +249,11 @@ class Arriendo_Facil_Guest_Admin_Controller {
 			wp_send_json_error( array( 'message' => __( 'El telefono debe contener solo numeros, maximo 10 digitos.', 'arriendo-facil' ) ) );
 		}
 
-		if ( $id_number && 1 !== preg_match( '/^[0-9]{10,13}$/', $id_number ) ) {
-			wp_send_json_error( array( 'message' => __( 'La cedula debe tener 10 digitos y el RUC 13.', 'arriendo-facil' ) ) );
+		if ( $id_number ) {
+			$id_number = $this->normalize_id_number( $id_type, $id_number );
+			if ( ! $this->is_valid_id_number( $id_type, $id_number ) ) {
+				wp_send_json_error( array( 'message' => $this->id_number_error_message( $id_type ) ) );
+			}
 		}
 
 		$email_owner = (int) $wpdb->get_var(
@@ -463,5 +469,45 @@ class Arriendo_Facil_Guest_Admin_Controller {
 		} else {
 			wp_send_json_error( array( 'message' => __( 'AI scoring failed.', 'arriendo-facil' ) ) );
 		}
+	}
+
+	/**
+	 * Resolves the document type; falls back to the number length when absent.
+	 *
+	 * @param string $id_type   Submitted type.
+	 * @param string $id_number Raw number.
+	 * @return string cedula|ruc|pasaporte
+	 */
+	private function resolve_id_type( $id_type, $id_number ) {
+		if ( in_array( $id_type, array( 'cedula', 'ruc', 'pasaporte' ), true ) ) {
+			return $id_type;
+		}
+
+		$digits = preg_replace( '/\D/', '', (string) $id_number );
+		if ( 13 === strlen( $digits ) ) {
+			return 'ruc';
+		}
+
+		return ctype_digit( (string) $id_number ) ? 'cedula' : 'pasaporte';
+	}
+
+	private function normalize_id_number( $id_type, $id_number ) {
+		return AF_Text_Normalizer::document( $this->resolve_id_type( $id_type, $id_number ), (string) $id_number );
+	}
+
+	private function is_valid_id_number( $id_type, $id_number ) {
+		return Arriendo_Facil_Identity_Validator::validate_format( $this->resolve_id_type( $id_type, $id_number ), $id_number );
+	}
+
+	private function id_number_error_message( $id_type ) {
+		if ( 'pasaporte' === $id_type ) {
+			return __( 'El pasaporte debe tener entre 6 y 12 caracteres alfanumericos.', 'arriendo-facil' );
+		}
+
+		if ( 'ruc' === $id_type ) {
+			return __( 'El RUC debe tener 13 digitos.', 'arriendo-facil' );
+		}
+
+		return __( 'La cedula debe tener 10 digitos.', 'arriendo-facil' );
 	}
 }

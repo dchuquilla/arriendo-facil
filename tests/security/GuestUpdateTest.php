@@ -202,6 +202,7 @@ namespace {
 	}
 
 	require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-tenancy.php';
+	require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-text-normalizer.php';
 	require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-identity-validator.php';
 	require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-guest.php';
 	require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-guest-admin-controller.php';

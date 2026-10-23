@@ -1255,10 +1255,33 @@
 		$( '#af-guest-form-card' ).hide();
 	} );
 
-	$( document ).on( 'input', '#af_guest_phone, #af_guest_id_number', function () {
-		var maxLen = 'af_guest_id_number' === this.id ? 13 : 10;
-		var sanitized = String( $( this ).val() || '' ).replace( /\D+/g, '' ).slice( 0, maxLen );
-		$( this ).val( sanitized );
+	$( document ).on( 'input', '#af_guest_phone', function () {
+		$( this ).val( String( $( this ).val() || '' ).replace( /\D+/g, '' ).slice( 0, 10 ) );
+	} );
+
+	function afSanitizeIdNumber( $input, type ) {
+		var val = String( $input.val() || '' );
+		if ( 'pasaporte' === type ) {
+			val = val.replace( /[^A-Za-z0-9]/g, '' ).toUpperCase().slice( 0, 12 );
+		} else {
+			val = val.replace( /\D+/g, '' ).slice( 0, 'ruc' === type ? 13 : 10 );
+		}
+		$input.val( val );
+	}
+
+	$( document ).on( 'input', '#af_guest_id_number', function () {
+		afSanitizeIdNumber( $( this ), $( '#af_guest_id_type' ).val() );
+	} );
+
+	$( document ).on( 'change', '#af_guest_id_type', function () {
+		var type = $( this ).val();
+		var hints = {
+			cedula: 'Solo números: 10 dígitos para cédula.',
+			ruc: 'Solo números: 13 dígitos para RUC.',
+			pasaporte: 'Letras y números, de 6 a 12 caracteres.'
+		};
+		$( '#af_guest_id_hint' ).text( hints[ type ] || '' );
+		afSanitizeIdNumber( $( '#af_guest_id_number' ), type );
 	} );
 
 	// Vincular inmueble: muestra vigencia/canon/garantía y precarga el canon del inmueble.

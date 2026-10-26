@@ -1058,15 +1058,24 @@ $af_audit_labels = Arriendo_Facil_SRI_Audit::event_labels();
 	}
 	var pw = document.getElementById( 'af_cert_password' );
 	if ( pw ) {
+		var eye = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+		var eyeOff = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-6.5 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c6.5 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19"/><path d="M1 1l22 22"/></svg>';
+		var showTxt = '<?php echo esc_js( __( 'Mostrar', 'arriendo-facil' ) ); ?>', hideTxt = '<?php echo esc_js( __( 'Ocultar', 'arriendo-facil' ) ); ?>';
+		var wrap = document.createElement( 'div' );
+		wrap.className = 'af-pw';
+		pw.parentNode.insertBefore( wrap, pw );
+		wrap.appendChild( pw );
 		var tg = document.createElement( 'button' );
-		tg.type = 'button'; tg.className = 'af-pw-toggle'; tg.textContent = '<?php echo esc_js( __( 'Mostrar', 'arriendo-facil' ) ); ?>';
+		tg.type = 'button'; tg.className = 'af-pw-toggle';
 		tg.setAttribute( 'aria-controls', 'af_cert_password' );
-		tg.addEventListener( 'click', function () {
-			var show = pw.type === 'password';
-			pw.type = show ? 'text' : 'password';
-			tg.textContent = show ? '<?php echo esc_js( __( 'Ocultar', 'arriendo-facil' ) ); ?>' : '<?php echo esc_js( __( 'Mostrar', 'arriendo-facil' ) ); ?>';
-		} );
-		pw.insertAdjacentElement( 'afterend', tg );
+		var paint = function () {
+			var visible = pw.type === 'text';
+			tg.innerHTML = ( visible ? eyeOff : eye ) + '<span>' + ( visible ? hideTxt : showTxt ) + '</span>';
+			tg.setAttribute( 'aria-label', visible ? hideTxt : showTxt );
+		};
+		tg.addEventListener( 'click', function () { pw.type = pw.type === 'password' ? 'text' : 'password'; paint(); } );
+		wrap.appendChild( tg );
+		paint();
 	}
 	// Aviso de cambios sin guardar en cada formulario.
 	document.querySelectorAll( '.af-sx form.af-sri-form' ).forEach( function ( form ) {

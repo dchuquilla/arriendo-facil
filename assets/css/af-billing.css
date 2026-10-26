@@ -1050,3 +1050,18 @@
 .af-sx .af-cert-status__item { padding: 4px 10px; font-size: 13px; }
 .af-sx-nav__item { padding: 6px 12px 6px 10px; }
 .af-sx-nav__item strong { font-size: 13px; }
+
+/* Anchos acordes al contenido */
+.af-sx #af_ruc { width: 100%; max-width: 200px; }
+.af-sx .af-input-row input#af_ruc { flex: 0 0 200px; }
+.af-sx #af_email_notificacion { max-width: 340px; }
+.af-sx .af-pw { position: relative; width: 100%; max-width: 280px; }
+.af-sx .af-pw input { padding-right: 92px; max-width: none; }
+.af-sx .af-pw .af-pw-toggle {
+	position: absolute; top: 0; right: 0; height: 36px; padding: 0 10px;
+	display: inline-flex; align-items: center; gap: 6px;
+	text-decoration: none; color: var(--af-gray-600); font-size: 13px; font-weight: 500;
+	background: transparent; border: 0; border-radius: 0 6px 6px 0; cursor: pointer;
+}
+.af-sx .af-pw .af-pw-toggle:hover { color: var(--af-primary-500); }
+.af-sx .af-pw .af-pw-toggle:focus-visible { outline: 2px solid var(--af-primary-400); outline-offset: -2px; }

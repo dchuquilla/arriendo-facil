@@ -199,6 +199,29 @@ class Arriendo_Facil_Billing_Ledger {
 	}
 
 	/**
+	 * Makes sure af_service_schedules has the service_label column, so the
+	 * due-date queries never fail on installs whose schema upgrade has not run.
+	 *
+	 * @return void
+	 */
+	private static function ensure_service_label_column() {
+		global $wpdb;
+
+		static $checked = false;
+		if ( $checked ) {
+			return;
+		}
+		$checked = true;
+
+		$table  = self::schedules_table();
+		$exists = $wpdb->get_var( $wpdb->prepare( "SHOW COLUMNS FROM {$table} LIKE %s", 'service_label' ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		if ( ! $exists ) {
+			$wpdb->query( "ALTER TABLE {$table} ADD COLUMN service_label VARCHAR(60) DEFAULT NULL AFTER service" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		}
+	}
+
+	/**
 	 * Fetches the due-date rules for a scope.
 	 *
 	 * @param array<string,mixed> $args {
@@ -211,6 +234,7 @@ class Arriendo_Facil_Billing_Ledger {
 	 * @return array<int,object>
 	 */
 	public static function get_service_schedules( array $args = array() ) {
+		self::ensure_service_label_column();
 		global $wpdb;
 
 		$args = wp_parse_args(
@@ -292,6 +316,7 @@ class Arriendo_Facil_Billing_Ledger {
 	 * @return int|WP_Error Schedule ID.
 	 */
 	public static function upsert_service_schedule( array $data ) {
+		self::ensure_service_label_column();
 		global $wpdb;
 
 		$unit_id          = isset( $data['unit_id'] ) ? absint( $data['unit_id'] ) : 0;
@@ -803,6 +828,7 @@ class Arriendo_Facil_Billing_Ledger {
 	 * @return array<int,array<string,mixed>>
 	 */
 	public static function get_service_due_rows( $period, $accommodation_ids = null ) {
+		self::ensure_service_label_column();
 		global $wpdb;
 
 		$period = $period ? sanitize_text_field( $period ) : gmdate( 'Y-m' );

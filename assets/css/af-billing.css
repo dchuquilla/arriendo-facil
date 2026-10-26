@@ -168,10 +168,23 @@
 .af-invoice-no { font-weight: 700; }
 
 /* Fila desplegable de error */
-.af-error-details { background: var(--af-danger-50); }
-.af-error-details td {
+.af-error-details { background: var(--af-gray-50); }
+.af-error-details--error { background: var(--af-danger-50); }
+.af-error-details--error td {
 	border-left: 4px solid var(--af-danger-500);
 }
+.af-invoice-detail {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+	gap: var(--af-space-2) var(--af-space-4);
+	margin: 0 0 var(--af-space-3);
+}
+.af-invoice-detail dt {
+	font-size: var(--af-text-xs);
+	color: var(--af-gray-500);
+}
+.af-invoice-detail dd { margin: 0; font-size: var(--af-text-sm); color: var(--af-gray-900); word-break: break-all; }
+.af-invoice-detail__wide { grid-column: 1 / -1; }
 .af-error-details__msg {
 	color: var(--af-danger-700);
 	font-size: var(--af-text-xs);
@@ -539,3 +552,40 @@
 .af-billing-kpis .af-kpi { padding: 14px 16px; }
 .af-billing-kpis .af-kpi__value { font-size: 28px; }
 .af-invoice-list .af-data-table { border-radius: var(--af-radius-lg); overflow: hidden; }
+
+/* Paginación y mensaje de búsqueda sin resultados */
+.af-invoice-pager {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: var(--af-space-3);
+	margin-top: var(--af-space-3);
+	font-size: var(--af-text-sm);
+	color: var(--af-gray-600);
+}
+.af-invoice-pager[hidden],
+#af-invoice-noresults[hidden] { display: none; }
+#af-invoice-noresults { padding: var(--af-space-4); text-align: center; }
+.af-invoice-toolbar input[type="date"] { min-height: 32px; }
+
+/* Comprobación de conexión con el SRI */
+.af-sri-conn {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--af-space-3);
+	padding: var(--af-space-3) var(--af-space-4);
+	margin-bottom: var(--af-space-4);
+	background: var(--af-gray-50);
+	border: 1px solid var(--af-gray-200);
+	border-radius: var(--af-radius-md);
+}
+.af-sri-conn__main { display: flex; flex-direction: column; gap: 2px; }
+.af-sri-conn__label { font-size: var(--af-text-xs); color: var(--af-gray-500); text-transform: uppercase; letter-spacing: .04em; }
+.af-sri-conn__meta { font-size: var(--af-text-xs); color: var(--af-gray-600); }
+.af-sri-conn__status.is-ready { color: var(--af-success-700); }
+.af-sri-conn__status.is-error { color: var(--af-danger-700); }
+.af-sri-conn__status.is-pending { color: var(--af-gray-700); }
+
+#af-billing-panel-comprobantes button.is-busy { opacity: .6; pointer-events: none; }

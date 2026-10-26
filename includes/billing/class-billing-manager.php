@@ -169,7 +169,7 @@ class Arriendo_Facil_Billing_Manager {
 		if ( $owner_id <= 0 && isset( $context['lease_id'] ) ) {
 			$owner_id = $this->owner_id_for_lease( (int) $context['lease_id'] );
 		}
-		$scope = $owner_id > 0 ? $owner_id : null; // null = admin/global scope
+		$scope = max( 0, $owner_id ); // 0 = configuración global (admin), nunca la del usuario en sesión
 
 		$config = Arriendo_Facil_SRI_Config::get( $scope );
 		$pems   = Arriendo_Facil_SRI_Config::get_cert_pems( $scope );

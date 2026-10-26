@@ -86,6 +86,7 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ota-webhook-handler.php
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-ota-notifications.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'admin/class-ota-ajax-handlers.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-sri-config.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-sri-audit.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-sri-clave-acceso.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-sri-xml-factura.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/billing/class-sri-signer.php';

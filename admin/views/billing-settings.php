@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-if ( ! current_user_can( 'af_view_billing' ) && ! current_user_can( 'manage_options' ) ) {
+if ( ! current_user_can( 'manage_options' ) && ( ! current_user_can( 'af_view_billing' ) || ! ( class_exists( 'Arriendo_Facil_Accommodation' ) && Arriendo_Facil_Accommodation::user_is_owner() ) ) ) {
 	wp_die( esc_html__( 'No tienes permisos suficientes para acceder a esta página.', 'arriendo-facil' ) );
 }
 

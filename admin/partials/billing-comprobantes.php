@@ -23,7 +23,7 @@ if ( $is_owner_view ) {
 		$invoices = array();
 	} else {
 		$owner_ids_sql = implode( ',', array_map( 'intval', $owner_acc_ids ) );
-		$owner_where   = " AND l.accommodation_id IN ($owner_ids_sql)";
+		$owner_where   = " AND COALESCE(l.accommodation_id, cr.accommodation_id) IN ($owner_ids_sql)";
 	}
 }
 
@@ -36,7 +36,8 @@ $base_invoice_query = function ( string $extra_where = '' ) use ( $wpdb, $owner_
 		        g.id_number AS guest_id_number
 		 FROM {$wpdb->prefix}af_electronic_invoices ei
 		 LEFT JOIN {$wpdb->prefix}af_leases l         ON l.id   = ei.lease_id
-		 LEFT JOIN {$wpdb->posts} p                   ON p.ID   = l.accommodation_id
+		 LEFT JOIN {$wpdb->prefix}af_cleaning_requests cr ON cr.id = ei.cleaning_request_id
+		 LEFT JOIN {$wpdb->posts} p                   ON p.ID   = COALESCE(l.accommodation_id, cr.accommodation_id)
 		 LEFT JOIN {$wpdb->prefix}af_guests g         ON g.id   = l.guest_id
 		 WHERE 1=1 {$owner_where} {$extra_where}
 		 ORDER BY ei.created_at DESC
@@ -82,8 +83,15 @@ if ( isset( $_POST['af_issue_invoice_submit'] ) ) {
 		if ( ! $allowed_lease ) {
 			$last_action_message = __( 'No tienes acceso a este contrato.', 'arriendo-facil' );
 		} else {
-			$manager = new Arriendo_Facil_Billing_Manager();
-			$result  = $manager->issue_lease_invoice( $lease_id );
+			$manager   = new Arriendo_Facil_Billing_Manager();
+			$lock_key  = 'af_issue_lock_' . $lease_id;
+			if ( get_transient( $lock_key ) ) {
+				$result = new WP_Error( 'af_in_flight', __( 'Ya hay una emisión en curso para este contrato. Espera unos segundos y revisa el listado antes de reintentar.', 'arriendo-facil' ) );
+			} else {
+				set_transient( $lock_key, 1, 60 );
+				$result = $manager->issue_lease_invoice( $lease_id );
+				delete_transient( $lock_key );
+			}
 			if ( is_wp_error( $result ) ) {
 				$last_action_message = __( 'Error al emitir:', 'arriendo-facil' ) . ' ' . $result->get_error_message();
 			} else {
@@ -100,10 +108,16 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 	if ( $invoice_id > 0 ) {
 		$allowed_invoice = true;
 		if ( $is_owner_view ) {
-			$lease_id_for_invoice = (int) $wpdb->get_var( $wpdb->prepare( "SELECT lease_id FROM {$wpdb->prefix}af_electronic_invoices WHERE id = %d LIMIT 1", $invoice_id ) );
-			$acc_id_for_invoice   = $lease_id_for_invoice > 0
-				? (int) $wpdb->get_var( $wpdb->prepare( "SELECT accommodation_id FROM {$wpdb->prefix}af_leases WHERE id = %d LIMIT 1", $lease_id_for_invoice ) )
-				: 0;
+			$acc_id_for_invoice = (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COALESCE(l.accommodation_id, cr.accommodation_id)
+					 FROM {$wpdb->prefix}af_electronic_invoices ei
+					 LEFT JOIN {$wpdb->prefix}af_leases l ON l.id = ei.lease_id
+					 LEFT JOIN {$wpdb->prefix}af_cleaning_requests cr ON cr.id = ei.cleaning_request_id
+					 WHERE ei.id = %d LIMIT 1",
+					$invoice_id
+				)
+			);
 			$allowed_invoice = $acc_id_for_invoice > 0 && in_array( $acc_id_for_invoice, array_map( 'intval', (array) ( $owner_acc_ids ?? array() ) ), true );
 		}
 		if ( ! $allowed_invoice ) {
@@ -115,8 +129,15 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 				update_option( 'af_sri_retry_meta', $retry_meta, false );
 			}
 
-			$manager = new Arriendo_Facil_Billing_Manager();
-			$result  = $manager->retry_invoice( $invoice_id );
+			$manager  = new Arriendo_Facil_Billing_Manager();
+			$lock_key = 'af_retry_lock_' . $invoice_id;
+			if ( get_transient( $lock_key ) ) {
+				$result = new WP_Error( 'af_in_flight', __( 'Este comprobante ya se está reenviando. Espera unos segundos y actualiza el listado.', 'arriendo-facil' ) );
+			} else {
+				set_transient( $lock_key, 1, 60 );
+				$result = $manager->retry_invoice( $invoice_id );
+				delete_transient( $lock_key );
+			}
 			if ( is_wp_error( $result ) ) {
 				$last_action_message = __( 'Error al reintentar:', 'arriendo-facil' ) . ' ' . $result->get_error_message();
 			} else {
@@ -308,10 +329,14 @@ foreach ( $invoices as $inv_row ) {
 	</div>
 
 	<div class="af-invoice-toolbar">
-		<label for="af-invoice-filter" class="af-invoice-search"><?php esc_html_e( 'Filtrar:', 'arriendo-facil' ); ?></label>
+		<label for="af-invoice-filter" class="af-invoice-search"><?php esc_html_e( 'Buscar:', 'arriendo-facil' ); ?></label>
 		<input type="search" id="af-invoice-filter"
 			placeholder="<?php esc_attr_e( 'Cédula/RUC, nombre, inmueble, número…', 'arriendo-facil' ); ?>" />
-		<span id="af-invoice-filter-count" class="af-invoice-toolbar__meta"></span>
+		<label for="af-invoice-date-from" class="af-invoice-search"><?php esc_html_e( 'Desde', 'arriendo-facil' ); ?></label>
+		<input type="date" id="af-invoice-date-from" />
+		<label for="af-invoice-date-to" class="af-invoice-search"><?php esc_html_e( 'Hasta', 'arriendo-facil' ); ?></label>
+		<input type="date" id="af-invoice-date-to" />
+		<span id="af-invoice-filter-count" class="af-invoice-toolbar__meta" aria-live="polite"></span>
 		<span class="af-invoice-toolbar__spacer" aria-hidden="true"></span>
 		<span id="af-last-update-time" class="af-invoice-toolbar__meta" aria-live="polite">—</span>
 		<button type="button" id="af-refresh-invoices" class="af-invoice-refresh">
@@ -349,6 +374,7 @@ foreach ( $invoices as $inv_row ) {
 				?>
 				<tr data-search="<?php echo esc_attr( strtolower( $guest_label . ' ' . $guest_id . ' ' . (string) $inv->accommodation_title . ' ' . (string) $inv->numero_comprobante ) ); ?>"
 					data-grupo="<?php echo esc_attr( $grupo ); ?>"
+					data-date="<?php echo esc_attr( wp_date( 'Y-m-d', strtotime( $inv->created_at ) ) ); ?>"
 					data-invoice-id="<?php echo (int) $inv->id; ?>"
 					data-estado="<?php echo esc_attr( $inv->estado ); ?>"
 					data-total="<?php echo esc_attr( (float) $inv->total ); ?>">
@@ -376,11 +402,9 @@ foreach ( $invoices as $inv_row ) {
 							<span class="af-status-chip__dot" aria-hidden="true"></span>
 							<?php echo esc_html( $estado_info['label'] ); ?>
 						</span>
-						<?php if ( $has_mensajes ) : ?>
-							<button type="button" class="af-toggle-error-details">
-								<?php esc_html_e( 'detalles', 'arriendo-facil' ); ?>
-							</button>
-						<?php endif; ?>
+						<button type="button" class="af-toggle-error-details" aria-expanded="false">
+							<?php echo $has_mensajes ? esc_html__( 'ver error', 'arriendo-facil' ) : esc_html__( 'ver detalle', 'arriendo-facil' ); ?>
+						</button>
 					</td>
 					<td class="af-td-meta" data-label="<?php esc_attr_e( 'Fecha', 'arriendo-facil' ); ?>">
 						<?php echo esc_html( wp_date( 'd/m/Y', strtotime( $inv->created_at ) ) ); ?>
@@ -411,10 +435,25 @@ foreach ( $invoices as $inv_row ) {
 						</div>
 					</td>
 				</tr>
-				<?php if ( $has_mensajes ) : ?>
-					<tr class="af-error-details" style="display:none;">
-						<td colspan="8">
-							<p class="af-error-details__head"><?php esc_html_e( 'Detalles del error:', 'arriendo-facil' ); ?></p>
+				<tr class="af-error-details<?php echo $has_mensajes ? ' af-error-details--error' : ''; ?>" style="display:none;">
+					<td colspan="8">
+						<dl class="af-invoice-detail">
+							<div><dt><?php esc_html_e( 'Tipo', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( '01' === (string) $inv->tipo_comprobante ? __( 'Factura (01)', 'arriendo-facil' ) : (string) $inv->tipo_comprobante ); ?></dd></div>
+							<div><dt><?php esc_html_e( 'Ambiente', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( 2 === (int) $inv->ambiente ? __( 'Producción', 'arriendo-facil' ) : __( 'Pruebas', 'arriendo-facil' ) ); ?></dd></div>
+							<div><dt><?php esc_html_e( 'Periodo', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( $inv->billing_period ?: '—' ); ?></dd></div>
+							<div><dt><?php esc_html_e( 'Subtotal 0%', 'arriendo-facil' ); ?></dt><dd>$<?php echo esc_html( number_format( (float) $inv->subtotal_0, 2 ) ); ?></dd></div>
+							<div><dt><?php esc_html_e( 'Subtotal con IVA', 'arriendo-facil' ); ?></dt><dd>$<?php echo esc_html( number_format( (float) $inv->subtotal_iva, 2 ) ); ?></dd></div>
+							<div><dt><?php esc_html_e( 'IVA', 'arriendo-facil' ); ?></dt><dd>$<?php echo esc_html( number_format( (float) $inv->iva_valor, 2 ) ); ?></dd></div>
+							<div><dt><?php esc_html_e( 'Total', 'arriendo-facil' ); ?></dt><dd><strong>$<?php echo esc_html( number_format( (float) $inv->total, 2 ) ); ?></strong></dd></div>
+							<div><dt><?php esc_html_e( 'Autorización SRI', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( $inv->numero_autorizacion ?: __( 'Sin autorización', 'arriendo-facil' ) ); ?></dd></div>
+							<div><dt><?php esc_html_e( 'Fecha de autorización', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( $inv->fecha_autorizacion ? wp_date( 'd/m/Y H:i', strtotime( $inv->fecha_autorizacion ) ) : '—' ); ?></dd></div>
+							<div><dt><?php esc_html_e( 'Enviado por correo', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( $inv->emailed_at ? wp_date( 'd/m/Y H:i', strtotime( $inv->emailed_at ) ) : __( 'No', 'arriendo-facil' ) ); ?></dd></div>
+							<div><dt><?php esc_html_e( 'Creado', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( wp_date( 'd/m/Y H:i', strtotime( $inv->created_at ) ) ); ?></dd></div>
+							<div><dt><?php esc_html_e( 'Última actualización', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( wp_date( 'd/m/Y H:i', strtotime( $inv->updated_at ) ) ); ?></dd></div>
+							<div class="af-invoice-detail__wide"><dt><?php esc_html_e( 'Clave de acceso', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( $inv->clave_acceso ?: '—' ); ?></dd></div>
+						</dl>
+						<?php if ( $has_mensajes ) : ?>
+							<p class="af-error-details__head"><?php esc_html_e( 'Mensajes del SRI:', 'arriendo-facil' ); ?></p>
 							<ul style="margin:0; padding:0 0 0 20px;">
 								<?php foreach ( $mensajes_decoded as $msg ) :
 									$tipo = strtoupper( (string) ( $msg['tipo'] ?? '' ) );
@@ -429,13 +468,20 @@ foreach ( $invoices as $inv_row ) {
 									</li>
 								<?php endforeach; ?>
 							</ul>
-						</td>
-					</tr>
-				<?php endif; ?>
+							<p class="af-td-meta"><?php esc_html_e( 'Corrige el dato indicado y usa “Reintentar” en la fila; si el SRI no responde, vuelve a intentarlo más tarde.', 'arriendo-facil' ); ?></p>
+						<?php endif; ?>
+					</td>
+				</tr>
 			<?php endforeach; ?>
 		</tbody>
 	</table>
 	</div>
+	<p id="af-invoice-noresults" class="af-empty__text" role="status" hidden><?php esc_html_e( 'Ningún comprobante coincide con los filtros. Prueba con otro texto, otro rango de fechas o revisa las demás pestañas de estado.', 'arriendo-facil' ); ?></p>
+	<nav id="af-invoice-pager" class="af-invoice-pager" aria-label="<?php esc_attr_e( 'Paginación de comprobantes', 'arriendo-facil' ); ?>" hidden>
+		<button type="button" class="button" id="af-invoice-prev"><?php esc_html_e( 'Anterior', 'arriendo-facil' ); ?></button>
+		<span id="af-invoice-page-label" aria-live="polite"></span>
+		<button type="button" class="button" id="af-invoice-next"><?php esc_html_e( 'Siguiente', 'arriendo-facil' ); ?></button>
+	</nav>
 </div>
 <?php else : ?>
 	<div class="af-empty" style="margin-top: var(--af-space-5);">
@@ -789,6 +835,18 @@ foreach ( $invoices as $inv_row ) {
 		}
 	} );
 
+	// Evita envíos duplicados por doble clic en reintento / emisión.
+	document.querySelectorAll( '#af-billing-panel-comprobantes form[method="post"]' ).forEach( function ( form ) {
+		form.addEventListener( 'submit', function ( e ) {
+			if ( form.dataset.submitting ) {
+				e.preventDefault();
+				return;
+			}
+			form.dataset.submitting = '1';
+			form.querySelectorAll( 'button[type="submit"]' ).forEach( function ( b ) { b.setAttribute( 'aria-busy', 'true' ); b.classList.add( 'is-busy' ); } );
+		} );
+	} );
+
 	// ── 3. Tab navigation & filtering ──────────────────────────────────
 	var tabBtns = document.querySelectorAll( '.af-invoice-tab-btn' );
 	var filterInput = document.getElementById( 'af-invoice-filter' );
@@ -798,6 +856,15 @@ foreach ( $invoices as $inv_row ) {
 	var hubPanel = document.getElementById( 'af-billing-panel-comprobantes' );
 
 	var activeTab = 'autorizadas';
+	var PAGE_SIZE = 25;
+	var currentPage = 1;
+	var dateFrom = document.getElementById( 'af-invoice-date-from' );
+	var dateTo = document.getElementById( 'af-invoice-date-to' );
+	var noResults = document.getElementById( 'af-invoice-noresults' );
+	var pager = document.getElementById( 'af-invoice-pager' );
+	var pageLabel = document.getElementById( 'af-invoice-page-label' );
+	var prevBtn = document.getElementById( 'af-invoice-prev' );
+	var nextBtn = document.getElementById( 'af-invoice-next' );
 
 	function kpiMoney( value ) {
 		var x = Number( value || 0 ).toFixed( 2 ).split( '.' );
@@ -830,34 +897,45 @@ foreach ( $invoices as $inv_row ) {
 		} );
 	}
 
-	function filterTable() {
+	function filterTable( keepPage ) {
 		if ( ! tbody ) return;
+		if ( true !== keepPage ) currentPage = 1;
 		var q = ( filterInput && filterInput.value.toLowerCase().trim() ) || '';
-		var visibleCount = 0;
+		var from = dateFrom ? dateFrom.value : '';
+		var to = dateTo ? dateTo.value : '';
+		var matched = [];
 
-		tbody.querySelectorAll( 'tr' ).forEach( function ( row ) {
-			var grupoRow = row.dataset.grupo;
-			var isDataRow = grupoRow !== undefined;
-			var isErrorDetail = row.classList.contains( 'af-error-details' );
-
-			if ( isErrorDetail ) {
-				var prevRow = row.previousElementSibling;
-				row.style.display = prevRow && prevRow.style.display !== 'none' ? '' : 'none';
-				return;
-			}
-
-			if ( ! isDataRow ) return;
-
-			var matchGroup = !activeTab || grupoRow === activeTab;
+		tbody.querySelectorAll( 'tr[data-grupo]' ).forEach( function ( row ) {
+			var matchGroup = !activeTab || row.dataset.grupo === activeTab;
 			var matchFilter = !q || row.dataset.search.indexOf( q ) !== -1;
-			var show = matchGroup && matchFilter;
+			var d = row.dataset.date || '';
+			var matchDate = ( !from || d >= from ) && ( !to || d <= to );
+			if ( matchGroup && matchFilter && matchDate ) matched.push( row );
+		} );
 
+		var pages = Math.max( 1, Math.ceil( matched.length / PAGE_SIZE ) );
+		if ( currentPage > pages ) currentPage = pages;
+		var start = ( currentPage - 1 ) * PAGE_SIZE;
+		var visible = new Set( matched.slice( start, start + PAGE_SIZE ) );
+
+		tbody.querySelectorAll( 'tr[data-grupo]' ).forEach( function ( row ) {
+			var show = visible.has( row );
 			row.style.display = show ? '' : 'none';
-			if ( show ) visibleCount++;
+			var next = row.nextElementSibling;
+			if ( next && next.classList.contains( 'af-error-details' ) && ! show ) {
+				next.style.display = 'none';
+			}
 		} );
 
 		if ( filterCount ) {
-			filterCount.textContent = q ? '(' + visibleCount + ' <?php echo esc_js( __( 'resultados', 'arriendo-facil' ) ); ?>)' : '';
+			filterCount.textContent = matched.length + ' <?php echo esc_js( __( 'resultados', 'arriendo-facil' ) ); ?>';
+		}
+		if ( noResults ) noResults.hidden = matched.length > 0;
+		if ( pager ) {
+			pager.hidden = matched.length <= PAGE_SIZE;
+			pageLabel.textContent = '<?php echo esc_js( __( 'Página', 'arriendo-facil' ) ); ?> ' + currentPage + ' / ' + pages;
+			prevBtn.disabled = currentPage <= 1;
+			nextBtn.disabled = currentPage >= pages;
 		}
 	}
 
@@ -885,13 +963,20 @@ foreach ( $invoices as $inv_row ) {
 	if ( filterInput ) {
 		filterInput.addEventListener( 'input', filterTable );
 	}
+	[ dateFrom, dateTo ].forEach( function ( el ) {
+		if ( el ) el.addEventListener( 'change', filterTable );
+	} );
+	if ( prevBtn ) prevBtn.addEventListener( 'click', function () { currentPage--; filterTable( true ); } );
+	if ( nextBtn ) nextBtn.addEventListener( 'click', function () { currentPage++; filterTable( true ); } );
 
 	// Toggle error details
 	document.addEventListener( 'click', function ( e ) {
 		if ( e.target.classList.contains( 'af-toggle-error-details' ) ) {
 			var detailRow = e.target.closest( 'tr' ).nextElementSibling;
 			if ( detailRow && detailRow.classList.contains( 'af-error-details' ) ) {
-				detailRow.style.display = detailRow.style.display === 'none' ? '' : 'none';
+				var opening = detailRow.style.display === 'none';
+				detailRow.style.display = opening ? '' : 'none';
+				e.target.setAttribute( 'aria-expanded', opening ? 'true' : 'false' );
 			}
 		}
 	} );
@@ -970,7 +1055,7 @@ foreach ( $invoices as $inv_row ) {
 				} );
 
 				updateCounts();
-				filterTable();
+				filterTable( true );
 				lastRefresh = Date.now();
 				updateLastRefreshTime();
 			}

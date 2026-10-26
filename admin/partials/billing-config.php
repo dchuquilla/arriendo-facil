@@ -135,6 +135,7 @@ if ( isset( $_POST['af_save_sri_config'] ) ) {
 				? (string) ( $af_current_cfg['sri_soap_max_retries'] ?? 3 )
 				: (string) absint( wp_unslash( $_POST['af_sri_soap_max_retries'] ?? 3 ) );
 
+			$af_audit_before = $af_current_cfg;
 			Arriendo_Facil_SRI_Config::save(
 				array(
 					'ruc'                   => $ruc,
@@ -150,6 +151,14 @@ if ( isset( $_POST['af_save_sri_config'] ) ) {
 				),
 				$af_owner_scope_arg
 			);
+			$af_changed = array();
+			$af_new     = Arriendo_Facil_SRI_Config::get( $af_owner_scope_arg );
+			foreach ( array( 'ruc', 'razon_social', 'nombre_comercial', 'dir_establecimiento', 'dir_matriz', 'obligado_contabilidad', 'ambiente', 'email_notificacion', 'sri_soap_timeout', 'sri_soap_max_retries' ) as $af_k ) {
+				if ( (string) ( $af_audit_before[ $af_k ] ?? '' ) !== (string) ( $af_new[ $af_k ] ?? '' ) ) {
+					$af_changed[] = $af_k . ( 'ambiente' === $af_k ? ' (' . ( '2' === (string) $af_audit_before[ $af_k ] ? 'producción' : 'pruebas' ) . ' → ' . ( '2' === (string) $af_new[ $af_k ] ? 'producción' : 'pruebas' ) . ')' : '' );
+				}
+			}
+			Arriendo_Facil_SRI_Audit::log( 'config_saved', $af_changed ? implode( ', ', $af_changed ) : 'Sin cambios', $af_owner_scope_arg );
 
 			// Owners get a default emission point (001-001) auto-provisioned so they
 			// never have to touch the Puntos de Emisión UI — it's hidden for them.
@@ -211,6 +220,7 @@ if ( isset( $_POST['af_upload_certificate'] ) ) {
 	$password_for_processing = '';
 	if ( '' !== $new_password ) {
 		Arriendo_Facil_SRI_Config::save_cert_password( $new_password, $af_owner_scope_arg );
+		Arriendo_Facil_SRI_Audit::log( 'cert_password', '', $af_owner_scope_arg );
 		$password_for_processing = $new_password;
 	} elseif ( $uploaded_new_certificate ) {
 		$password_for_processing = Arriendo_Facil_SRI_Config::cert_password( $af_owner_scope_arg );
@@ -264,6 +274,7 @@ if ( isset( $_POST['af_upload_certificate'] ) ) {
 						$chain = Arriendo_Facil_SRI_Config::fetch_ca_chain( $p12_result['cert'] );
 					}
 					Arriendo_Facil_SRI_Config::save_cert_pems( $p12_result['cert'], $p12_result['pkey'], $chain, $af_owner_scope_arg );
+					Arriendo_Facil_SRI_Audit::log( 'cert_uploaded', '', $af_owner_scope_arg );
 					$chain_count = ( '' !== trim( $chain ) ) ? preg_match_all( '/-----BEGIN CERTIFICATE-----/', $chain ) : 0;
 					if ( (int) $chain_count > 0 ) {
 						$msg           = sprintf(
@@ -303,6 +314,7 @@ if ( isset( $_POST['af_test_certificate'] ) ) {
 	check_admin_referer( 'af_sri_settings_nonce' );
 
 	$test_result = Arriendo_Facil_SRI_Config::test_stored_certificate( $af_owner_scope_arg );
+	Arriendo_Facil_SRI_Audit::log( 'cert_tested', is_wp_error( $test_result ) ? 'Inválido' : 'Válido', $af_owner_scope_arg );
 	if ( is_wp_error( $test_result ) ) {
 		$af_sri_notice = array( 'type' => 'error', 'msg' => $test_result->get_error_message() );
 	} else {
@@ -375,6 +387,9 @@ if ( isset( $_POST['af_save_emission_point'] ) && ! $af_is_owner ) {
 	$desc   = sanitize_text_field( wp_unslash( $_POST['af_punto_desc'] ?? '' ) );
 	$activo = isset( $_POST['af_punto_activo'] ) ? 1 : 0;
 
+	if ( strlen( $estab ) === 3 && strlen( $punto ) === 3 ) {
+		Arriendo_Facil_SRI_Audit::log( 'emission_point_saved', $estab . '-' . $punto . ( $activo ? '' : ' (inactivo)' ), $af_owner_scope_arg );
+	}
 	if ( strlen( $estab ) !== 3 || strlen( $punto ) !== 3 ) {
 		$af_sri_notice = array( 'type' => 'error', 'msg' => __( 'Los códigos de establecimiento y punto de emisión deben tener exactamente 3 dígitos.', 'arriendo-facil' ) );
 	} else {
@@ -481,7 +496,7 @@ $af_points_ready     = ! empty( $emission_points );
 		</div>
 		<div class="af-sri-status-card <?php echo $af_cert_ready ? 'is-ready' : 'is-pending'; ?>">
 			<span class="af-sri-status-card__label"><?php esc_html_e( 'Certificado', 'arriendo-facil' ); ?></span>
-			<strong class="af-sri-status-card__value"><?php echo esc_html( $af_cert_ready ? __( 'Listo', 'arriendo-facil' ) : __( 'Pendiente', 'arriendo-facil' ) ); ?></strong>
+			<strong class="af-sri-status-card__value"><?php echo esc_html( $af_cert_ready ? __( 'Cargado', 'arriendo-facil' ) : __( 'Pendiente', 'arriendo-facil' ) ); ?></strong>
 			<span class="af-sri-status-card__hint"><?php esc_html_e( 'P12/PFX, contraseña y cadena CA.', 'arriendo-facil' ); ?></span>
 		</div>
 		<?php if ( ! $af_is_owner ) : ?>
@@ -494,6 +509,71 @@ $af_points_ready     = ! empty( $emission_points );
 	</div>
 </div>
 
+<?php
+$af_last_check = get_option( 'af_sri_last_check_' . get_current_user_id(), array() );
+$af_has_check  = is_array( $af_last_check ) && ! empty( $af_last_check['time'] );
+$af_check_cls  = ! $af_has_check ? 'is-pending' : ( ! empty( $af_last_check['ok'] ) ? 'is-ready' : 'is-error' );
+$af_check_txt  = ! $af_has_check ? __( 'Sin comprobar', 'arriendo-facil' ) : ( ! empty( $af_last_check['ok'] ) ? __( 'Servicios del SRI disponibles', 'arriendo-facil' ) : __( 'No se pudo conectar con el SRI', 'arriendo-facil' ) );
+?>
+<div class="af-sri-conn" id="af-sri-conexion">
+	<div class="af-sri-conn__main">
+		<span class="af-sri-conn__label"><?php esc_html_e( 'Conexión con el SRI', 'arriendo-facil' ); ?></span>
+		<strong id="af-sri-conn-status" class="af-sri-conn__status <?php echo esc_attr( $af_check_cls ); ?>"><?php echo esc_html( $af_check_txt ); ?></strong>
+		<small id="af-sri-conn-meta" class="af-sri-conn__meta" aria-live="polite">
+			<?php
+			echo esc_html(
+				$af_has_check
+					? sprintf(
+						/* translators: 1: environment, 2: date/time */
+						__( 'Ambiente %1$s · comprobado el %2$s', 'arriendo-facil' ),
+						'2' === (string) $af_last_check['ambiente'] ? __( 'producción', 'arriendo-facil' ) : __( 'pruebas', 'arriendo-facil' ),
+						wp_date( 'd/m/Y H:i', strtotime( (string) $af_last_check['time'] ) )
+					)
+					: __( 'Aún no se ha realizado ninguna comprobación.', 'arriendo-facil' )
+			);
+			?>
+		</small>
+	</div>
+	<button type="button" id="af-sri-conn-btn" class="button af-btn af-btn--ghost"><?php esc_html_e( 'Comprobar conexión', 'arriendo-facil' ); ?></button>
+</div>
+<script>
+(function () {
+	'use strict';
+	var btn = document.getElementById( 'af-sri-conn-btn' );
+	if ( ! btn ) { return; }
+	var status = document.getElementById( 'af-sri-conn-status' );
+	var meta = document.getElementById( 'af-sri-conn-meta' );
+	btn.addEventListener( 'click', function () {
+		if ( btn.disabled ) { return; }
+		btn.disabled = true;
+		status.className = 'af-sri-conn__status is-pending';
+		status.textContent = '<?php echo esc_js( __( 'Comprobando…', 'arriendo-facil' ) ); ?>';
+		var fd = new FormData();
+		fd.append( 'action', 'af_sri_check_connection' );
+		fd.append( 'nonce', '<?php echo esc_js( wp_create_nonce( 'af_billing_nonce' ) ); ?>' );
+		fetch( '<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>', { method: 'POST', body: fd, credentials: 'same-origin' } )
+			.then( function ( r ) { return r.json(); } )
+			.then( function ( resp ) {
+				if ( ! resp.success ) { throw new Error( 'denied' ); }
+				var d = resp.data;
+				status.className = 'af-sri-conn__status ' + ( d.ok ? 'is-ready' : 'is-error' );
+				status.textContent = d.ok ? '<?php echo esc_js( __( 'Servicios del SRI disponibles', 'arriendo-facil' ) ); ?>' : '<?php echo esc_js( __( 'No se pudo conectar con el SRI', 'arriendo-facil' ) ); ?>';
+				var parts = [];
+				Object.keys( d.services ).forEach( function ( k ) {
+					parts.push( k + ': ' + ( d.services[ k ].ok ? 'OK' : ( d.services[ k ].code ? 'HTTP ' + d.services[ k ].code : '<?php echo esc_js( __( 'sin respuesta', 'arriendo-facil' ) ); ?>' ) ) );
+				} );
+				meta.textContent = ( d.ambiente === '2' ? '<?php echo esc_js( __( 'Producción', 'arriendo-facil' ) ); ?>' : '<?php echo esc_js( __( 'Pruebas', 'arriendo-facil' ) ); ?>' ) + ' · ' + d.time + ' · ' + parts.join( ' · ' ) + ( d.ok ? '' : ' — <?php echo esc_js( __( 'el SRI puede estar temporalmente fuera de servicio; reintenta en unos minutos.', 'arriendo-facil' ) ); ?>' );
+			} )
+			.catch( function () {
+				status.className = 'af-sri-conn__status is-error';
+				status.textContent = '<?php echo esc_js( __( 'No se pudo realizar la comprobación', 'arriendo-facil' ) ); ?>';
+				meta.textContent = '<?php echo esc_js( __( 'Revisa tu sesión o permisos e inténtalo de nuevo.', 'arriendo-facil' ) ); ?>';
+			} )
+			.finally( function () { btn.disabled = false; } );
+	} );
+}());
+</script>
+
 <?php if ( $cert_p12_missing ) : ?>
 	<div class="af-note af-note--warn">
 		<p><?php esc_html_e( '⚠️ El archivo .p12 ya no se encuentra en el servidor (puede haberse borrado en un deploy o limpieza). La firma sigue funcionando con los PEM almacenados, pero si necesitas cambiar la contraseña o resubir el certificado, sube de nuevo el archivo .p12.', 'arriendo-facil' ); ?></p>
@@ -503,24 +583,6 @@ $af_points_ready     = ! empty( $emission_points );
 	<div class="af-note af-note--<?php echo esc_attr( 'success' === $af_sri_notice['type'] ? 'ok' : ( 'error' === $af_sri_notice['type'] ? 'error' : 'warn' ) ); ?>" role="status">
 		<p><?php echo esc_html( $af_sri_notice['msg'] ); ?></p>
 	</div>
-	<?php if ( ! empty( $af_sri_notice['console_log'] ) ) : ?>
-	<script>
-	(function() {
-		const payload = {
-			code:    <?php echo wp_json_encode( $af_sri_notice['error_code'] ); ?>,
-			message: <?php echo wp_json_encode( $af_sri_notice['msg'] ); ?>,
-			data:    <?php echo wp_json_encode( $af_sri_notice['error_data'] ); ?>
-		};
-
-		console.error( '[AF SRI] rebuild_chain error', payload );
-		console.error( '[AF SRI] rebuild_chain error JSON', JSON.stringify( payload, null, 2 ) );
-
-		if ( payload.data && Array.isArray( payload.data.attempts ) && payload.data.attempts.length ) {
-			console.table( payload.data.attempts );
-		}
-	})();
-	</script>
-	<?php endif; ?>
 <?php endif; ?>
 
 <!-- ─── Datos del Emisor ──────────────────────────────────────────────── -->
@@ -961,3 +1023,42 @@ $af_points_ready     = ! empty( $emission_points );
 	} );
 }());
 </script>
+
+<?php
+$af_audit_rows   = Arriendo_Facil_SRI_Audit::recent( $af_owner_scope_arg, 20 );
+$af_audit_labels = Arriendo_Facil_SRI_Audit::event_labels();
+?>
+<div class="af-sri-section" id="af-sri-auditoria">
+	<div class="af-sri-section__header">
+		<div>
+			<h2><?php esc_html_e( 'Historial de cambios', 'arriendo-facil' ); ?></h2>
+			<p><?php esc_html_e( 'Últimas operaciones sobre esta configuración. No incluye contraseñas ni contenido del certificado. Solo se registran los cambios hechos desde esta versión en adelante.', 'arriendo-facil' ); ?></p>
+		</div>
+	</div>
+	<?php if ( empty( $af_audit_rows ) ) : ?>
+		<p class="af-td-meta"><?php esc_html_e( 'Aún no hay cambios registrados.', 'arriendo-facil' ); ?></p>
+	<?php else : ?>
+		<div class="af-table-scroll">
+			<table class="wp-list-table widefat striped af-data-table">
+				<thead>
+					<tr>
+						<th><?php esc_html_e( 'Fecha', 'arriendo-facil' ); ?></th>
+						<th><?php esc_html_e( 'Usuario', 'arriendo-facil' ); ?></th>
+						<th><?php esc_html_e( 'Operación', 'arriendo-facil' ); ?></th>
+						<th><?php esc_html_e( 'Detalle', 'arriendo-facil' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+					<?php foreach ( $af_audit_rows as $af_audit_row ) : ?>
+						<tr>
+							<td data-label="<?php esc_attr_e( 'Fecha', 'arriendo-facil' ); ?>"><?php echo esc_html( wp_date( 'd/m/Y H:i', strtotime( (string) $af_audit_row->created_at ) ) ); ?></td>
+							<td data-label="<?php esc_attr_e( 'Usuario', 'arriendo-facil' ); ?>"><?php echo esc_html( $af_audit_row->display_name ?: '#' . (int) $af_audit_row->actor_id ); ?></td>
+							<td data-label="<?php esc_attr_e( 'Operación', 'arriendo-facil' ); ?>"><?php echo esc_html( $af_audit_labels[ $af_audit_row->event ] ?? $af_audit_row->event ); ?></td>
+							<td data-label="<?php esc_attr_e( 'Detalle', 'arriendo-facil' ); ?>"><?php echo esc_html( $af_audit_row->detail ?: '—' ); ?></td>
+						</tr>
+					<?php endforeach; ?>
+				</tbody>
+			</table>
+		</div>
+	<?php endif; ?>
+</div>

@@ -13,7 +13,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 $billing_capability = apply_filters( 'af_billing_capability', 'af_view_billing' );
-if ( ! current_user_can( (string) $billing_capability ) && ! current_user_can( 'manage_options' ) ) {
+$billing_is_owner = class_exists( 'Arriendo_Facil_Accommodation' ) && Arriendo_Facil_Accommodation::user_is_owner();
+if ( ! current_user_can( 'manage_options' ) && ( ! current_user_can( (string) $billing_capability ) || ! $billing_is_owner ) ) {
 	wp_die( esc_html__( 'No tienes permisos suficientes para acceder a esta página.', 'arriendo-facil' ) );
 }
 
@@ -49,7 +50,21 @@ $env_label   = ( '2' === $hub_cfg['ambiente'] )
 		array(
 			'eyebrow'  => __( 'SRI Ecuador', 'arriendo-facil' ),
 			'title'    => __( 'Facturación electrónica', 'arriendo-facil' ),
-			'subtitle' => __( 'Cobra, factura y envía el comprobante al inquilino sin salir de aquí.', 'arriendo-facil' ),
+			'subtitle' => __( 'Consulta y administra los comprobantes electrónicos.', 'arriendo-facil' ),
+			'actions'  => array(
+				array(
+					'label'   => __( 'Configuración SRI', 'arriendo-facil' ),
+					'url'     => admin_url( 'admin.php?page=af-billing&tab=sri' ),
+					'variant' => 'ghost',
+					'icon'    => af_lucide( 'settings', 16 ),
+				),
+				array(
+					'label'   => __( 'Emitir factura', 'arriendo-facil' ),
+					'url'     => admin_url( 'admin.php?page=af-billing&tab=pendientes' ),
+					'variant' => 'primary',
+					'icon'    => af_lucide( 'receipt', 16 ),
+				),
+			),
 		)
 	);
 	?>
@@ -58,8 +73,8 @@ $env_label   = ( '2' === $hub_cfg['ambiente'] )
 		<div class="af-bill-status__item af-bill-status__item--<?php echo $hub_sri_ready ? 'ok' : 'warn'; ?>">
 			<span class="af-bill-status__icon" aria-hidden="true"><?php echo af_lucide( $hub_sri_ready ? 'circle-check' : 'triangle-alert', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
 			<span class="af-bill-status__text">
-				<strong><?php echo esc_html( $hub_sri_ready ? __( 'Firma electrónica conectada', 'arriendo-facil' ) : __( 'Falta conectar tu firma electrónica', 'arriendo-facil' ) ); ?></strong>
-				<small><?php echo esc_html( $hub_sri_ready ? __( 'Listo para emitir facturas', 'arriendo-facil' ) : __( 'Sin ella no puedes emitir facturas', 'arriendo-facil' ) ); ?></small>
+				<strong><?php echo esc_html( $hub_sri_ready ? __( 'Firma electrónica cargada', 'arriendo-facil' ) : __( 'Falta cargar tu firma electrónica', 'arriendo-facil' ) ); ?></strong>
+				<small><?php echo esc_html( $hub_sri_ready ? __( 'Verifica su vigencia en Configuración SRI', 'arriendo-facil' ) : __( 'Sin ella no puedes emitir facturas', 'arriendo-facil' ) ); ?></small>
 			</span>
 			<?php if ( ! $hub_sri_ready ) : ?>
 				<a class="af-bill-status__cta" href="<?php echo esc_url( admin_url( 'admin.php?page=af-billing&tab=sri' ) ); ?>"><?php esc_html_e( 'Configurar', 'arriendo-facil' ); ?></a>

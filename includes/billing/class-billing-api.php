@@ -47,6 +47,7 @@ class Arriendo_Facil_Billing_API {
 		add_action( 'wp_ajax_af_billing_lease_search', array( $this, 'ajax_billing_lease_search' ) );
 		add_action( 'wp_ajax_af_sri_log_view',         array( $this, 'ajax_sri_log_view' ) );
 		add_action( 'wp_ajax_af_get_invoices_async',   array( $this, 'ajax_get_invoices_async' ) );
+		add_action( 'wp_ajax_af_sri_check_connection', array( $this, 'ajax_sri_check_connection' ) );
 		add_action( 'wp_ajax_af_billing_pending',      array( $this, 'ajax_billing_pending' ) );
 		add_action( 'wp_ajax_af_preview_charges_invoice', array( $this, 'ajax_preview_charges_invoice' ) );
 		add_action( 'wp_ajax_af_issue_charges_invoice',   array( $this, 'ajax_issue_charges_invoice' ) );
@@ -582,7 +583,13 @@ class Arriendo_Facil_Billing_API {
 	 */
 	private function can_manage_billing(): bool {
 		$default_capability = apply_filters( 'af_billing_capability', 'af_view_billing' );
-		return current_user_can( (string) $default_capability );
+		if ( ! current_user_can( (string) $default_capability ) ) {
+			return false;
+		}
+		// Solo administradores y gestores de propiedades operan facturación;
+		// cualquier otro rol con la capacidad queda fuera (sin datos de terceros).
+		return current_user_can( 'manage_options' )
+			|| ( class_exists( 'Arriendo_Facil_Accommodation' ) && Arriendo_Facil_Accommodation::user_is_owner() );
 	}
 
 	/**
@@ -633,11 +640,27 @@ class Arriendo_Facil_Billing_API {
 		if ( current_user_can( 'manage_options' ) ) {
 			return true;
 		}
-		$invoice = $this->manager->get_invoice( $invoice_id );
-		if ( ! $invoice || empty( $invoice->lease_id ) ) {
+		if ( ! class_exists( 'Arriendo_Facil_Accommodation' ) || ! Arriendo_Facil_Accommodation::user_is_owner() ) {
 			return false;
 		}
-		return $this->current_user_owns_lease( (int) $invoice->lease_id );
+
+		// El inmueble de la factura viene del contrato o, si no hay, de la solicitud de servicio.
+		global $wpdb;
+		$accommodation_id = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COALESCE(l.accommodation_id, cr.accommodation_id)
+				 FROM {$wpdb->prefix}af_electronic_invoices ei
+				 LEFT JOIN {$wpdb->prefix}af_leases l ON l.id = ei.lease_id
+				 LEFT JOIN {$wpdb->prefix}af_cleaning_requests cr ON cr.id = ei.cleaning_request_id
+				 WHERE ei.id = %d LIMIT 1",
+				$invoice_id
+			)
+		);
+		if ( $accommodation_id <= 0 ) {
+			return false;
+		}
+		$owner_ids = Arriendo_Facil_Accommodation::get_owner_accommodation_ids( get_current_user_id() );
+		return in_array( $accommodation_id, array_map( 'intval', (array) $owner_ids ), true );
 	}
 
 	/**
@@ -685,7 +708,7 @@ class Arriendo_Facil_Billing_API {
 	public function ajax_sri_ruc_lookup(): void {
 		check_ajax_referer( 'af_sri_ruc_lookup', 'nonce' );
 
-		if ( ! current_user_can( 'manage_options' ) && ! current_user_can( 'af_view_billing' ) ) {
+		if ( ! $this->can_manage_billing() ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
@@ -854,6 +877,52 @@ class Arriendo_Facil_Billing_API {
 	}
 
 	/**
+	 * Comprueba la conectividad con los servicios SOAP del SRI (solo lectura del WSDL).
+	 * Guarda únicamente metadatos no sensibles de la última comprobación.
+	 */
+	public function ajax_sri_check_connection(): void {
+		check_ajax_referer( 'af_billing_nonce', 'nonce' );
+
+		if ( ! $this->can_manage_billing() ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$cfg      = Arriendo_Facil_SRI_Config::get( Arriendo_Facil_SRI_Config::resolve_scope() );
+		$ambiente = ( '2' === (string) $cfg['ambiente'] ) ? '2' : '1';
+		$client   = new Arriendo_Facil_SRI_Soap_Client( $ambiente, 10 );
+		$services = array(
+			'recepcion'    => $client->recepcion_url(),
+			'autorizacion' => $client->autorizacion_url(),
+		);
+
+		$results = array();
+		$all_ok  = true;
+		foreach ( $services as $name => $url ) {
+			$response = wp_remote_get( $url . '?wsdl', array( 'timeout' => 10 ) );
+			if ( is_wp_error( $response ) ) {
+				$results[ $name ] = array( 'ok' => false, 'code' => 0 );
+				$all_ok           = false;
+				continue;
+			}
+			$code             = (int) wp_remote_retrieve_response_code( $response );
+			$results[ $name ] = array( 'ok' => 200 === $code, 'code' => $code );
+			$all_ok           = $all_ok && 200 === $code;
+		}
+
+		$record = array(
+			'time'     => current_time( 'mysql' ),
+			'ambiente' => $ambiente,
+			'ok'       => $all_ok,
+			'services' => $results,
+			'user_id'  => get_current_user_id(),
+		);
+		update_option( 'af_sri_last_check_' . get_current_user_id(), $record, false );
+		Arriendo_Facil_SRI_Audit::log( 'connection_checked', $all_ok ? 'OK' : 'Falló', Arriendo_Facil_SRI_Config::resolve_scope() );
+
+		wp_send_json_success( $record );
+	}
+
+	/**
 	 * AJAX: get invoices async for live UI updates (tab counts, status changes).
 	 * Returns basic invoice data to detect state changes without full page refresh.
 	 */
@@ -875,13 +944,14 @@ class Arriendo_Facil_Billing_API {
 				return;
 			}
 			$owner_ids_sql = implode( ',', array_map( 'intval', $owner_acc_ids ) );
-			$owner_where   = " AND l.accommodation_id IN ($owner_ids_sql)";
+			$owner_where   = " AND COALESCE(l.accommodation_id, cr.accommodation_id) IN ($owner_ids_sql)";
 		}
 
 		$results = $wpdb->get_results(
 			"SELECT ei.id, ei.estado, ei.numero_comprobante
 			 FROM {$wpdb->prefix}af_electronic_invoices ei
 			 LEFT JOIN {$wpdb->prefix}af_leases l ON l.id = ei.lease_id
+			 LEFT JOIN {$wpdb->prefix}af_cleaning_requests cr ON cr.id = ei.cleaning_request_id
 			 WHERE 1=1 {$owner_where}
 			 ORDER BY ei.created_at DESC
 			 LIMIT 200"
@@ -925,7 +995,7 @@ class Arriendo_Facil_Billing_API {
 		if ( class_exists( 'Arriendo_Facil_Accommodation' ) && Arriendo_Facil_Accommodation::user_is_owner() ) {
 			return array_map( 'intval', (array) Arriendo_Facil_Accommodation::get_owner_accommodation_ids( get_current_user_id() ) );
 		}
-		return null;
+		return array();
 	}
 
 	/**

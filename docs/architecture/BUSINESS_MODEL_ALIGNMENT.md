@@ -85,13 +85,18 @@ la capa de supervisión agregada del super admin sobre todos los subadmins.
 | Pedido | Estado |
 |---|---|
 | Usuario/clave SRI + firma .p12/.pfx | ✅ `admin/views/billing-settings.php` |
-| Emisión en 1 clic | ✅ `admin/views/billing.php` |
-| Historial (emitidas/anuladas/pendientes) + filtros | ✅ tabs + búsqueda |
-| Autorización manual (criterio humano) | ✅ siempre requiere click explícito del administrador |
+| Factura a partir del **cobro registrado** (no del contrato) | ✅ pestaña "Por facturar" (`admin/partials/billing-pending.php`): cobros `paid` sin factura, agrupados por inquilino, emisión en 1 clic o por lote |
+| IVA según uso del inmueble | ✅ vivienda 0 %, comercial/oficina/local 15 % (`Billing_Manager::iva_code_for_accommodation`, filtro `af_billing_commercial_types`) |
+| Forma de pago SRI según el pago real | ✅ efectivo → 01, transferencia/depósito/cheque/otro → 20 |
+| Vínculo cobro ↔ factura | ✅ `af_charges.invoice_id`; un cobro no se factura dos veces; si el SRI rechaza (devuelta/no autorizada) el cobro vuelve a "Por facturar" |
+| Varias facturas por contrato y periodo | ✅ se eliminó `UNIQUE(lease_id, billing_period)` |
+| Consumidor final | ✅ bloqueado sobre $50 (regla SRI) |
+| Entrega al inquilino | ✅ correo con RIDE + XML al autorizarse (`emailed_at`, filtro `af_billing_email_enabled`) |
+| Historial (emitidas/en proceso/errores) + filtros | ✅ pestaña "Emitidas" |
+| Autorización manual (criterio humano) | ✅ siempre requiere clic explícito del administrador; no hay emisión automática |
+| Emisión por contrato sin cobro | ✅ conservada como "Emisión manual avanzada" (colapsada) |
 
-**Regla del proyecto (reafirmada):** este módulo NO se toca a nivel de
-lógica/AJAX/firma; solo se le aplicó responsive puramente visual en una
-sesión anterior.
+**Pendiente:** nota de crédito / anulación de facturas autorizadas (hoy se hace en el portal SRI).
 
 ## Módulo 8 — Mantenimiento e Incidencias
 

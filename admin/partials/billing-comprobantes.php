@@ -250,7 +250,11 @@ foreach ( $invoices as $inv_row ) {
 	</div>
 <?php endif; ?>
 
-<section class="af-section">
+<details class="af-section af-manual-issue">
+	<summary class="af-manual-issue__summary">
+		<span><?php esc_html_e( 'Emisión manual avanzada (por contrato, sin cobro registrado)', 'arriendo-facil' ); ?></span>
+	</summary>
+	<section>
 	<header class="af-section__header">
 		<div>
 			<h2 class="af-section__title"><?php esc_html_e( 'Emisión manual de comprobante', 'arriendo-facil' ); ?></h2>
@@ -289,6 +293,7 @@ foreach ( $invoices as $inv_row ) {
 		</div>
 	</form>
 </section>
+</details>
 
 <div id="af-billing-preview-modal" class="af-modal" hidden>
 	<div class="af-modal__backdrop" data-af-close-billing-preview></div>

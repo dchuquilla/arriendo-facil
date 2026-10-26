@@ -348,6 +348,7 @@ class Arriendo_Facil_Activator {
 				amount                 DECIMAL(12,2) NOT NULL DEFAULT 0.00,
 				amount_paid            DECIMAL(12,2) NOT NULL DEFAULT 0.00,
 				due_date               DATE NOT NULL,
+				invoice_id             BIGINT(20) UNSIGNED DEFAULT NULL COMMENT 'Comprobante SRI que factura este cargo',
 				status                 VARCHAR(20) NOT NULL DEFAULT 'pending' COMMENT 'pending, partial, paid, overdue, void',
 				created_by             BIGINT(20) UNSIGNED DEFAULT NULL,
 				created_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -359,6 +360,7 @@ class Arriendo_Facil_Activator {
 				KEY guest_id (guest_id),
 				KEY charge_type (charge_type),
 				KEY period (period),
+				KEY invoice_id (invoice_id),
 				KEY status_due (status, due_date)
 			) $charset_collate;",
 
@@ -925,11 +927,12 @@ class Arriendo_Facil_Activator {
 				xml_autorizacion     LONGTEXT DEFAULT NULL,
 				ride_path            VARCHAR(500) DEFAULT NULL,
 				errores              TEXT DEFAULT NULL,
+				emailed_at           DATETIME DEFAULT NULL,
 				created_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 				updated_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 				PRIMARY KEY (id),
 				UNIQUE KEY clave_acceso (clave_acceso),
-				UNIQUE KEY uniq_lease_period (lease_id, billing_period),
+				KEY lease_period (lease_id, billing_period),
 				KEY lease_id (lease_id),
 				KEY billing_period (billing_period),
 				KEY cleaning_request_id (cleaning_request_id),
@@ -1288,6 +1291,8 @@ class Arriendo_Facil_Activator {
 				$wpdb->query( $alter_sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			}
 		}
+
+		self::maybe_upgrade_invoice_linking();
 
 		$reservations_table = $wpdb->prefix . 'af_reservations';
 		$reservation_status_exists = $wpdb->get_var(
@@ -1896,6 +1901,40 @@ class Arriendo_Facil_Activator {
 			if ( ! $exists ) {
 				$wpdb->query( $index['sql'] ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			}
+		}
+	}
+
+	/**
+	 * Links charges to the electronic invoice that bills them and allows several
+	 * invoices per lease/period (e.g. services paid after the rent).
+	 */
+	private static function maybe_upgrade_invoice_linking() {
+		global $wpdb;
+
+		$charges  = $wpdb->prefix . 'af_charges';
+		$invoices = $wpdb->prefix . 'af_electronic_invoices';
+
+		$has_column = static function ( $table, $column ) use ( $wpdb ) {
+			return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = %s', DB_NAME, $table, $column ) );
+		};
+		$has_index = static function ( $table, $index ) use ( $wpdb ) {
+			return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND INDEX_NAME = %s', DB_NAME, $table, $index ) );
+		};
+
+		if ( ! $has_column( $charges, 'invoice_id' ) ) {
+			$wpdb->query( "ALTER TABLE {$charges} ADD COLUMN invoice_id BIGINT(20) UNSIGNED DEFAULT NULL" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		}
+		if ( ! $has_index( $charges, 'invoice_id' ) ) {
+			$wpdb->query( "ALTER TABLE {$charges} ADD KEY invoice_id (invoice_id)" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		}
+		if ( ! $has_column( $invoices, 'emailed_at' ) ) {
+			$wpdb->query( "ALTER TABLE {$invoices} ADD COLUMN emailed_at DATETIME DEFAULT NULL" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		}
+		if ( $has_index( $invoices, 'uniq_lease_period' ) ) {
+			$wpdb->query( "ALTER TABLE {$invoices} DROP INDEX uniq_lease_period" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		}
+		if ( ! $has_index( $invoices, 'lease_period' ) ) {
+			$wpdb->query( "ALTER TABLE {$invoices} ADD KEY lease_period (lease_id, billing_period)" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		}
 	}
 

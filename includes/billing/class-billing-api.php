@@ -47,6 +47,9 @@ class Arriendo_Facil_Billing_API {
 		add_action( 'wp_ajax_af_billing_lease_search', array( $this, 'ajax_billing_lease_search' ) );
 		add_action( 'wp_ajax_af_sri_log_view',         array( $this, 'ajax_sri_log_view' ) );
 		add_action( 'wp_ajax_af_get_invoices_async',   array( $this, 'ajax_get_invoices_async' ) );
+		add_action( 'wp_ajax_af_billing_pending',      array( $this, 'ajax_billing_pending' ) );
+		add_action( 'wp_ajax_af_preview_charges_invoice', array( $this, 'ajax_preview_charges_invoice' ) );
+		add_action( 'wp_ajax_af_issue_charges_invoice',   array( $this, 'ajax_issue_charges_invoice' ) );
 
 		add_filter( 'cron_schedules', array( $this, 'register_retry_schedule' ) );
 		add_action( 'init', array( $this, 'maybe_schedule_retry_cron' ) );
@@ -908,5 +911,183 @@ class Arriendo_Facil_Billing_API {
 		}, (array) $results );
 
 		wp_send_json_success( array( 'invoices' => $invoices ) );
+	}
+
+	/**
+	 * Accommodation IDs the current user may bill, or null when unrestricted.
+	 *
+	 * @return int[]|null
+	 */
+	private function billing_scope_accommodation_ids(): ?array {
+		if ( current_user_can( 'manage_options' ) ) {
+			return null;
+		}
+		if ( class_exists( 'Arriendo_Facil_Accommodation' ) && Arriendo_Facil_Accommodation::user_is_owner() ) {
+			return array_map( 'intval', (array) Arriendo_Facil_Accommodation::get_owner_accommodation_ids( get_current_user_id() ) );
+		}
+		return null;
+	}
+
+	/**
+	 * Validates nonce/permission/ownership shared by the charge-invoice endpoints.
+	 *
+	 * @return array{lease_id:int,charge_ids:int[],email:string}
+	 */
+	private function read_charge_invoice_request(): array {
+		check_ajax_referer( 'af_billing_nonce', 'nonce' );
+
+		if ( ! $this->can_manage_billing() ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$lease_id = isset( $_POST['lease_id'] ) ? absint( wp_unslash( $_POST['lease_id'] ) ) : 0;
+		if ( $lease_id <= 0 || ! $this->current_user_owns_lease( $lease_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes acceso a este contrato.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$raw_ids    = isset( $_POST['charge_ids'] ) ? (array) wp_unslash( $_POST['charge_ids'] ) : array();
+		$charge_ids = array_values( array_unique( array_filter( array_map( 'absint', $raw_ids ) ) ) );
+		$email      = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
+
+		return array(
+			'lease_id'   => $lease_id,
+			'charge_ids' => $charge_ids,
+			'email'      => $email,
+		);
+	}
+
+	/**
+	 * AJAX: paid charges waiting to be invoiced, grouped by lease.
+	 */
+	public function ajax_billing_pending(): void {
+		check_ajax_referer( 'af_billing_nonce', 'nonce' );
+
+		if ( ! $this->can_manage_billing() ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$args  = array();
+		$scope = $this->billing_scope_accommodation_ids();
+		if ( null !== $scope ) {
+			$args['owner_accommodation_ids'] = $scope;
+		}
+
+		$groups = array();
+		foreach ( $this->manager->get_billable_charges( $args ) as $row ) {
+			$lease_id = (int) $row->lease_id;
+			if ( ! isset( $groups[ $lease_id ] ) ) {
+				$iva_code            = $this->manager->iva_code_for_accommodation( (int) $row->accommodation_id );
+				$groups[ $lease_id ] = array(
+					'lease_id'      => $lease_id,
+					'guest'         => trim( $row->first_name . ' ' . $row->last_name ),
+					'guest_id'      => (string) $row->id_number,
+					'email'         => (string) $row->email,
+					'accommodation' => (string) $row->accommodation_title,
+					'iva_rate'      => '4' === $iva_code ? 15 : 0,
+					'total'         => 0.0,
+					'has_rejected'  => false,
+					'charges'       => array(),
+				);
+			}
+			$rejected = (int) $row->invoice_id > 0;
+			$groups[ $lease_id ]['total']       += (float) $row->amount;
+			$groups[ $lease_id ]['has_rejected'] = $groups[ $lease_id ]['has_rejected'] || $rejected;
+			$groups[ $lease_id ]['charges'][]    = array(
+				'id'       => (int) $row->id,
+				'label'    => '' !== (string) $row->description ? (string) $row->description : (string) $row->charge_type,
+				'type'     => (string) $row->charge_type,
+				'period'   => (string) $row->period,
+				'amount'   => round( (float) $row->amount, 2 ),
+				'paid_on'  => (string) $row->paid_on,
+				'method'   => (string) $row->pay_method,
+				'rejected' => $rejected ? (string) $row->invoice_estado : '',
+			);
+		}
+
+		wp_send_json_success(
+			array(
+				'groups' => array_values( $groups ),
+				'count'  => count( $groups ),
+			)
+		);
+	}
+
+	/**
+	 * AJAX: preview the invoice for selected paid charges (no SRI call).
+	 */
+	public function ajax_preview_charges_invoice(): void {
+		$req  = $this->read_charge_invoice_request();
+		$plan = $this->manager->build_charges_invoice_plan(
+			$req['lease_id'],
+			$req['charge_ids'],
+			'' !== $req['email'] ? array( 'email' => $req['email'] ) : array()
+		);
+		if ( is_wp_error( $plan ) ) {
+			wp_send_json_error( array( 'message' => $plan->get_error_message(), 'code' => $plan->get_error_code() ), 400 );
+		}
+
+		$totals = $plan['totals'];
+		wp_send_json_success(
+			array(
+				'buyer_name'  => (string) $plan['payload']['razon_social_comprador'],
+				'buyer_id'    => (string) $plan['payload']['identificacion_comprador'],
+				'email'       => (string) $plan['email'],
+				'items'       => array_map(
+					static function ( $item ) {
+						return array(
+							'descripcion' => (string) $item['descripcion'],
+							'total'       => (float) $item['precio_total_sin_impuesto'],
+						);
+					},
+					(array) $totals['items']
+				),
+				'subtotal'    => (float) $totals['total_sin_impuestos'],
+				'iva_rate'    => (int) $plan['iva_rate'],
+				'iva'         => (float) $totals['iva_valor'],
+				'total'       => (float) $totals['importe_total'],
+				'forma_pago'  => '01' === $plan['payload']['forma_pago'] ? __( 'Efectivo', 'arriendo-facil' ) : __( 'Transferencia / sistema financiero', 'arriendo-facil' ),
+				'fecha'       => (string) $plan['payload']['fecha_emision'],
+				'warnings'    => $plan['warnings'],
+				'blocking'    => $plan['blocking'],
+			)
+		);
+	}
+
+	/**
+	 * AJAX: issue one invoice covering the selected paid charges.
+	 */
+	public function ajax_issue_charges_invoice(): void {
+		$req = $this->read_charge_invoice_request();
+
+		if ( class_exists( 'Arriendo_Facil_Rate_Limiter' ) && Arriendo_Facil_Rate_Limiter::is_rate_limited( 'issue_invoice' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Demasiadas solicitudes. Intenta más tarde.', 'arriendo-facil' ) ), 429 );
+		}
+
+		$ids = $req['charge_ids'];
+		sort( $ids );
+		$lock_key = 'af_inv_lock_' . $req['lease_id'] . '_' . substr( md5( implode( ',', $ids ) ), 0, 12 );
+		if ( get_transient( $lock_key ) ) {
+			wp_send_json_error( array( 'message' => __( 'Operación en progreso. Espere un momento antes de reintentar.', 'arriendo-facil' ), 'code' => 'request_locked' ), 429 );
+		}
+		set_transient( $lock_key, 1, 60 );
+
+		$result = $this->manager->issue_for_charges(
+			$req['lease_id'],
+			$req['charge_ids'],
+			'' !== $req['email'] ? array( 'email' => $req['email'] ) : array()
+		);
+		delete_transient( $lock_key );
+
+		if ( is_wp_error( $result ) ) {
+			$response   = array( 'message' => $result->get_error_message(), 'code' => $result->get_error_code() );
+			$error_data = $result->get_error_data();
+			if ( ! empty( $error_data['mensajes'] ) ) {
+				$response['detalle_error'] = $error_data['mensajes'];
+			}
+			wp_send_json_error( $response, 400 );
+		}
+
+		unset( $result['xml_firmado'], $result['xml_autorizacion'], $result['ride_path'] );
+		wp_send_json_success( $result );
 	}
 }

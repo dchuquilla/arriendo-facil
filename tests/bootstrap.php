@@ -235,6 +235,18 @@ if ( ! function_exists( 'wp_mkdir_p' ) ) {
 	}
 }
 
+if ( ! function_exists( 'apply_filters' ) ) {
+	function apply_filters( $hook, $value ) {
+		return $value;
+	}
+}
+
+if ( ! function_exists( 'is_email' ) ) {
+	function is_email( $value ) {
+		return false !== filter_var( (string) $value, FILTER_VALIDATE_EMAIL );
+	}
+}
+
 if ( ! function_exists( 'wp_date' ) ) {
 	function wp_date( $format, $timestamp = null ) {
 		return gmdate( $format, $timestamp ?? time() );

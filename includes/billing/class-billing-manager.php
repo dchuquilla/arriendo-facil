@@ -135,11 +135,20 @@ class Arriendo_Facil_Billing_Manager {
 		// Logging mejorado para diagnóstico
 		error_log( '=== Arriendo Facil: Emitiendo factura para lease ' . $lease_id . ' periodo ' . $period . ' ===' );
 
+		// Los cargos del ledger incluidos quedan vinculados para no reaparecer en "Por facturar".
+		$charge_ids = array();
+		foreach ( (array) ( $payload['items'] ?? array() ) as $item ) {
+			if ( ! empty( $item['codigo_auxiliar'] ) && preg_match( '/^\d+-(\d+)$/', (string) $item['codigo_auxiliar'], $m ) ) {
+				$charge_ids[] = (int) $m[1];
+			}
+		}
+
 		return $this->issue_from_payload(
 			$payload,
 			array(
 				'lease_id'       => $lease_id,
 				'billing_period' => $period,
+				'charge_ids'     => $charge_ids,
 			)
 		);
 	}
@@ -416,6 +425,8 @@ class Arriendo_Facil_Billing_Manager {
 
 		$invoice_id = (int) $invoice_id;
 
+		$this->link_charges_to_invoice( $invoice_id, (array) ( $context['charge_ids'] ?? array() ) );
+
 		// LOGGING: XML que se envía al SRI
 		// El XML completo se guarda en un archivo temporal de diagnóstico para
 		// poder validarlo en herramientas externas como:
@@ -554,6 +565,8 @@ class Arriendo_Facil_Billing_Manager {
 			)
 		);
 
+		$this->send_invoice_email( $invoice_id );
+
 		return array(
 			'invoice_id'          => $invoice_id,
 			'estado'              => 'autorizada',
@@ -565,6 +578,341 @@ class Arriendo_Facil_Billing_Manager {
 			'xml_firmado'         => $xml_signed,
 			'xml_autorizacion'    => (string) ( $autorizacion['xml_autorizacion'] ?? '' ),
 		);
+	}
+
+	/**
+	 * Invoice states where the SRI definitively refused the document, so the
+	 * charges it covered can be invoiced again with a new sequence number.
+	 */
+	const REISSUABLE_STATES = array( 'devuelta', 'no_autorizada', 'rechazada', 'anulada' );
+
+	/**
+	 * Maximum total (USD) the SRI allows for a "consumidor final" invoice.
+	 */
+	const CONSUMIDOR_FINAL_LIMIT = 50.0;
+
+	/**
+	 * Whether an accommodation is rented for commercial use (rent taxed with IVA).
+	 *
+	 * @param int $accommodation_id Accommodation post ID.
+	 * @return bool
+	 */
+	public function is_commercial_accommodation( int $accommodation_id ): bool {
+		$type = function_exists( 'get_post_meta' )
+			? strtolower( trim( (string) get_post_meta( $accommodation_id, '_af_property_type', true ) ) )
+			: '';
+		$commercial = (array) apply_filters(
+			'af_billing_commercial_types',
+			array( 'commercial', 'comercial', 'office', 'oficina', 'local', 'local_comercial', 'bodega' )
+		);
+		return '' !== $type && in_array( $type, $commercial, true );
+	}
+
+	/**
+	 * SRI IVA percentage code for a lease: 15% for commercial use, 0% for housing.
+	 *
+	 * @param int $accommodation_id Accommodation post ID.
+	 * @return string SRI codigoPorcentaje ('0' or '4').
+	 */
+	public function iva_code_for_accommodation( int $accommodation_id ): string {
+		$code = $this->is_commercial_accommodation( $accommodation_id ) ? '4' : '0';
+		return (string) apply_filters( 'af_billing_iva_code', $code, $accommodation_id );
+	}
+
+	/**
+	 * Maps a ledger payment method to the SRI "forma de pago" code.
+	 *
+	 * @param string $method Ledger method key.
+	 * @return string '01' (sin utilización del sistema financiero) or '20' (otros con sistema financiero).
+	 */
+	public static function sri_forma_pago( string $method ): string {
+		return 'efectivo' === $method ? '01' : '20';
+	}
+
+	/**
+	 * Paid charges not yet covered by a valid electronic invoice.
+	 *
+	 * @param array $args owner_accommodation_ids (int[]|null), lease_id (int), limit (int).
+	 * @return array<int,object>
+	 */
+	public function get_billable_charges( array $args = array() ): array {
+		if ( ! $this->wpdb ) {
+			return array();
+		}
+
+		$p       = $this->wpdb->prefix;
+		$failed  = "'" . implode( "','", self::REISSUABLE_STATES ) . "'";
+		$where   = "c.status = 'paid' AND c.amount > 0 AND ( c.invoice_id IS NULL OR c.invoice_id = 0 OR ei.estado IN ({$failed}) )";
+		$params  = array();
+
+		if ( ! empty( $args['lease_id'] ) ) {
+			$where   .= ' AND c.lease_id = %d';
+			$params[] = (int) $args['lease_id'];
+		}
+		if ( isset( $args['owner_accommodation_ids'] ) && is_array( $args['owner_accommodation_ids'] ) ) {
+			$ids = array_filter( array_map( 'intval', $args['owner_accommodation_ids'] ) );
+			if ( empty( $ids ) ) {
+				return array();
+			}
+			$where .= ' AND l.accommodation_id IN (' . implode( ',', $ids ) . ')';
+		}
+		$limit = max( 1, min( 500, (int) ( $args['limit'] ?? 300 ) ) );
+
+		$sql = "SELECT c.id, c.lease_id, c.charge_type, c.period, c.description, c.amount, c.invoice_id,
+		               l.accommodation_id, p.post_title AS accommodation_title,
+		               g.first_name, g.last_name, g.id_number, g.email,
+		               ei.estado AS invoice_estado, ei.numero_comprobante AS invoice_number,
+		               ( SELECT MAX(pm.payment_date) FROM {$p}af_payments pm WHERE pm.charge_id = c.id ) AS paid_on,
+		               ( SELECT pm2.method FROM {$p}af_payments pm2 WHERE pm2.charge_id = c.id ORDER BY pm2.payment_date DESC, pm2.id DESC LIMIT 1 ) AS pay_method
+		        FROM {$p}af_charges c
+		        INNER JOIN {$p}af_leases l ON l.id = c.lease_id
+		        LEFT JOIN {$this->wpdb->posts} p ON p.ID = l.accommodation_id
+		        LEFT JOIN {$p}af_guests g ON g.id = l.guest_id
+		        LEFT JOIN {$p}af_electronic_invoices ei ON ei.id = c.invoice_id
+		        WHERE {$where}
+		        ORDER BY c.lease_id ASC, c.period ASC, c.id ASC
+		        LIMIT {$limit}";
+
+		if ( ! empty( $params ) ) {
+			$sql = $this->wpdb->prepare( $sql, $params ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		}
+
+		return (array) $this->wpdb->get_results( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	}
+
+	/**
+	 * Builds the invoice that would bill the given paid charges of a lease.
+	 *
+	 * @param int   $lease_id   Lease ID.
+	 * @param int[] $charge_ids Charge IDs to invoice together.
+	 * @param array $overrides  Optional: email.
+	 * @return array|WP_Error {payload, totals, charges, warnings, billing_period, reuse_invoice_id, blocking}
+	 */
+	public function build_charges_invoice_plan( int $lease_id, array $charge_ids, array $overrides = array() ) {
+		$charge_ids = array_values( array_unique( array_filter( array_map( 'intval', $charge_ids ) ) ) );
+		if ( $lease_id <= 0 || empty( $charge_ids ) ) {
+			return new WP_Error( 'no_charges_selected', __( 'Selecciona al menos un cobro para facturar.', 'arriendo-facil' ) );
+		}
+
+		$billable = array();
+		foreach ( $this->get_billable_charges( array( 'lease_id' => $lease_id ) ) as $row ) {
+			$billable[ (int) $row->id ] = $row;
+		}
+		$selected = array();
+		foreach ( $charge_ids as $charge_id ) {
+			if ( ! isset( $billable[ $charge_id ] ) ) {
+				return new WP_Error(
+					'charge_not_billable',
+					__( 'Alguno de los cobros ya fue facturado, no está pagado o no pertenece a este contrato.', 'arriendo-facil' )
+				);
+			}
+			$selected[] = $billable[ $charge_id ];
+		}
+
+		$first       = $selected[0];
+		$labels      = class_exists( 'Arriendo_Facil_Billing_Ledger' ) ? Arriendo_Facil_Billing_Ledger::charge_types() : array();
+		$guest_name  = trim( $first->first_name . ' ' . $first->last_name );
+		$guest_id    = trim( (string) $first->id_number );
+		$accommodation = '' !== (string) $first->accommodation_title ? (string) $first->accommodation_title : 'Inmueble';
+		$warnings    = array();
+		$blocking    = '';
+		$items       = array();
+		$periods     = array();
+		$reuse_id    = 0;
+		$methods     = array();
+		$paid_dates  = array();
+		$total_base  = 0.0;
+
+		foreach ( $selected as $row ) {
+			$type   = (string) $row->charge_type;
+			$label  = (string) ( $labels[ $type ] ?? ucfirst( $type ) );
+			$detail = '' !== (string) $row->description && 'canon' !== $type ? (string) $row->description : $label;
+			$amount = round( (float) $row->amount, 2 );
+
+			$items[] = array(
+				'codigo_principal' => strtoupper( mb_substr( $type, 0, 12 ) ),
+				'codigo_auxiliar'  => sprintf( '%d-%d', $lease_id, (int) $row->id ),
+				'descripcion'      => sprintf( '%s %s - %s', $detail, (string) $row->period, $accommodation ),
+				'cantidad'         => 1,
+				'precio_unitario'  => $amount,
+				'descuento'        => 0,
+			);
+			$total_base += $amount;
+			$periods[]   = (string) $row->period;
+			$methods[]   = (string) $row->pay_method;
+			if ( ! empty( $row->paid_on ) ) {
+				$paid_dates[] = (string) $row->paid_on;
+			}
+			if ( (int) $row->invoice_id > 0 && 0 === $reuse_id ) {
+				$reuse_id = (int) $row->invoice_id;
+			}
+		}
+
+		if ( '' === $guest_name ) {
+			$guest_name = 'CONSUMIDOR FINAL';
+		}
+		if ( '' === $guest_id ) {
+			$guest_id = '9999999999999';
+			if ( $total_base > self::CONSUMIDOR_FINAL_LIMIT ) {
+				$blocking = __( 'El inquilino no tiene cédula/RUC registrado. El SRI no permite facturar a consumidor final montos mayores a $50: completa su ficha.', 'arriendo-facil' );
+			} else {
+				$warnings[] = __( 'Sin identificación del inquilino: se emitirá a consumidor final.', 'arriendo-facil' );
+			}
+		}
+
+		$email = isset( $overrides['email'] ) && '' !== (string) $overrides['email'] ? (string) $overrides['email'] : (string) $first->email;
+		if ( '' === $email || ! is_email( $email ) ) {
+			$email      = '';
+			$warnings[] = __( 'El inquilino no tiene correo: no se podrá enviar el RIDE automáticamente.', 'arriendo-facil' );
+		}
+
+		sort( $periods );
+		$period_label = (string) end( $periods );
+		$iva_code     = $this->iva_code_for_accommodation( (int) $first->accommodation_id );
+		$forma_pago   = 'efectivo' === implode( '', array_unique( $methods ) ) ? '01' : '20';
+		$info         = array();
+		if ( '' !== $email ) {
+			$info['email'] = $email;
+		}
+		if ( ! empty( $paid_dates ) ) {
+			$info['Fecha de pago'] = wp_date( 'd/m/Y', strtotime( (string) max( $paid_dates ) ) );
+		}
+
+		$payload = array(
+			'fecha_emision'            => wp_date( 'd/m/Y' ),
+			'razon_social_comprador'   => $guest_name,
+			'identificacion_comprador' => $guest_id,
+			'tipo_id_comprador'        => Arriendo_Facil_SRI_XML_Factura::infer_buyer_id_type( $guest_id ),
+			'iva_codigo_porcentaje'    => $iva_code,
+			'forma_pago'               => $forma_pago,
+			'plazo'                    => '0',
+			'unidad_tiempo'            => 'dias',
+			'items'                    => $items,
+			'info_adicional'           => $info,
+		);
+
+		$totals = Arriendo_Facil_SRI_XML_Factura::compute_totals( $items, $iva_code );
+
+		return array(
+			'payload'          => $payload,
+			'totals'           => $totals,
+			'charges'          => $selected,
+			'warnings'         => $warnings,
+			'blocking'         => $blocking,
+			'billing_period'   => $period_label,
+			'reuse_invoice_id' => $reuse_id,
+			'iva_rate'         => '4' === $iva_code ? 15 : 0,
+			'email'            => $email,
+		);
+	}
+
+	/**
+	 * Issues one invoice that bills the selected paid charges of a lease.
+	 *
+	 * @param int   $lease_id   Lease ID.
+	 * @param int[] $charge_ids Paid charge IDs.
+	 * @param array $overrides  Optional: email.
+	 * @return array|WP_Error
+	 */
+	public function issue_for_charges( int $lease_id, array $charge_ids, array $overrides = array() ) {
+		$plan = $this->build_charges_invoice_plan( $lease_id, $charge_ids, $overrides );
+		if ( is_wp_error( $plan ) ) {
+			return $plan;
+		}
+		if ( '' !== $plan['blocking'] ) {
+			return new WP_Error( 'invoice_blocked', $plan['blocking'] );
+		}
+
+		return $this->issue_from_payload(
+			$plan['payload'],
+			array(
+				'lease_id'         => $lease_id,
+				'billing_period'   => $plan['billing_period'],
+				'charge_ids'       => array_map( 'intval', wp_list_pluck( $plan['charges'], 'id' ) ),
+				'reuse_invoice_id' => $plan['reuse_invoice_id'],
+			)
+		);
+	}
+
+	/**
+	 * Marks charges as billed by an invoice.
+	 *
+	 * @param int   $invoice_id Invoice ID.
+	 * @param int[] $charge_ids Charge IDs.
+	 */
+	protected function link_charges_to_invoice( int $invoice_id, array $charge_ids ): void {
+		$charge_ids = array_filter( array_map( 'intval', $charge_ids ) );
+		if ( ! $this->wpdb || $invoice_id <= 0 || empty( $charge_ids ) ) {
+			return;
+		}
+		$this->wpdb->query(
+			$this->wpdb->prepare(
+				"UPDATE {$this->wpdb->prefix}af_charges SET invoice_id = %d WHERE id IN (" . implode( ',', $charge_ids ) . ')', // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+				$invoice_id
+			)
+		);
+	}
+
+	/**
+	 * Emails the authorized RIDE (PDF) and XML to the tenant, once per invoice.
+	 *
+	 * @param int $invoice_id Invoice ID.
+	 * @return bool True when an email was sent.
+	 */
+	public function send_invoice_email( int $invoice_id ): bool {
+		if ( ! $this->wpdb || ! function_exists( 'wp_mail' ) || ! apply_filters( 'af_billing_email_enabled', true ) ) {
+			return false;
+		}
+		$invoice = $this->get_invoice( $invoice_id );
+		if ( ! $invoice || ! empty( $invoice->emailed_at ) || ! in_array( (string) $invoice->estado, array( 'autorizada', 'autorizada_sin_ride' ), true ) ) {
+			return false;
+		}
+
+		$email = (string) $this->wpdb->get_var(
+			$this->wpdb->prepare(
+				"SELECT g.email FROM {$this->wpdb->prefix}af_leases l
+				 INNER JOIN {$this->wpdb->prefix}af_guests g ON g.id = l.guest_id
+				 WHERE l.id = %d LIMIT 1",
+				(int) $invoice->lease_id
+			)
+		);
+		if ( '' === $email || ! is_email( $email ) ) {
+			return false;
+		}
+
+		$attachments = array();
+		$tmp_xml     = '';
+		if ( ! empty( $invoice->ride_path ) && file_exists( (string) $invoice->ride_path ) ) {
+			$attachments[] = (string) $invoice->ride_path;
+		}
+		if ( ! empty( $invoice->xml_autorizacion ) ) {
+			$tmp_xml = trailingslashit( get_temp_dir() ) . 'factura-' . preg_replace( '/[^0-9A-Za-z\-]/', '', (string) $invoice->numero_comprobante ) . '.xml';
+			if ( false !== file_put_contents( $tmp_xml, (string) $invoice->xml_autorizacion ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+				$attachments[] = $tmp_xml;
+			}
+		}
+
+		$subject = sprintf(
+			/* translators: %s: invoice number */
+			__( 'Tu factura electrónica %s', 'arriendo-facil' ),
+			(string) $invoice->numero_comprobante
+		);
+		$body = sprintf(
+			/* translators: 1: invoice number, 2: total */
+			__( "Hola,\n\nAdjuntamos tu factura electrónica %1\$s por un total de \$%2\$s, autorizada por el SRI.\n\nGracias por tu pago.", 'arriendo-facil' ),
+			(string) $invoice->numero_comprobante,
+			number_format( (float) $invoice->total, 2 )
+		);
+
+		$sent = wp_mail( $email, $subject, $body, array(), $attachments );
+
+		if ( '' !== $tmp_xml && file_exists( $tmp_xml ) ) {
+			wp_delete_file( $tmp_xml );
+		}
+		if ( $sent ) {
+			$this->update_invoice_row( $invoice_id, array( 'emailed_at' => current_time( 'mysql' ) ) );
+		}
+		return (bool) $sent;
 	}
 
 	/**
@@ -761,6 +1109,8 @@ class Arriendo_Facil_Billing_Manager {
 				'errores'             => '',
 			)
 		);
+
+		$this->send_invoice_email( (int) $invoice->id );
 
 		return array(
 			'invoice_id'          => (int) $invoice->id,
@@ -1151,8 +1501,14 @@ class Arriendo_Facil_Billing_Manager {
 		// Si el intento anterior falló antes de autorizarse, reutilizamos la fila
 		// para no chocar con el UNIQUE KEY uniq_lease_period. Nunca sobrescribimos
 		// una factura ya autorizada por el SRI (obligación tributaria).
-		$existing = null;
-		if ( ! empty( $data['lease_id'] ) && ! empty( $data['billing_period'] ) ) {
+		$existing       = null;
+		$charge_scoped  = ! empty( $row['charge_ids'] );
+		if ( $charge_scoped && ! empty( $row['reuse_invoice_id'] ) ) {
+			// Emisión por cargos: solo se reutiliza la fila fallida que ya facturaba estos cargos.
+			$existing = $this->wpdb->get_row(
+				$this->wpdb->prepare( "SELECT id, estado FROM {$table} WHERE id = %d LIMIT 1", (int) $row['reuse_invoice_id'] )
+			);
+		} elseif ( ! $charge_scoped && ! empty( $data['lease_id'] ) && ! empty( $data['billing_period'] ) ) {
 			$existing = $this->wpdb->get_row(
 				$this->wpdb->prepare(
 					"SELECT id, estado FROM {$table} WHERE lease_id = %d AND billing_period = %s LIMIT 1",
@@ -1235,7 +1591,7 @@ class Arriendo_Facil_Billing_Manager {
 						)
 					);
 				}
-				if ( ! $collide && ! empty( $data['lease_id'] ) && ! empty( $data['billing_period'] ) ) {
+				if ( ! $collide && ! $charge_scoped && ! empty( $data['lease_id'] ) && ! empty( $data['billing_period'] ) ) {
 					$collide = $this->wpdb->get_row(
 						$this->wpdb->prepare(
 							"SELECT id, estado FROM {$table} WHERE lease_id = %d AND billing_period = %s LIMIT 1",

@@ -9,6 +9,7 @@
    1. Tabs del hub (CSS-only radio switcher, ids af-tab-billing-*)
    ───────────────────────────────────────────────────────────────────── */
 
+#af-tab-billing-pendientes:checked ~ .af-tabs__nav > label[for="af-tab-billing-pendientes"],
 #af-tab-billing-comprobantes:checked ~ .af-tabs__nav > label[for="af-tab-billing-comprobantes"],
 #af-tab-billing-sri:checked ~ .af-tabs__nav > label[for="af-tab-billing-sri"] {
 	background: var(--af-gray-0, #fff);
@@ -16,13 +17,15 @@
 	box-shadow: var(--af-shadow-sm);
 }
 
+#af-tab-billing-pendientes:checked ~ .af-tabs__panels > .af-tabs__panel--pendientes,
 #af-tab-billing-comprobantes:checked ~ .af-tabs__panels > .af-tabs__panel--comprobantes,
 #af-tab-billing-sri:checked ~ .af-tabs__panels > .af-tabs__panel--sri {
 	display: block;
 }
 
-.af-tabs__radio:focus-visible + .af-tabs__radio + .af-tabs__nav > label[for="af-tab-billing-comprobantes"],
-.af-tabs__radio + .af-tabs__radio:focus-visible + .af-tabs__nav > label[for="af-tab-billing-sri"] {
+#af-tab-billing-pendientes:focus-visible ~ .af-tabs__nav > label[for="af-tab-billing-pendientes"],
+#af-tab-billing-comprobantes:focus-visible ~ .af-tabs__nav > label[for="af-tab-billing-comprobantes"],
+#af-tab-billing-sri:focus-visible ~ .af-tabs__nav > label[for="af-tab-billing-sri"] {
 	box-shadow: var(--af-focus-ring);
 }
 
@@ -332,4 +335,129 @@
 @media (max-width: 600px) {
 	.af-invoice-tabs { width: 100%; }
 	.af-invoice-tab { flex: 1 1 auto; justify-content: center; padding: 9px 10px; }
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   Por facturar — cobros pagados listos para emitir
+   ───────────────────────────────────────────────────────────────────── */
+
+.af-pending-setup {
+	display: flex;
+	align-items: center;
+	gap: var(--af-space-4);
+	padding: var(--af-space-4) var(--af-space-5);
+	margin-bottom: var(--af-space-4);
+	background: var(--af-warning-50, #f5e9da);
+	border: 1px solid var(--af-warning-200, #ebd3b3);
+	border-radius: var(--af-radius-lg);
+	color: var(--af-warning-700, #7a4b00);
+}
+.af-pending-setup h3 { margin: 0 0 2px; font-size: 15px; }
+.af-pending-setup p { margin: 0; font-size: 13px; }
+.af-pending-setup .button { margin-left: auto; flex-shrink: 0; }
+
+.af-pending__bar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--af-space-3);
+	padding: var(--af-space-3) var(--af-space-4);
+	background: var(--af-gray-0, #fff);
+	border: 1px solid var(--af-gray-200);
+	border-radius: var(--af-radius-lg);
+	box-shadow: var(--af-shadow-sm);
+}
+.af-pending__summary { display: flex; align-items: baseline; gap: 8px; flex: 1 1 260px; color: var(--af-gray-600); font-size: 13px; }
+.af-pending__summary strong { font-size: 26px; line-height: 1; color: var(--af-gray-900); }
+.af-pending__search { min-width: 220px; flex: 0 1 280px; }
+.af-pending__all { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--af-gray-700); }
+.af-pending__batch-count {
+	display: inline-block;
+	min-width: 20px;
+	margin-left: 6px;
+	padding: 0 6px;
+	border-radius: 999px;
+	background: rgba(255, 255, 255, 0.25);
+	font-size: 12px;
+	line-height: 20px;
+	text-align: center;
+}
+
+.af-pending__progress { margin-top: var(--af-space-3); }
+.af-pending__progress-track { height: 8px; background: var(--af-gray-200); border-radius: 999px; overflow: hidden; }
+.af-pending__progress-fill { height: 100%; width: 0; background: var(--af-primary-600, #2f7d73); transition: width 0.25s ease; }
+.af-pending__progress p { margin: 6px 0 0; font-size: 13px; color: var(--af-gray-600); }
+
+.af-pending__results { margin-top: var(--af-space-3); padding: var(--af-space-3) var(--af-space-4); background: var(--af-gray-0, #fff); border: 1px solid var(--af-gray-200); border-radius: var(--af-radius-lg); }
+.af-pending__results p { margin: 2px 0; font-size: 13px; }
+.af-pending__results .is-ok, .af-pending-feedback.is-ok { color: var(--af-success-700, #1f6b3a); }
+.af-pending__results .is-error, .af-pending-feedback.is-error, .af-pending-notes .is-error { color: var(--af-danger-700, #b03a36); }
+
+.af-pending__list {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+	gap: var(--af-space-4);
+	margin-top: var(--af-space-4);
+}
+
+.af-pcard {
+	display: flex;
+	flex-direction: column;
+	gap: var(--af-space-3);
+	padding: var(--af-space-4);
+	background: var(--af-gray-0, #fff);
+	border: 1px solid var(--af-gray-200);
+	border-radius: var(--af-radius-lg);
+	box-shadow: var(--af-shadow-sm);
+	transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.af-pcard:hover { box-shadow: var(--af-shadow-md, 0 4px 14px rgba(0, 0, 0, 0.08)); border-color: var(--af-gray-300, #cfd6d8); }
+.af-pcard.is-rejected { border-left: 4px solid var(--af-danger-600, #b03a36); }
+.af-pcard__head { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; align-items: start; }
+.af-pcard__who { display: flex; flex-direction: column; min-width: 0; }
+.af-pcard__who strong { font-size: 15px; color: var(--af-gray-900); }
+.af-pcard__who span { font-size: 12px; color: var(--af-gray-500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.af-pcard__tags { grid-column: 2; display: flex; flex-wrap: wrap; gap: 6px; }
+
+.af-tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+.af-tag--muted { background: var(--af-gray-100); color: var(--af-gray-600); }
+.af-tag--info { background: #e3effd; color: #1f5fbf; }
+.af-tag--warn { background: var(--af-warning-50, #f5e9da); color: var(--af-warning-700, #7a4b00); }
+.af-tag--danger { background: #fbe4e3; color: #b03a36; }
+
+.af-pcard__charges { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.af-pcard__charges li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; background: var(--af-gray-50, #f7f9f9); border-radius: var(--af-radius-md); }
+.af-pcard__charges label { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.af-pcard__charge-text { display: flex; flex-direction: column; min-width: 0; }
+.af-pcard__charge-label { font-size: 13px; color: var(--af-gray-800); }
+.af-pcard__charge-text small { color: var(--af-gray-500); }
+.af-pcard__amount { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--af-gray-800); }
+.af-pcard__foot { display: flex; align-items: center; justify-content: space-between; margin-top: auto; }
+.af-pcard__total { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--af-gray-900); }
+
+/* Modal de revisión */
+.af-pending-notes { margin-bottom: var(--af-space-3); padding: 10px 12px; border-radius: var(--af-radius-md); background: var(--af-warning-50, #f5e9da); color: var(--af-warning-700, #7a4b00); font-size: 13px; }
+.af-pending-notes p { margin: 2px 0; }
+.af-pending-buyer { display: grid; grid-template-columns: 1fr 1fr; gap: 10px var(--af-space-4); margin: 0 0 var(--af-space-4); }
+.af-pending-buyer dt { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--af-gray-500); }
+.af-pending-buyer dd { margin: 2px 0 0; font-weight: 600; color: var(--af-gray-900); }
+.af-pending-items { width: 100%; border-collapse: collapse; margin-bottom: var(--af-space-4); }
+.af-pending-items th, .af-pending-items td { padding: 8px 4px; text-align: left; border-bottom: 1px solid var(--af-gray-200); font-size: 13px; }
+.af-pending-items th:last-child, .af-pending-items td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.af-pending-items tfoot td { border-bottom: 0; color: var(--af-gray-600); }
+.af-pending-items tfoot .is-total td { font-size: 16px; font-weight: 700; color: var(--af-gray-900); }
+.af-pending-email { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--af-gray-600); }
+.af-pending-email input { width: 100%; }
+.af-pending-feedback { min-height: 20px; margin: var(--af-space-3) 0; font-size: 13px; color: var(--af-gray-600); }
+.af-pending-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* Emisión manual: colapsada por defecto */
+.af-manual-issue { margin-top: var(--af-space-5); }
+.af-manual-issue__summary { cursor: pointer; font-weight: 600; color: var(--af-gray-700); padding: var(--af-space-1) 0; }
+
+@media (max-width: 640px) {
+	.af-pending__list { grid-template-columns: 1fr; }
+	.af-pending-buyer { grid-template-columns: 1fr; }
+	.af-pending-setup { flex-direction: column; align-items: flex-start; }
+	.af-pending-setup .button { margin-left: 0; }
 }

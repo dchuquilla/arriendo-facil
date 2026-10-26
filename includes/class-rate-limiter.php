@@ -39,7 +39,7 @@ class Arriendo_Facil_Rate_Limiter {
 				'login_attempt'     => array( 10, 900 ),     // 10 attempts per 15 min
 				'password_reset'    => array( 3, 3600 ),     // 3 resets per hour
 				'contact_form'      => array( 10, 3600 ),    // 10 submissions per hour
-				'issue_invoice'     => array( 5, 3600 ),     // 5 invoices per hour
+				'issue_invoice'     => array( 60, 3600 ),    // 60 invoices per hour (batch billing)
 				'download_invoice'  => array( 20, 3600 ),    // 20 downloads per hour
 				'add_visit'         => array( 30, 86400 ),   // 30 visits per day
 			)

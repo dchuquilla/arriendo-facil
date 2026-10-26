@@ -1069,3 +1069,6 @@
 /* El texto del campo no debe quedar bajo el botón Mostrar/Ocultar */
 .af-sx .af-pw input#af_cert_password { padding-right: 104px !important; box-sizing: border-box; }
 .af-sx .af-pw .af-pw-toggle { z-index: 1; padding: 0 12px; background: var(--af-gray-0, #fff); }
+
+/* El botón queda dentro del borde del campo, sin taparlo */
+.af-sx .af-pw .af-pw-toggle { top: 1px; right: 1px; height: 34px; background: transparent; border-radius: 0 5px 5px 0; }

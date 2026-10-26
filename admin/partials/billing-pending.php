@@ -18,15 +18,21 @@ $pending_nonce = wp_create_nonce( 'af_billing_nonce' );
 ?>
 
 <?php if ( ! $pending_ready ) : ?>
-	<div class="af-pending-setup">
-		<span class="af-pending-setup__icon" aria-hidden="true"><?php echo af_lucide( 'triangle-alert', 22 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-		<div>
-			<h3><?php esc_html_e( 'Antes de facturar, conecta tu firma electrónica', 'arriendo-facil' ); ?></h3>
-			<p><?php esc_html_e( 'Cada propietario factura con su propio RUC y certificado (.p12). Es una configuración de una sola vez.', 'arriendo-facil' ); ?></p>
+	<section class="af-onboard">
+		<div class="af-onboard__intro">
+			<span class="af-onboard__eyebrow"><?php esc_html_e( 'Empieza en 3 pasos', 'arriendo-facil' ); ?></span>
+			<h2><?php esc_html_e( 'Activa tu facturación electrónica', 'arriendo-facil' ); ?></h2>
+			<p><?php esc_html_e( 'Cada propietario factura con su propio RUC y firma electrónica. Se configura una sola vez y después facturar toma un clic.', 'arriendo-facil' ); ?></p>
+			<a class="button button-primary button-hero" href="<?php echo esc_url( admin_url( 'admin.php?page=af-billing&tab=sri' ) ); ?>"><?php esc_html_e( 'Configurar ahora', 'arriendo-facil' ); ?></a>
 		</div>
-		<a class="button button-primary" href="<?php echo esc_url( admin_url( 'admin.php?page=af-billing&tab=sri' ) ); ?>"><?php esc_html_e( 'Configurar ahora', 'arriendo-facil' ); ?></a>
-	</div>
-<?php endif; ?>
+		<ol class="af-onboard__steps">
+			<li class="is-current"><span>1</span><div><strong><?php esc_html_e( 'Datos del emisor', 'arriendo-facil' ); ?></strong><small><?php esc_html_e( 'RUC, razón social y dirección.', 'arriendo-facil' ); ?></small></div></li>
+			<li><span>2</span><div><strong><?php esc_html_e( 'Firma electrónica', 'arriendo-facil' ); ?></strong><small><?php esc_html_e( 'Sube tu archivo .p12 y su contraseña.', 'arriendo-facil' ); ?></small></div></li>
+			<li><span>3</span><div><strong><?php esc_html_e( 'Factura tus cobros', 'arriendo-facil' ); ?></strong><small><?php esc_html_e( 'Los pagos registrados aparecen aquí listos para emitir.', 'arriendo-facil' ); ?></small></div></li>
+		</ol>
+	</section>
+<?php else : ?>
+
 
 <section class="af-pending" id="af-pending" data-ajax="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>" data-nonce="<?php echo esc_attr( $pending_nonce ); ?>" data-ready="<?php echo $pending_ready ? '1' : '0'; ?>">
 
@@ -46,13 +52,22 @@ $pending_nonce = wp_create_nonce( 'af_billing_nonce' );
 		</button>
 	</header>
 
+	<div class="af-chips" id="af-pending-chips" role="group" aria-label="<?php esc_attr_e( 'Filtrar cobros', 'arriendo-facil' ); ?>">
+		<button type="button" class="af-chip is-active" data-filter="all"><?php esc_html_e( 'Todos', 'arriendo-facil' ); ?></button>
+		<button type="button" class="af-chip" data-filter="rejected"><?php esc_html_e( 'Rechazados por el SRI', 'arriendo-facil' ); ?></button>
+		<button type="button" class="af-chip" data-filter="noemail"><?php esc_html_e( 'Sin correo', 'arriendo-facil' ); ?></button>
+		<button type="button" class="af-chip" data-filter="commercial"><?php esc_html_e( 'Con IVA 15%', 'arriendo-facil' ); ?></button>
+	</div>
+
 	<div id="af-pending-progress" class="af-pending__progress" hidden>
 		<div class="af-pending__progress-track"><div class="af-pending__progress-fill" id="af-pending-progress-fill"></div></div>
 		<p id="af-pending-progress-text"></p>
 	</div>
 
 	<div id="af-pending-results" class="af-pending__results" hidden></div>
-	<div id="af-pending-list" class="af-pending__list" aria-busy="true"></div>
+	<div id="af-pending-list" class="af-pending__list" aria-busy="true">
+		<div class="af-skel"></div><div class="af-skel"></div><div class="af-skel"></div>
+	</div>
 
 	<div id="af-pending-empty" class="af-empty" hidden>
 		<span class="af-empty__icon" aria-hidden="true"><?php echo af_lucide( 'circle-check', 28 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
@@ -61,6 +76,7 @@ $pending_nonce = wp_create_nonce( 'af_billing_nonce' );
 		<a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=af-collections' ) ); ?>"><?php esc_html_e( 'Ir a Cobranza', 'arriendo-facil' ); ?></a>
 	</div>
 </section>
+<?php endif; ?>
 
 <div id="af-pending-modal" class="af-modal" hidden>
 	<div class="af-modal__backdrop" data-af-pending-close></div>
@@ -116,6 +132,7 @@ $pending_nonce = wp_create_nonce( 'af_billing_nonce' );
 	var modal = document.getElementById( 'af-pending-modal' );
 	var groups = [];
 	var current = null;
+	var mode = 'all';
 
 	var T = {
 		method: { efectivo: '<?php echo esc_js( __( 'Efectivo', 'arriendo-facil' ) ); ?>', transferencia: '<?php echo esc_js( __( 'Transferencia', 'arriendo-facil' ) ); ?>', deposito: '<?php echo esc_js( __( 'Depósito', 'arriendo-facil' ) ); ?>', cheque: '<?php echo esc_js( __( 'Cheque', 'arriendo-facil' ) ); ?>', otro: '<?php echo esc_js( __( 'Otro', 'arriendo-facil' ) ); ?>' },
@@ -170,6 +187,9 @@ $pending_nonce = wp_create_nonce( 'af_billing_nonce' );
 			grand += g.total;
 			var hay = ( g.guest + ' ' + g.guest_id + ' ' + g.accommodation ).toLowerCase();
 			if ( q && hay.indexOf( q ) === -1 ) { return; }
+			if ( mode === 'rejected' && ! g.has_rejected ) { return; }
+			if ( mode === 'noemail' && g.email ) { return; }
+			if ( mode === 'commercial' && ! g.iva_rate ) { return; }
 			visible++;
 
 			var card = el( 'article', 'af-pcard' + ( g.has_rejected ? ' is-rejected' : '' ) );
@@ -181,7 +201,8 @@ $pending_nonce = wp_create_nonce( 'af_billing_nonce' );
 			var who = el( 'div', 'af-pcard__who' );
 			who.appendChild( el( 'strong', '', g.guest || '—' ) );
 			who.appendChild( el( 'span', '', ( g.guest_id || '—' ) + ' · ' + ( g.accommodation || '' ) ) );
-			head.appendChild( pick ); head.appendChild( who );
+			var initials = ( g.guest || '?' ).split( ' ' ).filter( Boolean ).slice( 0, 2 ).map( function ( w ) { return w.charAt( 0 ).toUpperCase(); } ).join( '' );
+			head.appendChild( pick ); head.appendChild( el( 'span', 'af-avatar', initials ) ); head.appendChild( who );
 
 			var tags = el( 'div', 'af-pcard__tags' );
 			tags.appendChild( el( 'span', 'af-tag af-tag--' + ( g.iva_rate ? 'info' : 'muted' ), 'IVA ' + g.iva_rate + '%' ) );
@@ -308,6 +329,13 @@ $pending_nonce = wp_create_nonce( 'af_billing_nonce' );
 	document.addEventListener( 'keydown', function ( e ) { if ( e.key === 'Escape' ) { modal.hidden = true; } } );
 
 	filter.addEventListener( 'input', render );
+	document.querySelectorAll( '#af-pending-chips .af-chip' ).forEach( function ( chip ) {
+		chip.addEventListener( 'click', function () {
+			mode = chip.dataset.filter;
+			document.querySelectorAll( '#af-pending-chips .af-chip' ).forEach( function ( c ) { c.classList.toggle( 'is-active', c === chip ); } );
+			render();
+		} );
+	} );
 	selectAll.addEventListener( 'change', function () { groups.forEach( function ( g ) { g.picked = selectAll.checked; } ); render(); } );
 
 	batchBtn.addEventListener( 'click', function () {

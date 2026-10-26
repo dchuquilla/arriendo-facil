@@ -49,17 +49,30 @@ $env_label   = ( '2' === $hub_cfg['ambiente'] )
 		array(
 			'eyebrow'  => __( 'SRI Ecuador', 'arriendo-facil' ),
 			'title'    => __( 'Facturación electrónica', 'arriendo-facil' ),
-			'subtitle' => __( 'Factura tus cobros en 1 clic: el pago se registra, la factura se emite y el inquilino la recibe por correo.', 'arriendo-facil' ),
-			'actions'  => array(
-				sprintf(
-					'<span class="af-pill af-pill--%s">%s</span>',
-					esc_attr( $env_variant ),
-					esc_html( $env_label )
-				),
-			),
+			'subtitle' => __( 'Cobra, factura y envía el comprobante al inquilino sin salir de aquí.', 'arriendo-facil' ),
 		)
 	);
 	?>
+
+	<div class="af-bill-status">
+		<div class="af-bill-status__item af-bill-status__item--<?php echo $hub_sri_ready ? 'ok' : 'warn'; ?>">
+			<span class="af-bill-status__icon" aria-hidden="true"><?php echo af_lucide( $hub_sri_ready ? 'circle-check' : 'triangle-alert', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+			<span class="af-bill-status__text">
+				<strong><?php echo esc_html( $hub_sri_ready ? __( 'Firma electrónica conectada', 'arriendo-facil' ) : __( 'Falta conectar tu firma electrónica', 'arriendo-facil' ) ); ?></strong>
+				<small><?php echo esc_html( $hub_sri_ready ? __( 'Listo para emitir facturas', 'arriendo-facil' ) : __( 'Sin ella no puedes emitir facturas', 'arriendo-facil' ) ); ?></small>
+			</span>
+			<?php if ( ! $hub_sri_ready ) : ?>
+				<a class="af-bill-status__cta" href="<?php echo esc_url( admin_url( 'admin.php?page=af-billing&tab=sri' ) ); ?>"><?php esc_html_e( 'Configurar', 'arriendo-facil' ); ?></a>
+			<?php endif; ?>
+		</div>
+		<div class="af-bill-status__item af-bill-status__item--<?php echo '2' === $hub_cfg['ambiente'] ? 'prod' : 'test'; ?>">
+			<span class="af-bill-status__icon" aria-hidden="true"><?php echo af_lucide( '2' === $hub_cfg['ambiente'] ? 'shield-check' : 'file-text', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+			<span class="af-bill-status__text">
+				<strong><?php echo esc_html( '2' === $hub_cfg['ambiente'] ? __( 'Producción', 'arriendo-facil' ) : __( 'Modo pruebas', 'arriendo-facil' ) ); ?></strong>
+				<small><?php echo esc_html( '2' === $hub_cfg['ambiente'] ? __( 'Las facturas tienen validez tributaria', 'arriendo-facil' ) : __( 'Las facturas no tienen validez tributaria', 'arriendo-facil' ) ); ?></small>
+			</span>
+		</div>
+	</div>
 
 	<input type="radio" class="af-tabs__radio" id="af-tab-billing-pendientes" name="af-billing-tabs" <?php checked( $active_tab, 'pendientes' ); ?> />
 	<input type="radio" class="af-tabs__radio" id="af-tab-billing-comprobantes" name="af-billing-tabs" <?php checked( $active_tab, 'comprobantes' ); ?> />

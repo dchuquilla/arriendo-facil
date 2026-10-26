@@ -175,59 +175,8 @@ foreach ( $invoices as $inv_row ) {
 	</article>
 </div>
 
-<div class="af-split af-sri-status-row" style="margin-top: var(--af-space-5);">
-	<?php $sri_connected = ! empty( $comprobantes_cfg['ruc'] ) && ! empty( $comprobantes_cfg['cert_filename'] ); ?>
-	<div class="af-section af-sri-connect-card af-sri-connect-card--<?php echo $sri_connected ? 'ok' : 'error'; ?>">
-		<span class="af-sri-connect-card__icon" aria-hidden="true"><?php echo af_lucide( $sri_connected ? 'circle-check' : 'triangle-alert', 22 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-		<div>
-			<h3 class="af-sri-connect-card__title"><?php esc_html_e( 'SRI · Sistema de Rentas Internas', 'arriendo-facil' ); ?></h3>
-			<p class="af-sri-connect-card__text">
-				<?php
-				echo esc_html(
-					$sri_connected
-						? __( 'Conectado — tu sistema de facturación está correctamente configurado.', 'arriendo-facil' )
-						: __( 'Sin configurar — completa la configuración SRI para poder emitir comprobantes.', 'arriendo-facil' )
-				);
-				?>
-			</p>
-		</div>
-	</div>
-
-	<aside class="af-section af-sri-connect-card">
-		<h3 class="af-sri-connect-card__title"><?php esc_html_e( 'Último comprobante', 'arriendo-facil' ); ?></h3>
-		<?php
-		$last_invoice      = ! empty( $invoices ) ? $invoices[0] : null;
-		$last_invoice_info = $last_invoice && isset( $estado_labels[ $last_invoice->estado ] ) ? $estado_labels[ $last_invoice->estado ] : null;
-		if ( $last_invoice ) :
-			?>
-			<p class="af-sri-connect-card__text">
-				<strong><?php echo esc_html( $last_invoice->numero_comprobante ? $last_invoice->numero_comprobante : '#' . (int) $last_invoice->id ); ?></strong><br />
-				<?php echo esc_html( wp_date( 'd/m/Y', strtotime( (string) $last_invoice->created_at ) ) ); ?> · <span class="af-money">$<?php echo esc_html( number_format( (float) $last_invoice->total, 2 ) ); ?></span>
-			</p>
-			<?php if ( $last_invoice_info ) : ?>
-				<span class="af-status-chip af-status-chip--<?php echo esc_attr( $last_invoice_info['grupo'] ); ?>">
-					<span class="af-status-chip__dot" aria-hidden="true"></span>
-					<?php echo esc_html( $last_invoice_info['label'] ); ?>
-				</span>
-			<?php endif; ?>
-		<?php else : ?>
-			<p class="af-sri-connect-card__text"><?php esc_html_e( 'Aún no se ha emitido ningún comprobante.', 'arriendo-facil' ); ?></p>
-		<?php endif; ?>
-	</aside>
-</div>
-
-<div class="af-sri-flow" aria-label="<?php esc_attr_e( 'Ciclo del comprobante SRI', 'arriendo-facil' ); ?>">
-	<ol class="af-sri-flow__list">
-		<li class="af-sri-flow__step"><span class="af-sri-flow__num">1</span><span class="af-sri-flow__label"><?php esc_html_e( 'Generada', 'arriendo-facil' ); ?></span></li>
-		<li class="af-sri-flow__step"><span class="af-sri-flow__num">2</span><span class="af-sri-flow__label"><?php esc_html_e( 'Firmada', 'arriendo-facil' ); ?></span></li>
-		<li class="af-sri-flow__step"><span class="af-sri-flow__num">3</span><span class="af-sri-flow__label"><?php esc_html_e( 'Enviada al SRI', 'arriendo-facil' ); ?></span></li>
-		<li class="af-sri-flow__step"><span class="af-sri-flow__num">4</span><span class="af-sri-flow__label"><?php esc_html_e( 'Autorizada', 'arriendo-facil' ); ?></span></li>
-		<li class="af-sri-flow__step"><span class="af-sri-flow__num">5</span><span class="af-sri-flow__label"><?php esc_html_e( 'RIDE + XML entregados', 'arriendo-facil' ); ?></span></li>
-	</ol>
-</div>
-
 <?php if ( '' !== $last_action_message ) : ?>
-	<div class="notice notice-info is-dismissible" style="margin-top:12px;">
+	<div class="af-note af-note--ok" role="status">
 		<p><?php echo esc_html( $last_action_message ); ?></p>
 	</div>
 	<?php if ( strpos( $last_action_message, 'correctamente' ) !== false ) : ?>
@@ -237,17 +186,6 @@ foreach ( $invoices as $inv_row ) {
 			}, 2000 );
 		</script>
 	<?php endif; ?>
-<?php endif; ?>
-
-<?php if ( empty( $comprobantes_cfg['ruc'] ) || empty( $comprobantes_cfg['cert_filename'] ) ) : ?>
-	<div class="notice notice-error">
-		<p>
-			<?php esc_html_e( 'Faltan datos de configuración SRI.', 'arriendo-facil' ); ?>
-			<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-billing&tab=sri' ) ); ?>">
-				<?php esc_html_e( 'Ir a Configuración SRI', 'arriendo-facil' ); ?>
-			</a>
-		</p>
-	</div>
 <?php endif; ?>
 
 <details class="af-section af-manual-issue">
@@ -503,7 +441,7 @@ foreach ( $invoices as $inv_row ) {
 	<div class="af-empty" style="margin-top: var(--af-space-5);">
 		<span class="af-empty__icon" aria-hidden="true"><?php echo af_lucide( 'receipt', 28 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
 		<h3 class="af-empty__title"><?php esc_html_e( 'Aún no se han emitido comprobantes', 'arriendo-facil' ); ?></h3>
-		<p class="af-empty__text"><?php esc_html_e( 'Se generarán automáticamente al aprobar un contrato.', 'arriendo-facil' ); ?></p>
+		<p class="af-empty__text"><?php esc_html_e( 'Cuando factures un cobro desde “Por facturar”, aparecerá aquí con su estado y descargas.', 'arriendo-facil' ); ?></p>
 	</div>
 <?php endif; ?>
 

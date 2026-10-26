@@ -495,12 +495,12 @@ $af_points_ready     = ! empty( $emission_points );
 </div>
 
 <?php if ( $cert_p12_missing ) : ?>
-	<div class="notice notice-warning is-dismissible">
+	<div class="af-note af-note--warn">
 		<p><?php esc_html_e( '⚠️ El archivo .p12 ya no se encuentra en el servidor (puede haberse borrado en un deploy o limpieza). La firma sigue funcionando con los PEM almacenados, pero si necesitas cambiar la contraseña o resubir el certificado, sube de nuevo el archivo .p12.', 'arriendo-facil' ); ?></p>
 	</div>
 <?php endif; ?>
 <?php if ( $af_sri_notice ) : ?>
-	<div class="notice notice-<?php echo esc_attr( $af_sri_notice['type'] ); ?> is-dismissible">
+	<div class="af-note af-note--<?php echo esc_attr( 'success' === $af_sri_notice['type'] ? 'ok' : ( 'error' === $af_sri_notice['type'] ? 'error' : 'warn' ) ); ?>" role="status">
 		<p><?php echo esc_html( $af_sri_notice['msg'] ); ?></p>
 	</div>
 	<?php if ( ! empty( $af_sri_notice['console_log'] ) ) : ?>
@@ -521,21 +521,6 @@ $af_points_ready     = ! empty( $emission_points );
 	})();
 	</script>
 	<?php endif; ?>
-<?php endif; ?>
-
-<?php if ( '2' === $cfg['ambiente'] ) : ?>
-	<div class="notice notice-warning">
-		<p>
-			<strong><?php esc_html_e( '⚠ Ambiente de PRODUCCIÓN activo.', 'arriendo-facil' ); ?></strong>
-			<?php esc_html_e( 'Los comprobantes emitidos son documentos tributarios con validez legal ante el SRI. Asegúrese de que el RUC y el certificado sean los definitivos.', 'arriendo-facil' ); ?>
-		</p>
-	</div>
-<?php else : ?>
-	<div class="notice notice-info">
-		<p>
-			<?php esc_html_e( 'Ambiente de PRUEBAS activo. Los comprobantes se envían al servidor de certificación del SRI y no tienen validez tributaria.', 'arriendo-facil' ); ?>
-		</p>
-	</div>
 <?php endif; ?>
 
 <!-- ─── Datos del Emisor ──────────────────────────────────────────────── -->

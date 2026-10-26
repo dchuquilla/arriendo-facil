@@ -1681,7 +1681,10 @@ body.post-type-accommodation #titlediv {
 }
 
 .af-modal__header {
-	padding: 20px 24px 12px;
+	padding: 20px 56px 12px 24px;
+	flex-direction: column;
+	align-items: flex-start;
+	justify-content: flex-start;
 	border-bottom: 1px solid #eef2f0;
 }
 

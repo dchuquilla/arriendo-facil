@@ -1489,3 +1489,42 @@
 		justify-content: flex-start;
 	}
 }
+/* ── Cobranza cards: composición más aireada ───────────────────────────── */
+
+.af-buildings-page .af-cobranza-card .af-property-card__body {
+	padding: var(--af-space-5, 20px) var(--af-space-5, 20px) var(--af-space-3, 12px);
+	gap: var(--af-space-3, 12px);
+}
+
+.af-buildings-page .af-cobranza-card .af-property-card__title {
+	min-height: 0;
+}
+
+.af-buildings-page .af-cobranza-card .af-catalog-card__specs {
+	gap: var(--af-space-2, 8px) var(--af-space-4, 16px);
+}
+
+.af-buildings-page .af-cobranza-card .af-catalog-card__spec {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.af-buildings-page .af-cobranza-card .af-property-card__footer {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	align-items: center;
+	gap: var(--af-space-3, 12px) var(--af-space-4, 16px);
+	margin: 0;
+	padding: var(--af-space-4, 16px) var(--af-space-5, 20px) var(--af-space-5, 20px);
+}
+
+.af-buildings-page .af-cobranza-card .af-cobranza-card__due {
+	justify-content: flex-end;
+}
+
+.af-buildings-page .af-cobranza-card .af-catalog-card__hint {
+	grid-column: 1 / -1;
+	justify-content: center;
+	padding: 9px 14px;
+}

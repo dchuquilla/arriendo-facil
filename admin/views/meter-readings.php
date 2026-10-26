@@ -559,6 +559,9 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 											<button type="button" class="af-sp-icon-btn af-delete-schedule" data-schedule="<?php echo esc_attr( (string) $row['schedule_id'] ); ?>" title="<?php esc_attr_e( 'Pausar alertas', 'arriendo-facil' ); ?>" aria-label="<?php esc_attr_e( 'Pausar alertas', 'arriendo-facil' ); ?>">
 												<?php echo af_lucide( 'pause', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 											</button>
+											<button type="button" class="af-sp-icon-btn af-remove-schedule" data-schedule="<?php echo esc_attr( (string) $row['schedule_id'] ); ?>" title="<?php esc_attr_e( 'Eliminar servicio', 'arriendo-facil' ); ?>" aria-label="<?php esc_attr_e( 'Eliminar servicio', 'arriendo-facil' ); ?>">
+												<?php echo af_lucide( 'trash-2', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+											</button>
 										</span>
 									</div>
 								</article>
@@ -618,6 +621,10 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 						>
 							<?php echo af_lucide( 'play', 12 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 							<?php esc_html_e( 'Reactivar', 'arriendo-facil' ); ?>
+						</button>
+						<button type="button" class="button button-small af-remove-schedule" data-schedule="<?php echo esc_attr( (string) $row['schedule_id'] ); ?>">
+							<?php echo af_lucide( 'trash-2', 12 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+							<?php esc_html_e( 'Eliminar', 'arriendo-facil' ); ?>
 						</button>
 					</li>
 				<?php endforeach; ?>
@@ -777,6 +784,7 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 		'outstanding'    => __( 'Saldo pendiente:', 'arriendo-facil' ),
 		'overpay'        => __( 'puedes superarlo y el excedente quedará como saldo a favor.', 'arriendo-facil' ),
 		'confirmRemove'  => __( '¿Pausar las alertas de este servicio? Dejará de avisar y de generar cobros hasta que lo reactives.', 'arriendo-facil' ),
+		'confirmDelete'  => __( '¿Eliminar este servicio definitivamente? Se borrará su configuración y el registro de pagos marcados. Esta acción no se puede deshacer.', 'arriendo-facil' ),
 		'genericError'   => __( 'No se pudo completar la operación.', 'arriendo-facil' ),
 		'titleNew'       => __( 'Agregar servicio', 'arriendo-facil' ),
 		'titleEdit'      => __( 'Editar servicio', 'arriendo-facil' ),
@@ -1106,6 +1114,21 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 			if (!window.confirm(i18n.confirmRemove)) { return; }
 			btn.disabled = true;
 			post({ action: 'af_delete_service_schedule', nonce: nonce, schedule_id: btn.getAttribute('data-schedule') }).then(function (json) {
+				btn.disabled = false;
+				if (!json || !json.success) {
+					window.alert((json && json.data && json.data.message) || i18n.genericError);
+					return;
+				}
+				window.location.reload();
+			});
+		});
+	});
+
+	document.querySelectorAll('.af-remove-schedule').forEach(function (btn) {
+		btn.addEventListener('click', function () {
+			if (!window.confirm(i18n.confirmDelete)) { return; }
+			btn.disabled = true;
+			post({ action: 'af_remove_service_schedule', nonce: nonce, schedule_id: btn.getAttribute('data-schedule') }).then(function (json) {
 				btn.disabled = false;
 				if (!json || !json.success) {
 					window.alert((json && json.data && json.data.message) || i18n.genericError);

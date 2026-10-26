@@ -27,6 +27,7 @@ class Arriendo_Facil_Billing_Ledger_Controller {
 		add_action( 'wp_ajax_af_delete_meter_reading', array( $this, 'ajax_delete_meter_reading' ) );
 		add_action( 'wp_ajax_af_save_service_schedule', array( $this, 'ajax_save_service_schedule' ) );
 		add_action( 'wp_ajax_af_delete_service_schedule', array( $this, 'ajax_delete_service_schedule' ) );
+		add_action( 'wp_ajax_af_remove_service_schedule', array( $this, 'ajax_remove_service_schedule' ) );
 		add_action( 'wp_ajax_af_generate_service_charges', array( $this, 'ajax_generate_service_charges' ) );
 		add_action( 'wp_ajax_af_mark_service_paid', array( $this, 'ajax_mark_service_paid' ) );
 		add_action( 'wp_ajax_af_unmark_service_paid', array( $this, 'ajax_unmark_service_paid' ) );
@@ -269,6 +270,46 @@ class Arriendo_Facil_Billing_Ledger_Controller {
 		}
 
 		wp_send_json_success( array( 'message' => __( 'Regla desactivada.', 'arriendo-facil' ) ) );
+	}
+
+	/**
+	 * AJAX: permanently deletes a service due-date rule.
+	 *
+	 * @return void
+	 */
+	public function ajax_remove_service_schedule() {
+		global $wpdb;
+
+		check_ajax_referer( 'af_ledger_nonce', 'nonce' );
+
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$schedule_id = isset( $_POST['schedule_id'] ) ? absint( wp_unslash( $_POST['schedule_id'] ) ) : 0;
+		$schedule    = $wpdb->get_row(
+			$wpdb->prepare( 'SELECT * FROM ' . Arriendo_Facil_Billing_Ledger::schedules_table() . ' WHERE id = %d', $schedule_id )
+		);
+
+		if ( ! $schedule ) {
+			wp_send_json_error( array( 'message' => __( 'La regla de vencimiento no existe.', 'arriendo-facil' ) ), 404 );
+		}
+
+		$allowed = $schedule->unit_id
+			? Arriendo_Facil_Tenancy::can_access_unit( (int) $schedule->unit_id )
+			: Arriendo_Facil_Tenancy::can_access_accommodation( (int) $schedule->accommodation_id );
+
+		if ( ! $allowed ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes acceso a ese inmueble.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$result = Arriendo_Facil_Billing_Ledger::delete_service_schedule( $schedule_id );
+
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ), 400 );
+		}
+
+		wp_send_json_success( array( 'message' => __( 'Servicio eliminado.', 'arriendo-facil' ) ) );
 	}
 
 	/**

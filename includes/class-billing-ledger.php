@@ -372,6 +372,35 @@ class Arriendo_Facil_Billing_Ledger {
 	}
 
 	/**
+	 * Permanently deletes a due-date rule and its paid-bill marks.
+	 * Charges already generated are kept.
+	 *
+	 * @param int $schedule_id Schedule ID.
+	 * @return true|WP_Error
+	 */
+	public static function delete_service_schedule( $schedule_id ) {
+		global $wpdb;
+
+		$schedule_id = absint( $schedule_id );
+		$exists      = $wpdb->get_var(
+			$wpdb->prepare( 'SELECT id FROM ' . self::schedules_table() . ' WHERE id = %d', $schedule_id )
+		);
+
+		if ( ! $exists ) {
+			return new WP_Error( 'af_schedule_not_found', __( 'La regla de vencimiento no existe.', 'arriendo-facil' ) );
+		}
+
+		$wpdb->delete( self::bill_payments_table(), array( 'schedule_id' => $schedule_id ), array( '%d' ) );
+		$deleted = $wpdb->delete( self::schedules_table(), array( 'id' => $schedule_id ), array( '%d' ) );
+
+		if ( false === $deleted ) {
+			return new WP_Error( 'af_schedule_delete_failed', __( 'No se pudo eliminar el servicio.', 'arriendo-facil' ) );
+		}
+
+		return true;
+	}
+
+	/**
 	 * Table where the operator marks a service bill as paid for a period,
 	 * independent of any charge to the tenant.
 	 *

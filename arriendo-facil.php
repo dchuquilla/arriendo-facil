@@ -390,7 +390,7 @@ function arriendo_facil_maybe_upgrade_schema() {
 		return;
 	}
 
-	$target_schema_version = '2026-12-tecnicos-recomendados';
+	$target_schema_version = '2026-12-servicios-personalizados';
 	$current_schema_version = (string) get_option( 'af_db_schema_version', '' );
 
 	if ( $current_schema_version === $target_schema_version && ! arriendo_facil_has_lease_schema_drift() ) {

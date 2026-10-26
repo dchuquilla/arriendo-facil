@@ -403,7 +403,8 @@ class Arriendo_Facil_Activator {
 			id                BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
 			unit_id           BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
 			accommodation_id  BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
-			service           VARCHAR(30) NOT NULL COMMENT 'agua, luz, gas, internet, telefono',
+			service           VARCHAR(30) NOT NULL COMMENT 'agua, luz, gas, internet, telefono o x-personalizado',
+			service_label     VARCHAR(60) DEFAULT NULL,
 			due_day           TINYINT(3) UNSIGNED NOT NULL DEFAULT 5,
 			flat_amount       DECIMAL(10,2) NOT NULL DEFAULT 0.00,
 			amount_mode       VARCHAR(20) NOT NULL DEFAULT 'auto' COMMENT 'auto (lectura o tarifa fija), fixed, metered',
@@ -1200,6 +1201,23 @@ class Arriendo_Facil_Activator {
 			'nationality'     => "ALTER TABLE {$guests_table} ADD COLUMN nationality VARCHAR(100) DEFAULT NULL",
 			'birth_city'      => "ALTER TABLE {$guests_table} ADD COLUMN birth_city VARCHAR(150) DEFAULT NULL",
 		);
+
+		$schedules_table = $wpdb->prefix . 'af_service_schedules';
+		$label_column    = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				 FROM INFORMATION_SCHEMA.COLUMNS
+				 WHERE TABLE_SCHEMA = %s
+				   AND TABLE_NAME = %s
+				   AND COLUMN_NAME = %s",
+				DB_NAME,
+				$schedules_table,
+				'service_label'
+			)
+		);
+		if ( ! (int) $label_column ) {
+			$wpdb->query( "ALTER TABLE {$schedules_table} ADD COLUMN service_label VARCHAR(60) DEFAULT NULL AFTER service" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		}
 
 		foreach ( $guest_doc_columns as $column_name => $alter_sql ) {
 			$column_exists = $wpdb->get_var(

@@ -97,13 +97,40 @@ class Arriendo_Facil_Billing_Ledger {
 	/**
 	 * Human label for a service key, falling back to the raw key.
 	 *
-	 * @param string $service Service key.
+	 * @param string $service      Service key.
+	 * @param string $custom_label Stored name for custom services.
 	 * @return string
 	 */
-	public static function service_label( $service ) {
+	public static function service_label( $service, $custom_label = '' ) {
 		$catalog = self::service_catalog();
 
-		return isset( $catalog[ $service ] ) ? $catalog[ $service ]['label'] : (string) $service;
+		if ( isset( $catalog[ $service ] ) ) {
+			return $catalog[ $service ]['label'];
+		}
+
+		return '' !== (string) $custom_label ? (string) $custom_label : (string) $service;
+	}
+
+	/**
+	 * Whether a key belongs to a user-defined (non catalog) service.
+	 *
+	 * @param string $service Service key.
+	 * @return bool
+	 */
+	public static function is_custom_service( $service ) {
+		return (bool) preg_match( '/^x-[a-z0-9-]{1,27}$/', (string) $service );
+	}
+
+	/**
+	 * Builds the stored key of a custom service from its display name.
+	 *
+	 * @param string $label Display name.
+	 * @return string Empty when the name yields no usable slug.
+	 */
+	public static function custom_service_key( $label ) {
+		$slug = trim( substr( sanitize_title( $label ), 0, 27 ), '-' );
+
+		return '' === $slug ? '' : 'x-' . $slug;
 	}
 
 	/**
@@ -279,8 +306,23 @@ class Arriendo_Facil_Billing_Ledger {
 			return new WP_Error( 'af_schedule_scope_invalid', __( 'Selecciona un inmueble.', 'arriendo-facil' ) );
 		}
 
-		if ( ! isset( $catalog[ $service ] ) ) {
-			return new WP_Error( 'af_schedule_service_invalid', __( 'Servicio no valido.', 'arriendo-facil' ) );
+		$custom_label = isset( $data['service_label'] ) ? trim( sanitize_text_field( (string) $data['service_label'] ) ) : '';
+		$custom_label = function_exists( 'mb_substr' ) ? mb_substr( $custom_label, 0, 60 ) : substr( $custom_label, 0, 60 );
+
+		if ( isset( $catalog[ $service ] ) ) {
+			$custom_label = '';
+		} else {
+			if ( 'otro' === $service ) {
+				$service = self::custom_service_key( $custom_label );
+			}
+
+			if ( ! self::is_custom_service( $service ) ) {
+				return new WP_Error( 'af_schedule_service_invalid', __( 'Servicio no valido.', 'arriendo-facil' ) );
+			}
+
+			if ( '' === $custom_label ) {
+				return new WP_Error( 'af_schedule_label_required', __( 'Escribe el nombre del servicio.', 'arriendo-facil' ) );
+			}
 		}
 
 		$due_day = isset( $data['due_day'] ) ? (int) $data['due_day'] : 5;
@@ -300,11 +342,12 @@ class Arriendo_Facil_Billing_Ledger {
 
 		$notes      = isset( $data['notes'] ) ? sanitize_text_field( (string) $data['notes'] ) : '';
 		$is_active  = ! empty( $data['is_active'] ) ? 1 : 0;
-		$row_format = array( '%d', '%d', '%s', '%d', '%f', '%s', '%s', '%d', '%d' );
+		$row_format = array( '%d', '%d', '%s', '%s', '%d', '%f', '%s', '%s', '%d', '%d' );
 		$row        = array(
 			'unit_id'          => $unit_id,
 			'accommodation_id' => $accommodation_id,
 			'service'          => $service,
+			'service_label'    => '' !== $custom_label ? $custom_label : null,
 			'due_day'          => $due_day,
 			'flat_amount'      => $flat_amount,
 			'amount_mode'      => $amount_mode,
@@ -317,7 +360,7 @@ class Arriendo_Facil_Billing_Ledger {
 
 		if ( $existing ) {
 			unset( $row['created_by'] );
-			$row_format = array( '%d', '%d', '%s', '%d', '%f', '%s', '%s', '%d' );
+			$row_format = array( '%d', '%d', '%s', '%s', '%d', '%f', '%s', '%s', '%d' );
 
 			$updated = $wpdb->update( self::schedules_table(), $row, array( 'id' => (int) $existing->id ), $row_format, array( '%d' ) );
 
@@ -632,7 +675,7 @@ class Arriendo_Facil_Billing_Ledger {
 						array(
 							'amount'      => $amount,
 							'due_date'    => $due_date,
-							'description' => self::service_charge_description( $service, $reading_amount, $flat_amount, $amount_mode ),
+							'description' => self::service_charge_description( $service, $reading_amount, $flat_amount, $amount_mode, isset( $schedule->service_label ) ? (string) $schedule->service_label : '' ),
 						),
 						array( 'id' => (int) $existing->id ),
 						array( '%f', '%s', '%s' ),
@@ -654,7 +697,7 @@ class Arriendo_Facil_Billing_Ledger {
 					'period'       => $period,
 					'amount'       => $amount,
 					'due_date'     => $due_date,
-					'description'  => self::service_charge_description( $service, $reading_amount, $flat_amount, $amount_mode ),
+					'description'  => self::service_charge_description( $service, $reading_amount, $flat_amount, $amount_mode, isset( $schedule->service_label ) ? (string) $schedule->service_label : '' ),
 				)
 			);
 
@@ -682,10 +725,11 @@ class Arriendo_Facil_Billing_Ledger {
 	 * @param float  $reading_amount Amount calculated from the reading.
 	 * @param float  $flat_amount   Configured fixed amount.
 	 * @param string $amount_mode   Rule pricing mode.
+	 * @param string $custom_label  Name of a custom service.
 	 * @return string
 	 */
-	private static function service_charge_description( $service, $reading_amount, $flat_amount, $amount_mode ) {
-		$label = self::service_label( $service );
+	private static function service_charge_description( $service, $reading_amount, $flat_amount, $amount_mode, $custom_label = '' ) {
+		$label = self::service_label( $service, $custom_label );
 
 		if ( 'fixed' === $amount_mode ) {
 			return sprintf(
@@ -809,7 +853,7 @@ class Arriendo_Facil_Billing_Ledger {
 			  ) )";
 
 		$sql = $wpdb->prepare(
-			"SELECT s.id AS schedule_id, s.unit_id, s.accommodation_id, s.service, s.due_day,
+			"SELECT s.id AS schedule_id, s.unit_id, s.accommodation_id, s.service, s.service_label, s.due_day,
 			        s.flat_amount, s.amount_mode, s.is_active, s.notes,
 			        l.id AS lease_id, l.guest_id,
 			        c.id AS charge_id, c.amount, c.amount_paid, c.due_date, c.status AS charge_status,
@@ -882,7 +926,7 @@ class Arriendo_Facil_Billing_Ledger {
 				'unit_id'          => (int) $row->unit_id,
 				'accommodation_id' => (int) $row->accommodation_id,
 				'service'          => (string) $row->service,
-				'service_label'    => self::service_label( $row->service ),
+				'service_label'    => self::service_label( $row->service, isset( $row->service_label ) ? $row->service_label : '' ),
 				'due_day'          => (int) $row->due_day,
 				'flat_amount'      => (float) $row->flat_amount,
 				'amount_mode'      => (string) $row->amount_mode,
@@ -1282,7 +1326,7 @@ class Arriendo_Facil_Billing_Ledger {
 		$period      = isset( $data['period'] ) ? sanitize_text_field( (string) $data['period'] ) : '';
 		$amount      = isset( $data['amount'] ) ? round( (float) $data['amount'], 2 ) : 0.0;
 
-		if ( ! array_key_exists( $charge_type, self::charge_types() ) ) {
+		if ( ! array_key_exists( $charge_type, self::charge_types() ) && ! self::is_custom_service( $charge_type ) ) {
 			return new WP_Error( 'af_charge_type_invalid', __( 'Tipo de cargo invalido.', 'arriendo-facil' ) );
 		}
 

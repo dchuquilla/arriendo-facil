@@ -57,6 +57,7 @@
 .af-sp-icon--gas,      .af-sp-chip--gas      { --sp-c: #c2410c; --sp-bg: #ffedd5; }
 .af-sp-icon--internet, .af-sp-chip--internet { --sp-c: #7c3aed; --sp-bg: #ede9fe; }
 .af-sp-icon--telefono, .af-sp-chip--telefono { --sp-c: #2f7d73; --sp-bg: #ccfbf1; }
+.af-sp-icon--custom,   .af-sp-chip--custom   { --sp-c: #475569; --sp-bg: #e2e8f0; }
 
 .af-sp-icon {
 	display: inline-flex;
@@ -930,4 +931,9 @@
 		animation: none;
 		transition: none;
 	}
+}
+
+#af-schedule-custom {
+	width: 100%;
+	margin-top: 8px;
 }

@@ -117,6 +117,7 @@ foreach ( array_keys( $bucket_meta ) as $bucket_key ) {
 $groups         = array();
 $paused         = array();
 $configured_map = array();
+$custom_services = array();
 $active_count   = 0;
 $today_ts       = strtotime( $today );
 
@@ -159,6 +160,10 @@ foreach ( $rows as $row ) {
 			'rows'             => array(),
 			'services'         => array(),
 		);
+	}
+
+	if ( ! isset( $catalog[ $row['service'] ] ) ) {
+		$custom_services[ $row['service'] ] = $row['service_label'];
 	}
 
 	$groups[ $key ]['rows'][]                     = $row;
@@ -359,6 +364,12 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 						<?php echo esc_html( $service_meta['label'] ); ?>
 					</button>
 				<?php endforeach; ?>
+				<?php foreach ( $custom_services as $custom_key => $custom_label ) : ?>
+					<button type="button" class="af-sp-chip af-sp-chip--custom" data-service="<?php echo esc_attr( $custom_key ); ?>" aria-pressed="false">
+						<?php echo af_lucide( 'circle-alert', 14 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+						<?php echo esc_html( $custom_label ); ?>
+					</button>
+				<?php endforeach; ?>
 			</div>
 		</div>
 
@@ -451,7 +462,7 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 								?>
 								<article class="af-sp-tile is-<?php echo esc_attr( $row['bucket'] ); ?>" data-bucket="<?php echo esc_attr( $row['bucket'] ); ?>" data-service="<?php echo esc_attr( $row['service'] ); ?>">
 									<div class="af-sp-tile__top">
-										<span class="af-sp-icon af-sp-icon--<?php echo esc_attr( $row['service'] ); ?>" aria-hidden="true"><?php echo af_lucide( $icon_key, 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
+										<span class="af-sp-icon af-sp-icon--<?php echo esc_attr( isset( $catalog[ $row['service'] ] ) ? $row['service'] : 'custom' ); ?>" aria-hidden="true"><?php echo af_lucide( $icon_key, 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
 										<div class="af-sp-tile__name">
 											<strong><?php echo esc_html( $row['service_label'] ); ?></strong>
 											<span><?php echo esc_html( sprintf( /* translators: %d */ __( 'Día %d de cada mes', 'arriendo-facil' ), (int) $row['due_day'] ) ); ?></span>
@@ -551,6 +562,7 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 												data-accommodation="<?php echo esc_attr( (string) $row['accommodation_id'] ); ?>"
 												data-scope-title="<?php echo esc_attr( $group['title'] ); ?>"
 												data-service="<?php echo esc_attr( $row['service'] ); ?>"
+												data-label="<?php echo esc_attr( $row['service_label'] ); ?>"
 												data-due-day="<?php echo esc_attr( (string) $row['due_day'] ); ?>"
 												data-flat="<?php echo esc_attr( (string) $row['flat_amount'] ); ?>"
 												data-mode="<?php echo esc_attr( $row['amount_mode'] ); ?>"
@@ -605,7 +617,7 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 					$icon_key     = isset( $catalog[ $row['service'] ]['icon'] ) ? $catalog[ $row['service'] ]['icon'] : 'circle-alert';
 					?>
 					<li>
-						<span class="af-sp-icon af-sp-icon--sm af-sp-icon--<?php echo esc_attr( $row['service'] ); ?>" aria-hidden="true"><?php echo af_lucide( $icon_key, 12 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
+						<span class="af-sp-icon af-sp-icon--sm af-sp-icon--<?php echo esc_attr( isset( $catalog[ $row['service'] ] ) ? $row['service'] : 'custom' ); ?>" aria-hidden="true"><?php echo af_lucide( $icon_key, 12 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
 						<strong><?php echo esc_html( $row['service_label'] ); ?></strong>
 						<span><?php echo esc_html( $paused_title ); ?> · <?php echo esc_html( sprintf( /* translators: %d */ __( 'día %d', 'arriendo-facil' ), (int) $row['due_day'] ) ); ?></span>
 						<button
@@ -614,6 +626,7 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 							data-unit="<?php echo esc_attr( (string) $row['unit_id'] ); ?>"
 							data-accommodation="<?php echo esc_attr( (string) $row['accommodation_id'] ); ?>"
 							data-service="<?php echo esc_attr( $row['service'] ); ?>"
+							data-label="<?php echo esc_attr( $row['service_label'] ); ?>"
 							data-due-day="<?php echo esc_attr( (string) $row['due_day'] ); ?>"
 							data-flat="<?php echo esc_attr( (string) $row['flat_amount'] ); ?>"
 							data-mode="<?php echo esc_attr( $row['amount_mode'] ); ?>"
@@ -668,7 +681,13 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 							<span class="af-sp-picker__badge"><?php esc_html_e( 'ya existe', 'arriendo-facil' ); ?></span>
 						</label>
 					<?php endforeach; ?>
+					<label class="af-sp-picker__item">
+						<input type="radio" name="af-schedule-service" value="otro" />
+						<span class="af-sp-icon" aria-hidden="true"><?php echo af_lucide( 'plus', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
+						<span class="af-sp-picker__label"><?php esc_html_e( 'Otro', 'arriendo-facil' ); ?></span>
+					</label>
 				</div>
+				<input type="text" id="af-schedule-custom" maxlength="60" hidden placeholder="<?php esc_attr_e( 'Nombre del servicio (Ej: Alícuota extra, Seguridad)', 'arriendo-facil' ); ?>" />
 			</fieldset>
 			<div class="af-modal__field">
 				<label for="af-schedule-due-day"><?php esc_html_e( '¿Qué día del mes se paga?', 'arriendo-facil' ); ?></label>
@@ -785,6 +804,7 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 		'overpay'        => __( 'puedes superarlo y el excedente quedará como saldo a favor.', 'arriendo-facil' ),
 		'confirmRemove'  => __( '¿Pausar las alertas de este servicio? Dejará de avisar y de generar cobros hasta que lo reactives.', 'arriendo-facil' ),
 		'confirmDelete'  => __( '¿Eliminar este servicio definitivamente? Se borrará su configuración y el registro de pagos marcados. Esta acción no se puede deshacer.', 'arriendo-facil' ),
+		'customRequired' => __( 'Escribe el nombre del servicio.', 'arriendo-facil' ),
 		'genericError'   => __( 'No se pudo completar la operación.', 'arriendo-facil' ),
 		'titleNew'       => __( 'Agregar servicio', 'arriendo-facil' ),
 		'titleEdit'      => __( 'Editar servicio', 'arriendo-facil' ),
@@ -960,6 +980,8 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 	const schedulePreview = document.getElementById('af-schedule-preview');
 	const scheduleConfirm = document.getElementById('af-schedule-confirm');
 	const serviceInputs = Array.prototype.slice.call(scheduleModal.querySelectorAll('input[name="af-schedule-service"]'));
+	const customInput = document.getElementById('af-schedule-custom');
+	let editingCustomKey = '';
 	const dayPicks = Array.prototype.slice.call(scheduleModal.querySelectorAll('[data-pick-day]'));
 	const configuredMap = <?php echo wp_json_encode( (object) $configured_map ); ?>;
 	const dateFormat = new Intl.DateTimeFormat(document.documentElement.lang || 'es', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -992,12 +1014,24 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 		return checked ? checked.value : '';
 	}
 
+	function syncCustom() {
+		customInput.hidden = getService() !== 'otro';
+	}
+
 	function setService(value, locked) {
 		serviceInputs.forEach(function (input) {
 			input.checked = input.value === value;
 			input.disabled = !!locked && input.value !== value;
 		});
+		syncCustom();
 	}
+
+	serviceInputs.forEach(function (input) {
+		input.addEventListener('change', function () {
+			syncCustom();
+			if (!customInput.hidden) { customInput.focus(); }
+		});
+	});
 
 	function markConfigured() {
 		const list = (!editing && scheduleUnit.value === '0' && configuredMap[currentAccommodation()]) || [];
@@ -1061,6 +1095,8 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 		scheduleUnit.value = unitId ? String(unitId) : '0';
 		lockProperty(unitId ? '' : propertyId);
 		showScope(unitId ? unitTitle : '');
+		editingCustomKey = '';
+		customInput.value = '';
 		setService(service || firstFreeService(), false);
 		scheduleDueDay.value = 5;
 		scheduleMode.value = 'auto';
@@ -1096,7 +1132,11 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 			showScope(unit === '0' ? '' : btn.getAttribute('data-scope-title'));
 			// The rule is keyed by scope + service, so changing the service while
 			// editing would silently create a second rule instead.
-			setService(btn.getAttribute('data-service'), true);
+			const editService = btn.getAttribute('data-service');
+			const isCustom = !serviceInputs.some(function (input) { return input.value === editService; });
+			editingCustomKey = isCustom ? editService : '';
+			customInput.value = isCustom ? (btn.getAttribute('data-label') || '') : '';
+			setService(isCustom ? 'otro' : editService, true);
 			scheduleDueDay.value = btn.getAttribute('data-due-day') || '5';
 			scheduleMode.value = btn.getAttribute('data-mode') || 'auto';
 			const flat = parseFloat(btn.getAttribute('data-flat')) || 0;
@@ -1149,6 +1189,7 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 				unit_id: unit,
 				accommodation_id: unit === '0' ? btn.getAttribute('data-accommodation') : '',
 				service: btn.getAttribute('data-service'),
+				service_label: btn.getAttribute('data-label') || '',
 				due_day: btn.getAttribute('data-due-day'),
 				amount_mode: btn.getAttribute('data-mode') || 'auto',
 				flat_amount: btn.getAttribute('data-flat') || '0',
@@ -1169,6 +1210,7 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 		const unit = scheduleUnit.value || '0';
 		const accommodation = unit !== '0' ? '' : currentAccommodation();
 		const service = getService();
+		const customLabel = service === 'otro' ? customInput.value.trim() : '';
 
 		if (unit === '0' && !accommodation) {
 			setStatus(scheduleStatus, i18n.pickProperty, 'error');
@@ -1176,6 +1218,11 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 		}
 		if (!service) {
 			setStatus(scheduleStatus, i18n.pickService, 'error');
+			return;
+		}
+		if (service === 'otro' && !customLabel) {
+			setStatus(scheduleStatus, i18n.customRequired, 'error');
+			customInput.focus();
 			return;
 		}
 		const day = parseInt(scheduleDueDay.value, 10);
@@ -1192,7 +1239,8 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 			nonce: nonce,
 			unit_id: unit,
 			accommodation_id: accommodation,
-			service: service,
+			service: editingCustomKey || service,
+			service_label: customLabel,
 			due_day: day,
 			amount_mode: scheduleMode.value,
 			flat_amount: scheduleAmount.value || '0',

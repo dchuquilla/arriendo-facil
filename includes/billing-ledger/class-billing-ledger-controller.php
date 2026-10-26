@@ -212,6 +212,7 @@ class Arriendo_Facil_Billing_Ledger_Controller {
 				'unit_id'          => $unit_id,
 				'accommodation_id' => $accommodation_id,
 				'service'          => isset( $_POST['service'] ) ? wp_unslash( $_POST['service'] ) : '',
+				'service_label'    => isset( $_POST['service_label'] ) ? wp_unslash( $_POST['service_label'] ) : '',
 				'due_day'          => isset( $_POST['due_day'] ) ? absint( wp_unslash( $_POST['due_day'] ) ) : 5,
 				'flat_amount'      => isset( $_POST['flat_amount'] ) ? (float) wp_unslash( $_POST['flat_amount'] ) : 0,
 				'amount_mode'      => isset( $_POST['amount_mode'] ) ? wp_unslash( $_POST['amount_mode'] ) : 'auto',

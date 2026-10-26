@@ -38,90 +38,100 @@ foreach ( ( new Arriendo_Facil_Billing_Manager() )->get_billable_charges( $hub_p
 }
 $hub_pending_count = count( $hub_pending_leases );
 
-$env_variant = ( '2' === $hub_cfg['ambiente'] ) ? 'danger' : 'info';
-$env_label   = ( '2' === $hub_cfg['ambiente'] )
-	? __( 'Ambiente: PRODUCCIÓN', 'arriendo-facil' )
-	: __( 'Ambiente: PRUEBAS (certificación SRI)', 'arriendo-facil' );
+$is_prod   = ( '2' === (string) $hub_cfg['ambiente'] );
+$hub_ready = array(
+	'emisor' => '' !== trim( (string) $hub_cfg['ruc'] ) && '' !== trim( (string) $hub_cfg['razon_social'] ),
+	'firma'  => $hub_sri_ready,
+);
+global $wpdb;
+$hub_points_sql = ( $hub_scope_owner = ! current_user_can( 'manage_options' ) )
+	? $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}af_emission_points WHERE activo = 1 AND owner_id = %d", get_current_user_id() )
+	: "SELECT COUNT(*) FROM {$wpdb->prefix}af_emission_points WHERE activo = 1 AND owner_id IS NULL";
+$hub_ready['punto'] = (int) $wpdb->get_var( $hub_points_sql ) > 0;
+$hub_done           = count( array_filter( $hub_ready ) );
+$hub_all_ready      = 3 === $hub_done;
+$hub_steps          = array(
+	'emisor' => array( __( 'Datos del emisor', 'arriendo-facil' ), 'building-2' ),
+	'firma'  => array( __( 'Firma electrónica', 'arriendo-facil' ), 'shield-check' ),
+	'punto'  => array( __( 'Punto de emisión', 'arriendo-facil' ), 'receipt' ),
+);
+$hub_tabs = array(
+	'pendientes'   => array( __( 'Por facturar', 'arriendo-facil' ), 'clock' ),
+	'comprobantes' => array( __( 'Emitidas', 'arriendo-facil' ), 'receipt' ),
+	'sri'          => array( __( 'Configuración SRI', 'arriendo-facil' ), 'settings' ),
+);
 ?>
-<div class="wrap af-shell">
+<div class="wrap af-shell af-bx">
 
-	<?php
-	af_page_header(
-		array(
-			'eyebrow'  => __( 'SRI Ecuador', 'arriendo-facil' ),
-			'title'    => __( 'Facturación electrónica', 'arriendo-facil' ),
-			'subtitle' => __( 'Consulta y administra los comprobantes electrónicos.', 'arriendo-facil' ),
-			'actions'  => array(
-				array(
-					'label'   => __( 'Configuración SRI', 'arriendo-facil' ),
-					'url'     => admin_url( 'admin.php?page=af-billing&tab=sri' ),
-					'variant' => 'ghost',
-					'icon'    => af_lucide( 'settings', 16 ),
-				),
-				array(
-					'label'   => __( 'Emitir factura', 'arriendo-facil' ),
-					'url'     => admin_url( 'admin.php?page=af-billing&tab=pendientes' ),
-					'variant' => 'primary',
-					'icon'    => af_lucide( 'receipt', 16 ),
-				),
-			),
-		)
-	);
-	?>
-
-	<div class="af-bill-status">
-		<div class="af-bill-status__item af-bill-status__item--<?php echo $hub_sri_ready ? 'ok' : 'warn'; ?>">
-			<span class="af-bill-status__icon" aria-hidden="true"><?php echo af_lucide( $hub_sri_ready ? 'circle-check' : 'triangle-alert', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-			<span class="af-bill-status__text">
-				<strong><?php echo esc_html( $hub_sri_ready ? __( 'Firma electrónica cargada', 'arriendo-facil' ) : __( 'Falta cargar tu firma electrónica', 'arriendo-facil' ) ); ?></strong>
-				<small><?php echo esc_html( $hub_sri_ready ? __( 'Verifica su vigencia en Configuración SRI', 'arriendo-facil' ) : __( 'Sin ella no puedes emitir facturas', 'arriendo-facil' ) ); ?></small>
-			</span>
-			<?php if ( ! $hub_sri_ready ) : ?>
-				<a class="af-bill-status__cta" href="<?php echo esc_url( admin_url( 'admin.php?page=af-billing&tab=sri' ) ); ?>"><?php esc_html_e( 'Configurar', 'arriendo-facil' ); ?></a>
-			<?php endif; ?>
+	<header class="af-bx-head">
+		<div class="af-bx-head__title">
+			<span class="af-bx-eyebrow"><?php esc_html_e( 'SRI Ecuador', 'arriendo-facil' ); ?></span>
+			<h1><?php esc_html_e( 'Facturación', 'arriendo-facil' ); ?></h1>
+			<p><?php esc_html_e( 'Consulta y administra los comprobantes electrónicos.', 'arriendo-facil' ); ?></p>
 		</div>
-		<div class="af-bill-status__item af-bill-status__item--<?php echo '2' === $hub_cfg['ambiente'] ? 'prod' : 'test'; ?>">
-			<span class="af-bill-status__icon" aria-hidden="true"><?php echo af_lucide( '2' === $hub_cfg['ambiente'] ? 'shield-check' : 'file-text', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-			<span class="af-bill-status__text">
-				<strong><?php echo esc_html( '2' === $hub_cfg['ambiente'] ? __( 'Producción', 'arriendo-facil' ) : __( 'Modo pruebas', 'arriendo-facil' ) ); ?></strong>
-				<small><?php echo esc_html( '2' === $hub_cfg['ambiente'] ? __( 'Las facturas tienen validez tributaria', 'arriendo-facil' ) : __( 'Las facturas no tienen validez tributaria', 'arriendo-facil' ) ); ?></small>
+		<div class="af-bx-head__side">
+			<span class="af-bx-env af-bx-env--<?php echo $is_prod ? 'prod' : 'test'; ?>">
+				<span class="af-bx-env__dot" aria-hidden="true"></span>
+				<span>
+					<strong><?php echo esc_html( $is_prod ? __( 'Producción', 'arriendo-facil' ) : __( 'Pruebas', 'arriendo-facil' ) ); ?></strong>
+					<small><?php echo esc_html( $is_prod ? __( 'Validez tributaria real', 'arriendo-facil' ) : __( 'Sin validez tributaria', 'arriendo-facil' ) ); ?></small>
+				</span>
 			</span>
+			<a class="button af-btn af-btn--primary" href="<?php echo esc_url( admin_url( 'admin.php?page=af-billing&tab=pendientes' ) ); ?>">
+				<span class="af-btn__icon" aria-hidden="true"><?php echo af_lucide( 'receipt', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+				<?php esc_html_e( 'Emitir factura', 'arriendo-facil' ); ?>
+			</a>
 		</div>
-	</div>
+	</header>
 
-	<input type="radio" class="af-tabs__radio" id="af-tab-billing-pendientes" name="af-billing-tabs" <?php checked( $active_tab, 'pendientes' ); ?> />
-	<input type="radio" class="af-tabs__radio" id="af-tab-billing-comprobantes" name="af-billing-tabs" <?php checked( $active_tab, 'comprobantes' ); ?> />
-	<input type="radio" class="af-tabs__radio" id="af-tab-billing-sri" name="af-billing-tabs" <?php checked( $active_tab, 'sri' ); ?> />
+	<?php if ( ! $hub_all_ready ) : ?>
+		<section class="af-bx-setup" aria-label="<?php esc_attr_e( 'Preparación para facturar', 'arriendo-facil' ); ?>">
+			<div class="af-bx-setup__lead">
+				<strong><?php esc_html_e( 'Termina tu configuración para emitir', 'arriendo-facil' ); ?></strong>
+				<span><?php echo esc_html( sprintf( /* translators: 1: done, 2: total */ __( '%1$d de %2$d pasos completos', 'arriendo-facil' ), $hub_done, 3 ) ); ?></span>
+				<div class="af-bx-setup__bar" role="progressbar" aria-valuemin="0" aria-valuemax="3" aria-valuenow="<?php echo (int) $hub_done; ?>"><i style="width:<?php echo (int) round( $hub_done / 3 * 100 ); ?>%"></i></div>
+			</div>
+			<ol class="af-bx-setup__steps">
+				<?php foreach ( $hub_steps as $key => $step ) : ?>
+					<li class="<?php echo $hub_ready[ $key ] ? 'is-done' : 'is-todo'; ?>">
+						<span class="af-bx-setup__ico" aria-hidden="true"><?php echo af_lucide( $hub_ready[ $key ] ? 'circle-check' : $step[1], 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+						<?php echo esc_html( $step[0] ); ?>
+						<span class="screen-reader-text"><?php echo esc_html( $hub_ready[ $key ] ? __( '(completo)', 'arriendo-facil' ) : __( '(pendiente)', 'arriendo-facil' ) ); ?></span>
+					</li>
+				<?php endforeach; ?>
+			</ol>
+			<a class="button af-btn af-btn--ghost" href="<?php echo esc_url( admin_url( 'admin.php?page=af-billing&tab=sri' ) ); ?>"><?php esc_html_e( 'Completar configuración', 'arriendo-facil' ); ?></a>
+		</section>
+	<?php endif; ?>
 
-	<nav class="af-tabs__nav" role="tablist" aria-label="<?php esc_attr_e( 'Facturación electrónica', 'arriendo-facil' ); ?>">
-		<label class="af-tabs__tab" for="af-tab-billing-pendientes" role="tab" aria-selected="<?php echo $active_tab === 'pendientes' ? 'true' : 'false'; ?>">
-			<span class="af-tabs__icon" aria-hidden="true"><?php echo af_lucide( 'clock', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-			<span class="af-tabs__label"><?php esc_html_e( 'Por facturar', 'arriendo-facil' ); ?></span>
-			<span class="af-tabs__badge af-tabs__badge--attention" id="af-pending-tab-count" <?php echo 0 === $hub_pending_count ? 'hidden' : ''; ?>><?php echo (int) $hub_pending_count; ?></span>
-		</label>
-		<label class="af-tabs__tab" for="af-tab-billing-comprobantes" role="tab" aria-selected="<?php echo $active_tab === 'comprobantes' ? 'true' : 'false'; ?>">
-			<span class="af-tabs__icon" aria-hidden="true"><?php echo af_lucide( 'receipt', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-			<span class="af-tabs__label"><?php esc_html_e( 'Emitidas', 'arriendo-facil' ); ?></span>
-		</label>
-		<label class="af-tabs__tab" for="af-tab-billing-sri" role="tab" aria-selected="<?php echo $active_tab === 'sri' ? 'true' : 'false'; ?>">
-			<span class="af-tabs__icon" aria-hidden="true"><?php echo af_lucide( 'settings', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-			<span class="af-tabs__label"><?php esc_html_e( 'Configuración SRI', 'arriendo-facil' ); ?></span>
-			<?php if ( ! $hub_sri_ready ) : ?>
-				<span class="af-tabs__badge af-tabs__badge--attention" aria-hidden="true">!</span>
-			<?php endif; ?>
-		</label>
+	<?php foreach ( $hub_tabs as $key => $tab ) : ?>
+		<input type="radio" class="af-bx-radio" id="af-tab-billing-<?php echo esc_attr( $key ); ?>" name="af-billing-tabs" <?php checked( $active_tab, $key ); ?> />
+	<?php endforeach; ?>
+
+	<nav class="af-bx-nav" role="tablist" aria-label="<?php esc_attr_e( 'Facturación', 'arriendo-facil' ); ?>">
+		<?php foreach ( $hub_tabs as $key => $tab ) : ?>
+			<label class="af-bx-nav__tab" for="af-tab-billing-<?php echo esc_attr( $key ); ?>" role="tab" aria-selected="<?php echo $active_tab === $key ? 'true' : 'false'; ?>">
+				<span aria-hidden="true"><?php echo af_lucide( $tab[1], 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+				<?php echo esc_html( $tab[0] ); ?>
+				<?php if ( 'pendientes' === $key ) : ?>
+					<span class="af-bx-badge" id="af-pending-tab-count" <?php echo 0 === $hub_pending_count ? 'hidden' : ''; ?>><?php echo (int) $hub_pending_count; ?></span>
+				<?php elseif ( 'sri' === $key && ! $hub_all_ready ) : ?>
+					<span class="af-bx-badge" aria-label="<?php esc_attr_e( 'Configuración incompleta', 'arriendo-facil' ); ?>">!</span>
+				<?php endif; ?>
+			</label>
+		<?php endforeach; ?>
 	</nav>
 
-	<div class="af-tabs__panels">
-		<section id="af-billing-panel-pendientes" class="af-tabs__panel af-tabs__panel--pendientes" role="tabpanel">
+	<div class="af-bx-panels">
+		<section id="af-billing-panel-pendientes" class="af-bx-panel af-bx-panel--pendientes" role="tabpanel">
 			<?php include __DIR__ . '/../partials/billing-pending.php'; ?>
 		</section>
 
-		<section id="af-billing-panel-comprobantes" class="af-tabs__panel af-tabs__panel--comprobantes" role="tabpanel">
+		<section id="af-billing-panel-comprobantes" class="af-bx-panel af-bx-panel--comprobantes" role="tabpanel">
 			<?php include __DIR__ . '/../partials/billing-comprobantes.php'; ?>
 		</section>
 
-		<section id="af-billing-panel-sri" class="af-tabs__panel af-tabs__panel--sri" role="tabpanel">
+		<section id="af-billing-panel-sri" class="af-bx-panel af-bx-panel--sri" role="tabpanel">
 			<?php include __DIR__ . '/../partials/billing-config.php'; ?>
 		</section>
 	</div>
@@ -131,7 +141,7 @@ $env_label   = ( '2' === $hub_cfg['ambiente'] )
 <script>
 (function () {
 	'use strict';
-	var radios = document.querySelectorAll( '.af-tabs__radio[name="af-billing-tabs"]' );
+	var radios = document.querySelectorAll( '.af-bx-radio[name="af-billing-tabs"]' );
 	if ( ! radios.length ) {
 		return;
 	}
@@ -144,7 +154,7 @@ $env_label   = ( '2' === $hub_cfg['ambiente'] )
 	// Normaliza la URL al primer render: mantiene el deep-link ?tab= legible.
 	try {
 		var url = new URL( window.location.href );
-		var current = tabFromId( document.querySelector( '.af-tabs__radio[name="af-billing-tabs"]:checked' ).id );
+		var current = tabFromId( document.querySelector( '.af-bx-radio[name="af-billing-tabs"]:checked' ).id );
 		if ( url.searchParams.get( 'tab' ) !== current ) {
 			url.searchParams.set( 'tab', current );
 			window.history.replaceState( {}, '', url );

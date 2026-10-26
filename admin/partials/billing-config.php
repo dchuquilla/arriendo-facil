@@ -475,39 +475,34 @@ $af_points_ready     = ! empty( $emission_points );
 
 ?>
 
-<div class="af-sri-hero">
-	<div class="af-sri-hero__content">
-		<p class="af-sri-hero__eyebrow"><?php esc_html_e( 'Guía rápida de configuración', 'arriendo-facil' ); ?></p>
-		<h2 class="af-sri-hero__title"><?php esc_html_e( 'Configura el SRI sin perderte en la pantalla', 'arriendo-facil' ); ?></h2>
-		<p class="af-sri-hero__text"><?php esc_html_e( 'Completa primero los datos del emisor, luego sube el certificado y finalmente crea tu punto de emisión. Todo lo necesario para emitir está reunido aquí.', 'arriendo-facil' ); ?></p>
-	</div>
-	<div class="af-sri-hero__links">
-		<a class="button af-btn af-btn--ghost" href="#af-sri-datos-emisor"><?php esc_html_e( '1. Datos del emisor', 'arriendo-facil' ); ?></a>
-		<a class="button af-btn af-btn--ghost" href="#af-sri-certificado"><?php esc_html_e( '2. Certificado', 'arriendo-facil' ); ?></a>
+<div class="af-sx">
+<aside class="af-sri-hero" aria-label="<?php esc_attr_e( 'Secciones de la configuración', 'arriendo-facil' ); ?>">
+	<p class="af-sri-hero__eyebrow"><?php esc_html_e( 'Configuración SRI', 'arriendo-facil' ); ?></p>
+	<nav class="af-sx-nav">
+		<a class="af-sx-nav__item <?php echo $af_has_emitter_data ? 'is-ready' : 'is-pending'; ?>" href="#af-sri-datos-emisor">
+			<span class="af-sx-nav__dot" aria-hidden="true"></span>
+			<span><strong><?php esc_html_e( 'Datos del emisor', 'arriendo-facil' ); ?></strong><small><?php echo esc_html( $af_has_emitter_data ? __( 'Completo', 'arriendo-facil' ) : __( 'Pendiente', 'arriendo-facil' ) ); ?></small></span>
+		</a>
+		<a class="af-sx-nav__item <?php echo $af_cert_ready ? 'is-ready' : 'is-pending'; ?>" href="#af-sri-certificado">
+			<span class="af-sx-nav__dot" aria-hidden="true"></span>
+			<span><strong><?php esc_html_e( 'Firma electrónica', 'arriendo-facil' ); ?></strong><small><?php echo esc_html( $af_cert_ready ? __( 'Cargada', 'arriendo-facil' ) : __( 'Pendiente', 'arriendo-facil' ) ); ?></small></span>
+		</a>
 		<?php if ( ! $af_is_owner ) : ?>
-			<a class="button af-btn af-btn--ghost" href="#af-sri-puntos"><?php esc_html_e( '3. Puntos de emisión', 'arriendo-facil' ); ?></a>
+			<a class="af-sx-nav__item <?php echo $af_points_ready ? 'is-ready' : 'is-pending'; ?>" href="#af-sri-puntos">
+				<span class="af-sx-nav__dot" aria-hidden="true"></span>
+				<span><strong><?php esc_html_e( 'Puntos de emisión', 'arriendo-facil' ); ?></strong><small><?php echo esc_html( $af_points_ready ? __( 'Configurados', 'arriendo-facil' ) : __( 'Falta crear', 'arriendo-facil' ) ); ?></small></span>
+			</a>
 		<?php endif; ?>
-	</div>
-	<div class="af-sri-status-grid">
-		<div class="af-sri-status-card <?php echo $af_has_emitter_data ? 'is-ready' : 'is-pending'; ?>">
-			<span class="af-sri-status-card__label"><?php esc_html_e( 'Datos del emisor', 'arriendo-facil' ); ?></span>
-			<strong class="af-sri-status-card__value"><?php echo esc_html( $af_has_emitter_data ? __( 'Completo', 'arriendo-facil' ) : __( 'Pendiente', 'arriendo-facil' ) ); ?></strong>
-			<span class="af-sri-status-card__hint"><?php esc_html_e( 'RUC, razón social, dirección y email.', 'arriendo-facil' ); ?></span>
-		</div>
-		<div class="af-sri-status-card <?php echo $af_cert_ready ? 'is-ready' : 'is-pending'; ?>">
-			<span class="af-sri-status-card__label"><?php esc_html_e( 'Certificado', 'arriendo-facil' ); ?></span>
-			<strong class="af-sri-status-card__value"><?php echo esc_html( $af_cert_ready ? __( 'Cargado', 'arriendo-facil' ) : __( 'Pendiente', 'arriendo-facil' ) ); ?></strong>
-			<span class="af-sri-status-card__hint"><?php esc_html_e( 'P12/PFX, contraseña y cadena CA.', 'arriendo-facil' ); ?></span>
-		</div>
-		<?php if ( ! $af_is_owner ) : ?>
-		<div class="af-sri-status-card <?php echo $af_points_ready ? 'is-ready' : 'is-pending'; ?>">
-			<span class="af-sri-status-card__label"><?php esc_html_e( 'Puntos de emisión', 'arriendo-facil' ); ?></span>
-			<strong class="af-sri-status-card__value"><?php echo esc_html( $af_points_ready ? __( 'Configurados', 'arriendo-facil' ) : __( 'Falta crear', 'arriendo-facil' ) ); ?></strong>
-			<span class="af-sri-status-card__hint"><?php esc_html_e( 'Serie y secuencial para facturar.', 'arriendo-facil' ); ?></span>
-		</div>
-		<?php endif; ?>
-	</div>
-</div>
+		<a class="af-sx-nav__item" href="#af-sri-conexion">
+			<span class="af-sx-nav__dot" aria-hidden="true"></span>
+			<span><strong><?php esc_html_e( 'Conexión', 'arriendo-facil' ); ?></strong><small><?php esc_html_e( 'Estado del SRI', 'arriendo-facil' ); ?></small></span>
+		</a>
+		<a class="af-sx-nav__item" href="#af-sri-auditoria">
+			<span class="af-sx-nav__dot" aria-hidden="true"></span>
+			<span><strong><?php esc_html_e( 'Historial', 'arriendo-facil' ); ?></strong><small><?php esc_html_e( 'Cambios registrados', 'arriendo-facil' ); ?></small></span>
+		</a>
+	</nav>
+</aside>
 
 <?php
 $af_last_check = get_option( 'af_sri_last_check_' . get_current_user_id(), array() );
@@ -1062,3 +1057,4 @@ $af_audit_labels = Arriendo_Facil_SRI_Audit::event_labels();
 		</div>
 	<?php endif; ?>
 </div>
+</div><!-- .af-sx -->

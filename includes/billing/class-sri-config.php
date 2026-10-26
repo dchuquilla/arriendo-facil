@@ -129,7 +129,7 @@ class Arriendo_Facil_SRI_Config {
 			$saved = array();
 		}
 
-		return array_merge(
+		$merged = array_merge(
 			array(
 				'ruc'                   => '',
 				'razon_social'          => '',
@@ -150,6 +150,14 @@ class Arriendo_Facil_SRI_Config {
 			),
 			$saved
 		);
+
+		// Los gestores de propiedades siempre emiten en producción: el valor
+		// efectivo no depende de lo que haya quedado almacenado.
+		if ( $scope > 0 ) {
+			$merged['ambiente'] = '2';
+		}
+
+		return $merged;
 	}
 
 	/**

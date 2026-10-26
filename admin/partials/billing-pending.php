@@ -18,18 +18,13 @@ $pending_nonce = wp_create_nonce( 'af_billing_nonce' );
 ?>
 
 <?php if ( ! $pending_ready ) : ?>
-	<section class="af-onboard">
-		<div class="af-onboard__intro">
-			<span class="af-onboard__eyebrow"><?php esc_html_e( 'Empieza en 3 pasos', 'arriendo-facil' ); ?></span>
+	<section class="af-bx-empty">
+		<span class="af-bx-empty__ico" aria-hidden="true"><?php echo af_lucide( 'shield-check', 28 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+		<div>
 			<h2><?php esc_html_e( 'Activa tu facturación electrónica', 'arriendo-facil' ); ?></h2>
-			<p><?php esc_html_e( 'Cada propietario factura con su propio RUC y firma electrónica. Se configura una sola vez y después facturar toma un clic.', 'arriendo-facil' ); ?></p>
-			<a class="button button-primary button-hero" href="<?php echo esc_url( admin_url( 'admin.php?page=af-billing&tab=sri' ) ); ?>"><?php esc_html_e( 'Configurar ahora', 'arriendo-facil' ); ?></a>
+			<p><?php esc_html_e( 'Cada propietario factura con su propio RUC y firma electrónica. Se configura una sola vez; después, facturar un cobro toma un clic.', 'arriendo-facil' ); ?></p>
 		</div>
-		<ol class="af-onboard__steps">
-			<li class="is-current"><span>1</span><div><strong><?php esc_html_e( 'Datos del emisor', 'arriendo-facil' ); ?></strong><small><?php esc_html_e( 'RUC, razón social y dirección.', 'arriendo-facil' ); ?></small></div></li>
-			<li><span>2</span><div><strong><?php esc_html_e( 'Firma electrónica', 'arriendo-facil' ); ?></strong><small><?php esc_html_e( 'Sube tu archivo .p12 y su contraseña.', 'arriendo-facil' ); ?></small></div></li>
-			<li><span>3</span><div><strong><?php esc_html_e( 'Factura tus cobros', 'arriendo-facil' ); ?></strong><small><?php esc_html_e( 'Los pagos registrados aparecen aquí listos para emitir.', 'arriendo-facil' ); ?></small></div></li>
-		</ol>
+		<a class="button af-btn af-btn--primary" href="<?php echo esc_url( admin_url( 'admin.php?page=af-billing&tab=sri' ) ); ?>"><?php esc_html_e( 'Ir a la configuración', 'arriendo-facil' ); ?></a>
 	</section>
 <?php else : ?>
 

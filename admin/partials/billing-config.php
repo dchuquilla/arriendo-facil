@@ -585,7 +585,7 @@ $af_check_txt  = ! $af_has_check ? __( 'Sin comprobar', 'arriendo-facil' ) : ( !
 	<div class="af-sri-section__header">
 		<div>
 			<h2><?php esc_html_e( 'Datos del Emisor', 'arriendo-facil' ); ?></h2>
-			<p class="description"><?php esc_html_e( 'Esta es la base de la configuración. Si ya consultaste el RUC, revisa que el sistema haya traído los datos correctos antes de guardar.', 'arriendo-facil' ); ?></p>
+			<p class="description"><?php esc_html_e( 'Consulta tu RUC y revisa los datos antes de guardar.', 'arriendo-facil' ); ?></p>
 		</div>
 		<span class="af-sri-section__pill"><?php esc_html_e( 'Paso 1', 'arriendo-facil' ); ?></span>
 	</div>
@@ -593,15 +593,12 @@ $af_check_txt  = ! $af_has_check ? __( 'Sin comprobar', 'arriendo-facil' ) : ( !
 	<form method="post" action="" class="af-sri-form">
 		<?php wp_nonce_field( 'af_sri_settings_nonce' ); ?>
 
-		<p class="description af-sri-section__intro">
-			<?php esc_html_e( 'Información requerida por el SRI para emitir comprobantes válidos. Los campos marcados con * son obligatorios.', 'arriendo-facil' ); ?>
-		</p>
 
 		<div class="af-form-grid">
 			<div class="af-form-field af-form-field--full">
 				<label class="af-form-field__label" for="af_ruc">
 					<?php esc_html_e( 'RUC', 'arriendo-facil' ); ?> <span class="af-required">*</span>
-					<span class="af-form-field__hint">(13 dígitos; o cédula de 10 dígitos para persona natural)</span>
+					<span class="af-form-field__hint af-ruc-hint" id="af-ruc-hint">10 o 13 dígitos</span>
 				</label>
 				<div class="af-input-row">
 					<input type="text" id="af_ruc" name="af_ruc"
@@ -624,13 +621,12 @@ $af_check_txt  = ! $af_has_check ? __( 'Sin comprobar', 'arriendo-facil' ) : ( !
 				<input type="text" id="af_razon_social" name="af_razon_social"
 					value="<?php echo esc_attr( $cfg['razon_social'] ); ?>"
 					class="large-text" maxlength="300" required <?php echo esc_attr( $af_readonly_attr ); ?> />
-				<span class="af-form-field__hint"><?php esc_html_e( 'Tal como aparece en el RUC del SRI. Auto-completado al consultar el RUC.', 'arriendo-facil' ); ?></span>
 			</div>
 
 			<div class="af-form-field">
 				<label class="af-form-field__label" for="af_nombre_comercial">
 					<?php esc_html_e( 'Nombre Comercial', 'arriendo-facil' ); ?>
-					<span class="af-form-field__hint"><?php esc_html_e( 'Opcional. Solo si es diferente a la razón social.', 'arriendo-facil' ); ?></span>
+					<span class="af-form-field__hint"><?php esc_html_e( 'Opcional', 'arriendo-facil' ); ?></span>
 				</label>
 				<input type="text" id="af_nombre_comercial" name="af_nombre_comercial"
 					value="<?php echo esc_attr( $cfg['nombre_comercial'] ); ?>"
@@ -644,9 +640,6 @@ $af_check_txt  = ! $af_has_check ? __( 'Sin comprobar', 'arriendo-facil' ) : ( !
 				<input type="text" id="af_dir_establecimiento" name="af_dir_establecimiento"
 					value="<?php echo esc_attr( $cfg['dir_establecimiento'] ); ?>"
 					class="large-text" maxlength="300" placeholder="Ej: Quito, Pichincha, Calle X Nº123" required <?php echo esc_attr( $af_readonly_attr ); ?> />
-				<span class="af-form-field__hint">
-					<?php esc_html_e( 'Dirección física del establecimiento (se extrae del SRI al consultar el RUC). Si está vacía, completa manualmente.', 'arriendo-facil' ); ?>
-				</span>
 			</div>
 
 			<div class="af-form-field">
@@ -661,7 +654,7 @@ $af_check_txt  = ! $af_has_check ? __( 'Sin comprobar', 'arriendo-facil' ) : ( !
 					<?php if ( $af_dir_match ) : ?>
 						<span style="color:var(--af-success-700, #2F7D73); font-weight:500;">✓ <?php esc_html_e( 'Igual a la dirección del establecimiento.', 'arriendo-facil' ); ?></span>
 					<?php else : ?>
-						<?php esc_html_e( 'Opcional. Solo si es diferente a la dirección del establecimiento.', 'arriendo-facil' ); ?>
+						<?php esc_html_e( 'Opcional si es distinta.', 'arriendo-facil' ); ?>
 					<?php endif; ?>
 				</span>
 			</div>
@@ -684,7 +677,6 @@ $af_check_txt  = ! $af_has_check ? __( 'Sin comprobar', 'arriendo-facil' ) : ( !
 						<?php esc_html_e( 'SI', 'arriendo-facil' ); ?>
 					</label>
 				</div>
-				<span class="af-form-field__hint"><?php esc_html_e( 'Auto-completado al consultar el RUC.', 'arriendo-facil' ); ?></span>
 			</div>
 
 			<div class="af-form-field af-form-field--full">
@@ -695,9 +687,7 @@ $af_check_txt  = ! $af_has_check ? __( 'Sin comprobar', 'arriendo-facil' ) : ( !
 					value="<?php echo esc_attr( $cfg['email_notificacion'] ); ?>"
 					class="regular-text" required
 					pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$" />
-				<span class="af-form-field__hint" style="color:var(--af-danger-700, #B03A36); font-weight:500;">
-					<?php esc_html_e( '⚠️ CRÍTICO: El SRI envía las autorizaciones de comprobantes a este email. Sin él, no recibirás los documentos autorizados.', 'arriendo-facil' ); ?>
-				</span>
+				<span class="af-form-field__hint"><?php esc_html_e( 'El SRI enviará aquí los comprobantes autorizados.', 'arriendo-facil' ); ?></span>
 				<span id="af-email-error" class="af-form-field__error" style="display:none;"></span>
 			</div>
 		</div>
@@ -710,10 +700,10 @@ $af_check_txt  = ! $af_has_check ? __( 'Sin comprobar', 'arriendo-facil' ) : ( !
 					<label>
 						<input type="radio" name="af_ambiente_display" value="2" checked disabled />
 						<strong><?php esc_html_e( 'Producción', 'arriendo-facil' ); ?></strong>
-						<span class="af-form-field__hint"> — <?php esc_html_e( 'Comprobantes con validez legal ante el SRI.', 'arriendo-facil' ); ?></span>
+						<span class="af-form-field__hint"> — <?php esc_html_e( 'validez legal ante el SRI', 'arriendo-facil' ); ?></span>
 					</label>
 				</div>
-				<span class="af-form-field__hint"><?php esc_html_e( 'Los owners emiten siempre en ambiente de producción.', 'arriendo-facil' ); ?></span>
+				<span class="af-form-field__hint"><?php esc_html_e( 'Tu cuenta emite siempre en producción.', 'arriendo-facil' ); ?></span>
 			<?php else : ?>
 				<div class="af-radio-row">
 					<label>
@@ -733,13 +723,8 @@ $af_check_txt  = ! $af_has_check ? __( 'Sin comprobar', 'arriendo-facil' ) : ( !
 		</div>
 
 		<?php if ( ! $af_is_owner ) : ?>
-		<h2 class="af-sri-form__title" style="margin-top: var(--af-space-5);">
-			<?php esc_html_e( 'Configuración Avanzada', 'arriendo-facil' ); ?>
-			<span class="af-form-field__hint">(<?php esc_html_e( 'Opcional', 'arriendo-facil' ); ?>)</span>
-		</h2>
-		<p class="af-sri-form__desc">
-			<?php esc_html_e( 'Parámetros técnicos. Los valores por defecto funcionan para la mayoría de casos. Modifica solo si tienes problemas de conexión.', 'arriendo-facil' ); ?>
-		</p>
+		<details class="af-adv">
+		<summary><?php esc_html_e( 'Opciones avanzadas de conexión', 'arriendo-facil' ); ?></summary>
 		<div class="af-form-grid">
 			<div class="af-form-field">
 				<label class="af-form-field__label" for="af_sri_soap_timeout">
@@ -748,7 +733,7 @@ $af_check_txt  = ! $af_has_check ? __( 'Sin comprobar', 'arriendo-facil' ) : ( !
 				<input type="number" id="af_sri_soap_timeout" name="af_sri_soap_timeout"
 					value="<?php echo esc_attr( $cfg['sri_soap_timeout'] ?? 30 ); ?>"
 					class="small-text" min="10" max="120" step="1" />
-				<span class="af-form-field__hint"><?php esc_html_e( '⚙️ Default: 30 seg. Aumenta a 60 si tu conexión es lenta.', 'arriendo-facil' ); ?></span>
+				<span class="af-form-field__hint"><?php esc_html_e( 'Por defecto 30 s.', 'arriendo-facil' ); ?></span>
 			</div>
 			<div class="af-form-field">
 				<label class="af-form-field__label" for="af_sri_soap_max_retries">
@@ -757,12 +742,14 @@ $af_check_txt  = ! $af_has_check ? __( 'Sin comprobar', 'arriendo-facil' ) : ( !
 				<input type="number" id="af_sri_soap_max_retries" name="af_sri_soap_max_retries"
 					value="<?php echo esc_attr( $cfg['sri_soap_max_retries'] ?? 3 ); ?>"
 					class="small-text" min="1" max="5" step="1" />
-				<span class="af-form-field__hint"><?php esc_html_e( '⚙️ Default: 3. Reintentos inmediatos ante errores temporales.', 'arriendo-facil' ); ?></span>
+				<span class="af-form-field__hint"><?php esc_html_e( 'Por defecto 3.', 'arriendo-facil' ); ?></span>
 			</div>
 		</div>
+		</details>
 		<?php endif; ?>
 
-		<div class="af-sri-form__actions">
+		<div class="af-sri-form__actions af-sticky-save">
+			<span class="af-dirty-flag" hidden><?php esc_html_e( 'Cambios sin guardar', 'arriendo-facil' ); ?></span>
 			<button type="submit" name="af_save_sri_config" class="button af-btn af-btn--primary">
 				<?php echo af_lucide( 'save', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
 				<?php esc_html_e( 'Guardar Configuración', 'arriendo-facil' ); ?>
@@ -776,7 +763,7 @@ $af_check_txt  = ! $af_has_check ? __( 'Sin comprobar', 'arriendo-facil' ) : ( !
 	<div class="af-sri-section__header">
 		<div>
 			<h2><?php esc_html_e( 'Certificado Digital (P12)', 'arriendo-facil' ); ?></h2>
-			<p class="description"><?php esc_html_e( 'Sube el certificado, guarda su contraseña y confirma que la cadena CA quedó lista para evitar errores de firma.', 'arriendo-facil' ); ?></p>
+			<p class="description"><?php esc_html_e( 'Archivo .p12 o .pfx y su contraseña.', 'arriendo-facil' ); ?></p>
 		</div>
 		<span class="af-sri-section__pill"><?php esc_html_e( 'Paso 2', 'arriendo-facil' ); ?></span>
 	</div>
@@ -806,9 +793,7 @@ $af_check_txt  = ! $af_has_check ? __( 'Sin comprobar', 'arriendo-facil' ) : ( !
 					<?php esc_html_e( 'Archivo .p12 / .pfx', 'arriendo-facil' ); ?>
 				</label>
 				<input type="file" id="af_cert_file" name="af_cert_file" accept=".p12,.pfx" />
-				<span class="af-form-field__hint">
-					<?php esc_html_e( 'Certificado emitido por el Banco Central del Ecuador o una entidad de certificación autorizada. Máx. 1 MB.', 'arriendo-facil' ); ?>
-				</span>
+				<span class="af-form-field__hint" id="af-cert-file-name"><?php esc_html_e( '.p12 o .pfx · máx. 1 MB', 'arriendo-facil' ); ?></span>
 			</div>
 
 			<div class="af-form-field">
@@ -819,11 +804,7 @@ $af_check_txt  = ! $af_has_check ? __( 'Sin comprobar', 'arriendo-facil' ) : ( !
 					class="regular-text" autocomplete="new-password" />
 				<span class="af-form-field__hint">
 					<?php
-					if ( $cert_has_pwd ) {
-						esc_html_e( 'Ya hay una contraseña guardada. Déjela en blanco para mantenerla.', 'arriendo-facil' );
-					} else {
-						esc_html_e( 'Introduzca la contraseña del archivo P12.', 'arriendo-facil' );
-					}
+					echo esc_html( $cert_has_pwd ? __( 'Déjala vacía para mantener la guardada.', 'arriendo-facil' ) : __( 'Contraseña del archivo P12.', 'arriendo-facil' ) );
 					?>
 				</span>
 			</div>
@@ -850,9 +831,7 @@ $af_check_txt  = ! $af_has_check ? __( 'Sin comprobar', 'arriendo-facil' ) : ( !
 					<?php esc_html_e( 'Reconstruir cadena CA', 'arriendo-facil' ); ?>
 				</button>
 			</div>
-			<p class="af-sri-form__desc" style="margin-top: var(--af-space-2);">
-				<?php esc_html_e( 'Verifica que el certificado sea válido y esté activo. Usa "Reconstruir cadena CA" si los certificados intermedios están en 0 o la firma es rechazada por el SRI.', 'arriendo-facil' ); ?>
-			</p>
+			<p class="af-form-field__hint"><?php esc_html_e( 'Reconstruir la cadena CA solo si el SRI rechaza la firma.', 'arriendo-facil' ); ?></p>
 		</form>
 	<?php endif; ?>
 </div>
@@ -863,7 +842,7 @@ $af_check_txt  = ! $af_has_check ? __( 'Sin comprobar', 'arriendo-facil' ) : ( !
 	<div class="af-sri-section__header">
 		<div>
 			<h2><?php esc_html_e( 'Puntos de Emisión', 'arriendo-facil' ); ?></h2>
-			<p class="description"><?php esc_html_e( 'Cada comprobante se asocia a un establecimiento y punto de emisión (serie). El punto activo con el secuencial más bajo se utiliza por defecto.', 'arriendo-facil' ); ?></p>
+			<p class="description"><?php esc_html_e( 'Serie de tus comprobantes (establecimiento + punto).', 'arriendo-facil' ); ?></p>
 		</div>
 		<span class="af-sri-section__pill"><?php esc_html_e( 'Paso 3', 'arriendo-facil' ); ?></span>
 	</div>
@@ -1057,4 +1036,43 @@ $af_audit_labels = Arriendo_Facil_SRI_Audit::event_labels();
 		</div>
 	<?php endif; ?>
 </div>
+<script>
+(function () {
+	'use strict';
+	// Validación en vivo del RUC.
+	var ruc = document.getElementById( 'af_ruc' ), hint = document.getElementById( 'af-ruc-hint' );
+	if ( ruc && hint ) {
+		var check = function () {
+			var n = ruc.value.replace( /\D/g, '' ).length;
+			hint.className = 'af-form-field__hint af-ruc-hint' + ( n === 10 || n === 13 ? ' is-ok' : ( n ? ' is-bad' : '' ) );
+			hint.textContent = n === 10 || n === 13 ? '\u2713 <?php echo esc_js( __( 'Formato válido', 'arriendo-facil' ) ); ?>' : ( n ? n + ' / 13 <?php echo esc_js( __( 'dígitos', 'arriendo-facil' ) ); ?>' : '<?php echo esc_js( __( '10 o 13 dígitos', 'arriendo-facil' ) ); ?>' );
+		};
+		ruc.addEventListener( 'input', check ); check();
+	}
+	// Nombre del archivo elegido y botón para ver/ocultar la contraseña.
+	var file = document.getElementById( 'af_cert_file' ), fname = document.getElementById( 'af-cert-file-name' );
+	if ( file && fname ) {
+		file.addEventListener( 'change', function () { if ( file.files[ 0 ] ) { fname.textContent = '\u2713 ' + file.files[ 0 ].name; fname.classList.add( 'is-ok' ); } } );
+	}
+	var pw = document.getElementById( 'af_cert_password' );
+	if ( pw ) {
+		var tg = document.createElement( 'button' );
+		tg.type = 'button'; tg.className = 'af-pw-toggle'; tg.textContent = '<?php echo esc_js( __( 'Mostrar', 'arriendo-facil' ) ); ?>';
+		tg.setAttribute( 'aria-controls', 'af_cert_password' );
+		tg.addEventListener( 'click', function () {
+			var show = pw.type === 'password';
+			pw.type = show ? 'text' : 'password';
+			tg.textContent = show ? '<?php echo esc_js( __( 'Ocultar', 'arriendo-facil' ) ); ?>' : '<?php echo esc_js( __( 'Mostrar', 'arriendo-facil' ) ); ?>';
+		} );
+		pw.insertAdjacentElement( 'afterend', tg );
+	}
+	// Aviso de cambios sin guardar en cada formulario.
+	document.querySelectorAll( '.af-sx form.af-sri-form' ).forEach( function ( form ) {
+		var flag = form.querySelector( '.af-dirty-flag' );
+		if ( ! flag ) { return; }
+		var mark = function () { flag.hidden = false; };
+		form.addEventListener( 'input', mark ); form.addEventListener( 'change', mark );
+	} );
+}());
+</script>
 </div><!-- .af-sx -->

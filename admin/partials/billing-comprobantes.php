@@ -209,49 +209,34 @@ foreach ( $invoices as $inv_row ) {
 	<?php endif; ?>
 <?php endif; ?>
 
-<details class="af-section af-manual-issue">
+<details class="af-manual-issue" id="af-manual-issue">
 	<summary class="af-manual-issue__summary">
-		<span><?php esc_html_e( 'Emisión manual avanzada (por contrato, sin cobro registrado)', 'arriendo-facil' ); ?></span>
+		<span class="af-manual-issue__ico" aria-hidden="true"><?php echo af_lucide( 'receipt', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+		<span>
+			<strong><?php esc_html_e( 'Facturar un contrato sin cobro registrado', 'arriendo-facil' ); ?></strong>
+			<small><?php esc_html_e( 'Para casos puntuales: busca el contrato y revisa la factura antes de emitir.', 'arriendo-facil' ); ?></small>
+		</span>
 	</summary>
-	<section>
-	<header class="af-section__header">
-		<div>
-			<h2 class="af-section__title"><?php esc_html_e( 'Emisión manual de comprobante', 'arriendo-facil' ); ?></h2>
-			<p class="af-section__subtitle"><?php esc_html_e( 'Busca el contrato por cédula, RUC, pasaporte o nombre e inicia la emisión.', 'arriendo-facil' ); ?></p>
-		</div>
-	</header>
 
 	<form method="post" class="af-issue-form">
 		<?php wp_nonce_field( 'af_billing_manual_issue' ); ?>
-		<div class="af-form-field af-form-field--full">
-			<label class="af-form-field__label" for="af-lease-search-input">
-				<?php esc_html_e( 'Buscar contrato (cédula / RUC / pasaporte / nombre)', 'arriendo-facil' ); ?>
-			</label>
-			<div class="af-lease-search__row">
-				<input type="text" id="af-lease-search-input" placeholder="<?php esc_attr_e( 'Escribe al menos 2 caracteres…', 'arriendo-facil' ); ?>" class="regular-text" autocomplete="off" />
-				<span id="af-lease-search-spinner" hidden style="color: var(--af-gray-500, #647579);"><?php esc_html_e( 'Buscando…', 'arriendo-facil' ); ?></span>
-			</div>
+		<div class="af-issue-search">
+			<label class="screen-reader-text" for="af-lease-search-input"><?php esc_html_e( 'Buscar contrato', 'arriendo-facil' ); ?></label>
+			<input type="search" id="af-lease-search-input" placeholder="<?php esc_attr_e( 'Cédula, RUC, pasaporte o nombre del inquilino…', 'arriendo-facil' ); ?>" autocomplete="off" />
+			<span id="af-lease-search-spinner" hidden class="af-td-meta"><?php esc_html_e( 'Buscando…', 'arriendo-facil' ); ?></span>
 			<ul id="af-lease-search-results" class="af-lease-search__list" style="display:none;"></ul>
 		</div>
-
-		<div class="af-issue-form__actions">
-			<div class="af-form-field">
-				<label class="af-form-field__label" for="af-billing-lease-id"><?php esc_html_e( 'ID del contrato', 'arriendo-facil' ); ?></label>
-				<input id="af-billing-lease-id" type="number" name="lease_id" min="1" required />
-			</div>
-			<button type="button" id="af-open-issue-preview" class="button af-btn af-btn--primary">
-				<?php echo af_lucide( 'receipt', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
-				<?php esc_html_e( 'Emitir Comprobante', 'arriendo-facil' ); ?>
-			</button>
-			<noscript>
-				<button type="submit" name="af_issue_invoice_submit" class="button">
-					<?php esc_html_e( 'Emitir (sin vista previa)', 'arriendo-facil' ); ?>
-				</button>
-			</noscript>
+		<input id="af-billing-lease-id" type="hidden" name="lease_id" value="" />
+		<div class="af-issue-picked" id="af-issue-picked" hidden>
 			<span id="af-billing-lease-label" class="af-issue-form__lease-label"></span>
+			<button type="button" id="af-open-issue-preview" class="button af-btn af-btn--primary">
+				<?php esc_html_e( 'Revisar y emitir', 'arriendo-facil' ); ?>
+			</button>
 		</div>
+		<noscript>
+			<button type="submit" name="af_issue_invoice_submit" class="button"><?php esc_html_e( 'Emitir (sin vista previa)', 'arriendo-facil' ); ?></button>
+		</noscript>
 	</form>
-</section>
 </details>
 
 <div id="af-billing-preview-modal" class="af-modal" hidden>
@@ -543,6 +528,7 @@ foreach ( $invoices as $inv_row ) {
 							e.preventDefault();
 							leaseIdField.value        = l.id;
 							leaseLabel.textContent    = ( l.guest_name || '' ) + ' — ' + ( l.accommodation_title || '' );
+							var pickedBox = document.getElementById( 'af-issue-picked' ); if ( pickedBox ) { pickedBox.hidden = false; }
 							searchInput.value         = ( l.guest_name || '' ) + ' (' + ( l.id_number || '' ) + ')';
 							selectedLeaseData         = l;
 							resultsList.style.display = 'none';

@@ -1065,3 +1065,7 @@
 }
 .af-sx .af-pw .af-pw-toggle:hover { color: var(--af-primary-500); }
 .af-sx .af-pw .af-pw-toggle:focus-visible { outline: 2px solid var(--af-primary-400); outline-offset: -2px; }
+
+/* El texto del campo no debe quedar bajo el botón Mostrar/Ocultar */
+.af-sx .af-pw input#af_cert_password { padding-right: 104px !important; box-sizing: border-box; }
+.af-sx .af-pw .af-pw-toggle { z-index: 1; padding: 0 12px; background: var(--af-gray-0, #fff); }

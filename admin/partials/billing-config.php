@@ -103,7 +103,8 @@ if ( isset( $_POST['af_save_sri_config'] ) ) {
 			$posted_razon      = ! empty( $sri_data['razon_social'] )         ? (string) $sri_data['razon_social']         : (string) $af_current_cfg['razon_social'];
 			$posted_nombre_com = ! empty( $sri_data['nombre_comercial'] )     ? (string) $sri_data['nombre_comercial']     : (string) $af_current_cfg['nombre_comercial'];
 			$posted_dir_matriz = ! empty( $sri_data['dir_matriz'] )           ? (string) $sri_data['dir_matriz']           : (string) $af_current_cfg['dir_matriz'];
-			$posted_obligado   = ! empty( $sri_data['obligado_contabilidad'] ) ? (string) $sri_data['obligado_contabilidad'] : ( (string) $af_current_cfg['obligado_contabilidad'] ?: 'NO' );
+			// Editable por el gestor: se toma lo enviado (NO por defecto); la consulta del RUC solo lo autocompleta en pantalla.
+			$posted_obligado   = ( 'SI' === strtoupper( (string) ( $_POST['af_obligado_contabilidad'] ?? 'NO' ) ) ) ? 'SI' : 'NO';
 
 			// dir_establecimiento: prefer SRI, then previously saved, then posted (locked in UI).
 			if ( ! empty( $sri_data['dir_establecimiento'] ) ) {
@@ -667,16 +668,17 @@ $af_check_txt  = ! $af_has_check ? __( 'Sin comprobar', 'arriendo-facil' ) : ( !
 					<label>
 						<input type="radio" name="af_obligado_contabilidad" value="NO"
 							<?php checked( $cfg['obligado_contabilidad'], 'NO' ); ?>
-							<?php echo esc_attr( $af_disabled_attr ); ?> />
+							/>
 						<?php esc_html_e( 'NO', 'arriendo-facil' ); ?>
 					</label>
 					<label>
 						<input type="radio" name="af_obligado_contabilidad" value="SI"
 							<?php checked( $cfg['obligado_contabilidad'], 'SI' ); ?>
-							<?php echo esc_attr( $af_disabled_attr ); ?> />
+							/>
 						<?php esc_html_e( 'SI', 'arriendo-facil' ); ?>
 					</label>
 				</div>
+				<span class="af-form-field__hint"><?php echo esc_html( __( 'Se autocompleta al consultar el RUC; puedes cambiarlo. Por defecto: NO.', 'arriendo-facil' ) ); ?></span>
 			</div>
 
 			<div class="af-form-field af-form-field--full">

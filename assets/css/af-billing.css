@@ -1026,3 +1026,27 @@
 	.af-sx > .af-sri-hero { position: static; }
 	.af-sx .af-input-row { flex-wrap: wrap; }
 }
+
+/* ── Escala de controles (estándar actual: 36 px de alto, texto 14 px) ── */
+.af-sx input.regular-text, .af-sx input.large-text, .af-sx input[type="text"], .af-sx input[type="email"],
+.af-sx input[type="password"], .af-sx input[type="number"], .af-bx .af-issue-search input[type="search"],
+.af-bx .af-invoice-toolbar input[type="search"], .af-bx .af-invoice-toolbar input[type="date"] {
+	min-height: 36px; height: 36px; padding: 6px 12px; font-size: 14px; line-height: 1.4; border-radius: 6px;
+}
+.af-sx input.small-text { width: 96px; }
+.af-sx .af-form-field { gap: 4px; }
+.af-sx .af-form-field__label { font-size: 13px; }
+.af-sx .af-form-field__hint { font-size: 12px; }
+.af-sx .af-form-grid { gap: var(--af-space-3) var(--af-space-4); }
+.af-sx .af-sri-section { padding: var(--af-space-4) var(--af-space-5); }
+.af-sx .af-sri-section__header h2 { font-size: 16px; }
+.af-sx .af-sri-form__title { font-size: 14px; margin: var(--af-space-4) 0 var(--af-space-2); }
+.af-sx input[type="file"] { padding: 6px 10px; font-size: 13px; }
+.af-sx .af-radio-row label { padding: 5px 12px; font-size: 13px; }
+.af-sx .af-btn, .af-sx .button, .af-bx .af-issue-picked .button {
+	min-height: 36px; padding: 0 14px; font-size: 14px; line-height: 34px; border-radius: 6px;
+}
+.af-sx .af-btn svg { vertical-align: -3px; }
+.af-sx .af-cert-status__item { padding: 4px 10px; font-size: 13px; }
+.af-sx-nav__item { padding: 6px 12px 6px 10px; }
+.af-sx-nav__item strong { font-size: 13px; }

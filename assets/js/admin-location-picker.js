@@ -255,6 +255,7 @@
 		if (handleUrlInput(query)) return;
 
 		if (query.length < 3) {
+			searchSeq++;
 			closeSuggestions();
 			return;
 		}
@@ -312,60 +313,135 @@
 		activeIndex = -1;
 	}
 
-	function searchNominatim(query, autoSelect) {
-		var queries = buildSearchVariants(query);
-		searchWithFallback(queries, 0, autoSelect || false);
+	var searchSeq = 0;
+
+	function stripAccents(t) {
+		return t.normalize ? t.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : t;
 	}
 
-	function buildSearchVariants(query) {
-		var variants = [query];
-
-		// For Ecuadorian intersections: "Calle X y Calle Y" → try "Calle X, Ecuador"
-		var intersection = query.split(/\s+y\s+/i);
-		if (intersection.length === 2) {
-			variants.push(intersection[0].trim() + ', ' + intersection[1].trim() + ', Ecuador');
-			variants.push(intersection[0].trim() + ', Ecuador');
-		}
-
-		// Append Ecuador if not already present.
-		if (!/ecuador/i.test(query)) {
-			variants.push(query + ', Ecuador');
-		}
-
-		return variants;
+	function fetchJson(url, opts) {
+		return fetch(url, opts).then(function (r) {
+			if (!r.ok) throw new Error('http ' + r.status);
+			return r.json();
+		});
 	}
 
-	function searchWithFallback(queries, index, autoSelect) {
-		if (index >= queries.length) {
-			closeSuggestions();
-			showNoResults();
-			return;
-		}
+	function nominatimQuery(q) {
+		var c = map ? map.getCenter() : { lat: defaultLat, lng: defaultLng };
+		var vb = [c.lng - 0.5, c.lat + 0.5, c.lng + 0.5, c.lat - 0.5].join(',');
+		var url = 'https://nominatim.openstreetmap.org/search?format=json&countrycodes=ec&limit=8&addressdetails=1&viewbox=' + vb + '&q=' + encodeURIComponent(q);
+		return fetchJson(url, { headers: { 'Accept-Language': 'es' } }).catch(function () { return []; });
+	}
 
-		var viewbox = [bounds.lngMin, bounds.latMax, bounds.lngMax, bounds.latMin].join(',');
-		var url = 'https://nominatim.openstreetmap.org/search?format=json&countrycodes=ec&limit=5&addressdetails=1&bounded=1&viewbox=' + viewbox + '&q=' + encodeURIComponent(queries[index]);
+	// Photon (OSM-based) tolerates typos and partial names much better than Nominatim.
+	function photonQuery(q) {
+		var c = map ? map.getCenter() : { lat: defaultLat, lng: defaultLng };
+		var url = 'https://photon.komoot.io/api/?limit=8&lat=' + c.lat + '&lon=' + c.lng + '&q=' + encodeURIComponent(q);
+		return fetchJson(url).then(function (data) {
+			return (data.features || []).map(function (f) {
+				var p = f.properties || {};
+				var label = [p.name || p.street, p.district || p.locality, p.city || p.county, p.state].filter(Boolean).join(', ');
+				return {
+					lat: f.geometry.coordinates[1],
+					lon: f.geometry.coordinates[0],
+					display_name: label + ', Ecuador',
+					address: {
+						road: p.street || p.name,
+						house_number: p.housenumber,
+						suburb: p.district || p.locality,
+						city: p.city || p.county,
+						state: p.state,
+						country_code: (p.countrycode || '').toLowerCase()
+					}
+				};
+			});
+		}).catch(function () { return []; });
+	}
 
-		fetch(url, { headers: { 'Accept-Language': 'es' } })
-			.then(function (r) { return r.json(); })
-			.then(function (results) {
-				suggestions = results.filter(function (r) {
-					return isEcuadorResult(r);
+	function searchBoth(q) {
+		return Promise.all([nominatimQuery(q), photonQuery(q)]).then(function (res) {
+			var seen = {};
+			return res[0].concat(res[1]).filter(function (r) {
+				if (!isEcuadorResult(r)) return false;
+				var key = parseFloat(r.lat).toFixed(4) + ',' + parseFloat(r.lon).toFixed(4);
+				if (seen[key]) return false;
+				seen[key] = true;
+				return true;
+			});
+		});
+	}
+
+	function distKm(a, b) {
+		var dx = (a.lon - b.lon) * 111 * Math.cos(a.lat * Math.PI / 180);
+		var dy = (a.lat - b.lat) * 111;
+		return Math.sqrt(dx * dx + dy * dy);
+	}
+
+	// "Calle A y Calle B": find A and B, then pick the closest pair as the intersection.
+	function searchIntersection(partA, partB) {
+		return Promise.all([searchBoth(partA), searchBoth(partB)]).then(function (res) {
+			var best = null;
+			res[0].forEach(function (x) {
+				var xp = { lat: parseFloat(x.lat), lon: parseFloat(x.lon) };
+				res[1].forEach(function (y) {
+					var d = distKm(xp, { lat: parseFloat(y.lat), lon: parseFloat(y.lon) });
+					if (d < 1.5 && (!best || d < best.d)) best = { d: d, x: x, y: y };
 				});
+			});
+			if (!best) return [];
+			var r = JSON.parse(JSON.stringify(best.x));
+			r.lat = (parseFloat(best.x.lat) + parseFloat(best.y.lat)) / 2;
+			r.lon = (parseFloat(best.x.lon) + parseFloat(best.y.lon)) / 2;
+			var road = (best.x.address && best.x.address.road) || partA;
+			var other = (best.y.address && best.y.address.road) || partB;
+			r.address = r.address || {};
+			r.address.road = road + ' y ' + other;
+			r.display_name = road + ' y ' + other + ', ' + (best.x.display_name || '').split(',').slice(1).join(',').trim();
+			return [r];
+		});
+	}
 
-				if (suggestions.length) {
-					// Only auto-pick when unambiguous; otherwise let the user choose.
+	function searchNominatim(query, autoSelect) {
+		var seq = ++searchSeq;
+		var clean = stripAccents(query).replace(/\s+/g, ' ').trim();
+		var parts = clean.split(/\s+(?:y|e|&|esq\.?|esquina)\s+/i);
+		var steps = [];
+
+		if (parts.length === 2 && parts[0] && parts[1]) {
+			steps.push(function () { return searchIntersection(parts[0], parts[1]); });
+		}
+		steps.push(function () { return searchBoth(query); });
+		if (!/ecuador/i.test(query)) {
+			steps.push(function () { return searchBoth(query + ', Ecuador'); });
+		}
+		if (parts.length === 2) {
+			steps.push(function () { return searchBoth(parts[0]); });
+		}
+
+		var i = 0;
+		function next() {
+			if (seq !== searchSeq) return;
+			if (i >= steps.length) {
+				closeSuggestions();
+				showNoResults();
+				return;
+			}
+			steps[i++]().then(function (results) {
+				if (seq !== searchSeq) return;
+				if (results.length) {
+					suggestions = results.slice(0, 6);
+					suggestionsEl.innerHTML = '';
 					if (autoSelect && suggestions.length === 1) {
 						selectSuggestion(suggestions[0]);
 					} else {
 						renderSuggestions();
 					}
 				} else {
-					searchWithFallback(queries, index + 1, autoSelect);
+					next();
 				}
-			})
-			.catch(function () {
-				searchWithFallback(queries, index + 1, autoSelect);
-			});
+			}).catch(next);
+		}
+		next();
 	}
 
 	function showNoResults() {
@@ -398,6 +474,7 @@
 	}
 
 	function selectSuggestion(item) {
+		searchSeq++;
 		var lat = parseFloat(item.lat);
 		var lng = parseFloat(item.lon);
 

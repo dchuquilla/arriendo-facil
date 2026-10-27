@@ -1077,6 +1077,40 @@ $af_audit_labels = Arriendo_Facil_SRI_Audit::event_labels();
 		wrap.appendChild( tg );
 		paint();
 	}
+	// Envío por AJAX: evita la recarga y refresca el panel (barra de progreso incluida) en tiempo real.
+	var root = document.querySelector( '.af-sx' );
+	if ( root && ! root.dataset.afAjax && window.fetch && window.DOMParser && window.FormData ) {
+		root.dataset.afAjax = '1';
+		root.addEventListener( 'submit', function ( e ) {
+			var form = e.target;
+			if ( ! form.classList || ! form.classList.contains( 'af-sri-form' ) || e.defaultPrevented ) { return; }
+			e.preventDefault();
+			var submitter = e.submitter, fd = submitter && submitter.name ? new FormData( form, submitter ) : new FormData( form );
+			if ( submitter && submitter.name && ! fd.has( submitter.name ) ) { fd.append( submitter.name, '1' ); }
+			var buttons = form.querySelectorAll( 'button[type="submit"]' );
+			buttons.forEach( function ( b ) { b.disabled = true; } );
+			var scrollY = window.scrollY;
+			fetch( window.location.href, { method: 'POST', body: fd, credentials: 'same-origin' } )
+				.then( function ( r ) { return r.text(); } )
+				.then( function ( html ) {
+					var fresh = new DOMParser().parseFromString( html, 'text/html' ).querySelector( '.af-sx' );
+					if ( ! fresh ) { throw new Error( 'no-panel' ); }
+					root.innerHTML = fresh.innerHTML;
+					root.querySelectorAll( 'script' ).forEach( function ( old ) {
+						var s = document.createElement( 'script' );
+						s.text = old.textContent;
+						old.parentNode.replaceChild( s, old );
+					} );
+					window.scrollTo( 0, scrollY );
+					var note = root.querySelector( '.af-note[role="status"]' );
+					if ( note && note.scrollIntoView ) { note.scrollIntoView( { block: 'nearest', behavior: 'smooth' } ); }
+				} )
+				.catch( function () {
+					buttons.forEach( function ( b ) { b.disabled = false; } );
+					HTMLFormElement.prototype.submit.call( form );
+				} );
+		} );
+	}
 	// Aviso de cambios sin guardar en cada formulario.
 	document.querySelectorAll( '.af-sx form.af-sri-form' ).forEach( function ( form ) {
 		var flag = form.querySelector( '.af-dirty-flag' );

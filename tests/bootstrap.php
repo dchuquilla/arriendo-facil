@@ -223,6 +223,19 @@ if ( ! function_exists( 'update_option' ) ) {
 	}
 }
 
+if ( ! function_exists( 'update_user_meta' ) ) {
+	function update_user_meta( $user_id, $key, $value ) {
+		$GLOBALS['af_test_user_meta'][ (int) $user_id ][ $key ] = $value;
+		return true;
+	}
+}
+
+if ( ! function_exists( 'get_user_meta' ) ) {
+	function get_user_meta( $user_id, $key = '', $single = false ) {
+		return $GLOBALS['af_test_user_meta'][ (int) $user_id ][ $key ] ?? '';
+	}
+}
+
 if ( ! function_exists( 'wp_delete_attachment' ) ) {
 	function wp_delete_attachment( $id, $force = false ) {
 		return true;

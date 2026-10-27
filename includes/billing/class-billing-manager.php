@@ -169,6 +169,13 @@ class Arriendo_Facil_Billing_Manager {
 		if ( $owner_id <= 0 && isset( $context['lease_id'] ) ) {
 			$owner_id = $this->owner_id_for_lease( (int) $context['lease_id'] );
 		}
+		// La factura se emite a nombre del propietario/persona jurídica, nunca del gestor logueado.
+		if ( $owner_id <= 0 ) {
+			return new WP_Error(
+				'sri_owner_missing',
+				__( 'El inmueble de este contrato no tiene un propietario asignado. La factura debe emitirse a nombre del propietario o persona jurídica (condominio); asigne el propietario al inmueble y pídale que registre su RUC y certificado digital.', 'arriendo-facil' )
+			);
+		}
 		$scope = max( 0, $owner_id ); // 0 = configuración global (admin), nunca la del usuario en sesión
 
 		$config = Arriendo_Facil_SRI_Config::get( $scope );

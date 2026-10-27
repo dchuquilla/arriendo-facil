@@ -586,7 +586,7 @@ $af_check_txt  = ! $af_has_check ? __( 'Sin comprobar', 'arriendo-facil' ) : ( !
 	<div class="af-sri-section__header">
 		<div>
 			<h2><?php esc_html_e( 'Datos del Emisor', 'arriendo-facil' ); ?></h2>
-			<p class="description"><?php esc_html_e( 'Consulta tu RUC y revisa los datos antes de guardar.', 'arriendo-facil' ); ?></p>
+			<p class="description"><?php esc_html_e( 'Los datos del emisor deben ser los del propietario del inmueble o de la persona jurídica (condominio), no los del administrador. Las facturas de arriendo y alícuotas se emiten a su nombre. Consulta el RUC y revisa los datos antes de guardar.', 'arriendo-facil' ); ?></p>
 		</div>
 		<span class="af-sri-section__pill"><?php esc_html_e( 'Paso 1', 'arriendo-facil' ); ?></span>
 	</div>

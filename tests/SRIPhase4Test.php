@@ -100,7 +100,8 @@ class SRIPhase4Test extends TestCase {
 						'precio_unitario'  => 400,
 					),
 				),
-			)
+			),
+			array( 'owner_id' => 7 )
 		);
 
 		$this->assertTrue( is_wp_error( $result ) );
@@ -113,8 +114,9 @@ class SRIPhase4Test extends TestCase {
 
 		$pems = $this->make_test_cert_pem();
 
-		update_option(
-			Arriendo_Facil_SRI_Config::OPTION_KEY,
+		update_user_meta(
+			7,
+			Arriendo_Facil_SRI_Config::USER_META_KEY,
 			array(
 				'ruc'                   => '0912345678001',
 				'razon_social'          => 'EMPRESA PRUEBA S.A.',
@@ -157,7 +159,8 @@ class SRIPhase4Test extends TestCase {
 						'precio_unitario'  => 500.00,
 					),
 				),
-			)
+			),
+			array( 'owner_id' => 7 )
 		);
 
 		$this->assertIsArray( $result );
@@ -174,8 +177,9 @@ class SRIPhase4Test extends TestCase {
 
 		$pems = $this->make_test_cert_pem();
 
-		update_option(
-			Arriendo_Facil_SRI_Config::OPTION_KEY,
+		update_user_meta(
+			7,
+			Arriendo_Facil_SRI_Config::USER_META_KEY,
 			array(
 				'ruc'                   => '0912345678001',
 				'razon_social'          => 'EMPRESA PRUEBA S.A.',
@@ -214,7 +218,8 @@ class SRIPhase4Test extends TestCase {
 						'precio_unitario'  => 500.00,
 					),
 				),
-			)
+			),
+			array( 'owner_id' => 7 )
 		);
 
 		$this->assertTrue( is_wp_error( $result ) );

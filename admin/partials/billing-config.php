@@ -55,9 +55,14 @@ if ( isset( $_POST['af_save_sri_config'] ) ) {
 	$ruc = Arriendo_Facil_SRI_Config::normalize_ruc(
 		preg_replace( '/\D/', '', sanitize_text_field( wp_unslash( $_POST['af_ruc'] ?? '' ) ) )
 	);
-	// If owner already has a RUC locked, ignore any attempt to change it via POST.
-	if ( $af_is_owner && '' !== trim( (string) $af_current_cfg['ruc'] ) ) {
-		$ruc = (string) $af_current_cfg['ruc'];
+	// Owners may change their RUC; dependent data is re-fetched from SRI and the
+	// certificate is discarded (it is bound to the previous RUC).
+	$af_ruc_changed = '' !== trim( (string) $af_current_cfg['ruc'] ) && $ruc !== (string) $af_current_cfg['ruc'];
+	if ( $af_ruc_changed ) {
+		$af_current_cfg['razon_social']        = '';
+		$af_current_cfg['nombre_comercial']    = '';
+		$af_current_cfg['dir_matriz']          = '';
+		$af_current_cfg['dir_establecimiento'] = '';
 	}
 	$email               = sanitize_email( wp_unslash( $_POST['af_email_notificacion'] ?? '' ) );
 	$dir_establecimiento = sanitize_text_field( wp_unslash( $_POST['af_dir_establecimiento'] ?? '' ) );
@@ -111,6 +116,10 @@ if ( isset( $_POST['af_save_sri_config'] ) ) {
 				$dir_establecimiento = (string) $sri_data['dir_establecimiento'];
 			} elseif ( '' !== trim( (string) $af_current_cfg['dir_establecimiento'] ) ) {
 				$dir_establecimiento = (string) $af_current_cfg['dir_establecimiento'];
+			} elseif ( mb_strlen( trim( $dir_establecimiento ) ) < 10 || ! preg_match( '/\p{L}/u', $dir_establecimiento ) || ! preg_match( '/\d/', $dir_establecimiento ) ) {
+				// SRI has no address: accept a manual one only if it looks like a real address.
+				$af_sri_notice = array( 'type' => 'error', 'msg' => __( '❌ El SRI no tiene dirección para este RUC. Ingresa una dirección física real (calle, número, ciudad).', 'arriendo-facil' ) );
+				$af_skip_save  = true;
 			}
 
 			// Owners can never toggle ambiente — always Production.
@@ -137,6 +146,9 @@ if ( isset( $_POST['af_save_sri_config'] ) ) {
 				: (string) absint( wp_unslash( $_POST['af_sri_soap_max_retries'] ?? 3 ) );
 
 			$af_audit_before = $af_current_cfg;
+			if ( $af_ruc_changed ) {
+				Arriendo_Facil_SRI_Config::clear_certificate( $af_owner_scope_arg );
+			}
 			Arriendo_Facil_SRI_Config::save(
 				array(
 					'ruc'                   => $ruc,
@@ -187,7 +199,12 @@ if ( isset( $_POST['af_save_sri_config'] ) ) {
 				}
 			}
 
-			$af_sri_notice = array( 'type' => 'success', 'msg' => __( 'Configuración guardada.', 'arriendo-facil' ) );
+			$af_sri_notice = array(
+				'type' => 'success',
+				'msg'  => $af_ruc_changed
+					? __( 'Configuración guardada. Como cambió el RUC, el certificado anterior fue eliminado: sube la firma electrónica correspondiente al nuevo RUC.', 'arriendo-facil' )
+					: __( 'Configuración guardada.', 'arriendo-facil' ),
+			);
 		}
 	}
 }
@@ -611,6 +628,12 @@ $af_check_txt  = ! $af_has_check ? __( 'Sin comprobar', 'arriendo-facil' ) : ( !
 						<?php echo af_lucide( 'search', 15 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
 						<?php esc_html_e( 'Consultar en SRI', 'arriendo-facil' ); ?>
 					</button>
+					<?php if ( '' !== $af_ro_if_filled( (string) $cfg['ruc'] ) ) : ?>
+						<button type="button" id="af-ruc-unlock-btn" class="button af-btn af-btn--ghost"
+							data-confirm="<?php echo esc_attr__( 'Cambiar el RUC eliminará el certificado de firma actual y se recalcularán los datos del emisor desde el SRI. ¿Continuar?', 'arriendo-facil' ); ?>">
+							<?php esc_html_e( 'Cambiar RUC', 'arriendo-facil' ); ?>
+						</button>
+					<?php endif; ?>
 					<span id="af-ruc-lookup-status" style="font-style:italic; color: var(--af-gray-500, #647579);"></span>
 				</div>
 			</div>
@@ -640,7 +663,7 @@ $af_check_txt  = ! $af_has_check ? __( 'Sin comprobar', 'arriendo-facil' ) : ( !
 				</label>
 				<input type="text" id="af_dir_establecimiento" name="af_dir_establecimiento"
 					value="<?php echo esc_attr( $cfg['dir_establecimiento'] ); ?>"
-					class="large-text" maxlength="300" placeholder="Ej: Quito, Pichincha, Calle X Nº123" required <?php echo esc_attr( $af_readonly_attr ); ?> />
+					class="large-text" maxlength="300" placeholder="Ej: Quito, Pichincha, Calle X Nº123" required <?php echo esc_attr( $af_ro_if_filled( (string) $cfg['dir_establecimiento'] ) ); ?> />
 			</div>
 
 			<div class="af-form-field">
@@ -1042,6 +1065,17 @@ $af_audit_labels = Arriendo_Facil_SRI_Audit::event_labels();
 (function () {
 	'use strict';
 	// Validación en vivo del RUC.
+	var unlockBtn = document.getElementById( 'af-ruc-unlock-btn' );
+	if ( unlockBtn ) {
+		unlockBtn.addEventListener( 'click', function () {
+			if ( ! window.confirm( unlockBtn.getAttribute( 'data-confirm' ) ) ) { return; }
+			var r = document.getElementById( 'af_ruc' );
+			r.removeAttribute( 'readonly' );
+			r.focus();
+			r.select();
+			unlockBtn.style.display = 'none';
+		} );
+	}
 	var ruc = document.getElementById( 'af_ruc' ), hint = document.getElementById( 'af-ruc-hint' );
 	if ( ruc && hint ) {
 		var check = function () {

@@ -343,6 +343,22 @@ class Arriendo_Facil_SRI_Config {
 	}
 
 	/**
+	 * Removes the stored certificate (PEMs, password, filename). Used when the
+	 * RUC changes, since the signature is bound to the previous RUC.
+	 *
+	 * @param int|null $user_id Optional owner scope.
+	 * @return bool
+	 */
+	public static function clear_certificate( ?int $user_id = null ): bool {
+		$scope   = self::resolve_scope( $user_id );
+		$current = self::get( $scope );
+		foreach ( array( 'cert_filename', 'cert_password_enc', 'cert_pem_enc', 'pkey_pem_enc', 'chain_pem_enc' ) as $key ) {
+			$current[ $key ] = '';
+		}
+		return self::write_storage( $current, $scope );
+	}
+
+	/**
 	 * Returns the decrypted PEM certificate, private key, and CA chain.
 	 *
 	 * @param int|null $user_id Optional owner scope. null = infer from current user.

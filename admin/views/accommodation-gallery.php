@@ -24,7 +24,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 				}
 			?>
 				<div class="af-gallery-item" data-id="<?php echo esc_attr( $att_id ); ?>">
-					<img src="<?php echo esc_url( $thumb[0] ); ?>" alt="" />
+					<img src="<?php echo esc_url( $thumb[0] ); ?>" alt="" loading="lazy" decoding="async" width="<?php echo esc_attr( isset( $thumb[1] ) ? (string) $thumb[1] : '150' ); ?>" height="<?php echo esc_attr( isset( $thumb[2] ) ? (string) $thumb[2] : '150' ); ?>" />
 					<button type="button" class="af-gallery-item__remove" title="<?php esc_attr_e( 'Eliminar foto', 'arriendo-facil' ); ?>">&#x2715;</button>
 				</div>
 			<?php endforeach; ?>

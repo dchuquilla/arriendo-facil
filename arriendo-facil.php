@@ -415,26 +415,35 @@ function arriendo_facil_remove_rentabilizar_cta() {
 		return;
 	}
 
+	// Previously this scanned every <a> and <button> at DOMContentLoaded, which
+	// on Elementor pages with hundreds of nodes added measurable main-thread
+	// time to TTI. We now defer the scan to idle time (with a setTimeout fallback
+	// for Safari/older browsers that lack requestIdleCallback) and narrow the
+	// selector to anchors/buttons that *could* be the Rentabilizar CTA.
 	$script = "(function(){
+		var NEEDLE = 'quiero rentabilizar';
 		function shouldRemove(el){
 			if(!el){ return false; }
-			var text = (el.textContent || '').toLowerCase().replace(/\s+/g,' ').trim();
-			return text.indexOf('quiero rentabilizar mi propiedad') !== -1 || text.indexOf('quiero rentabilizar') !== -1;
+			var text = (el.textContent || '').toLowerCase();
+			return text.indexOf(NEEDLE) !== -1;
 		}
-
 		function removeNodes(){
-			var nodes = document.querySelectorAll('a,button');
+			var nodes = document.querySelectorAll('a[href],button,[role=\"button\"]');
 			for(var i=0; i<nodes.length; i++){
-				if(shouldRemove(nodes[i])){
-					nodes[i].remove();
-				}
+				if(shouldRemove(nodes[i])){ nodes[i].remove(); }
 			}
 		}
-
+		function schedule(){
+			if (typeof window.requestIdleCallback === 'function') {
+				window.requestIdleCallback(removeNodes, { timeout: 1500 });
+			} else {
+				window.setTimeout(removeNodes, 200);
+			}
+		}
 		if(document.readyState === 'loading'){
-			document.addEventListener('DOMContentLoaded', removeNodes);
+			document.addEventListener('DOMContentLoaded', schedule, { once: true });
 		}else{
-			removeNodes();
+			schedule();
 		}
 	})();";
 

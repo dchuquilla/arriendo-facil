@@ -64,10 +64,13 @@ class Arriendo_Facil_Security_Headers {
 	 * 'unsafe-inline' for scripts but keep styles strict.
 	 */
 	private static function set_content_security_policy() {
+		// Leaflet (map picker) and Chart.js are loaded from the CDNs below.
+		// Without listing them explicitly the browser rejected the assets even
+		// though the files were requested, leaving the location picker broken.
 		$csp_directives = array(
 			"default-src 'self'",
-			"script-src 'self' 'unsafe-inline' 'unsafe-eval' *.wp.com cdn.jsdelivr.net", // WordPress core uses eval for some JS
-			"style-src 'self' 'unsafe-inline' fonts.googleapis.com", // Inline styles needed for WordPress
+			"script-src 'self' 'unsafe-inline' 'unsafe-eval' *.wp.com cdn.jsdelivr.net cdnjs.cloudflare.com", // WordPress core uses eval for some JS
+			"style-src 'self' 'unsafe-inline' fonts.googleapis.com cdnjs.cloudflare.com", // Inline styles needed for WordPress
 			"img-src 'self' data: https:",
 			"font-src 'self' fonts.gstatic.com",
 			"connect-src 'self'",

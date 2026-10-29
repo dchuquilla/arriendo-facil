@@ -54,6 +54,8 @@ class Arriendo_Facil_Admin {
 		add_action( 'wp_dashboard_setup', array( $this, 'remove_owner_dashboard_widgets' ), 999 );
 		add_action( 'wp_dashboard_setup', array( $this, 'register_native_dashboard_widget' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
+		add_filter( 'wp_resource_hints', array( $this, 'admin_resource_hints' ), 10, 2 );
+		add_action( 'admin_head', array( $this, 'preload_critical_admin_assets' ), 1 );
 		add_filter( 'wp_authenticate_user', array( $this, 'check_login_rate_limit' ), 5, 2 );
 		add_filter( 'wp_authenticate_user', array( $this, 'block_suspended_property_admin_login' ), 10, 2 );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
@@ -1818,6 +1820,78 @@ array(
 	}
 
 	/**
+	 * Emits <link rel="preload"> for the critical CSS token file and the
+	 * self-hosted Inter woff2. These two resources gate the first paint of
+	 * every admin screen; preloading them means the browser starts fetching
+	 * them in parallel with the HTML parse instead of waiting for the
+	 * `<link rel="stylesheet">` to be discovered mid-cascade.
+	 *
+	 * Runs early so we win the TCP slow-start race before any
+	 * wp_enqueue_scripts output is emitted.
+	 *
+	 * @return void
+	 */
+	public function preload_critical_admin_assets() {
+		if ( ! is_admin() ) {
+			return;
+		}
+
+		$tokens_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-tokens.css';
+		$tokens_url  = ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/af-tokens.css';
+		$tokens_ver  = file_exists( $tokens_path ) ? (string) filemtime( $tokens_path ) : ARRIENDO_FACIL_VERSION;
+
+		$font_latin_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/fonts/inter/inter-latin.woff2';
+		$font_latin_url  = ARRIENDO_FACIL_PLUGIN_URL . 'assets/fonts/inter/inter-latin.woff2';
+
+		printf(
+			"<link rel=\"preload\" as=\"style\" href=\"%s\" />\n",
+			esc_url( add_query_arg( 'ver', $tokens_ver, $tokens_url ) )
+		);
+
+		if ( file_exists( $font_latin_path ) ) {
+			printf(
+				"<link rel=\"preload\" as=\"font\" type=\"font/woff2\" href=\"%s\" crossorigin />\n",
+				esc_url( $font_latin_url )
+			);
+		}
+	}
+
+	/**
+	 * Emits resource hints (preconnect / dns-prefetch) for third-party
+	 * origins used by the admin UI. Preconnect warms the TLS handshake and
+	 * DNS lookup before the browser hits the blocking stylesheet from
+	 * fonts.googleapis.com or the Chart.js/Leaflet CDNs, trimming
+	 * ~100–300ms of latency on first paint on cold connections.
+	 *
+	 * Scoped to admin to avoid leaking hints on public pages.
+	 *
+	 * @param array  $urls          Current hints.
+	 * @param string $relation_type Hint type.
+	 * @return array
+	 */
+	public function admin_resource_hints( $urls, $relation_type ) {
+		if ( ! is_admin() ) {
+			return $urls;
+		}
+
+		if ( 'preconnect' === $relation_type ) {
+			$urls[] = array( 'href' => 'https://fonts.googleapis.com', 'crossorigin' );
+			$urls[] = array( 'href' => 'https://fonts.gstatic.com', 'crossorigin' );
+			$urls[] = array( 'href' => 'https://cdn.jsdelivr.net', 'crossorigin' );
+			$urls[] = array( 'href' => 'https://cdnjs.cloudflare.com', 'crossorigin' );
+		}
+
+		if ( 'dns-prefetch' === $relation_type ) {
+			$urls[] = 'https://fonts.googleapis.com';
+			$urls[] = 'https://fonts.gstatic.com';
+			$urls[] = 'https://cdn.jsdelivr.net';
+			$urls[] = 'https://cdnjs.cloudflare.com';
+		}
+
+		return $urls;
+	}
+
+	/**
 	 * Enqueues plugin admin CSS and JS.
 	 *
 	 * @param string $hook Current admin page hook.
@@ -1849,13 +1923,17 @@ array(
 			$tokens_css_version
 		);
 
-		// Inter webfont — af-tokens/af-admin-chrome reference it, but it was never
-		// actually loaded, so every admin screen fell back to the OS system font.
+		// Inter webfont — self-hosted variable font (weights 400–800) saves one
+		// blocking round-trip to fonts.googleapis.com. The woff2 lives in
+		// assets/fonts/inter/ and is served from the same origin, so no
+		// preconnect, no third-party cookies, and no CDN compromise surface.
+		// Keeps same-origin Cache-Control inherited from .htaccess.
+		$fonts_css_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-fonts-inter.css';
 		wp_enqueue_style(
-			'af-google-font-inter',
-			'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap',
+			'af-fonts-inter',
+			ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/af-fonts-inter.css',
 			array(),
-			null
+			file_exists( $fonts_css_path ) ? (string) filemtime( $fonts_css_path ) : ARRIENDO_FACIL_VERSION
 		);
 
 		// Global chrome rebrand (sidebar, adminbar, notices, body bg) on ALL admin pages.
@@ -2009,20 +2087,34 @@ array(
 			);
 		}
 
-		wp_enqueue_script(
+		// mammoth.browser.min.js is 628 KB and only needed on the owner-contacts
+		// template analyzer and the contracts screens. We register it unconditionally
+		// so other handles can declare it as a dependency, but only enqueue it on
+		// the screens that actually run DOCX→HTML conversion. The admin.js guard
+		// (`typeof mammoth === 'undefined'`) already short-circuits elsewhere.
+		wp_register_script(
 			'mammoth',
 			ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/vendor/mammoth.browser.min.js',
 			array(),
 			'1.8.0',
-			true
+			array( 'in_footer' => true, 'strategy' => 'defer' )
 		);
+
+		$mammoth_screens = array(
+			'arriendo-facil_page_af-owner-contacts',
+			'arriendo-facil_page_af-contracts',
+			'arriendo-facil_page_af-contracts-new',
+		);
+		if ( in_array( $hook, $mammoth_screens, true ) ) {
+			wp_enqueue_script( 'mammoth' );
+		}
 
 		wp_enqueue_script(
 			'af-admin',
 			ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/admin.js',
-			array( 'jquery', 'mammoth' ),
+			array( 'jquery' ),
 			$admin_js_version,
-			true
+			array( 'in_footer' => true, 'strategy' => 'defer' )
 		);
 
 		$tabs_js_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/admin-tabs.js';
@@ -2053,8 +2145,23 @@ array(
 		);
 
 		// Chart.js solo en las pantallas con gráficos (Panel y Administradores).
+		// Deferred to let HTML parse continue; `strategy` requires WP 6.3+.
+		// SRI baked in for the pinned 4.4.4 bundle: the browser rejects any
+		// payload whose SHA-384 drifts, protecting against CDN compromise.
+		// Override via AF_CDN_SRI_CHART_JS in wp-config.php if you bump the pin.
 		if ( in_array( $hook, array( 'toplevel_page_arriendo-facil', 'arriendo-facil_page_af-property-admins' ), true ) ) {
-			wp_enqueue_script( 'chart-js', 'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js', array(), '4.4.4', true );
+			wp_enqueue_script(
+				'chart-js',
+				'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js',
+				array(),
+				'4.4.4',
+				array( 'in_footer' => true, 'strategy' => 'defer' )
+			);
+			$chart_sri = defined( 'AF_CDN_SRI_CHART_JS' ) && AF_CDN_SRI_CHART_JS
+				? AF_CDN_SRI_CHART_JS
+				: 'sha384-NrKB+u6Ts6AtkIhwPixiKTzgSKNblyhlk0Sohlgar9UHUBzai/sgnNNWWd291xqt';
+			wp_script_add_data( 'chart-js', 'integrity', $chart_sri );
+			wp_script_add_data( 'chart-js', 'crossorigin', 'anonymous' );
 		}
 
 		// Estilos del Panel (hero de cobranza, tarjetas de estado y métricas operativas).
@@ -2158,7 +2265,23 @@ array(
 		if ( $screen && 'accommodation' === $screen->post_type && in_array( $hook, array( 'post.php', 'post-new.php' ), true ) ) {
 			wp_enqueue_media();
 			wp_enqueue_style( 'leaflet-css', 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css', array(), '1.9.4' );
-			wp_enqueue_script( 'leaflet-js', 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js', array(), '1.9.4', true );
+			wp_enqueue_script(
+				'leaflet-js',
+				'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js',
+				array(),
+				'1.9.4',
+				array( 'in_footer' => true, 'strategy' => 'defer' )
+			);
+			$leaflet_js_sri = defined( 'AF_CDN_SRI_LEAFLET_JS' ) && AF_CDN_SRI_LEAFLET_JS
+				? AF_CDN_SRI_LEAFLET_JS
+				: 'sha384-NElt3Op+9NBMCYaef5HxeJmU4Xeard/Lku8ek6hoPTvYkQPh3zLIrJP7KiRocsxO';
+			$leaflet_css_sri = defined( 'AF_CDN_SRI_LEAFLET_CSS' ) && AF_CDN_SRI_LEAFLET_CSS
+				? AF_CDN_SRI_LEAFLET_CSS
+				: 'sha384-c6Rcwz4e4CITMbu/NBmnNS8yN2sC3cUElMEMfP3vqqKFp7GOYaaBBCqmaWBjmkjb';
+			wp_script_add_data( 'leaflet-js', 'integrity', $leaflet_js_sri );
+			wp_script_add_data( 'leaflet-js', 'crossorigin', 'anonymous' );
+			wp_style_add_data( 'leaflet-css', 'integrity', $leaflet_css_sri );
+			wp_style_add_data( 'leaflet-css', 'crossorigin', 'anonymous' );
 
 			$picker_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/admin-location-picker.js';
 			wp_enqueue_script(

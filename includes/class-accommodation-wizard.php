@@ -124,8 +124,18 @@ class Arriendo_Facil_Accommodation_Wizard {
 			'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js',
 			array(),
 			'1.9.4',
-			true
+			array( 'in_footer' => true, 'strategy' => 'defer' )
 		);
+		$leaflet_js_sri  = defined( 'AF_CDN_SRI_LEAFLET_JS' ) && AF_CDN_SRI_LEAFLET_JS
+			? AF_CDN_SRI_LEAFLET_JS
+			: 'sha384-NElt3Op+9NBMCYaef5HxeJmU4Xeard/Lku8ek6hoPTvYkQPh3zLIrJP7KiRocsxO';
+		$leaflet_css_sri = defined( 'AF_CDN_SRI_LEAFLET_CSS' ) && AF_CDN_SRI_LEAFLET_CSS
+			? AF_CDN_SRI_LEAFLET_CSS
+			: 'sha384-c6Rcwz4e4CITMbu/NBmnNS8yN2sC3cUElMEMfP3vqqKFp7GOYaaBBCqmaWBjmkjb';
+		wp_script_add_data( 'leaflet-js', 'integrity', $leaflet_js_sri );
+		wp_script_add_data( 'leaflet-js', 'crossorigin', 'anonymous' );
+		wp_style_add_data( 'leaflet-css', 'integrity', $leaflet_css_sri );
+		wp_style_add_data( 'leaflet-css', 'crossorigin', 'anonymous' );
 
 		$picker_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/admin-location-picker.js';
 		wp_enqueue_script(

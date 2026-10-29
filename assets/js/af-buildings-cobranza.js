@@ -302,13 +302,17 @@
 			items.push({ key: 'payday', label: T.payday, dot: 'is-payday', static: true });
 		}
 
-		legendEl.innerHTML = '';
+		// Build legend off-DOM in a DocumentFragment so we commit a single
+		// reflow instead of one per appended node. Also replaces innerHTML
+		// clearing with a replaceChildren() call, which is faster and does
+		// not re-parse the empty string into an HTML tree.
+		var frag = document.createDocumentFragment();
 		items.forEach(function (item) {
 			if (item.static) {
 				var s = document.createElement('span');
 				s.className = 'af-calendar-mini__legend-item';
 				s.innerHTML = '<i class="' + item.dot + '"></i> ' + item.label;
-				legendEl.appendChild(s);
+				frag.appendChild(s);
 				return;
 			}
 			if (!t[item.key]) { return; }
@@ -321,8 +325,9 @@
 			if (state.filters[item.key]) { btn.classList.add('is-active'); }
 			btn.innerHTML = '<i class="' + item.dot + '"></i> ' + item.label +
 				' <span class="af-calendar-mini__filter-n">' + t[item.key] + '</span>';
-			legendEl.appendChild(btn);
+			frag.appendChild(btn);
 		});
+		legendEl.replaceChildren(frag);
 	}
 
 	/* ── Calendario ───────────────────────────────────────────────────────── */
@@ -458,16 +463,28 @@
 		if (prop && prop.has_lease && prop.payment_due_day === Number(dayStr.slice(-2))) {
 			lines.push((T.paydayOn || 'Día de pago: %d').replace('%d', prop.payment_due_day));
 		}
+
+		// Batch to avoid layout thrashing: previously we wrote innerHTML +
+		// flipped `hidden`, then immediately read offsetHeight/offsetWidth of
+		// the tooltip plus two getBoundingClientRect() calls, forcing the
+		// browser to run layout three times per hover. rAF lets the DOM
+		// commit the writes before we read dimensions.
 		tipEl.innerHTML = lines.join('<br>');
+		tipEl.style.visibility = 'hidden';
 		tipEl.hidden = false;
 
-		var box = cell.getBoundingClientRect();
-		var host = modal.getBoundingClientRect();
-		tipEl.style.top = (box.top - host.top - tipEl.offsetHeight - 8) + 'px';
-		tipEl.style.left = Math.max(8, Math.min(
-			box.left - host.left + box.width / 2 - tipEl.offsetWidth / 2,
-			host.width - tipEl.offsetWidth - 8
-		)) + 'px';
+		window.requestAnimationFrame(function () {
+			var box = cell.getBoundingClientRect();
+			var host = modal.getBoundingClientRect();
+			var tipHeight = tipEl.offsetHeight;
+			var tipWidth = tipEl.offsetWidth;
+			tipEl.style.top = (box.top - host.top - tipHeight - 8) + 'px';
+			tipEl.style.left = Math.max(8, Math.min(
+				box.left - host.left + box.width / 2 - tipWidth / 2,
+				host.width - tipWidth - 8
+			)) + 'px';
+			tipEl.style.visibility = '';
+		});
 	}
 
 	/* ── Lista de cargos ─────────────────────────────────────────────────── */
@@ -487,12 +504,11 @@
 		var hasFilters = hasActiveFilters();
 		if (!hasDay && !hasFilters) {
 			dayFilterEl.hidden = true;
-			dayFilterEl.innerHTML = '';
+			dayFilterEl.replaceChildren();
 			return;
 		}
 
-		dayFilterEl.hidden = false;
-		dayFilterEl.innerHTML = '';
+		var frag = document.createDocumentFragment();
 
 		var chip = document.createElement('span');
 		chip.className = 'af-cobranza-dayfilter__chip';
@@ -501,14 +517,17 @@
 			text = text ? text + ' · ' : '';
 		}
 		chip.textContent = text;
-		if (text) { dayFilterEl.appendChild(chip); }
+		if (text) { frag.appendChild(chip); }
 
 		var clear = document.createElement('button');
 		clear.type = 'button';
 		clear.className = 'button af-btn af-btn--ghost';
 		clear.setAttribute('data-clear-filters', '1');
 		clear.textContent = hasDay ? (T.showAll || 'Ver todos los días') : (T.clearFilters || 'Quitar filtros');
-		dayFilterEl.appendChild(clear);
+		frag.appendChild(clear);
+
+		dayFilterEl.hidden = false;
+		dayFilterEl.replaceChildren(frag);
 	}
 
 	function renderCharges() {

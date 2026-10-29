@@ -396,7 +396,7 @@ $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data[
 					<div class="af-featured-picker">
 						<div id="af-featured-preview" class="af-featured-preview <?php echo $featured_url ? 'has-image' : ''; ?>">
 							<?php if ( $featured_url ) : ?>
-								<img src="<?php echo esc_url( $featured_url ); ?>" alt="" />
+								<img src="<?php echo esc_url( $featured_url ); ?>" alt="" loading="lazy" decoding="async" width="300" height="200" />
 							<?php else : ?>
 								<span class="af-featured-preview__placeholder">
 									<span aria-hidden="true">&#x1F5BC;</span>
@@ -432,7 +432,7 @@ $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data[
 								}
 							?>
 								<div class="af-gallery-item" data-id="<?php echo esc_attr( (string) $att_id ); ?>">
-									<img src="<?php echo esc_url( $thumb[0] ); ?>" alt="" />
+									<img src="<?php echo esc_url( $thumb[0] ); ?>" alt="" loading="lazy" decoding="async" width="<?php echo esc_attr( isset( $thumb[1] ) ? (string) $thumb[1] : '150' ); ?>" height="<?php echo esc_attr( isset( $thumb[2] ) ? (string) $thumb[2] : '150' ); ?>" />
 									<button type="button" class="af-gallery-item__remove" title="<?php esc_attr_e( 'Eliminar foto', 'arriendo-facil' ); ?>">&#x2715;</button>
 								</div>
 							<?php endforeach; ?>

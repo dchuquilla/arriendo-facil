@@ -1881,6 +1881,33 @@ array(
 			$forms_css_version
 		);
 
+		// Motion layer (premium): spring easings, modal scale/fade, hover sheen.
+		$motion_css_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-motion.css';
+		$motion_js_path  = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/af-motion.js';
+		$taste_css_path  = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-taste.css';
+
+		wp_enqueue_style(
+			'af-motion',
+			ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/af-motion.css',
+			array( 'af-shell', 'af-forms' ),
+			file_exists( $motion_css_path ) ? (string) filemtime( $motion_css_path ) : ARRIENDO_FACIL_VERSION
+		);
+
+		wp_enqueue_style(
+			'af-taste',
+			ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/af-taste.css',
+			array( 'af-motion' ),
+			file_exists( $taste_css_path ) ? (string) filemtime( $taste_css_path ) : ARRIENDO_FACIL_VERSION
+		);
+
+		wp_enqueue_script(
+			'af-motion',
+			ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/af-motion.js',
+			array(),
+			file_exists( $motion_js_path ) ? (string) filemtime( $motion_js_path ) : ARRIENDO_FACIL_VERSION,
+			true
+		);
+
 		// Rebrand the WordPress native dashboard only on index.php.
 		if ( 'index.php' === $hook ) {
 			wp_enqueue_style(

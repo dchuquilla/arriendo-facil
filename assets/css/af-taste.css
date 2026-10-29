@@ -1,0 +1,297 @@
+/**
+ * Arriendo Facil — Taste Layer (Visual Refinement)
+ *
+ * Capa aditiva que refina la jerarquía visual del shell:
+ *  - Tipografía editorial (H1 con tracking negativo)
+ *  - Sombras tintadas (hint de brand)
+ *  - Bordes delicados (1px -> 1px blend)
+ *  - Separadores con gradient
+ *  - Hover states refinados
+ *  - Densidad visual Silicon Valley
+ *
+ * Diseñada 100% aditiva. Load order: tokens → shell → forms → motion → taste.
+ */
+
+/* ══════════════════════════════════════════════════════════════════════
+   1 — TIPOGRAFÍA (editorial para headlines)
+   ══════════════════════════════════════════════════════════════════════ */
+
+.af-shell {
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	text-rendering: optimizeLegibility;
+	font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+.af-shell .af-page-header__title h1 {
+	font-size: clamp(1.5rem, 1.1rem + 1.1vw, 1.875rem); /* 24 → 30 */
+	letter-spacing: -0.015em;
+	font-weight: 700;
+	line-height: 1.15;
+}
+
+.af-shell .af-page-header__eyebrow {
+	font-size: 11px;
+	letter-spacing: 0.1em;
+	font-weight: 700;
+	color: var(--af-primary-600);
+	opacity: 0.85;
+}
+
+.af-shell .af-section__title {
+	letter-spacing: -0.008em;
+}
+
+.af-shell .af-kpi__value {
+	letter-spacing: -0.02em;
+	font-feature-settings: "tnum" 1, "ss01" 1;
+}
+
+.af-shell .af-welcome__title {
+	letter-spacing: -0.02em;
+}
+
+/* Links con color consistente y mejor peso */
+.af-shell a:not(.af-btn):not(.button):not(.af-kpi__link):not(.af-link-underline) {
+	color: var(--af-primary-600);
+	text-decoration-color: rgba(22, 74, 85, 0.25);
+	text-underline-offset: 2px;
+	transition: color 160ms, text-decoration-color 220ms;
+}
+.af-shell a:not(.af-btn):not(.button):hover {
+	text-decoration-color: currentColor;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   2 — SOMBRAS TINTADAS GLOBALES (sobrescribe shadow-xs/sm/md con hint brand)
+   ══════════════════════════════════════════════════════════════════════ */
+
+.af-shell {
+	--af-shadow-xs: 0 1px 2px rgba(22, 74, 85, 0.06);
+	--af-shadow-sm: 0 2px 8px rgba(22, 74, 85, 0.07), 0 1px 2px rgba(22, 74, 85, 0.04);
+	--af-shadow-md: 0 10px 24px rgba(22, 74, 85, 0.09), 0 2px 6px rgba(22, 74, 85, 0.05);
+	--af-shadow-lg: 0 24px 48px rgba(22, 74, 85, 0.12), 0 6px 12px rgba(22, 74, 85, 0.06);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   3 — SECCIONES (bordes refinados + hover sutil)
+   ══════════════════════════════════════════════════════════════════════ */
+
+.af-shell .af-section {
+	border-color: rgba(220, 229, 227, 0.9);
+	border-radius: 16px;
+	transition: box-shadow 320ms var(--af-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+	backdrop-filter: saturate(102%);
+}
+
+.af-shell .af-section:hover {
+	box-shadow: var(--af-shadow-sm);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   4 — PAGE HEADER (separador con gradient)
+   ══════════════════════════════════════════════════════════════════════ */
+
+.af-shell .af-page-header {
+	border-bottom: none;
+	position: relative;
+}
+
+.af-shell .af-page-header::after {
+	content: "";
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	height: 1px;
+	background: linear-gradient(
+		90deg,
+		transparent 0%,
+		rgba(22, 74, 85, 0.12) 20%,
+		rgba(22, 74, 85, 0.12) 80%,
+		transparent 100%
+	);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   5 — BOTONES PRIMARIOS (hint de gradient sutil + inner highlight)
+   ══════════════════════════════════════════════════════════════════════ */
+
+.af-shell .button.button-primary,
+.af-shell button.button.button-primary,
+.af-shell .af-btn--primary {
+	background: linear-gradient(180deg, var(--af-primary-500) 0%, var(--af-primary-600) 100%);
+	border-color: var(--af-primary-600);
+	box-shadow:
+		0 1px 2px rgba(22, 74, 85, 0.18),
+		0 1px 0 0 rgba(255, 255, 255, 0.12) inset;
+}
+
+.af-shell .button.button-primary:hover,
+.af-shell button.button.button-primary:hover,
+.af-shell .af-btn--primary:hover {
+	background: linear-gradient(180deg, var(--af-primary-500) 0%, var(--af-primary-700) 100%);
+	border-color: var(--af-primary-700);
+	box-shadow:
+		0 4px 12px rgba(22, 74, 85, 0.22),
+		0 1px 0 0 rgba(255, 255, 255, 0.14) inset;
+}
+
+/* Botón accent con el mismo tratamiento */
+.af-shell .af-btn--accent,
+.af-shell .button.af-btn--accent {
+	background: linear-gradient(180deg, var(--af-accent-500) 0%, var(--af-accent-600) 100%);
+	box-shadow:
+		0 1px 2px rgba(216, 155, 91, 0.22),
+		0 1px 0 0 rgba(255, 255, 255, 0.16) inset;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   6 — KPIs (densidad + hint de gradient de fondo)
+   ══════════════════════════════════════════════════════════════════════ */
+
+.af-shell .af-kpi {
+	background:
+		linear-gradient(180deg, rgba(255, 255, 255, 1) 0%, rgba(247, 248, 246, 0.6) 100%);
+	border-color: rgba(220, 229, 227, 0.9);
+	border-radius: 16px;
+}
+
+.af-shell .af-kpi__label {
+	font-size: 11px;
+	letter-spacing: 0.08em;
+	color: var(--af-gray-500);
+	font-weight: 700;
+}
+
+.af-shell .af-kpi__value {
+	font-size: clamp(1.75rem, 1.4rem + 1vw, 2.25rem);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   7 — PILLS (más contrast ratio, sin perder suavidad)
+   ══════════════════════════════════════════════════════════════════════ */
+
+.af-shell .af-pill {
+	font-weight: 600;
+	letter-spacing: 0.01em;
+	border: 1px solid rgba(0, 0, 0, 0.02);
+	backdrop-filter: saturate(110%);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   8 — FORMS (float-label hint + hover sutil)
+   ══════════════════════════════════════════════════════════════════════ */
+
+.af-shell .af-form-field label,
+.af-shell .form-table th label {
+	font-weight: 600;
+	color: var(--af-gray-700);
+	letter-spacing: 0;
+}
+
+.af-shell input[type="text"]:hover:not(:focus):not([disabled]),
+.af-shell input[type="email"]:hover:not(:focus):not([disabled]),
+.af-shell input[type="url"]:hover:not(:focus):not([disabled]),
+.af-shell input[type="password"]:hover:not(:focus):not([disabled]),
+.af-shell input[type="number"]:hover:not(:focus):not([disabled]),
+.af-shell input[type="tel"]:hover:not(:focus):not([disabled]),
+.af-shell select:hover:not(:focus):not([disabled]),
+.af-shell textarea:hover:not(:focus):not([disabled]) {
+	border-color: var(--af-gray-400);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   9 — TABLES (headers con más densidad tipográfica)
+   ══════════════════════════════════════════════════════════════════════ */
+
+.af-shell .af-data-table thead th {
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	font-size: 11px;
+	font-weight: 700;
+	color: var(--af-gray-600);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   10 — MODAL (header con separador gradient, body con mejor spacing)
+   ══════════════════════════════════════════════════════════════════════ */
+
+.af-modal .af-modal__header {
+	position: relative;
+	border-bottom: none;
+	padding: 20px 24px 16px;
+}
+
+.af-modal .af-modal__header::after {
+	content: "";
+	position: absolute;
+	left: 24px;
+	right: 24px;
+	bottom: 0;
+	height: 1px;
+	background: linear-gradient(90deg,
+		transparent 0%,
+		rgba(22, 74, 85, 0.12) 50%,
+		transparent 100%);
+}
+
+.af-modal .af-modal__header h2 {
+	font-size: 1.125rem;
+	font-weight: 700;
+	letter-spacing: -0.01em;
+	color: var(--af-gray-900, #193238);
+}
+
+.af-modal .af-modal__body {
+	padding: 20px 24px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   11 — SCROLLBAR fina (para scroll áreas custom)
+   ══════════════════════════════════════════════════════════════════════ */
+
+.af-shell *::-webkit-scrollbar {
+	width: 8px;
+	height: 8px;
+}
+.af-shell *::-webkit-scrollbar-track {
+	background: transparent;
+}
+.af-shell *::-webkit-scrollbar-thumb {
+	background: rgba(22, 74, 85, 0.14);
+	border-radius: 999px;
+}
+.af-shell *::-webkit-scrollbar-thumb:hover {
+	background: rgba(22, 74, 85, 0.28);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   12 — SELECTION color consistente con brand
+   ══════════════════════════════════════════════════════════════════════ */
+
+.af-shell ::selection {
+	background: rgba(22, 74, 85, 0.18);
+	color: var(--af-gray-900);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   13 — DARK MODE OVERRIDES (coherencia con taste layer)
+   ══════════════════════════════════════════════════════════════════════ */
+
+.af-shell[data-af-theme="dark"] {
+	--af-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+	--af-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.5);
+	--af-shadow-md: 0 10px 24px rgba(0, 0, 0, 0.55);
+	--af-shadow-lg: 0 24px 48px rgba(0, 0, 0, 0.65);
+}
+
+.af-shell[data-af-theme="dark"] .af-kpi {
+	background: linear-gradient(180deg, var(--af-gray-0) 0%, var(--af-gray-50) 100%);
+}
+
+.af-shell[data-af-theme="dark"] .button.button-primary,
+.af-shell[data-af-theme="dark"] .af-btn--primary {
+	background: linear-gradient(180deg, var(--af-primary-500) 0%, var(--af-primary-600) 100%);
+	color: var(--af-gray-900);
+}

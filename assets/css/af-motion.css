@@ -1,0 +1,491 @@
+/**
+ * Arriendo Facil — Motion Layer (Premium)
+ *
+ * Capa aditiva de motion inspirada en transitions.dev + patrones Silicon Valley:
+ *  - Easings spring + out-expo + in-out-smooth
+ *  - Transiciones de página con stagger
+ *  - Modales con scale/fade y backdrop blur
+ *  - Botones con active:scale, focus-ring animado y hover elevado
+ *  - Cards con sheen diagonal y sombras tintadas
+ *  - Toasts con entrada/salida simétrica
+ *  - Micro-interacciones (pulse de pills, nudge de iconos)
+ *
+ * Diseñada para ser 100% aditiva sobre af-shell.css. Respeta prefers-reduced-motion.
+ * Scope: .af-shell + .af-modal (modales existen fuera del shell).
+ */
+
+.af-shell,
+.af-modal {
+	/* ── Easings extendidos ───────────────────────────────────────────── */
+	--af-ease-spring:        cubic-bezier(0.34, 1.56, 0.64, 1);   /* overshoot sutil */
+	--af-ease-spring-soft:   cubic-bezier(0.22, 1.2, 0.36, 1);    /* spring suave */
+	--af-ease-out-expo:      cubic-bezier(0.16, 1, 0.3, 1);        /* final silky */
+	--af-ease-in-out-smooth: cubic-bezier(0.65, 0, 0.35, 1);       /* bidireccional */
+
+	--af-motion-xslow:       420ms var(--af-ease-out-expo);
+
+	/* Sombras tintadas con el petróleo de marca — se sienten premium */
+	--af-shadow-tinted-sm:   0 2px 8px rgba(22, 74, 85, 0.08), 0 1px 2px rgba(22, 74, 85, 0.04);
+	--af-shadow-tinted-md:   0 10px 24px rgba(22, 74, 85, 0.10), 0 2px 6px rgba(22, 74, 85, 0.05);
+	--af-shadow-tinted-lg:   0 24px 48px rgba(22, 74, 85, 0.14), 0 6px 12px rgba(22, 74, 85, 0.06);
+	--af-shadow-focus-ring:  0 0 0 3px rgba(22, 74, 85, 0.18), 0 0 0 1px rgba(22, 74, 85, 0.4);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   1 — PAGE ENTRANCE (vista completa al cargar)
+   ══════════════════════════════════════════════════════════════════════ */
+
+@keyframes af-page-enter {
+	from {
+		opacity: 0;
+		transform: translateY(6px);
+		filter: blur(2px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+		filter: blur(0);
+	}
+}
+
+.af-shell {
+	animation: af-page-enter 360ms var(--af-ease-out-expo) both;
+}
+
+/* Stagger: cada sección hija aparece con un offset. Usa el fade-up existente. */
+.af-shell > .af-page-header { animation: af-fade-up 320ms var(--af-ease-out-expo) 20ms both; }
+.af-shell > .af-section:nth-of-type(1),
+.af-shell > .af-split:nth-of-type(1),
+.af-shell > .af-kpi-grid:nth-of-type(1) { animation-delay: 60ms; }
+.af-shell > .af-section:nth-of-type(2) { animation-delay: 120ms; }
+.af-shell > .af-section:nth-of-type(3) { animation-delay: 180ms; }
+.af-shell > .af-section:nth-of-type(4) { animation-delay: 240ms; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   2 — BUTTONS (ripple-feel sin JS, focus-ring animado)
+   ══════════════════════════════════════════════════════════════════════ */
+
+.af-shell .button,
+.af-shell button.button,
+.af-shell .af-btn {
+	position: relative;
+	transition:
+		transform 140ms var(--af-ease-spring-soft),
+		box-shadow 220ms var(--af-ease-out-expo),
+		background-color 180ms var(--af-ease-in-out-smooth),
+		border-color 180ms var(--af-ease-in-out-smooth),
+		color 180ms var(--af-ease-in-out-smooth);
+	will-change: transform, box-shadow;
+}
+
+.af-shell .button:hover,
+.af-shell button.button:hover,
+.af-shell .af-btn:hover {
+	transform: translateY(-1px);
+}
+
+.af-shell .button:active,
+.af-shell button.button:active,
+.af-shell .af-btn:active {
+	transform: translateY(0) scale(0.98);
+	transition-duration: 80ms;
+}
+
+.af-shell .button.button-primary:hover,
+.af-shell button.button.button-primary:hover,
+.af-shell .af-btn--primary:hover {
+	box-shadow: var(--af-shadow-tinted-md);
+}
+
+.af-shell .button:focus-visible,
+.af-shell button.button:focus-visible,
+.af-shell .af-btn:focus-visible {
+	outline: none;
+	box-shadow: var(--af-shadow-focus-ring);
+	animation: af-focus-pulse 600ms var(--af-ease-out-expo);
+}
+
+@keyframes af-focus-pulse {
+	0%   { box-shadow: 0 0 0 0 rgba(22, 74, 85, 0.0),  0 0 0 1px rgba(22, 74, 85, 0.4); }
+	40%  { box-shadow: 0 0 0 6px rgba(22, 74, 85, 0.14), 0 0 0 1px rgba(22, 74, 85, 0.4); }
+	100% { box-shadow: 0 0 0 3px rgba(22, 74, 85, 0.18), 0 0 0 1px rgba(22, 74, 85, 0.4); }
+}
+
+/* Icono dentro del botón: pequeño nudge en hover */
+.af-shell .af-btn:hover .af-btn__icon,
+.af-shell .button:hover .dashicons {
+	transform: translateX(1px);
+	transition: transform 180ms var(--af-ease-spring-soft);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   3 — CARDS (sheen diagonal al hover + sombra tintada)
+   ══════════════════════════════════════════════════════════════════════ */
+
+.af-shell .af-kpi,
+.af-shell .af-property-card,
+.af-shell .af-maint-card,
+.af-shell .af-service-card,
+.af-shell .af-integration-card {
+	position: relative;
+	overflow: hidden;
+	transition:
+		transform 260ms var(--af-ease-out-expo),
+		box-shadow 260ms var(--af-ease-out-expo),
+		border-color 220ms var(--af-ease-in-out-smooth);
+}
+
+.af-shell .af-kpi::after,
+.af-shell .af-property-card::after,
+.af-shell .af-service-card::after {
+	content: "";
+	position: absolute;
+	top: 0;
+	left: -40%;
+	width: 40%;
+	height: 100%;
+	background: linear-gradient(
+		115deg,
+		transparent 0%,
+		rgba(255, 255, 255, 0.14) 50%,
+		transparent 100%
+	);
+	transform: translateX(0) skewX(-18deg);
+	transition: transform 1.4s var(--af-ease-out-expo);
+	pointer-events: none;
+	opacity: 0;
+}
+
+.af-shell .af-kpi:hover::after,
+.af-shell .af-property-card:hover::after,
+.af-shell .af-service-card:hover::after {
+	opacity: 1;
+	transform: translateX(380%) skewX(-18deg);
+}
+
+.af-shell .af-kpi:hover,
+.af-shell .af-service-card:hover,
+.af-shell .af-integration-card:hover,
+.af-shell .af-maint-card:hover {
+	box-shadow: var(--af-shadow-tinted-md);
+}
+
+.af-shell .af-property-card:hover {
+	transform: translateY(-3px);
+	box-shadow: var(--af-shadow-tinted-lg);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   4 — MODAL (backdrop blur + scale/fade spring)
+   ══════════════════════════════════════════════════════════════════════ */
+
+.af-modal:not([hidden]) {
+	animation: af-backdrop-in 220ms var(--af-ease-out-expo) both;
+}
+
+.af-modal.is-closing {
+	animation: af-backdrop-out 180ms var(--af-ease-in-out-smooth) both;
+	pointer-events: none;
+}
+
+.af-modal .af-modal__backdrop {
+	background: rgba(10, 22, 25, 0.42);
+	backdrop-filter: blur(8px) saturate(140%);
+	-webkit-backdrop-filter: blur(8px) saturate(140%);
+}
+
+.af-modal .af-modal__dialog {
+	border-radius: var(--af-radius-lg, 14px);
+	border: 1px solid rgba(220, 229, 227, 0.9);
+	box-shadow:
+		0 32px 64px -16px rgba(10, 22, 25, 0.30),
+		0 16px 32px -8px rgba(10, 22, 25, 0.15),
+		0 1px 0 0 rgba(255, 255, 255, 0.6) inset;
+	animation: af-modal-in 320ms var(--af-ease-spring-soft) both;
+	transform-origin: center top;
+}
+
+.af-modal.is-closing .af-modal__dialog {
+	animation: af-modal-out 200ms var(--af-ease-in-out-smooth) both;
+}
+
+@keyframes af-backdrop-in {
+	from { opacity: 0; }
+	to   { opacity: 1; }
+}
+@keyframes af-backdrop-out {
+	from { opacity: 1; }
+	to   { opacity: 0; }
+}
+@keyframes af-modal-in {
+	from {
+		opacity: 0;
+		transform: scale(0.96) translateY(-8px);
+	}
+	to {
+		opacity: 1;
+		transform: scale(1) translateY(0);
+	}
+}
+@keyframes af-modal-out {
+	from {
+		opacity: 1;
+		transform: scale(1) translateY(0);
+	}
+	to {
+		opacity: 0;
+		transform: scale(0.98) translateY(-4px);
+	}
+}
+
+/* En móvil (bottom-sheet) el shell ya tiene af-sheet-in; evitamos conflicto. */
+@media (max-width: 640px) {
+	.af-modal .af-modal__dialog {
+		animation: af-sheet-in 320ms var(--af-ease-spring-soft) both;
+	}
+}
+
+/* Botón close del modal con rotación sutil */
+.af-modal .af-modal__close {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 32px;
+	border-radius: 50%;
+	transition:
+		background 160ms var(--af-ease-in-out-smooth),
+		transform 220ms var(--af-ease-spring-soft);
+}
+.af-modal .af-modal__close:hover {
+	background: rgba(10, 22, 25, 0.06);
+	transform: rotate(90deg);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   5 — TOASTS (entrada + salida simétrica con spring)
+   ══════════════════════════════════════════════════════════════════════ */
+
+.af-toast {
+	animation: af-toast-in-premium 320ms var(--af-ease-spring-soft) both;
+	border-radius: var(--af-radius-lg, 14px);
+	box-shadow: var(--af-shadow-tinted-md);
+}
+
+.af-toast.is-closing {
+	animation: af-toast-out 200ms var(--af-ease-in-out-smooth) both;
+}
+
+@keyframes af-toast-in-premium {
+	from {
+		opacity: 0;
+		transform: translateY(-12px) scale(0.96);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
+}
+@keyframes af-toast-out {
+	to {
+		opacity: 0;
+		transform: translateY(-8px) scale(0.98);
+	}
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   6 — STATUS PILLS (pulse sutil en estados que requieren atención)
+   ══════════════════════════════════════════════════════════════════════ */
+
+.af-pill--warning.af-pill--pulse,
+.af-pill--danger.af-pill--pulse {
+	animation: af-pill-pulse 2.4s var(--af-ease-in-out-smooth) infinite;
+}
+
+@keyframes af-pill-pulse {
+	0%, 100% { box-shadow: 0 0 0 0 rgba(216, 155, 91, 0); }
+	50%      { box-shadow: 0 0 0 4px rgba(216, 155, 91, 0.18); }
+}
+
+.af-pill--danger.af-pill--pulse {
+	animation-name: af-pill-pulse-danger;
+}
+@keyframes af-pill-pulse-danger {
+	0%, 100% { box-shadow: 0 0 0 0 rgba(217, 83, 79, 0); }
+	50%      { box-shadow: 0 0 0 4px rgba(217, 83, 79, 0.22); }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   7 — INPUTS (focus-ring animado + float-hint)
+   ══════════════════════════════════════════════════════════════════════ */
+
+.af-shell input[type="text"],
+.af-shell input[type="email"],
+.af-shell input[type="url"],
+.af-shell input[type="password"],
+.af-shell input[type="search"],
+.af-shell input[type="number"],
+.af-shell input[type="tel"],
+.af-shell input[type="date"],
+.af-shell input[type="time"],
+.af-shell input[type="datetime-local"],
+.af-shell select,
+.af-shell textarea {
+	transition:
+		border-color 180ms var(--af-ease-in-out-smooth),
+		box-shadow 220ms var(--af-ease-out-expo),
+		background 180ms var(--af-ease-in-out-smooth),
+		transform 160ms var(--af-ease-spring-soft);
+}
+
+.af-shell input[type="text"]:focus,
+.af-shell input[type="email"]:focus,
+.af-shell input[type="url"]:focus,
+.af-shell input[type="password"]:focus,
+.af-shell input[type="search"]:focus,
+.af-shell input[type="number"]:focus,
+.af-shell input[type="tel"]:focus,
+.af-shell input[type="date"]:focus,
+.af-shell input[type="time"]:focus,
+.af-shell input[type="datetime-local"]:focus,
+.af-shell select:focus,
+.af-shell textarea:focus {
+	border-color: var(--af-primary-500, #164A55);
+	box-shadow:
+		0 0 0 3px rgba(22, 74, 85, 0.16),
+		0 1px 2px rgba(22, 74, 85, 0.06);
+	transform: translateY(-1px);
+}
+
+/* Checkbox / radio con rebote al chequear */
+.af-shell input[type="checkbox"]:checked,
+.af-shell input[type="radio"]:checked {
+	animation: af-check-pop 260ms var(--af-ease-spring);
+}
+
+@keyframes af-check-pop {
+	0%   { transform: scale(0.9); }
+	60%  { transform: scale(1.1); }
+	100% { transform: scale(1); }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   8 — TABS & STATUS-TABS (slider + bounce)
+   ══════════════════════════════════════════════════════════════════════ */
+
+.af-status-tabs__btn {
+	transition:
+		background 200ms var(--af-ease-in-out-smooth),
+		color 200ms var(--af-ease-in-out-smooth),
+		border-color 200ms var(--af-ease-in-out-smooth),
+		transform 180ms var(--af-ease-spring-soft),
+		box-shadow 220ms var(--af-ease-out-expo);
+}
+
+.af-status-tabs__btn:hover {
+	transform: translateY(-1px);
+}
+
+.af-status-tabs__btn.is-active {
+	box-shadow: var(--af-shadow-tinted-sm);
+}
+
+.af-tabs__tab {
+	transition:
+		color 180ms var(--af-ease-in-out-smooth),
+		background 240ms var(--af-ease-out-expo),
+		box-shadow 240ms var(--af-ease-out-expo),
+		transform 160ms var(--af-ease-spring-soft);
+}
+.af-tabs__tab:active { transform: scale(0.98); }
+
+/* ══════════════════════════════════════════════════════════════════════
+   9 — TABLE ROWS (hover suave + row-reveal al entrar en vista)
+   ══════════════════════════════════════════════════════════════════════ */
+
+.af-shell .af-data-table tbody tr {
+	transition:
+		background 160ms var(--af-ease-in-out-smooth),
+		box-shadow 220ms var(--af-ease-out-expo);
+}
+
+.af-shell .af-data-table tbody tr:hover {
+	background: var(--af-gray-50);
+	box-shadow: inset 3px 0 0 0 var(--af-primary-400);
+}
+
+/* Clase utilitaria para elementos observados por IntersectionObserver */
+.af-reveal {
+	opacity: 0;
+	transform: translateY(10px);
+	transition:
+		opacity 480ms var(--af-ease-out-expo),
+		transform 480ms var(--af-ease-out-expo);
+}
+.af-reveal.is-visible {
+	opacity: 1;
+	transform: translateY(0);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   10 — LINKS (underline grow + arrow nudge)
+   ══════════════════════════════════════════════════════════════════════ */
+
+.af-shell .af-link-underline {
+	position: relative;
+	text-decoration: none;
+}
+.af-shell .af-link-underline::after {
+	content: "";
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: -2px;
+	height: 1.5px;
+	background: currentColor;
+	transform: scaleX(0);
+	transform-origin: left center;
+	transition: transform 320ms var(--af-ease-out-expo);
+}
+.af-shell .af-link-underline:hover::after {
+	transform: scaleX(1);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   11 — PREFERS-REDUCED-MOTION (coherente con reglas existentes)
+   ══════════════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+	.af-shell,
+	.af-shell > .af-page-header,
+	.af-shell > .af-section,
+	.af-shell > .af-split,
+	.af-shell > .af-kpi-grid,
+	.af-toast,
+	.af-modal,
+	.af-modal .af-modal__dialog,
+	.af-reveal {
+		animation: none !important;
+		transition: none !important;
+	}
+
+	.af-shell .af-kpi::after,
+	.af-shell .af-property-card::after,
+	.af-shell .af-service-card::after {
+		display: none !important;
+	}
+
+	.af-shell .button:hover,
+	.af-shell .af-btn:hover,
+	.af-shell .af-kpi:hover,
+	.af-shell .af-property-card:hover,
+	.af-shell .af-service-card:hover,
+	.af-shell .af-maint-card:hover,
+	.af-shell .af-integration-card:hover,
+	.af-shell .af-status-tabs__btn:hover {
+		transform: none !important;
+	}
+
+	.af-pill--pulse { animation: none !important; }
+	.af-reveal { opacity: 1; transform: none; }
+}

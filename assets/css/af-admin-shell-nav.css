@@ -519,6 +519,23 @@ body.af-sidebar-collapsed .af-app-sidebar__section-label {
 	color: #fff;
 }
 
+html body .af-shell .af-app-sidebar a:not(.af-btn):not(.button):not(.af-kpi__link):not(.af-link-underline) {
+	color: var(--af-gray-300, #C3D1CE);
+	text-decoration: none;
+}
+
+html body .af-shell .af-app-sidebar a:not(.af-btn):not(.button):not(.af-kpi__link):not(.af-link-underline):hover,
+html body .af-shell .af-app-sidebar a:not(.af-btn):not(.button):not(.af-kpi__link):not(.af-link-underline):focus,
+html body .af-shell .af-app-sidebar .af-app-sidebar__item.is-active a:not(.af-btn):not(.button):not(.af-kpi__link):not(.af-link-underline),
+html body .af-shell .af-app-sidebar a.af-app-sidebar__logo:not(.x):not(.y):not(.z),
+html body .af-shell .af-app-sidebar a.af-app-sidebar__user:not(.x):not(.y):not(.z) {
+	color: #fff;
+}
+
+html body .af-shell .af-app-sidebar a.af-app-sidebar__logout:not(.x):not(.y):not(.z) {
+	color: var(--af-gray-400, #8A9799);
+}
+
 body.af-sidebar-collapsed .af-app-sidebar__group.is-open .af-app-sidebar__subnav {
 	display: none;
 }

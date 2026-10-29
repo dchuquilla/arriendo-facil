@@ -79,6 +79,26 @@ body.wp-admin .wrap > h1.wp-heading-inline {
 	background: #193238;
 }
 
+/* Explicit text color for non-current top-level items. Without this, WP core
+   falls back to a faint gray that blends with the brand-tinted dark surface
+   and makes labels (Panel, Calendario, Inmuebles…) look washed out. */
+#adminmenu a.menu-top,
+#adminmenu .wp-menu-name,
+#adminmenu div.wp-menu-image::before {
+	color: #E6EDEC !important;
+}
+
+#adminmenu li.menu-top .wp-menu-image::before,
+#adminmenu li.menu-top:not(.current):not(.wp-has-current-submenu) .wp-menu-image::before {
+	color: #B5C5C7 !important;
+}
+
+#adminmenu li.menu-top:hover .wp-menu-name,
+#adminmenu li.menu-top:focus-within .wp-menu-name,
+#adminmenu li.opensub .wp-menu-name {
+	color: #FFFFFF !important;
+}
+
 /* Current top-level item + folded state */
 #adminmenu li.wp-has-current-submenu a.wp-has-current-submenu,
 #adminmenu li.current a.menu-top,
@@ -349,23 +369,38 @@ body.wp-admin .wrap > h1.wp-heading-inline {
     margin-bottom: 12px;
 }
 
-/* Add New button en listas nativas (edit.php, users.php, etc.) */
-body.wp-admin .wrap > .page-title-action,
-body.wp-admin .wrap > h1 + .page-title-action {
-    background: #164A55;
-    color: #fff;
-    border-color: #0F3D47;
+/* Add New button en listas nativas (edit.php, users.php, etc.).
+   Reglas con mayor especificidad y sin dependencia estricta del `>` directo:
+   WP a veces inserta nodos intermedios (notices, wp-header-end) que rompen
+   el combinador, dejando el botón sin estilo y mezclado con el fondo. */
+body.wp-admin .wrap .page-title-action,
+body.wp-admin.wp-core-ui .wrap a.page-title-action {
+    background: linear-gradient(180deg, #1C5E6C 0%, #164A55 100%) !important;
+    color: #FFFFFF !important;
+    border: 1px solid #0F3D47 !important;
     border-radius: 8px;
     padding: 6px 16px;
-    font-weight: 500;
-    box-shadow: 0 1px 2px rgba(37, 99, 235, 0.3);
-    transition: background 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+    font-weight: 600;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.15);
+    box-shadow:
+        0 1px 2px rgba(22, 74, 85, 0.25),
+        0 1px 0 0 rgba(255, 255, 255, 0.12) inset !important;
+    transition: background 160ms ease, box-shadow 220ms ease, transform 160ms cubic-bezier(0.22, 1.2, 0.36, 1);
 }
-body.wp-admin .wrap > .page-title-action:hover {
-    background: #0F3D47;
-    box-shadow: 0 4px 10px rgba(37, 99, 235, 0.35);
+body.wp-admin .wrap .page-title-action:hover,
+body.wp-admin.wp-core-ui .wrap a.page-title-action:hover,
+body.wp-admin .wrap .page-title-action:focus {
+    background: linear-gradient(180deg, #164A55 0%, #0F3D47 100%) !important;
+    box-shadow:
+        0 6px 14px rgba(22, 74, 85, 0.32),
+        0 1px 0 0 rgba(255, 255, 255, 0.14) inset !important;
     transform: translateY(-1px);
-    color: #fff;
+    color: #fff !important;
+    outline: none;
+}
+body.wp-admin .wrap .page-title-action:active {
+    transform: translateY(0) scale(0.98);
+    transition-duration: 80ms;
 }
 
 /* ── Postboxes (widgets del dashboard nativo y meta boxes) ──────────── */

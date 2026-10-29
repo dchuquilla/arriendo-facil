@@ -218,6 +218,10 @@
 				var dir = 'desc' === parts[ 1 ] ? -1 : 1;
 				var numeric = 'order' === key || 'cost' === key || 'priorityRank' === key;
 
+				// Reorder off-DOM: ONE paint for the whole sorted list instead
+				// of one per appendChild. appendChild on a live node is also a
+				// move, so each call triggered a style invalidation.
+				var sortedFrag = document.createDocumentFragment();
 				rows.slice().sort( function ( a, b ) {
 					var av = a.dataset[ key ] || '';
 					var bv = b.dataset[ key ] || '';
@@ -225,8 +229,9 @@
 						? ( parseFloat( av ) || 0 ) - ( parseFloat( bv ) || 0 )
 						: String( av ).localeCompare( String( bv ), undefined, { numeric: true } ) );
 				} ).forEach( function ( row ) {
-					grid.appendChild( row );
+					sortedFrag.appendChild( row );
 				} );
+				grid.appendChild( sortedFrag );
 			} );
 		}
 
@@ -546,11 +551,13 @@
 			}
 			var units = ( afMaintenance.units || {} )[ propertySelect.value ] || [];
 
-			unitSelect.innerHTML = '';
-			unitSelect.appendChild( new Option( afMaintenance.i18n.noUnit, '' ) );
+			// Batch option replacement off-DOM to avoid one reflow per Option.
+			var optFrag = document.createDocumentFragment();
+			optFrag.appendChild( new Option( afMaintenance.i18n.noUnit, '' ) );
 			units.forEach( function ( unit ) {
-				unitSelect.appendChild( new Option( afMaintenance.i18n.unitPrefix + ' ' + unit.code, unit.id ) );
+				optFrag.appendChild( new Option( afMaintenance.i18n.unitPrefix + ' ' + unit.code, unit.id ) );
 			} );
+			unitSelect.replaceChildren( optFrag );
 			unitSelect.disabled = ! units.length;
 			var unitWrap = document.getElementById( 'af-maint-unit-wrap' );
 			if ( unitWrap ) {

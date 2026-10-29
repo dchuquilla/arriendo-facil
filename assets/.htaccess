@@ -1,0 +1,38 @@
+# Apache: long-lived caching for plugin assets.
+#
+# Safe because every <link>/<script> URL carries ?ver=<filemtime>, so changing
+# a file forces a new URL and bypasses the cache. If mod_expires/mod_headers
+# are missing (shared hosts, Litespeed with partial module parity) the file is
+# simply ignored and WordPress defaults apply.
+#
+# Preserves security headers set upstream (CSP, HSTS, X-Frame-Options) — we
+# only add caching directives, we don't `unset` anything.
+
+<IfModule mod_expires.c>
+	ExpiresActive On
+	ExpiresDefault "access plus 1 year"
+	ExpiresByType image/webp         "access plus 1 year"
+	ExpiresByType image/avif         "access plus 1 year"
+	ExpiresByType image/jpeg         "access plus 1 year"
+	ExpiresByType image/png          "access plus 1 year"
+	ExpiresByType image/svg+xml      "access plus 1 year"
+	ExpiresByType text/css           "access plus 1 year"
+	ExpiresByType application/javascript "access plus 1 year"
+	ExpiresByType font/woff2         "access plus 1 year"
+	ExpiresByType font/woff          "access plus 1 year"
+</IfModule>
+
+<IfModule mod_headers.c>
+	# `immutable` tells browsers never to revalidate within max-age — URLs are
+	# already content-addressed via ?ver=<filemtime>.
+	<FilesMatch "\.(css|js|woff2?|svg|png|jpe?g|webp|avif|gif|ico)$">
+		Header set Cache-Control "public, max-age=31536000, immutable"
+	</FilesMatch>
+
+	# CORS for the self-hosted font so that any theme/subdomain that preloads
+	# it with the `crossorigin` attribute does not get a credentialed-request
+	# miss. Same-origin only — we do NOT widen to `*`.
+	<FilesMatch "\.(woff2?|ttf|otf)$">
+		Header set Access-Control-Allow-Origin "same-origin"
+	</FilesMatch>
+</IfModule>

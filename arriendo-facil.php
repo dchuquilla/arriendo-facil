@@ -53,6 +53,7 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-catalog-pdf.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-catalog-groups.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-catalog-share.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-security-hardening.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-image-optimizer.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-list-admin.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-search-api.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-matching-engine.php';

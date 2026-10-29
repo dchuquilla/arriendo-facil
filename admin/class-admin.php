@@ -2107,6 +2107,21 @@ array(
 		);
 		if ( in_array( $hook, $mammoth_screens, true ) ) {
 			wp_enqueue_script( 'mammoth' );
+
+			// Code-split: template analyzer (~338 lines of JS) extracted from
+			// admin.js so other screens no longer parse it. Loads AFTER mammoth
+			// (declared as dep) and after af-admin because it reuses the
+			// afAdmin localized object + jQuery.
+			$analyzer_js_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/admin-template-analyzer.js';
+			if ( file_exists( $analyzer_js_path ) ) {
+				wp_enqueue_script(
+					'af-admin-template-analyzer',
+					ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/admin-template-analyzer.js',
+					array( 'jquery', 'mammoth', 'af-admin' ),
+					(string) filemtime( $analyzer_js_path ),
+					array( 'in_footer' => true, 'strategy' => 'defer' )
+				);
+			}
 		}
 
 		wp_enqueue_script(

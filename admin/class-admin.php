@@ -2276,6 +2276,16 @@ array(
 			);
 		}
 
+		if ( 'arriendo-facil_page_af-reviews' === $hook ) {
+			$reviews_css_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-reviews.css';
+			wp_enqueue_style(
+				'af-reviews',
+				ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/af-reviews.css',
+				array( 'af-tokens', 'af-shell', 'af-forms', 'af-admin-chrome' ),
+				file_exists( $reviews_css_path ) ? (string) filemtime( $reviews_css_path ) : ARRIENDO_FACIL_VERSION
+			);
+		}
+
 		$screen = get_current_screen();
 		if ( $screen && 'accommodation' === $screen->post_type && in_array( $hook, array( 'post.php', 'post-new.php' ), true ) ) {
 			wp_enqueue_media();

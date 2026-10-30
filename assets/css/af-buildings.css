@@ -1528,3 +1528,119 @@
 	justify-content: center;
 	padding: 9px 14px;
 }
+
+/* ── Modal de cobranza: capa moderna (ID-scoped para ganar a estilos del tema) ── */
+
+#af-cobranza-modal .af-cobranza-summary {
+	display: grid;
+	gap: 12px;
+	padding: 16px;
+	border: 1px solid var(--af-gray-200, #DCE5E3);
+	border-radius: 16px;
+	background: linear-gradient(180deg, #fff, var(--af-gray-50, #F7F8F6));
+}
+
+#af-cobranza-modal .af-cobranza-summary[hidden] { display: none; }
+
+#af-cobranza-modal .af-cobranza-summary__row {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 10px;
+	margin: 0;
+}
+
+#af-cobranza-modal .af-cobranza-summary__item {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 10px 12px;
+	border-radius: 12px;
+	background: #fff;
+	border: 1px solid var(--af-gray-200, #DCE5E3);
+	min-width: 0;
+}
+
+#af-cobranza-modal .af-cobranza-summary__v {
+	font-size: clamp(14px, 2.4vw, 18px);
+	overflow-wrap: anywhere;
+}
+
+#af-cobranza-modal .af-cobranza-summary__bar {
+	height: 10px;
+	background: var(--af-gray-200, #DCE5E3);
+}
+
+#af-cobranza-modal .af-cobranza-summary__fill {
+	background: linear-gradient(90deg, #2F7D73, #4fb3a5);
+}
+
+#af-cobranza-modal .af-cobranza-charges__title {
+	margin-top: 4px;
+	flex-wrap: wrap;
+}
+
+#af-cobranza-modal .af-cobranza-charges {
+	display: grid;
+	gap: 10px;
+}
+
+#af-cobranza-modal .af-cobranza-charge {
+	display: grid;
+	grid-template-columns: 40px minmax(0, 1fr) auto auto;
+	align-items: center;
+	gap: 6px 14px;
+	margin: 0;
+	padding: 12px 14px;
+	border-radius: 14px;
+	border-left-width: 4px;
+	animation: af-cob-in 0.28s ease both;
+	transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+#af-cobranza-modal .af-cobranza-charge:hover {
+	transform: translateY(-1px);
+	box-shadow: 0 8px 18px -10px rgba(15, 23, 42, 0.35);
+}
+
+#af-cobranza-modal .af-cobranza-charge.is-overdue { border-left-color: var(--af-danger-500, #D9534F); background: color-mix(in srgb, var(--af-danger-50, #FBECEB) 55%, #fff); }
+#af-cobranza-modal .af-cobranza-charge.is-pending { border-left-color: var(--af-info-500, #3882F6); }
+#af-cobranza-modal .af-cobranza-charge.is-paid { border-left-color: var(--af-success-500, #2F7D73); opacity: 0.8; }
+
+#af-cobranza-modal .af-cobranza-charge__icon {
+	width: 40px;
+	height: 40px;
+	border-radius: 12px;
+}
+
+#af-cobranza-modal .af-cobranza-charge__label {
+	overflow-wrap: anywhere;
+}
+
+#af-cobranza-modal .af-cobranza-charge__amount {
+	min-width: 96px;
+	align-items: flex-end;
+}
+
+#af-cobranza-modal .af-cobranza-charge__value { font-size: 15px; }
+
+#af-cobranza-modal .af-cobranza-charge__actions .af-btn {
+	padding: 6px 14px;
+	border-radius: 999px;
+	white-space: nowrap;
+}
+
+@keyframes af-cob-in {
+	from { opacity: 0; transform: translateY(6px); }
+	to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	#af-cobranza-modal .af-cobranza-charge { animation: none; transition: none; }
+}
+
+@media (max-width: 560px) {
+	#af-cobranza-modal .af-cobranza-summary__row { grid-template-columns: 1fr; }
+	#af-cobranza-modal .af-cobranza-charge { grid-template-columns: 40px minmax(0, 1fr); }
+	#af-cobranza-modal .af-cobranza-charge__amount,
+	#af-cobranza-modal .af-cobranza-charge__actions { grid-column: 1 / -1; flex-direction: row; justify-content: space-between; }
+}

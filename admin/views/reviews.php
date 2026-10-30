@@ -149,7 +149,7 @@ if ( function_exists( 'current_user_can' ) && current_user_can( 'manage_options'
 	);
 }
 ?>
-<div class="wrap af-shell">
+<div class="wrap af-shell af-reviews-page">
 
 	<?php
 	af_page_header(
@@ -196,13 +196,17 @@ if ( function_exists( 'current_user_can' ) && current_user_can( 'manage_options'
 										echo esc_html(
 											sprintf(
 											/* translators: 1: average days late, 2: total charges */
-											__( '%1$s días promedio de atraso (%2$d cobros)', 'arriendo-facil' ),
+											__( '%1$s días promedio de atraso (%2$d vencimientos)', 'arriendo-facil' ),
 											number_format_i18n( $payment_hint['average_days_late'], 1 ),
 											$payment_hint['total']
 											)
 										);
 										?>
 									</span>
+									<div class="af-payhist" title="<?php echo esc_attr( sprintf( /* translators: 1: on time, 2: total */ __( '%1$d de %2$d vencimientos pagados a tiempo', 'arriendo-facil' ), $payment_hint['on_time'], $payment_hint['total'] ) ); ?>">
+										<span class="af-payhist__bar"><span class="af-payhist__fill" style="width:<?php echo esc_attr( round( 100 * $payment_hint['on_time'] / max( 1, $payment_hint['total'] ) ) ); ?>%"></span></span>
+										<span class="af-payhist__txt"><?php echo esc_html( sprintf( /* translators: 1: on time, 2: late */ __( '%1$d a tiempo · %2$d con atraso', 'arriendo-facil' ), $payment_hint['on_time'], $payment_hint['late'] ) ); ?></span>
+									</div>
 								<?php else : ?>
 									<span class="af-td-meta"><?php esc_html_e( 'Sin historial suficiente', 'arriendo-facil' ); ?></span>
 								<?php endif; ?>

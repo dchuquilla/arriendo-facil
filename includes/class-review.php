@@ -273,17 +273,34 @@ class Arriendo_Facil_Review {
 		$on_time = 0;
 		$late    = 0;
 		$total_days_late = 0;
+		$today   = gmdate( 'Y-m-d' );
 
+		// One obligation per due date: rent + services due the same day count once, with the worst delay.
+		$by_due = array();
 		foreach ( $rows as $row ) {
-			$reference_date = 'paid' === $row->status && $row->last_payment ? (string) $row->last_payment : gmdate( 'Y-m-d' );
-			$days_late      = max( 0, (int) floor( ( strtotime( $reference_date ) - strtotime( $row->due_date ) ) / DAY_IN_SECONDS ) );
-			$total_days_late += $days_late;
-
-			if ( $days_late > 0 || 'paid' !== $row->status ) {
-				$late++;
+			$due = (string) $row->due_date;
+			// Charges not yet due cannot be late; skip unless already paid.
+			if ( $due > $today && 'paid' !== $row->status ) {
 				continue;
 			}
-			$on_time++;
+			$reference_date = 'paid' === $row->status && $row->last_payment ? substr( (string) $row->last_payment, 0, 10 ) : $today;
+			$days_late      = max( 0, (int) floor( ( strtotime( $reference_date ) - strtotime( $due ) ) / DAY_IN_SECONDS ) );
+			$is_late        = $days_late > 0 || 'paid' !== $row->status;
+
+			if ( ! isset( $by_due[ $due ] ) ) {
+				$by_due[ $due ] = array( 'days' => 0, 'late' => false );
+			}
+			$by_due[ $due ]['days'] = max( $by_due[ $due ]['days'], $days_late );
+			$by_due[ $due ]['late'] = $by_due[ $due ]['late'] || $is_late;
+		}
+
+		foreach ( $by_due as $event ) {
+			$total_days_late += $event['days'];
+			if ( $event['late'] ) {
+				$late++;
+			} else {
+				$on_time++;
+			}
 		}
 
 		$total = $on_time + $late;

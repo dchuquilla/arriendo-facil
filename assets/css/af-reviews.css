@@ -1,0 +1,97 @@
+/* Calificaciones: capa visual moderna, acotada a .af-reviews-page. */
+
+.af-reviews-page .af-kpi {
+	transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.af-reviews-page .af-kpi:hover {
+	transform: translateY(-2px);
+	box-shadow: 0 12px 24px -14px rgba(15, 23, 42, 0.35);
+}
+
+.af-reviews-page .af-section {
+	border-radius: 16px;
+	overflow: hidden;
+}
+
+.af-reviews-page .af-data-table {
+	border: 0;
+	border-collapse: separate;
+	border-spacing: 0;
+}
+
+.af-reviews-page .af-data-table thead th {
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+	color: var(--af-gray-500, #647579);
+	background: var(--af-gray-50, #F7F8F6);
+}
+
+.af-reviews-page .af-data-table tbody tr {
+	transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.af-reviews-page .af-data-table tbody tr:hover {
+	background: var(--af-primary-50, #DDEEEB);
+	box-shadow: inset 3px 0 0 var(--af-primary-500, #164A55);
+}
+
+.af-reviews-page .af-pill {
+	border-radius: 999px;
+	font-weight: 700;
+}
+
+.af-reviews-page .af-rate-tenant,
+.af-reviews-page .af-rate-admin {
+	border-radius: 999px;
+	padding: 2px 16px;
+	transition: transform 0.15s ease;
+}
+
+.af-reviews-page .af-rate-tenant:hover,
+.af-reviews-page .af-rate-admin:hover {
+	transform: translateY(-1px);
+}
+
+.af-reviews-page .af-status-tabs__btn {
+	border-radius: 999px;
+	transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.af-reviews-page .af-status-tabs__btn:hover {
+	transform: translateY(-1px);
+}
+
+.af-reviews-page .af-payhist {
+	display: grid;
+	gap: 4px;
+	margin-top: 6px;
+	max-width: 240px;
+}
+
+.af-reviews-page .af-payhist__bar {
+	display: block;
+	height: 6px;
+	border-radius: 999px;
+	background: var(--af-danger-100, #F6D3D0);
+	overflow: hidden;
+}
+
+.af-reviews-page .af-payhist__fill {
+	display: block;
+	height: 100%;
+	border-radius: 999px;
+	background: linear-gradient(90deg, #2F7D73, #4fb3a5);
+	transition: width 0.4s ease;
+}
+
+.af-reviews-page .af-payhist__txt {
+	font-size: 12px;
+	color: var(--af-gray-500, #647579);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.af-reviews-page * { transition: none !important; }
+}

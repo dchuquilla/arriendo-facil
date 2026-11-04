@@ -1892,6 +1892,8 @@ class Arriendo_Facil_Billing_Ledger {
 		$leases      = array();
 		$lease_ids   = array();
 		$by_acc      = array();
+		$payments_by_charge = array();
+		$invoice_by_charge  = array();
 		if ( ! empty( $acc_ids ) ) {
 			$ph = implode( ',', array_fill( 0, count( $acc_ids ), '%d' ) );
 			$lrows = (array) $wpdb->get_results(
@@ -1927,6 +1929,44 @@ class Arriendo_Facil_Billing_Ledger {
 				);
 				foreach ( $crows as $row ) {
 					$by_acc[ (int) $row->accommodation_id ][] = $row;
+				}
+
+				$charge_ids = array_map( 'intval', wp_list_pluck( $crows, 'id' ) );
+				if ( ! empty( $charge_ids ) ) {
+					$pph   = implode( ',', array_fill( 0, count( $charge_ids ), '%d' ) );
+					$prows = (array) $wpdb->get_results(
+						$wpdb->prepare(
+							"SELECT charge_id, amount, payment_date, method, reference
+							 FROM " . self::payments_table() . "
+							 WHERE charge_id IN ({$pph}) ORDER BY payment_date ASC, id ASC",
+							$charge_ids
+						) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- placeholder list built safely.
+					);
+					$methods = self::payment_methods();
+					foreach ( $prows as $prow ) {
+						$payments_by_charge[ (int) $prow->charge_id ][] = array(
+							'amount'    => (float) $prow->amount,
+							'date'      => (string) $prow->payment_date,
+							'method'    => isset( $methods[ $prow->method ] ) ? (string) $methods[ $prow->method ] : (string) $prow->method,
+							'reference' => (string) $prow->reference,
+						);
+					}
+
+					$irows = (array) $wpdb->get_results(
+						$wpdb->prepare(
+							"SELECT c.id, ei.numero_comprobante, ei.estado
+							 FROM {$wpdb->prefix}af_charges c
+							 INNER JOIN {$wpdb->prefix}af_electronic_invoices ei ON ei.id = c.invoice_id
+							 WHERE c.id IN ({$pph})",
+							$charge_ids
+						) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- placeholder list built safely.
+					);
+					foreach ( $irows as $irow ) {
+						$invoice_by_charge[ (int) $irow->id ] = array(
+							'number' => (string) $irow->numero_comprobante,
+							'state'  => (string) $irow->estado,
+						);
+					}
 				}
 			}
 		}
@@ -1965,6 +2005,8 @@ class Arriendo_Facil_Billing_Ledger {
 					'paid'    => (float) $c->amount_paid,
 					'dueDate' => (string) $c->due_date,
 					'status'  => (string) $c->status,
+					'payments' => isset( $payments_by_charge[ (int) $c->id ] ) ? $payments_by_charge[ (int) $c->id ] : array(),
+					'invoice'  => isset( $invoice_by_charge[ (int) $c->id ] ) ? $invoice_by_charge[ (int) $c->id ] : null,
 				);
 
 				if ( $per === $current_period ) {

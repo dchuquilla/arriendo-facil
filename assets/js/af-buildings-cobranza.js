@@ -585,6 +585,25 @@
 			li.querySelector('.af-cobranza-charge__balance').textContent =
 				paid ? (T.paid || 'Pagado') : ((T.balance || 'Saldo') + ' ' + money(bal));
 
+			var history = c.payments || [];
+			if (history.length || c.invoice) {
+				var det = document.createElement('div');
+				det.className = 'af-cobranza-charge__history';
+				history.forEach(function (p) {
+					var line = document.createElement('div');
+					line.className = 'af-cobranza-charge__pay';
+					line.textContent = shortDate(p.date) + ' · ' + p.method + (p.reference ? ' · ' + p.reference : '') + ' · ' + money(p.amount);
+					det.appendChild(line);
+				});
+				if (c.invoice) {
+					var inv = document.createElement('div');
+					inv.className = 'af-cobranza-charge__invoice';
+					inv.textContent = (T.invoice || 'Factura') + ' ' + (c.invoice.number || '') + (c.invoice.state ? ' (' + c.invoice.state + ')' : '');
+					det.appendChild(inv);
+				}
+				li.appendChild(det);
+			}
+
 			frag.appendChild(li);
 		});
 		chargesEl.replaceChildren(frag);
@@ -858,6 +877,7 @@
 		if (!cell) { return; }
 		var day = cell.getAttribute('data-day');
 		state.day = (state.day === day) ? '' : day;
+		payPanel.hidden = true;
 		render();
 	});
 
@@ -889,6 +909,7 @@
 		if (state.filters.paid && state.filters.pending && state.filters.overdue) {
 			state.filters = {};
 		}
+		payPanel.hidden = true;
 		render();
 	});
 
@@ -896,6 +917,7 @@
 		if (!e.target.closest('[data-clear-filters]')) { return; }
 		state.day = '';
 		state.filters = {};
+		payPanel.hidden = true;
 		render();
 	});
 

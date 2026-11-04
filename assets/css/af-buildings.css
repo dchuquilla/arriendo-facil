@@ -1644,3 +1644,19 @@
 	#af-cobranza-modal .af-cobranza-charge__amount,
 	#af-cobranza-modal .af-cobranza-charge__actions { grid-column: 1 / -1; flex-direction: row; justify-content: space-between; }
 }
+
+#af-cobranza-modal .af-cobranza-charge__history {
+	grid-column: 1 / -1;
+	display: grid;
+	gap: 2px;
+	padding: 8px 10px;
+	border-radius: 10px;
+	background: var(--af-gray-50, #F7F8F6);
+	font-size: 12px;
+	color: var(--af-gray-600, #4a5c61);
+}
+
+#af-cobranza-modal .af-cobranza-charge__invoice {
+	font-weight: 700;
+	color: var(--af-primary-700);
+}

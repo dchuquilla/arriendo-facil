@@ -1413,3 +1413,28 @@
 	display: block;
 	margin-bottom: 4px;
 }
+
+.af-cs-card__share {
+	align-self: flex-start;
+	margin-top: 10px;
+	padding: 6px 12px;
+	border: 1px solid var(--af-cs-line);
+	border-radius: 999px;
+	background: #fff;
+	color: var(--af-cs-brand);
+	font: inherit;
+	font-size: .85rem;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.af-cs-card__share:hover,
+.af-cs-card__share:focus-visible {
+	background: rgba(15, 23, 42, .06);
+}
+
+@media print {
+	.af-cs-card__share {
+		display: none;
+	}
+}

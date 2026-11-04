@@ -37,6 +37,50 @@ $catalog_share_groups  = $catalog['groups'];
 $catalog_share_total   = (int) $catalog['total'];
 $catalog_share_free    = (int) $catalog['available'];
 
+$af_catalog_base_url = $catalog_share_token
+	? home_url( '/' . Arriendo_Facil_Catalog_Share::REWRITE_SLUG . '/' . $catalog_share_token . '/' )
+	: '';
+
+/*
+ * Single-property mode (?inmueble=<id>): the same catalog narrowed to one
+ * card. Filtering the already owner-scoped dataset means an ID that belongs
+ * to someone else, or is hidden/inactive, simply never matches.
+ */
+$af_single_id     = isset( $_GET[ Arriendo_Facil_Catalog_Share::PROPERTY_ARG ] ) // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+	? absint( wp_unslash( $_GET[ Arriendo_Facil_Catalog_Share::PROPERTY_ARG ] ) ) // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+	: 0;
+$af_single_mode   = false;
+$af_single_missing = false;
+
+if ( $af_single_id && ! $catalog_share_not_found ) {
+	$af_filtered = array();
+
+	foreach ( $catalog_share_groups as $af_group ) {
+		$af_cards = array_values(
+			array_filter(
+				$af_group['cards'],
+				static function ( $c ) use ( $af_single_id ) {
+					return (int) $c['id'] === $af_single_id;
+				}
+			)
+		);
+
+		if ( $af_cards ) {
+			$af_group['cards'] = $af_cards;
+			$af_filtered[]     = $af_group;
+		}
+	}
+
+	if ( $af_filtered ) {
+		$af_single_mode        = true;
+		$catalog_share_groups  = $af_filtered;
+		$catalog_share_total   = 1;
+		$catalog_share_free    = ( 'available' === $af_filtered[0]['cards'][0]['status'] ) ? 1 : 0;
+	} else {
+		$af_single_missing = true;
+	}
+}
+
 /*
  * Filter vocabulary, collected from the rendered cards so the controls can
  * never offer a value that returns zero results.
@@ -119,7 +163,11 @@ get_header();
 
 		<?php if ( ! $catalog_share_not_found && $catalog_share_total > 0 ) : ?>
 			<div class="af-cs-toolbar">
-				<?php if ( $af_pdf_url ) : ?>
+				<?php if ( $af_single_mode && $af_catalog_base_url ) : ?>
+					<a class="af-cs-btn af-cs-btn--primary" href="<?php echo esc_url( $af_catalog_base_url ); ?>">
+						<?php esc_html_e( 'Ver todo el catálogo', 'arriendo-facil' ); ?>
+					</a>
+				<?php elseif ( $af_pdf_url ) : ?>
 					<a class="af-cs-btn af-cs-btn--primary" href="<?php echo esc_url( $af_pdf_url ); ?>">
 						<?php esc_html_e( 'Descargar PDF', 'arriendo-facil' ); ?>
 					</a>
@@ -145,6 +193,13 @@ get_header();
 
 	<?php else : ?>
 
+		<?php if ( $af_single_missing ) : ?>
+			<div class="af-cs-noresults">
+				<p><?php esc_html_e( 'El inmueble solicitado ya no está disponible. Te mostramos el resto del catálogo.', 'arriendo-facil' ); ?></p>
+			</div>
+		<?php endif; ?>
+
+		<?php if ( ! $af_single_mode ) : ?>
 		<div class="af-cs-filters" role="search">
 			<div class="af-cs-filters__field af-cs-filters__field--search">
 				<label class="screen-reader-text" for="af-cs-q"><?php esc_html_e( 'Buscar', 'arriendo-facil' ); ?></label>
@@ -192,6 +247,8 @@ get_header();
 				</select>
 			</div>
 		</div>
+
+		<?php endif; ?>
 
 		<p class="af-cs-count" data-af-cs-count hidden></p>
 
@@ -259,6 +316,10 @@ get_header();
 						 * template only has to loop, never to branch.
 						 */
 						$af_facts = array();
+
+						$af_share_url = $af_catalog_base_url
+							? add_query_arg( Arriendo_Facil_Catalog_Share::PROPERTY_ARG, (int) $af_card['id'], $af_catalog_base_url )
+							: '';
 
 						if ( $af_card['address'] ) {
 							$af_facts[ __( 'Ubicación', 'arriendo-facil' ) ] = $af_card['address'];
@@ -377,6 +438,18 @@ get_header();
 												</span>
 											<?php endif; ?>
 										</div>
+
+										<?php if ( $af_share_url ) : ?>
+											<button
+												type="button"
+												class="af-cs-card__share"
+												data-af-cs-share
+												data-af-cs-share-url="<?php echo esc_url( $af_share_url ); ?>"
+												data-af-cs-share-title="<?php echo esc_attr( $af_card['title'] ); ?>"
+											>
+												<span data-af-cs-share-text><?php esc_html_e( 'Compartir enlace', 'arriendo-facil' ); ?></span>
+											</button>
+										<?php endif; ?>
 									</div>
 
 									<button

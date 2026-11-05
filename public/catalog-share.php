@@ -37,10 +37,6 @@ $catalog_share_groups  = $catalog['groups'];
 $catalog_share_total   = (int) $catalog['total'];
 $catalog_share_free    = (int) $catalog['available'];
 
-$af_catalog_base_url = $catalog_share_token
-	? home_url( '/' . Arriendo_Facil_Catalog_Share::REWRITE_SLUG . '/' . $catalog_share_token . '/' )
-	: '';
-
 /*
  * Single-property mode (?inmueble=<id>): the same catalog narrowed to one
  * card. Filtering the already owner-scoped dataset means an ID that belongs
@@ -161,13 +157,9 @@ get_header();
 			<?php endif; ?>
 		</div>
 
-		<?php if ( ! $catalog_share_not_found && $catalog_share_total > 0 ) : ?>
+		<?php if ( ! $af_single_mode && ! $catalog_share_not_found && $catalog_share_total > 0 ) : ?>
 			<div class="af-cs-toolbar">
-				<?php if ( $af_single_mode && $af_catalog_base_url ) : ?>
-					<a class="af-cs-btn af-cs-btn--primary" href="<?php echo esc_url( $af_catalog_base_url ); ?>">
-						<?php esc_html_e( 'Ver todo el catálogo', 'arriendo-facil' ); ?>
-					</a>
-				<?php elseif ( $af_pdf_url ) : ?>
+				<?php if ( $af_pdf_url ) : ?>
 					<a class="af-cs-btn af-cs-btn--primary" href="<?php echo esc_url( $af_pdf_url ); ?>">
 						<?php esc_html_e( 'Descargar PDF', 'arriendo-facil' ); ?>
 					</a>
@@ -263,6 +255,15 @@ get_header();
 				data-af-cs-group-name="<?php echo esc_attr( $af_group['name'] ); ?>"
 			>
 				<div class="af-cs-group__head">
+					<?php if ( $af_single_mode ) : ?>
+						<?php
+						// The "loose" bucket name only makes sense next to other groups.
+						$af_single_heading = (int) $af_group['id']
+							? $af_group['name']
+							: __( 'Detalles del inmueble', 'arriendo-facil' );
+						?>
+						<h2 class="af-cs-group__title"><?php echo esc_html( $af_single_heading ); ?></h2>
+					<?php else : ?>
 					<h2 class="af-cs-group__title"><?php echo esc_html( $af_group['name'] ); ?></h2>
 					<span class="af-cs-group__count" data-af-cs-group-count>
 						<?php
@@ -275,6 +276,7 @@ get_header();
 						);
 						?>
 					</span>
+					<?php endif; ?>
 				</div>
 
 				<div class="af-cs-grid">
@@ -611,6 +613,7 @@ get_header();
 
 	<?php endif; ?>
 
+	<?php if ( ! $af_single_mode ) : ?>
 	<footer class="af-cs-footer">
 		<p>
 			<?php
@@ -625,6 +628,7 @@ get_header();
 			?>
 		</p>
 	</footer>
+	<?php endif; ?>
 </main>
 
 <?php

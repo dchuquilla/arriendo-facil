@@ -252,8 +252,7 @@ class Arriendo_Facil_Accommodation {
 	}
 
 	/**
-	 * Lets the owner pick the building group and decide whether this property
-	 * appears in the shared public catalog.
+	 * Lets the owner pick the building group of this property.
 	 *
 	 * @param WP_Post $post Current post object.
 	 */
@@ -264,7 +263,6 @@ class Arriendo_Facil_Accommodation {
 
 		$owner_id   = absint( get_post_meta( $post->ID, '_af_owner_id', true ) );
 		$group_id   = Arriendo_Facil_Catalog_Groups::get_group_id_for_property( $post->ID );
-		$included   = Arriendo_Facil_Catalog_Groups::is_in_public_catalog( $post->ID );
 		$groups     = $owner_id ? Arriendo_Facil_Catalog_Groups::get_for_owner( $owner_id ) : array();
 
 		// Never offer a group whose owner no longer matches the property's.
@@ -292,20 +290,9 @@ class Arriendo_Facil_Accommodation {
 
 			<?php if ( empty( $groups ) ) : ?>
 				<p class="description">
-					<?php esc_html_e( 'Crea edificios o conjuntos desde Propiedades → Catálogo de propiedades.', 'arriendo-facil' ); ?>
+					<?php esc_html_e( 'Crea edificios o conjuntos desde la lista de Inmuebles.', 'arriendo-facil' ); ?>
 				</p>
 			<?php endif; ?>
-
-			<p class="af-catalog-metabox__field">
-				<label for="af_in_public_catalog">
-					<input type="checkbox" name="af_in_public_catalog" id="af_in_public_catalog" value="1" <?php checked( $included ); ?> />
-					<?php esc_html_e( 'Mostrar en el catálogo público', 'arriendo-facil' ); ?>
-				</label>
-			</p>
-
-			<p class="description">
-				<?php esc_html_e( 'Si lo desmarcas, la propiedad no aparecerá en el enlace compartido ni en el PDF, pero seguirá aquí en el panel.', 'arriendo-facil' ); ?>
-			</p>
 		</div>
 		<?php
 	}
@@ -612,9 +599,9 @@ class Arriendo_Facil_Accommodation {
 		}
 
 		/*
-		 * Public catalog: building group and visibility toggle. Both are
-		 * delegated to the groups helper so the ownership rules (the group must
-		 * belong to the property's owner) cannot be bypassed from the editor.
+		 * Public catalog: building group, delegated to the groups helper so the
+		 * ownership rules (the group must belong to the property's owner) cannot
+		 * be bypassed from the editor.
 		 */
 		if ( class_exists( 'Arriendo_Facil_Catalog_Groups' ) ) {
 			if ( isset( $_POST['af_catalog_group_id'] ) ) {
@@ -623,11 +610,6 @@ class Arriendo_Facil_Accommodation {
 				// A rejected assignment (wrong owner, unknown group) is ignored,
 				// leaving any previously saved group untouched.
 				Arriendo_Facil_Catalog_Groups::set_group_for_property( $post_id, $group_id, $current_user_id );
-			}
-
-			if ( isset( $_POST['af_in_public_catalog'] ) ) {
-				$included = ! empty( $_POST['af_in_public_catalog'] ) && '0' !== wp_unslash( $_POST['af_in_public_catalog'] );
-				Arriendo_Facil_Catalog_Groups::set_in_public_catalog( $post_id, $included, $current_user_id );
 			}
 		}
 

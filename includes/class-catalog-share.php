@@ -20,10 +20,6 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class Arriendo_Facil_Catalog_Share {
 
-	const META_KEY     = '_af_catalog_share_token';
-	const META_SLUG    = '_af_catalog_share_slug';
-	const SLUG_MIN     = 3;
-	const SLUG_MAX     = 40;
 	const QUERY_VAR    = 'af_catalog_share';
 	const REWRITE_SLUG = 'catalogo';
 
@@ -47,9 +43,6 @@ class Arriendo_Facil_Catalog_Share {
 		add_action( 'template_redirect', array( $this, 'maybe_stream_pdf' ), 5 );
 		add_action( 'init', array( $this, 'maybe_flush_rules' ), 99 );
 
-		add_action( 'wp_ajax_af_catalog_share_generate', array( $this, 'ajax_generate' ) );
-		add_action( 'wp_ajax_af_catalog_share_revoke', array( $this, 'ajax_revoke' ) );
-		add_action( 'wp_ajax_af_catalog_share_slug', array( $this, 'ajax_slug' ) );
 		add_action( 'wp_ajax_af_catalog_share_stats', array( $this, 'ajax_stats' ) );
 
 		add_shortcode( 'af_catalog_share', array( $this, 'render_shortcode' ) );
@@ -112,16 +105,20 @@ class Arriendo_Facil_Catalog_Share {
 			return $template;
 		}
 
-		$user = $this->user_for_token( $token );
-		if ( ! $user ) {
-			$GLOBALS['af_catalog_share_user']        = null;
-			$GLOBALS['af_catalog_share_not_found']   = true;
-			$GLOBALS['af_catalog_share_token']       = '';
+		$catalog = Arriendo_Facil_Catalogs::find_by_public_key( $token );
+		$user    = $catalog ? get_userdata( (int) $catalog->post_author ) : null;
+
+		if ( ! $catalog || ! $user ) {
+			$GLOBALS['af_catalog_share_user']      = null;
+			$GLOBALS['af_catalog_share_catalog']   = null;
+			$GLOBALS['af_catalog_share_not_found'] = true;
+			$GLOBALS['af_catalog_share_token']     = '';
 
 			return $this->public_template_path();
 		}
 
 		$GLOBALS['af_catalog_share_user']      = $user;
+		$GLOBALS['af_catalog_share_catalog']   = $catalog;
 		$GLOBALS['af_catalog_share_not_found'] = false;
 		$GLOBALS['af_catalog_share_token']     = $token;
 
@@ -153,7 +150,8 @@ class Arriendo_Facil_Catalog_Share {
 			return;
 		}
 
-		$user = $this->user_for_token( $token );
+		$catalog_post = Arriendo_Facil_Catalogs::find_by_public_key( $token );
+		$user         = $catalog_post ? get_userdata( (int) $catalog_post->post_author ) : null;
 
 		if ( ! $user ) {
 			status_header( 404 );
@@ -163,7 +161,7 @@ class Arriendo_Facil_Catalog_Share {
 			exit;
 		}
 
-		$catalog = self::get_catalog( $user );
+		$catalog = self::get_catalog( $user, Arriendo_Facil_Catalogs::property_ids( $catalog_post->ID ) );
 		$pdf     = Arriendo_Facil_Catalog_Pdf::build( $catalog );
 
 		if ( is_wp_error( $pdf ) ) {
@@ -174,7 +172,7 @@ class Arriendo_Facil_Catalog_Share {
 			exit;
 		}
 
-		$slug = sanitize_title( $catalog['company'] );
+		$slug = sanitize_title( $catalog_post->post_title );
 		$slug = $slug ? $slug : 'catalogo';
 
 		nocache_headers();
@@ -188,261 +186,40 @@ class Arriendo_Facil_Catalog_Share {
 	}
 
 	/**
-	 * Shortcode fallback: renders the shared catalog for the current user's token.
+	 * Shortcode fallback: renders one of the current user's active catalogs
+	 * ([af_catalog_share id="123"]; the most recently used one by default).
 	 *
+	 * @param array $atts Shortcode attributes.
 	 * @return string
 	 */
-	public function render_shortcode() {
+	public function render_shortcode( $atts = array() ) {
 		if ( ! is_user_logged_in() || ! in_array( 'af_property_admin', (array) wp_get_current_user()->roles, true ) ) {
 			return '<p>' . esc_html__( 'Catálogo no disponible.', 'arriendo-facil' ) . '</p>';
 		}
 
+		$atts       = shortcode_atts( array( 'id' => 0 ), (array) $atts, 'af_catalog_share' );
+		$catalog_id = absint( $atts['id'] );
+
+		if ( ! $catalog_id ) {
+			$latest     = Arriendo_Facil_Catalogs::list_for_owner( get_current_user_id() );
+			$catalog_id = $latest ? (int) $latest[0]->ID : 0;
+		}
+
+		if ( ! $catalog_id || ! Arriendo_Facil_Catalogs::user_can_manage( $catalog_id ) || Arriendo_Facil_Catalogs::is_archived( $catalog_id ) ) {
+			return '<p>' . esc_html__( 'Catálogo no disponible.', 'arriendo-facil' ) . '</p>';
+		}
+
+		$link = Arriendo_Facil_Catalogs::link( $catalog_id );
+
 		$GLOBALS['af_catalog_share_user']      = wp_get_current_user();
+		$GLOBALS['af_catalog_share_catalog']   = Arriendo_Facil_Catalogs::get( $catalog_id );
 		$GLOBALS['af_catalog_share_not_found'] = false;
-		$GLOBALS['af_catalog_share_token']     = self::token_for_user( get_current_user_id() );
+		$GLOBALS['af_catalog_share_token']     = basename( untrailingslashit( $link['url'] ) );
 
 		ob_start();
 		require ARRIENDO_FACIL_PLUGIN_DIR . 'public/catalog-share.php';
 
 		return (string) ob_get_clean();
-	}
-
-	/* ---------------------------------------------------------------------
-	 * Token helpers
-	 * ------------------------------------------------------------------- */
-
-	/**
-	 * @param int|null $user_id User ID or current user.
-	 * @return string Token value or empty string.
-	 */
-	public static function token_for_user( $user_id = 0 ) {
-		$user_id = $user_id ? absint( $user_id ) : get_current_user_id();
-		return (string) get_user_meta( $user_id, self::META_KEY, true );
-	}
-
-	/**
-	 * Creates (or rotates) the share token. Returns raw token + public URL.
-	 *
-	 * @param int  $user_id User ID.
-	 * @param bool $rotate  Force a new token.
-	 * @return array{token:string,url:string,pdf_url:string}|null
-	 */
-	public static function generate_token( $user_id, $rotate = false ) {
-		$user_id = absint( $user_id );
-		if ( ! $user_id ) {
-			return null;
-		}
-
-		$token = self::token_for_user( $user_id );
-		if ( '' === $token || $rotate ) {
-			$token = '';
-			if ( function_exists( 'random_bytes' ) ) {
-				$token = bin2hex( random_bytes( 32 ) );
-			}
-			if ( ! preg_match( '/^[a-f0-9]{64}$/', $token ) ) {
-				$token = md5( wp_salt( 'auth' ) . uniqid( (string) $user_id, true ) ) . md5( microtime() . wp_salt( 'secure_auth' ) );
-			}
-			update_user_meta( $user_id, self::META_KEY, $token );
-		}
-
-		if ( '' === self::slug_for_user( $user_id ) ) {
-			$suggestions = self::suggest_slugs( self::default_slug_base( $user_id ), $user_id, 1 );
-			if ( $suggestions ) {
-				update_user_meta( $user_id, self::META_SLUG, $suggestions[0] );
-			}
-		}
-
-		return self::link_payload( $user_id );
-	}
-
-	/**
-	 * Public URL + PDF URL for a user's active link.
-	 *
-	 * @param int $user_id User ID.
-	 * @return array{token:string,slug:string,url:string,pdf_url:string}|null
-	 */
-	public static function link_payload( $user_id ) {
-		$token = self::token_for_user( $user_id );
-		if ( '' === $token ) {
-			return null;
-		}
-
-		$slug = self::slug_for_user( $user_id );
-		$base = home_url( '/' . self::REWRITE_SLUG . '/' . ( $slug ? $slug : $token ) . '/' );
-
-		return array(
-			'token'   => $token,
-			'slug'    => $slug,
-			'url'     => $base,
-			'pdf_url' => add_query_arg( self::PDF_ARG, '1', $base ),
-		);
-	}
-
-	/**
-	 * Removes the share token (and short name) so the public link stops working.
-	 *
-	 * @param int $user_id User ID.
-	 */
-	public static function revoke_token( $user_id ) {
-		delete_user_meta( absint( $user_id ), self::META_KEY );
-		delete_user_meta( absint( $user_id ), self::META_SLUG );
-	}
-
-	/* ---------------------------------------------------------------------
-	 * Short name (slug) helpers
-	 * ------------------------------------------------------------------- */
-
-	/**
-	 * @param int $user_id User ID.
-	 * @return string
-	 */
-	public static function slug_for_user( $user_id = 0 ) {
-		$user_id = $user_id ? absint( $user_id ) : get_current_user_id();
-		return (string) get_user_meta( $user_id, self::META_SLUG, true );
-	}
-
-	/**
-	 * @return string[] Names that can never be used as a catalog link.
-	 */
-	private static function reserved_slugs() {
-		return array( 'admin', 'wp-admin', 'login', 'wp-login', 'api', 'catalogo', 'catalogos', 'arriendo-facil', 'arriendofacil', 'soporte', 'ayuda', 'null', 'www', 'pdf' );
-	}
-
-	/**
-	 * Lower-cases, strips accents and collapses the input into a URL-safe name.
-	 *
-	 * @param string $raw Raw user input.
-	 * @return string
-	 */
-	public static function normalize_slug( $raw ) {
-		$slug = sanitize_title( remove_accents( (string) $raw ) );
-		$slug = preg_replace( '/[^a-z0-9-]+/', '', $slug );
-		$slug = preg_replace( '/-+/', '-', (string) $slug );
-
-		return trim( (string) $slug, '-' );
-	}
-
-	/**
-	 * @param string $slug    Normalized slug.
-	 * @param int    $user_id Owner allowed to keep it.
-	 * @return true|WP_Error
-	 */
-	public static function validate_slug( $slug, $user_id ) {
-		$len = strlen( $slug );
-
-		if ( $len < self::SLUG_MIN || $len > self::SLUG_MAX ) {
-			return new WP_Error( 'length', sprintf( /* translators: 1: min, 2: max */ __( 'Usa entre %1$d y %2$d caracteres.', 'arriendo-facil' ), self::SLUG_MIN, self::SLUG_MAX ) );
-		}
-		if ( ! preg_match( '/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug ) ) {
-			return new WP_Error( 'format', __( 'Usa solo letras, números y guiones.', 'arriendo-facil' ) );
-		}
-		if ( in_array( $slug, self::reserved_slugs(), true ) ) {
-			return new WP_Error( 'reserved', __( 'Ese nombre está reservado por el sistema.', 'arriendo-facil' ) );
-		}
-
-		$owners = get_users(
-			array(
-				'meta_key'   => self::META_SLUG, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key
-				'meta_value' => $slug, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value
-				'fields'     => 'ID',
-				'number'     => 2,
-			)
-		);
-		foreach ( (array) $owners as $owner_id ) {
-			if ( (int) $owner_id !== (int) $user_id ) {
-				return new WP_Error( 'taken', __( 'Ese nombre ya lo usa otro catálogo.', 'arriendo-facil' ) );
-			}
-		}
-
-		return true;
-	}
-
-	/**
-	 * Company name (or display name) as the starting point for suggestions.
-	 *
-	 * @param int $user_id User ID.
-	 * @return string
-	 */
-	private static function default_slug_base( $user_id ) {
-		$company = (string) get_user_meta( $user_id, 'af_company_name', true );
-		if ( '' === $company ) {
-			$user    = get_userdata( $user_id );
-			$company = $user ? $user->display_name : '';
-		}
-
-		$base = self::normalize_slug( $company );
-
-		return '' !== $base ? $base : 'mis-inmuebles';
-	}
-
-	/**
-	 * Available alternatives built from a base name.
-	 *
-	 * @param string $base    Normalized base (may be empty or invalid).
-	 * @param int    $user_id Owner.
-	 * @param int    $limit   Max suggestions.
-	 * @return string[]
-	 */
-	public static function suggest_slugs( $base, $user_id, $limit = 3 ) {
-		$base = substr( self::normalize_slug( $base ), 0, self::SLUG_MAX - 10 );
-		$base = trim( $base, '-' );
-		if ( strlen( $base ) < self::SLUG_MIN ) {
-			$base = self::default_slug_base( $user_id );
-		}
-
-		$city       = self::normalize_slug( (string) get_user_meta( $user_id, 'af_city', true ) );
-		$candidates = array( $base, $base . '-arriendos', $base . '-inmuebles' );
-		if ( $city && false === strpos( $base, $city ) ) {
-			$candidates[] = $base . '-' . $city;
-		}
-		$candidates[] = $base . '-' . gmdate( 'Y' );
-		for ( $i = 2; $i <= 9; $i++ ) {
-			$candidates[] = $base . '-' . $i;
-		}
-
-		$out = array();
-		foreach ( array_unique( $candidates ) as $candidate ) {
-			$candidate = substr( $candidate, 0, self::SLUG_MAX );
-			if ( true === self::validate_slug( $candidate, $user_id ) ) {
-				$out[] = $candidate;
-			}
-			if ( count( $out ) >= $limit ) {
-				break;
-			}
-		}
-
-		return $out;
-	}
-
-	/**
-	 * Resolves a token to its owning WP_User.
-	 *
-	 * @param string $token Raw token.
-	 * @return WP_User|null
-	 */
-	public function user_for_token( $token ) {
-		$token = sanitize_key( (string) $token );
-		$is_token = (bool) preg_match( '/^[a-f0-9]{64}$/', $token );
-
-		if ( ! $is_token && ! preg_match( '/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $token ) ) {
-			return null;
-		}
-
-		$users = get_users(
-			array(
-				'meta_key'   => $is_token ? self::META_KEY : self::META_SLUG, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key
-				'meta_value' => $token,
-				'number'     => 1,
-				'fields'     => 'all',
-			)
-		);
-
-		if ( empty( $users ) ) {
-			return null;
-		}
-
-		// A short name only resolves while the link is active.
-		return ( $is_token || '' !== self::token_for_user( $users[0]->ID ) ) ? $users[0] : null;
 	}
 
 	/* ---------------------------------------------------------------------
@@ -507,7 +284,7 @@ class Arriendo_Facil_Catalog_Share {
 	 *   total:int, available:int
 	 * }
 	 */
-	public static function get_catalog( WP_User $owner ) {
+	public static function get_catalog( WP_User $owner, $property_ids = null ) {
 		$owner_id = (int) $owner->ID;
 
 		// Use af_contact_name (responsible person) instead of af_company_name in catalogs.
@@ -520,7 +297,7 @@ class Arriendo_Facil_Catalog_Share {
 		$email    = (string) $owner->user_email;
 		$whatsapp = self::whatsapp_link( $phone );
 
-		$cards = self::get_cards( $owner_id );
+		$cards = self::get_cards( $owner_id, $property_ids );
 
 		$groups = self::group_cards( $cards, $owner_id );
 
@@ -575,11 +352,16 @@ class Arriendo_Facil_Catalog_Share {
 	 * @param int $owner_id Owner user ID.
 	 * @return array<int,array<string,mixed>>
 	 */
-	private static function get_cards( $owner_id ) {
+	private static function get_cards( $owner_id, $property_ids = null ) {
 		global $wpdb;
 
 		$owner_id = absint( $owner_id );
 		if ( ! $owner_id ) {
+			return array();
+		}
+
+		// An explicit selection (a catalog) that is empty shows nothing.
+		if ( is_array( $property_ids ) && empty( $property_ids ) ) {
 			return array();
 		}
 
@@ -596,6 +378,7 @@ class Arriendo_Facil_Catalog_Share {
 					array( 'key' => '_af_owner_id', 'value' => $owner_id ),
 				),
 			)
+			+ ( is_array( $property_ids ) ? array( 'post__in' => array_map( 'absint', $property_ids ) ) : array() )
 		);
 
 		if ( empty( $candidates ) ) {
@@ -696,11 +479,6 @@ class Arriendo_Facil_Catalog_Share {
 				continue;
 			}
 			if ( (int) get_post_meta( $post_id, '_af_owner_id', true ) !== $owner_id ) {
-				continue;
-			}
-
-			// Opt-out switch set from the admin catalog.
-			if ( ! Arriendo_Facil_Catalog_Groups::is_in_public_catalog( $post_id ) ) {
 				continue;
 			}
 
@@ -855,115 +633,6 @@ class Arriendo_Facil_Catalog_Share {
 	 * ------------------------------------------------------------------- */
 
 	/**
-	 * Generates or rotates the current user's share link.
-	 */
-	public function ajax_generate() {
-		check_ajax_referer( 'af_catalog_share_nonce', 'nonce' );
-
-		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
-			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
-		}
-
-		$user_id = get_current_user_id();
-		$wanted  = isset( $_POST['slug'] ) ? self::normalize_slug( sanitize_text_field( wp_unslash( $_POST['slug'] ) ) ) : '';
-
-		if ( '' !== $wanted ) {
-			$valid = self::validate_slug( $wanted, $user_id );
-			if ( is_wp_error( $valid ) ) {
-				wp_send_json_error(
-					array(
-						'message'     => $valid->get_error_message(),
-						'suggestions' => self::suggest_slugs( $wanted, $user_id ),
-					)
-				);
-			}
-			update_user_meta( $user_id, self::META_SLUG, $wanted );
-		}
-
-		$result = self::generate_token( $user_id );
-
-		if ( ! $result ) {
-			wp_send_json_error( array( 'message' => __( 'No se pudo generar el enlace.', 'arriendo-facil' ) ), 400 );
-		}
-
-		wp_send_json_success(
-			array(
-				'message' => __( 'Enlace creado. Ya puedes compartirlo.', 'arriendo-facil' ),
-				'slug'    => $result['slug'],
-				'url'     => $result['url'],
-				'pdfUrl'  => $result['pdf_url'],
-			)
-		);
-	}
-
-	/**
-	 * Checks (check=1) or saves the short name of the current user's link.
-	 */
-	public function ajax_slug() {
-		check_ajax_referer( 'af_catalog_share_nonce', 'nonce' );
-
-		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
-			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
-		}
-
-		$user_id = get_current_user_id();
-		$raw     = isset( $_POST['slug'] ) ? sanitize_text_field( wp_unslash( $_POST['slug'] ) ) : '';
-		$slug    = self::normalize_slug( $raw );
-		$check   = ! empty( $_POST['check'] );
-		$valid   = self::validate_slug( $slug, $user_id );
-
-		if ( is_wp_error( $valid ) ) {
-			wp_send_json_error(
-				array(
-					'message'     => $valid->get_error_message(),
-					'slug'        => $slug,
-					'suggestions' => self::suggest_slugs( '' !== $slug ? $slug : $raw, $user_id ),
-				)
-			);
-		}
-
-		if ( $check ) {
-			wp_send_json_success(
-				array(
-					'slug'    => $slug,
-					'message' => __( 'Disponible.', 'arriendo-facil' ),
-				)
-			);
-		}
-
-		if ( '' === self::token_for_user( $user_id ) ) {
-			wp_send_json_error( array( 'message' => __( 'Primero crea tu enlace.', 'arriendo-facil' ) ) );
-		}
-
-		update_user_meta( $user_id, self::META_SLUG, $slug );
-		$payload = self::link_payload( $user_id );
-
-		wp_send_json_success(
-			array(
-				'message' => __( 'Nombre del enlace guardado.', 'arriendo-facil' ),
-				'slug'    => $payload['slug'],
-				'url'     => $payload['url'],
-				'pdfUrl'  => $payload['pdf_url'],
-			)
-		);
-	}
-
-	/**
-	 * Revokes the current user's share link.
-	 */
-	public function ajax_revoke() {
-		check_ajax_referer( 'af_catalog_share_nonce', 'nonce' );
-
-		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
-			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
-		}
-
-		self::revoke_token( get_current_user_id() );
-
-		wp_send_json_success( array( 'message' => __( 'Enlace desactivado.', 'arriendo-facil' ) ) );
-	}
-
-	/**
 	 * Live counters for the share panel (how many properties will be shown).
 	 */
 	public function ajax_stats() {
@@ -1077,9 +746,9 @@ class Arriendo_Facil_Catalog_Share {
 	 * @param string $hook Current admin page hook.
 	 */
 	public function enqueue_admin_assets( $hook ) {
-		$screen      = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
-		$is_listing  = 'edit.php' === $hook && $screen && 'accommodation' === $screen->post_type;
-		if ( 'arriendo-facil_page_af-catalog' !== $hook && ! $is_listing ) {
+		// Only the property listing still hosts the building-group tools.
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( 'edit.php' !== $hook || ! $screen || 'accommodation' !== $screen->post_type ) {
 			return;
 		}
 
@@ -1110,7 +779,6 @@ class Arriendo_Facil_Catalog_Share {
 					'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 					'nonce'   => wp_create_nonce( 'af_catalog_share_nonce' ),
 					'i18n'    => array(
-						'copied'        => __( 'Enlace copiado.', 'arriendo-facil' ),
 						'groupPrompt'   => __( 'Escribe el nombre del edificio o conjunto.', 'arriendo-facil' ),
 						'renamePrompt'  => __( 'Escribe el nuevo nombre.', 'arriendo-facil' ),
 						'deleteConfirm' => __( '¿Eliminar este grupo? Sus propiedades quedarán como inmuebles independientes.', 'arriendo-facil' ),
@@ -1120,9 +788,6 @@ class Arriendo_Facil_Catalog_Share {
 						'remove'        => __( 'Eliminar', 'arriendo-facil' ),
 						'unitLabel'     => __( 'inmueble', 'arriendo-facil' ),
 						'unitLabelPlural' => __( 'inmuebles', 'arriendo-facil' ),
-						'checking'      => __( 'Comprobando…', 'arriendo-facil' ),
-						'tryThese'      => __( 'Prueba con:', 'arriendo-facil' ),
-						'slugChange'    => __( 'El enlace anterior dejará de funcionar. ¿Guardar el nuevo nombre?', 'arriendo-facil' ),
 					),
 				)
 			);

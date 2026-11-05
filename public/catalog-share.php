@@ -29,7 +29,11 @@ $catalog = array(
 );
 
 if ( $catalog_share_user instanceof WP_User ) {
-	$catalog = Arriendo_Facil_Catalog_Share::get_catalog( $catalog_share_user );
+	$catalog_post = isset( $GLOBALS['af_catalog_share_catalog'] ) ? $GLOBALS['af_catalog_share_catalog'] : null;
+	$catalog      = Arriendo_Facil_Catalog_Share::get_catalog(
+		$catalog_share_user,
+		$catalog_post ? Arriendo_Facil_Catalogs::property_ids( $catalog_post->ID ) : null
+	);
 }
 
 $catalog_share_company = $catalog['company'];

@@ -51,6 +51,7 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-occupied-
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-pdf.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-catalog-pdf.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-catalog-groups.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-catalogs.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-catalog-share.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-security-hardening.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-security-headers.php';
@@ -292,6 +293,7 @@ function arriendo_facil_init() {
 		'Arriendo_Facil_Document_Verification',
 		'Arriendo_Facil_Review',
 		'Arriendo_Facil_Catalog_Groups',
+		'Arriendo_Facil_Catalogs',
 		'Arriendo_Facil_Catalog_Share',
 		'Arriendo_Facil_Security_Hardening',
 		'Arriendo_Facil_Email',

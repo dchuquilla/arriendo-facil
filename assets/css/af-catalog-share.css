@@ -1413,27 +1413,3 @@
 	display: block;
 	margin-bottom: 4px;
 }
-
-.af-cs-prop-share {
-	display: inline-flex;
-	align-items: center;
-	gap: 5px;
-	padding: 4px 10px;
-	border: 1px solid #cfd8da;
-	border-radius: 999px;
-	background: #fff;
-	color: #1d4d55;
-	font-size: 12px;
-	font-weight: 600;
-	cursor: pointer;
-}
-
-.af-cs-prop-share[hidden] {
-	display: none;
-}
-
-.af-cs-prop-share:hover,
-.af-cs-prop-share:focus-visible,
-.af-cs-prop-share.is-copied {
-	background: #e8f1f2;
-}

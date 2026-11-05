@@ -27,11 +27,6 @@ class Arriendo_Facil_Catalog_Groups {
 	const META_GROUP = '_af_catalog_group_id';
 
 	/**
-	 * Post meta flag: whether the property is exposed in the public catalog.
-	 */
-	const META_INCLUDED = '_af_in_public_catalog';
-
-	/**
 	 * Wire AJAX endpoints for group + inclusion management.
 	 */
 	public function __construct() {
@@ -40,7 +35,6 @@ class Arriendo_Facil_Catalog_Groups {
 		add_action( 'wp_ajax_af_catalog_group_save', array( $this, 'ajax_save_group' ) );
 		add_action( 'wp_ajax_af_catalog_group_delete', array( $this, 'ajax_delete_group' ) );
 		add_action( 'wp_ajax_af_catalog_assign_group', array( $this, 'ajax_assign_property' ) );
-		add_action( 'wp_ajax_af_catalog_toggle_include', array( $this, 'ajax_toggle_include' ) );
 		add_action( 'wp_ajax_af_catalog_bulk_action', array( $this, 'ajax_bulk_action' ) );
 	}
 
@@ -449,50 +443,6 @@ class Arriendo_Facil_Catalog_Groups {
 		return true;
 	}
 
-	/**
-	 * Whether a property is exposed in the public catalog.
-	 *
-	 * Defaults to true: a property is visible until the owner opts out.
-	 *
-	 * @param int $property_id Accommodation post ID.
-	 * @return bool
-	 */
-	public static function is_in_public_catalog( $property_id ) {
-		$raw = get_post_meta( absint( $property_id ), self::META_INCLUDED, true );
-
-		// No stored value => included by default.
-		if ( '' === $raw || null === $raw ) {
-			return true;
-		}
-
-		return '0' !== (string) $raw;
-	}
-
-	/**
-	 * Stores the public-catalog opt-in flag for a property.
-	 *
-	 * @param int  $property_id Accommodation post ID.
-	 * @param bool $included    Whether to expose it.
-	 * @param int  $user_id     Acting user. Defaults to current user.
-	 * @return true|WP_Error
-	 */
-	public static function set_in_public_catalog( $property_id, $included, $user_id = 0 ) {
-		$property_id = absint( $property_id );
-		$user_id     = $user_id ? absint( $user_id ) : get_current_user_id();
-
-		if ( ! $property_id || 'accommodation' !== get_post_type( $property_id ) ) {
-			return new WP_Error( 'af_property_invalid', __( 'La propiedad no es válida.', 'arriendo-facil' ) );
-		}
-
-		if ( ! class_exists( 'Arriendo_Facil_Tenancy' ) || ! Arriendo_Facil_Tenancy::can_access_accommodation( $property_id, $user_id ) ) {
-			return new WP_Error( 'af_property_forbidden', __( 'No tienes acceso a esa propiedad.', 'arriendo-facil' ) );
-		}
-
-		update_post_meta( $property_id, self::META_INCLUDED, $included ? '1' : '0' );
-
-		return true;
-	}
-
 	/* ---------------------------------------------------------------------
 	 * AJAX
 	 * ------------------------------------------------------------------- */
@@ -612,30 +562,7 @@ class Arriendo_Facil_Catalog_Groups {
 	}
 
 	/**
-	 * Toggles public-catalog inclusion for one property.
-	 */
-	public function ajax_toggle_include() {
-		$this->guard();
-
-		$property_id = isset( $_POST['property_id'] ) ? absint( wp_unslash( $_POST['property_id'] ) ) : 0;
-		$included    = ! empty( $_POST['included'] ) && '0' !== wp_unslash( $_POST['included'] ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in guard().
-
-		$result = self::set_in_public_catalog( $property_id, $included );
-
-		if ( is_wp_error( $result ) ) {
-			wp_send_json_error( array( 'message' => $result->get_error_message() ), 400 );
-		}
-
-		wp_send_json_success(
-			array(
-				'message'  => $included ? __( 'Visible en el catálogo público.', 'arriendo-facil' ) : __( 'Oculta del catálogo público.', 'arriendo-facil' ),
-				'included' => $included,
-			)
-		);
-	}
-
-	/**
-	 * Applies a group assignment / inclusion flag to many properties at once.
+	 * Applies a group assignment to many properties at once.
 	 */
 	public function ajax_bulk_action() {
 		$this->guard();
@@ -643,7 +570,6 @@ class Arriendo_Facil_Catalog_Groups {
 		$owner_id  = $this->resolve_owner_id();
 		$action    = isset( $_POST['bulk_action'] ) ? sanitize_key( wp_unslash( $_POST['bulk_action'] ) ) : '';
 		$group_id  = isset( $_POST['group_id'] ) ? absint( wp_unslash( $_POST['group_id'] ) ) : 0;
-		$included  = isset( $_POST['included'] ) && '0' !== wp_unslash( $_POST['included'] );
 		$has_scope = class_exists( 'Arriendo_Facil_Tenancy' );
 		$scope_ids = $has_scope ? Arriendo_Facil_Tenancy::accessible_accommodation_ids( $owner_id ) : array();
 
@@ -666,13 +592,6 @@ class Arriendo_Facil_Catalog_Groups {
 			}
 			foreach ( $requested as $property_id ) {
 				$result = self::set_group_for_property( $property_id, $group_id, $owner_id );
-				if ( ! is_wp_error( $result ) ) {
-					$updated++;
-				}
-			}
-		} elseif ( 'set_include' === $action ) {
-			foreach ( $requested as $property_id ) {
-				$result = self::set_in_public_catalog( $property_id, $included, $owner_id );
 				if ( ! is_wp_error( $result ) ) {
 					$updated++;
 				}

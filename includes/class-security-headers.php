@@ -24,37 +24,39 @@ class Arriendo_Facil_Security_Headers {
 	 */
 	public static function init() {
 		add_action( 'send_headers', array( __CLASS__, 'set_security_headers' ), 5 );
-		add_action( 'init', array( __CLASS__, 'set_rest_headers' ), 5 );
+		add_action( 'admin_init', array( __CLASS__, 'set_admin_headers' ), 5 );
+		add_filter( 'rest_pre_serve_request', array( __CLASS__, 'filter_rest_pre_serve' ), 10, 1 );
 		add_filter( 'secure_auth_cookie', '__return_true' );
 		add_filter( 'secure_logged_in_cookie', '__return_true' );
 		add_filter( 'auth_cookie_expiration', array( __CLASS__, 'clamp_cookie_lifetime' ), 10, 3 );
-		add_action( 'set_auth_cookie', array( __CLASS__, 'harden_auth_cookie_header' ), 10, 0 );
-		add_action( 'set_logged_in_cookie', array( __CLASS__, 'harden_auth_cookie_header' ), 10, 0 );
+		// Runs right before headers are flushed, so every pending cookie exists.
+		header_register_callback( array( __CLASS__, 'add_samesite_to_cookies' ) );
 	}
 
 	/**
-	 * Ensures every Set-Cookie emitted during login carries SameSite=Lax.
-	 *
-	 * WordPress emits the cookie with `setcookie()` before any filter runs,
-	 * so the only safe way to append SameSite is to rewrite the pending
-	 * Set-Cookie header in the response. `header_remove` + re-emit keeps the
-	 * HttpOnly/Secure flags WordPress already applied.
+	 * Adds SameSite=Lax to every pending Set-Cookie lacking it, preserving all cookies.
 	 */
-	public static function harden_auth_cookie_header() {
+	public static function add_samesite_to_cookies() {
+		$cookies = array();
 		foreach ( headers_list() as $header ) {
-			if ( 0 !== stripos( $header, 'Set-Cookie:' ) ) {
-				continue;
+			if ( 0 === stripos( $header, 'Set-Cookie:' ) ) {
+				$cookies[] = $header;
 			}
-			if ( false !== stripos( $header, 'SameSite=' ) ) {
-				continue;
+		}
+		if ( empty( $cookies ) ) {
+			return;
+		}
+		header_remove( 'Set-Cookie' );
+		foreach ( $cookies as $cookie ) {
+			if ( false === stripos( $cookie, 'SameSite=' ) ) {
+				$cookie = rtrim( $cookie, '; ' ) . '; SameSite=Lax';
 			}
-			header_remove( 'Set-Cookie' );
-			header( rtrim( $header, '; ' ) . '; SameSite=Lax', false );
+			header( $cookie, false );
 		}
 	}
 
 	/**
-	 * Caps "remember me" cookie lifetime so a stolen cookie has a short tail.
+	 * Caps auth cookie lifetime (12h regular session, 7 days with "remember me").
 	 *
 	 * @param int  $seconds  WP default.
 	 * @param int  $user_id  Target user.
@@ -62,7 +64,30 @@ class Arriendo_Facil_Security_Headers {
 	 * @return int
 	 */
 	public static function clamp_cookie_lifetime( $seconds, $user_id, $remember ) {
-		return $remember ? min( (int) $seconds, 7 * DAY_IN_SECONDS ) : min( (int) $seconds, 2 * HOUR_IN_SECONDS );
+		return $remember ? min( (int) $seconds, 7 * DAY_IN_SECONDS ) : min( (int) $seconds, 12 * HOUR_IN_SECONDS );
+	}
+
+	/**
+	 * Basic hardening headers for wp-admin (CSP omitted: core admin relies on inline/iframes).
+	 */
+	public static function set_admin_headers() {
+		header( 'X-Content-Type-Options: nosniff', true );
+		header( 'X-Frame-Options: SAMEORIGIN', true );
+		header( 'Referrer-Policy: strict-origin-when-cross-origin', true );
+		if ( is_ssl() ) {
+			header( 'Strict-Transport-Security: max-age=31536000; includeSubDomains', true );
+		}
+	}
+
+	/**
+	 * Sends REST headers once REST_REQUEST is actually defined.
+	 *
+	 * @param bool $served Whether the request was already served.
+	 * @return bool
+	 */
+	public static function filter_rest_pre_serve( $served ) {
+		self::set_rest_headers();
+		return $served;
 	}
 
 	/**
@@ -116,8 +141,6 @@ class Arriendo_Facil_Security_Headers {
 	}
 
 	private static function set_content_security_policy() {
-		$nonce = self::script_nonce();
-
 		$csp_directives = array(
 			"default-src 'self'",
 			"script-src 'self' 'unsafe-inline' 'unsafe-eval' *.wp.com cdn.jsdelivr.net cdnjs.cloudflare.com", // WordPress core uses eval for some JS.
@@ -145,9 +168,6 @@ class Arriendo_Facil_Security_Headers {
 	 * REST API responses should include standard headers to prevent misuse.
 	 */
 	public static function set_rest_headers() {
-		if ( ! self::is_rest_request() ) {
-			return;
-		}
 
 		// Prevent browser from opening response as HTML.
 		header( 'X-Content-Type-Options: nosniff', true );

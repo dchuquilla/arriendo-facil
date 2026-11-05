@@ -145,7 +145,7 @@ class Arriendo_Facil_Security_Headers {
 	 * REST API responses should include standard headers to prevent misuse.
 	 */
 	public static function set_rest_headers() {
-		if ( ! is_rest_request() ) {
+		if ( ! self::is_rest_request() ) {
 			return;
 		}
 

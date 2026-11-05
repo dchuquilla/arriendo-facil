@@ -617,22 +617,6 @@ get_header();
 
 	<?php endif; ?>
 
-	<?php if ( ! $af_single_mode ) : ?>
-	<footer class="af-cs-footer">
-		<p>
-			<?php
-			echo esc_html(
-				sprintf(
-					/* translators: 1: company name, 2: generated date */
-					__( '%1$s — Listado generado el %2$s.', 'arriendo-facil' ),
-					$catalog_share_company,
-					wp_date( get_option( 'date_format' ) )
-				)
-			);
-			?>
-		</p>
-	</footer>
-	<?php endif; ?>
 </main>
 
 <?php

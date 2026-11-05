@@ -399,6 +399,18 @@ $af_prefix     = ( isset( $af_home_parts['host'] ) ? $af_home_parts['host'] : ''
 							<?php echo esc_html( isset( $af_group_names[ $group_id ] ) ? $af_group_names[ $group_id ] : __( 'Sin edificio', 'arriendo-facil' ) ); ?>
 						</span>
 
+						<button
+							type="button"
+							class="af-cs-prop-share"
+							data-af-cs-prop-share
+							data-property-id="<?php echo esc_attr( (int) $prop_id ); ?>"
+							title="<?php esc_attr_e( 'Copiar el enlace de solo esta propiedad', 'arriendo-facil' ); ?>"
+							<?php echo ( $share_url && $in_catalog ) ? '' : 'hidden'; ?>
+						>
+							<?php echo af_lucide( 'link-2', 13 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
+							<span data-label><?php esc_html_e( 'Copiar enlace', 'arriendo-facil' ); ?></span>
+						</button>
+
 						<label class="af-cs-switch">
 							<input
 								type="checkbox"

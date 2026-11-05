@@ -396,6 +396,80 @@
 	/* Building groups                                                     */
 	/* ================================================================== */
 
+	/* Per-property share links, built from the catalog URL currently shown. */
+	function propertyUrl( id ) {
+		var base = document.getElementById( 'af-share-url' );
+
+		if ( ! base || ! base.value ) {
+			return '';
+		}
+
+		return base.value + ( base.value.indexOf( '?' ) === -1 ? '?' : '&' ) + 'inmueble=' + encodeURIComponent( id );
+	}
+
+	function copyValue( value ) {
+		if ( navigator.clipboard && navigator.clipboard.writeText ) {
+			return navigator.clipboard.writeText( value );
+		}
+
+		return new Promise( function ( resolve, reject ) {
+			var tmp = document.createElement( 'textarea' );
+
+			tmp.value = value;
+			tmp.setAttribute( 'readonly', '' );
+			tmp.style.position = 'fixed';
+			tmp.style.opacity = '0';
+			document.body.appendChild( tmp );
+			tmp.select();
+
+			try {
+				document.execCommand( 'copy' ) ? resolve() : reject();
+			} catch ( e ) {
+				reject( e );
+			}
+
+			document.body.removeChild( tmp );
+		} );
+	}
+
+	document.querySelectorAll( '[data-af-cs-prop-share]' ).forEach( function ( btn ) {
+		var label = btn.querySelector( '[data-label]' );
+		var original = label ? label.textContent : '';
+		var card = btn.closest( '.af-cs-prop-controls' );
+		var box = card ? card.querySelector( '[data-af-cs-include]' ) : null;
+
+		btn.hidden = ! propertyUrl( 1 ) || ( box && ! box.checked );
+
+		if ( box ) {
+			box.addEventListener( 'change', function () {
+				btn.hidden = ! box.checked || ! propertyUrl( 1 );
+			} );
+		}
+
+		btn.addEventListener( 'click', function () {
+			var url = propertyUrl( btn.getAttribute( 'data-property-id' ) );
+
+			if ( ! url ) {
+				return;
+			}
+
+			copyValue( url ).then( function () {
+				btn.classList.add( 'is-copied' );
+				if ( label ) {
+					label.textContent = t( 'copiedShort', '¡Copiado!' );
+				}
+				setTimeout( function () {
+					btn.classList.remove( 'is-copied' );
+					if ( label ) {
+						label.textContent = original;
+					}
+				}, 2000 );
+			}, function () {
+				window.prompt( 'Copia el enlace:', url );
+			} );
+		} );
+	} );
+
 	var groupList = document.getElementById( 'af-cs-group-list' );
 
 	if ( groupList || document.querySelector( '[data-af-cs-include], [data-af-cs-assign]' ) ) {

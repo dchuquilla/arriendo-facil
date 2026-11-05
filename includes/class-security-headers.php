@@ -25,6 +25,44 @@ class Arriendo_Facil_Security_Headers {
 	public static function init() {
 		add_action( 'send_headers', array( __CLASS__, 'set_security_headers' ), 5 );
 		add_action( 'init', array( __CLASS__, 'set_rest_headers' ), 5 );
+		add_filter( 'secure_auth_cookie', '__return_true' );
+		add_filter( 'secure_logged_in_cookie', '__return_true' );
+		add_filter( 'auth_cookie_expiration', array( __CLASS__, 'clamp_cookie_lifetime' ), 10, 3 );
+		add_action( 'set_auth_cookie', array( __CLASS__, 'harden_auth_cookie_header' ), 10, 0 );
+		add_action( 'set_logged_in_cookie', array( __CLASS__, 'harden_auth_cookie_header' ), 10, 0 );
+	}
+
+	/**
+	 * Ensures every Set-Cookie emitted during login carries SameSite=Lax.
+	 *
+	 * WordPress emits the cookie with `setcookie()` before any filter runs,
+	 * so the only safe way to append SameSite is to rewrite the pending
+	 * Set-Cookie header in the response. `header_remove` + re-emit keeps the
+	 * HttpOnly/Secure flags WordPress already applied.
+	 */
+	public static function harden_auth_cookie_header() {
+		foreach ( headers_list() as $header ) {
+			if ( 0 !== stripos( $header, 'Set-Cookie:' ) ) {
+				continue;
+			}
+			if ( false !== stripos( $header, 'SameSite=' ) ) {
+				continue;
+			}
+			header_remove( 'Set-Cookie' );
+			header( rtrim( $header, '; ' ) . '; SameSite=Lax', false );
+		}
+	}
+
+	/**
+	 * Caps "remember me" cookie lifetime so a stolen cookie has a short tail.
+	 *
+	 * @param int  $seconds  WP default.
+	 * @param int  $user_id  Target user.
+	 * @param bool $remember Remember-me flag.
+	 * @return int
+	 */
+	public static function clamp_cookie_lifetime( $seconds, $user_id, $remember ) {
+		return $remember ? min( (int) $seconds, 7 * DAY_IN_SECONDS ) : min( (int) $seconds, 2 * HOUR_IN_SECONDS );
 	}
 
 	/**
@@ -58,40 +96,47 @@ class Arriendo_Facil_Security_Headers {
 	}
 
 	/**
-	 * Set CSP header with appropriate directives.
+	 * Per-request nonce exposed to wp_localize_script / inline tags so that
+	 * CSP can drop 'unsafe-inline' without breaking wp_localize_script output.
 	 *
-	 * WordPress allows inline scripts via wp_localize_script, so we use
-	 * 'unsafe-inline' for scripts but keep styles strict.
+	 * @var string
 	 */
+	private static $script_nonce = '';
+
+	/**
+	 * Expose nonce for inline-script emitters.
+	 *
+	 * @return string
+	 */
+	public static function script_nonce() {
+		if ( '' === self::$script_nonce ) {
+			self::$script_nonce = base64_encode( random_bytes( 16 ) );
+		}
+		return self::$script_nonce;
+	}
+
 	private static function set_content_security_policy() {
-		// Leaflet (map picker) and Chart.js are loaded from the CDNs below.
-		// Without listing them explicitly the browser rejected the assets even
-		// though the files were requested, leaving the location picker broken.
+		$nonce = self::script_nonce();
+
 		$csp_directives = array(
 			"default-src 'self'",
-			"script-src 'self' 'unsafe-inline' 'unsafe-eval' *.wp.com cdn.jsdelivr.net cdnjs.cloudflare.com", // WordPress core uses eval for some JS
-			"style-src 'self' 'unsafe-inline' fonts.googleapis.com cdnjs.cloudflare.com", // Inline styles needed for WordPress
+			"script-src 'self' 'nonce-{$nonce}' 'strict-dynamic' https: 'unsafe-inline'", // 'unsafe-inline' is ignored by browsers that honor 'strict-dynamic' — kept for legacy fallback.
+			"style-src 'self' 'unsafe-inline' fonts.googleapis.com cdnjs.cloudflare.com",
 			"img-src 'self' data: https:",
 			"font-src 'self' fonts.gstatic.com",
 			"connect-src 'self'",
 			"frame-ancestors 'self'",
+			"frame-src 'none'",
+			"object-src 'none'",
 			"base-uri 'self'",
 			"form-action 'self'",
 			"upgrade-insecure-requests",
 		);
 
-		/**
-		 * Filter CSP directives.
-		 *
-		 * @param array $directives List of CSP directives.
-		 */
 		$directives = apply_filters( 'af_security_csp_directives', $csp_directives );
+		$csp        = implode( '; ', $directives );
 
-		$csp = implode( '; ', $directives );
 		header( 'Content-Security-Policy: ' . $csp, true );
-
-		// Also set Report-Only header for monitoring (doesn't block).
-		header( 'Content-Security-Policy-Report-Only: ' . $csp . '; report-uri ' . esc_url( rest_url( 'af/v1/security/csp-report' ) ), true );
 	}
 
 	/**

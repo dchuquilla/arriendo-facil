@@ -88,13 +88,14 @@ class Arriendo_Facil_Input_Validator {
 			}
 		}
 
-		// Length checking.
-		if ( isset( $rules['min_length'] ) && strlen( (string) $value ) < $rules['min_length'] ) {
+		// Length checking (multibyte-aware: tildes/ñ/emoji cuentan como 1 carácter).
+		$length = function_exists( 'mb_strlen' ) ? mb_strlen( (string) $value, 'UTF-8' ) : strlen( (string) $value );
+		if ( isset( $rules['min_length'] ) && $length < $rules['min_length'] ) {
 			self::$errors[ $field ] = sprintf( __( '%s must be at least %d characters', 'arriendo-facil' ), $field, $rules['min_length'] );
 			return false;
 		}
 
-		if ( isset( $rules['max_length'] ) && strlen( (string) $value ) > $rules['max_length'] ) {
+		if ( isset( $rules['max_length'] ) && $length > $rules['max_length'] ) {
 			self::$errors[ $field ] = sprintf( __( '%s must be at most %d characters', 'arriendo-facil' ), $field, $rules['max_length'] );
 			return false;
 		}
@@ -150,7 +151,11 @@ class Arriendo_Facil_Input_Validator {
 			case 'email':
 				return is_email( $value );
 			case 'url':
-				return filter_var( $value, FILTER_VALIDATE_URL );
+				if ( ! filter_var( $value, FILTER_VALIDATE_URL ) ) {
+					return false;
+				}
+				$scheme = strtolower( (string) parse_url( $value, PHP_URL_SCHEME ) );
+				return in_array( $scheme, array( 'http', 'https' ), true );
 			case 'phone':
 				return preg_match( '/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/', (string) $value );
 			default:

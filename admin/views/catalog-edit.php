@@ -45,18 +45,9 @@ $msg   = isset( $_GET['af_msg'] ) ? sanitize_key( wp_unslash( $_GET['af_msg'] ) 
 	?>
 
 	<?php if ( in_array( $msg, array( 'created', 'saved', 'duplicated' ), true ) ) : ?>
-		<div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'Listo, cambios guardados.', 'arriendo-facil' ); ?></p></div>
+		<div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'Guardado. Tu enlace ya está listo para compartir.', 'arriendo-facil' ); ?></p></div>
 	<?php elseif ( 0 === strpos( $msg, 'slug_' ) ) : ?>
 		<div class="notice notice-error is-dismissible"><p><?php esc_html_e( 'El enlace personalizado no es válido o ya está en uso. Se guardó lo demás.', 'arriendo-facil' ); ?></p></div>
-	<?php endif; ?>
-
-	<?php if ( $link ) : ?>
-		<div class="af-cats-linkbox">
-			<input type="text" readonly value="<?php echo esc_attr( $link['url'] ); ?>" onfocus="this.select()">
-			<button type="button" class="button button-primary" data-af-copy="<?php echo esc_attr( $link['url'] ); ?>"><?php esc_html_e( 'Copiar enlace', 'arriendo-facil' ); ?></button>
-			<a class="button" href="<?php echo esc_url( $link['url'] ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'Ver', 'arriendo-facil' ); ?></a>
-			<a class="button" href="<?php echo esc_url( $link['pdf_url'] ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'PDF', 'arriendo-facil' ); ?></a>
-		</div>
 	<?php endif; ?>
 
 	<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="af-cats-editor" data-af-cats-editor>
@@ -65,17 +56,11 @@ $msg   = isset( $_GET['af_msg'] ) ? sanitize_key( wp_unslash( $_GET['af_msg'] ) 
 		<?php wp_nonce_field( 'af_catalog_save' ); ?>
 
 		<label class="af-cats-field">
-			<span><?php esc_html_e( 'Nombre del catálogo', 'arriendo-facil' ); ?></span>
+			<span><b class="af-cats-step">1</b> <?php esc_html_e( 'Ponle un nombre', 'arriendo-facil' ); ?></span>
 			<input type="text" name="catalog_name" value="<?php echo esc_attr( $name ); ?>" maxlength="120" placeholder="<?php esc_attr_e( 'Ej. Apartamentos zona norte', 'arriendo-facil' ); ?>">
 		</label>
 
-		<?php if ( $catalog_id ) : ?>
-			<details class="af-cats-slug">
-				<summary><?php esc_html_e( 'Personalizar enlace', 'arriendo-facil' ); ?></summary>
-				<input type="text" name="catalog_slug" value="<?php echo esc_attr( $link['slug'] ); ?>" placeholder="mi-catalogo" pattern="[a-z0-9][a-z0-9\-]{1,62}[a-z0-9]">
-			</details>
-		<?php endif; ?>
-
+		<h2 class="af-cats-h"><b class="af-cats-step">2</b> <?php esc_html_e( 'Elige las propiedades que quieres mostrar', 'arriendo-facil' ); ?></h2>
 		<div class="af-cats-picker">
 			<div class="af-cats-picker__bar">
 				<input type="search" data-af-cats-search placeholder="<?php esc_attr_e( 'Buscar propiedad…', 'arriendo-facil' ); ?>">
@@ -113,9 +98,26 @@ $msg   = isset( $_GET['af_msg'] ) ? sanitize_key( wp_unslash( $_GET['af_msg'] ) 
 			<p class="af-cats-empty" hidden></p>
 		</div>
 
+		<?php if ( $link ) : ?>
+			<h2 class="af-cats-h"><b class="af-cats-step">3</b> <?php esc_html_e( 'Comparte tu catálogo', 'arriendo-facil' ); ?></h2>
+			<div class="af-cats-sharecard">
+				<div class="af-cats-linkbox">
+					<input type="text" readonly value="<?php echo esc_attr( $link['url'] ); ?>" onfocus="this.select()">
+					<button type="button" class="button button-primary" data-af-copy="<?php echo esc_attr( $link['url'] ); ?>"><?php esc_html_e( 'Copiar enlace', 'arriendo-facil' ); ?></button>
+					<a class="button" href="<?php echo esc_url( $link['url'] ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'Ver', 'arriendo-facil' ); ?></a>
+					<a class="button" href="<?php echo esc_url( $link['pdf_url'] ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'PDF', 'arriendo-facil' ); ?></a>
+				</div>
+				<details class="af-cats-slug">
+					<summary><?php esc_html_e( 'Cambiar la dirección del enlace', 'arriendo-facil' ); ?></summary>
+					<p class="description"><?php esc_html_e( 'Solo letras minúsculas, números y guiones. Se aplica al guardar y el enlace anterior dejará de funcionar.', 'arriendo-facil' ); ?></p>
+					<input type="text" name="catalog_slug" value="<?php echo esc_attr( $link['slug'] ); ?>" placeholder="mi-catalogo" pattern="[a-z0-9][a-z0-9\-]{1,62}[a-z0-9]">
+				</details>
+			</div>
+		<?php endif; ?>
+
 		<div class="af-cats-savebar">
 			<span data-af-cats-count></span>
-			<a class="button" href="<?php echo esc_url( $back ); ?>"><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></a>
+			<a class="button" href="<?php echo esc_url( $back ); ?>"><?php esc_html_e( 'Volver', 'arriendo-facil' ); ?></a>
 			<button type="submit" class="button button-primary"><?php echo esc_html( $catalog_id ? __( 'Guardar cambios', 'arriendo-facil' ) : __( 'Crear catálogo', 'arriendo-facil' ) ); ?></button>
 		</div>
 	</form>

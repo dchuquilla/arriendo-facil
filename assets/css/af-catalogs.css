@@ -46,3 +46,10 @@
 .af-cats-empty{padding:16px;color:#646970}
 .af-cats-savebar{position:sticky;bottom:0;display:flex;gap:10px;align-items:center;justify-content:flex-end;padding:12px 16px;margin-top:16px;background:#fff;border-top:1px solid #dcdcde;box-shadow:0 -2px 8px rgba(0,0,0,.06)}
 .af-cats-savebar [data-af-cats-count]{margin-right:auto;font-weight:600}
+.af-cats-step{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#0f3d47;color:#fff;font-size:13px;margin-right:6px}
+.af-cats-h{font-size:16px;margin:24px 0 10px;display:flex;align-items:center}
+.af-cats-sharecard{background:#fff;border:1px solid #dcdcde;border-radius:12px;padding:16px}
+.af-cats-sharecard .af-cats-linkbox{margin:0 0 12px}
+.af-cats-slug input{width:100%;max-width:420px}
+.af-cats-list{max-height:460px;overflow:auto}
+.af-cats-page .notice,.af-catalogs-page .notice{margin:12px 0}

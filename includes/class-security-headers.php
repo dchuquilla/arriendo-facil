@@ -120,7 +120,7 @@ class Arriendo_Facil_Security_Headers {
 
 		$csp_directives = array(
 			"default-src 'self'",
-			"script-src 'self' 'nonce-{$nonce}' 'strict-dynamic' https: 'unsafe-inline'", // 'unsafe-inline' is ignored by browsers that honor 'strict-dynamic' — kept for legacy fallback.
+			"script-src 'self' 'unsafe-inline' 'unsafe-eval' *.wp.com cdn.jsdelivr.net cdnjs.cloudflare.com", // WordPress core uses eval for some JS.
 			"style-src 'self' 'unsafe-inline' fonts.googleapis.com cdnjs.cloudflare.com",
 			"img-src 'self' data: https:",
 			"font-src 'self' fonts.gstatic.com",

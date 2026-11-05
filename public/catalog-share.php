@@ -317,10 +317,6 @@ get_header();
 						 */
 						$af_facts = array();
 
-						$af_share_url = $af_catalog_base_url
-							? add_query_arg( Arriendo_Facil_Catalog_Share::PROPERTY_ARG, (int) $af_card['id'], $af_catalog_base_url )
-							: '';
-
 						if ( $af_card['address'] ) {
 							$af_facts[ __( 'Ubicación', 'arriendo-facil' ) ] = $af_card['address'];
 						}
@@ -438,18 +434,6 @@ get_header();
 												</span>
 											<?php endif; ?>
 										</div>
-
-										<?php if ( $af_share_url ) : ?>
-											<button
-												type="button"
-												class="af-cs-card__share"
-												data-af-cs-share
-												data-af-cs-share-url="<?php echo esc_url( $af_share_url ); ?>"
-												data-af-cs-share-title="<?php echo esc_attr( $af_card['title'] ); ?>"
-											>
-												<span data-af-cs-share-text><?php esc_html_e( 'Compartir enlace', 'arriendo-facil' ); ?></span>
-											</button>
-										<?php endif; ?>
 									</div>
 
 									<button

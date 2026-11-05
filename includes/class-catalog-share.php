@@ -1161,8 +1161,6 @@ class Arriendo_Facil_Catalog_Share {
 				'af-catalog-share-public',
 				'afCatalogPublic',
 				array(
-					'copiedLabel'      => __( '¡Enlace copiado!', 'arriendo-facil' ),
-					'copyPrompt'       => __( 'Copia el enlace:', 'arriendo-facil' ),
 					'flipLabel'        => __( 'Ver detalles', 'arriendo-facil' ),
 					'backLabel'        => __( 'Volver', 'arriendo-facil' ),
 					'moreLabel'        => __( 'Leer más', 'arriendo-facil' ),

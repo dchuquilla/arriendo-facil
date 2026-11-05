@@ -36,69 +36,6 @@
 		} );
 	}
 
-	/* ------------------------------------------------------------- Share */
-
-	function copyText( text ) {
-		if ( navigator.clipboard && window.isSecureContext ) {
-			return navigator.clipboard.writeText( text );
-		}
-
-		return new Promise( function ( resolve, reject ) {
-			var field = document.createElement( 'textarea' );
-
-			field.value = text;
-			field.setAttribute( 'readonly', '' );
-			field.style.position = 'fixed';
-			field.style.opacity = '0';
-			document.body.appendChild( field );
-			field.select();
-
-			try {
-				document.execCommand( 'copy' ) ? resolve() : reject();
-			} catch ( e ) {
-				reject( e );
-			}
-
-			document.body.removeChild( field );
-		} );
-	}
-
-	function initShare( root ) {
-		Array.prototype.forEach.call( root.querySelectorAll( '[data-af-cs-share]' ), function ( btn ) {
-			var text = btn.querySelector( '[data-af-cs-share-text]' );
-			var idle = text ? text.textContent : '';
-			var timer;
-
-			var flash = function ( msg ) {
-				if ( ! text ) {
-					return;
-				}
-
-				text.textContent = msg;
-				clearTimeout( timer );
-				timer = setTimeout( function () {
-					text.textContent = idle;
-				}, 2200 );
-			};
-
-			btn.addEventListener( 'click', function () {
-				var url = btn.getAttribute( 'data-af-cs-share-url' );
-				var title = btn.getAttribute( 'data-af-cs-share-title' ) || '';
-
-				if ( navigator.share ) {
-					navigator.share( { title: title, url: url } ).catch( function () {} );
-					return;
-				}
-
-				copyText( url ).then( function () {
-					flash( label( 'copiedLabel', '¡Enlace copiado!' ) );
-				}, function () {
-					window.prompt( label( 'copyPrompt', 'Copia el enlace:' ), url );
-				} );
-			} );
-		} );
-	}
-
 	/* ------------------------------------------------------------ Filter */
 
 	function initFilters( root ) {
@@ -436,7 +373,6 @@
 
 		initFlip( root );
 		initCarousels( root );
-		initShare( root );
 		initSizing( root );
 		initFilters( root );
 

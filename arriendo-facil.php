@@ -358,24 +358,28 @@ function arriendo_facil_has_lease_schema_drift() {
 	}
 
 	global $wpdb;
-	$leases_table = $wpdb->prefix . 'af_leases';
-	$required     = array( 'template_attachment_id', 'payment_due_day' );
+	$required_columns = array(
+		$wpdb->prefix . 'af_leases'  => array( 'template_attachment_id', 'payment_due_day' ),
+		$wpdb->prefix . 'af_charges' => array( 'invoice_id' ),
+	);
 
-	foreach ( $required as $column_name ) {
-		$found = $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT COUNT(*)
-				 FROM INFORMATION_SCHEMA.COLUMNS
-				 WHERE TABLE_SCHEMA = %s
-				   AND TABLE_NAME = %s
-				   AND COLUMN_NAME = %s",
-				DB_NAME,
-				$leases_table,
-				$column_name
-			)
-		);
-		if ( ! (int) $found ) {
-			return true;
+	foreach ( $required_columns as $table_name => $required ) {
+		foreach ( $required as $column_name ) {
+			$found = $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*)
+					 FROM INFORMATION_SCHEMA.COLUMNS
+					 WHERE TABLE_SCHEMA = %s
+					   AND TABLE_NAME = %s
+					   AND COLUMN_NAME = %s",
+					DB_NAME,
+					$table_name,
+					$column_name
+				)
+			);
+			if ( ! (int) $found ) {
+				return true;
+			}
 		}
 	}
 

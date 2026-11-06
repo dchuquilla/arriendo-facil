@@ -649,7 +649,7 @@ class Arriendo_Facil_Billing_Manager {
 
 		$p       = $this->wpdb->prefix;
 		$failed  = "'" . implode( "','", self::REISSUABLE_STATES ) . "'";
-		$where   = "c.status = 'paid' AND c.amount > 0 AND ( c.invoice_id IS NULL OR c.invoice_id = 0 OR ei.estado IN ({$failed}) )";
+		$where   = "c.status = 'paid' AND c.amount > 0 AND ( c.invoice_id IS NULL OR c.invoice_id = 0 OR ei.id IS NULL OR ei.estado IN ({$failed}) )";
 		$params  = array();
 
 		if ( ! empty( $args['lease_id'] ) ) {
@@ -684,7 +684,12 @@ class Arriendo_Facil_Billing_Manager {
 			$sql = $this->wpdb->prepare( $sql, $params ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		}
 
-		return (array) $this->wpdb->get_results( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$rows = $this->wpdb->get_results( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( ! empty( $this->wpdb->last_error ) ) {
+			error_log( 'Arriendo Facil get_billable_charges SQL error: ' . $this->wpdb->last_error ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		}
+
+		return (array) $rows;
 	}
 
 	/**

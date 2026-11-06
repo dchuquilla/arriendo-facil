@@ -1029,11 +1029,6 @@ class Arriendo_Facil_Billing_API {
 		if ( isset( $_POST['forma_pago'] ) ) {
 			$overrides['forma_pago'] = sanitize_text_field( wp_unslash( $_POST['forma_pago'] ) );
 		}
-		if ( isset( $_POST['descriptions'] ) && is_array( $_POST['descriptions'] ) ) {
-			foreach ( wp_unslash( $_POST['descriptions'] ) as $desc_charge_id => $desc_text ) {
-				$overrides['descriptions'][ absint( $desc_charge_id ) ] = sanitize_text_field( (string) $desc_text );
-			}
-		}
 
 		return array(
 			'lease_id'   => $lease_id,

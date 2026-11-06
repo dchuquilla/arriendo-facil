@@ -1080,3 +1080,32 @@
 .af-pending-field small { font-weight: 500; color: var(--af-gray-500); }
 .af-pending-field strong { min-height: 38px; display: flex; align-items: center; color: var(--af-gray-900); }
 .af-pending-items td:first-child { padding-right: 10px; }
+
+/* Revisar factura: diseño del modal (el modal vive en <body>, estilos globales) */
+.af-pending-dialog { width: min(680px, 100%); }
+.af-pending-dialog .af-modal__header { display: flex; align-items: center; justify-content: space-between; padding: 22px 28px 16px; border-bottom: 1px solid var(--af-gray-200, #DCE5E3); }
+.af-pending-dialog .af-modal__header h2 { margin: 0; font-size: 20px; }
+.af-pending-dialog .af-modal__close { position: static; }
+.af-pending-dialog .af-modal__body { padding: 20px 28px 24px; }
+.af-pending-dialog .af-pending-hint { margin: 0 0 16px; }
+.af-pending-dialog .af-pending-buyer { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 20px; align-items: start; margin: 0 0 20px; }
+.af-pending-dialog .af-pending-field { gap: 6px; }
+.af-pending-dialog .af-pending-field > span { font-size: 12px; font-weight: 700; color: var(--af-gray-600); }
+.af-pending-dialog .af-pending-field input,
+.af-pending-dialog .af-pending-field select { min-height: 42px; padding: 0 12px; border: 1px solid var(--af-gray-300, #C3D1CE); border-radius: 10px; font-weight: 600; background: #fff; }
+.af-pending-dialog .af-pending-field input:focus,
+.af-pending-dialog .af-pending-field select:focus { border-color: var(--af-primary-500, #164A55); box-shadow: 0 0 0 3px var(--af-primary-100, #DDEEEB); outline: 0; }
+.af-pending-dialog .af-pending-field strong { min-height: 42px; padding: 0 12px; border: 1px dashed var(--af-gray-300, #C3D1CE); border-radius: 10px; background: var(--af-gray-50, #F7F8F6); }
+.af-pending-dialog .af-pending-field small { min-height: 16px; font-size: 11.5px; }
+.af-pending-dialog .af-pending-notes { display: flex; flex-direction: column; gap: 4px; margin: 0 0 16px; padding: 12px 14px; border-radius: 10px; font-size: 13px; line-height: 1.4; }
+.af-pending-dialog .af-pending-notes p { margin: 0; }
+.af-pending-dialog .af-pending-notes:has(.is-error) { background: #FBECEB; border: 1px solid #F1C4C1; color: #A3322D; }
+.af-pending-dialog .af-pending-items { margin: 0 0 20px; border: 1px solid var(--af-gray-200, #DCE5E3); border-radius: 12px; overflow: hidden; }
+.af-pending-dialog .af-pending-items thead th { background: var(--af-gray-50, #F7F8F6); padding: 10px 14px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--af-gray-500); }
+.af-pending-dialog .af-pending-items td { padding: 10px 14px; }
+.af-pending-dialog .af-pending-items__desc { font-weight: 600; color: var(--af-gray-900); }
+.af-pending-dialog .af-pending-items tfoot td { background: var(--af-gray-50, #F7F8F6); }
+.af-pending-dialog .af-pending-email { gap: 6px; font-weight: 700; }
+.af-pending-dialog .af-pending-email input { min-height: 42px; padding: 0 12px; border: 1px solid var(--af-gray-300, #C3D1CE); border-radius: 10px; }
+.af-pending-dialog .af-pending-actions { margin-top: 8px; padding-top: 16px; border-top: 1px solid var(--af-gray-200, #DCE5E3); }
+@media (max-width: 600px) { .af-pending-dialog .af-pending-buyer { grid-template-columns: 1fr; } }

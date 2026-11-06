@@ -725,7 +725,6 @@ class Arriendo_Facil_Billing_Manager {
 		$labels      = class_exists( 'Arriendo_Facil_Billing_Ledger' ) ? Arriendo_Facil_Billing_Ledger::charge_types() : array();
 		$guest_name  = trim( $first->first_name . ' ' . $first->last_name );
 		$guest_id    = trim( (string) $first->id_number );
-		$desc_edits  = isset( $overrides['descriptions'] ) && is_array( $overrides['descriptions'] ) ? $overrides['descriptions'] : array();
 		if ( ! empty( $overrides['buyer_name'] ) ) {
 			$guest_name = trim( mb_substr( (string) $overrides['buyer_name'], 0, 300 ) );
 		}
@@ -748,9 +747,6 @@ class Arriendo_Facil_Billing_Manager {
 			$detail = '' !== (string) $row->description && 'canon' !== $type ? (string) $row->description : $label;
 			$amount = round( (float) $row->amount, 2 );
 			$descripcion = sprintf( '%s %s - %s', $detail, (string) $row->period, $accommodation );
-			if ( ! empty( $desc_edits[ (int) $row->id ] ) ) {
-				$descripcion = trim( mb_substr( (string) $desc_edits[ (int) $row->id ], 0, 300 ) );
-			}
 
 			$items[] = array(
 				'codigo_principal' => strtoupper( mb_substr( $type, 0, 12 ) ),

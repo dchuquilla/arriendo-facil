@@ -1019,10 +1019,27 @@ class Arriendo_Facil_Billing_API {
 		$charge_ids = array_values( array_unique( array_filter( array_map( 'absint', $raw_ids ) ) ) );
 		$email      = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
 
+		$overrides = '' !== $email ? array( 'email' => $email ) : array();
+		if ( isset( $_POST['buyer_name'] ) ) {
+			$overrides['buyer_name'] = sanitize_text_field( wp_unslash( $_POST['buyer_name'] ) );
+		}
+		if ( isset( $_POST['buyer_id'] ) ) {
+			$overrides['buyer_id'] = preg_replace( '/[^0-9A-Za-z\-]/', '', sanitize_text_field( wp_unslash( $_POST['buyer_id'] ) ) );
+		}
+		if ( isset( $_POST['forma_pago'] ) ) {
+			$overrides['forma_pago'] = sanitize_text_field( wp_unslash( $_POST['forma_pago'] ) );
+		}
+		if ( isset( $_POST['descriptions'] ) && is_array( $_POST['descriptions'] ) ) {
+			foreach ( wp_unslash( $_POST['descriptions'] ) as $desc_charge_id => $desc_text ) {
+				$overrides['descriptions'][ absint( $desc_charge_id ) ] = sanitize_text_field( (string) $desc_text );
+			}
+		}
+
 		return array(
 			'lease_id'   => $lease_id,
 			'charge_ids' => $charge_ids,
 			'email'      => $email,
+			'overrides'  => $overrides,
 		);
 	}
 
@@ -1090,15 +1107,29 @@ class Arriendo_Facil_Billing_API {
 		$plan = $this->manager->build_charges_invoice_plan(
 			$req['lease_id'],
 			$req['charge_ids'],
-			'' !== $req['email'] ? array( 'email' => $req['email'] ) : array()
+			$req['overrides']
 		);
 		if ( is_wp_error( $plan ) ) {
 			wp_send_json_error( array( 'message' => $plan->get_error_message(), 'code' => $plan->get_error_code() ), 400 );
 		}
 
 		$totals = $plan['totals'];
+		$charge_ids_ordered = array_map( 'intval', wp_list_pluck( $plan['charges'], 'id' ) );
+		$raw_items          = array_values( (array) $plan['payload']['items'] );
+		$total_items        = array_values( (array) $totals['items'] );
+		$lines              = array();
+		foreach ( $charge_ids_ordered as $idx => $line_charge_id ) {
+			$lines[] = array(
+				'charge_id'   => $line_charge_id,
+				'descripcion' => isset( $raw_items[ $idx ]['descripcion'] ) ? (string) $raw_items[ $idx ]['descripcion'] : '',
+				'total'       => isset( $total_items[ $idx ]['precio_total_sin_impuesto'] ) ? (float) $total_items[ $idx ]['precio_total_sin_impuesto'] : 0.0,
+			);
+		}
+
 		wp_send_json_success(
 			array(
+				'lines'           => $lines,
+				'forma_pago_code' => (string) $plan['payload']['forma_pago'],
 				'buyer_name'  => (string) $plan['payload']['razon_social_comprador'],
 				'buyer_id'    => (string) $plan['payload']['identificacion_comprador'],
 				'email'       => (string) $plan['email'],
@@ -1144,7 +1175,7 @@ class Arriendo_Facil_Billing_API {
 		$result = $this->manager->issue_for_charges(
 			$req['lease_id'],
 			$req['charge_ids'],
-			'' !== $req['email'] ? array( 'email' => $req['email'] ) : array()
+			$req['overrides']
 		);
 		delete_transient( $lock_key );
 

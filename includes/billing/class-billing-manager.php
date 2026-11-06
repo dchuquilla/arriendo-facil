@@ -725,6 +725,13 @@ class Arriendo_Facil_Billing_Manager {
 		$labels      = class_exists( 'Arriendo_Facil_Billing_Ledger' ) ? Arriendo_Facil_Billing_Ledger::charge_types() : array();
 		$guest_name  = trim( $first->first_name . ' ' . $first->last_name );
 		$guest_id    = trim( (string) $first->id_number );
+		$desc_edits  = isset( $overrides['descriptions'] ) && is_array( $overrides['descriptions'] ) ? $overrides['descriptions'] : array();
+		if ( ! empty( $overrides['buyer_name'] ) ) {
+			$guest_name = trim( mb_substr( (string) $overrides['buyer_name'], 0, 300 ) );
+		}
+		if ( ! empty( $overrides['buyer_id'] ) ) {
+			$guest_id = trim( mb_substr( (string) $overrides['buyer_id'], 0, 20 ) );
+		}
 		$accommodation = '' !== (string) $first->accommodation_title ? (string) $first->accommodation_title : 'Inmueble';
 		$warnings    = array();
 		$blocking    = '';
@@ -740,11 +747,15 @@ class Arriendo_Facil_Billing_Manager {
 			$label  = (string) ( $labels[ $type ] ?? ucfirst( $type ) );
 			$detail = '' !== (string) $row->description && 'canon' !== $type ? (string) $row->description : $label;
 			$amount = round( (float) $row->amount, 2 );
+			$descripcion = sprintf( '%s %s - %s', $detail, (string) $row->period, $accommodation );
+			if ( ! empty( $desc_edits[ (int) $row->id ] ) ) {
+				$descripcion = trim( mb_substr( (string) $desc_edits[ (int) $row->id ], 0, 300 ) );
+			}
 
 			$items[] = array(
 				'codigo_principal' => strtoupper( mb_substr( $type, 0, 12 ) ),
 				'codigo_auxiliar'  => sprintf( '%d-%d', $lease_id, (int) $row->id ),
-				'descripcion'      => sprintf( '%s %s - %s', $detail, (string) $row->period, $accommodation ),
+				'descripcion'      => $descripcion,
 				'cantidad'         => 1,
 				'precio_unitario'  => $amount,
 				'descuento'        => 0,
@@ -770,6 +781,15 @@ class Arriendo_Facil_Billing_Manager {
 			} else {
 				$warnings[] = __( 'Sin identificación del inquilino: se emitirá a consumidor final.', 'arriendo-facil' );
 			}
+		} elseif ( '' === $blocking && class_exists( 'Arriendo_Facil_Identity_Validator' ) ) {
+			$id_digits = preg_replace( '/\D/', '', $guest_id );
+			if ( 10 === strlen( $id_digits ) && ctype_digit( $guest_id ) && ! Arriendo_Facil_Identity_Validator::validate_cedula( $id_digits ) ) {
+				$blocking = __( 'La cédula no es válida. Corrígela antes de emitir: el SRI rechazaría la factura.', 'arriendo-facil' );
+			} elseif ( 13 === strlen( $id_digits ) && ctype_digit( $guest_id ) && '9999999999999' !== $id_digits && ! Arriendo_Facil_Identity_Validator::validate_ruc( $id_digits ) ) {
+				$blocking = __( 'El RUC no es válido. Corrígelo antes de emitir: el SRI rechazaría la factura.', 'arriendo-facil' );
+			} elseif ( ctype_digit( $guest_id ) && ! in_array( strlen( $guest_id ), array( 10, 13 ), true ) ) {
+				$blocking = __( 'La identificación debe tener 10 dígitos (cédula) o 13 (RUC). Para extranjeros usa el pasaporte con letras y números.', 'arriendo-facil' );
+			}
 		}
 
 		$email = isset( $overrides['email'] ) && '' !== (string) $overrides['email'] ? (string) $overrides['email'] : (string) $first->email;
@@ -782,6 +802,9 @@ class Arriendo_Facil_Billing_Manager {
 		$period_label = (string) end( $periods );
 		$iva_code     = $this->iva_code_for_accommodation( (int) $first->accommodation_id );
 		$forma_pago   = 'efectivo' === implode( '', array_unique( $methods ) ) ? '01' : '20';
+		if ( isset( $overrides['forma_pago'] ) && in_array( (string) $overrides['forma_pago'], array( '01', '20' ), true ) ) {
+			$forma_pago = (string) $overrides['forma_pago'];
+		}
 		$info         = array();
 		if ( '' !== $email ) {
 			$info['email'] = $email;

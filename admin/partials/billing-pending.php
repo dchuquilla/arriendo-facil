@@ -82,12 +82,18 @@ $pending_nonce = wp_create_nonce( 'af_billing_nonce' );
 		</div>
 		<div class="af-modal__body">
 			<div id="af-pending-warnings" class="af-pending-notes" hidden></div>
-			<dl class="af-pending-buyer">
-				<div><dt><?php esc_html_e( 'Cliente', 'arriendo-facil' ); ?></dt><dd id="af-pm-buyer">—</dd></div>
-				<div><dt><?php esc_html_e( 'Identificación', 'arriendo-facil' ); ?></dt><dd id="af-pm-id">—</dd></div>
-				<div><dt><?php esc_html_e( 'Forma de pago', 'arriendo-facil' ); ?></dt><dd id="af-pm-pay">—</dd></div>
-				<div><dt><?php esc_html_e( 'Fecha de emisión', 'arriendo-facil' ); ?></dt><dd id="af-pm-date">—</dd></div>
-			</dl>
+			<p class="af-pending-hint"><?php esc_html_e( 'Corrige aquí cualquier dato antes de emitir. Los montos no se editan: vienen de los pagos registrados.', 'arriendo-facil' ); ?></p>
+			<div class="af-pending-buyer">
+				<label class="af-pending-field"><span><?php esc_html_e( 'Cliente (razón social)', 'arriendo-facil' ); ?></span><input type="text" id="af-pm-buyer" maxlength="300" /></label>
+				<label class="af-pending-field"><span><?php esc_html_e( 'Cédula, RUC o pasaporte', 'arriendo-facil' ); ?></span><input type="text" id="af-pm-id" maxlength="20" inputmode="numeric" /><small id="af-pm-id-type"></small></label>
+				<label class="af-pending-field"><span><?php esc_html_e( 'Forma de pago', 'arriendo-facil' ); ?></span>
+					<select id="af-pm-pay">
+						<option value="01"><?php esc_html_e( 'Efectivo', 'arriendo-facil' ); ?></option>
+						<option value="20"><?php esc_html_e( 'Transferencia / sistema financiero', 'arriendo-facil' ); ?></option>
+					</select>
+				</label>
+				<div class="af-pending-field"><span><?php esc_html_e( 'Fecha de emisión', 'arriendo-facil' ); ?></span><strong id="af-pm-date">—</strong><small><?php esc_html_e( 'El SRI exige la fecha de hoy.', 'arriendo-facil' ); ?></small></div>
+			</div>
 			<table class="af-pending-items">
 				<thead><tr><th><?php esc_html_e( 'Concepto', 'arriendo-facil' ); ?></th><th><?php esc_html_e( 'Valor', 'arriendo-facil' ); ?></th></tr></thead>
 				<tbody id="af-pm-items"></tbody>
@@ -152,7 +158,10 @@ $pending_nonce = wp_create_nonce( 'af_billing_nonce' );
 		issued: '<?php echo esc_js( __( 'Factura emitida. Puedes verla en Comprobantes.', 'arriendo-facil' ) ); ?>',
 		loadErr: '<?php echo esc_js( __( 'No se pudo cargar. Intenta de nuevo.', 'arriendo-facil' ) ); ?>',
 		netErr: '<?php echo esc_js( __( 'Error de conexión.', 'arriendo-facil' ) ); ?>',
-		issue: '<?php echo esc_js( __( 'Emitir factura', 'arriendo-facil' ) ); ?>'
+		issue: '<?php echo esc_js( __( 'Emitir factura', 'arriendo-facil' ) ); ?>',
+		idFinal: '<?php echo esc_js( __( 'Consumidor final', 'arriendo-facil' ) ); ?>',
+		idCedula: '<?php echo esc_js( __( 'Cédula', 'arriendo-facil' ) ); ?>',
+		idPassport: '<?php echo esc_js( __( 'Pasaporte / otro', 'arriendo-facil' ) ); ?>'
 	};
 
 	function money( n ) { return '$' + ( Number( n ) || 0 ).toFixed( 2 ); }
@@ -279,24 +288,46 @@ $pending_nonce = wp_create_nonce( 'af_billing_nonce' );
 		document.getElementById( 'af-pm-email' ).value = g.email || '';
 		document.getElementById( 'af-pm-issue' ).disabled = true;
 		setModal( true );
-		loadPreview();
+		loadPreview( true );
 	}
 
-	function loadPreview() {
+	// Datos editados por el usuario; se envían tanto a la vista previa como a la emisión.
+	function edits() {
+		var data = {
+			email: document.getElementById( 'af-pm-email' ).value,
+			buyer_name: document.getElementById( 'af-pm-buyer' ).value,
+			buyer_id: document.getElementById( 'af-pm-id' ).value,
+			forma_pago: document.getElementById( 'af-pm-pay' ).value
+		};
+		document.querySelectorAll( '#af-pm-items input[data-charge]' ).forEach( function ( inp ) {
+			data[ 'descriptions[' + inp.dataset.charge + ']' ] = inp.value;
+		} );
+		return data;
+	}
+
+	function loadPreview( initial ) {
 		var g = current, fb = document.getElementById( 'af-pm-feedback' );
 		fb.textContent = '…';
-		post( { action: 'af_preview_charges_invoice', lease_id: g.lease_id, charge_ids: selectedIds( g ), email: document.getElementById( 'af-pm-email' ).value } ).then( function ( resp ) {
+		var req = initial ? { email: document.getElementById( 'af-pm-email' ).value } : edits();
+		req.action = 'af_preview_charges_invoice'; req.lease_id = g.lease_id; req.charge_ids = selectedIds( g );
+		post( req ).then( function ( resp ) {
 			if ( ! resp.success ) { fb.textContent = ( resp.data && resp.data.message ) || T.loadErr; fb.className = 'af-pending-feedback is-error'; return; }
 			var d = resp.data;
 			fb.textContent = '';
-			document.getElementById( 'af-pm-buyer' ).textContent = d.buyer_name;
-			document.getElementById( 'af-pm-id' ).textContent = d.buyer_id;
-			document.getElementById( 'af-pm-pay' ).textContent = d.forma_pago;
+			var idDigits = ( d.buyer_id || '' ).replace( /\D/g, '' );
+			document.getElementById( 'af-pm-id-type' ).textContent = idDigits === '9999999999999' ? T.idFinal : ( idDigits.length === 13 ? 'RUC' : ( idDigits.length === 10 ? T.idCedula : T.idPassport ) );
 			document.getElementById( 'af-pm-date' ).textContent = d.fecha;
-			var body = document.getElementById( 'af-pm-items' ); body.innerHTML = '';
-			d.items.forEach( function ( it ) {
-				var tr = el( 'tr' ); tr.appendChild( el( 'td', '', it.descripcion ) ); tr.appendChild( el( 'td', '', money( it.total ) ) ); body.appendChild( tr );
-			} );
+			if ( initial ) {
+				document.getElementById( 'af-pm-buyer' ).value = d.buyer_name;
+				document.getElementById( 'af-pm-id' ).value = d.buyer_id;
+				document.getElementById( 'af-pm-pay' ).value = d.forma_pago_code;
+				var body = document.getElementById( 'af-pm-items' ); body.innerHTML = '';
+				d.lines.forEach( function ( it ) {
+					var tr = el( 'tr' ), td = el( 'td' ), inp = el( 'input' );
+					inp.type = 'text'; inp.value = it.descripcion; inp.maxLength = 300; inp.dataset.charge = it.charge_id; inp.className = 'af-pending-desc';
+					td.appendChild( inp ); tr.appendChild( td ); tr.appendChild( el( 'td', '', money( it.total ) ) ); body.appendChild( tr );
+				} );
+			}
 			document.getElementById( 'af-pm-subtotal' ).textContent = money( d.subtotal );
 			document.getElementById( 'af-pm-iva-label' ).textContent = 'IVA ' + d.iva_rate + '%';
 			document.getElementById( 'af-pm-iva' ).textContent = money( d.iva );
@@ -309,16 +340,21 @@ $pending_nonce = wp_create_nonce( 'af_billing_nonce' );
 		} ).catch( function () { fb.textContent = T.netErr; fb.className = 'af-pending-feedback is-error'; } );
 	}
 
-	function issue( g, email ) {
-		return post( { action: 'af_issue_charges_invoice', lease_id: g.lease_id, charge_ids: selectedIds( g ), email: email || '' } );
+	function issue( g, email, extra ) {
+		var req = extra || {};
+		req.action = 'af_issue_charges_invoice'; req.lease_id = g.lease_id; req.charge_ids = selectedIds( g ); req.email = email || '';
+		return post( req );
 	}
 
-	document.getElementById( 'af-pm-email' ).addEventListener( 'change', function () { if ( current ) { loadPreview(); } } );
+	[ 'af-pm-email', 'af-pm-buyer', 'af-pm-id', 'af-pm-pay' ].forEach( function ( id ) {
+		document.getElementById( id ).addEventListener( 'change', function () { if ( current ) { loadPreview( false ); } } );
+	} );
+	document.getElementById( 'af-pm-items' ).addEventListener( 'change', function () { if ( current ) { loadPreview( false ); } } );
 
 	document.getElementById( 'af-pm-issue' ).addEventListener( 'click', function () {
 		var btn = this, fb = document.getElementById( 'af-pm-feedback' );
 		btn.disabled = true; fb.className = 'af-pending-feedback'; fb.textContent = T.issuing;
-		issue( current, document.getElementById( 'af-pm-email' ).value ).then( function ( resp ) {
+		issue( current, document.getElementById( 'af-pm-email' ).value, edits() ).then( function ( resp ) {
 			if ( resp.success ) {
 				fb.className = 'af-pending-feedback is-ok'; fb.textContent = T.issued;
 				setTimeout( function () { setModal( false ); load(); }, 1200 );

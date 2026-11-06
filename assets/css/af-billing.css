@@ -1072,3 +1072,11 @@
 
 /* El botón queda dentro del borde del campo, sin taparlo */
 .af-sx .af-pw .af-pw-toggle { top: 1px; right: 1px; height: 34px; background: transparent; border-radius: 0 5px 5px 0; }
+
+/* Revisar factura: campos editables */
+.af-pending-hint { margin: 0 0 var(--af-space-3); font-size: 12.5px; color: var(--af-gray-600); }
+.af-pending-field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: var(--af-gray-700); }
+.af-pending-field input, .af-pending-field select, .af-pending-desc { width: 100%; min-height: 38px; box-sizing: border-box; }
+.af-pending-field small { font-weight: 500; color: var(--af-gray-500); }
+.af-pending-field strong { min-height: 38px; display: flex; align-items: center; color: var(--af-gray-900); }
+.af-pending-items td:first-child { padding-right: 10px; }

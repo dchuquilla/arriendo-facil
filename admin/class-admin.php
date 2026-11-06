@@ -1317,7 +1317,7 @@ array(
 		<div id="af-app-sidebar" class="af-app-sidebar af-shell" role="navigation" aria-label="<?php esc_attr_e( 'Arriendo Fácil', 'arriendo-facil' ); ?>">
 			<div class="af-app-sidebar__brand">
 				<a href="<?php echo esc_url( admin_url( 'admin.php?page=arriendo-facil' ) ); ?>" class="af-app-sidebar__logo">
-					<?php echo af_lucide( 'home', 22 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
+					<img class="af-app-sidebar__logo-img" src="<?php echo esc_url( ARRIENDO_FACIL_PLUGIN_URL . 'assets/images/arriendo-facil-logo-sq.png' ); ?>" width="40" height="40" alt="" />
 					<span class="af-app-sidebar__logo-copy">
 						<span class="af-app-sidebar__logo-text"><?php esc_html_e( 'Arriendo Fácil', 'arriendo-facil' ); ?></span>
 						<span class="af-app-sidebar__logo-tagline"><?php echo esc_html( $this->get_user_display_name( $current_user ) ); ?></span>
@@ -1352,8 +1352,8 @@ array(
 							}
 						}
 						?>
-						<li class="af-app-sidebar__group<?php echo $group_active ? ' is-active is-open' : ''; ?>">
-							<a class="af-app-sidebar__group-link" href="<?php echo esc_url( $grouped[ $group_slug ][0]['url'] ); ?>" aria-expanded="<?php echo $group_active ? 'true' : 'false'; ?>">
+						<li class="af-app-sidebar__group is-open<?php echo $group_active ? ' is-active' : ''; ?>">
+							<a class="af-app-sidebar__group-link" href="<?php echo esc_url( $grouped[ $group_slug ][0]['url'] ); ?>" aria-expanded="true">
 								<?php echo af_lucide( $group_meta['icon'], 20 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
 								<span class="af-app-sidebar__group-label"><?php echo esc_html( $group_meta['label'] ); ?></span>
 								<span class="af-app-sidebar__group-chevron"><?php echo af_lucide( 'chevron-down', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>

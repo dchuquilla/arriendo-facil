@@ -572,7 +572,7 @@ class Arriendo_Facil_Billing_Manager {
 			)
 		);
 
-		$this->send_invoice_email( $invoice_id );
+		$this->send_invoice_email( $invoice_id, (string) ( $payload['info_adicional']['email'] ?? '' ) );
 
 		return array(
 			'invoice_id'          => $invoice_id,
@@ -894,7 +894,7 @@ class Arriendo_Facil_Billing_Manager {
 	 * @param int $invoice_id Invoice ID.
 	 * @return bool True when an email was sent.
 	 */
-	public function send_invoice_email( int $invoice_id ): bool {
+	public function send_invoice_email( int $invoice_id, string $email_override = '' ): bool {
 		if ( ! $this->wpdb || ! function_exists( 'wp_mail' ) || ! apply_filters( 'af_billing_email_enabled', true ) ) {
 			return false;
 		}
@@ -903,27 +903,43 @@ class Arriendo_Facil_Billing_Manager {
 			return false;
 		}
 
-		$email = (string) $this->wpdb->get_var(
-			$this->wpdb->prepare(
-				"SELECT g.email FROM {$this->wpdb->prefix}af_leases l
-				 INNER JOIN {$this->wpdb->prefix}af_guests g ON g.id = l.guest_id
-				 WHERE l.id = %d LIMIT 1",
-				(int) $invoice->lease_id
-			)
-		);
+		// Prioridad: correo corregido al emitir (queda en el XML) y luego el de la ficha del inquilino.
+		$email = $email_override;
+		if ( '' === $email && ! empty( $invoice->xml_autorizacion ) && preg_match( '/nombre=(?:"|&quot;)email(?:"|&quot;)>([^<&]+)</', (string) $invoice->xml_autorizacion, $m ) ) {
+			$email = trim( $m[1] );
+		}
 		if ( '' === $email || ! is_email( $email ) ) {
+			$email = (string) $this->wpdb->get_var(
+				$this->wpdb->prepare(
+					"SELECT g.email FROM {$this->wpdb->prefix}af_leases l
+					 INNER JOIN {$this->wpdb->prefix}af_guests g ON g.id = l.guest_id
+					 WHERE l.id = %d LIMIT 1",
+					(int) $invoice->lease_id
+				)
+			);
+		}
+		if ( '' === $email || ! is_email( $email ) ) {
+			error_log( 'Arriendo Facil: factura ' . $invoice_id . ' sin correo valido, no se envio RIDE.' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 			return false;
 		}
 
 		$attachments = array();
 		$tmp_xml     = '';
+		$tmp_dir     = '';
 		if ( ! empty( $invoice->ride_path ) && file_exists( (string) $invoice->ride_path ) ) {
 			$attachments[] = (string) $invoice->ride_path;
 		}
 		if ( ! empty( $invoice->xml_autorizacion ) ) {
-			$tmp_xml = trailingslashit( get_temp_dir() ) . 'factura-' . preg_replace( '/[^0-9A-Za-z\-]/', '', (string) $invoice->numero_comprobante ) . '.xml';
-			if ( false !== file_put_contents( $tmp_xml, (string) $invoice->xml_autorizacion ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
-				$attachments[] = $tmp_xml;
+			// Carpeta privada (0700) con nombre impredecible: el XML lleva datos personales en claro.
+			$tmp_dir = trailingslashit( get_temp_dir() ) . 'af-' . bin2hex( random_bytes( 8 ) );
+			if ( mkdir( $tmp_dir, 0700 ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_mkdir
+				$tmp_xml = $tmp_dir . '/factura-' . preg_replace( '/[^0-9A-Za-z\-]/', '', (string) $invoice->numero_comprobante ) . '.xml';
+				if ( false !== file_put_contents( $tmp_xml, (string) $invoice->xml_autorizacion ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+					chmod( $tmp_xml, 0600 );
+					$attachments[] = $tmp_xml;
+				}
+			} else {
+				$tmp_dir = '';
 			}
 		}
 
@@ -939,13 +955,20 @@ class Arriendo_Facil_Billing_Manager {
 			number_format( (float) $invoice->total, 2 )
 		);
 
-		$sent = wp_mail( $email, $subject, $body, array(), $attachments );
-
-		if ( '' !== $tmp_xml && file_exists( $tmp_xml ) ) {
-			wp_delete_file( $tmp_xml );
+		try {
+			$sent = wp_mail( $email, $subject, $body, array(), $attachments );
+		} finally {
+			if ( '' !== $tmp_xml && file_exists( $tmp_xml ) ) {
+				wp_delete_file( $tmp_xml );
+			}
+			if ( '' !== $tmp_dir && is_dir( $tmp_dir ) ) {
+				rmdir( $tmp_dir ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir
+			}
 		}
 		if ( $sent ) {
 			$this->update_invoice_row( $invoice_id, array( 'emailed_at' => current_time( 'mysql' ) ) );
+		} else {
+			error_log( 'Arriendo Facil: wp_mail fallo al enviar la factura ' . $invoice_id ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 		}
 		return (bool) $sent;
 	}

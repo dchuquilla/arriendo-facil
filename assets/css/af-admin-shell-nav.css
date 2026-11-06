@@ -95,11 +95,24 @@ body.af-sidebar-collapsed .af-app-topbar {
 	color: var(--af-gray-500, #647579);
 }
 
-.af-app-topbar__search input[type="search"] {
+.af-app-topbar__search input[type="search"],
+.af-app-topbar .af-app-topbar__search input[type="search"] {
 	all: unset;
 	flex: 1;
+	min-width: 0;
 	font-size: var(--af-text-sm);
 	color: var(--af-gray-900, #193238);
+}
+
+.af-app-topbar .af-app-topbar__search input[type="search"]:focus {
+	outline: none;
+	box-shadow: none;
+}
+
+.af-app-topbar__search:focus-within {
+	border-color: var(--af-primary-400, #4F8A94);
+	box-shadow: 0 0 0 3px rgba(79, 138, 148, 0.18);
+	background: #fff;
 }
 
 .af-app-topbar__actions {

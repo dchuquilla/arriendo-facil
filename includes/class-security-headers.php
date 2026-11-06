@@ -143,13 +143,13 @@ class Arriendo_Facil_Security_Headers {
 	private static function set_content_security_policy() {
 		$csp_directives = array(
 			"default-src 'self'",
-			"script-src 'self' 'unsafe-inline' 'unsafe-eval' *.wp.com cdn.jsdelivr.net cdnjs.cloudflare.com", // WordPress core uses eval for some JS.
+			"script-src 'self' 'unsafe-inline' 'unsafe-eval' *.wp.com cdn.jsdelivr.net cdnjs.cloudflare.com www.youtube.com s.ytimg.com static.cloudflareinsights.com", // WordPress core uses eval for some JS.
 			"style-src 'self' 'unsafe-inline' fonts.googleapis.com cdnjs.cloudflare.com",
 			"img-src 'self' data: https:",
 			"font-src 'self' fonts.gstatic.com",
 			"connect-src 'self'",
 			"frame-ancestors 'self'",
-			"frame-src 'none'",
+			"frame-src https://www.youtube.com https://www.youtube-nocookie.com",
 			"object-src 'none'",
 			"base-uri 'self'",
 			"form-action 'self'",

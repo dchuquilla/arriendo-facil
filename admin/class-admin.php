@@ -1167,7 +1167,7 @@ array(
 			),
 			array(
 				'slug'  => 'af-reviews',
-				'label' => __( 'Reviews', 'arriendo-facil' ),
+				'label' => __( 'Calificaciones', 'arriendo-facil' ),
 				'url'   => admin_url( 'admin.php?page=af-reviews' ),
 				'icon'  => 'star',
 				'group' => 'propiedades',

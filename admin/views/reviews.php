@@ -463,10 +463,10 @@ $config = array(
 										echo esc_html(
 											sprintf(
 												/* translators: 1: on-time count, 2: late count, 3: average days late */
-												__( '%1$d a tiempo · %2$d con atraso · %3$s días de atraso promedio', 'arriendo-facil' ),
+												__( '%1$d a tiempo · %2$d con atraso · %3$s de atraso promedio', 'arriendo-facil' ),
 												$payment_hint['on_time'],
 												$payment_hint['late'],
-												number_format_i18n( $payment_hint['average_days_late'], 1 )
+												sprintf( _n( '%d día', '%d días', (int) round( $payment_hint['average_days_late'] ), 'arriendo-facil' ), (int) round( $payment_hint['average_days_late'] ) )
 											)
 										);
 										?>
@@ -485,7 +485,7 @@ $config = array(
 										data-name="<?php echo esc_attr( $tenant_name ); ?>"
 										data-context="<?php echo esc_attr( $property ); ?>"
 										data-suggested="<?php echo esc_attr( $payment_hint ? $payment_hint['score'] : 0 ); ?>"
-										data-suggested-note="<?php echo esc_attr( $payment_hint ? sprintf( /* translators: 1: percentage on time, 2: avg days late */ __( '%1$d%% de pagos a tiempo · %2$s días de atraso promedio', 'arriendo-facil' ), $on_time_pct, number_format_i18n( $payment_hint['average_days_late'], 1 ) ) : '' ); ?>">
+										data-suggested-note="<?php echo esc_attr( $payment_hint ? sprintf( /* translators: 1: percentage on time, 2: avg days late */ __( '%1$d%% de pagos a tiempo · %2$s de atraso promedio', 'arriendo-facil' ), $on_time_pct, sprintf( _n( '%d día', '%d días', (int) round( $payment_hint['average_days_late'] ), 'arriendo-facil' ), (int) round( $payment_hint['average_days_late'] ) ) ) : '' ); ?>">
 										<?php esc_html_e( 'Calificar', 'arriendo-facil' ); ?>
 									</button>
 								<?php endif; ?>

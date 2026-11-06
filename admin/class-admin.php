@@ -2539,20 +2539,58 @@ array(
 	 * @return array<string,mixed>
 	 */
 	private static function cobranza_calendar_strings() {
-		$weekdays = array();
-		// 2024-01-01 fue un lunes: seis pasos dan los siete días en orden.
-		for ( $i = 0; $i < 7; $i++ ) {
-			$weekdays[] = wp_date( 'D', strtotime( '2024-01-01 +' . $i . ' day' ) );
-		}
+		// Fijos en español: wp_date() depende del idioma del sitio y salía en inglés.
+		$weekdays = array(
+			__( 'Lun', 'arriendo-facil' ),
+			__( 'Mar', 'arriendo-facil' ),
+			__( 'Mié', 'arriendo-facil' ),
+			__( 'Jue', 'arriendo-facil' ),
+			__( 'Vie', 'arriendo-facil' ),
+			__( 'Sáb', 'arriendo-facil' ),
+			__( 'Dom', 'arriendo-facil' ),
+		);
 
-		$months = array();
-		for ( $m = 1; $m <= 12; $m++ ) {
-			$months[] = wp_date( 'M', mktime( 0, 0, 0, $m, 1, 2024 ) );
-		}
+		$months = array(
+			__( 'ene', 'arriendo-facil' ),
+			__( 'feb', 'arriendo-facil' ),
+			__( 'mar', 'arriendo-facil' ),
+			__( 'abr', 'arriendo-facil' ),
+			__( 'may', 'arriendo-facil' ),
+			__( 'jun', 'arriendo-facil' ),
+			__( 'jul', 'arriendo-facil' ),
+			__( 'ago', 'arriendo-facil' ),
+			__( 'sep', 'arriendo-facil' ),
+			__( 'oct', 'arriendo-facil' ),
+			__( 'nov', 'arriendo-facil' ),
+			__( 'dic', 'arriendo-facil' ),
+		);
 
 		return array(
 			'weekdays'          => $weekdays,
 			'months'            => $months,
+			'sumTotal'          => __( 'Total del mes', 'arriendo-facil' ),
+			'sumPaid'           => __( 'Cobrado', 'arriendo-facil' ),
+			'sumPending'        => __( 'Por cobrar', 'arriendo-facil' ),
+			'stepCharge'        => __( 'Cobro', 'arriendo-facil' ),
+			'stepPayment'       => __( 'Pago', 'arriendo-facil' ),
+			'stepInvoice'       => __( 'Factura SRI', 'arriendo-facil' ),
+			'stepDone'          => __( 'Listo', 'arriendo-facil' ),
+			'stepWaiting'       => __( 'Falta', 'arriendo-facil' ),
+			'stepProcessing'    => __( 'En proceso', 'arriendo-facil' ),
+			'stepRejected'      => __( 'Rechazada', 'arriendo-facil' ),
+			'invoiceIssue'      => __( 'Facturar', 'arriendo-facil' ),
+			'invoiceRetry'      => __( 'Corregir y reemitir', 'arriendo-facil' ),
+			'invoiceView'       => __( 'Ver factura', 'arriendo-facil' ),
+			'invoiceUrl'        => admin_url( 'admin.php?page=af-billing&tab=pendientes' ),
+			'invoicedUrl'       => admin_url( 'admin.php?page=af-billing&tab=comprobantes' ),
+			'flowPending'       => __( 'Por cobrar', 'arriendo-facil' ),
+			'flowToInvoice'     => __( 'Por facturar', 'arriendo-facil' ),
+			'flowInvoiced'      => __( 'Facturado', 'arriendo-facil' ),
+			'flowPendingHint'   => __( 'Registra el pago cuando lo recibas.', 'arriendo-facil' ),
+			'flowToInvoiceHint' => __( 'Ya cobrados: emite la factura SRI.', 'arriendo-facil' ),
+			'flowInvoicedHint'  => __( 'Cobrados y con factura emitida.', 'arriendo-facil' ),
+			'flowGoInvoice'     => __( 'Ir a facturar', 'arriendo-facil' ),
+			'pickDay'           => __( 'Toca un día para ver sus cargos.', 'arriendo-facil' ),
 			'paid'              => __( 'Pagado', 'arriendo-facil' ),
 			'pending'           => __( 'Pendiente', 'arriendo-facil' ),
 			'overdue'           => __( 'Vencido', 'arriendo-facil' ),
@@ -2563,7 +2601,7 @@ array(
 			'noCharges'         => __( 'Sin cargos para este periodo.', 'arriendo-facil' ),
 			'noMatches'         => __( 'Ningún cargo coincide con el filtro.', 'arriendo-facil' ),
 			'tenant'            => __( 'Arrendatario:', 'arriendo-facil' ),
-			'recordPayment'     => __( 'Anotar pago', 'arriendo-facil' ),
+			'recordPayment'     => __( 'Registrar pago', 'arriendo-facil' ),
 			'noActiveLease'     => __( 'Sin contrato activo: este inmueble no genera cobros.', 'arriendo-facil' ),
 			'balance'           => __( 'Saldo', 'arriendo-facil' ),
 			'showAll'           => __( 'Ver todos los días', 'arriendo-facil' ),

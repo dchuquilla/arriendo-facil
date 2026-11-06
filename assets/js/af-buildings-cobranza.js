@@ -227,6 +227,34 @@
 		return 'is-' + toneOf(c);
 	}
 
+	/* Factura SRI de un cargo: none | processing | rejected | done. Los estados
+	   rechazados son los mismos que deja reemitir Facturación. */
+	var INVOICE_REJECTED = ['devuelta', 'no_autorizada', 'rechazada', 'anulada'];
+	var INVOICE_DONE = ['autorizada', 'autorizada_sin_ride'];
+
+	function invoiceStage(c) {
+		if (!c.invoice) { return 'none'; }
+		var s = String(c.invoice.state || '');
+		if (INVOICE_REJECTED.indexOf(s) !== -1) { return 'rejected'; }
+		if (INVOICE_DONE.indexOf(s) !== -1) { return 'done'; }
+		return 'processing';
+	}
+
+	/* Etapa del cargo en el flujo: pending → toinvoice → invoiced. */
+	function flowOf(c) {
+		if (!isPaid(c)) { return 'pending'; }
+		var stage = invoiceStage(c);
+		return ('none' === stage || 'rejected' === stage) ? 'toinvoice' : 'invoiced';
+	}
+
+	function invoiceUrl(c) {
+		var prop = currentProp();
+		var base = T.invoiceUrl || '';
+		if (!base) { return '#'; }
+		var who = prop && prop.guest ? prop.guest : '';
+		return who ? base + '&s=' + encodeURIComponent(who) : base;
+	}
+
 	/* Agrupa los cargos del periodo por día (YYYY-MM-DD). */
 	function chargesByDay(period) {
 		var map = {};
@@ -283,6 +311,35 @@
 		}
 	}
 
+	/* ── Guía de flujo: cuántos cargos hay en cada etapa ─────────────────── */
+
+	function renderFlow(charges) {
+		var flowEl = document.getElementById('af-cobranza-flow');
+		if (!flowEl) { return; }
+		var n = { pending: 0, toinvoice: 0, invoiced: 0 };
+		(charges || []).forEach(function (c) { n[flowOf(c)] += 1; });
+
+		Object.keys(n).forEach(function (k) {
+			var count = flowEl.querySelector('[data-flow-count="' + k + '"]');
+			var step = flowEl.querySelector('[data-flow="' + k + '"]');
+			if (count) { count.textContent = n[k]; }
+			if (step) { step.classList.toggle('is-active', n[k] > 0); }
+		});
+
+		var step2 = flowEl.querySelector('[data-flow="toinvoice"]');
+		var go = step2 && step2.querySelector('.af-cobranza-flow__go');
+		if (step2 && !go && T.invoiceUrl) {
+			go = document.createElement('a');
+			go.className = 'af-cobranza-flow__go';
+			go.textContent = T.flowGoInvoice || 'Ir a facturar';
+			step2.appendChild(go);
+		}
+		if (go) {
+			go.href = invoiceUrl();
+			go.hidden = n.toinvoice === 0;
+		}
+	}
+
 	/* ── Leyenda: filtros por estado ─────────────────────────────────────── */
 
 	function renderLegend(charges) {
@@ -328,6 +385,10 @@
 			frag.appendChild(btn);
 		});
 		legendEl.replaceChildren(frag);
+		var hint = document.createElement('span');
+		hint.className = 'af-calendar-mini__hint';
+		hint.textContent = T.pickDay || '';
+		legendEl.appendChild(hint);
 	}
 
 	/* ── Calendario ───────────────────────────────────────────────────────── */
@@ -405,6 +466,11 @@
 			if (state.day && dayStr !== state.day) { cls += ' is-dimmed'; }
 			if (dayCharges.length && !visible.length && !state.day) { cls += ' is-dimmed'; }
 			if (dueDay === day) { cls += ' is-payday'; }
+
+			var dayTone = monthTotals(visible);
+			if (visible.length) {
+				cls += dayTone.overdue > 0.01 ? ' tone-overdue' : (dayTone.pending > 0.01 ? ' tone-pending' : ' tone-paid');
+			}
 
 			var dots = '';
 			visible.forEach(function (c) {
@@ -561,23 +627,44 @@
 		list.forEach(function (c) {
 			var paid = isPaid(c);
 			var bal = balanceOf(c);
+			var stage = invoiceStage(c);
 			var li = document.createElement('li');
 			li.className = 'af-cobranza-charge ' + statusClass(c);
 			li.setAttribute('data-day', c.dueDate || '');
+
+			var action = '';
+			if (!paid) {
+				action = '<button type="button" class="button af-btn af-btn--primary af-cobranza-pay-open" data-charge="' + c.id + '" data-outstanding="' + bal.toFixed(2) + '">' + (T.recordPayment || 'Registrar pago') + '</button>';
+			} else if ('none' === stage || 'rejected' === stage) {
+				action = '<a class="button af-btn af-btn--primary af-cobranza-invoice-go" href="' + escapeAttr(invoiceUrl(c)) + '">' +
+					('rejected' === stage ? (T.invoiceRetry || 'Corregir y reemitir') : (T.invoiceIssue || 'Facturar')) + '</a>';
+			} else if (T.invoicedUrl) {
+				action = '<a class="button af-btn af-btn--ghost af-cobranza-invoice-go" href="' + escapeAttr(T.invoicedUrl) + '">' + (T.invoiceView || 'Ver factura') + '</a>';
+			}
+
+			// Pipeline: Cobro → Pago → Factura SRI, para ver de un vistazo qué falta.
+			var payState = paid ? 'done' : 'todo';
+			var invState = !paid ? 'locked' : ('done' === stage ? 'done' : ('processing' === stage ? 'wip' : ('rejected' === stage ? 'bad' : 'todo')));
+			var invText = !paid ? '' : ('done' === stage ? (T.stepDone || 'Listo') : ('processing' === stage ? (T.stepProcessing || 'En proceso') : ('rejected' === stage ? (T.stepRejected || 'Rechazada') : (T.stepWaiting || 'Falta'))));
+			var pipe =
+				'<ol class="af-cobranza-pipe">' +
+				'<li class="af-cobranza-pipe__s is-done">' + (T.stepCharge || 'Cobro') + '</li>' +
+				'<li class="af-cobranza-pipe__s is-' + payState + '">' + (T.stepPayment || 'Pago') + (paid ? '' : ' · ' + (T.stepWaiting || 'Falta')) + '</li>' +
+				'<li class="af-cobranza-pipe__s is-' + invState + '">' + (T.stepInvoice || 'Factura SRI') + (invText ? ' · ' + invText : '') + '</li>' +
+				'</ol>';
 
 			li.innerHTML =
 				'<span class="af-cobranza-charge__icon">' + chargeIcon(c.type) + '</span>' +
 				'<div class="af-cobranza-charge__body">' +
 				'<span class="af-cobranza-charge__label"></span>' +
 				'<span class="af-cobranza-charge__meta"></span>' +
+				pipe +
 				'</div>' +
 				'<div class="af-cobranza-charge__amount">' +
 				'<span class="af-cobranza-charge__value">' + money(c.amount) + '</span>' +
 				'<span class="af-cobranza-charge__balance"></span>' +
 				'</div>' +
-				'<div class="af-cobranza-charge__actions">' +
-				(paid ? '' : '<button type="button" class="button af-btn af-cobranza-pay-open" data-charge="' + c.id + '" data-outstanding="' + bal.toFixed(2) + '">' + (T.recordPayment || 'Anotar pago') + '</button>') +
-				'</div>';
+				'<div class="af-cobranza-charge__actions">' + action + '</div>';
 
 			li.querySelector('.af-cobranza-charge__label').textContent = c.label + (c.desc ? ' · ' + c.desc : '');
 			li.querySelector('.af-cobranza-charge__meta').textContent =
@@ -598,7 +685,7 @@
 				if (c.invoice) {
 					var inv = document.createElement('div');
 					inv.className = 'af-cobranza-charge__invoice';
-					inv.textContent = (T.invoice || 'Factura') + ' ' + (c.invoice.number || '') + (c.invoice.state ? ' (' + c.invoice.state + ')' : '');
+					inv.textContent = (T.stepInvoice || 'Factura SRI') + ' ' + (c.invoice.number || '') + (c.invoice.state ? ' (' + c.invoice.state + ')' : '');
 					det.appendChild(inv);
 				}
 				li.appendChild(det);
@@ -626,6 +713,7 @@
 		var charges = chargesOf(state.period);
 		renderCalendar();
 		renderLegend(charges);
+		renderFlow(charges);
 		renderSummary(charges);
 		renderDayFilter();
 		renderCharges();
@@ -634,6 +722,8 @@
 	/* ── Modal: abrir / cerrar ───────────────────────────────────────────── */
 
 	function openModal() {
+		// Colgado de <body>: dentro del layout de WP el menú lateral quedaba encima.
+		if (modal.parentNode !== document.body) { document.body.appendChild(modal); }
 		modal.classList.add('is-open');
 		document.body.classList.add('af-modal-open');
 	}
@@ -1010,7 +1100,10 @@
 
 			// Se refresca todo en el sitio: modal, tarjetas, alertas y contadores.
 			refreshCurrent().then(function (ok) {
-				if (ok) { hidePayStatus(); }
+				if (ok) {
+					hidePayStatus();
+					showStatus((json.data.message || 'Pago registrado correctamente.') + ' ' + (T.flowToInvoiceHint || ''), 'success');
+				}
 			});
 		}).catch(function () {
 			payConfirm.disabled = false;

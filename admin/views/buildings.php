@@ -181,7 +181,7 @@ $cob_alerts   = $cob_snapshot['display'];
 		array(
 			'eyebrow'  => __( 'Cobranza', 'arriendo-facil' ),
 			'title'    => __( 'Cobranza de inmuebles', 'arriendo-facil' ),
-			'subtitle' => __( 'Cada tarjeta es un inmueble y su borde indica su estado de pago: rojo vencido, naranja por vencer, azul pendiente, verde al día y gris sin contrato. Pulsa una tarjeta para abrir su calendario de cobros, navega entre meses y registra pagos al instante.', 'arriendo-facil' ),
+			'subtitle' => __( 'Cada tarjeta es un inmueble y su borde indica su estado de pago: rojo vencido, naranja por vencer, azul pendiente, verde al día y gris sin contrato. Pulsa una tarjeta para ver sus cobros, registrar pagos y pasar a facturar al SRI.', 'arriendo-facil' ),
 		)
 	);
 	?>
@@ -330,6 +330,34 @@ $cob_alerts   = $cob_snapshot['display'];
 		<div class="af-modal__body">
 			<p class="af-modal__status" id="af-cobranza-status" style="display:none;"></p>
 
+			<!-- Guía: de qué va esta pantalla y cómo se conecta con la facturación SRI. -->
+			<ol class="af-cobranza-flow" id="af-cobranza-flow" aria-label="<?php esc_attr_e( 'Proceso de cobro y facturación', 'arriendo-facil' ); ?>">
+				<li class="af-cobranza-flow__step" data-flow="pending">
+					<span class="af-cobranza-flow__n">1</span>
+					<span class="af-cobranza-flow__txt">
+						<strong><?php esc_html_e( 'Por cobrar', 'arriendo-facil' ); ?></strong>
+						<small><?php esc_html_e( 'Registra el pago cuando lo recibas.', 'arriendo-facil' ); ?></small>
+					</span>
+					<span class="af-cobranza-flow__count" data-flow-count="pending">0</span>
+				</li>
+				<li class="af-cobranza-flow__step" data-flow="toinvoice">
+					<span class="af-cobranza-flow__n">2</span>
+					<span class="af-cobranza-flow__txt">
+						<strong><?php esc_html_e( 'Por facturar', 'arriendo-facil' ); ?></strong>
+						<small><?php esc_html_e( 'Ya cobrados: emite la factura SRI.', 'arriendo-facil' ); ?></small>
+					</span>
+					<span class="af-cobranza-flow__count" data-flow-count="toinvoice">0</span>
+				</li>
+				<li class="af-cobranza-flow__step" data-flow="invoiced">
+					<span class="af-cobranza-flow__n">3</span>
+					<span class="af-cobranza-flow__txt">
+						<strong><?php esc_html_e( 'Facturado', 'arriendo-facil' ); ?></strong>
+						<small><?php esc_html_e( 'Cobrados y con factura emitida.', 'arriendo-facil' ); ?></small>
+					</span>
+					<span class="af-cobranza-flow__count" data-flow-count="invoiced">0</span>
+				</li>
+			</ol>
+
 			<div class="af-cobranza-cal__nav">
 				<button type="button" class="button af-cobranza-cal__nav-btn" data-cal="prev" aria-label="<?php esc_attr_e( 'Mes anterior', 'arriendo-facil' ); ?>">&larr;</button>
 				<h3 class="af-cobranza-cal__period">
@@ -349,15 +377,15 @@ $cob_alerts   = $cob_snapshot['display'];
 			<div class="af-cobranza-summary" id="af-cobranza-summary" hidden>
 				<div class="af-cobranza-summary__row">
 					<span class="af-cobranza-summary__item">
-						<span class="af-cobranza-summary__k"><?php esc_html_e( 'Facturado', 'arriendo-facil' ); ?></span>
+						<span class="af-cobranza-summary__k"><?php esc_html_e( 'Total del mes', 'arriendo-facil' ); ?></span>
 						<span class="af-cobranza-summary__v" data-sum="charged">$0,00</span>
 					</span>
 					<span class="af-cobranza-summary__item">
-						<span class="af-cobranza-summary__k"><?php esc_html_e( 'Pagado', 'arriendo-facil' ); ?></span>
+						<span class="af-cobranza-summary__k"><?php esc_html_e( 'Cobrado', 'arriendo-facil' ); ?></span>
 						<span class="af-cobranza-summary__v is-ok" data-sum="paid">$0,00</span>
 					</span>
 					<span class="af-cobranza-summary__item">
-						<span class="af-cobranza-summary__k"><?php esc_html_e( 'Pendiente', 'arriendo-facil' ); ?></span>
+						<span class="af-cobranza-summary__k"><?php esc_html_e( 'Por cobrar', 'arriendo-facil' ); ?></span>
 						<span class="af-cobranza-summary__v is-danger" data-sum="pending">$0,00</span>
 					</span>
 				</div>
@@ -375,7 +403,7 @@ $cob_alerts   = $cob_snapshot['display'];
 			<ul class="af-cobranza-charges" id="af-cobranza-charges" aria-live="polite"></ul>
 
 			<div class="af-cobranza-pay" id="af-cobranza-pay" hidden>
-				<h4 class="af-cobranza-pay__title"><?php esc_html_e( 'Anotar pago', 'arriendo-facil' ); ?></h4>
+				<h4 class="af-cobranza-pay__title"><?php esc_html_e( 'Registrar pago recibido', 'arriendo-facil' ); ?></h4>
 				<p class="af-modal__status" id="af-cobranza-pay-status" style="display:none;"></p>
 				<input type="hidden" id="af-cobranza-pay-charge-id" />
 				<div class="af-modal__field">
@@ -401,8 +429,9 @@ $cob_alerts   = $cob_snapshot['display'];
 				</div>
 				<div class="af-cobranza-pay__actions">
 					<button type="button" class="button" id="af-cobranza-pay-cancel"><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
-					<button type="button" class="button button-primary" id="af-cobranza-pay-confirm"><?php esc_html_e( 'Registrar pago', 'arriendo-facil' ); ?></button>
+					<button type="button" class="button button-primary" id="af-cobranza-pay-confirm"><?php esc_html_e( 'Guardar pago', 'arriendo-facil' ); ?></button>
 				</div>
+				<p class="af-modal__hint"><?php esc_html_e( 'Al guardar, el cobro pasa a “Por facturar” para emitir su factura SRI.', 'arriendo-facil' ); ?></p>
 			</div>
 		</div>
 		<div class="af-modal__footer">

@@ -67,7 +67,7 @@ $hub_tabs = array(
 		<div class="af-bx-head__title">
 			<span class="af-bx-eyebrow"><?php esc_html_e( 'SRI Ecuador', 'arriendo-facil' ); ?></span>
 			<h1><?php esc_html_e( 'Facturación', 'arriendo-facil' ); ?></h1>
-			<p><?php esc_html_e( 'Consulta y administra los comprobantes electrónicos.', 'arriendo-facil' ); ?></p>
+			<p><?php esc_html_e( 'Emite la factura electrónica SRI de los cobros que ya registraste en Cobranza: primero cobras, luego facturas con un clic.', 'arriendo-facil' ); ?></p>
 		</div>
 		<div class="af-bx-head__side">
 			<span class="af-bx-env af-bx-env--<?php echo $is_prod ? 'prod' : 'test'; ?>">
@@ -77,9 +77,9 @@ $hub_tabs = array(
 					<small><?php echo esc_html( $is_prod ? __( 'Validez tributaria real', 'arriendo-facil' ) : __( 'Sin validez tributaria', 'arriendo-facil' ) ); ?></small>
 				</span>
 			</span>
-			<a class="button af-btn af-btn--primary" href="<?php echo esc_url( admin_url( 'admin.php?page=af-billing&tab=pendientes' ) ); ?>">
-				<span class="af-btn__icon" aria-hidden="true"><?php echo af_lucide( 'receipt', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-				<?php esc_html_e( 'Emitir factura', 'arriendo-facil' ); ?>
+			<a class="button af-btn af-btn--ghost" href="<?php echo esc_url( admin_url( 'admin.php?page=af-buildings' ) ); ?>">
+				<span class="af-btn__icon" aria-hidden="true"><?php echo af_lucide( 'wallet', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+				<?php esc_html_e( 'Ir a Cobranza', 'arriendo-facil' ); ?>
 			</a>
 		</div>
 	</header>

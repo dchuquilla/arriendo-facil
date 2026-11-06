@@ -68,7 +68,7 @@ $pending_nonce = wp_create_nonce( 'af_billing_nonce' );
 		<span class="af-empty__icon" aria-hidden="true"><?php echo af_lucide( 'circle-check', 28 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
 		<h3 class="af-empty__title"><?php esc_html_e( 'Todo al día', 'arriendo-facil' ); ?></h3>
 		<p class="af-empty__text"><?php esc_html_e( 'Cuando registres un pago en Cobranza, aparecerá aquí listo para facturar.', 'arriendo-facil' ); ?></p>
-		<a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=af-collections' ) ); ?>"><?php esc_html_e( 'Ir a Cobranza', 'arriendo-facil' ); ?></a>
+		<a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=af-buildings' ) ); ?>"><?php esc_html_e( 'Ir a Cobranza', 'arriendo-facil' ); ?></a>
 	</div>
 </section>
 <?php endif; ?>
@@ -324,6 +324,11 @@ $pending_nonce = wp_create_nonce( 'af_billing_nonce' );
 	document.addEventListener( 'keydown', function ( e ) { if ( e.key === 'Escape' ) { modal.hidden = true; } } );
 
 	filter.addEventListener( 'input', render );
+	// Deep-link desde Cobranza: ?s=<inquilino> deja la lista filtrada.
+	try {
+		var preset = new URL( window.location.href ).searchParams.get( 's' );
+		if ( preset ) { filter.value = preset; }
+	} catch ( e ) {}
 	document.querySelectorAll( '#af-pending-chips .af-chip' ).forEach( function ( chip ) {
 		chip.addEventListener( 'click', function () {
 			mode = chip.dataset.filter;

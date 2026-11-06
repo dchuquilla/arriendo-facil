@@ -1660,3 +1660,131 @@
 	font-weight: 700;
 	color: var(--af-primary-700);
 }
+
+/* ── Cobranza → Facturación: guía de flujo y pipeline por cargo ─────────── */
+
+#af-cobranza-modal .af-cobranza-flow {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 8px;
+	margin: 0 0 16px;
+	padding: 0;
+	list-style: none;
+}
+
+#af-cobranza-modal .af-cobranza-flow__step {
+	position: relative;
+	display: grid;
+	grid-template-columns: 26px minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 8px;
+	padding: 10px 12px;
+	border: 1px solid var(--af-gray-200, #DCE5E3);
+	border-radius: 12px;
+	background: var(--af-gray-50, #F7F8F6);
+	opacity: 0.7;
+}
+
+#af-cobranza-modal .af-cobranza-flow__step.is-active {
+	opacity: 1;
+	background: #fff;
+	border-color: var(--af-primary-400, #3C7C88);
+}
+
+#af-cobranza-modal .af-cobranza-flow__n {
+	display: grid;
+	place-items: center;
+	width: 26px;
+	height: 26px;
+	border-radius: 50%;
+	background: var(--af-primary-500, #164A55);
+	color: #fff;
+	font-size: 12px;
+	font-weight: 800;
+}
+
+#af-cobranza-modal .af-cobranza-flow__txt { display: grid; gap: 1px; min-width: 0; }
+#af-cobranza-modal .af-cobranza-flow__txt strong { font-size: 13px; color: var(--af-gray-900, #193238); }
+#af-cobranza-modal .af-cobranza-flow__txt small { font-size: 11px; line-height: 1.3; color: var(--af-gray-500, #647579); }
+
+#af-cobranza-modal .af-cobranza-flow__count {
+	font-family: var(--af-font-numeric, ui-monospace, monospace);
+	font-size: 18px;
+	font-weight: 800;
+	color: var(--af-primary-700, #0b2f37);
+}
+
+#af-cobranza-modal .af-cobranza-flow__go {
+	grid-column: 1 / -1;
+	justify-self: start;
+	font-size: 12px;
+	font-weight: 700;
+	color: var(--af-primary-600, #0F3D47);
+	text-decoration: underline;
+}
+
+#af-cobranza-modal .af-cobranza-flow__go[hidden] { display: none; }
+
+#af-cobranza-modal .af-cobranza-pipe {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin: 6px 0 0;
+	padding: 0;
+	list-style: none;
+}
+
+#af-cobranza-modal .af-cobranza-pipe__s {
+	margin: 0;
+	padding: 2px 8px;
+	border-radius: 999px;
+	border: 1px solid var(--af-gray-200, #DCE5E3);
+	background: #fff;
+	font-size: 11px;
+	font-weight: 700;
+	color: var(--af-gray-500, #647579);
+}
+
+#af-cobranza-modal .af-cobranza-pipe__s.is-done { background: #E6F2EF; border-color: #BFDDD6; color: #1F6358; }
+#af-cobranza-modal .af-cobranza-pipe__s.is-todo { background: #FFF4E5; border-color: #F3D9AE; color: #8A5A12; }
+#af-cobranza-modal .af-cobranza-pipe__s.is-wip { background: #E8F0FE; border-color: #C3D6FA; color: #2352A8; }
+#af-cobranza-modal .af-cobranza-pipe__s.is-bad { background: #FBECEB; border-color: #F1C4C1; color: #A3322D; }
+#af-cobranza-modal .af-cobranza-pipe__s.is-locked { opacity: 0.55; }
+
+#af-cobranza-modal .af-cobranza-charge.is-paid { opacity: 1; }
+
+#af-cobranza-modal .af-cobranza-charge__actions .af-btn--primary,
+#af-cobranza-modal .af-cobranza-charge__actions .af-btn--ghost {
+	display: inline-flex;
+	align-items: center;
+	text-decoration: none;
+}
+
+/* Calendario: color de fondo según el estado del día y encabezado legible. */
+
+.af-calendar-mini__wd { font-size: 12px; color: var(--af-gray-600, #4a5c61); }
+.af-calendar-mini__day.tone-overdue { background: #FBECEB; border-color: #F1C4C1; }
+.af-calendar-mini__day.tone-pending { background: #EEF4FF; border-color: #C3D6FA; }
+.af-calendar-mini__day.tone-paid { background: #E6F2EF; border-color: #BFDDD6; }
+.af-calendar-mini__day.is-today .af-calendar-mini__day-num {
+	display: inline-grid;
+	place-items: center;
+	min-width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	background: var(--af-primary-500, #164A55);
+	color: #fff;
+}
+
+.af-calendar-mini__hint {
+	margin-left: auto;
+	font-style: italic;
+	color: var(--af-gray-500, #647579);
+}
+
+@media (max-width: 640px) {
+	#af-cobranza-modal .af-cobranza-flow { grid-template-columns: 1fr; }
+	.af-calendar-mini { gap: 3px; }
+	.af-calendar-mini__day { min-height: 48px; }
+	.af-calendar-mini__day-amt { display: none; }
+}

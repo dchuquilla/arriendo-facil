@@ -816,6 +816,9 @@
 
 .af-section__head {
 	display: flex;
+	justify-content: flex-start;
+	flex-wrap: nowrap;
+	margin-bottom: 0;
 	align-items: center;
 	gap: var(--af-space-3);
 	min-width: 0;

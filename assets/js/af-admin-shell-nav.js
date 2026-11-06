@@ -37,17 +37,63 @@
 		// Accordion: clicking a group header expands/collapses its sub-items.
 		// When the sidebar is collapsed to icons the header keeps navigating.
 		var groupLinks = document.querySelectorAll('.af-app-sidebar__group-link');
+		var groups     = document.querySelectorAll('.af-app-sidebar__group');
+		var nav        = document.querySelector('.af-app-sidebar__nav');
+		var pinned     = null;
+		var hoverTimer = null;
+		var canHover   = window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+
+		var setOpen = function (target) {
+			Array.prototype.forEach.call(groups, function (g) {
+				var open = g === target;
+				g.classList.toggle('is-open', open);
+				g.firstElementChild.setAttribute('aria-expanded', open ? 'true' : 'false');
+			});
+		};
+
+		// Estado de reposo: el grupo de la página actual (o el fijado con clic).
+		var activeGroup = document.querySelector('.af-app-sidebar__group.is-active');
+		var restore = function () {
+			setOpen(pinned || activeGroup);
+		};
+
 		Array.prototype.forEach.call(groupLinks, function (link) {
+			var group = link.parentNode;
+
+			if (canHover) {
+				// Retardo corto para no abrir grupos al cruzar el menú con el mouse.
+				group.addEventListener('mouseenter', function () {
+					if (body.classList.contains('af-sidebar-collapsed')) {
+						return;
+					}
+					clearTimeout(hoverTimer);
+					hoverTimer = setTimeout(function () {
+						setOpen(group);
+					}, 150);
+				});
+			}
+
 			link.addEventListener('click', function (event) {
 				if (body.classList.contains('af-sidebar-collapsed')) {
 					return;
 				}
 				event.preventDefault();
-				var group = link.parentNode;
-				var open  = group.classList.toggle('is-open');
-				link.setAttribute('aria-expanded', open ? 'true' : 'false');
+				clearTimeout(hoverTimer);
+				var open = !group.classList.contains('is-open') || pinned !== group;
+				pinned = open ? group : null;
+				setOpen(open ? group : activeGroup);
 			});
 		});
+
+		if (canHover && nav) {
+			nav.addEventListener('mouseleave', function () {
+				clearTimeout(hoverTimer);
+				hoverTimer = setTimeout(restore, 350);
+			});
+			nav.addEventListener('mouseenter', function () {
+				clearTimeout(hoverTimer);
+			});
+		}
 
 		// User dropdown (top bar).
 		var userMenu   = document.getElementById('af-user-menu');

@@ -295,18 +295,20 @@ if ( $is_management_model && $has_ledger ) {
 		}
 	}
 
+	// Una fila por inquilino/propiedad: suma de cargos vencidos y mora máxima.
 	$top_mora = (array) $wpdb->get_results(
-		"SELECT c.id, c.amount, c.amount_paid, c.due_date, DATEDIFF(CURDATE(), c.due_date) AS days_overdue,
+		"SELECT MAX(DATEDIFF(CURDATE(), c.due_date)) AS days_overdue,
+		        SUM(c.amount) AS amount, SUM(c.amount_paid) AS amount_paid, COUNT(*) AS charge_count,
 		        p.post_title AS accommodation_title,
-		        CONCAT(g.first_name, ' ', g.last_name) AS guest_name,
-		        l.id AS lease_id
+		        CONCAT(g.first_name, ' ', g.last_name) AS guest_name
 		 FROM {$charges_table} c
 		 LEFT JOIN {$wpdb->prefix}af_leases l ON l.id = c.lease_id
 		 LEFT JOIN {$wpdb->posts} p ON p.ID = l.accommodation_id
 		 LEFT JOIN {$wpdb->prefix}af_guests g ON g.id = c.guest_id
 		 WHERE c.status IN ('pending', 'partial', 'overdue') AND c.due_date < CURDATE(){$semaforo_scope}
+		 GROUP BY c.lease_id, c.guest_id, p.post_title, g.first_name, g.last_name
 		 ORDER BY days_overdue DESC
-		 LIMIT 6" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		 LIMIT 3" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 	);
 }
 
@@ -341,7 +343,9 @@ if ( $hour < 12 ) {
 }
 
 $first_name = $current_user->first_name ? $current_user->first_name : $current_user->display_name;
-$today_str  = wp_date( 'l, j \d\e F' );
+$af_day_names   = array( 'domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado' );
+$af_month_names = array( 1 => 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre' );
+$today_str      = ucfirst( $af_day_names[ (int) wp_date( 'w' ) ] ) . ', ' . wp_date( 'j' ) . ' de ' . $af_month_names[ (int) wp_date( 'n' ) ];
 
 // ── Video de marca en el hero (opcional, configurable por el super admin) ─
 $hero_video_url    = (string) get_option( 'af_dashboard_hero_video_url', '' );
@@ -635,42 +639,61 @@ $recent_reviews        = (array) $wpdb->get_results(
 				</div>
 			</section>
 
-			<div class="af-overview-stats">
-				<article class="af-overview-stat">
-					<span class="af-overview-stat__icon" aria-hidden="true"><?php echo af_lucide( 'credit-card', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-					<span class="af-overview-stat__body">
-						<span class="af-overview-stat__label"><?php esc_html_e( 'Por cobrar', 'arriendo-facil' ); ?></span>
-						<span class="af-overview-stat__value">$<?php echo esc_html( number_format_i18n( $period_balance, 2 ) ); ?></span>
-						<span class="af-overview-stat__hint"><?php esc_html_e( 'Saldo del periodo actual', 'arriendo-facil' ); ?></span>
-					</span>
-				</article>
-
-				<article class="af-overview-stat <?php echo $overdue_count > 0 ? 'is-danger' : 'is-ok'; ?>">
-					<span class="af-overview-stat__icon" aria-hidden="true"><?php echo af_lucide( 'circle-alert', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-					<span class="af-overview-stat__body">
-						<span class="af-overview-stat__label"><?php esc_html_e( 'En mora', 'arriendo-facil' ); ?></span>
-						<span class="af-overview-stat__value">$<?php echo esc_html( number_format_i18n( $overdue_amount, 2 ) ); ?></span>
-						<span class="af-overview-stat__hint">
-							<?php echo esc_html( sprintf( /* translators: %d: overdue charges count */ _n( '%d cargo vencido', '%d cargos vencidos', $overdue_count, 'arriendo-facil' ), $overdue_count ) ); ?>
-						</span>
-					</span>
-					<?php if ( $overdue_count > 0 ) : ?>
-						<a class="af-overview-stat__link" href="<?php echo esc_url( admin_url( 'admin.php?page=af-buildings' ) ); ?>"><?php esc_html_e( 'Gestionar', 'arriendo-facil' ); ?></a>
-					<?php endif; ?>
-				</article>
-
-				<article class="af-overview-stat <?php echo $expiring_count > 0 ? 'is-warn' : ''; ?>">
-					<span class="af-overview-stat__icon" aria-hidden="true"><?php echo af_lucide( 'calendar', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-					<span class="af-overview-stat__body">
-						<span class="af-overview-stat__label"><?php esc_html_e( 'Contratos por vencer', 'arriendo-facil' ); ?></span>
-						<span class="af-overview-stat__value"><?php echo esc_html( number_format_i18n( $expiring_count ) ); ?></span>
-						<span class="af-overview-stat__hint"><?php esc_html_e( 'En los próximos 60 días', 'arriendo-facil' ); ?></span>
-					</span>
-					<?php if ( $expiring_count > 0 ) : ?>
-						<a class="af-overview-stat__link" href="<?php echo esc_url( admin_url( 'admin.php?page=af-leases' ) ); ?>"><?php esc_html_e( 'Ver contratos', 'arriendo-facil' ); ?></a>
-					<?php endif; ?>
-				</article>
-			</div>
+			<?php
+			// Solo se muestran los pendientes reales; si no hay ninguno, un estado positivo.
+			$af_attention = array();
+			if ( $overdue_count > 0 ) {
+				$af_attention[] = array(
+					'tone'  => 'is-danger',
+					'icon'  => 'circle-alert',
+					'title' => sprintf( /* translators: %s: overdue amount */ __( '$%s en mora', 'arriendo-facil' ), number_format_i18n( $overdue_amount, 2 ) ),
+					'hint'  => sprintf( /* translators: %d: overdue charges count */ _n( '%d cargo vencido', '%d cargos vencidos', $overdue_count, 'arriendo-facil' ), $overdue_count ),
+					'url'   => admin_url( 'admin.php?page=af-buildings' ),
+				);
+			}
+			if ( $expiring_count > 0 ) {
+				$af_attention[] = array(
+					'tone'  => 'is-warn',
+					'icon'  => 'calendar',
+					'title' => sprintf( /* translators: %d: contracts count */ _n( '%d contrato por vencer', '%d contratos por vencer', $expiring_count, 'arriendo-facil' ), $expiring_count ),
+					'hint'  => __( 'En los próximos 60 días', 'arriendo-facil' ),
+					'url'   => admin_url( 'admin.php?page=af-leases' ),
+				);
+			}
+			if ( $docs_pending > 0 ) {
+				$af_attention[] = array(
+					'tone'  => 'is-warn',
+					'icon'  => 'users',
+					'title' => sprintf( /* translators: %d: tenants count */ _n( '%d inquilino con documentos pendientes', '%d inquilinos con documentos pendientes', $docs_pending, 'arriendo-facil' ), $docs_pending ),
+					'hint'  => __( 'Revisa su verificación', 'arriendo-facil' ),
+					'url'   => admin_url( 'admin.php?page=af-guests' ),
+				);
+			}
+			if ( $maintenance_open_total > 0 ) {
+				$af_attention[] = array(
+					'tone'  => $maintenance_urgent_total > 0 ? 'is-danger' : 'is-warn',
+					'icon'  => 'wrench',
+					'title' => sprintf( /* translators: %d: requests count */ _n( '%d solicitud de mantenimiento', '%d solicitudes de mantenimiento', $maintenance_open_total, 'arriendo-facil' ), $maintenance_open_total ),
+					'hint'  => $maintenance_urgent_total > 0 ? __( 'Prioridad crítica', 'arriendo-facil' ) : __( 'Acción requerida', 'arriendo-facil' ),
+					'url'   => admin_url( 'admin.php?page=af-maintenance' ),
+				);
+			}
+			?>
+			<section class="af-overview-stats af-overview-stats--attention" aria-label="<?php esc_attr_e( 'Requiere tu atención', 'arriendo-facil' ); ?>">
+				<?php if ( empty( $af_attention ) ) : ?>
+					<p class="af-attention-ok"><?php esc_html_e( 'Todo al día: no hay pendientes que requieran tu atención.', 'arriendo-facil' ); ?></p>
+				<?php else : ?>
+					<?php foreach ( $af_attention as $af_item ) : ?>
+						<a class="af-overview-stat <?php echo esc_attr( $af_item['tone'] ); ?>" href="<?php echo esc_url( $af_item['url'] ); ?>">
+							<span class="af-overview-stat__icon" aria-hidden="true"><?php echo af_lucide( $af_item['icon'], 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+							<span class="af-overview-stat__body">
+								<span class="af-overview-stat__label"><?php echo esc_html( $af_item['title'] ); ?></span>
+								<span class="af-overview-stat__hint"><?php echo esc_html( $af_item['hint'] ); ?></span>
+							</span>
+						</a>
+					<?php endforeach; ?>
+				<?php endif; ?>
+			</section>
 
 		<?php endif; ?>
 
@@ -858,6 +881,7 @@ $recent_reviews        = (array) $wpdb->get_results(
 		return function_exists( 'mb_strtoupper' ) ? mb_strtoupper( $af_letter, 'UTF-8' ) : strtoupper( $af_letter );
 	};
 	?>
+	<div class="af-split af-pair-row">
 	<section class="af-section" aria-labelledby="af-recent-leases-title">
 		<header class="af-section__header">
 			<div class="af-section__head">
@@ -957,6 +981,11 @@ $recent_reviews        = (array) $wpdb->get_results(
 		<?php endif; ?>
 	</section>
 	<?php endif; ?>
+	</div>
+
+	<?php $af_calendar_open = isset( $_GET['af_date_from'] ) || isset( $_GET['af_date_to'] ) || isset( $_GET['af_building_id'] ) || isset( $_GET['af_accommodation_id'] ) || isset( $_GET['af_admin_id'] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended ?>
+	<details class="af-collapsible"<?php echo $af_calendar_open ? ' open' : ''; ?>>
+	<summary class="af-collapsible__summary"><?php esc_html_e( 'Agenda operativa: calendario, visitas y vencimientos', 'arriendo-facil' ); ?></summary>
 
 	<section class="af-section" aria-labelledby="af-calendar-title" id="af-alerts">
 		<header class="af-section__header">
@@ -1136,6 +1165,7 @@ $recent_reviews        = (array) $wpdb->get_results(
 			</div>
 		<?php endif; ?>
 	</section>
+	</details>
 
 	<div class="af-split">
 

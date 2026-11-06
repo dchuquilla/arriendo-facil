@@ -254,6 +254,64 @@
 	text-decoration: underline;
 }
 
+/* ── Requiere tu atención: solo pendientes reales ───────────────────────── */
+
+.af-overview-stats--attention .af-overview-stat {
+	align-items: center;
+	padding: var(--af-space-3) var(--af-space-4);
+	text-decoration: none;
+}
+
+.af-overview-stats--attention .af-overview-stat__icon {
+	width: 36px;
+	height: 36px;
+}
+
+.af-overview-stats--attention .af-overview-stat__label {
+	color: var(--af-gray-900, #193238);
+	font-weight: 700;
+}
+
+.af-attention-ok {
+	grid-column: 1 / -1;
+	margin: 0;
+	padding: var(--af-space-3) var(--af-space-4);
+	border-radius: var(--af-radius-md);
+	background: var(--af-success-50, #DDEEEB);
+	color: var(--af-success-700, #1F5A52);
+	font-weight: 600;
+}
+
+/* Contratos recientes + semáforo lado a lado, columnas iguales. */
+.af-pair-row {
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+/* Agenda operativa plegable: reduce el scroll inicial. */
+.af-collapsible {
+	margin: var(--af-space-6) 0;
+}
+
+.af-collapsible__summary {
+	cursor: pointer;
+	padding: var(--af-space-3) var(--af-space-4);
+	border: 1px solid var(--af-gray-100, #EEF2F0);
+	border-radius: var(--af-radius-md);
+	background: var(--af-gray-0, #fff);
+	font-weight: 700;
+	color: var(--af-gray-900, #193238);
+}
+
+.af-collapsible[open] > .af-collapsible__summary {
+	margin-bottom: var(--af-space-4);
+}
+
+@media (max-width: 1100px) {
+	.af-pair-row {
+		grid-template-columns: 1fr;
+	}
+}
+
 /* ── Métricas operativas (chips) ────────────────────────────────────────── */
 
 .af-overview-chips {

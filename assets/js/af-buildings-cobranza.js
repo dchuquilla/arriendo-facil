@@ -166,6 +166,18 @@
 	var payStatus = document.getElementById('af-cobranza-pay-status');
 	var payCancel = document.getElementById('af-cobranza-pay-cancel');
 	var payConfirm = document.getElementById('af-cobranza-pay-confirm');
+	var payNotes = document.getElementById('af-cobranza-pay-notes');
+	var payContext = document.getElementById('af-cobranza-pay-context');
+	var payFull = document.getElementById('af-cobranza-pay-full');
+	var paySri = document.getElementById('af-cobranza-pay-sri');
+
+	/* Qué forma de pago llevará la factura SRI: efectivo = 01, el resto = 20. */
+	function updateSriHint() {
+		if (!paySri) { return; }
+		paySri.textContent = 'efectivo' === payMethod.value
+			? (T.sriCash || 'En la factura SRI: sin utilización del sistema financiero.')
+			: (T.sriBank || 'En la factura SRI: otros con utilización del sistema financiero.');
+	}
 
 	var gridEl = document.getElementById('af-cobranza-grid');
 	var attentionEl = document.querySelector('[data-cobranza-attention]');
@@ -1060,6 +1072,15 @@
 		payOutstanding.textContent = (T.outstanding || 'Saldo del cargo: %s')
 			.replace('%s', money(outstanding)) + ' ' + (T.overpayHint || '');
 		payReference.value = '';
+		if (payNotes) { payNotes.value = ''; }
+
+		var chargeRow = chargesOf(state.period).filter(function (c) { return String(c.id) === payChargeId.value; })[0];
+		var prop = currentProp();
+		payContext.textContent = (chargeRow ? chargeRow.label + (chargeRow.desc ? ' · ' + chargeRow.desc : '') + ' · ' + monthLabel(state.period) : '') +
+			(prop && prop.guest ? ' — ' + prop.guest : '');
+		payFull.textContent = (T.payFull || 'Pagar el saldo completo') + ' (' + money(outstanding) + ')';
+		payFull.setAttribute('data-amount', outstanding.toFixed(2));
+		updateSriHint();
 		hidePayStatus();
 		payPanel.hidden = false;
 		if (payPanel.scrollIntoView) {
@@ -1072,10 +1093,17 @@
 		hidePayStatus();
 	});
 
+	payFull.addEventListener('click', function () { payAmount.value = payFull.getAttribute('data-amount'); });
+	payMethod.addEventListener('change', updateSriHint);
+
 	payConfirm.addEventListener('click', function () {
 		var amount = parseFloat(payAmount.value);
 		if (!amount || amount <= 0) {
 			setPayStatus(T.amountRequired || 'Ingresa un monto mayor a cero.', 'error');
+			return;
+		}
+		if (!payDate.value || (state.today && payDate.value > state.today)) {
+			setPayStatus(T.dateInvalid || 'La fecha del pago no puede ser futura.', 'error');
 			return;
 		}
 
@@ -1087,7 +1115,8 @@
 			amount: amount,
 			payment_date: payDate.value,
 			method: payMethod.value,
-			reference: payReference.value
+			reference: payReference.value,
+			notes: payNotes ? payNotes.value : ''
 		}).then(function (json) {
 			payConfirm.disabled = false;
 			if (!json || !json.success) {

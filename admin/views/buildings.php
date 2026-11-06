@@ -403,35 +403,52 @@ $cob_alerts   = $cob_snapshot['display'];
 			<ul class="af-cobranza-charges" id="af-cobranza-charges" aria-live="polite"></ul>
 
 			<div class="af-cobranza-pay" id="af-cobranza-pay" hidden>
-				<h4 class="af-cobranza-pay__title"><?php esc_html_e( 'Registrar pago recibido', 'arriendo-facil' ); ?></h4>
+				<div class="af-cobranza-pay__head">
+					<span class="af-cobranza-pay__ico" aria-hidden="true"><?php echo af_lucide( 'wallet', 20 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+					<div>
+						<h4 class="af-cobranza-pay__title"><?php esc_html_e( 'Registrar pago recibido', 'arriendo-facil' ); ?></h4>
+						<p class="af-cobranza-pay__ctx" id="af-cobranza-pay-context"></p>
+					</div>
+				</div>
 				<p class="af-modal__status" id="af-cobranza-pay-status" style="display:none;"></p>
 				<input type="hidden" id="af-cobranza-pay-charge-id" />
-				<div class="af-modal__field">
-					<label for="af-cobranza-pay-amount"><?php esc_html_e( 'Monto recibido (USD)', 'arriendo-facil' ); ?></label>
-					<input type="number" id="af-cobranza-pay-amount" step="0.01" min="0.01" />
-					<p class="af-modal__hint" id="af-cobranza-pay-outstanding"></p>
+				<div class="af-cobranza-pay__grid">
+					<div class="af-modal__field">
+						<label for="af-cobranza-pay-amount"><?php esc_html_e( 'Monto recibido', 'arriendo-facil' ); ?></label>
+						<div class="af-cobranza-pay__money">
+							<span aria-hidden="true">$</span>
+							<input type="number" id="af-cobranza-pay-amount" step="0.01" min="0.01" inputmode="decimal" />
+						</div>
+						<button type="button" class="af-cobranza-pay__full" id="af-cobranza-pay-full"></button>
+					</div>
+					<div class="af-modal__field">
+						<label for="af-cobranza-pay-date"><?php esc_html_e( 'Fecha en que recibiste el pago', 'arriendo-facil' ); ?></label>
+						<input type="date" id="af-cobranza-pay-date" max="<?php echo esc_attr( current_time( 'Y-m-d' ) ); ?>" value="<?php echo esc_attr( current_time( 'Y-m-d' ) ); ?>" />
+					</div>
+					<div class="af-modal__field">
+						<label for="af-cobranza-pay-method"><?php esc_html_e( 'Forma de pago', 'arriendo-facil' ); ?></label>
+						<select id="af-cobranza-pay-method">
+							<?php foreach ( Arriendo_Facil_Billing_Ledger::payment_methods() as $method_key => $method_label ) : ?>
+								<option value="<?php echo esc_attr( $method_key ); ?>"><?php echo esc_html( $method_label ); ?></option>
+							<?php endforeach; ?>
+						</select>
+						<p class="af-modal__hint" id="af-cobranza-pay-sri"></p>
+					</div>
+					<div class="af-modal__field">
+						<label for="af-cobranza-pay-reference"><?php esc_html_e( 'N.º de comprobante (opcional)', 'arriendo-facil' ); ?></label>
+						<input type="text" id="af-cobranza-pay-reference" maxlength="100" placeholder="<?php esc_attr_e( 'Ej: transferencia 01234', 'arriendo-facil' ); ?>" />
+					</div>
+					<div class="af-modal__field af-cobranza-pay__wide">
+						<label for="af-cobranza-pay-notes"><?php esc_html_e( 'Nota interna (opcional)', 'arriendo-facil' ); ?></label>
+						<input type="text" id="af-cobranza-pay-notes" maxlength="200" placeholder="<?php esc_attr_e( 'Ej: pagó en dos partes', 'arriendo-facil' ); ?>" />
+					</div>
 				</div>
-				<div class="af-modal__field">
-					<label for="af-cobranza-pay-date"><?php esc_html_e( 'Fecha de pago', 'arriendo-facil' ); ?></label>
-					<input type="date" id="af-cobranza-pay-date" value="<?php echo esc_attr( current_time( 'Y-m-d' ) ); ?>" />
-				</div>
-				<div class="af-modal__field">
-					<label for="af-cobranza-pay-method"><?php esc_html_e( 'Método', 'arriendo-facil' ); ?></label>
-					<select id="af-cobranza-pay-method">
-						<?php foreach ( Arriendo_Facil_Billing_Ledger::payment_methods() as $method_key => $method_label ) : ?>
-							<option value="<?php echo esc_attr( $method_key ); ?>"><?php echo esc_html( $method_label ); ?></option>
-						<?php endforeach; ?>
-					</select>
-				</div>
-				<div class="af-modal__field">
-					<label for="af-cobranza-pay-reference"><?php esc_html_e( 'Referencia / comprobante', 'arriendo-facil' ); ?></label>
-					<input type="text" id="af-cobranza-pay-reference" placeholder="<?php esc_attr_e( 'Ej: transferencia #01234', 'arriendo-facil' ); ?>" />
-				</div>
+				<p class="af-modal__hint" id="af-cobranza-pay-outstanding"></p>
 				<div class="af-cobranza-pay__actions">
 					<button type="button" class="button" id="af-cobranza-pay-cancel"><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
 					<button type="button" class="button button-primary" id="af-cobranza-pay-confirm"><?php esc_html_e( 'Guardar pago', 'arriendo-facil' ); ?></button>
 				</div>
-				<p class="af-modal__hint"><?php esc_html_e( 'Al guardar, el cobro pasa a “Por facturar” para emitir su factura SRI.', 'arriendo-facil' ); ?></p>
+				<p class="af-cobranza-pay__next"><?php esc_html_e( 'Qué pasa al guardar: el pago queda en el historial de este cargo (visible debajo de él). Si el cargo queda saldado, pasa a “Por facturar” en Facturación para emitir su factura SRI.', 'arriendo-facil' ); ?></p>
 			</div>
 		</div>
 		<div class="af-modal__footer">

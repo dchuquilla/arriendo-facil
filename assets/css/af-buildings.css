@@ -1788,3 +1788,104 @@
 	.af-calendar-mini__day { min-height: 48px; }
 	.af-calendar-mini__day-amt { display: none; }
 }
+
+/* ── Panel de pago: tarjeta moderna ─────────────────────────────────────── */
+
+#af-cobranza-modal .af-cobranza-pay {
+	margin-top: 18px;
+	padding: 18px;
+	background: #fff;
+	border: 1px solid var(--af-gray-200, #DCE5E3);
+	border-top: 4px solid var(--af-primary-500, #164A55);
+	border-radius: 16px;
+	box-shadow: 0 14px 30px -18px rgba(15, 23, 42, 0.4);
+}
+
+#af-cobranza-modal .af-cobranza-pay[hidden] { display: none; }
+
+#af-cobranza-modal .af-cobranza-pay__head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+
+#af-cobranza-modal .af-cobranza-pay__ico {
+	display: grid;
+	place-items: center;
+	flex: none;
+	width: 40px;
+	height: 40px;
+	border-radius: 12px;
+	background: var(--af-primary-50, #DDEEEB);
+	color: var(--af-primary-600, #0F3D47);
+}
+
+#af-cobranza-modal .af-cobranza-pay__title { margin: 0; font-size: 16px; }
+#af-cobranza-modal .af-cobranza-pay__ctx { margin: 2px 0 0; font-size: 12.5px; color: var(--af-gray-600, #4a5c61); }
+
+#af-cobranza-modal .af-cobranza-pay__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+#af-cobranza-modal .af-cobranza-pay__wide { grid-column: 1 / -1; }
+
+#af-cobranza-modal .af-cobranza-pay .af-modal__field label { font-size: 12px; font-weight: 700; color: var(--af-gray-700, #2e4046); }
+
+#af-cobranza-modal .af-cobranza-pay input[type="text"],
+#af-cobranza-modal .af-cobranza-pay input[type="date"],
+#af-cobranza-modal .af-cobranza-pay select {
+	width: 100%;
+	min-height: 42px;
+	box-sizing: border-box;
+	border: 1px solid var(--af-gray-300, #C3D1CE);
+	border-radius: 10px;
+	padding: 0 12px;
+	background: #fff;
+}
+
+#af-cobranza-modal .af-cobranza-pay__money {
+	display: flex;
+	align-items: center;
+	border: 1px solid var(--af-gray-300, #C3D1CE);
+	border-radius: 10px;
+	background: #fff;
+	padding-left: 12px;
+	font-weight: 800;
+	color: var(--af-gray-600, #4a5c61);
+}
+
+#af-cobranza-modal .af-cobranza-pay__money:focus-within {
+	border-color: var(--af-primary-500, #164A55);
+	box-shadow: 0 0 0 3px var(--af-primary-100, #DDEEEB);
+}
+
+#af-cobranza-modal .af-cobranza-pay__money input {
+	flex: 1;
+	min-height: 42px;
+	border: 0 !important;
+	box-shadow: none !important;
+	background: transparent !important;
+	font-size: 20px;
+	font-weight: 800;
+	color: var(--af-gray-900, #193238);
+}
+
+#af-cobranza-modal .af-cobranza-pay__full {
+	justify-self: start;
+	margin-top: 6px;
+	padding: 3px 10px;
+	border: 1px solid var(--af-primary-200, #9CC3C0);
+	border-radius: 999px;
+	background: var(--af-primary-50, #DDEEEB);
+	color: var(--af-primary-700, #0b2f37);
+	font-size: 12px;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+#af-cobranza-modal .af-cobranza-pay__next {
+	margin: 14px 0 0;
+	padding: 10px 12px;
+	border-radius: 10px;
+	background: var(--af-gray-50, #F7F8F6);
+	font-size: 12px;
+	line-height: 1.45;
+	color: var(--af-gray-600, #4a5c61);
+}
+
+@media (max-width: 560px) {
+	#af-cobranza-modal .af-cobranza-pay__grid { grid-template-columns: 1fr; }
+}

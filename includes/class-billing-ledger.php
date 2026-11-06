@@ -1332,7 +1332,7 @@ class Arriendo_Facil_Billing_Ledger {
 		return array(
 			'transferencia' => __( 'Transferencia', 'arriendo-facil' ),
 			'efectivo'      => __( 'Efectivo', 'arriendo-facil' ),
-			'deposito'      => __( 'Deposito', 'arriendo-facil' ),
+			'deposito'      => __( 'Depósito', 'arriendo-facil' ),
 			'cheque'        => __( 'Cheque', 'arriendo-facil' ),
 			'otro'          => __( 'Otro', 'arriendo-facil' ),
 		);
@@ -1434,7 +1434,10 @@ class Arriendo_Facil_Billing_Ledger {
 			$method = 'otro';
 		}
 
-		$payment_date = isset( $data['payment_date'] ) ? sanitize_text_field( (string) $data['payment_date'] ) : gmdate( 'Y-m-d' );
+		$payment_date = isset( $data['payment_date'] ) ? sanitize_text_field( (string) $data['payment_date'] ) : current_time( 'Y-m-d' );
+		if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $payment_date ) || $payment_date > current_time( 'Y-m-d' ) ) {
+			return new WP_Error( 'af_payment_date_invalid', __( 'La fecha del pago no es válida o es futura.', 'arriendo-facil' ) );
+		}
 
 		$inserted = $wpdb->insert(
 			self::payments_table(),

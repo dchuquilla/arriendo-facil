@@ -1,6 +1,9 @@
 <?php
 /**
- * Reviews admin page view.
+ * Calificación de inquilinos — vista del panel.
+ *
+ * Enfoque: reputación interna y privada. El gestor evalúa a cada inquilino
+ * (y el super-admin evalúa a los gestores) para decidir renovaciones.
  *
  * @package Arriendo_Facil
  */
@@ -11,79 +14,63 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 global $wpdb;
 
-$is_owner          = Arriendo_Facil_Accommodation::user_is_owner();
-$review_table      = $wpdb->prefix . 'af_reviews';
-$groups_table      = $wpdb->prefix . 'af_review_groups';
-$posts_table       = $wpdb->posts;
-$directions_map    = class_exists( 'Arriendo_Facil_Review' ) ? Arriendo_Facil_Review::review_directions() : array();
-$direction_filter  = isset( $_GET['direction'] ) ? sanitize_key( wp_unslash( $_GET['direction'] ) ) : '';
+$is_owner            = Arriendo_Facil_Accommodation::user_is_owner();
+$is_management_model = ! ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES );
+$is_super_admin      = current_user_can( 'manage_options' );
+$can_rate            = current_user_can( Arriendo_Facil_Tenancy::CAP );
 
+$review_table   = $wpdb->prefix . 'af_reviews';
+$groups_table   = $wpdb->prefix . 'af_review_groups';
+$directions_map = Arriendo_Facil_Review::review_directions();
+$criteria_map   = Arriendo_Facil_Review::owner_to_tenant_criteria();
+$admin_criteria = Arriendo_Facil_Review::admin_criteria();
+
+$direction_filter = isset( $_GET['direction'] ) ? sanitize_key( wp_unslash( $_GET['direction'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+
+// ── Alcance de datos ────────────────────────────────────────────────────────
 $where_clauses = array( 'r.status = %s' );
 $where_args    = array( 'completed' );
 
-if ( $is_owner ) {
-	$owner_ids = Arriendo_Facil_Accommodation::get_owner_accommodation_ids( get_current_user_id() );
-	if ( empty( $owner_ids ) ) {
-		$owner_ids = array( 0 );
+if ( $is_management_model ) {
+	$where_clauses[] = 'r.review_direction = %s';
+	$where_args[]    = 'owner_to_tenant';
+	$accessible_ids  = Arriendo_Facil_Tenancy::accessible_accommodation_ids();
+	$scope_ids       = $accessible_ids;
+} else {
+	if ( '' !== $direction_filter ) {
+		$where_clauses[] = 'r.review_direction = %s';
+		$where_args[]    = $direction_filter;
 	}
-	$ids_sql = implode( ',', array_map( 'intval', $owner_ids ) );
-	$where_clauses[] = "r.accommodation_id IN ({$ids_sql})";
+	$scope_ids = $is_owner ? Arriendo_Facil_Accommodation::get_owner_accommodation_ids( get_current_user_id() ) : null;
 }
 
-if ( '' !== $direction_filter ) {
-	$where_clauses[] = 'r.review_direction = %s';
-	$where_args[]    = $direction_filter;
+if ( null !== $scope_ids ) {
+	$scope_ids       = empty( $scope_ids ) ? array( 0 ) : $scope_ids;
+	$where_clauses[] = 'r.accommodation_id IN (' . implode( ',', array_map( 'intval', $scope_ids ) ) . ')';
 }
 
 $where_sql = implode( ' AND ', $where_clauses );
 
-$summary_query = "
-	SELECT
-		COUNT(*) AS total_reviews,
-		AVG(r.stars) AS avg_stars,
-		SUM(CASE WHEN r.stars >= 4 THEN 1 ELSE 0 END) AS positive_reviews
-	FROM {$review_table} r
-	WHERE {$where_sql}
-";
+$rows = (array) $wpdb->get_results(
+	$wpdb->prepare(
+		"SELECT r.*, p.post_title AS accommodation_title,
+		        l.start_date, l.end_date,
+		        CONCAT(g.first_name, ' ', g.last_name) AS guest_name
+		 FROM {$review_table} r
+		 LEFT JOIN {$wpdb->posts} p ON p.ID = r.accommodation_id
+		 LEFT JOIN {$wpdb->prefix}af_leases l ON l.id = r.lease_id
+		 LEFT JOIN {$wpdb->prefix}af_guests g ON g.id = l.guest_id
+		 WHERE {$where_sql}
+		 ORDER BY r.submitted_at DESC
+		 LIMIT 300", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$where_args
+	)
+);
 
-$summary = $wpdb->get_row( $wpdb->prepare( $summary_query, $where_args ) );
-$total_reviews    = isset( $summary->total_reviews ) ? (int) $summary->total_reviews : 0;
-$avg_stars        = isset( $summary->avg_stars ) ? (float) $summary->avg_stars : 0.0;
-$positive_reviews = isset( $summary->positive_reviews ) ? (int) $summary->positive_reviews : 0;
-$positive_rate    = $total_reviews > 0 ? ( $positive_reviews / $total_reviews ) * 100 : 0;
-
-$list_query = "
-	SELECT
-		r.id,
-		r.lease_id,
-		r.accommodation_id,
-		r.review_direction,
-		r.stars,
-		r.criteria_scores,
-		r.submitted_at,
-		r.tenant_email,
-		r.owner_user_id,
-		p.post_title AS accommodation_title,
-		g.reviewer_type
-	FROM {$review_table} r
-	LEFT JOIN {$posts_table} p ON p.ID = r.accommodation_id
-	LEFT JOIN {$groups_table} g ON g.id = r.review_group_id
-	WHERE {$where_sql}
-	ORDER BY r.submitted_at DESC
-	LIMIT 150
-";
-
-$rows = $wpdb->get_results( $wpdb->prepare( $list_query, $where_args ) );
-
-$is_management_model = ! ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES );
-$criteria_labels     = Arriendo_Facil_Review::owner_to_tenant_criteria();
-
-// Contratos vigentes o terminados que aún no tienen calificación del administrador.
+// ── Contratos pendientes de calificar ───────────────────────────────────────
 $pending_leases = array();
 if ( $is_management_model ) {
-	$accessible_ids = Arriendo_Facil_Tenancy::accessible_accommodation_ids();
-	$scope_clause    = null === $accessible_ids ? '' : ' AND l.accommodation_id IN (' . Arriendo_Facil_Tenancy::ids_in_clause( $accessible_ids ) . ')';
-
+	$scope_clause   = null === $scope_ids ? '' : ' AND l.accommodation_id IN (' . Arriendo_Facil_Tenancy::ids_in_clause( $scope_ids ) . ')';
 	$pending_leases = (array) $wpdb->get_results(
 		"SELECT l.id, l.start_date, l.end_date, l.status,
 		        p.post_title AS accommodation_title,
@@ -98,49 +85,47 @@ if ( $is_management_model ) {
 		 WHERE l.deleted_at IS NULL
 		   AND l.status IN ('active', 'terminated')
 		   AND r.id IS NULL{$scope_clause}
-		 ORDER BY l.end_date ASC
+		 ORDER BY (l.status = 'terminated') DESC, l.end_date ASC
 		 LIMIT 100" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 	);
 }
 
-// Evaluación del super-admin hacia los administradores de propiedades.
+// ── Evaluación de gestores (super-admin) / mi evaluación (gestor) ───────────
+$admins                = array();
 $admin_evaluations     = array();
 $admin_property_counts = array();
-$admins                = array();
-$my_evaluation     = null;
-if ( function_exists( 'current_user_can' ) && current_user_can( 'manage_options' ) ) {
-	$admins = class_exists( 'Arriendo_Facil_Tenancy' ) ? Arriendo_Facil_Tenancy::get_property_admins() : array();
+$my_evaluation         = null;
 
-	$evaluated_admin_ids = array_map( 'absint', wp_list_pluck( (array) $admins, 'ID' ) );
-	foreach ( $evaluated_admin_ids as $evaluated_admin_id ) {
-		$admin_evaluations[ $evaluated_admin_id ] = null;
-	}
-	if ( ! empty( $evaluated_admin_ids ) ) {
+if ( $is_management_model && $is_super_admin ) {
+	$admins    = (array) Arriendo_Facil_Tenancy::get_property_admins();
+	$admin_ids = array_map( 'absint', wp_list_pluck( $admins, 'ID' ) );
+
+	if ( ! empty( $admin_ids ) ) {
+		$admin_ids_sql   = implode( ',', $admin_ids );
 		$evaluation_rows = (array) $wpdb->get_results(
-			"SELECT id, admin_user_id, stars, criteria_scores, comment_text, reviewer_user_id, updated_at
+			"SELECT id, admin_user_id, stars, criteria_scores, comment_text, updated_at
 			 FROM {$wpdb->prefix}af_admin_reviews
-			 WHERE admin_user_id IN (" . implode( ',', $evaluated_admin_ids ) . ')' // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			 WHERE admin_user_id IN ({$admin_ids_sql})" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		);
 		foreach ( $evaluation_rows as $evaluation_row ) {
 			$admin_evaluations[ (int) $evaluation_row->admin_user_id ] = $evaluation_row;
 		}
 
-		$admin_meta_in = "'" . implode( "','", $evaluated_admin_ids ) . "'";
-		$property_count_rows = (array) $wpdb->get_results(
+		$count_rows = (array) $wpdb->get_results(
 			"SELECT pm.meta_value AS owner_id, COUNT(DISTINCT p.ID) AS total
 			 FROM {$wpdb->postmeta} pm
 			 INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id AND p.post_type = 'accommodation' AND p.post_status NOT IN ('trash','auto-draft')
-			 WHERE pm.meta_key = '_af_owner_id' AND pm.meta_value IN ({$admin_meta_in})
+			 WHERE pm.meta_key = '_af_owner_id' AND pm.meta_value IN ('" . implode( "','", $admin_ids ) . "')
 			 GROUP BY pm.meta_value" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		);
-		foreach ( $property_count_rows as $property_count_row ) {
-			$admin_property_counts[ (int) $property_count_row->owner_id ] = (int) $property_count_row->total;
+		foreach ( $count_rows as $count_row ) {
+			$admin_property_counts[ (int) $count_row->owner_id ] = (int) $count_row->total;
 		}
 	}
-} elseif ( class_exists( 'Arriendo_Facil_Tenancy' ) && in_array( 'af_property_admin', (array) wp_get_current_user()->roles, true ) ) {
+} elseif ( $is_management_model && in_array( 'af_property_admin', (array) wp_get_current_user()->roles, true ) ) {
 	$my_evaluation = $wpdb->get_row(
 		$wpdb->prepare(
-			"SELECT id, stars, criteria_scores, comment_text, reviewer_user_id, updated_at
+			"SELECT id, stars, criteria_scores, comment_text, updated_at
 			 FROM {$wpdb->prefix}af_admin_reviews
 			 WHERE admin_user_id = %d
 			 LIMIT 1",
@@ -148,614 +133,592 @@ if ( function_exists( 'current_user_can' ) && current_user_can( 'manage_options'
 		)
 	);
 }
+
+// ── Helpers de presentación ─────────────────────────────────────────────────
+$tone_for = static function ( $score ) {
+	if ( $score <= 0 ) {
+		return 'none';
+	}
+	return $score >= 4 ? 'good' : ( $score >= 3 ? 'mid' : 'bad' );
+};
+
+$verdict_for = static function ( $score ) {
+	if ( $score <= 0 ) {
+		return '';
+	}
+	if ( $score >= 4.5 ) {
+		return __( 'Excelente', 'arriendo-facil' );
+	}
+	if ( $score >= 3.5 ) {
+		return __( 'Muy bueno', 'arriendo-facil' );
+	}
+	if ( $score >= 2.5 ) {
+		return __( 'Regular', 'arriendo-facil' );
+	}
+	return __( 'Requiere atención', 'arriendo-facil' );
+};
+
+$initials_for = static function ( $name ) {
+	$parts = preg_split( '/\s+/', trim( (string) $name ), -1, PREG_SPLIT_NO_EMPTY );
+	if ( empty( $parts ) ) {
+		return '?';
+	}
+	$first = function_exists( 'mb_substr' ) ? mb_substr( $parts[0], 0, 1 ) : substr( $parts[0], 0, 1 );
+	$last  = count( $parts ) > 1 ? ( function_exists( 'mb_substr' ) ? mb_substr( end( $parts ), 0, 1 ) : substr( end( $parts ), 0, 1 ) ) : '';
+	return strtoupper( $first . $last );
+};
+
+$format_date = static function ( $date, $is_gmt = false ) {
+	if ( empty( $date ) || '0000-00-00' === substr( (string) $date, 0, 10 ) ) {
+		return '—';
+	}
+	$ts = strtotime( (string) $date . ( $is_gmt ? ' UTC' : '' ) );
+	return $ts ? wp_date( 'j M Y', $ts ) : '—';
+};
+
+$scores_of = static function ( $json ) {
+	$decoded = ! empty( $json ) ? json_decode( (string) $json, true ) : array();
+	return is_array( $decoded ) ? $decoded : array();
+};
+
+// Promedio preciso: de los criterios si existen, si no de las estrellas guardadas.
+$score_of_row = static function ( $row, array $criteria ) use ( $scores_of ) {
+	$scores = $scores_of( isset( $row->criteria_scores ) ? $row->criteria_scores : '' );
+	$values = array();
+	foreach ( array_keys( $criteria ) as $key ) {
+		if ( isset( $scores[ $key ] ) && (int) $scores[ $key ] > 0 ) {
+			$values[] = (int) $scores[ $key ];
+		}
+	}
+	return empty( $values ) ? (float) $row->stars : array_sum( $values ) / count( $values );
+};
+
+// ── Agregados ───────────────────────────────────────────────────────────────
+$total_reviews = count( $rows );
+$sum_scores    = 0.0;
+$distribution  = array( 5 => 0, 4 => 0, 3 => 0, 2 => 0, 1 => 0 );
+$criteria_sum  = array_fill_keys( array_keys( $criteria_map ), 0 );
+$criteria_n    = array_fill_keys( array_keys( $criteria_map ), 0 );
+$tone_counts   = array( 'good' => 0, 'mid' => 0, 'bad' => 0, 'none' => 0 );
+
+foreach ( $rows as $row ) {
+	$row->_score = $score_of_row( $row, $criteria_map );
+	$sum_scores += $row->_score;
+	$bucket      = max( 1, min( 5, (int) round( $row->_score ) ) );
+	++$distribution[ $bucket ];
+	++$tone_counts[ $tone_for( $row->_score ) ];
+
+	$row_scores = $scores_of( $row->criteria_scores );
+	foreach ( array_keys( $criteria_map ) as $key ) {
+		if ( isset( $row_scores[ $key ] ) && (int) $row_scores[ $key ] > 0 ) {
+			$criteria_sum[ $key ] += (int) $row_scores[ $key ];
+			++$criteria_n[ $key ];
+		}
+	}
+}
+
+$avg_score      = $total_reviews > 0 ? $sum_scores / $total_reviews : 0.0;
+$positive_rate  = $total_reviews > 0 ? round( 100 * $tone_counts['good'] / $total_reviews ) : 0;
+$pending_count  = count( $pending_leases );
+$overdue_leases = 0;
+foreach ( $pending_leases as $pl ) {
+	if ( 'terminated' === $pl->status ) {
+		++$overdue_leases;
+	}
+}
+
+$show_managers_tab = $is_management_model && ! empty( $admins );
+$default_tab       = $pending_count > 0 ? 'pending' : 'rated';
+if ( ! $is_management_model ) {
+	$default_tab = 'rated';
+}
+
+$config = array(
+	'ajaxUrl'  => admin_url( 'admin-ajax.php' ),
+	'tenant'   => array(
+		'action'   => 'af_rate_tenant',
+		'nonce'    => wp_create_nonce( 'af_rate_tenant_nonce' ),
+		'idField'  => 'lease_id',
+		'criteria' => $criteria_map,
+		'hints'    => array(
+			'puntualidad_pago' => __( 'Pagos a tiempo y sin recordatorios', 'arriendo-facil' ),
+			'cuidado_inmueble' => __( 'Estado del inmueble y sus bienes', 'arriendo-facil' ),
+			'convivencia'      => __( 'Trato con vecinos y respeto de normas', 'arriendo-facil' ),
+			'comunicacion'     => __( 'Respuesta rápida y trato cordial', 'arriendo-facil' ),
+		),
+		'title'    => __( 'Calificar inquilino', 'arriendo-facil' ),
+		'save'     => __( 'Guardar calificación', 'arriendo-facil' ),
+		'placeholder' => __( 'Ej: pagó puntual todo el contrato y entregó el inmueble en buen estado.', 'arriendo-facil' ),
+	),
+	'admin'    => array(
+		'action'   => 'af_rate_admin',
+		'nonce'    => wp_create_nonce( 'af_rate_admin_nonce' ),
+		'idField'  => 'admin_user_id',
+		'criteria' => $admin_criteria,
+		'hints'    => array(),
+		'title'    => __( 'Evaluar gestor', 'arriendo-facil' ),
+		'save'     => __( 'Guardar evaluación', 'arriendo-facil' ),
+		'placeholder' => __( 'Ej: gestiona la cobranza puntualmente y responde rápido.', 'arriendo-facil' ),
+	),
+	'labels'   => array(
+		1          => __( 'Deficiente', 'arriendo-facil' ),
+		2          => __( 'Regular', 'arriendo-facil' ),
+		3          => __( 'Bueno', 'arriendo-facil' ),
+		4          => __( 'Muy bueno', 'arriendo-facil' ),
+		5          => __( 'Excelente', 'arriendo-facil' ),
+		'overall'  => __( 'Calificación general', 'arriendo-facil' ),
+		'pick'     => __( 'Califica los 4 criterios', 'arriendo-facil' ),
+		'missing'  => __( 'Falta calificar: %s', 'arriendo-facil' ),
+		'suggest'  => __( 'Sugerencia del historial de cobranza', 'arriendo-facil' ),
+		'applied'  => __( 'Aplicada a "Puntualidad de pago"', 'arriendo-facil' ),
+		'apply'    => __( 'Aplicar', 'arriendo-facil' ),
+		'saving'   => __( 'Guardando…', 'arriendo-facil' ),
+		'error'    => __( 'No se pudo guardar. Inténtalo de nuevo.', 'arriendo-facil' ),
+		'noMatch'  => __( 'Ningún resultado coincide con tu búsqueda.', 'arriendo-facil' ),
+	),
+);
 ?>
 <div class="wrap af-shell af-reviews-page">
 
 	<?php
 	af_page_header(
 		array(
-			'eyebrow'  => __( 'Reputación', 'arriendo-facil' ),
+			'eyebrow'  => __( 'Reputación · Privado', 'arriendo-facil' ),
 			'title'    => __( 'Calificación de inquilinos', 'arriendo-facil' ),
-			'subtitle' => __( 'Evalúa el comportamiento de cada inquilino: pago, cuidado del inmueble, convivencia y comunicación.', 'arriendo-facil' ),
+			'subtitle' => __( 'Tu historial interno de cada inquilino: puntualidad, cuidado del inmueble, convivencia y comunicación. Solo lo ves tú y te ayuda a decidir renovaciones.', 'arriendo-facil' ),
 		)
 	);
 	?>
 
-	<?php if ( $is_management_model && ! empty( $pending_leases ) ) : ?>
-		<section class="af-section" style="margin-bottom: var(--af-space-4);">
-			<header class="af-section__header">
-				<div>
-					<h2 class="af-section__title"><?php esc_html_e( 'Pendientes de calificar', 'arriendo-facil' ); ?></h2>
-					<p class="af-section__subtitle"><?php esc_html_e( 'La puntualidad de pago se sugiere automáticamente desde el historial de cobranza.', 'arriendo-facil' ); ?></p>
-				</div>
-			</header>
+	<?php if ( ! $is_management_model ) : ?>
+		<form method="get" class="af-rv-legacy-filter">
+			<input type="hidden" name="page" value="af-reviews" />
+			<label>
+				<span><?php esc_html_e( 'Dirección', 'arriendo-facil' ); ?></span>
+				<select name="direction">
+					<option value=""><?php esc_html_e( 'Todas', 'arriendo-facil' ); ?></option>
+					<?php foreach ( $directions_map as $key => $label ) : ?>
+						<option value="<?php echo esc_attr( $key ); ?>" <?php selected( $direction_filter, $key ); ?>><?php echo esc_html( $label ); ?></option>
+					<?php endforeach; ?>
+				</select>
+			</label>
+			<button type="submit" class="button af-btn af-btn--primary"><?php esc_html_e( 'Filtrar', 'arriendo-facil' ); ?></button>
+			<a class="button af-btn af-btn--ghost" href="<?php echo esc_url( admin_url( 'admin.php?page=af-reviews' ) ); ?>"><?php esc_html_e( 'Limpiar', 'arriendo-facil' ); ?></a>
+		</form>
+	<?php endif; ?>
 
-			<table class="wp-list-table widefat fixed striped af-data-table">
-				<thead>
-					<tr>
-						<th><?php esc_html_e( 'Inmueble', 'arriendo-facil' ); ?></th>
-						<th><?php esc_html_e( 'Inquilino', 'arriendo-facil' ); ?></th>
-						<th><?php esc_html_e( 'Vigencia', 'arriendo-facil' ); ?></th>
-						<th><?php esc_html_e( 'Historial de pago', 'arriendo-facil' ); ?></th>
-						<th><?php esc_html_e( 'Acción', 'arriendo-facil' ); ?></th>
-					</tr>
-				</thead>
-				<tbody>
+	<!-- ── Resumen ───────────────────────────────────────────────────────── -->
+	<section class="af-rv-summary" aria-label="<?php esc_attr_e( 'Resumen de calificaciones', 'arriendo-facil' ); ?>">
+
+		<div class="af-rv-card af-rv-overall">
+			<span class="af-rv-eyebrow"><?php esc_html_e( 'Promedio de tus inquilinos', 'arriendo-facil' ); ?></span>
+			<?php if ( $total_reviews > 0 ) : ?>
+				<div class="af-rv-overall__main">
+					<strong class="af-rv-overall__value"><?php echo esc_html( number_format_i18n( $avg_score, 1 ) ); ?></strong>
+					<div>
+						<span class="af-rv-stars" style="--pct: <?php echo esc_attr( round( $avg_score / 5 * 100 ) ); ?>%" aria-hidden="true"></span>
+						<p class="af-rv-overall__verdict"><?php echo esc_html( $verdict_for( $avg_score ) ); ?> · <?php echo esc_html( sprintf( /* translators: %s: number of ratings */ _n( '%s calificación', '%s calificaciones', $total_reviews, 'arriendo-facil' ), number_format_i18n( $total_reviews ) ) ); ?></p>
+					</div>
+				</div>
+				<ul class="af-rv-dist" aria-label="<?php esc_attr_e( 'Distribución de estrellas', 'arriendo-facil' ); ?>">
+					<?php foreach ( $distribution as $star => $count ) : ?>
+						<li>
+							<span class="af-rv-dist__label"><?php echo esc_html( $star ); ?>★</span>
+							<span class="af-rv-dist__bar"><span style="width: <?php echo esc_attr( round( 100 * $count / $total_reviews ) ); ?>%"></span></span>
+							<span class="af-rv-dist__count"><?php echo esc_html( $count ); ?></span>
+						</li>
+					<?php endforeach; ?>
+				</ul>
+			<?php else : ?>
+				<p class="af-rv-muted"><?php esc_html_e( 'Aún no hay calificaciones. Cuando califiques a tu primer inquilino verás aquí su promedio y distribución.', 'arriendo-facil' ); ?></p>
+			<?php endif; ?>
+		</div>
+
+		<div class="af-rv-card af-rv-criteria">
+			<span class="af-rv-eyebrow"><?php esc_html_e( 'Qué evalúas mejor y peor', 'arriendo-facil' ); ?></span>
+			<?php if ( $total_reviews > 0 ) : ?>
+				<ul>
+					<?php foreach ( $criteria_map as $key => $label ) : ?>
+						<?php
+						$crit_avg  = $criteria_n[ $key ] > 0 ? $criteria_sum[ $key ] / $criteria_n[ $key ] : 0;
+						$crit_tone = $tone_for( $crit_avg );
+						?>
+						<li>
+							<div class="af-rv-criteria__row">
+								<span><?php echo esc_html( $label ); ?></span>
+								<strong><?php echo esc_html( $crit_avg > 0 ? number_format_i18n( $crit_avg, 1 ) : '—' ); ?></strong>
+							</div>
+							<span class="af-rv-meter af-rv-tone--<?php echo esc_attr( $crit_tone ); ?>"><span style="width: <?php echo esc_attr( round( $crit_avg / 5 * 100 ) ); ?>%"></span></span>
+						</li>
+					<?php endforeach; ?>
+				</ul>
+			<?php else : ?>
+				<p class="af-rv-muted"><?php esc_html_e( 'Se mostrará el promedio por criterio.', 'arriendo-facil' ); ?></p>
+			<?php endif; ?>
+		</div>
+
+		<div class="af-rv-card af-rv-stats">
+			<button type="button" class="af-rv-stat <?php echo $pending_count > 0 ? 'is-alert' : ''; ?>" data-rv-goto="pending"<?php echo $is_management_model ? '' : ' hidden'; ?>>
+				<span class="af-rv-stat__value"><?php echo esc_html( number_format_i18n( $pending_count ) ); ?></span>
+				<span class="af-rv-stat__label"><?php esc_html_e( 'Por calificar', 'arriendo-facil' ); ?></span>
+				<?php if ( $overdue_leases > 0 ) : ?>
+					<span class="af-rv-stat__hint"><?php echo esc_html( sprintf( /* translators: %d: number of finished leases */ _n( '%d con contrato terminado', '%d con contrato terminado', $overdue_leases, 'arriendo-facil' ), $overdue_leases ) ); ?></span>
+				<?php endif; ?>
+			</button>
+			<button type="button" class="af-rv-stat" data-rv-goto="rated">
+				<span class="af-rv-stat__value"><?php echo esc_html( number_format_i18n( $total_reviews ) ); ?></span>
+				<span class="af-rv-stat__label"><?php esc_html_e( 'Calificados', 'arriendo-facil' ); ?></span>
+			</button>
+			<div class="af-rv-stat af-rv-stat--static af-rv-tone--<?php echo esc_attr( $positive_rate >= 80 ? 'good' : ( $positive_rate >= 60 ? 'mid' : ( $total_reviews > 0 ? 'bad' : 'none' ) ) ); ?>">
+				<span class="af-rv-stat__value"><?php echo esc_html( $total_reviews > 0 ? $positive_rate . '%' : '—' ); ?></span>
+				<span class="af-rv-stat__label"><?php esc_html_e( 'Inquilinos 4★ o más', 'arriendo-facil' ); ?></span>
+			</div>
+		</div>
+	</section>
+
+	<!-- ── Barra de herramientas ─────────────────────────────────────────── -->
+	<div class="af-rv-toolbar">
+		<div class="af-rv-tabs" role="tablist">
+			<?php if ( $is_management_model ) : ?>
+				<button type="button" role="tab" class="af-rv-tab" data-rv-tab="pending" aria-selected="false">
+					<?php esc_html_e( 'Por calificar', 'arriendo-facil' ); ?>
+					<span class="af-rv-tab__count<?php echo $pending_count > 0 ? ' is-alert' : ''; ?>"><?php echo esc_html( $pending_count ); ?></span>
+				</button>
+			<?php endif; ?>
+			<button type="button" role="tab" class="af-rv-tab" data-rv-tab="rated" aria-selected="false">
+				<?php esc_html_e( 'Calificados', 'arriendo-facil' ); ?>
+				<span class="af-rv-tab__count"><?php echo esc_html( $total_reviews ); ?></span>
+			</button>
+			<?php if ( $show_managers_tab ) : ?>
+				<button type="button" role="tab" class="af-rv-tab" data-rv-tab="managers" aria-selected="false">
+					<?php esc_html_e( 'Gestores', 'arriendo-facil' ); ?>
+					<span class="af-rv-tab__count"><?php echo esc_html( count( $admins ) ); ?></span>
+				</button>
+			<?php elseif ( $my_evaluation ) : ?>
+				<button type="button" role="tab" class="af-rv-tab" data-rv-tab="mine" aria-selected="false"><?php esc_html_e( 'Mi evaluación', 'arriendo-facil' ); ?></button>
+			<?php endif; ?>
+		</div>
+
+		<div class="af-rv-toolbar__tools">
+			<div class="af-rv-chips" data-rv-chips="rated" hidden>
+				<button type="button" class="af-rv-chip is-active" data-rv-filter=""><?php esc_html_e( 'Todos', 'arriendo-facil' ); ?></button>
+				<button type="button" class="af-rv-chip" data-rv-filter="good"><?php esc_html_e( 'Positivos', 'arriendo-facil' ); ?> <em><?php echo esc_html( $tone_counts['good'] ); ?></em></button>
+				<button type="button" class="af-rv-chip" data-rv-filter="mid"><?php esc_html_e( 'Regulares', 'arriendo-facil' ); ?> <em><?php echo esc_html( $tone_counts['mid'] ); ?></em></button>
+				<button type="button" class="af-rv-chip" data-rv-filter="bad"><?php esc_html_e( 'Atención', 'arriendo-facil' ); ?> <em><?php echo esc_html( $tone_counts['bad'] ); ?></em></button>
+			</div>
+			<label class="af-rv-search">
+				<span class="screen-reader-text"><?php esc_html_e( 'Buscar', 'arriendo-facil' ); ?></span>
+				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+				<input type="search" id="af-rv-search" placeholder="<?php esc_attr_e( 'Buscar inquilino o inmueble…', 'arriendo-facil' ); ?>" autocomplete="off" />
+			</label>
+		</div>
+	</div>
+
+	<!-- ── Panel: por calificar ──────────────────────────────────────────── -->
+	<?php if ( $is_management_model ) : ?>
+		<section class="af-rv-panel" data-rv-panel="pending" hidden>
+			<?php if ( empty( $pending_leases ) ) : ?>
+				<div class="af-rv-empty">
+					<span class="af-rv-empty__icon" aria-hidden="true">✓</span>
+					<h3><?php esc_html_e( '¡Todo al día!', 'arriendo-facil' ); ?></h3>
+					<p><?php esc_html_e( 'No tienes inquilinos pendientes de calificar. Los nuevos contratos activos aparecerán aquí.', 'arriendo-facil' ); ?></p>
+				</div>
+			<?php else : ?>
+				<div class="af-rv-grid">
 					<?php foreach ( $pending_leases as $pending_lease ) : ?>
-						<?php $payment_hint = Arriendo_Facil_Review::suggest_payment_score( (int) $pending_lease->id ); ?>
-						<tr>
-							<td data-label="<?php esc_attr_e( 'Inmueble', 'arriendo-facil' ); ?>"><?php echo esc_html( $pending_lease->accommodation_title ? $pending_lease->accommodation_title : '—' ); ?></td>
-							<td data-label="<?php esc_attr_e( 'Inquilino', 'arriendo-facil' ); ?>"><strong><?php echo esc_html( trim( (string) $pending_lease->guest_name ) ); ?></strong></td>
-							<td data-label="<?php esc_attr_e( 'Vigencia', 'arriendo-facil' ); ?>">
-								<?php echo esc_html( $pending_lease->start_date . ' → ' . $pending_lease->end_date ); ?>
-							</td>
-							<td data-label="<?php esc_attr_e( 'Historial de pago', 'arriendo-facil' ); ?>">
+						<?php
+						$tenant_name  = trim( (string) $pending_lease->guest_name );
+						$tenant_name  = '' !== $tenant_name ? $tenant_name : __( 'Inquilino sin nombre', 'arriendo-facil' );
+						$property     = $pending_lease->accommodation_title ? $pending_lease->accommodation_title : '—';
+						$payment_hint = Arriendo_Facil_Review::suggest_payment_score( (int) $pending_lease->id );
+						$is_finished  = 'terminated' === $pending_lease->status;
+						$hint_tone    = $payment_hint ? $tone_for( $payment_hint['score'] ) : 'none';
+						$on_time_pct  = $payment_hint ? round( 100 * $payment_hint['on_time'] / max( 1, $payment_hint['total'] ) ) : 0;
+						?>
+						<article class="af-rv-card af-rv-tenant" data-rv-item data-search="<?php echo esc_attr( strtolower( $tenant_name . ' ' . $property ) ); ?>">
+							<header class="af-rv-tenant__head">
+								<span class="af-rv-avatar" aria-hidden="true"><?php echo esc_html( $initials_for( $tenant_name ) ); ?></span>
+								<div class="af-rv-tenant__id">
+									<h3><?php echo esc_html( $tenant_name ); ?></h3>
+									<p><?php echo esc_html( $property ); ?></p>
+								</div>
+								<span class="af-rv-badge <?php echo $is_finished ? 'af-rv-badge--warn' : 'af-rv-badge--ok'; ?>">
+									<?php echo $is_finished ? esc_html__( 'Contrato terminado', 'arriendo-facil' ) : esc_html__( 'Contrato activo', 'arriendo-facil' ); ?>
+								</span>
+							</header>
+
+							<p class="af-rv-tenant__dates">
+								<?php echo esc_html( $format_date( $pending_lease->start_date ) . ' → ' . $format_date( $pending_lease->end_date ) ); ?>
+							</p>
+
+							<div class="af-rv-payment af-rv-tone--<?php echo esc_attr( $hint_tone ); ?>">
 								<?php if ( $payment_hint ) : ?>
-									<span class="af-pill <?php echo $payment_hint['score'] >= 4 ? 'af-pill--success' : ( $payment_hint['score'] >= 3 ? 'af-pill--warning' : 'af-pill--danger' ); ?>">
+									<div class="af-rv-payment__top">
+										<span><?php esc_html_e( 'Historial de pago', 'arriendo-facil' ); ?></span>
+										<strong><?php echo esc_html( sprintf( /* translators: %d: percentage */ __( '%d%% a tiempo', 'arriendo-facil' ), $on_time_pct ) ); ?></strong>
+									</div>
+									<span class="af-rv-meter"><span style="width: <?php echo esc_attr( $on_time_pct ); ?>%"></span></span>
+									<p class="af-rv-muted">
 										<?php
 										echo esc_html(
 											sprintf(
-											/* translators: 1: average days late, 2: total charges */
-											__( '%1$s días promedio de atraso (%2$d vencimientos)', 'arriendo-facil' ),
-											number_format_i18n( $payment_hint['average_days_late'], 1 ),
-											$payment_hint['total']
+												/* translators: 1: on-time count, 2: late count, 3: average days late */
+												__( '%1$d a tiempo · %2$d con atraso · %3$s días de atraso promedio', 'arriendo-facil' ),
+												$payment_hint['on_time'],
+												$payment_hint['late'],
+												number_format_i18n( $payment_hint['average_days_late'], 1 )
 											)
 										);
 										?>
-									</span>
-									<div class="af-payhist" title="<?php echo esc_attr( sprintf( /* translators: 1: on time, 2: total */ __( '%1$d de %2$d vencimientos pagados a tiempo', 'arriendo-facil' ), $payment_hint['on_time'], $payment_hint['total'] ) ); ?>">
-										<span class="af-payhist__bar"><span class="af-payhist__fill" style="width:<?php echo esc_attr( round( 100 * $payment_hint['on_time'] / max( 1, $payment_hint['total'] ) ) ); ?>%"></span></span>
-										<span class="af-payhist__txt"><?php echo esc_html( sprintf( /* translators: 1: on time, 2: late */ __( '%1$d a tiempo · %2$d con atraso', 'arriendo-facil' ), $payment_hint['on_time'], $payment_hint['late'] ) ); ?></span>
-									</div>
+									</p>
 								<?php else : ?>
-									<span class="af-td-meta"><?php esc_html_e( 'Sin historial suficiente', 'arriendo-facil' ); ?></span>
+									<div class="af-rv-payment__top"><span><?php esc_html_e( 'Historial de pago', 'arriendo-facil' ); ?></span></div>
+									<p class="af-rv-muted"><?php esc_html_e( 'Sin historial suficiente para sugerir una nota.', 'arriendo-facil' ); ?></p>
 								<?php endif; ?>
-							</td>
-							<td data-label="<?php esc_attr_e( 'Acción', 'arriendo-facil' ); ?>">
-								<?php if ( current_user_can( Arriendo_Facil_Tenancy::CAP ) ) : ?>
-									<button type="button" class="button button-primary af-rate-tenant"
-										data-lease="<?php echo esc_attr( (int) $pending_lease->id ); ?>"
-										data-tenant="<?php echo esc_attr( trim( (string) $pending_lease->guest_name ) ); ?>"
-										data-suggested="<?php echo esc_attr( $payment_hint ? $payment_hint['score'] : 0 ); ?>">
+							</div>
+
+							<footer class="af-rv-tenant__foot">
+								<?php if ( $can_rate ) : ?>
+									<button type="button" class="button button-primary af-rv-cta"
+										data-rv-open="tenant"
+										data-id="<?php echo esc_attr( (int) $pending_lease->id ); ?>"
+										data-name="<?php echo esc_attr( $tenant_name ); ?>"
+										data-context="<?php echo esc_attr( $property ); ?>"
+										data-suggested="<?php echo esc_attr( $payment_hint ? $payment_hint['score'] : 0 ); ?>"
+										data-suggested-note="<?php echo esc_attr( $payment_hint ? sprintf( /* translators: 1: percentage on time, 2: avg days late */ __( '%1$d%% de pagos a tiempo · %2$s días de atraso promedio', 'arriendo-facil' ), $on_time_pct, number_format_i18n( $payment_hint['average_days_late'], 1 ) ) : '' ); ?>">
 										<?php esc_html_e( 'Calificar', 'arriendo-facil' ); ?>
 									</button>
-								<?php else : ?>
-									<span class="af-td-meta">—</span>
 								<?php endif; ?>
-							</td>
-						</tr>
+							</footer>
+						</article>
 					<?php endforeach; ?>
-				</tbody>
-			</table>
-		</section>
-	<?php endif; ?>
-
-	<?php if ( $is_management_model && current_user_can( 'manage_options' ) && ! empty( $admins ) ) : ?>
-		<section class="af-section" style="margin-bottom: var(--af-space-4);">
-			<header class="af-section__header">
-				<div>
-					<h2 class="af-section__title"><?php esc_html_e( 'Evaluación de gestores', 'arriendo-facil' ); ?></h2>
-					<p class="af-section__subtitle"><?php esc_html_e( 'El administrador de la plataforma califica la gestión de cada gestor de propiedades.', 'arriendo-facil' ); ?></p>
 				</div>
-			</header>
-
-			<table class="wp-list-table widefat fixed striped af-data-table">
-				<thead>
-					<tr>
-						<th><?php esc_html_e( 'Gestor', 'arriendo-facil' ); ?></th>
-						<th><?php esc_html_e( 'Inmuebles', 'arriendo-facil' ); ?></th>
-						<th><?php esc_html_e( 'Evaluación', 'arriendo-facil' ); ?></th>
-						<th><?php esc_html_e( 'Actualizada', 'arriendo-facil' ); ?></th>
-						<th><?php esc_html_e( 'Acción', 'arriendo-facil' ); ?></th>
-					</tr>
-				</thead>
-				<tbody>
-					<?php foreach ( $admins as $af_admin ) : ?>
-						<?php
-						$af_review   = isset( $admin_evaluations[ (int) $af_admin->ID ] ) ? $admin_evaluations[ (int) $af_admin->ID ] : null;
-						$af_stars    = $af_review ? (float) $af_review->stars : 0.0;
-						$af_scores   = $af_review && ! empty( $af_review->criteria_scores ) ? json_decode( (string) $af_review->criteria_scores, true ) : array();
-						$af_prop_count = isset( $admin_property_counts[ (int) $af_admin->ID ] ) ? $admin_property_counts[ (int) $af_admin->ID ] : 0;
-						$af_pill     = 'af-pill--neutral';
-						if ( $af_stars >= 4 ) {
-							$af_pill = 'af-pill--success';
-						} elseif ( $af_stars >= 3 ) {
-							$af_pill = 'af-pill--warning';
-						} elseif ( $af_stars > 0 ) {
-							$af_pill = 'af-pill--danger';
-						}
-						?>
-						<tr>
-							<td data-label="<?php esc_attr_e( 'Gestor', 'arriendo-facil' ); ?>">
-								<strong><?php echo esc_html( $af_admin->display_name ? $af_admin->display_name : $af_admin->user_login ); ?></strong><br />
-								<span class="af-td-meta"><?php echo esc_html( $af_admin->user_email ); ?></span>
-							</td>
-							<td data-label="<?php esc_attr_e( 'Inmuebles', 'arriendo-facil' ); ?>">
-								<span class="af-pill af-pill--neutral"><?php echo esc_html( number_format_i18n( $af_prop_count ) ); ?></span>
-							</td>
-							<td data-label="<?php esc_attr_e( 'Evaluación', 'arriendo-facil' ); ?>">
-								<?php if ( $af_review ) : ?>
-									<span class="af-pill <?php echo esc_attr( $af_pill ); ?>">★ <?php echo esc_html( number_format_i18n( $af_stars, 1 ) ); ?></span>
-									<?php if ( ! empty( $af_scores ) ) : ?>
-										<ul style="margin:6px 0 0;padding-left:16px;font-size:13px;color:var(--af-gray-600);">
-											<?php foreach ( Arriendo_Facil_Review::admin_criteria() as $af_key => $af_label ) : ?>
-												<?php if ( isset( $af_scores[ $af_key ] ) ) : ?>
-													<li><?php echo esc_html( $af_label ); ?>: <?php echo esc_html( (int) $af_scores[ $af_key ] ); ?>/5</li>
-												<?php endif; ?>
-											<?php endforeach; ?>
-										</ul>
-									<?php endif; ?>
-								<?php else : ?>
-									<span class="af-td-meta"><?php esc_html_e( 'Sin evaluar', 'arriendo-facil' ); ?></span>
-								<?php endif; ?>
-							</td>
-							<td data-label="<?php esc_attr_e( 'Actualizada', 'arriendo-facil' ); ?>">
-								<?php echo esc_html( $af_review && isset( $af_review->updated_at ) ? (string) $af_review->updated_at : '—' ); ?>
-							</td>
-							<td data-label="<?php esc_attr_e( 'Acción', 'arriendo-facil' ); ?>">
-								<button type="button" class="button button-primary af-rate-admin"
-									data-admin="<?php echo esc_attr( (int) $af_admin->ID ); ?>"
-									data-name="<?php echo esc_attr( $af_admin->display_name ? $af_admin->display_name : $af_admin->user_login ); ?>"
-									data-stars="<?php echo esc_attr( $af_review ? (float) $af_review->stars : 0 ); ?>"
-									data-scores="<?php echo esc_attr( wp_json_encode( $af_scores ) ); ?>"
-									data-comment="<?php echo esc_attr( $af_review && isset( $af_review->comment_text ) ? (string) $af_review->comment_text : '' ); ?>">
-									<?php echo $af_review ? esc_html__( 'Editar', 'arriendo-facil' ) : esc_html__( 'Calificar', 'arriendo-facil' ); ?>
-								</button>
-							</td>
-						</tr>
-					<?php endforeach; ?>
-				</tbody>
-			</table>
-		</section>
-	<?php elseif ( $my_evaluation ) : ?>
-		<section class="af-section" style="margin-bottom: var(--af-space-4);">
-			<header class="af-section__header">
-				<div>
-					<h2 class="af-section__title"><?php esc_html_e( 'Mi evaluación', 'arriendo-facil' ); ?></h2>
-					<p class="af-section__subtitle"><?php esc_html_e( 'Evaluación registrada por el administrador de la plataforma.', 'arriendo-facil' ); ?></p>
-				</div>
-			</header>
-			<?php
-			$my_scores = ! empty( $my_evaluation->criteria_scores ) ? json_decode( (string) $my_evaluation->criteria_scores, true ) : array();
-			?>
-			<ul class="af-review-list__criteria" style="margin-top:0;">
-				<?php foreach ( Arriendo_Facil_Review::admin_criteria() as $mk => $ml ) : ?>
-					<?php if ( isset( $my_scores[ $mk ] ) ) : ?>
-						<li class="af-pill af-pill--neutral"><?php echo esc_html( $ml ); ?>: <?php echo esc_html( (int) $my_scores[ $mk ] ); ?>/5</li>
-					<?php endif; ?>
-				<?php endforeach; ?>
-			</ul>
+			<?php endif; ?>
 		</section>
 	<?php endif; ?>
 
-	<?php if ( ! $is_management_model ) : ?>
-	<form method="get" class="af-section" style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; padding: var(--af-space-4) var(--af-space-5); margin-bottom: var(--af-space-4);">
-		<input type="hidden" name="page" value="af-reviews" />
-		<label style="display:flex; align-items:center; gap:8px; font-weight:600; color: var(--af-gray-700);">
-			<?php esc_html_e( 'Dirección', 'arriendo-facil' ); ?>
-			<select name="direction" style="min-height:36px;">
-				<option value=""><?php esc_html_e( 'Todas', 'arriendo-facil' ); ?></option>
-				<?php foreach ( $directions_map as $key => $label ) : ?>
-					<option value="<?php echo esc_attr( $key ); ?>" <?php selected( $direction_filter, $key ); ?>><?php echo esc_html( $label ); ?></option>
-				<?php endforeach; ?>
-			</select>
-		</label>
-		<button type="submit" class="button af-btn af-btn--primary"><?php esc_html_e( 'Filtrar', 'arriendo-facil' ); ?></button>
-		<a class="button af-btn af-btn--ghost" href="<?php echo esc_url( admin_url( 'admin.php?page=af-reviews' ) ); ?>"><?php esc_html_e( 'Limpiar', 'arriendo-facil' ); ?></a>
-	</form>
-	<?php endif; ?>
-
-	<div class="af-kpi-grid">
-
-		<article class="af-kpi">
-			<div class="af-kpi__head">
-				<span class="af-kpi__label"><?php esc_html_e( 'Reseñas completadas', 'arriendo-facil' ); ?></span>
+	<!-- ── Panel: calificados ────────────────────────────────────────────── -->
+	<section class="af-rv-panel" data-rv-panel="rated" hidden>
+		<?php if ( empty( $rows ) ) : ?>
+			<div class="af-rv-empty">
+				<span class="af-rv-empty__icon" aria-hidden="true">★</span>
+				<h3><?php esc_html_e( 'Aún no has calificado inquilinos', 'arriendo-facil' ); ?></h3>
+				<p><?php esc_html_e( 'Tus calificaciones quedan como historial privado de cada inquilino.', 'arriendo-facil' ); ?></p>
+				<?php if ( $pending_count > 0 ) : ?>
+					<button type="button" class="button button-primary" data-rv-goto="pending"><?php esc_html_e( 'Ver pendientes', 'arriendo-facil' ); ?></button>
+				<?php endif; ?>
 			</div>
-			<div class="af-kpi__value"><?php echo esc_html( number_format_i18n( $total_reviews ) ); ?></div>
-			<div class="af-kpi__hint"><?php esc_html_e( 'Total en el filtro actual', 'arriendo-facil' ); ?></div>
-		</article>
-
-		<article class="af-kpi af-kpi--accent">
-			<div class="af-kpi__head">
-				<span class="af-kpi__label"><?php esc_html_e( 'Promedio general', 'arriendo-facil' ); ?></span>
-				<span class="af-kpi__icon" aria-hidden="true">
-					<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3 6.5 7 .9-5.1 4.7 1.3 7L12 17.8 5.8 21l1.3-7L2 9.4l7-.9L12 2z"/></svg>
-				</span>
-			</div>
-			<div class="af-kpi__value"><?php echo esc_html( $total_reviews > 0 ? number_format_i18n( $avg_stars, 2 ) : '—' ); ?></div>
-			<div class="af-kpi__hint"><?php esc_html_e( 'Estrellas sobre 5', 'arriendo-facil' ); ?></div>
-		</article>
-
-		<article class="af-kpi af-kpi--success">
-			<div class="af-kpi__head">
-				<span class="af-kpi__label"><?php esc_html_e( 'Reseñas positivas', 'arriendo-facil' ); ?></span>
-			</div>
-			<div class="af-kpi__value"><?php echo esc_html( number_format_i18n( $positive_reviews ) ); ?></div>
-			<div class="af-kpi__hint"><?php esc_html_e( 'Con 4 o más estrellas', 'arriendo-facil' ); ?></div>
-		</article>
-
-		<article class="af-kpi <?php echo $positive_rate >= 80 ? 'af-kpi--success' : ( $positive_rate >= 60 ? '' : 'af-kpi--attention' ); ?>">
-			<div class="af-kpi__head">
-				<span class="af-kpi__label"><?php esc_html_e( 'Tasa positiva', 'arriendo-facil' ); ?></span>
-			</div>
-			<div class="af-kpi__value"><?php echo esc_html( number_format_i18n( $positive_rate, 1 ) ); ?>%</div>
-			<div class="af-kpi__hint"><?php esc_html_e( 'Objetivo mínimo: 80%', 'arriendo-facil' ); ?></div>
-		</article>
-
-	</div>
-
-	<section class="af-section">
-		<header class="af-section__header">
-			<div>
-				<h2 class="af-section__title"><?php esc_html_e( 'Detalle de reseñas', 'arriendo-facil' ); ?></h2>
-				<p class="af-section__subtitle"><?php esc_html_e( 'Últimas 150 completadas.', 'arriendo-facil' ); ?></p>
-			</div>
-		</header>
-
-	<?php
-	$review_tab_counts = array( 'positivas' => 0, 'neutras' => 0, 'negativas' => 0 );
-	foreach ( (array) $rows as $rt_row ) {
-		$rt_stars = (float) $rt_row->stars;
-		$rt_group = $rt_stars >= 4 ? 'positivas' : ( $rt_stars >= 3 ? 'neutras' : 'negativas' );
-		$review_tab_counts[ $rt_group ]++;
-	}
-	?>
-	<div class="af-status-tabs" data-tabs-target="#af-reviews-tbody">
-		<button type="button" class="af-status-tabs__btn is-active" data-tab-value=""><?php esc_html_e( 'Todas', 'arriendo-facil' ); ?> <span class="af-status-tabs__count"><?php echo esc_html( number_format_i18n( count( (array) $rows ) ) ); ?></span></button>
-		<button type="button" class="af-status-tabs__btn" data-tab-value="positivas"><?php esc_html_e( 'Positivas', 'arriendo-facil' ); ?> <span class="af-status-tabs__count"><?php echo esc_html( number_format_i18n( $review_tab_counts['positivas'] ) ); ?></span></button>
-		<button type="button" class="af-status-tabs__btn" data-tab-value="neutras"><?php esc_html_e( 'Neutras', 'arriendo-facil' ); ?> <span class="af-status-tabs__count"><?php echo esc_html( number_format_i18n( $review_tab_counts['neutras'] ) ); ?></span></button>
-		<button type="button" class="af-status-tabs__btn" data-tab-value="negativas"><?php esc_html_e( 'Negativas', 'arriendo-facil' ); ?> <span class="af-status-tabs__count"><?php echo esc_html( number_format_i18n( $review_tab_counts['negativas'] ) ); ?></span></button>
-	</div>
-
-	<div class="af-split">
-	<div>
-	<table class="wp-list-table widefat fixed striped af-data-table">
-		<thead>
-			<tr>
-				<th><?php esc_html_e( 'ID', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Contrato', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Propiedad', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Dirección', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Estrellas', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Detalle', 'arriendo-facil' ); ?></th>
-				<th><?php esc_html_e( 'Fecha', 'arriendo-facil' ); ?></th>
-			</tr>
-		</thead>
-		<tbody id="af-reviews-tbody">
-			<?php if ( empty( $rows ) ) : ?>
-				<tr>
-					<td colspan="7"><?php esc_html_e( 'No hay reseñas completadas para los filtros actuales.', 'arriendo-facil' ); ?></td>
-				</tr>
-			<?php else : ?>
+		<?php else : ?>
+			<div class="af-rv-grid">
 				<?php foreach ( $rows as $row ) : ?>
 					<?php
-					$direction = isset( $row->review_direction ) ? sanitize_key( (string) $row->review_direction ) : '';
-					$label     = isset( $directions_map[ $direction ] ) ? $directions_map[ $direction ] : $direction;
-					$title     = isset( $row->accommodation_title ) && '' !== trim( (string) $row->accommodation_title ) ? (string) $row->accommodation_title : '#' . absint( $row->accommodation_id );
-					$stars     = (float) $row->stars;
-					$star_pill = 'af-pill--danger';
-					$row_tab_group = 'negativas';
-					if ( $stars >= 4 ) {
-						$star_pill = 'af-pill--success';
-						$row_tab_group = 'positivas';
-					} elseif ( $stars >= 3 ) {
-						$star_pill = 'af-pill--warning';
-						$row_tab_group = 'neutras';
+					$direction   = sanitize_key( (string) $row->review_direction );
+					$tenant_name = trim( (string) $row->guest_name );
+					if ( '' === $tenant_name ) {
+						$tenant_name = isset( $directions_map[ $direction ] ) ? $directions_map[ $direction ] : __( 'Inquilino', 'arriendo-facil' );
 					}
-					$criteria_labels = Arriendo_Facil_Review::owner_to_tenant_criteria();
-					$criteria_scores = 'owner_to_tenant' === $direction && ! empty( $row->criteria_scores ) ? json_decode( (string) $row->criteria_scores, true ) : null;
+					$property = '' !== trim( (string) $row->accommodation_title ) ? (string) $row->accommodation_title : '#' . absint( $row->accommodation_id );
+					$score    = (float) $row->_score;
+					$tone     = $tone_for( $score );
+					$row_crit = 'owner_to_tenant' === $direction ? $scores_of( $row->criteria_scores ) : array();
+					$comment  = isset( $row->comment_text ) ? trim( (string) $row->comment_text ) : '';
 					?>
-					<tr data-tab-group="<?php echo esc_attr( $row_tab_group ); ?>">
-						<td data-label="<?php esc_attr_e( 'ID', 'arriendo-facil' ); ?>"><?php echo esc_html( (int) $row->id ); ?></td>
-						<td data-label="<?php esc_attr_e( 'Contrato', 'arriendo-facil' ); ?>"><?php echo esc_html( (int) $row->lease_id ); ?></td>
-						<td data-label="<?php esc_attr_e( 'Propiedad', 'arriendo-facil' ); ?>"><?php echo esc_html( $title ); ?></td>
-						<td data-label="<?php esc_attr_e( 'Dirección', 'arriendo-facil' ); ?>"><span class="af-pill af-pill--neutral"><?php echo esc_html( $label ); ?></span></td>
-						<td data-label="<?php esc_attr_e( 'Estrellas', 'arriendo-facil' ); ?>"><span class="af-pill <?php echo esc_attr( $star_pill ); ?>">★ <?php echo esc_html( number_format_i18n( $stars, 1 ) ); ?></span></td>
-						<td data-label="<?php esc_attr_e( 'Detalle', 'arriendo-facil' ); ?>">
-							<?php if ( is_array( $criteria_scores ) ) : ?>
-								<ul style="margin:0;padding-left:16px;">
-									<?php foreach ( $criteria_labels as $crit_key => $crit_label ) : ?>
-										<?php if ( isset( $criteria_scores[ $crit_key ] ) ) : ?>
-											<li><?php echo esc_html( $crit_label ); ?>: <?php echo esc_html( (int) $criteria_scores[ $crit_key ] ); ?>/5</li>
-										<?php endif; ?>
-									<?php endforeach; ?>
-								</ul>
-							<?php else : ?>
-								&mdash;
-							<?php endif; ?>
-						</td>
-						<td data-label="<?php esc_attr_e( 'Fecha', 'arriendo-facil' ); ?>"><?php echo esc_html( isset( $row->submitted_at ) ? (string) $row->submitted_at : '' ); ?></td>
-					</tr>
-				<?php endforeach; ?>
-			<?php endif; ?>
-		</tbody>
-	</table>
-	</div>
+					<article class="af-rv-card af-rv-tenant af-rv-rated" data-rv-item data-tone="<?php echo esc_attr( $tone ); ?>" data-search="<?php echo esc_attr( strtolower( $tenant_name . ' ' . $property ) ); ?>">
+						<header class="af-rv-tenant__head">
+							<span class="af-rv-avatar" aria-hidden="true"><?php echo esc_html( $initials_for( $tenant_name ) ); ?></span>
+							<div class="af-rv-tenant__id">
+								<h3><?php echo esc_html( $tenant_name ); ?></h3>
+								<p><?php echo esc_html( $property ); ?></p>
+							</div>
+							<div class="af-rv-ring af-rv-tone--<?php echo esc_attr( $tone ); ?>" style="--pct: <?php echo esc_attr( round( $score / 5 * 100 ) ); ?>%" title="<?php echo esc_attr( $verdict_for( $score ) ); ?>">
+								<strong><?php echo esc_html( number_format_i18n( $score, 1 ) ); ?></strong>
+							</div>
+						</header>
 
-	<aside class="af-section" aria-labelledby="af-review-detail-title">
-		<header class="af-section__header">
-			<div>
-				<h2 class="af-section__title" id="af-review-detail-title"><?php esc_html_e( 'Detalle de la review', 'arriendo-facil' ); ?></h2>
-			</div>
-		</header>
-		<?php if ( empty( $rows ) ) : ?>
-			<p class="af-empty__text"><?php esc_html_e( 'Selecciona o registra una reseña para ver el detalle aquí.', 'arriendo-facil' ); ?></p>
-		<?php else : ?>
-			<?php
-			$detail_row    = $rows[0];
-			$detail_title  = isset( $detail_row->accommodation_title ) && '' !== trim( (string) $detail_row->accommodation_title ) ? (string) $detail_row->accommodation_title : '#' . absint( $detail_row->accommodation_id );
-			$detail_stars  = (int) round( (float) $detail_row->stars );
-			$detail_scores = ! empty( $detail_row->criteria_scores ) ? json_decode( (string) $detail_row->criteria_scores, true ) : null;
-			?>
-			<div class="af-review-list__item">
-				<div class="af-review-list__head">
-					<strong><?php echo esc_html( sprintf( /* translators: %d: lease id */ __( 'Contrato #%d', 'arriendo-facil' ), (int) $detail_row->lease_id ) ); ?></strong>
-					<span class="af-review-list__stars"><?php echo esc_html( str_repeat( '★', $detail_stars ) . str_repeat( '☆', 5 - $detail_stars ) ); ?></span>
-				</div>
-				<p class="af-review-list__meta"><?php echo esc_html( $detail_title ); ?></p>
-				<?php if ( is_array( $detail_scores ) ) : ?>
-					<ul class="af-review-list__criteria">
-						<?php foreach ( Arriendo_Facil_Review::owner_to_tenant_criteria() as $dc_key => $dc_label ) : ?>
-							<?php if ( isset( $detail_scores[ $dc_key ] ) ) : ?>
-								<li class="af-pill af-pill--neutral"><?php echo esc_html( $dc_label ); ?>: <?php echo esc_html( (int) $detail_scores[ $dc_key ] ); ?>/5</li>
+						<p class="af-rv-verdict af-rv-tone--<?php echo esc_attr( $tone ); ?>">
+							<span class="af-rv-stars" style="--pct: <?php echo esc_attr( round( $score / 5 * 100 ) ); ?>%" aria-hidden="true"></span>
+							<span><?php echo esc_html( $verdict_for( $score ) ); ?></span>
+						</p>
+
+						<?php if ( ! empty( $row_crit ) ) : ?>
+							<ul class="af-rv-crit">
+								<?php foreach ( $criteria_map as $key => $label ) : ?>
+									<?php if ( isset( $row_crit[ $key ] ) ) : ?>
+										<li class="af-rv-tone--<?php echo esc_attr( $tone_for( (int) $row_crit[ $key ] ) ); ?>">
+											<span><?php echo esc_html( $label ); ?></span>
+											<span class="af-rv-meter"><span style="width: <?php echo esc_attr( (int) $row_crit[ $key ] * 20 ); ?>%"></span></span>
+											<strong><?php echo esc_html( (int) $row_crit[ $key ] ); ?></strong>
+										</li>
+									<?php endif; ?>
+								<?php endforeach; ?>
+							</ul>
+						<?php endif; ?>
+
+						<?php if ( '' !== $comment ) : ?>
+							<blockquote class="af-rv-quote"><?php echo esc_html( $comment ); ?></blockquote>
+						<?php endif; ?>
+
+						<footer class="af-rv-tenant__foot">
+							<span class="af-rv-muted"><?php echo esc_html( sprintf( /* translators: %s: date */ __( 'Calificado el %s', 'arriendo-facil' ), $format_date( $row->submitted_at, true ) ) ); ?></span>
+							<?php if ( $is_management_model && $can_rate ) : ?>
+								<button type="button" class="button af-rv-ghost"
+									data-rv-open="tenant"
+									data-id="<?php echo esc_attr( (int) $row->lease_id ); ?>"
+									data-name="<?php echo esc_attr( $tenant_name ); ?>"
+									data-context="<?php echo esc_attr( $property ); ?>"
+									data-scores="<?php echo esc_attr( wp_json_encode( $row_crit ) ); ?>"
+									data-comment="<?php echo esc_attr( $comment ); ?>">
+									<?php esc_html_e( 'Editar', 'arriendo-facil' ); ?>
+								</button>
 							<?php endif; ?>
-						<?php endforeach; ?>
-					</ul>
-				<?php endif; ?>
-				<p class="af-review-list__comment"><?php echo esc_html( isset( $detail_row->submitted_at ) ? (string) $detail_row->submitted_at : '' ); ?></p>
+						</footer>
+					</article>
+				<?php endforeach; ?>
 			</div>
 		<?php endif; ?>
-	</aside>
-
-	</div>
 	</section>
-</div>
 
-<?php if ( $is_management_model ) : ?>
-<div class="af-modal" id="af-modal-rate" role="dialog" aria-modal="true" aria-labelledby="af-modal-rate-title">
-	<div class="af-modal__backdrop" data-af-modal-close></div>
-	<div class="af-modal__dialog">
-		<button type="button" class="af-modal__close" data-af-modal-close aria-label="<?php esc_attr_e( 'Cerrar', 'arriendo-facil' ); ?>">&times;</button>
-		<div class="af-modal__header">
-			<h2 class="af-modal__title" id="af-modal-rate-title"><?php esc_html_e( 'Calificar inquilino', 'arriendo-facil' ); ?></h2>
-			<p class="af-modal__subtitle" id="af-rate-subtitle"></p>
-		</div>
-		<div class="af-modal__body">
-			<p class="af-modal__status" id="af-rate-status"></p>
+	<!-- ── Panel: gestores (super-admin) ─────────────────────────────────── -->
+	<?php if ( $show_managers_tab ) : ?>
+		<section class="af-rv-panel" data-rv-panel="managers" hidden>
+			<p class="af-rv-lead"><?php esc_html_e( 'Como administrador de la plataforma, evalúas la gestión de cada gestor de propiedades.', 'arriendo-facil' ); ?></p>
+			<div class="af-rv-grid">
+				<?php foreach ( $admins as $af_admin ) : ?>
+					<?php
+					$admin_name   = $af_admin->display_name ? $af_admin->display_name : $af_admin->user_login;
+					$evaluation   = isset( $admin_evaluations[ (int) $af_admin->ID ] ) ? $admin_evaluations[ (int) $af_admin->ID ] : null;
+					$eval_scores  = $evaluation ? $scores_of( $evaluation->criteria_scores ) : array();
+					$eval_score   = $evaluation ? $score_of_row( $evaluation, $admin_criteria ) : 0.0;
+					$eval_tone    = $tone_for( $eval_score );
+					$prop_count   = isset( $admin_property_counts[ (int) $af_admin->ID ] ) ? $admin_property_counts[ (int) $af_admin->ID ] : 0;
+					$eval_comment = $evaluation && isset( $evaluation->comment_text ) ? trim( (string) $evaluation->comment_text ) : '';
+					?>
+					<article class="af-rv-card af-rv-tenant" data-rv-item data-search="<?php echo esc_attr( strtolower( $admin_name . ' ' . $af_admin->user_email ) ); ?>">
+						<header class="af-rv-tenant__head">
+							<span class="af-rv-avatar af-rv-avatar--alt" aria-hidden="true"><?php echo esc_html( $initials_for( $admin_name ) ); ?></span>
+							<div class="af-rv-tenant__id">
+								<h3><?php echo esc_html( $admin_name ); ?></h3>
+								<p><?php echo esc_html( sprintf( /* translators: %s: number of properties */ _n( '%s inmueble', '%s inmuebles', $prop_count, 'arriendo-facil' ), number_format_i18n( $prop_count ) ) ); ?></p>
+							</div>
+							<?php if ( $evaluation ) : ?>
+								<div class="af-rv-ring af-rv-tone--<?php echo esc_attr( $eval_tone ); ?>" style="--pct: <?php echo esc_attr( round( $eval_score / 5 * 100 ) ); ?>%">
+									<strong><?php echo esc_html( number_format_i18n( $eval_score, 1 ) ); ?></strong>
+								</div>
+							<?php else : ?>
+								<span class="af-rv-badge"><?php esc_html_e( 'Sin evaluar', 'arriendo-facil' ); ?></span>
+							<?php endif; ?>
+						</header>
 
-			<?php foreach ( $criteria_labels as $criterion_key => $criterion_label ) : ?>
-				<div class="af-modal__field">
-					<label>
-						<?php echo esc_html( $criterion_label ); ?>
-						<?php if ( 'puntualidad_pago' === $criterion_key ) : ?>
-							<span class="af-modal__hint" id="af-rate-suggested" style="display:none;"></span>
+						<?php if ( ! empty( $eval_scores ) ) : ?>
+							<ul class="af-rv-crit">
+								<?php foreach ( $admin_criteria as $key => $label ) : ?>
+									<?php if ( isset( $eval_scores[ $key ] ) ) : ?>
+										<li class="af-rv-tone--<?php echo esc_attr( $tone_for( (int) $eval_scores[ $key ] ) ); ?>">
+											<span><?php echo esc_html( $label ); ?></span>
+											<span class="af-rv-meter"><span style="width: <?php echo esc_attr( (int) $eval_scores[ $key ] * 20 ); ?>%"></span></span>
+											<strong><?php echo esc_html( (int) $eval_scores[ $key ] ); ?></strong>
+										</li>
+									<?php endif; ?>
+								<?php endforeach; ?>
+							</ul>
 						<?php endif; ?>
-					</label>
-					<div style="display:flex; gap:12px; flex-wrap:wrap;">
-						<?php for ( $star = 1; $star <= 5; $star++ ) : ?>
-							<label style="display:flex; align-items:center; gap:5px;">
-								<input type="radio" name="af_rate_<?php echo esc_attr( $criterion_key ); ?>" value="<?php echo esc_attr( $star ); ?>" <?php checked( 5 === $star ); ?> />
-								<span><?php echo esc_html( $star ); ?>★</span>
-							</label>
-						<?php endfor; ?>
-					</div>
-				</div>
-			<?php endforeach; ?>
 
-			<div class="af-modal__field">
-				<label for="af-rate-comment"><?php esc_html_e( 'Observaciones', 'arriendo-facil' ); ?></label>
-				<textarea id="af-rate-comment" rows="3" placeholder="<?php esc_attr_e( 'Ej: pagó puntual todo el contrato, entregó el inmueble en buen estado.', 'arriendo-facil' ); ?>"></textarea>
+						<?php if ( '' !== $eval_comment ) : ?>
+							<blockquote class="af-rv-quote"><?php echo esc_html( $eval_comment ); ?></blockquote>
+						<?php endif; ?>
+
+						<footer class="af-rv-tenant__foot">
+							<span class="af-rv-muted"><?php echo esc_html( $evaluation ? sprintf( /* translators: %s: date */ __( 'Actualizada el %s', 'arriendo-facil' ), $format_date( $evaluation->updated_at ) ) : __( 'Aún sin evaluación', 'arriendo-facil' ) ); ?></span>
+							<button type="button" class="button <?php echo $evaluation ? 'af-rv-ghost' : 'button-primary af-rv-cta'; ?>"
+								data-rv-open="admin"
+								data-id="<?php echo esc_attr( (int) $af_admin->ID ); ?>"
+								data-name="<?php echo esc_attr( $admin_name ); ?>"
+								data-context="<?php echo esc_attr( $af_admin->user_email ); ?>"
+								data-scores="<?php echo esc_attr( wp_json_encode( $eval_scores ) ); ?>"
+								data-comment="<?php echo esc_attr( $eval_comment ); ?>">
+								<?php echo $evaluation ? esc_html__( 'Editar', 'arriendo-facil' ) : esc_html__( 'Evaluar', 'arriendo-facil' ); ?>
+							</button>
+						</footer>
+					</article>
+				<?php endforeach; ?>
 			</div>
-		</div>
-		<div class="af-modal__footer">
-			<button type="button" class="button" data-af-modal-close><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
-			<button type="button" class="button button-primary" id="af-rate-confirm"><?php esc_html_e( 'Guardar calificación', 'arriendo-facil' ); ?></button>
-		</div>
-	</div>
-</div>
-
-<script>
-(function () {
-	const modal = document.getElementById('af-modal-rate');
-	if (!modal) { return; }
-
-	const ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
-	const nonce = <?php echo wp_json_encode( wp_create_nonce( 'af_rate_tenant_nonce' ) ); ?>;
-	const criteria = <?php echo wp_json_encode( array_keys( $criteria_labels ) ); ?>;
-
-	const status = document.getElementById('af-rate-status');
-	const subtitle = document.getElementById('af-rate-subtitle');
-	const suggested = document.getElementById('af-rate-suggested');
-	const comment = document.getElementById('af-rate-comment');
-	const confirm = document.getElementById('af-rate-confirm');
-	let leaseId = 0;
-
-	modal.querySelectorAll('[data-af-modal-close]').forEach(function (btn) {
-		btn.addEventListener('click', function () { modal.classList.remove('is-open'); });
-	});
-
-	document.addEventListener('keydown', function (e) {
-		if (e.key === 'Escape') { modal.classList.remove('is-open'); }
-	});
-
-	document.querySelectorAll('.af-rate-tenant').forEach(function (btn) {
-		btn.addEventListener('click', function () {
-			leaseId = btn.getAttribute('data-lease');
-			subtitle.textContent = btn.getAttribute('data-tenant');
-			comment.value = '';
-			status.textContent = '';
-			status.className = 'af-modal__status';
-
-			// Preselect the punctuality score derived from the ledger.
-			const score = parseInt(btn.getAttribute('data-suggested'), 10);
-			if (score >= 1 && score <= 5) {
-				const input = modal.querySelector('input[name="af_rate_puntualidad_pago"][value="' + score + '"]');
-				if (input) { input.checked = true; }
-				suggested.textContent = <?php echo wp_json_encode( __( '— sugerido desde el historial de cobranza', 'arriendo-facil' ) ); ?>;
-				suggested.style.display = 'inline';
-			} else {
-				suggested.style.display = 'none';
-			}
-
-			modal.classList.add('is-open');
-		});
-	});
-
-	confirm.addEventListener('click', function () {
-		confirm.disabled = true;
-		status.textContent = '';
-		status.className = 'af-modal__status';
-
-		const body = new URLSearchParams();
-		body.append('action', 'af_rate_tenant');
-		body.append('nonce', nonce);
-		body.append('lease_id', leaseId);
-		body.append('comment', comment.value);
-
-		criteria.forEach(function (key) {
-			const checked = modal.querySelector('input[name="af_rate_' + key + '"]:checked');
-			body.append(key, checked ? checked.value : '0');
-		});
-
-		fetch(ajaxUrl, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-			body: body
-		}).then((r) => r.json()).then(function (json) {
-			confirm.disabled = false;
-			if (!json || !json.success) {
-				status.textContent = (json && json.data && json.data.message) || 'Error';
-				status.className = 'af-modal__status is-error';
-				return;
-			}
-			status.textContent = json.data.message;
-			status.className = 'af-modal__status is-success';
-			setTimeout(function () { window.location.reload(); }, 800);
-		});
-	});
-}());
-	</script>
+		</section>
+	<?php elseif ( $my_evaluation ) : ?>
+		<?php
+		$my_scores = $scores_of( $my_evaluation->criteria_scores );
+		$my_score  = $score_of_row( $my_evaluation, $admin_criteria );
+		$my_tone   = $tone_for( $my_score );
+		$my_note   = isset( $my_evaluation->comment_text ) ? trim( (string) $my_evaluation->comment_text ) : '';
+		?>
+		<section class="af-rv-panel" data-rv-panel="mine" hidden>
+			<p class="af-rv-lead"><?php esc_html_e( 'Evaluación registrada por el administrador de la plataforma sobre tu gestión.', 'arriendo-facil' ); ?></p>
+			<article class="af-rv-card af-rv-tenant af-rv-mine">
+				<header class="af-rv-tenant__head">
+					<div class="af-rv-ring af-rv-tone--<?php echo esc_attr( $my_tone ); ?>" style="--pct: <?php echo esc_attr( round( $my_score / 5 * 100 ) ); ?>%">
+						<strong><?php echo esc_html( number_format_i18n( $my_score, 1 ) ); ?></strong>
+					</div>
+					<div class="af-rv-tenant__id">
+						<h3><?php echo esc_html( $verdict_for( $my_score ) ); ?></h3>
+						<p><?php echo esc_html( sprintf( /* translators: %s: date */ __( 'Actualizada el %s', 'arriendo-facil' ), $format_date( $my_evaluation->updated_at ) ) ); ?></p>
+					</div>
+				</header>
+				<ul class="af-rv-crit">
+					<?php foreach ( $admin_criteria as $key => $label ) : ?>
+						<?php if ( isset( $my_scores[ $key ] ) ) : ?>
+							<li class="af-rv-tone--<?php echo esc_attr( $tone_for( (int) $my_scores[ $key ] ) ); ?>">
+								<span><?php echo esc_html( $label ); ?></span>
+								<span class="af-rv-meter"><span style="width: <?php echo esc_attr( (int) $my_scores[ $key ] * 20 ); ?>%"></span></span>
+								<strong><?php echo esc_html( (int) $my_scores[ $key ] ); ?></strong>
+							</li>
+						<?php endif; ?>
+					<?php endforeach; ?>
+				</ul>
+				<?php if ( '' !== $my_note ) : ?>
+					<blockquote class="af-rv-quote"><?php echo esc_html( $my_note ); ?></blockquote>
+				<?php endif; ?>
+			</article>
+		</section>
 	<?php endif; ?>
 
-<?php if ( $is_management_model && current_user_can( 'manage_options' ) ) : ?>
-<div class="af-modal" id="af-modal-rate-admin" role="dialog" aria-modal="true" aria-labelledby="af-modal-rate-admin-title">
-	<div class="af-modal__backdrop" data-af-admin-modal-close></div>
-	<div class="af-modal__dialog">
-		<button type="button" class="af-modal__close" data-af-admin-modal-close aria-label="<?php esc_attr_e( 'Cerrar', 'arriendo-facil' ); ?>">&times;</button>
-		<div class="af-modal__header">
-			<h2 class="af-modal__title" id="af-modal-rate-admin-title"><?php esc_html_e( 'Evaluar gestor', 'arriendo-facil' ); ?></h2>
-			<p class="af-modal__subtitle" id="af-admin-rate-subtitle"></p>
-		</div>
-		<div class="af-modal__body">
-			<p class="af-modal__status" id="af-admin-rate-status"></p>
-
-			<?php foreach ( Arriendo_Facil_Review::admin_criteria() as $criterion_key => $criterion_label ) : ?>
-				<div class="af-modal__field">
-					<label><?php echo esc_html( $criterion_label ); ?></label>
-					<div style="display:flex; gap:12px; flex-wrap:wrap;">
-						<?php for ( $star = 1; $star <= 5; $star++ ) : ?>
-							<label style="display:flex; align-items:center; gap:5px;">
-								<input type="radio" name="af_admin_rate_<?php echo esc_attr( $criterion_key ); ?>" value="<?php echo esc_attr( $star ); ?>" />
-								<span><?php echo esc_html( $star ); ?>★</span>
-							</label>
-						<?php endfor; ?>
-					</div>
-				</div>
-			<?php endforeach; ?>
-
-			<div class="af-modal__field">
-				<label for="af-admin-rate-comment"><?php esc_html_e( 'Observaciones', 'arriendo-facil' ); ?></label>
-				<textarea id="af-admin-rate-comment" rows="3" placeholder="<?php esc_attr_e( 'Ej: gestiona la cobranza puntualmente y responde rápido.', 'arriendo-facil' ); ?>"></textarea>
-			</div>
-		</div>
-		<div class="af-modal__footer">
-			<button type="button" class="button" data-af-admin-modal-close><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
-			<button type="button" class="button button-primary" id="af-admin-rate-confirm"><?php esc_html_e( 'Guardar evaluación', 'arriendo-facil' ); ?></button>
-		</div>
-	</div>
+	<p class="af-rv-empty af-rv-empty--search" id="af-rv-nomatch" hidden></p>
 </div>
 
-<script>
-(function () {
-	const modal = document.getElementById('af-modal-rate-admin');
-	if (!modal) { return; }
+<?php if ( $is_management_model && ( $can_rate || $is_super_admin ) ) : ?>
+	<!-- ── Panel lateral de calificación ───────────────────────────────── -->
+	<div class="af-rv-drawer af-shell" id="af-rv-drawer" role="dialog" aria-modal="true" aria-labelledby="af-rv-drawer-title" hidden>
+		<div class="af-rv-drawer__backdrop" data-rv-close></div>
+		<aside class="af-rv-drawer__panel">
+			<header class="af-rv-drawer__head">
+				<span class="af-rv-avatar" id="af-rv-drawer-avatar" aria-hidden="true"></span>
+				<div>
+					<h2 id="af-rv-drawer-title"></h2>
+					<p id="af-rv-drawer-sub"></p>
+				</div>
+				<button type="button" class="af-rv-drawer__close" data-rv-close aria-label="<?php esc_attr_e( 'Cerrar', 'arriendo-facil' ); ?>">&times;</button>
+			</header>
 
-	const ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
-	const nonce = <?php echo wp_json_encode( wp_create_nonce( 'af_rate_admin_nonce' ) ); ?>;
-	const adminCriteria = <?php echo wp_json_encode( array_keys( Arriendo_Facil_Review::admin_criteria() ) ); ?>;
+			<div class="af-rv-drawer__body">
+				<div class="af-rv-suggest" id="af-rv-suggest" hidden></div>
+				<div id="af-rv-criteria"></div>
 
-	const status = document.getElementById('af-admin-rate-status');
-	const subtitle = document.getElementById('af-admin-rate-subtitle');
-	const comment = document.getElementById('af-admin-rate-comment');
-	const confirm = document.getElementById('af-admin-rate-confirm');
-	let adminUserId = 0;
+				<div class="af-rv-field">
+					<label for="af-rv-comment"><?php esc_html_e( 'Observaciones', 'arriendo-facil' ); ?> <em><?php esc_html_e( '(opcional, solo visible para ti)', 'arriendo-facil' ); ?></em></label>
+					<textarea id="af-rv-comment" rows="4" maxlength="600"></textarea>
+					<span class="af-rv-counter" id="af-rv-counter">0 / 600</span>
+				</div>
+			</div>
 
-	modal.querySelectorAll('[data-af-admin-modal-close]').forEach(function (btn) {
-		btn.addEventListener('click', function () { modal.classList.remove('is-open'); });
-	});
-
-	document.addEventListener('keydown', function (e) {
-		if (e.key === 'Escape') { modal.classList.remove('is-open'); }
-	});
-
-	document.querySelectorAll('.af-rate-admin').forEach(function (btn) {
-		btn.addEventListener('click', function () {
-			adminUserId = parseInt(btn.getAttribute('data-admin'), 10) || 0;
-			subtitle.textContent = btn.getAttribute('data-name');
-			comment.value = btn.getAttribute('data-comment') || '';
-			status.textContent = '';
-			status.className = 'af-modal__status';
-
-			let scores = {};
-			try { scores = JSON.parse(btn.getAttribute('data-scores') || '{}'); } catch (e) { scores = {}; }
-
-			adminCriteria.forEach(function (key) {
-				const value = parseInt(scores[key], 10);
-				if (value >= 1 && value <= 5) {
-					const input = modal.querySelector('input[name="af_admin_rate_' + key + '"][value="' + value + '"]');
-					if (input) { input.checked = true; }
-				} else {
-					const input = modal.querySelector('input[name="af_admin_rate_' + key + '"]:checked');
-					if (input) { input.checked = false; }
-				}
-			});
-
-			modal.classList.add('is-open');
-		});
-	});
-
-	confirm.addEventListener('click', function () {
-		confirm.disabled = true;
-		status.textContent = '';
-		status.className = 'af-modal__status';
-
-		const body = new URLSearchParams();
-		body.append('action', 'af_rate_admin');
-		body.append('nonce', nonce);
-		body.append('admin_user_id', adminUserId);
-		body.append('comment', comment.value);
-
-		adminCriteria.forEach(function (key) {
-			const checked = modal.querySelector('input[name="af_admin_rate_' + key + '"]:checked');
-			body.append(key, checked ? checked.value : '0');
-		});
-
-		fetch(ajaxUrl, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-			body: body
-		}).then((r) => r.json()).then(function (json) {
-			confirm.disabled = false;
-			if (!json || !json.success) {
-				status.textContent = (json && json.data && json.data.message) || 'Error';
-				status.className = 'af-modal__status is-error';
-				return;
-			}
-			status.textContent = json.data.message;
-			status.className = 'af-modal__status is-success';
-			setTimeout(function () { window.location.reload(); }, 800);
-		});
-	});
-}());
-</script>
+			<footer class="af-rv-drawer__foot">
+				<div class="af-rv-total" id="af-rv-total" aria-live="polite"></div>
+				<p class="af-rv-status" id="af-rv-status" role="status"></p>
+				<div class="af-rv-drawer__actions">
+					<button type="button" class="button" data-rv-close><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
+					<button type="button" class="button button-primary" id="af-rv-save"></button>
+				</div>
+			</footer>
+		</aside>
+	</div>
 <?php endif; ?>
+
+<script type="application/json" id="af-rv-config"><?php echo wp_json_encode( $config ); ?></script>
+<script>window.afRvDefaultTab = <?php echo wp_json_encode( $default_tab ); ?>;</script>

@@ -2284,6 +2284,15 @@ array(
 				array( 'af-tokens', 'af-shell', 'af-forms', 'af-admin-chrome' ),
 				file_exists( $reviews_css_path ) ? (string) filemtime( $reviews_css_path ) : ARRIENDO_FACIL_VERSION
 			);
+
+			$reviews_js_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/af-reviews.js';
+			wp_enqueue_script(
+				'af-reviews',
+				ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/af-reviews.js',
+				array(),
+				file_exists( $reviews_js_path ) ? (string) filemtime( $reviews_js_path ) : ARRIENDO_FACIL_VERSION,
+				true
+			);
 		}
 
 		$screen = get_current_screen();

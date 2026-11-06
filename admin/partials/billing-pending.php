@@ -129,6 +129,14 @@ $pending_nonce = wp_create_nonce( 'af_billing_nonce' );
 	var current = null;
 	var mode = 'all';
 
+	// .af-modal solo se muestra con .is-open; colgado de <body> para no quedar bajo el layout de WP.
+	document.body.appendChild( modal );
+	function setModal( open ) {
+		modal.hidden = ! open;
+		modal.classList.toggle( 'is-open', open );
+		document.body.classList.toggle( 'af-modal-open', open );
+	}
+
 	var T = {
 		method: { efectivo: '<?php echo esc_js( __( 'Efectivo', 'arriendo-facil' ) ); ?>', transferencia: '<?php echo esc_js( __( 'Transferencia', 'arriendo-facil' ) ); ?>', deposito: '<?php echo esc_js( __( 'Depósito', 'arriendo-facil' ) ); ?>', cheque: '<?php echo esc_js( __( 'Cheque', 'arriendo-facil' ) ); ?>', otro: '<?php echo esc_js( __( 'Otro', 'arriendo-facil' ) ); ?>' },
 		rejected: '<?php echo esc_js( __( 'Rechazada por el SRI: corrige y reemite', 'arriendo-facil' ) ); ?>',
@@ -270,7 +278,7 @@ $pending_nonce = wp_create_nonce( 'af_billing_nonce' );
 		document.getElementById( 'af-pending-warnings' ).hidden = true;
 		document.getElementById( 'af-pm-email' ).value = g.email || '';
 		document.getElementById( 'af-pm-issue' ).disabled = true;
-		modal.hidden = false;
+		setModal( true );
 		loadPreview();
 	}
 
@@ -313,15 +321,15 @@ $pending_nonce = wp_create_nonce( 'af_billing_nonce' );
 		issue( current, document.getElementById( 'af-pm-email' ).value ).then( function ( resp ) {
 			if ( resp.success ) {
 				fb.className = 'af-pending-feedback is-ok'; fb.textContent = T.issued;
-				setTimeout( function () { modal.hidden = true; load(); }, 1200 );
+				setTimeout( function () { setModal( false ); load(); }, 1200 );
 			} else {
 				fb.className = 'af-pending-feedback is-error'; fb.textContent = ( resp.data && resp.data.message ) || T.netErr; btn.disabled = false;
 			}
 		} ).catch( function () { fb.className = 'af-pending-feedback is-error'; fb.textContent = T.netErr; btn.disabled = false; } );
 	} );
 
-	modal.querySelectorAll( '[data-af-pending-close]' ).forEach( function ( n ) { n.addEventListener( 'click', function () { modal.hidden = true; if ( document.getElementById( 'af-pm-feedback' ).className.indexOf( 'is-ok' ) === -1 ) { return; } load(); } ); } );
-	document.addEventListener( 'keydown', function ( e ) { if ( e.key === 'Escape' ) { modal.hidden = true; } } );
+	modal.querySelectorAll( '[data-af-pending-close]' ).forEach( function ( n ) { n.addEventListener( 'click', function () { setModal( false ); if ( document.getElementById( 'af-pm-feedback' ).className.indexOf( 'is-ok' ) === -1 ) { return; } load(); } ); } );
+	document.addEventListener( 'keydown', function ( e ) { if ( e.key === 'Escape' ) { setModal( false ); } } );
 
 	filter.addEventListener( 'input', render );
 	// Deep-link desde Cobranza: ?s=<inquilino> deja la lista filtrada.

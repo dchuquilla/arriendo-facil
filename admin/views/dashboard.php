@@ -967,9 +967,85 @@ $recent_reviews        = (array) $wpdb->get_results(
 	<?php endif; ?>
 	</div>
 
+	<?php
+	$af_today_ts  = strtotime( gmdate( 'Y-m-d' ) );
+	$af_week_end  = gmdate( 'Y-m-d', strtotime( '+7 days', $af_today_ts ) );
+	$af_agenda    = array();
+	$af_push      = static function ( $date, $time, $icon, $kind, $tone, $who, $where ) use ( &$af_agenda, $af_week_end ) {
+		if ( empty( $date ) || $date < gmdate( 'Y-m-d' ) || $date > $af_week_end ) {
+			return;
+		}
+		$af_agenda[] = compact( 'date', 'time', 'icon', 'kind', 'tone', 'who', 'where' );
+	};
+	foreach ( $upcoming_moves as $move ) {
+		$af_push( $move->move_date, '00:00', 'log-in', __( 'Check-in', 'arriendo-facil' ), 'info', $move->contact_name, $move->accommodation_title );
+	}
+	foreach ( $upcoming_checkouts as $checkout ) {
+		$af_push( $checkout->end_date, '00:00', 'log-out', __( 'Salida', 'arriendo-facil' ), 'warning', $checkout->guest_name, $checkout->accommodation_title );
+	}
+	foreach ( $upcoming_visits as $visit ) {
+		$af_push( $visit->visit_date, (string) $visit->start_time, 'calendar', __( 'Visita', 'arriendo-facil' ), 'success', $visit->guest_name, $visit->accommodation_title );
+	}
+	usort(
+		$af_agenda,
+		static function ( $a, $b ) {
+			return strcmp( $a['date'] . $a['time'], $b['date'] . $b['time'] );
+		}
+	);
+	$af_agenda = array_slice( $af_agenda, 0, 6 );
+
+	$af_agenda_stats = array(
+		array( 'icon' => 'log-in', 'value' => count( $upcoming_moves ), 'label' => __( 'Check-in próximos', 'arriendo-facil' ), 'tone' => '' ),
+		array( 'icon' => 'log-out', 'value' => count( $upcoming_checkouts ), 'label' => __( 'Check-out próximos', 'arriendo-facil' ), 'tone' => '' ),
+		array( 'icon' => 'calendar', 'value' => count( $upcoming_visits ), 'label' => __( 'Visitas agendadas', 'arriendo-facil' ), 'tone' => $prospects_pending > 0 ? 'is-warn' : '' ),
+		array( 'icon' => 'clock', 'value' => (int) $exit_buckets['30'], 'label' => __( 'Contratos vencen ≤ 30 días', 'arriendo-facil' ), 'tone' => $exit_buckets['30'] > 0 ? 'is-danger' : '' ),
+	);
+	?>
+	<section class="af-agenda" aria-labelledby="af-agenda-title">
+		<header class="af-agenda__head">
+			<div>
+				<h2 class="af-agenda__title" id="af-agenda-title"><?php esc_html_e( 'Agenda operativa', 'arriendo-facil' ); ?></h2>
+				<p class="af-agenda__subtitle"><?php esc_html_e( 'Lo que viene en los próximos 7 días.', 'arriendo-facil' ); ?></p>
+			</div>
+			<a class="af-kpi__link" href="<?php echo esc_url( admin_url( 'admin.php?page=af-calendar' ) ); ?>"><?php esc_html_e( 'Abrir calendario', 'arriendo-facil' ); ?></a>
+		</header>
+
+		<div class="af-agenda__stats">
+			<?php foreach ( $af_agenda_stats as $af_stat ) : ?>
+				<a class="af-agenda__stat <?php echo esc_attr( $af_stat['tone'] ); ?>" href="#af-agenda-detail" data-af-open-agenda>
+					<span class="af-agenda__stat-icon" aria-hidden="true"><?php echo af_lucide( $af_stat['icon'], 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+					<span class="af-agenda__stat-value"><?php echo esc_html( number_format_i18n( $af_stat['value'] ) ); ?></span>
+					<span class="af-agenda__stat-label"><?php echo esc_html( $af_stat['label'] ); ?></span>
+				</a>
+			<?php endforeach; ?>
+		</div>
+
+		<?php if ( empty( $af_agenda ) ) : ?>
+			<p class="af-empty__text"><?php esc_html_e( 'Sin movimientos programados esta semana.', 'arriendo-facil' ); ?></p>
+		<?php else : ?>
+			<ol class="af-agenda__list">
+				<?php foreach ( $af_agenda as $af_event ) : ?>
+					<?php
+					$af_days = (int) round( ( strtotime( $af_event['date'] ) - $af_today_ts ) / DAY_IN_SECONDS );
+					$af_when = 0 === $af_days ? __( 'Hoy', 'arriendo-facil' ) : ( 1 === $af_days ? __( 'Mañana', 'arriendo-facil' ) : wp_date( 'D j M', strtotime( $af_event['date'] ) ) );
+					$af_who  = trim( (string) $af_event['who'] ) ? trim( (string) $af_event['who'] ) : __( 'Sin nombre', 'arriendo-facil' );
+					?>
+					<li class="af-agenda__item">
+						<span class="af-agenda__when<?php echo 0 === $af_days ? ' is-today' : ''; ?>"><?php echo esc_html( $af_when ); ?></span>
+						<span class="af-agenda__dot af-agenda__dot--<?php echo esc_attr( $af_event['tone'] ); ?>" aria-hidden="true"><?php echo af_lucide( $af_event['icon'], 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+						<span class="af-agenda__what">
+							<strong><?php echo esc_html( $af_event['kind'] . ' · ' . $af_who ); ?></strong>
+							<small><?php echo esc_html( $af_event['where'] ? $af_event['where'] : '—' ); ?></small>
+						</span>
+					</li>
+				<?php endforeach; ?>
+			</ol>
+		<?php endif; ?>
+	</section>
+
 	<?php $af_calendar_open = isset( $_GET['af_date_from'] ) || isset( $_GET['af_date_to'] ) || isset( $_GET['af_building_id'] ) || isset( $_GET['af_accommodation_id'] ) || isset( $_GET['af_admin_id'] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended ?>
-	<details class="af-collapsible"<?php echo $af_calendar_open ? ' open' : ''; ?>>
-	<summary class="af-collapsible__summary"><?php esc_html_e( 'Agenda operativa: calendario, visitas y vencimientos', 'arriendo-facil' ); ?></summary>
+	<details class="af-collapsible" id="af-agenda-detail"<?php echo $af_calendar_open ? ' open' : ''; ?>>
+	<summary class="af-collapsible__summary"><?php esc_html_e( 'Ver calendario completo, filtros y vencimientos', 'arriendo-facil' ); ?></summary>
 
 	<section class="af-section" aria-labelledby="af-calendar-title" id="af-alerts">
 		<header class="af-section__header">
@@ -1150,6 +1226,19 @@ $recent_reviews        = (array) $wpdb->get_results(
 		<?php endif; ?>
 	</section>
 	</details>
+	<script>
+	document.querySelectorAll( '[data-af-open-agenda]' ).forEach( function( link ) {
+		link.addEventListener( 'click', function( event ) {
+			var detail = document.getElementById( 'af-agenda-detail' );
+			if ( ! detail ) {
+				return;
+			}
+			event.preventDefault();
+			detail.open = true;
+			detail.scrollIntoView( { behavior: 'smooth', block: 'start' } );
+		} );
+	} );
+	</script>
 
 	<div class="af-split">
 

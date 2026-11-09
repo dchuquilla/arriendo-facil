@@ -408,12 +408,12 @@ foreach ( $invoices as $inv_row ) {
 									<?php esc_html_e( 'XML', 'arriendo-facil' ); ?>
 								</a>
 							<?php endif; ?>
-							<?php if ( in_array( (string) $inv->estado, array( 'error_envio', 'error_autorizacion', 'devuelta', 'no_autorizada', 'autorizada_sin_ride' ), true ) ) : ?>
+							<?php if ( in_array( (string) $inv->estado, array( 'enviada', 'error_envio', 'error_autorizacion', 'devuelta', 'no_autorizada', 'autorizada_sin_ride' ), true ) ) : ?>
 								<form method="post" style="display:inline;">
 									<?php wp_nonce_field( 'af_billing_retry_invoice' ); ?>
 									<input type="hidden" name="invoice_id" value="<?php echo (int) $inv->id; ?>" />
 									<button type="submit" name="af_retry_invoice_submit" class="button button-small" style="padding:4px 8px; font-size:11px;">
-										<?php esc_html_e( 'Reintentar', 'arriendo-facil' ); ?>
+										<?php echo 'enviada' === (string) $inv->estado ? esc_html__( 'Consultar SRI', 'arriendo-facil' ) : esc_html__( 'Reintentar', 'arriendo-facil' ); ?>
 									</button>
 								</form>
 							<?php endif; ?>
@@ -1002,6 +1002,21 @@ foreach ( $invoices as $inv_row ) {
 		}
 	}
 
+	function reloadRows() {
+		// Las filas nuevas o con otro estado vienen ya renderizadas (y escapadas) por el servidor.
+		return fetch( window.location.href, { credentials: 'same-origin' } )
+			.then( function ( r ) { return r.text(); } )
+			.then( function ( html ) {
+				var fresh = new DOMParser().parseFromString( html, 'text/html' ).getElementById( 'af-invoices-tbody' );
+				if ( ! fresh ) { return; }
+				tbody.innerHTML = fresh.innerHTML;
+				updateCounts();
+				filterTable( true );
+				lastRefresh = Date.now();
+				updateLastRefreshTime();
+			} );
+	}
+
 	function refreshInvoices() {
 		if ( ! tbody || ! table ) return;
 
@@ -1023,22 +1038,16 @@ foreach ( $invoices as $inv_row ) {
 		.then( function ( resp ) {
 			if ( resp.success && resp.data && resp.data.invoices ) {
 				var invoices = resp.data.invoices;
-				var currentIds = new Set();
-				tbody.querySelectorAll( 'tr[data-invoice-id]' ).forEach( function ( row ) {
-					currentIds.add( parseInt( row.dataset.invoiceId ) );
-				} );
-
+				var needsRows = false;
 				invoices.forEach( function ( inv ) {
 					var row = tbody.querySelector( 'tr[data-invoice-id="' + inv.id + '"]' );
-					if ( row ) {
-						var statusCell = row.querySelectorAll( 'td' )[ 5 ];
-						if ( statusCell && row.dataset.estado !== inv.estado ) {
-							statusCell.style.animation = 'pulse 0.5s';
-							row.dataset.estado = inv.estado;
-							row.dataset.grupo = inv.grupo;
-						}
+					if ( ! row || row.dataset.estado !== inv.estado ) {
+						needsRows = true;
 					}
 				} );
+				if ( needsRows ) {
+					return reloadRows();
+				}
 
 				updateCounts();
 				filterTable( true );
@@ -1058,6 +1067,18 @@ foreach ( $invoices as $inv_row ) {
 	if ( tableRefreshBtn ) {
 		tableRefreshBtn.addEventListener( 'click', refreshInvoices );
 	}
+
+	// Al abrir la pestaña Emitidas se actualiza al instante, sin esperar al ciclo de 15 s.
+	var emitidasTab = document.getElementById( 'af-tab-billing-comprobantes' );
+	if ( emitidasTab ) {
+		emitidasTab.addEventListener( 'change', function () { if ( emitidasTab.checked ) { refreshInvoices(); } } );
+	}
+
+	// "Por facturar" avisa cuando emite: si aún no hay tabla (sin comprobantes) se recarga la página.
+	document.addEventListener( 'af:invoice-issued', function () {
+		if ( ! tbody ) { window.location.reload(); return; }
+		refreshInvoices();
+	} );
 
 	setInterval( updateLastRefreshTime, 1000 );
 	setInterval( function () {

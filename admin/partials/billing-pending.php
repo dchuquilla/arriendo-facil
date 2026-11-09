@@ -367,7 +367,7 @@ $pending_nonce = wp_create_nonce( 'af_billing_nonce' );
 		issue( current, document.getElementById( 'af-pm-email' ).value, edits() ).then( function ( resp ) {
 			if ( resp.success ) {
 				fb.className = 'af-pending-feedback is-ok'; fb.textContent = T.issued;
-				setTimeout( function () { setModal( false ); load(); }, 1200 );
+				setTimeout( function () { setModal( false ); load(); document.dispatchEvent( new CustomEvent( 'af:invoice-issued' ) ); }, 1200 );
 			} else {
 				fb.className = 'af-pending-feedback is-error'; fb.textContent = ( resp.data && resp.data.message ) || T.netErr; btn.disabled = false;
 			}
@@ -410,6 +410,7 @@ $pending_nonce = wp_create_nonce( 'af_billing_nonce' );
 				results.appendChild( el( 'p', errors.length ? 'is-error' : 'is-ok', T.done + ': ' + ok + ( errors.length ? ' · ' + errors.length + ' ' + T.failed : '' ) ) );
 				errors.forEach( function ( m ) { results.appendChild( el( 'p', 'is-error', m ) ); } );
 				load();
+				if ( ok ) { document.dispatchEvent( new CustomEvent( 'af:invoice-issued' ) ); }
 				return;
 			}
 			var g = todo[ i ];

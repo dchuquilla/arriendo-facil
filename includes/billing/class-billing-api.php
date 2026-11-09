@@ -21,10 +21,13 @@ class Arriendo_Facil_Billing_API {
 	const RETRY_LOCK_TRANSIENT = 'af_sri_retry_lock';
 
 	/** Maximum age for SRI "en proceso" before escalating to manual review. */
-	const EN_PROCESO_MAX_AGE = 72 * HOUR_IN_SECONDS;
+	const EN_PROCESO_MAX_AGE = 3 * HOUR_IN_SECONDS;
 
 	/** Maximum retry attempts while SRI keeps returning "en proceso". */
-	const EN_PROCESO_MAX_ATTEMPTS = 96;
+	const EN_PROCESO_MAX_ATTEMPTS = 12;
+
+	/** Tras escalar a error se sigue consultando cada hora hasta esta edad; luego solo reintento manual. */
+	const EN_PROCESO_GIVE_UP_AGE = 7 * DAY_IN_SECONDS;
 
 	/** @var Arriendo_Facil_Billing_Manager */
 	private $manager;
@@ -519,23 +522,27 @@ class Arriendo_Facil_Billing_API {
 					$max_age = (int) apply_filters( 'af_billing_en_proceso_max_age', self::EN_PROCESO_MAX_AGE );
 					$max_attempts = (int) apply_filters( 'af_billing_en_proceso_max_attempts', self::EN_PROCESO_MAX_ATTEMPTS );
 
+					$escalated = ! empty( $meta['escalated'] );
+					$give_up   = (int) apply_filters( 'af_billing_en_proceso_give_up_age', self::EN_PROCESO_GIVE_UP_AGE );
+
 					$retry_meta[ $invoice_id ] = array_merge(
 						$meta,
 						array(
 							'en_proceso_since'    => $en_proceso_since,
 							'en_proceso_attempts' => $en_proceso_attempts,
-							'next_ts'             => $now + ( 15 * MINUTE_IN_SECONDS ),
+							'next_ts'             => $now + ( $escalated ? HOUR_IN_SECONDS : 15 * MINUTE_IN_SECONDS ),
 						)
 					);
 
-					if ( ( $now - $en_proceso_since ) >= $max_age || $en_proceso_attempts >= $max_attempts ) {
+					$just_escalated = ! $escalated && ( ( $now - $en_proceso_since ) >= $max_age || $en_proceso_attempts >= $max_attempts );
+					if ( $just_escalated || $escalated ) {
 						global $wpdb;
+						// retry_invoice() deja la factura en "enviada"; se vuelve a marcar como pendiente de revisión.
 						if ( $wpdb ) {
 							$mensaje = sprintf(
-								/* translators: 1: retry attempts, 2: max hours in queue */
-								__( 'SRI mantiene este comprobante en "EN PROCESO" (%1$d intentos, más de %2$d horas). Se pausaron reintentos automáticos; revisa el log SRI y reintenta manualmente.', 'arriendo-facil' ),
-								$en_proceso_attempts,
-								max( 1, (int) floor( $max_age / HOUR_IN_SECONDS ) )
+								/* translators: %d: hours in queue */
+								__( 'El SRI aún no confirma este comprobante (más de %d horas en proceso). Seguimos consultando automáticamente cada hora; también puedes pulsar "Reintentar".', 'arriendo-facil' ),
+								max( 1, (int) floor( ( $now - $en_proceso_since ) / HOUR_IN_SECONDS ) )
 							);
 
 							$wpdb->update(
@@ -550,12 +557,18 @@ class Arriendo_Facil_Billing_API {
 							);
 						}
 
-						$retry_meta[ $invoice_id ] = array(
-							'paused'   => 1,
-							'attempts' => isset( $meta['attempts'] ) ? (int) $meta['attempts'] + 1 : 1,
-							'next_ts'  => 0,
-						);
-						error_log( 'Arriendo Facil billing retry invoice ' . $invoice_id . ' escalada desde EN PROCESO a error_autorizacion tras ' . $en_proceso_attempts . ' intentos.' );
+						$retry_meta[ $invoice_id ]['escalated'] = 1;
+						if ( ( $now - $en_proceso_since ) >= $give_up ) {
+							// Tras varios días sin respuesta del SRI se deja de insistir solo; queda el reintento manual.
+							$retry_meta[ $invoice_id ] = array(
+								'paused'   => 1,
+								'attempts' => isset( $meta['attempts'] ) ? (int) $meta['attempts'] + 1 : 1,
+								'next_ts'  => 0,
+							);
+						}
+						if ( $just_escalated ) {
+							error_log( 'Arriendo Facil billing retry invoice ' . $invoice_id . ' escalada desde EN PROCESO a error_autorizacion tras ' . $en_proceso_attempts . ' intentos.' );
+						}
 					}
 
 					continue;
@@ -945,6 +958,25 @@ class Arriendo_Facil_Billing_API {
 			}
 			$owner_ids_sql = implode( ',', array_map( 'intval', $owner_acc_ids ) );
 			$owner_where   = " AND COALESCE(l.accommodation_id, cr.accommodation_id) IN ($owner_ids_sql)";
+		}
+
+		// Consulta al SRI las facturas en proceso del usuario sin esperar al cron (máx. 3, una vez por 45 s).
+		$pending_ids = $wpdb->get_col(
+			"SELECT ei.id
+			 FROM {$wpdb->prefix}af_electronic_invoices ei
+			 LEFT JOIN {$wpdb->prefix}af_leases l ON l.id = ei.lease_id
+			 LEFT JOIN {$wpdb->prefix}af_cleaning_requests cr ON cr.id = ei.cleaning_request_id
+			 WHERE ei.estado = 'enviada' {$owner_where}
+			 ORDER BY ei.created_at ASC
+			 LIMIT 3"
+		);
+		foreach ( (array) $pending_ids as $pending_id ) {
+			$poll_key = 'af_sri_poll_' . (int) $pending_id;
+			if ( get_transient( $poll_key ) ) {
+				continue;
+			}
+			set_transient( $poll_key, 1, 45 );
+			$this->manager->retry_invoice( (int) $pending_id );
 		}
 
 		$results = $wpdb->get_results(

@@ -1029,12 +1029,16 @@ class Arriendo_Facil_Billing_API {
 		if ( isset( $_POST['forma_pago'] ) ) {
 			$overrides['forma_pago'] = sanitize_text_field( wp_unslash( $_POST['forma_pago'] ) );
 		}
+		if ( isset( $_POST['buyer_id_type'] ) ) {
+			$overrides['buyer_id_type'] = sanitize_text_field( wp_unslash( $_POST['buyer_id_type'] ) );
+		}
 
 		return array(
 			'lease_id'   => $lease_id,
 			'charge_ids' => $charge_ids,
 			'email'      => $email,
 			'overrides'  => $overrides,
+			'save_guest' => ! empty( $_POST['save_guest'] ),
 		);
 	}
 
@@ -1125,6 +1129,7 @@ class Arriendo_Facil_Billing_API {
 			array(
 				'lines'           => $lines,
 				'forma_pago_code' => (string) $plan['payload']['forma_pago'],
+				'buyer_id_type'   => (string) $plan['id_type'],
 				'buyer_name'  => (string) $plan['payload']['razon_social_comprador'],
 				'buyer_id'    => (string) $plan['payload']['identificacion_comprador'],
 				'email'       => (string) $plan['email'],
@@ -1184,6 +1189,10 @@ class Arriendo_Facil_Billing_API {
 		}
 
 		unset( $result['xml_firmado'], $result['xml_autorizacion'], $result['ride_path'] );
+		// La identificación ya pasó la validación del plan al emitir: es segura de guardar.
+		if ( $req['save_guest'] && ! empty( $req['overrides']['buyer_id'] ) && ! empty( $req['overrides']['buyer_id_type'] ) ) {
+			$this->manager->remember_buyer_identity( $req['lease_id'], (string) $req['overrides']['buyer_id'], (string) $req['overrides']['buyer_id_type'] );
+		}
 		wp_send_json_success( $result );
 	}
 }

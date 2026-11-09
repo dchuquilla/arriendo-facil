@@ -603,6 +603,7 @@ class Arriendo_Facil_Activator {
 				email       VARCHAR(200) NOT NULL,
 				phone       VARCHAR(50) DEFAULT NULL,
 				id_number   VARCHAR(100) DEFAULT NULL,
+				id_type     CHAR(2) DEFAULT NULL COMMENT 'SRI: 04 RUC, 05 cedula, 06 pasaporte, 08 exterior',
 				nationality VARCHAR(100) DEFAULT NULL,
 				birth_city  VARCHAR(150) DEFAULT NULL,
 				ai_score    DECIMAL(5,2) DEFAULT NULL,
@@ -1926,6 +1927,10 @@ class Arriendo_Facil_Activator {
 		}
 		if ( ! $has_index( $charges, 'invoice_id' ) ) {
 			$wpdb->query( "ALTER TABLE {$charges} ADD KEY invoice_id (invoice_id)" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		}
+		$guests = $wpdb->prefix . 'af_guests';
+		if ( ! $has_column( $guests, 'id_type' ) ) {
+			$wpdb->query( "ALTER TABLE {$guests} ADD COLUMN id_type CHAR(2) DEFAULT NULL AFTER id_number" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		}
 		if ( ! $has_column( $invoices, 'emailed_at' ) ) {
 			$wpdb->query( "ALTER TABLE {$invoices} ADD COLUMN emailed_at DATETIME DEFAULT NULL" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared

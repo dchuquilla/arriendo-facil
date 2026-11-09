@@ -139,6 +139,26 @@ class BillingChargesInvoiceTest extends TestCase {
 		$this->assertSame( '9999999999999', $small['payload']['identificacion_comprador'] );
 	}
 
+	public function test_foreign_buyer_with_passport_is_billed_without_cedula_validation(): void {
+		$row = $this->row( 1, 'canon', '2026-10', 400.0, array( 'id_number' => '' ) );
+		foreach ( array( 'AB1234567', '12345678' ) as $passport ) {
+			$plan = $this->manager( array( $row ) )->build_charges_invoice_plan( 10, array( 1 ), array( 'buyer_id' => $passport, 'buyer_id_type' => '06' ) );
+
+			$this->assertSame( '', $plan['blocking'] );
+			$this->assertSame( '06', $plan['payload']['tipo_id_comprador'] );
+			$this->assertSame( $passport, $plan['payload']['identificacion_comprador'] );
+		}
+	}
+
+	public function test_invalid_cedula_blocks_but_passport_type_does_not(): void {
+		$row     = $this->row( 1, 'canon', '2026-10', 400.0, array( 'id_number' => '1714665521' ) );
+		$as_ced  = $this->manager( array( $row ) )->build_charges_invoice_plan( 10, array( 1 ), array( 'buyer_id_type' => '05' ) );
+		$as_pass = $this->manager( array( $row ) )->build_charges_invoice_plan( 10, array( 1 ), array( 'buyer_id_type' => '06' ) );
+
+		$this->assertNotSame( '', $as_ced['blocking'] );
+		$this->assertSame( '', $as_pass['blocking'] );
+	}
+
 	public function test_missing_email_only_warns(): void {
 		$plan = $this->manager( array( $this->row( 1, 'canon', '2026-10', 400.0, array( 'email' => '' ) ) ) )->build_charges_invoice_plan( 10, array( 1 ) );
 

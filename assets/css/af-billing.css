@@ -1109,3 +1109,5 @@
 .af-pending-dialog .af-pending-email input { min-height: 42px; padding: 0 12px; border: 1px solid var(--af-gray-300, #C3D1CE); border-radius: 10px; }
 .af-pending-dialog .af-pending-actions { margin-top: 8px; padding-top: 16px; border-top: 1px solid var(--af-gray-200, #DCE5E3); }
 @media (max-width: 600px) { .af-pending-dialog .af-pending-buyer { grid-template-columns: 1fr; } }
+.af-pending-save { display: flex; align-items: flex-start; gap: 8px; margin: 14px 0 0; font-size: 12.5px; color: var(--af-gray-700); cursor: pointer; }
+.af-pending-save input { margin-top: 2px; }

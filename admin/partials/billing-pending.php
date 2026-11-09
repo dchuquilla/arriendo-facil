@@ -85,7 +85,16 @@ $pending_nonce = wp_create_nonce( 'af_billing_nonce' );
 			<p class="af-pending-hint"><?php esc_html_e( 'Corrige aquí los datos del cliente antes de emitir. Los conceptos y montos no se editan: vienen de los cobros registrados.', 'arriendo-facil' ); ?></p>
 			<div class="af-pending-buyer">
 				<label class="af-pending-field"><span><?php esc_html_e( 'Cliente (razón social)', 'arriendo-facil' ); ?></span><input type="text" id="af-pm-buyer" maxlength="300" /></label>
-				<label class="af-pending-field"><span><?php esc_html_e( 'Cédula, RUC o pasaporte', 'arriendo-facil' ); ?></span><input type="text" id="af-pm-id" maxlength="20" inputmode="numeric" /><small id="af-pm-id-type"></small></label>
+				<label class="af-pending-field"><span><?php esc_html_e( 'Tipo de identificación', 'arriendo-facil' ); ?></span>
+					<select id="af-pm-idtype">
+						<option value="05"><?php esc_html_e( 'Cédula', 'arriendo-facil' ); ?></option>
+						<option value="04"><?php esc_html_e( 'RUC', 'arriendo-facil' ); ?></option>
+						<option value="06"><?php esc_html_e( 'Pasaporte (extranjero)', 'arriendo-facil' ); ?></option>
+						<option value="08"><?php esc_html_e( 'Identificación del exterior', 'arriendo-facil' ); ?></option>
+						<option value="07"><?php esc_html_e( 'Consumidor final', 'arriendo-facil' ); ?></option>
+					</select>
+				</label>
+				<label class="af-pending-field"><span><?php esc_html_e( 'Número de identificación', 'arriendo-facil' ); ?></span><input type="text" id="af-pm-id" maxlength="20" autocomplete="off" /><small><?php esc_html_e( 'Extranjeros: número de pasaporte, con letras si las tiene.', 'arriendo-facil' ); ?></small></label>
 				<label class="af-pending-field"><span><?php esc_html_e( 'Forma de pago', 'arriendo-facil' ); ?></span>
 					<select id="af-pm-pay">
 						<option value="01"><?php esc_html_e( 'Efectivo', 'arriendo-facil' ); ?></option>
@@ -106,6 +115,10 @@ $pending_nonce = wp_create_nonce( 'af_billing_nonce' );
 			<label class="af-pending-email">
 				<span><?php esc_html_e( 'Enviar RIDE y XML a', 'arriendo-facil' ); ?></span>
 				<input type="email" id="af-pm-email" placeholder="correo@inquilino.com" />
+			</label>
+			<label class="af-pending-save">
+				<input type="checkbox" id="af-pm-save" />
+				<span><?php esc_html_e( 'Guardar esta identificación en la ficha del inquilino para sus próximas facturas', 'arriendo-facil' ); ?></span>
 			</label>
 			<p id="af-pm-feedback" class="af-pending-feedback" aria-live="polite"></p>
 			<div class="af-pending-actions">
@@ -297,7 +310,9 @@ $pending_nonce = wp_create_nonce( 'af_billing_nonce' );
 			email: document.getElementById( 'af-pm-email' ).value,
 			buyer_name: document.getElementById( 'af-pm-buyer' ).value,
 			buyer_id: document.getElementById( 'af-pm-id' ).value,
-			forma_pago: document.getElementById( 'af-pm-pay' ).value
+			buyer_id_type: document.getElementById( 'af-pm-idtype' ).value,
+			forma_pago: document.getElementById( 'af-pm-pay' ).value,
+			save_guest: document.getElementById( 'af-pm-save' ).checked ? '1' : ''
 		};
 		return data;
 	}
@@ -311,12 +326,12 @@ $pending_nonce = wp_create_nonce( 'af_billing_nonce' );
 			if ( ! resp.success ) { fb.textContent = ( resp.data && resp.data.message ) || T.loadErr; fb.className = 'af-pending-feedback is-error'; return; }
 			var d = resp.data;
 			fb.textContent = '';
-			var idDigits = ( d.buyer_id || '' ).replace( /\D/g, '' );
-			document.getElementById( 'af-pm-id-type' ).textContent = idDigits === '9999999999999' ? T.idFinal : ( idDigits.length === 13 ? 'RUC' : ( idDigits.length === 10 ? T.idCedula : T.idPassport ) );
 			document.getElementById( 'af-pm-date' ).textContent = d.fecha;
 			if ( initial ) {
 				document.getElementById( 'af-pm-buyer' ).value = d.buyer_name;
 				document.getElementById( 'af-pm-id' ).value = d.buyer_id;
+				document.getElementById( 'af-pm-save' ).checked = false;
+				document.getElementById( 'af-pm-idtype' ).value = d.buyer_id_type;
 				document.getElementById( 'af-pm-pay' ).value = d.forma_pago_code;
 				var body = document.getElementById( 'af-pm-items' ); body.innerHTML = '';
 				d.lines.forEach( function ( it ) {
@@ -342,7 +357,7 @@ $pending_nonce = wp_create_nonce( 'af_billing_nonce' );
 		return post( req );
 	}
 
-	[ 'af-pm-email', 'af-pm-buyer', 'af-pm-id', 'af-pm-pay' ].forEach( function ( id ) {
+	[ 'af-pm-email', 'af-pm-buyer', 'af-pm-id', 'af-pm-idtype', 'af-pm-pay' ].forEach( function ( id ) {
 		document.getElementById( id ).addEventListener( 'change', function () { if ( current ) { loadPreview( false ); } } );
 	} );
 

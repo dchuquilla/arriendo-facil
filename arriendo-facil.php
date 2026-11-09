@@ -361,6 +361,7 @@ function arriendo_facil_has_lease_schema_drift() {
 	$required_columns = array(
 		$wpdb->prefix . 'af_leases'  => array( 'template_attachment_id', 'payment_due_day' ),
 		$wpdb->prefix . 'af_charges' => array( 'invoice_id' ),
+		$wpdb->prefix . 'af_guests'  => array( 'id_type' ),
 	);
 
 	foreach ( $required_columns as $table_name => $required ) {

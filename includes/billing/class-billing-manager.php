@@ -637,6 +637,54 @@ class Arriendo_Facil_Billing_Manager {
 	}
 
 	/**
+	 * Whether af_guests already has the id_type column (older databases may not).
+	 */
+	protected function guests_have_id_type(): bool {
+		static $has = array();
+		$table = $this->wpdb->prefix . 'af_guests';
+		if ( ! isset( $has[ $table ] ) ) {
+			if ( ! method_exists( $this->wpdb, 'get_var' ) ) {
+				return false;
+			}
+			$has[ $table ] = (int) $this->wpdb->get_var(
+				$this->wpdb->prepare(
+					'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = %s',
+					DB_NAME,
+					$table,
+					'id_type'
+				)
+			) > 0;
+		}
+		return $has[ $table ];
+	}
+
+	/**
+	 * Stores the buyer's identification (number + SRI type) on the tenant record so it
+	 * does not have to be typed again on the next invoice.
+	 *
+	 * @param int    $lease_id Lease ID.
+	 * @param string $number   Identification number.
+	 * @param string $type     SRI type: 04, 05, 06 or 08.
+	 */
+	public function remember_buyer_identity( int $lease_id, string $number, string $type ): bool {
+		$number = trim( $number );
+		if ( ! $this->wpdb || $lease_id <= 0 || '' === $number || '9999999999999' === $number || ! in_array( $type, array( '04', '05', '06', '08' ), true ) ) {
+			return false;
+		}
+		$guest_id = (int) $this->wpdb->get_var(
+			$this->wpdb->prepare( "SELECT guest_id FROM {$this->wpdb->prefix}af_leases WHERE id = %d LIMIT 1", $lease_id )
+		);
+		if ( $guest_id <= 0 ) {
+			return false;
+		}
+		$data = array( 'id_number' => mb_substr( $number, 0, 20 ) );
+		if ( $this->guests_have_id_type() ) {
+			$data['id_type'] = $type;
+		}
+		return false !== $this->wpdb->update( $this->wpdb->prefix . 'af_guests', $data, array( 'id' => $guest_id ) );
+	}
+
+	/**
 	 * Paid charges not yet covered by a valid electronic invoice.
 	 *
 	 * @param array $args owner_accommodation_ids (int[]|null), lease_id (int), limit (int).
@@ -664,10 +712,11 @@ class Arriendo_Facil_Billing_Manager {
 			$where .= ' AND l.accommodation_id IN (' . implode( ',', $ids ) . ')';
 		}
 		$limit = max( 1, min( 500, (int) ( $args['limit'] ?? 300 ) ) );
+		$id_type_col = $this->guests_have_id_type() ? 'g.id_type' : 'NULL AS id_type';
 
 		$sql = "SELECT c.id, c.lease_id, c.charge_type, c.period, c.description, c.amount, c.invoice_id,
 		               l.accommodation_id, p.post_title AS accommodation_title,
-		               g.first_name, g.last_name, g.id_number, g.email,
+		               g.first_name, g.last_name, g.id_number, {$id_type_col}, g.email,
 		               ei.estado AS invoice_estado, ei.numero_comprobante AS invoice_number,
 		               ( SELECT MAX(pm.payment_date) FROM {$p}af_payments pm WHERE pm.charge_id = c.id ) AS paid_on,
 		               ( SELECT pm2.method FROM {$p}af_payments pm2 WHERE pm2.charge_id = c.id ORDER BY pm2.payment_date DESC, pm2.id DESC LIMIT 1 ) AS pay_method
@@ -731,6 +780,13 @@ class Arriendo_Facil_Billing_Manager {
 		if ( ! empty( $overrides['buyer_id'] ) ) {
 			$guest_id = trim( mb_substr( (string) $overrides['buyer_id'], 0, 20 ) );
 		}
+		$id_type = isset( $overrides['buyer_id_type'] ) && in_array( (string) $overrides['buyer_id_type'], array( '04', '05', '06', '08' ), true )
+			? (string) $overrides['buyer_id_type']
+			: '';
+		// Sin edición del usuario, se usa el tipo guardado en la ficha (p. ej. pasaporte).
+		if ( '' === $id_type && empty( $overrides['buyer_id'] ) && isset( $first->id_type ) && in_array( (string) $first->id_type, array( '04', '05', '06', '08' ), true ) ) {
+			$id_type = (string) $first->id_type;
+		}
 		$accommodation = '' !== (string) $first->accommodation_title ? (string) $first->accommodation_title : 'Inmueble';
 		$warnings    = array();
 		$blocking    = '';
@@ -772,6 +828,7 @@ class Arriendo_Facil_Billing_Manager {
 		}
 		if ( '' === $guest_id ) {
 			$guest_id = '9999999999999';
+			$id_type  = '07';
 			if ( $total_base > self::CONSUMIDOR_FINAL_LIMIT ) {
 				$blocking = __( 'El inquilino no tiene cédula/RUC registrado. El SRI no permite facturar a consumidor final montos mayores a $50: completa su ficha.', 'arriendo-facil' );
 			} else {
@@ -779,13 +836,20 @@ class Arriendo_Facil_Billing_Manager {
 			}
 		} elseif ( '' === $blocking && class_exists( 'Arriendo_Facil_Identity_Validator' ) ) {
 			$id_digits = preg_replace( '/\D/', '', $guest_id );
-			if ( 10 === strlen( $id_digits ) && ctype_digit( $guest_id ) && ! Arriendo_Facil_Identity_Validator::validate_cedula( $id_digits ) ) {
-				$blocking = __( 'La cédula no es válida. Corrígela antes de emitir: el SRI rechazaría la factura.', 'arriendo-facil' );
-			} elseif ( 13 === strlen( $id_digits ) && ctype_digit( $guest_id ) && '9999999999999' !== $id_digits && ! Arriendo_Facil_Identity_Validator::validate_ruc( $id_digits ) ) {
-				$blocking = __( 'El RUC no es válido. Corrígelo antes de emitir: el SRI rechazaría la factura.', 'arriendo-facil' );
-			} elseif ( ctype_digit( $guest_id ) && ! in_array( strlen( $guest_id ), array( 10, 13 ), true ) ) {
-				$blocking = __( 'La identificación debe tener 10 dígitos (cédula) o 13 (RUC). Para extranjeros usa el pasaporte con letras y números.', 'arriendo-facil' );
+			$id_kind   = '' !== $id_type ? $id_type : Arriendo_Facil_SRI_XML_Factura::infer_buyer_id_type( $guest_id );
+			if ( '05' === $id_kind && ( ! ctype_digit( $guest_id ) || ! Arriendo_Facil_Identity_Validator::validate_cedula( $id_digits ) ) ) {
+				$blocking = __( 'La cédula no es válida (10 dígitos). Corrígela antes de emitir: el SRI rechazaría la factura. Si es extranjero, elige "Pasaporte".', 'arriendo-facil' );
+			} elseif ( '04' === $id_kind && ( ! ctype_digit( $guest_id ) || ! Arriendo_Facil_Identity_Validator::validate_ruc( $id_digits ) ) ) {
+				$blocking = __( 'El RUC no es válido (13 dígitos). Corrígelo antes de emitir: el SRI rechazaría la factura.', 'arriendo-facil' );
+			} elseif ( in_array( $id_kind, array( '06', '08' ), true ) && ( strlen( $guest_id ) < 3 || strlen( $guest_id ) > 20 ) ) {
+				$blocking = __( 'El pasaporte o la identificación del exterior debe tener entre 3 y 20 caracteres.', 'arriendo-facil' );
 			}
+			if ( '' === $id_type ) {
+				$id_type = $id_kind;
+			}
+		}
+		if ( '' === $id_type ) {
+			$id_type = Arriendo_Facil_SRI_XML_Factura::infer_buyer_id_type( $guest_id );
 		}
 
 		$email = isset( $overrides['email'] ) && '' !== (string) $overrides['email'] ? (string) $overrides['email'] : (string) $first->email;
@@ -813,7 +877,7 @@ class Arriendo_Facil_Billing_Manager {
 			'fecha_emision'            => wp_date( 'd/m/Y' ),
 			'razon_social_comprador'   => $guest_name,
 			'identificacion_comprador' => $guest_id,
-			'tipo_id_comprador'        => Arriendo_Facil_SRI_XML_Factura::infer_buyer_id_type( $guest_id ),
+			'tipo_id_comprador'        => $id_type,
 			'iva_codigo_porcentaje'    => $iva_code,
 			'forma_pago'               => $forma_pago,
 			'plazo'                    => '0',
@@ -833,6 +897,8 @@ class Arriendo_Facil_Billing_Manager {
 			'billing_period'   => $period_label,
 			'reuse_invoice_id' => $reuse_id,
 			'iva_rate'         => '4' === $iva_code ? 15 : 0,
+			'id_type'          => $id_type,
+			'id_type'          => $id_type,
 			'email'            => $email,
 		);
 	}

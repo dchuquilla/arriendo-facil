@@ -503,6 +503,14 @@ class Arriendo_Facil_Billing_API {
 		$expires = isset( $_GET['exp'] ) ? absint( wp_unslash( $_GET['exp'] ) ) : 0;
 		$token   = isset( $_GET['token'] ) ? sanitize_text_field( wp_unslash( $_GET['token'] ) ) : '';
 
+		// Tope por IP: el enlace ya es infalsificable, esto frena abusos y consumo de CPU.
+		$ip_key   = 'af_pubfile_' . md5( isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '' );
+		$ip_count = (int) get_transient( $ip_key );
+		if ( $ip_count >= 30 ) {
+			wp_die( esc_html__( 'Demasiadas descargas. Intenta más tarde.', 'arriendo-facil' ), 429 );
+		}
+		set_transient( $ip_key, $ip_count + 1, 10 * MINUTE_IN_SECONDS );
+
 		if ( $id <= 0 || ! $this->manager->verify_file_token( $id, $type, $expires, $token ) ) {
 			wp_die( esc_html__( 'El enlace de descarga no es válido o ya venció. Pide que te reenvíen la factura.', 'arriendo-facil' ), 403 );
 		}
@@ -515,6 +523,8 @@ class Arriendo_Facil_Billing_API {
 		nocache_headers();
 		header( 'X-Content-Type-Options: nosniff' );
 		header( 'X-Frame-Options: DENY' );
+		header( 'Referrer-Policy: no-referrer' );
+		header( "Content-Security-Policy: default-src 'none'" );
 
 		if ( 'xml' === $type ) {
 			$xml = ! empty( $invoice->xml_autorizacion ) ? (string) $invoice->xml_autorizacion : (string) $invoice->xml_firmado;
@@ -1035,14 +1045,27 @@ class Arriendo_Facil_Billing_API {
 			 ORDER BY ei.created_at ASC
 			 LIMIT 3"
 		);
+		// Tope por usuario hacia el SRI: máx. 10 consultas cada 5 minutos, además del límite por factura.
+		$budget_key = 'af_sri_poll_budget_' . get_current_user_id();
+		$budget     = get_transient( $budget_key );
+		$budget     = is_array( $budget ) && isset( $budget['start'], $budget['used'] ) && ( time() - (int) $budget['start'] ) < 5 * MINUTE_IN_SECONDS
+			? $budget
+			: array( 'start' => time(), 'used' => 0 );
+		$used       = (int) $budget['used'];
 		foreach ( (array) $pending_ids as $pending_id ) {
+			if ( $used >= 10 ) {
+				break;
+			}
 			$poll_key = 'af_sri_poll_' . (int) $pending_id;
 			if ( get_transient( $poll_key ) ) {
 				continue;
 			}
 			set_transient( $poll_key, 1, 45 );
+			++$used;
 			$this->manager->retry_invoice( (int) $pending_id );
 		}
+		$budget['used'] = $used;
+		set_transient( $budget_key, $budget, 5 * MINUTE_IN_SECONDS );
 
 		$results = $wpdb->get_results(
 			"SELECT ei.id, ei.estado, ei.numero_comprobante

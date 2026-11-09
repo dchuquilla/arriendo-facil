@@ -34,6 +34,12 @@ class SRIRideLayoutTest extends TestCase {
 		$this->assertSame( 345.0, $data['importe_total'] );
 	}
 
+	public function test_xml_with_doctype_or_entities_is_rejected(): void {
+		$evil = '<?xml version="1.0"?><!DOCTYPE factura [<!ENTITY x SYSTEM "file:///etc/passwd">]><factura><infoTributaria><razonSocial>&x;</razonSocial></infoTributaria></factura>';
+
+		$this->assertSame( array(), Arriendo_Facil_SRI_Ride::data_from_xml( $evil ) );
+	}
+
 	public function test_pdf_shows_issuer_buyer_barcode_and_test_banner(): void {
 		$ride = new Arriendo_Facil_SRI_Ride();
 		$data = Arriendo_Facil_SRI_Ride::data_from_xml( $this->xml() ) + array( 'numero_comprobante' => '001-001-000000001' );

@@ -144,7 +144,11 @@ class Arriendo_Facil_SRI_Ride {
 	 */
 	public static function data_from_xml( string $xml ): array {
 		$dom = new DOMDocument();
-		if ( '' === trim( $xml ) || ! @$dom->loadXML( $xml, LIBXML_NONET ) ) { // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		// Sin DTD/entidades: evita XXE y expansión de entidades (billion laughs).
+		if ( '' === trim( $xml ) || false !== stripos( $xml, '<!DOCTYPE' ) || false !== stripos( $xml, '<!ENTITY' ) ) {
+			return array();
+		}
+		if ( ! @$dom->loadXML( $xml, LIBXML_NONET ) ) { // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
 			return array();
 		}
 		$xp = new DOMXPath( $dom );

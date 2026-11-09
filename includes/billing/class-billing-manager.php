@@ -308,8 +308,6 @@ class Arriendo_Facil_Billing_Manager {
 			// 1. XML SIN FIRMAR
 			error_log( '[1] XML SIN FIRMAR' );
 			error_log( '    Longitud: ' . strlen( $xml ) . ' bytes' );
-			error_log( '    Primeras 300 caracteres:' );
-			error_log( '    ' . substr( $xml, 0, 300 ) );
 
 			// 2. CERTIFICADO
 			error_log( '[2] CERTIFICADO RECUPERADO' );
@@ -452,12 +450,8 @@ class Arriendo_Facil_Billing_Manager {
 		// Una vez validada la firma, eliminar este bloque de diagnóstico.
 		$this->dump_signed_xml_for_debug( $xml_signed, $clave );
 
-		error_log( '╔════════════════════════════════════════════════════════════════╗' );
-		error_log( '║              XML QUE SE ENVÍA AL SRI (PRIMEROS 1000 CHARS)     ║' );
-		error_log( '╚════════════════════════════════════════════════════════════════╝' );
-		error_log( substr( $xml_signed, 0, 1000 ) );
-		error_log( '... (XML truncado) ...' );
-		error_log( '╔════════════════════════════════════════════════════════════════╗' );
+		// El XML lleva datos personales (comprador): no se vuelca al log, solo su tamaño.
+		error_log( '[AF Billing] XML enviado al SRI: ' . strlen( $xml_signed ) . ' bytes, clave ' . $clave );
 
 		$soap = call_user_func( $this->soap_factory, $ambiente );
 
@@ -1165,7 +1159,29 @@ class Arriendo_Facil_Billing_Manager {
 	}
 
 	private function file_token( int $invoice_id, string $type, int $expires ): string {
-		return hash_hmac( 'sha256', $invoice_id . '|' . $type . '|' . $expires, wp_salt( 'auth' ) );
+		$payload = $invoice_id . '|' . $type . '|' . $expires;
+		$version = $this->link_version( $invoice_id );
+		if ( $version > 0 ) {
+			$payload .= '|v' . $version; // Sin versión (0) el formato es el original: los enlaces ya enviados siguen válidos.
+		}
+		return hash_hmac( 'sha256', $payload, wp_salt( 'auth' ) );
+	}
+
+	const LINK_VERSION_OPTION = 'af_invoice_link_versions';
+
+	private function link_version( int $invoice_id ): int {
+		$all = get_option( self::LINK_VERSION_OPTION, array() );
+		return is_array( $all ) ? (int) ( $all[ $invoice_id ] ?? 0 ) : 0;
+	}
+
+	/**
+	 * Invalidates every download link already emailed for this invoice.
+	 */
+	public function revoke_file_links( int $invoice_id ): void {
+		$all = get_option( self::LINK_VERSION_OPTION, array() );
+		$all = is_array( $all ) ? $all : array();
+		$all[ $invoice_id ] = $this->link_version( $invoice_id ) + 1;
+		update_option( self::LINK_VERSION_OPTION, $all, false );
 	}
 
 	/**
@@ -1177,6 +1193,13 @@ class Arriendo_Facil_Billing_Manager {
 		}
 		$all = get_option( self::MAIL_STATUS_OPTION, array() );
 		$all = is_array( $all ) ? $all : array();
+		// Retención limitada: los registros de envío de más de 90 días se descartan.
+		$cutoff = time() - 90 * DAY_IN_SECONDS;
+		foreach ( $all as $old_id => $entry ) {
+			if ( ! is_array( $entry ) || (int) ( $entry['at'] ?? 0 ) < $cutoff ) {
+				unset( $all[ $old_id ] );
+			}
+		}
 		$all[ $invoice_id ] = array(
 			'ok'    => $ok,
 			'to'    => $to,
@@ -1232,6 +1255,15 @@ class Arriendo_Facil_Billing_Manager {
 	 * @return true|WP_Error
 	 */
 	public function resend_invoice_email( int $invoice_id, string $email = '' ) {
+		// Tope de reenvíos por factura: evita usar el sistema para enviar correo masivo a terceros.
+		if ( function_exists( 'get_transient' ) && function_exists( 'set_transient' ) ) {
+			$key   = 'af_resend_' . $invoice_id;
+			$count = (int) get_transient( $key );
+			if ( $count >= 5 ) {
+				return new WP_Error( 'resend_limited', __( 'Ya se reenvió esta factura varias veces. Intenta de nuevo en una hora.', 'arriendo-facil' ) );
+			}
+			set_transient( $key, $count + 1, HOUR_IN_SECONDS );
+		}
 		$invoice = $this->get_invoice( $invoice_id );
 		if ( ! $invoice || ! in_array( (string) $invoice->estado, array( 'autorizada', 'autorizada_sin_ride' ), true ) ) {
 			return new WP_Error( 'invoice_not_authorized', __( 'Solo se puede reenviar una factura autorizada por el SRI.', 'arriendo-facil' ) );
@@ -2187,7 +2219,7 @@ class Arriendo_Facil_Billing_Manager {
 	 * @param string $clave_acceso Clave de acceso (usada para el nombre del archivo).
 	 */
 	protected function dump_signed_xml_for_debug( string $xml_firmado, string $clave_acceso ): void {
-		if ( ! defined( 'WP_DEBUG' ) || ! WP_DEBUG ) {
+		if ( ! defined( 'WP_DEBUG' ) || ! WP_DEBUG || ! defined( 'AF_SRI_DEBUG_XML_DUMP' ) || ! AF_SRI_DEBUG_XML_DUMP ) {
 			return;
 		}
 
@@ -2198,14 +2230,14 @@ class Arriendo_Facil_Billing_Manager {
 			wp_mkdir_p( $debug_dir );
 			// Bloquear acceso web directo al directorio.
 			file_put_contents( $debug_dir . '/.htaccess', "Deny from all\n" );
+			file_put_contents( $debug_dir . '/index.php', "<?php // Silence is golden.\n" );
 		}
 
 		$filename  = $debug_dir . '/xml-firmado-' . preg_replace( '/[^0-9]/', '', $clave_acceso ) . '.xml';
 		$resultado = file_put_contents( $filename, $xml_firmado );
-
 		if ( false !== $resultado ) {
+			chmod( $filename, 0600 );
 			error_log( '[DIAGNÓSTICO] XML firmado guardado en: ' . $filename );
-			error_log( '[DIAGNÓSTICO] Validar en: https://dss.esig.europa.eu/validation/detailed-report' );
 		} else {
 			error_log( '[DIAGNÓSTICO] No se pudo guardar el XML de diagnóstico en: ' . $debug_dir );
 		}

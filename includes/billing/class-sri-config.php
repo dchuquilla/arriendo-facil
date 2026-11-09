@@ -28,7 +28,7 @@ class Arriendo_Facil_SRI_Config {
 	const CIPHER = 'aes-256-cbc';
 
 	/** TEMPORAL: true = los gestores de propiedades emiten en ambiente de pruebas (sin validez tributaria). */
-	const AF_SRI_MANAGERS_TEST_MODE = true;
+	const AF_SRI_MANAGERS_TEST_MODE = false;
 
 	/** Authenticated cipher used for sensitive data at rest. */
 	const AEAD_CIPHER = 'aes-256-gcm';

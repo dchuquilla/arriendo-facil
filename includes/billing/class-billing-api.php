@@ -46,6 +46,8 @@ class Arriendo_Facil_Billing_API {
 		add_action( 'wp_ajax_af_retry_invoice', array( $this, 'ajax_retry_invoice' ) );
 		add_action( 'wp_ajax_af_download_ride', array( $this, 'ajax_download_ride' ) );
 		add_action( 'wp_ajax_af_download_xml', array( $this, 'ajax_download_xml' ) );
+		add_action( 'wp_ajax_af_invoice_file', array( $this, 'ajax_public_invoice_file' ) );
+		add_action( 'wp_ajax_nopriv_af_invoice_file', array( $this, 'ajax_public_invoice_file' ) );
 		add_action( 'wp_ajax_af_sri_ruc_lookup', array( $this, 'ajax_sri_ruc_lookup' ) );
 		add_action( 'wp_ajax_af_billing_lease_search', array( $this, 'ajax_billing_lease_search' ) );
 		add_action( 'wp_ajax_af_sri_log_view',         array( $this, 'ajax_sri_log_view' ) );
@@ -474,6 +476,53 @@ class Arriendo_Facil_Billing_API {
 		header( 'Content-Type: application/xml; charset=UTF-8' );
 		header( 'Content-Disposition: attachment; filename="comprobante-' . (int) $invoice->id . '.xml"' );
 		echo $xml; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		exit;
+	}
+
+	/**
+	 * Public download of an authorized invoice file through the signed link sent by email.
+	 */
+	public function ajax_public_invoice_file(): void {
+		$id      = isset( $_GET['id'] ) ? absint( wp_unslash( $_GET['id'] ) ) : 0;
+		$type    = isset( $_GET['type'] ) ? sanitize_key( wp_unslash( $_GET['type'] ) ) : '';
+		$expires = isset( $_GET['exp'] ) ? absint( wp_unslash( $_GET['exp'] ) ) : 0;
+		$token   = isset( $_GET['token'] ) ? sanitize_text_field( wp_unslash( $_GET['token'] ) ) : '';
+
+		if ( $id <= 0 || ! $this->manager->verify_file_token( $id, $type, $expires, $token ) ) {
+			wp_die( esc_html__( 'El enlace de descarga no es válido o ya venció. Pide que te reenvíen la factura.', 'arriendo-facil' ), 403 );
+		}
+
+		$invoice = $this->manager->get_invoice( $id );
+		if ( ! $invoice || ! in_array( (string) $invoice->estado, array( 'autorizada', 'autorizada_sin_ride' ), true ) ) {
+			wp_die( esc_html__( 'Comprobante no disponible.', 'arriendo-facil' ), 404 );
+		}
+
+		nocache_headers();
+		header( 'X-Content-Type-Options: nosniff' );
+		header( 'X-Frame-Options: DENY' );
+
+		if ( 'xml' === $type ) {
+			$xml = ! empty( $invoice->xml_autorizacion ) ? (string) $invoice->xml_autorizacion : (string) $invoice->xml_firmado;
+			if ( '' === trim( $xml ) ) {
+				wp_die( esc_html__( 'XML no disponible.', 'arriendo-facil' ), 404 );
+			}
+			header( 'Content-Type: application/xml; charset=UTF-8' );
+			header( 'Content-Disposition: attachment; filename="factura-' . preg_replace( '/[^0-9\-]/', '', (string) $invoice->numero_comprobante ) . '.xml"' );
+			echo $xml; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+			exit;
+		}
+
+		$path      = $this->manager->regenerate_ride( $invoice );
+		$ride_dir  = ( new Arriendo_Facil_SRI_Ride() )->ride_dir();
+		$path_real = '' !== $path ? realpath( $path ) : false;
+		$dir_real  = is_string( $ride_dir ) ? realpath( $ride_dir ) : false;
+		if ( false === $path_real || false === $dir_real || 0 !== strpos( $path_real, $dir_real . DIRECTORY_SEPARATOR ) ) {
+			wp_die( esc_html__( 'RIDE no disponible.', 'arriendo-facil' ), 404 );
+		}
+		header( 'Content-Type: application/pdf' );
+		header( 'Content-Disposition: attachment; filename="factura-' . preg_replace( '/[^0-9\-]/', '', (string) $invoice->numero_comprobante ) . '.pdf"' );
+		header( 'Content-Length: ' . filesize( $path_real ) );
+		readfile( $path_real ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_readfile
 		exit;
 	}
 

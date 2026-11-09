@@ -96,7 +96,7 @@ class BillingInvoiceEmailTest extends TestCase {
 		$this->assertTrue( $manager->send_invoice_email( 5 ) );
 		$mail = $GLOBALS['af_test_mail'][0];
 		$this->assertSame( 'ficha@example.com', $mail['to'] );
-		$this->assertStringContainsString( '001-001-000000123', $mail['subject'] );
+		$this->assertSame( 'Facturación - Arriendo Fácil', $mail['subject'] );
 		$this->assertCount( 2, $mail['attachments'] );
 		$this->assertContains( 'factura-001-001-000000123.xml', $mail['attachment_names'] );
 		$this->assertArrayHasKey( 'emailed_at', $db->updates[0] );

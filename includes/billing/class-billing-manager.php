@@ -1037,12 +1037,13 @@ class Arriendo_Facil_Billing_Manager {
 			}
 		}
 
-		$subject = sprintf(
-			/* translators: %s: invoice number */
-			__( 'Tu factura electrónica %s', 'arriendo-facil' ),
-			(string) $invoice->numero_comprobante
-		);
-		$body = sprintf(
+		$xml_info   = ! empty( $invoice->xml_firmado ) ? Arriendo_Facil_SRI_Ride::data_from_xml( (string) $invoice->xml_firmado ) : array();
+		$buyer_name = (string) ( $xml_info['razon_social_comprador'] ?? '' );
+		$concepts   = $this->invoice_concepts( (array) ( $xml_info['items'] ?? array() ) );
+		$subject    = '' !== $concepts
+			? sprintf( /* translators: %s: concepts, e.g. "Canon" */ __( 'Facturación %s - Arriendo Fácil', 'arriendo-facil' ), $concepts )
+			: __( 'Facturación - Arriendo Fácil', 'arriendo-facil' );
+		$body       = sprintf(
 			/* translators: 1: invoice number, 2: total */
 			__( "Hola,\n\nAdjuntamos tu factura electrónica %1\$s por un total de \$%2\$s, autorizada por el SRI.\n\nGracias por tu pago.", 'arriendo-facil' ),
 			(string) $invoice->numero_comprobante,
@@ -1058,11 +1059,6 @@ class Arriendo_Facil_Billing_Manager {
 				$site_name = function_exists( 'get_bloginfo' ) ? (string) get_bloginfo( 'name' ) : '';
 				$headers[] = sprintf( 'From: %s <%s>', '' !== $site_name ? $site_name : 'Arriendo Fácil', $from );
 			}
-		}
-
-		$buyer_name = '';
-		if ( ! empty( $invoice->xml_firmado ) ) {
-			$buyer_name = (string) ( Arriendo_Facil_SRI_Ride::data_from_xml( (string) $invoice->xml_firmado )['razon_social_comprador'] ?? '' );
 		}
 
 		$mail_error = '';
@@ -1091,6 +1087,7 @@ class Arriendo_Facil_Billing_Manager {
 								__( 'Autorización', 'arriendo-facil' ) => (string) ( $invoice->numero_autorizacion ?? '' ),
 							)
 						),
+						'content_after' => '<p style="margin:0 0 16px;font-size:13px;line-height:1.6;color:#647579;">' . esc_html__( 'Respaldo: si tu correo no muestra los archivos adjuntos, puedes descargarlos aquí:', 'arriendo-facil' ) . ' <a href="' . esc_url( $this->public_file_url( $invoice_id, 'ride' ) ) . '" style="color:#164A55;font-weight:700;">PDF</a> · <a href="' . esc_url( $this->public_file_url( $invoice_id, 'xml' ) ) . '" style="color:#164A55;font-weight:700;">XML</a>. ' . esc_html__( 'Los enlaces son personales y vencen en 30 días.', 'arriendo-facil' ) . '</p>',
 						'note'      => __( 'Gracias por tu pago.', 'arriendo-facil' ),
 					),
 					Arriendo_Facil_Email::CAT_TRANSACTIONAL,
@@ -1121,6 +1118,55 @@ class Arriendo_Facil_Billing_Manager {
 	}
 
 	const MAIL_STATUS_OPTION = 'af_invoice_mail_status';
+
+	/**
+	 * Human-readable concepts of an invoice for the email subject (e.g. "Canon e Internet").
+	 */
+	protected function invoice_concepts( array $items ): string {
+		$labels = class_exists( 'Arriendo_Facil_Billing_Ledger' ) ? Arriendo_Facil_Billing_Ledger::charge_types() : array();
+		$names  = array();
+		foreach ( $items as $item ) {
+			$code = strtolower( (string) ( $item['codigo_principal'] ?? '' ) );
+			if ( '' === $code ) {
+				continue;
+			}
+			$name = isset( $labels[ $code ] ) ? (string) strtok( (string) $labels[ $code ], ' ' ) : ucfirst( $code );
+			if ( ! in_array( $name, $names, true ) ) {
+				$names[] = $name;
+			}
+		}
+		if ( count( $names ) > 2 ) {
+			return implode( ', ', array_slice( $names, 0, 2 ) ) . ' ' . __( 'y otros', 'arriendo-facil' );
+		}
+		return implode( ' ' . __( 'e', 'arriendo-facil' ) . ' ', $names );
+	}
+
+	/**
+	 * Signed, expiring link to download an authorized invoice file (ride|xml) without logging in.
+	 * It travels in the email so the tenant can always download the files, even when the mail
+	 * client strips attachments.
+	 */
+	public function public_file_url( int $invoice_id, string $type ): string {
+		$expires = time() + 30 * DAY_IN_SECONDS;
+		return add_query_arg(
+			array(
+				'action' => 'af_invoice_file',
+				'id'     => $invoice_id,
+				'type'   => $type,
+				'exp'    => $expires,
+				'token'  => $this->file_token( $invoice_id, $type, $expires ),
+			),
+			admin_url( 'admin-ajax.php' )
+		);
+	}
+
+	public function verify_file_token( int $invoice_id, string $type, int $expires, string $token ): bool {
+		return $expires > time() && in_array( $type, array( 'ride', 'xml' ), true ) && hash_equals( $this->file_token( $invoice_id, $type, $expires ), $token );
+	}
+
+	private function file_token( int $invoice_id, string $type, int $expires ): string {
+		return hash_hmac( 'sha256', $invoice_id . '|' . $type . '|' . $expires, wp_salt( 'auth' ) );
+	}
 
 	/**
 	 * Remembers the last email attempt of an invoice so the UI can explain a missing email.

@@ -412,8 +412,9 @@ class Arriendo_Facil_Billing_API {
 			wp_die( esc_html__( 'RIDE no disponible.', 'arriendo-facil' ), 404 );
 		}
 
-		$path = (string) $invoice->ride_path;
-		if ( ! file_exists( $path ) ) {
+		// El RIDE es solo una representación: se vuelve a dibujar desde el XML enviado al SRI.
+		$path = $this->manager->regenerate_ride( $invoice );
+		if ( '' === $path || ! file_exists( $path ) ) {
 			wp_die( esc_html__( 'Archivo RIDE no encontrado.', 'arriendo-facil' ), 404 );
 		}
 

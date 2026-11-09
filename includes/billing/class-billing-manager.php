@@ -434,6 +434,17 @@ class Arriendo_Facil_Billing_Manager {
 
 		$this->link_charges_to_invoice( $invoice_id, (array) ( $context['charge_ids'] ?? array() ) );
 
+		// El comprador real de esta factura (puede diferir de la ficha del inquilino).
+		if ( $this->table_has_column( 'af_electronic_invoices', 'comprador_nombre' ) ) {
+			$this->update_invoice_row(
+				$invoice_id,
+				array(
+					'comprador_nombre'         => (string) $xml_data['razon_social_comprador'],
+					'comprador_identificacion' => (string) $xml_data['identificacion_comprador'],
+				)
+			);
+		}
+
 		// LOGGING: XML que se envía al SRI
 		// El XML completo se guarda en un archivo temporal de diagnóstico para
 		// poder validarlo en herramientas externas como:
@@ -640,22 +651,30 @@ class Arriendo_Facil_Billing_Manager {
 	 * Whether af_guests already has the id_type column (older databases may not).
 	 */
 	protected function guests_have_id_type(): bool {
-		static $has = array();
-		$table = $this->wpdb->prefix . 'af_guests';
-		if ( ! isset( $has[ $table ] ) ) {
-			if ( ! method_exists( $this->wpdb, 'get_var' ) ) {
-				return false;
-			}
-			$has[ $table ] = (int) $this->wpdb->get_var(
+		return $this->table_has_column( 'af_guests', 'id_type' );
+	}
+
+	/**
+	 * Whether a plugin table has a column (older databases may lack newer ones).
+	 */
+	protected function table_has_column( string $table_suffix, string $column ): bool {
+		static $cache = array();
+		if ( ! $this->wpdb || ! defined( 'DB_NAME' ) || ! method_exists( $this->wpdb, 'get_var' ) ) {
+			return false;
+		}
+		$table = $this->wpdb->prefix . $table_suffix;
+		$key   = $table . '.' . $column;
+		if ( ! isset( $cache[ $key ] ) ) {
+			$cache[ $key ] = (int) $this->wpdb->get_var(
 				$this->wpdb->prepare(
 					'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = %s',
 					DB_NAME,
 					$table,
-					'id_type'
+					$column
 				)
 			) > 0;
 		}
-		return $has[ $table ];
+		return $cache[ $key ];
 	}
 
 	/**
@@ -967,7 +986,11 @@ class Arriendo_Facil_Billing_Manager {
 
 		// Prioridad: correo corregido al emitir (queda en el XML) y luego el de la ficha del inquilino.
 		$email = $email_override;
-		if ( '' === $email && ! empty( $invoice->xml_autorizacion ) && preg_match( '/nombre=(?:"|&quot;)email(?:"|&quot;)>([^<&]+)</', (string) $invoice->xml_autorizacion, $m ) ) {
+		if ( '' === $email && ! empty( $invoice->xml_firmado ) ) {
+			$xml_data = Arriendo_Facil_SRI_Ride::data_from_xml( (string) $invoice->xml_firmado );
+			$email    = isset( $xml_data['info_adicional']['email'] ) ? (string) $xml_data['info_adicional']['email'] : '';
+		}
+		if ( '' === $email && ! empty( $invoice->xml_autorizacion ) && preg_match( '/nombre=(?:"|&quot;|\\\\")email(?:"|&quot;|\\\\")(?:>|&gt;)([^<&]+)/', (string) $invoice->xml_autorizacion, $m ) ) {
 			$email = trim( $m[1] );
 		}
 		if ( '' === $email || ! is_email( $email ) ) {
@@ -988,8 +1011,9 @@ class Arriendo_Facil_Billing_Manager {
 		$attachments = array();
 		$tmp_xml     = '';
 		$tmp_dir     = '';
-		if ( ! empty( $invoice->ride_path ) && file_exists( (string) $invoice->ride_path ) ) {
-			$attachments[] = (string) $invoice->ride_path;
+		$ride_file = ! empty( $invoice->xml_firmado ) ? $this->regenerate_ride( $invoice ) : (string) ( $invoice->ride_path ?? '' );
+		if ( '' !== $ride_file && file_exists( $ride_file ) ) {
+			$attachments[] = $ride_file;
 		}
 		if ( ! empty( $invoice->xml_autorizacion ) ) {
 			// Carpeta privada (0700) con nombre impredecible: el XML lleva datos personales en claro.
@@ -1033,6 +1057,63 @@ class Arriendo_Facil_Billing_Manager {
 			error_log( 'Arriendo Facil: wp_mail fallo al enviar la factura ' . $invoice_id ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 		}
 		return (bool) $sent;
+	}
+
+	/**
+	 * Builds RIDE data for a stored invoice from the XML that was sent to the SRI,
+	 * so a rebuilt RIDE always shows the real issuer, buyer and line items.
+	 *
+	 * @param object $invoice   Invoice row (xml_firmado already decrypted).
+	 * @param array  $overrides Authorization data that takes precedence.
+	 */
+	protected function ride_data_for_invoice( $invoice, array $overrides = array() ): array {
+		$data = Arriendo_Facil_SRI_Ride::data_from_xml( (string) ( $invoice->xml_firmado ?? '' ) );
+		if ( empty( $data ) ) {
+			$data = array(
+				'razon_social_comprador'   => '',
+				'identificacion_comprador' => '',
+				'items'                    => array(),
+				'total_sin_impuestos'      => (float) ( $invoice->subtotal_0 ?? 0 ) + (float) ( $invoice->subtotal_iva ?? 0 ),
+				'iva_valor'                => (float) ( $invoice->iva_valor ?? 0 ),
+				'importe_total'            => (float) ( $invoice->total ?? 0 ),
+				'ambiente_label'           => 2 === (int) ( $invoice->ambiente ?? 1 ) ? 'PRODUCCION' : 'PRUEBAS',
+			);
+		}
+
+		$data['numero_comprobante'] = (string) ( $invoice->numero_comprobante ?? '' );
+		$data['clave_acceso']       = (string) ( $invoice->clave_acceso ?? ( $data['clave_acceso'] ?? '' ) );
+		$auth_number                = (string) ( $invoice->numero_autorizacion ?? '' );
+		$data['numero_autorizacion'] = '' !== $auth_number ? $auth_number : $data['clave_acceso'];
+		$data['fecha_autorizacion']  = (string) ( $invoice->fecha_autorizacion ?? '' );
+
+		foreach ( $overrides as $key => $value ) {
+			if ( '' !== (string) $value ) {
+				$data[ $key ] = $value;
+			}
+		}
+
+		return $data;
+	}
+
+	/**
+	 * Re-renders the RIDE of an authorized invoice from its stored XML and
+	 * returns the file path (the file is overwritten in place).
+	 *
+	 * @param object $invoice Invoice row.
+	 * @return string Path, or '' when it cannot be rebuilt.
+	 */
+	public function regenerate_ride( $invoice ): string {
+		if ( ! $invoice || empty( $invoice->xml_firmado ) || ! in_array( (string) $invoice->estado, array( 'autorizada', 'autorizada_sin_ride' ), true ) ) {
+			return (string) ( $invoice->ride_path ?? '' );
+		}
+		$result = $this->ride_generator->generate( $this->ride_data_for_invoice( $invoice ) );
+		if ( is_wp_error( $result ) || empty( $result['path'] ) ) {
+			return (string) ( $invoice->ride_path ?? '' );
+		}
+		if ( (string) ( $invoice->ride_path ?? '' ) !== (string) $result['path'] ) {
+			$this->update_invoice_row( (int) $invoice->id, array( 'ride_path' => (string) $result['path'] ) );
+		}
+		return (string) $result['path'];
 	}
 
 	/**
@@ -1195,21 +1276,12 @@ class Arriendo_Facil_Billing_Manager {
 		$ride_path = (string) ( $invoice->ride_path ?? '' );
 		if ( '' === $ride_path || ! file_exists( $ride_path ) ) {
 			$ride_result = $this->ride_generator->generate(
-				array(
-					'razon_social'            => '',
-					'ruc'                     => '',
-					'numero_comprobante'      => (string) ( $invoice->numero_comprobante ?? '' ),
-					'clave_acceso'            => (string) $invoice->clave_acceso,
-					'numero_autorizacion'     => (string) ( $autorizacion['numero_autorizacion'] ?? '' ),
-					'fecha_autorizacion'      => (string) ( $autorizacion['fecha_autorizacion'] ?? '' ),
-					'ambiente_label'          => (string) ( $autorizacion['ambiente'] ?? '' ),
-					'razon_social_comprador'  => 'CONSUMIDOR FINAL',
-					'identificacion_comprador'=> '9999999999999',
-					'subtotal_0'              => (float) ( $invoice->subtotal_0 ?? 0 ),
-					'subtotal_iva'            => (float) ( $invoice->subtotal_iva ?? 0 ),
-					'iva_valor'               => (float) ( $invoice->iva_valor ?? 0 ),
-					'total'                   => (float) ( $invoice->total ?? 0 ),
-					'items'                   => array(),
+				$this->ride_data_for_invoice(
+					$invoice,
+					array(
+						'numero_autorizacion' => (string) ( $autorizacion['numero_autorizacion'] ?? '' ),
+						'fecha_autorizacion'  => (string) ( $autorizacion['fecha_autorizacion'] ?? '' ),
+					)
 				)
 			);
 

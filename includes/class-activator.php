@@ -913,6 +913,8 @@ class Arriendo_Facil_Activator {
 				lease_id             BIGINT(20) UNSIGNED DEFAULT NULL,
 				cleaning_request_id  BIGINT(20) UNSIGNED DEFAULT NULL,
 				billing_period       CHAR(7) DEFAULT NULL COMMENT 'YYYY-MM del periodo facturado',
+				comprador_nombre     VARCHAR(300) DEFAULT NULL,
+				comprador_identificacion VARCHAR(20) DEFAULT NULL,
 				tipo_comprobante     VARCHAR(2) NOT NULL DEFAULT '01',
 				clave_acceso         CHAR(49) DEFAULT NULL,
 				numero_autorizacion  VARCHAR(49) DEFAULT NULL,
@@ -1931,6 +1933,9 @@ class Arriendo_Facil_Activator {
 		$guests = $wpdb->prefix . 'af_guests';
 		if ( ! $has_column( $guests, 'id_type' ) ) {
 			$wpdb->query( "ALTER TABLE {$guests} ADD COLUMN id_type CHAR(2) DEFAULT NULL AFTER id_number" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		}
+		if ( ! $has_column( $invoices, 'comprador_nombre' ) ) {
+			$wpdb->query( "ALTER TABLE {$invoices} ADD COLUMN comprador_nombre VARCHAR(300) DEFAULT NULL, ADD COLUMN comprador_identificacion VARCHAR(20) DEFAULT NULL" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		}
 		if ( ! $has_column( $invoices, 'emailed_at' ) ) {
 			$wpdb->query( "ALTER TABLE {$invoices} ADD COLUMN emailed_at DATETIME DEFAULT NULL" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared

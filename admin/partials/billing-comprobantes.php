@@ -350,8 +350,8 @@ foreach ( $invoices as $inv_row ) {
 				$estado_info = isset( $estado_labels[ $inv->estado ] )
 					? $estado_labels[ $inv->estado ]
 					: array( 'label' => esc_html( $inv->estado ), 'color' => '#555', 'icon' => '?', 'grupo' => 'otro' );
-				$guest_label = isset( $inv->guest_name ) ? trim( (string) $inv->guest_name ) : '';
-				$guest_id    = isset( $inv->guest_id_number ) ? (string) $inv->guest_id_number : '';
+				$guest_label = ! empty( $inv->comprador_nombre ) ? trim( (string) $inv->comprador_nombre ) : ( isset( $inv->guest_name ) ? trim( (string) $inv->guest_name ) : '' );
+				$guest_id    = ! empty( $inv->comprador_identificacion ) ? (string) $inv->comprador_identificacion : ( isset( $inv->guest_id_number ) ? (string) $inv->guest_id_number : '' );
 				$grupo       = $estado_info['grupo'] ?? 'otro';
 				$errores_raw = (string) ( $inv->errores ?? '' );
 				$mensajes_decoded = '' !== $errores_raw ? json_decode( $errores_raw, true ) : null;

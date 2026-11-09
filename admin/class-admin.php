@@ -2575,6 +2575,7 @@ array(
 			'stepPayment'       => __( 'Pago', 'arriendo-facil' ),
 			'stepInvoice'       => __( 'Factura SRI', 'arriendo-facil' ),
 			'stepDone'          => __( 'Listo', 'arriendo-facil' ),
+			'stepNoInvoice'     => __( 'No se factura', 'arriendo-facil' ),
 			'stepWaiting'       => __( 'Falta', 'arriendo-facil' ),
 			'stepProcessing'    => __( 'En proceso', 'arriendo-facil' ),
 			'stepRejected'      => __( 'Rechazada', 'arriendo-facil' ),

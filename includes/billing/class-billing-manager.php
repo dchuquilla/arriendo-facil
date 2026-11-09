@@ -711,6 +711,19 @@ class Arriendo_Facil_Billing_Manager {
 		$p       = $this->wpdb->prefix;
 		$failed  = "'" . implode( "','", self::REISSUABLE_STATES ) . "'";
 		$where   = "c.status = 'paid' AND c.amount > 0 AND ( c.invoice_id IS NULL OR c.invoice_id = 0 OR ei.id IS NULL OR ei.estado IN ({$failed}) )";
+		// Los servicios que paga el propietario (agua, luz, internet…) no se facturan al inquilino.
+		if ( class_exists( 'Arriendo_Facil_Billing_Ledger' ) ) {
+			$skip = Arriendo_Facil_Billing_Ledger::non_invoiceable_charge_types();
+			if ( ! empty( $skip ) ) {
+				$skip   = array_map(
+					static function ( $type ) {
+						return preg_replace( '/[^a-z0-9_\-]/', '', strtolower( (string) $type ) );
+					},
+					$skip
+				);
+				$where .= " AND c.charge_type NOT IN ('" . implode( "','", $skip ) . "') AND LEFT(c.charge_type, 2) <> 'x-'";
+			}
+		}
 		$params  = array();
 
 		if ( ! empty( $args['lease_id'] ) ) {

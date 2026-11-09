@@ -258,6 +258,7 @@
 
 	/* Etapa del cargo en el flujo: pending → toinvoice → invoiced. */
 	function flowOf(c) {
+		if (c.invoiceable === false) { return isPaid(c) ? 'none' : 'pending'; }
 		if (!isPaid(c)) { return 'pending'; }
 		var stage = invoiceStage(c);
 		return ('none' === stage || 'rejected' === stage) ? 'toinvoice' : 'invoiced';
@@ -333,7 +334,10 @@
 		var flowEl = document.getElementById('af-cobranza-flow');
 		if (!flowEl) { return; }
 		var n = { pending: 0, toinvoice: 0, invoiced: 0 };
-		(charges || []).forEach(function (c) { n[flowOf(c)] += 1; });
+		(charges || []).forEach(function (c) {
+			var f = flowOf(c);
+			if (n[f] !== undefined) { n[f] += 1; }
+		});
 
 		Object.keys(n).forEach(function (k) {
 			var count = flowEl.querySelector('[data-flow-count="' + k + '"]');
@@ -644,6 +648,7 @@
 			var paid = isPaid(c);
 			var bal = balanceOf(c);
 			var stage = invoiceStage(c);
+			var noInvoice = c.invoiceable === false;
 			var li = document.createElement('li');
 			li.className = 'af-cobranza-charge ' + statusClass(c);
 			li.setAttribute('data-day', c.dueDate || '');
@@ -651,6 +656,8 @@
 			var action = '';
 			if (!paid) {
 				action = '<button type="button" class="button af-btn af-btn--primary af-cobranza-pay-open" data-charge="' + c.id + '" data-outstanding="' + bal.toFixed(2) + '">' + (T.recordPayment || 'Registrar pago') + '</button>';
+			} else if (noInvoice) {
+				action = '';
 			} else if ('none' === stage || 'rejected' === stage) {
 				action = '<a class="button af-btn af-btn--primary af-cobranza-invoice-go" href="' + escapeAttr(invoiceUrl(c)) + '">' +
 					('rejected' === stage ? (T.invoiceRetry || 'Corregir y reemitir') : (T.invoiceIssue || 'Facturar')) + '</a>';
@@ -660,8 +667,8 @@
 
 			// Pipeline: Cobro → Pago → Factura SRI, para ver de un vistazo qué falta.
 			var payState = paid ? 'done' : 'todo';
-			var invState = !paid ? 'locked' : ('done' === stage ? 'done' : ('processing' === stage ? 'wip' : ('rejected' === stage ? 'bad' : 'todo')));
-			var invText = !paid ? '' : ('done' === stage ? (T.stepDone || 'Listo') : ('processing' === stage ? (T.stepProcessing || 'En proceso') : ('rejected' === stage ? (T.stepRejected || 'Rechazada') : (T.stepWaiting || 'Falta'))));
+			var invState = noInvoice ? 'locked' : (!paid ? 'locked' : ('done' === stage ? 'done' : ('processing' === stage ? 'wip' : ('rejected' === stage ? 'bad' : 'todo'))));
+			var invText = noInvoice ? (T.stepNoInvoice || 'No se factura') : (!paid ? '' : ('done' === stage ? (T.stepDone || 'Listo') : ('processing' === stage ? (T.stepProcessing || 'En proceso') : ('rejected' === stage ? (T.stepRejected || 'Rechazada') : (T.stepWaiting || 'Falta')))));
 			var pipe =
 				'<ol class="af-cobranza-pipe">' +
 				'<li class="af-cobranza-pipe__s is-done">' + (T.stepCharge || 'Cobro') + '</li>' +

@@ -151,6 +151,7 @@ class BillingChargesInvoiceTest extends TestCase {
 	}
 
 	public function test_invalid_cedula_blocks_but_passport_type_does_not(): void {
+		require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-identity-validator.php';
 		$row     = $this->row( 1, 'canon', '2026-10', 400.0, array( 'id_number' => '1714665521' ) );
 		$as_ced  = $this->manager( array( $row ) )->build_charges_invoice_plan( 10, array( 1 ), array( 'buyer_id_type' => '05' ) );
 		$as_pass = $this->manager( array( $row ) )->build_charges_invoice_plan( 10, array( 1 ), array( 'buyer_id_type' => '06' ) );
@@ -183,5 +184,20 @@ class BillingChargesInvoiceTest extends TestCase {
 		$this->assertStringContainsString( 'c.invoice_id IS NULL', $last );
 		$this->assertStringContainsString( "'devuelta'", $last );
 		$this->assertStringNotContainsString( "'autorizada'", $last );
+	}
+
+	public function test_utilities_paid_by_the_owner_are_never_billable(): void {
+		require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-billing-ledger.php';
+		$manager = $this->manager( array() );
+		$manager->get_billable_charges();
+		$last = ( new ReflectionProperty( Arriendo_Facil_Billing_Manager::class, 'wpdb' ) )->getValue( $manager )->last_sql;
+
+		foreach ( array( 'agua', 'luz', 'gas', 'internet', 'telefono' ) as $type ) {
+			$this->assertStringContainsString( "'" . $type . "'", $last );
+		}
+		$this->assertStringContainsString( "<> 'x-'", $last );
+		$this->assertTrue( Arriendo_Facil_Billing_Ledger::is_invoiceable_charge_type( 'canon' ) );
+		$this->assertFalse( Arriendo_Facil_Billing_Ledger::is_invoiceable_charge_type( 'internet' ) );
+		$this->assertFalse( Arriendo_Facil_Billing_Ledger::is_invoiceable_charge_type( 'x-seguridad' ) );
 	}
 }

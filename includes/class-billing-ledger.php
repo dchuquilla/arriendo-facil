@@ -1766,6 +1766,30 @@ class Arriendo_Facil_Billing_Ledger {
 	}
 
 	/**
+	 * Charge types that are NOT invoiced to the tenant: utilities the owner pays to the
+	 * provider (Pagos de servicios). Only income the tenant pays us (canon, etc.) is invoiced.
+	 *
+	 * @return string[]
+	 */
+	public static function non_invoiceable_charge_types() {
+		$types = (array) apply_filters( 'af_billing_non_invoiceable_charge_types', array( 'agua', 'luz', 'gas', 'internet', 'telefono' ) );
+
+		return array_values( array_filter( array_map( 'sanitize_key', $types ) ) );
+	}
+
+	/**
+	 * Whether a charge of this type goes through SRI invoicing.
+	 *
+	 * @param string $charge_type Charge type key.
+	 * @return bool
+	 */
+	public static function is_invoiceable_charge_type( $charge_type ) {
+		$charge_type = (string) $charge_type;
+
+		return ! in_array( $charge_type, self::non_invoiceable_charge_types(), true ) && ! self::is_custom_service( $charge_type );
+	}
+
+	/**
 	 * Human labels for the charge types.
 	 *
 	 * @return array<string,string>
@@ -2009,6 +2033,7 @@ class Arriendo_Facil_Billing_Ledger {
 					'paid'    => (float) $c->amount_paid,
 					'dueDate' => (string) $c->due_date,
 					'status'  => (string) $c->status,
+					'invoiceable' => self::is_invoiceable_charge_type( $ctype ),
 					'payments' => isset( $payments_by_charge[ (int) $c->id ] ) ? $payments_by_charge[ (int) $c->id ] : array(),
 					'invoice'  => isset( $invoice_by_charge[ (int) $c->id ] ) ? $invoice_by_charge[ (int) $c->id ] : null,
 				);

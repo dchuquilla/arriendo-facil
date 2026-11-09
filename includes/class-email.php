@@ -93,9 +93,10 @@ class Arriendo_Facil_Email {
 	 * @param array<string,mixed>  $args     Ver render().
 	 * @param string               $category Categoría de envío.
 	 * @param string[]             $headers  Cabeceras adicionales (p. ej. From).
+	 * @param string[]             $attachments Rutas de archivos adjuntos.
 	 * @return bool
 	 */
-	public static function send( $to, $subject, array $args = array(), $category = self::CAT_TRANSACTIONAL, array $headers = array() ) {
+	public static function send( $to, $subject, array $args = array(), $category = self::CAT_TRANSACTIONAL, array $headers = array(), array $attachments = array() ) {
 		$recipients = array_values( array_filter( array_map( 'sanitize_email', (array) $to ) ) );
 
 		if ( empty( $recipients ) ) {
@@ -135,7 +136,7 @@ class Arriendo_Facil_Email {
 				$phpmailer->AltBody = $plain; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
 			};
 			add_action( 'phpmailer_init', $alt_body );
-			$sent = (bool) wp_mail( $recipient, (string) $subject, $html, $mail_headers );
+			$sent = (bool) wp_mail( $recipient, (string) $subject, $html, $mail_headers, $attachments );
 			remove_action( 'phpmailer_init', $alt_body );
 
 			if ( ! $sent ) {

@@ -98,7 +98,9 @@ $pending_nonce = wp_create_nonce( 'af_billing_nonce' );
 				<label class="af-pending-field"><span><?php esc_html_e( 'Forma de pago', 'arriendo-facil' ); ?></span>
 					<select id="af-pm-pay">
 						<option value="01"><?php esc_html_e( 'Efectivo', 'arriendo-facil' ); ?></option>
-						<option value="20"><?php esc_html_e( 'Transferencia / sistema financiero', 'arriendo-facil' ); ?></option>
+						<option value="20"><?php esc_html_e( 'Transferencia', 'arriendo-facil' ); ?></option>
+						<option value="19"><?php esc_html_e( 'Tarjeta de crédito', 'arriendo-facil' ); ?></option>
+						<option value="16"><?php esc_html_e( 'Tarjeta de débito', 'arriendo-facil' ); ?></option>
 					</select>
 				</label>
 				<div class="af-pending-field"><span><?php esc_html_e( 'Fecha de emisión', 'arriendo-facil' ); ?></span><strong id="af-pm-date">—</strong><small><?php esc_html_e( 'El SRI exige la fecha de hoy.', 'arriendo-facil' ); ?></small></div>
@@ -157,7 +159,7 @@ $pending_nonce = wp_create_nonce( 'af_billing_nonce' );
 	}
 
 	var T = {
-		method: { efectivo: '<?php echo esc_js( __( 'Efectivo', 'arriendo-facil' ) ); ?>', transferencia: '<?php echo esc_js( __( 'Transferencia', 'arriendo-facil' ) ); ?>', deposito: '<?php echo esc_js( __( 'Depósito', 'arriendo-facil' ) ); ?>', cheque: '<?php echo esc_js( __( 'Cheque', 'arriendo-facil' ) ); ?>', otro: '<?php echo esc_js( __( 'Otro', 'arriendo-facil' ) ); ?>' },
+		method: { efectivo: '<?php echo esc_js( __( 'Efectivo', 'arriendo-facil' ) ); ?>', transferencia: '<?php echo esc_js( __( 'Transferencia', 'arriendo-facil' ) ); ?>', tarjeta: '<?php echo esc_js( __( 'Tarjeta', 'arriendo-facil' ) ); ?>', deposito: '<?php echo esc_js( __( 'Depósito', 'arriendo-facil' ) ); ?>', cheque: '<?php echo esc_js( __( 'Cheque', 'arriendo-facil' ) ); ?>', otro: '<?php echo esc_js( __( 'Otro', 'arriendo-facil' ) ); ?>' },
 		rejected: '<?php echo esc_js( __( 'Rechazada por el SRI: corrige y reemite', 'arriendo-facil' ) ); ?>',
 		noEmail: '<?php echo esc_js( __( 'Sin correo', 'arriendo-facil' ) ); ?>',
 		review: '<?php echo esc_js( __( 'Revisar y facturar', 'arriendo-facil' ) ); ?>',

@@ -148,6 +148,35 @@ if ( isset( $_POST['af_retry_invoice_submit'] ) ) {
 	}
 }
 
+if ( isset( $_POST['af_resend_email_submit'] ) ) {
+	check_admin_referer( 'af_billing_resend_email' );
+	$resend_id = isset( $_POST['invoice_id'] ) ? absint( wp_unslash( $_POST['invoice_id'] ) ) : 0;
+	$resend_to = isset( $_POST['resend_email'] ) ? sanitize_email( wp_unslash( $_POST['resend_email'] ) ) : '';
+	$allowed   = $resend_id > 0;
+	if ( $allowed && $is_owner_view ) {
+		$resend_acc = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COALESCE(l.accommodation_id, cr.accommodation_id)
+				 FROM {$wpdb->prefix}af_electronic_invoices ei
+				 LEFT JOIN {$wpdb->prefix}af_leases l ON l.id = ei.lease_id
+				 LEFT JOIN {$wpdb->prefix}af_cleaning_requests cr ON cr.id = ei.cleaning_request_id
+				 WHERE ei.id = %d LIMIT 1",
+				$resend_id
+			)
+		);
+		$allowed = $resend_acc > 0 && in_array( $resend_acc, array_map( 'intval', (array) ( $owner_acc_ids ?? array() ) ), true );
+	}
+	if ( ! $allowed ) {
+		$last_action_message = __( 'No tienes acceso a este comprobante.', 'arriendo-facil' );
+	} else {
+		$resent = ( new Arriendo_Facil_Billing_Manager() )->resend_invoice_email( $resend_id, $resend_to );
+		$last_action_message = is_wp_error( $resent )
+			? $resent->get_error_message()
+			: __( 'Correo reenviado correctamente.', 'arriendo-facil' );
+		$invoices = $base_invoice_query();
+	}
+}
+
 // ── KPIs por estado (se actualizan también vía AJAX) ───────────────────────
 $kpi_groups  = array( 'autorizadas' => 0, 'en_proceso' => 0, 'error' => 0 );
 $kpi_totals  = array( 'autorizadas' => 0.0, 'en_proceso' => 0.0, 'error' => 0.0 );
@@ -356,6 +385,7 @@ foreach ( $invoices as $inv_row ) {
 				$errores_raw = (string) ( $inv->errores ?? '' );
 				$mensajes_decoded = '' !== $errores_raw ? json_decode( $errores_raw, true ) : null;
 				$has_mensajes = is_array( $mensajes_decoded ) && ! empty( $mensajes_decoded );
+				$mail_state   = Arriendo_Facil_Billing_Manager::mail_status( (int) $inv->id );
 				?>
 				<tr data-search="<?php echo esc_attr( strtolower( $guest_label . ' ' . $guest_id . ' ' . (string) $inv->accommodation_title . ' ' . (string) $inv->numero_comprobante ) ); ?>"
 					data-grupo="<?php echo esc_attr( $grupo ); ?>"
@@ -408,6 +438,16 @@ foreach ( $invoices as $inv_row ) {
 									<?php esc_html_e( 'XML', 'arriendo-facil' ); ?>
 								</a>
 							<?php endif; ?>
+							<?php if ( in_array( (string) $inv->estado, array( 'autorizada', 'autorizada_sin_ride' ), true ) ) : ?>
+								<form method="post" style="display:inline;" onsubmit="var e = this.querySelector('[name=resend_email]'); var v = window.prompt('<?php echo esc_js( __( 'Enviar la factura a este correo:', 'arriendo-facil' ) ); ?>', e.value); if (v === null) { return false; } e.value = v;">
+									<?php wp_nonce_field( 'af_billing_resend_email' ); ?>
+									<input type="hidden" name="invoice_id" value="<?php echo (int) $inv->id; ?>" />
+									<input type="hidden" name="resend_email" value="<?php echo esc_attr( (string) ( $mail_state['to'] ?? '' ) ); ?>" />
+									<button type="submit" name="af_resend_email_submit" class="button button-small" style="padding:4px 8px; font-size:11px;">
+										<?php esc_html_e( 'Reenviar correo', 'arriendo-facil' ); ?>
+									</button>
+								</form>
+							<?php endif; ?>
 							<?php if ( in_array( (string) $inv->estado, array( 'enviada', 'error_envio', 'error_autorizacion', 'devuelta', 'no_autorizada', 'autorizada_sin_ride' ), true ) ) : ?>
 								<form method="post" style="display:inline;">
 									<?php wp_nonce_field( 'af_billing_retry_invoice' ); ?>
@@ -423,6 +463,16 @@ foreach ( $invoices as $inv_row ) {
 				<tr class="af-error-details<?php echo $has_mensajes ? ' af-error-details--error' : ''; ?>" style="display:none;">
 					<td colspan="8">
 						<dl class="af-invoice-detail">
+								<?php
+								if ( $inv->emailed_at ) {
+									echo esc_html( wp_date( 'd/m/Y H:i', strtotime( $inv->emailed_at ) ) . ( ! empty( $mail_state['to'] ) ? ' → ' . $mail_state['to'] : '' ) );
+								} elseif ( ! empty( $mail_state ) && empty( $mail_state['ok'] ) ) {
+									echo esc_html( sprintf( /* translators: %s: reason */ __( 'No se pudo enviar: %s', 'arriendo-facil' ), (string) ( $mail_state['error'] ?: __( 'sin detalle', 'arriendo-facil' ) ) ) );
+								} else {
+									esc_html_e( 'No', 'arriendo-facil' );
+								}
+								?>
+							
 							<div><dt><?php esc_html_e( 'Tipo', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( '01' === (string) $inv->tipo_comprobante ? __( 'Factura (01)', 'arriendo-facil' ) : (string) $inv->tipo_comprobante ); ?></dd></div>
 							<div><dt><?php esc_html_e( 'Ambiente', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( 2 === (int) $inv->ambiente ? __( 'Producción', 'arriendo-facil' ) : __( 'Pruebas', 'arriendo-facil' ) ); ?></dd></div>
 							<div><dt><?php esc_html_e( 'Periodo', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( $inv->billing_period ?: '—' ); ?></dd></div>

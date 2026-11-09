@@ -171,9 +171,13 @@
 	var payFull = document.getElementById('af-cobranza-pay-full');
 	var paySri = document.getElementById('af-cobranza-pay-sri');
 
-	/* Qué forma de pago llevará la factura SRI: efectivo = 01, el resto = 20. */
+	/* Forma de pago de la factura SRI: efectivo, tarjeta (crédito) u otros con sistema financiero. */
 	function updateSriHint() {
 		if (!paySri) { return; }
+		if ('tarjeta' === payMethod.value) {
+			paySri.textContent = T.sriCard || 'En la factura SRI: tarjeta de crédito (puedes cambiarlo a débito al facturar).';
+			return;
+		}
 		paySri.textContent = 'efectivo' === payMethod.value
 			? (T.sriCash || 'En la factura SRI: sin utilización del sistema financiero.')
 			: (T.sriBank || 'En la factura SRI: otros con utilización del sistema financiero.');

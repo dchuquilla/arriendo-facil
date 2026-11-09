@@ -116,6 +116,14 @@ class BillingInvoiceEmailTest extends TestCase {
 		$this->assertSame( 'xml@example.com', $GLOBALS['af_test_mail'][0]['to'] );
 	}
 
+	public function test_invoice_without_pdf_is_not_emailed(): void {
+		list( $manager, $db ) = $this->manager();
+		$db->invoice->ride_path = '/nonexistent/ride.pdf';
+
+		$this->assertFalse( $manager->send_invoice_email( 5 ) );
+		$this->assertSame( array(), $GLOBALS['af_test_mail'] );
+	}
+
 	public function test_is_sent_only_once(): void {
 		list( $manager ) = $this->manager();
 

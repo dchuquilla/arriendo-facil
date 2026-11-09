@@ -644,7 +644,7 @@ class Arriendo_Facil_Billing_Manager {
 	 * @return string '01' (sin utilización del sistema financiero) or '20' (otros con sistema financiero).
 	 */
 	public static function sri_forma_pago( string $method ): string {
-		return 'efectivo' === $method ? '01' : '20';
+		return 'efectivo' === $method ? '01' : ( 'tarjeta' === $method ? '19' : '20' );
 	}
 
 	/**
@@ -880,8 +880,9 @@ class Arriendo_Facil_Billing_Manager {
 		sort( $periods );
 		$period_label = (string) end( $periods );
 		$iva_code     = $this->iva_code_for_accommodation( (int) $first->accommodation_id );
-		$forma_pago   = 'efectivo' === implode( '', array_unique( $methods ) ) ? '01' : '20';
-		if ( isset( $overrides['forma_pago'] ) && in_array( (string) $overrides['forma_pago'], array( '01', '20' ), true ) ) {
+		$unique_methods = array_values( array_unique( $methods ) );
+		$forma_pago     = 1 === count( $unique_methods ) ? self::sri_forma_pago( (string) $unique_methods[0] ) : '20';
+		if ( isset( $overrides['forma_pago'] ) && in_array( (string) $overrides['forma_pago'], array( '01', '20', '16', '19' ), true ) ) {
 			$forma_pago = (string) $overrides['forma_pago'];
 		}
 		$info         = array();
@@ -1005,6 +1006,7 @@ class Arriendo_Facil_Billing_Manager {
 		}
 		if ( '' === $email || ! is_email( $email ) ) {
 			error_log( 'Arriendo Facil: factura ' . $invoice_id . ' sin correo valido, no se envio RIDE.' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			$this->record_mail_status( $invoice_id, false, '', 'la factura no tiene un correo válido' );
 			return false;
 		}
 
@@ -1014,6 +1016,12 @@ class Arriendo_Facil_Billing_Manager {
 		$ride_file = ! empty( $invoice->xml_firmado ) ? $this->regenerate_ride( $invoice ) : (string) ( $invoice->ride_path ?? '' );
 		if ( '' !== $ride_file && file_exists( $ride_file ) ) {
 			$attachments[] = $ride_file;
+		}
+		if ( empty( $attachments ) ) {
+			// La factura debe llegar siempre con su PDF: sin RIDE no se envía y queda registrado el motivo.
+			error_log( 'Arriendo Facil: factura ' . $invoice_id . ' sin RIDE, no se envio el correo.' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			$this->record_mail_status( $invoice_id, false, $email, 'no se pudo generar el PDF (RIDE) de la factura' );
+			return false;
 		}
 		if ( ! empty( $invoice->xml_autorizacion ) ) {
 			// Carpeta privada (0700) con nombre impredecible: el XML lleva datos personales en claro.
@@ -1041,9 +1049,61 @@ class Arriendo_Facil_Billing_Manager {
 			number_format( (float) $invoice->total, 2 )
 		);
 
+		// Mismo remitente (correo del sitio) que usan los demás avisos: los servidores de correo
+		// suelen rechazar el remitente por defecto "wordpress@dominio".
+		$headers = array();
+		if ( function_exists( 'get_option' ) ) {
+			$from = (string) apply_filters( 'af_billing_mail_from', (string) get_option( 'admin_email' ) );
+			if ( '' !== $from && is_email( $from ) ) {
+				$site_name = function_exists( 'get_bloginfo' ) ? (string) get_bloginfo( 'name' ) : '';
+				$headers[] = sprintf( 'From: %s <%s>', '' !== $site_name ? $site_name : 'Arriendo Fácil', $from );
+			}
+		}
+
+		$buyer_name = '';
+		if ( ! empty( $invoice->xml_firmado ) ) {
+			$buyer_name = (string) ( Arriendo_Facil_SRI_Ride::data_from_xml( (string) $invoice->xml_firmado )['razon_social_comprador'] ?? '' );
+		}
+
+		$mail_error = '';
+		$capture    = static function ( $error ) use ( &$mail_error ) {
+			$mail_error = is_object( $error ) && method_exists( $error, 'get_error_message' ) ? (string) $error->get_error_message() : 'error desconocido';
+		};
+		if ( function_exists( 'add_action' ) ) {
+			add_action( 'wp_mail_failed', $capture );
+		}
 		try {
-			$sent = wp_mail( $email, $subject, $body, array(), $attachments );
+			if ( class_exists( 'Arriendo_Facil_Email' ) ) {
+				$sent = Arriendo_Facil_Email::send(
+					$email,
+					$subject,
+					array(
+						'preheader' => sprintf( /* translators: %s: invoice number */ __( 'Factura %s autorizada por el SRI', 'arriendo-facil' ), (string) $invoice->numero_comprobante ),
+						'eyebrow'   => __( 'Factura electrónica', 'arriendo-facil' ),
+						'title'     => __( 'Tu factura está lista', 'arriendo-facil' ),
+						'status'    => array( 'type' => 'success', 'label' => __( 'Autorizada por el SRI', 'arriendo-facil' ) ),
+						'greeting'  => '' !== $buyer_name ? sprintf( /* translators: %s: name */ __( 'Hola %s,', 'arriendo-facil' ), $buyer_name ) : __( 'Hola,', 'arriendo-facil' ),
+						'body_text' => __( 'Adjuntamos tu factura electrónica en PDF (RIDE) y el archivo XML autorizado por el SRI. Conserva ambos como respaldo.', 'arriendo-facil' ),
+						'details'   => array_filter(
+							array(
+								__( 'Comprobante', 'arriendo-facil' )  => (string) $invoice->numero_comprobante,
+								__( 'Total', 'arriendo-facil' )        => '$' . number_format( (float) $invoice->total, 2 ),
+								__( 'Autorización', 'arriendo-facil' ) => (string) ( $invoice->numero_autorizacion ?? '' ),
+							)
+						),
+						'note'      => __( 'Gracias por tu pago.', 'arriendo-facil' ),
+					),
+					Arriendo_Facil_Email::CAT_TRANSACTIONAL,
+					$headers,
+					$attachments
+				);
+			} else {
+				$sent = wp_mail( $email, $subject, $body, array_merge( array( 'Content-Type: text/plain; charset=UTF-8' ), $headers ), $attachments );
+			}
 		} finally {
+			if ( function_exists( 'remove_action' ) ) {
+				remove_action( 'wp_mail_failed', $capture );
+			}
 			if ( '' !== $tmp_xml && file_exists( $tmp_xml ) ) {
 				wp_delete_file( $tmp_xml );
 			}
@@ -1051,12 +1111,63 @@ class Arriendo_Facil_Billing_Manager {
 				rmdir( $tmp_dir ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir
 			}
 		}
+		$this->record_mail_status( $invoice_id, (bool) $sent, $email, $mail_error );
 		if ( $sent ) {
 			$this->update_invoice_row( $invoice_id, array( 'emailed_at' => current_time( 'mysql' ) ) );
 		} else {
-			error_log( 'Arriendo Facil: wp_mail fallo al enviar la factura ' . $invoice_id ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			error_log( 'Arriendo Facil: wp_mail fallo al enviar la factura ' . $invoice_id . ( '' !== $mail_error ? ': ' . $mail_error : '' ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 		}
 		return (bool) $sent;
+	}
+
+	const MAIL_STATUS_OPTION = 'af_invoice_mail_status';
+
+	/**
+	 * Remembers the last email attempt of an invoice so the UI can explain a missing email.
+	 */
+	protected function record_mail_status( int $invoice_id, bool $ok, string $to, string $error ): void {
+		if ( ! function_exists( 'get_option' ) || ! function_exists( 'update_option' ) ) {
+			return;
+		}
+		$all = get_option( self::MAIL_STATUS_OPTION, array() );
+		$all = is_array( $all ) ? $all : array();
+		$all[ $invoice_id ] = array(
+			'ok'    => $ok,
+			'to'    => $to,
+			'error' => $error,
+			'at'    => time(),
+		);
+		if ( count( $all ) > 300 ) {
+			$all = array_slice( $all, -300, null, true );
+		}
+		update_option( self::MAIL_STATUS_OPTION, $all, false );
+	}
+
+	/**
+	 * Last email attempt for an invoice: ok, to, error, at (empty when never tried).
+	 */
+	public static function mail_status( int $invoice_id ): array {
+		$all = function_exists( 'get_option' ) ? get_option( self::MAIL_STATUS_OPTION, array() ) : array();
+		return is_array( $all ) && isset( $all[ $invoice_id ] ) && is_array( $all[ $invoice_id ] ) ? $all[ $invoice_id ] : array();
+	}
+
+	/**
+	 * Sends the RIDE and XML again (optionally to a corrected address).
+	 *
+	 * @return true|WP_Error
+	 */
+	public function resend_invoice_email( int $invoice_id, string $email = '' ) {
+		$invoice = $this->get_invoice( $invoice_id );
+		if ( ! $invoice || ! in_array( (string) $invoice->estado, array( 'autorizada', 'autorizada_sin_ride' ), true ) ) {
+			return new WP_Error( 'invoice_not_authorized', __( 'Solo se puede reenviar una factura autorizada por el SRI.', 'arriendo-facil' ) );
+		}
+		$this->update_invoice_row( $invoice_id, array( 'emailed_at' => null ) );
+		if ( $this->send_invoice_email( $invoice_id, $email ) ) {
+			return true;
+		}
+		$status = self::mail_status( $invoice_id );
+		$reason = ! empty( $status['error'] ) ? (string) $status['error'] : __( 'revisa que el correo sea válido y que el servidor pueda enviar correos (SMTP).', 'arriendo-facil' );
+		return new WP_Error( 'mail_failed', sprintf( /* translators: %s: reason */ __( 'No se pudo enviar el correo: %s', 'arriendo-facil' ), $reason ) );
 	}
 
 	/**

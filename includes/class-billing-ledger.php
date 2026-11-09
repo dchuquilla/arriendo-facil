@@ -1332,6 +1332,7 @@ class Arriendo_Facil_Billing_Ledger {
 		return array(
 			'transferencia' => __( 'Transferencia', 'arriendo-facil' ),
 			'efectivo'      => __( 'Efectivo', 'arriendo-facil' ),
+			'tarjeta'       => __( 'Tarjeta', 'arriendo-facil' ),
 			'deposito'      => __( 'Depósito', 'arriendo-facil' ),
 			'cheque'        => __( 'Cheque', 'arriendo-facil' ),
 			'otro'          => __( 'Otro', 'arriendo-facil' ),

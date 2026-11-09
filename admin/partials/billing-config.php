@@ -721,14 +721,15 @@ $af_check_txt  = ! $af_has_check ? __( 'Sin comprobar', 'arriendo-facil' ) : ( !
 		<div class="af-form-field af-form-field--full" style="margin-top: var(--af-space-2);">
 			<span class="af-form-field__label"><?php esc_html_e( 'Ambiente de emisión', 'arriendo-facil' ); ?></span>
 			<?php if ( $af_is_owner ) : ?>
+				<?php $af_owner_prod = '2' === (string) $cfg['ambiente']; ?>
 				<div class="af-radio-row">
 					<label>
-						<input type="radio" name="af_ambiente_display" value="2" checked disabled />
-						<strong><?php esc_html_e( 'Producción', 'arriendo-facil' ); ?></strong>
-						<span class="af-form-field__hint"> — <?php esc_html_e( 'validez legal ante el SRI', 'arriendo-facil' ); ?></span>
+						<input type="radio" name="af_ambiente_display" value="<?php echo $af_owner_prod ? '2' : '1'; ?>" checked disabled />
+						<strong><?php echo esc_html( $af_owner_prod ? __( 'Producción', 'arriendo-facil' ) : __( 'Pruebas (Certificación)', 'arriendo-facil' ) ); ?></strong>
+						<span class="af-form-field__hint"> — <?php echo esc_html( $af_owner_prod ? __( 'validez legal ante el SRI', 'arriendo-facil' ) : __( 'sin validez tributaria', 'arriendo-facil' ) ); ?></span>
 					</label>
 				</div>
-				<span class="af-form-field__hint"><?php esc_html_e( 'Tu cuenta emite siempre en producción.', 'arriendo-facil' ); ?></span>
+				<span class="af-form-field__hint"><?php echo esc_html( $af_owner_prod ? __( 'Tu cuenta emite siempre en producción.', 'arriendo-facil' ) : __( 'Temporalmente tu cuenta emite en ambiente de pruebas.', 'arriendo-facil' ) ); ?></span>
 			<?php else : ?>
 				<div class="af-radio-row">
 					<label>

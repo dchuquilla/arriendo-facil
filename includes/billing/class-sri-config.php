@@ -27,6 +27,9 @@ class Arriendo_Facil_SRI_Config {
 	/** OpenSSL cipher used to protect the certificate password at rest. */
 	const CIPHER = 'aes-256-cbc';
 
+	/** TEMPORAL: true = los gestores de propiedades emiten en ambiente de pruebas (sin validez tributaria). */
+	const AF_SRI_MANAGERS_TEST_MODE = true;
+
 	/** Authenticated cipher used for sensitive data at rest. */
 	const AEAD_CIPHER = 'aes-256-gcm';
 
@@ -151,10 +154,10 @@ class Arriendo_Facil_SRI_Config {
 			$saved
 		);
 
-		// Los gestores de propiedades siempre emiten en producción: el valor
-		// efectivo no depende de lo que haya quedado almacenado.
+		// Los gestores de propiedades emiten en producción, salvo la ventana de pruebas.
+		// TEMPORAL: poner AF_SRI_MANAGERS_TEST_MODE en false para volver a producción.
 		if ( $scope > 0 ) {
-			$merged['ambiente'] = '2';
+			$merged['ambiente'] = self::AF_SRI_MANAGERS_TEST_MODE ? '1' : '2';
 		}
 
 		return $merged;

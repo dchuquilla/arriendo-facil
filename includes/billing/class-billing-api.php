@@ -47,6 +47,7 @@ class Arriendo_Facil_Billing_API {
 		add_action( 'wp_ajax_af_download_ride', array( $this, 'ajax_download_ride' ) );
 		add_action( 'wp_ajax_af_download_xml', array( $this, 'ajax_download_xml' ) );
 		add_action( 'wp_ajax_af_invoice_file', array( $this, 'ajax_public_invoice_file' ) );
+		add_action( 'wp_ajax_af_invoice_mail_default', array( $this, 'ajax_invoice_mail_default' ) );
 		add_action( 'wp_ajax_nopriv_af_invoice_file', array( $this, 'ajax_public_invoice_file' ) );
 		add_action( 'wp_ajax_af_sri_ruc_lookup', array( $this, 'ajax_sri_ruc_lookup' ) );
 		add_action( 'wp_ajax_af_billing_lease_search', array( $this, 'ajax_billing_lease_search' ) );
@@ -477,6 +478,20 @@ class Arriendo_Facil_Billing_API {
 		header( 'Content-Disposition: attachment; filename="comprobante-' . (int) $invoice->id . '.xml"' );
 		echo $xml; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		exit;
+	}
+
+	/**
+	 * AJAX: address to prefill when resending an invoice by email.
+	 */
+	public function ajax_invoice_mail_default(): void {
+		check_ajax_referer( 'af_billing_nonce', 'nonce' );
+
+		$invoice_id = isset( $_POST['invoice_id'] ) ? absint( wp_unslash( $_POST['invoice_id'] ) ) : 0;
+		if ( ! $this->can_manage_billing() || ! $this->current_user_owns_invoice( $invoice_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		wp_send_json_success( array( 'email' => $this->manager->default_mail_recipient( $invoice_id ) ) );
 	}
 
 	/**

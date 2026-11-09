@@ -1198,6 +1198,35 @@ class Arriendo_Facil_Billing_Manager {
 	}
 
 	/**
+	 * Address an invoice was (or should be) emailed to: last send, then the one typed when
+	 * issuing (kept in the XML), then the tenant record.
+	 */
+	public function default_mail_recipient( int $invoice_id ): string {
+		$status = self::mail_status( $invoice_id );
+		if ( ! empty( $status['to'] ) && is_email( (string) $status['to'] ) ) {
+			return (string) $status['to'];
+		}
+		$invoice = $this->get_invoice( $invoice_id );
+		if ( ! $invoice ) {
+			return '';
+		}
+		if ( ! empty( $invoice->xml_firmado ) ) {
+			$info = Arriendo_Facil_SRI_Ride::data_from_xml( (string) $invoice->xml_firmado );
+			$mail = (string) ( $info['info_adicional']['email'] ?? '' );
+			if ( is_email( $mail ) ) {
+				return $mail;
+			}
+		}
+		$mail = (string) $this->wpdb->get_var(
+			$this->wpdb->prepare(
+				"SELECT g.email FROM {$this->wpdb->prefix}af_leases l INNER JOIN {$this->wpdb->prefix}af_guests g ON g.id = l.guest_id WHERE l.id = %d LIMIT 1",
+				(int) $invoice->lease_id
+			)
+		);
+		return is_email( $mail ) ? $mail : '';
+	}
+
+	/**
 	 * Sends the RIDE and XML again (optionally to a corrected address).
 	 *
 	 * @return true|WP_Error

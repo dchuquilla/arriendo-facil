@@ -170,9 +170,10 @@ if ( isset( $_POST['af_resend_email_submit'] ) ) {
 		$last_action_message = __( 'No tienes acceso a este comprobante.', 'arriendo-facil' );
 	} else {
 		$resent = ( new Arriendo_Facil_Billing_Manager() )->resend_invoice_email( $resend_id, $resend_to );
+		$sent_to = (string) ( Arriendo_Facil_Billing_Manager::mail_status( $resend_id )['to'] ?? $resend_to );
 		$last_action_message = is_wp_error( $resent )
 			? $resent->get_error_message()
-			: __( 'Correo reenviado correctamente.', 'arriendo-facil' );
+			: sprintf( /* translators: %s: email address */ __( 'Factura reenviada a %s.', 'arriendo-facil' ), $sent_to );
 		$invoices = $base_invoice_query();
 	}
 }
@@ -267,6 +268,73 @@ foreach ( $invoices as $inv_row ) {
 		</noscript>
 	</form>
 </details>
+
+<div id="af-resend-modal" class="af-modal" hidden>
+	<div class="af-modal__backdrop" data-af-resend-close></div>
+	<div class="af-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="af-resend-title" style="width:min(460px,100%);">
+		<form method="post">
+			<div class="af-modal__header">
+				<h2 id="af-resend-title"><?php esc_html_e( 'Reenviar factura por correo', 'arriendo-facil' ); ?></h2>
+				<button type="button" class="af-modal__close" data-af-resend-close aria-label="<?php esc_attr_e( 'Cerrar', 'arriendo-facil' ); ?>">&times;</button>
+			</div>
+			<div class="af-modal__body">
+				<?php wp_nonce_field( 'af_billing_resend_email' ); ?>
+				<input type="hidden" name="invoice_id" id="af-resend-invoice" value="" />
+				<label for="af-resend-email" style="display:block;font-weight:700;margin-bottom:6px;"><?php esc_html_e( 'Enviar a', 'arriendo-facil' ); ?></label>
+				<input type="email" name="resend_email" id="af-resend-email" required style="width:100%;min-height:42px;" placeholder="correo@ejemplo.com" />
+				<p class="af-td-meta" id="af-resend-hint" style="margin:8px 0 0;"><?php esc_html_e( 'Se rellena con el correo al que se envió la factura; puedes cambiarlo para mandarla a otra persona.', 'arriendo-facil' ); ?></p>
+				<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px;">
+					<button type="button" class="button" data-af-resend-close><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
+					<button type="submit" name="af_resend_email_submit" class="button button-primary"><?php esc_html_e( 'Enviar factura', 'arriendo-facil' ); ?></button>
+				</div>
+			</div>
+		</form>
+	</div>
+</div>
+<script>
+( function () {
+	'use strict';
+	var modal = document.getElementById( 'af-resend-modal' );
+	if ( ! modal ) { return; }
+	document.body.appendChild( modal );
+	var input = document.getElementById( 'af-resend-email' );
+	var idField = document.getElementById( 'af-resend-invoice' );
+
+	function setOpen( open ) {
+		modal.hidden = ! open;
+		modal.classList.toggle( 'is-open', open );
+		document.body.classList.toggle( 'af-modal-open', open );
+		if ( open ) { input.focus(); input.select(); }
+	}
+
+	document.addEventListener( 'click', function ( e ) {
+		var btn = e.target.closest( '.af-resend-open' );
+		if ( btn ) {
+			idField.value = btn.dataset.invoice;
+			input.value = btn.dataset.email || '';
+			setOpen( true );
+			if ( ! input.value ) {
+				// Facturas anteriores al registro de envíos: se busca el correo con el que se emitió.
+				var fd = new FormData();
+				fd.append( 'action', 'af_invoice_mail_default' );
+				fd.append( 'nonce', '<?php echo esc_js( $billing_ajax_nonce ); ?>' );
+				fd.append( 'invoice_id', btn.dataset.invoice );
+				fetch( '<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>', { method: 'POST', body: fd, credentials: 'same-origin' } )
+					.then( function ( r ) { return r.json(); } )
+					.then( function ( resp ) {
+						if ( resp.success && resp.data && resp.data.email && ! input.value ) {
+							input.value = resp.data.email;
+							btn.dataset.email = resp.data.email;
+						}
+					} ).catch( function () {} );
+			}
+			return;
+		}
+		if ( e.target.closest( '[data-af-resend-close]' ) ) { setOpen( false ); }
+	} );
+	document.addEventListener( 'keydown', function ( e ) { if ( 'Escape' === e.key && ! modal.hidden ) { setOpen( false ); } } );
+}() );
+</script>
 
 <div id="af-billing-preview-modal" class="af-modal" hidden>
 	<div class="af-modal__backdrop" data-af-close-billing-preview></div>
@@ -439,14 +507,9 @@ foreach ( $invoices as $inv_row ) {
 								</a>
 							<?php endif; ?>
 							<?php if ( in_array( (string) $inv->estado, array( 'autorizada', 'autorizada_sin_ride' ), true ) ) : ?>
-								<form method="post" style="display:inline;" onsubmit="var e = this.querySelector('[name=resend_email]'); var v = window.prompt('<?php echo esc_js( __( 'Enviar la factura a este correo:', 'arriendo-facil' ) ); ?>', e.value); if (v === null) { return false; } e.value = v;">
-									<?php wp_nonce_field( 'af_billing_resend_email' ); ?>
-									<input type="hidden" name="invoice_id" value="<?php echo (int) $inv->id; ?>" />
-									<input type="hidden" name="resend_email" value="<?php echo esc_attr( (string) ( $mail_state['to'] ?? '' ) ); ?>" />
-									<button type="submit" name="af_resend_email_submit" class="button button-small" style="padding:4px 8px; font-size:11px;">
-										<?php esc_html_e( 'Reenviar correo', 'arriendo-facil' ); ?>
-									</button>
-								</form>
+								<button type="button" class="button button-small af-resend-open" style="padding:4px 8px; font-size:11px;" data-invoice="<?php echo (int) $inv->id; ?>" data-email="<?php echo esc_attr( (string) ( $mail_state['to'] ?? '' ) ); ?>">
+									<?php esc_html_e( 'Reenviar correo', 'arriendo-facil' ); ?>
+								</button>
 							<?php endif; ?>
 							<?php if ( in_array( (string) $inv->estado, array( 'enviada', 'error_envio', 'error_autorizacion', 'devuelta', 'no_autorizada', 'autorizada_sin_ride' ), true ) ) : ?>
 								<form method="post" style="display:inline;">

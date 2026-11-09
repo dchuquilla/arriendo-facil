@@ -178,31 +178,6 @@ if ( isset( $_POST['af_resend_email_submit'] ) ) {
 	}
 }
 
-if ( isset( $_POST['af_revoke_links_submit'] ) ) {
-	check_admin_referer( 'af_billing_revoke_links' );
-	$revoke_id = isset( $_POST['invoice_id'] ) ? absint( wp_unslash( $_POST['invoice_id'] ) ) : 0;
-	$allowed   = $revoke_id > 0;
-	if ( $allowed && $is_owner_view ) {
-		$revoke_acc = (int) $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT COALESCE(l.accommodation_id, cr.accommodation_id)
-				 FROM {$wpdb->prefix}af_electronic_invoices ei
-				 LEFT JOIN {$wpdb->prefix}af_leases l ON l.id = ei.lease_id
-				 LEFT JOIN {$wpdb->prefix}af_cleaning_requests cr ON cr.id = ei.cleaning_request_id
-				 WHERE ei.id = %d LIMIT 1",
-				$revoke_id
-			)
-		);
-		$allowed = $revoke_acc > 0 && in_array( $revoke_acc, array_map( 'intval', (array) ( $owner_acc_ids ?? array() ) ), true );
-	}
-	if ( ! $allowed ) {
-		$last_action_message = __( 'No tienes acceso a este comprobante.', 'arriendo-facil' );
-	} else {
-		( new Arriendo_Facil_Billing_Manager() )->revoke_file_links( $revoke_id );
-		$last_action_message = __( 'Enlaces de descarga revocados. Los correos anteriores ya no podrán descargar esta factura; puedes usar "Reenviar correo" para enviar enlaces nuevos.', 'arriendo-facil' );
-	}
-}
-
 // ── KPIs por estado (se actualizan también vía AJAX) ───────────────────────
 $kpi_groups  = array( 'autorizadas' => 0, 'en_proceso' => 0, 'error' => 0 );
 $kpi_totals  = array( 'autorizadas' => 0.0, 'en_proceso' => 0.0, 'error' => 0.0 );
@@ -535,13 +510,6 @@ foreach ( $invoices as $inv_row ) {
 								<button type="button" class="button button-small af-resend-open" style="padding:4px 8px; font-size:11px;" data-invoice="<?php echo (int) $inv->id; ?>" data-email="<?php echo esc_attr( (string) ( $mail_state['to'] ?? '' ) ); ?>">
 									<?php esc_html_e( 'Reenviar correo', 'arriendo-facil' ); ?>
 								</button>
-								<form method="post" style="display:inline;" onsubmit="return window.confirm('<?php echo esc_js( __( '¿Revocar los enlaces de descarga ya enviados por correo de esta factura?', 'arriendo-facil' ) ); ?>');">
-									<?php wp_nonce_field( 'af_billing_revoke_links' ); ?>
-									<input type="hidden" name="invoice_id" value="<?php echo (int) $inv->id; ?>" />
-									<button type="submit" name="af_revoke_links_submit" class="button button-small" style="padding:4px 8px; font-size:11px;">
-										<?php esc_html_e( 'Revocar enlaces', 'arriendo-facil' ); ?>
-									</button>
-								</form>
 							<?php endif; ?>
 							<?php if ( in_array( (string) $inv->estado, array( 'enviada', 'error_envio', 'error_autorizacion', 'devuelta', 'no_autorizada', 'autorizada_sin_ride' ), true ) ) : ?>
 								<form method="post" style="display:inline;">

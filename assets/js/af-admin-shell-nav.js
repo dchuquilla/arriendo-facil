@@ -13,6 +13,14 @@
 		var collapseToggle = document.getElementById('af-app-sidebar-toggle');
 		var mobileToggle    = document.getElementById('af-app-sidebar-mobile-toggle');
 		var storageKey      = 'af_admin_sidebar_collapsed';
+		var mobileQuery     = window.matchMedia('(max-width: 782px)');
+
+		var closeDrawer = function () {
+			body.classList.remove('af-sidebar-open');
+			if (mobileToggle) {
+				mobileToggle.setAttribute('aria-expanded', 'false');
+			}
+		};
 
 		if (window.localStorage && localStorage.getItem(storageKey) === '1') {
 			body.classList.add('af-sidebar-collapsed');
@@ -20,6 +28,10 @@
 
 		if (collapseToggle) {
 			collapseToggle.addEventListener('click', function () {
+				if (mobileQuery.matches) {
+					closeDrawer();
+					return;
+				}
 				var collapsed = body.classList.toggle('af-sidebar-collapsed');
 				if (window.localStorage) {
 					localStorage.setItem(storageKey, collapsed ? '1' : '0');
@@ -33,6 +45,18 @@
 				mobileToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
 			});
 		}
+
+		document.addEventListener('click', function (event) {
+			if (body.classList.contains('af-sidebar-open') && !event.target.closest('.af-app-sidebar') && event.target !== mobileToggle && !(mobileToggle && mobileToggle.contains(event.target))) {
+				closeDrawer();
+			}
+		});
+
+		document.addEventListener('keydown', function (event) {
+			if (event.key === 'Escape') {
+				closeDrawer();
+			}
+		});
 
 		// Accordion: clicking a group header expands/collapses its sub-items.
 		// When the sidebar is collapsed to icons the header keeps navigating.

@@ -188,9 +188,12 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['af_queue_action'], 
 if ( $is_owner ) {
 	// Incluye a los inquilinos que el propio usuario registró aún sin inmueble.
 	Arriendo_Facil_Guest::ensure_guest_extra_columns();
+	$guest_scope_sql = $owner_ids
+		? 'accommodation_id IN (' . implode( ',', array_map( 'intval', $owner_ids ) ) . ') OR '
+		: '';
 	$guests = $wpdb->get_results(
 		$wpdb->prepare(
-			"SELECT * FROM {$wpdb->prefix}af_guests WHERE accommodation_id IN (" . ( $owner_ids ? implode( ',', array_map( 'intval', $owner_ids ) ) : '0' ) . ') OR created_by = %d ORDER BY created_at DESC LIMIT 100', // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- ids casteados a int.
+			"SELECT * FROM {$wpdb->prefix}af_guests WHERE {$guest_scope_sql}created_by = %d ORDER BY created_at DESC LIMIT 100", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- ids casteados a int.
 			get_current_user_id()
 		)
 	);

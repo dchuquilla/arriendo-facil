@@ -260,13 +260,6 @@ class Arriendo_Facil_SRI_Ride {
 		$w    = self::PAGE_W - 2 * $m;
 		$top  = $m;
 		$amb  = strtoupper( (string) ( $d['ambiente_label'] ?? '' ) );
-		$prod = false !== strpos( $amb, 'PRODUCCI' );
-
-		if ( ! $prod && '' !== $amb ) {
-			$this->rect( $m, $top, $w, 16, array( 1, 0.93, 0.7 ), true );
-			$this->text_center( $m + $w / 2, $top + 11.5, 'DOCUMENTO DE PRUEBAS - SIN VALIDEZ TRIBUTARIA', 8.5, true, array( 0.45, 0.3, 0 ) );
-			$top += 22;
-		}
 
 		$ruc    = (string) ( $d['ruc'] ?? '' );
 		$numero = (string) ( $d['numero_comprobante'] ?? '' );

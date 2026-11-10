@@ -48,7 +48,7 @@ class SRIRideLayoutTest extends TestCase {
 		$this->assertStringStartsWith( '%PDF-1.4', $pdf );
 		$this->assertStringContainsString( '(KATTY PEREZ)', $pdf );
 		$this->assertStringContainsString( '(JOHN SMITH)', $pdf );
-		$this->assertStringContainsString( 'SIN VALIDEZ TRIBUTARIA', $pdf );
+		$this->assertStringNotContainsString( 'SIN VALIDEZ TRIBUTARIA', $pdf );
 		$this->assertGreaterThan( 50, substr_count( $pdf, ' re f' ) );
 	}
 

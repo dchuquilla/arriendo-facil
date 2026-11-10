@@ -428,7 +428,7 @@ $cob_alerts   = $cob_snapshot['display'];
 					<div class="af-modal__field">
 						<label for="af-cobranza-pay-method"><?php esc_html_e( 'Forma de pago', 'arriendo-facil' ); ?></label>
 						<select id="af-cobranza-pay-method">
-							<?php foreach ( Arriendo_Facil_Billing_Ledger::payment_methods() as $method_key => $method_label ) : ?>
+							<?php foreach ( Arriendo_Facil_Billing_Ledger::invoice_payment_methods() as $method_key => $method_label ) : ?>
 								<option value="<?php echo esc_attr( $method_key ); ?>"><?php echo esc_html( $method_label ); ?></option>
 							<?php endforeach; ?>
 						</select>

@@ -174,8 +174,10 @@
 	/* Forma de pago de la factura SRI: efectivo, tarjeta (crédito) u otros con sistema financiero. */
 	function updateSriHint() {
 		if (!paySri) { return; }
-		if ('tarjeta' === payMethod.value) {
-			paySri.textContent = T.sriCard || 'En la factura SRI: tarjeta de crédito (puedes cambiarlo a débito al facturar).';
+		if ('tarjeta_credito' === payMethod.value || 'tarjeta_debito' === payMethod.value) {
+			paySri.textContent = 'tarjeta_debito' === payMethod.value
+				? (T.sriDebit || 'En la factura SRI: tarjeta de débito.')
+				: (T.sriCredit || 'En la factura SRI: tarjeta de crédito.');
 			return;
 		}
 		paySri.textContent = 'efectivo' === payMethod.value

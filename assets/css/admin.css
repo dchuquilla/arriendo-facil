@@ -1718,6 +1718,7 @@ body.post-type-accommodation #titlediv {
 
 .af-modal__close {
 	position: absolute;
+	z-index: 10;
 	top: 14px;
 	right: 14px;
 	width: 30px;

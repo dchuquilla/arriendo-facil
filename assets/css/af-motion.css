@@ -247,6 +247,7 @@
 
 /* Botón close del modal con rotación sutil */
 .af-modal .af-modal__close {
+	z-index: 10; /* por encima del encabezado: si no, el clic cae en el header y no cierra */
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;

@@ -1083,9 +1083,10 @@
 
 /* Revisar factura: diseño del modal (el modal vive en <body>, estilos globales) */
 .af-pending-dialog { width: min(680px, 100%); }
-.af-pending-dialog .af-modal__header { display: flex; align-items: center; justify-content: space-between; padding: 22px 28px 16px; border-bottom: 1px solid var(--af-gray-200, #DCE5E3); }
+.af-pending-dialog .af-modal__header { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; padding: 22px 28px 16px; border-bottom: 1px solid var(--af-gray-200, #DCE5E3); }
 .af-pending-dialog .af-modal__header h2 { margin: 0; font-size: 20px; }
-.af-pending-dialog .af-modal__close { position: static; }
+.af-pending-dialog .af-modal__close { position: static; flex: none; margin: 0; }
+.af-pending-dialog .af-pending-notes[hidden] { display: none; }
 .af-pending-dialog .af-modal__body { padding: 20px 28px 24px; }
 .af-pending-dialog .af-pending-hint { margin: 0 0 16px; }
 .af-pending-dialog .af-pending-buyer { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 20px; align-items: start; margin: 0 0 20px; }

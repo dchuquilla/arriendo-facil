@@ -638,7 +638,9 @@ class Arriendo_Facil_Billing_Manager {
 	 * @return string '01' (sin utilización del sistema financiero) or '20' (otros con sistema financiero).
 	 */
 	public static function sri_forma_pago( string $method ): string {
-		return 'efectivo' === $method ? '01' : ( 'tarjeta' === $method ? '19' : '20' );
+		return 'efectivo' === $method
+			? '01'
+			: ( in_array( $method, array( 'tarjeta', 'tarjeta_credito' ), true ) ? '19' : ( 'tarjeta_debito' === $method ? '16' : '20' ) );
 	}
 
 	/**

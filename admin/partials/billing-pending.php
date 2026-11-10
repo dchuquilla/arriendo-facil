@@ -159,7 +159,7 @@ $pending_nonce = wp_create_nonce( 'af_billing_nonce' );
 	}
 
 	var T = {
-		method: { efectivo: '<?php echo esc_js( __( 'Efectivo', 'arriendo-facil' ) ); ?>', transferencia: '<?php echo esc_js( __( 'Transferencia', 'arriendo-facil' ) ); ?>', tarjeta: '<?php echo esc_js( __( 'Tarjeta', 'arriendo-facil' ) ); ?>', deposito: '<?php echo esc_js( __( 'Depósito', 'arriendo-facil' ) ); ?>', cheque: '<?php echo esc_js( __( 'Cheque', 'arriendo-facil' ) ); ?>', otro: '<?php echo esc_js( __( 'Otro', 'arriendo-facil' ) ); ?>' },
+		method: { efectivo: '<?php echo esc_js( __( 'Efectivo', 'arriendo-facil' ) ); ?>', transferencia: '<?php echo esc_js( __( 'Transferencia', 'arriendo-facil' ) ); ?>', tarjeta: '<?php echo esc_js( __( 'Tarjeta', 'arriendo-facil' ) ); ?>', tarjeta_credito: '<?php echo esc_js( __( 'Tarjeta de crédito', 'arriendo-facil' ) ); ?>', tarjeta_debito: '<?php echo esc_js( __( 'Tarjeta de débito', 'arriendo-facil' ) ); ?>', deposito: '<?php echo esc_js( __( 'Depósito', 'arriendo-facil' ) ); ?>', cheque: '<?php echo esc_js( __( 'Cheque', 'arriendo-facil' ) ); ?>', otro: '<?php echo esc_js( __( 'Otro', 'arriendo-facil' ) ); ?>' },
 		rejected: '<?php echo esc_js( __( 'Rechazada por el SRI: corrige y reemite', 'arriendo-facil' ) ); ?>',
 		noEmail: '<?php echo esc_js( __( 'Sin correo', 'arriendo-facil' ) ); ?>',
 		review: '<?php echo esc_js( __( 'Revisar y facturar', 'arriendo-facil' ) ); ?>',

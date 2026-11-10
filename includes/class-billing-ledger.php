@@ -1330,12 +1330,32 @@ class Arriendo_Facil_Billing_Ledger {
 	 */
 	public static function payment_methods() {
 		return array(
-			'transferencia' => __( 'Transferencia', 'arriendo-facil' ),
-			'efectivo'      => __( 'Efectivo', 'arriendo-facil' ),
-			'tarjeta'       => __( 'Tarjeta', 'arriendo-facil' ),
-			'deposito'      => __( 'Depósito', 'arriendo-facil' ),
-			'cheque'        => __( 'Cheque', 'arriendo-facil' ),
-			'otro'          => __( 'Otro', 'arriendo-facil' ),
+			'transferencia'  => __( 'Transferencia', 'arriendo-facil' ),
+			'efectivo'       => __( 'Efectivo', 'arriendo-facil' ),
+			'tarjeta_credito' => __( 'Tarjeta de crédito', 'arriendo-facil' ),
+			'tarjeta_debito' => __( 'Tarjeta de débito', 'arriendo-facil' ),
+			'tarjeta'        => __( 'Tarjeta', 'arriendo-facil' ),
+			'deposito'       => __( 'Depósito', 'arriendo-facil' ),
+			'cheque'         => __( 'Cheque', 'arriendo-facil' ),
+			'otro'           => __( 'Otro', 'arriendo-facil' ),
+		);
+	}
+
+	/**
+	 * Payment methods offered when registering a tenant payment: the same four the invoice
+	 * uses (efectivo, transferencia, tarjeta de crédito/débito). The legacy keys stay valid
+	 * in payment_methods() so older payments keep their label.
+	 *
+	 * @return array<string,string>
+	 */
+	public static function invoice_payment_methods() {
+		$all = self::payment_methods();
+
+		return array(
+			'efectivo'        => $all['efectivo'],
+			'transferencia'   => $all['transferencia'],
+			'tarjeta_credito' => $all['tarjeta_credito'],
+			'tarjeta_debito'  => $all['tarjeta_debito'],
 		);
 	}
 

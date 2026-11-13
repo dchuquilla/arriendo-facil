@@ -18,6 +18,8 @@ class Arriendo_Facil_Properties_Page {
 
 	const PAGE_SLUG = 'af-properties';
 	const PER_PAGE  = 12;
+	const NONCE     = 'af_properties';
+	const PURGE_HOOK = 'af_purge_trashed_properties';
 
 	/**
 	 * Hooks the hidden page, the list redirect and the assets.
@@ -28,6 +30,172 @@ class Arriendo_Facil_Properties_Page {
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ), 20 );
 		add_filter( 'parent_file', array( $this, 'keep_parent_menu_open' ) );
 		add_filter( 'submenu_file', array( $this, 'keep_submenu_selected' ) );
+
+		add_action( 'wp_ajax_af_property_trash', array( $this, 'ajax_trash' ) );
+		add_action( 'wp_ajax_af_property_restore', array( $this, 'ajax_restore' ) );
+		add_action( 'wp_ajax_af_property_delete', array( $this, 'ajax_delete' ) );
+
+		add_action( self::PURGE_HOOK, array( $this, 'purge_expired_trash' ) );
+		if ( ! wp_next_scheduled( self::PURGE_HOOK ) ) {
+			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', self::PURGE_HOOK );
+		}
+	}
+
+	/**
+	 * Days a property stays in the trash before it is deleted for good.
+	 *
+	 * @return int
+	 */
+	public static function retention_days() {
+		return max( 1, (int) apply_filters( 'af_property_trash_days', 30 ) );
+	}
+
+	/**
+	 * Timestamp at which a trashed property is deleted automatically.
+	 *
+	 * @param int $post_id Property ID.
+	 * @return int
+	 */
+	public static function purge_timestamp( $post_id ) {
+		$trashed_at = (int) get_post_meta( $post_id, '_wp_trash_meta_time', true );
+
+		return ( $trashed_at ? $trashed_at : time() ) + self::retention_days() * DAY_IN_SECONDS;
+	}
+
+	/**
+	 * Daily job: permanently deletes properties trashed longer than the retention window.
+	 */
+	public function purge_expired_trash() {
+		$ids = get_posts(
+			array(
+				'post_type'      => 'accommodation',
+				'post_status'    => 'trash',
+				'fields'         => 'ids',
+				'posts_per_page' => 50,
+				'meta_query'     => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+					array(
+						'key'     => '_wp_trash_meta_time',
+						'value'   => time() - self::retention_days() * DAY_IN_SECONDS,
+						'compare' => '<',
+						'type'    => 'NUMERIC',
+					),
+				),
+			)
+		);
+
+		foreach ( $ids as $id ) {
+			wp_delete_post( (int) $id, true );
+		}
+	}
+
+	/**
+	 * Validates the request and returns the property ID, or ends with a JSON error.
+	 *
+	 * @param string $expected_status Required post status ('trash' or 'not-trash').
+	 * @return int
+	 */
+	private function authorize_request( $expected_status ) {
+		check_ajax_referer( self::NONCE, 'nonce' );
+
+		$post_id = isset( $_POST['post_id'] ) ? absint( wp_unslash( $_POST['post_id'] ) ) : 0;
+		$post    = $post_id ? get_post( $post_id ) : null;
+
+		if ( ! $post || 'accommodation' !== $post->post_type ) {
+			wp_send_json_error( array( 'message' => __( 'No encontramos el inmueble.', 'arriendo-facil' ) ), 404 );
+		}
+
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) || ! Arriendo_Facil_Tenancy::can_access_accommodation( $post_id ) || ! current_user_can( 'delete_post', $post_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes permiso para esta acción.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$in_trash = 'trash' === $post->post_status;
+		if ( ( 'trash' === $expected_status ) !== $in_trash ) {
+			wp_send_json_error( array( 'message' => __( 'El inmueble ya cambió de estado. Recarga la página.', 'arriendo-facil' ) ), 409 );
+		}
+
+		return $post_id;
+	}
+
+	/**
+	 * Response payload shared by the three actions.
+	 *
+	 * @param string $message Success message.
+	 * @param int    $post_id Affected property.
+	 */
+	private function respond( $message, $post_id ) {
+		wp_send_json_success(
+			array(
+				'message' => $message,
+				'id'      => $post_id,
+				'counts'  => $this->counts( Arriendo_Facil_Tenancy::accessible_accommodation_ids() ),
+			)
+		);
+	}
+
+	/**
+	 * Moves a property to the trash (recoverable).
+	 */
+	public function ajax_trash() {
+		$post_id = $this->authorize_request( 'not-trash' );
+
+		global $wpdb;
+		$has_active_lease = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM {$wpdb->prefix}af_leases WHERE accommodation_id = %d AND status = 'active' AND deleted_at IS NULL",
+				$post_id
+			)
+		);
+		if ( $has_active_lease > 0 ) {
+			wp_send_json_error( array( 'message' => __( 'Tiene un contrato activo. Finalízalo antes de eliminar el inmueble.', 'arriendo-facil' ) ), 422 );
+		}
+
+		if ( ! wp_trash_post( $post_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'No se pudo mover el inmueble a la papelera.', 'arriendo-facil' ) ), 500 );
+		}
+
+		$this->respond(
+			sprintf(
+				/* translators: %d: days in the trash */
+				__( 'Movido a la papelera. Puedes restaurarlo durante %d días.', 'arriendo-facil' ),
+				self::retention_days()
+			),
+			$post_id
+		);
+	}
+
+	/**
+	 * Restores a trashed property with the status it had before.
+	 */
+	public function ajax_restore() {
+		$post_id = $this->authorize_request( 'trash' );
+
+		$previous = (string) get_post_meta( $post_id, '_wp_trash_meta_status', true );
+		$restore  = static function ( $new_status ) use ( $previous ) {
+			return in_array( $previous, array( 'publish', 'private', 'draft', 'pending' ), true ) ? $previous : $new_status;
+		};
+
+		add_filter( 'wp_untrash_post_status', $restore );
+		$result = wp_untrash_post( $post_id );
+		remove_filter( 'wp_untrash_post_status', $restore );
+
+		if ( ! $result ) {
+			wp_send_json_error( array( 'message' => __( 'No se pudo restaurar el inmueble.', 'arriendo-facil' ) ), 500 );
+		}
+
+		$this->respond( __( 'Inmueble restaurado.', 'arriendo-facil' ), $post_id );
+	}
+
+	/**
+	 * Deletes a trashed property for good.
+	 */
+	public function ajax_delete() {
+		$post_id = $this->authorize_request( 'trash' );
+
+		if ( ! wp_delete_post( $post_id, true ) ) {
+			wp_send_json_error( array( 'message' => __( 'No se pudo eliminar el inmueble.', 'arriendo-facil' ) ), 500 );
+		}
+
+		$this->respond( __( 'Inmueble eliminado definitivamente.', 'arriendo-facil' ), $post_id );
 	}
 
 	/**
@@ -144,6 +312,35 @@ class Arriendo_Facil_Properties_Page {
 			array(),
 			file_exists( $js ) ? (string) filemtime( $js ) : ARRIENDO_FACIL_VERSION,
 			true
+		);
+
+		$messages = array(
+			'trashed'   => __( 'El inmueble se movió a la papelera.', 'arriendo-facil' ),
+			'untrashed' => __( 'El inmueble se restauró.', 'arriendo-facil' ),
+		);
+		$notice   = isset( $_GET['af_msg'] ) ? sanitize_key( wp_unslash( $_GET['af_msg'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+
+		wp_localize_script(
+			'af-properties',
+			'afProperties',
+			array(
+				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+				'nonce'   => wp_create_nonce( self::NONCE ),
+				'notice'  => isset( $messages[ $notice ] ) ? $messages[ $notice ] : '',
+				'i18n'    => array(
+					'trashTitle'    => __( '¿Eliminar este inmueble?', 'arriendo-facil' ),
+					/* translators: %d: days in the trash */
+					'trashText'     => sprintf( __( 'Se moverá a la papelera. Podrás restaurarlo durante %d días; después se eliminará definitivamente.', 'arriendo-facil' ), self::retention_days() ),
+					'trashConfirm'  => __( 'Mover a la papelera', 'arriendo-facil' ),
+					'deleteTitle'   => __( '¿Eliminar definitivamente?', 'arriendo-facil' ),
+					'deleteText'    => __( 'Esta acción no se puede deshacer.', 'arriendo-facil' ),
+					'deleteConfirm' => __( 'Eliminar para siempre', 'arriendo-facil' ),
+					'working'       => __( 'Procesando…', 'arriendo-facil' ),
+					'networkError'  => __( 'No se pudo completar la acción. Revisa tu conexión e inténtalo de nuevo.', 'arriendo-facil' ),
+					'close'         => __( 'Cerrar', 'arriendo-facil' ),
+					'emptyTitle'    => __( 'No hay inmuebles en esta vista', 'arriendo-facil' ),
+				),
+			)
 		);
 	}
 

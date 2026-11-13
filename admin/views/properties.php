@@ -53,11 +53,6 @@ $tabs = array(
 
 $groups = ( $owner_id && class_exists( 'Arriendo_Facil_Catalog_Groups' ) ) ? Arriendo_Facil_Catalog_Groups::get_for_owner( $owner_id ) : array();
 
-$messages = array(
-	'trashed'   => __( 'El inmueble se movió a la papelera.', 'arriendo-facil' ),
-	'untrashed' => __( 'El inmueble se restauró.', 'arriendo-facil' ),
-);
-
 $is_filtered = 'all' !== $filter || '' !== $search;
 $show_new    = ! $is_filtered && 1 === $paged;
 ?>
@@ -69,29 +64,15 @@ $show_new    = ! $is_filtered && 1 === $paged;
 			'eyebrow'  => __( 'Propiedades', 'arriendo-facil' ),
 			'title'    => __( 'Inmuebles', 'arriendo-facil' ),
 			'subtitle' => __( 'Tus propiedades en un vistazo. Abre una para editarla.', 'arriendo-facil' ),
-			'actions'  => array(
-				sprintf(
-					'<a href="%1$s" class="button af-btn af-btn--primary"><span class="af-btn__icon" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>%2$s</a>',
-					esc_url( $new_url ),
-					esc_html__( 'Nuevo inmueble', 'arriendo-facil' )
-				),
-			),
 		)
 	);
 	?>
-
-	<?php if ( isset( $messages[ $notice ] ) ) : ?>
-		<div class="notice notice-success is-dismissible"><p><?php echo esc_html( $messages[ $notice ] ); ?></p></div>
-	<?php endif; ?>
 
 	<?php if ( $counts['all'] > 0 || $counts['trash'] > 0 ) : ?>
 		<div class="af-ptoolbar">
 			<nav class="af-ptabs" aria-label="<?php esc_attr_e( 'Filtrar inmuebles', 'arriendo-facil' ); ?>">
 				<?php foreach ( $tabs as $tab_key => $tab_label ) : ?>
 					<?php
-					if ( 'trash' === $tab_key && 0 === $counts['trash'] ) {
-						continue;
-					}
 					$tab_url = Arriendo_Facil_Properties_Page::url(
 						array_filter(
 							array(
@@ -102,9 +83,9 @@ $show_new    = ! $is_filtered && 1 === $paged;
 						)
 					);
 					?>
-					<a class="af-ptabs__tab<?php echo $tab_key === $filter ? ' is-active' : ''; ?>" href="<?php echo esc_url( $tab_url ); ?>"<?php echo $tab_key === $filter ? ' aria-current="page"' : ''; ?>>
+					<a class="af-ptabs__tab<?php echo $tab_key === $filter ? ' is-active' : ''; ?>"<?php echo ( 'trash' === $tab_key && 0 === $counts['trash'] && $tab_key !== $filter ) ? ' hidden' : ''; ?> data-af-tab="<?php echo esc_attr( $tab_key ); ?>" href="<?php echo esc_url( $tab_url ); ?>"<?php echo $tab_key === $filter ? ' aria-current="page"' : ''; ?>>
 						<?php echo esc_html( $tab_label ); ?>
-						<span class="af-ptabs__count"><?php echo esc_html( number_format_i18n( $counts[ $tab_key ] ) ); ?></span>
+						<span class="af-ptabs__count" data-af-count="<?php echo esc_attr( $tab_key ); ?>"><?php echo esc_html( number_format_i18n( $counts[ $tab_key ] ) ); ?></span>
 					</a>
 				<?php endforeach; ?>
 			</nav>
@@ -168,8 +149,7 @@ $show_new    = ! $is_filtered && 1 === $paged;
 				$thumb       = get_the_post_thumbnail_url( $pid, 'medium_large' );
 				$title       = get_the_title( $pid );
 				$link        = $is_trashed ? '' : $edit_url( $pid );
-				$trash_url   = ( ! $is_trashed && current_user_can( 'delete_post', $pid ) ) ? get_delete_post_link( $pid ) : '';
-				$restore_url = ( $is_trashed && current_user_can( 'delete_post', $pid ) ) ? wp_nonce_url( admin_url( 'post.php?post=' . $pid . '&action=untrash' ), 'untrash-post_' . $pid ) : '';
+				$can_delete  = current_user_can( 'delete_post', $pid );
 				$group_id    = $owner_id && class_exists( 'Arriendo_Facil_Catalog_Groups' ) ? (int) Arriendo_Facil_Catalog_Groups::get_group_id_for_property( $pid ) : 0;
 
 				if ( ! $thumb ) {
@@ -206,6 +186,9 @@ $show_new    = ! $is_filtered && 1 === $paged;
 								<?php if ( $area ) : ?><span><?php echo esc_html( number_format_i18n( $area, 0 ) ); ?> m²</span><?php endif; ?>
 							</p>
 						<?php endif; ?>
+						<?php if ( $is_trashed ) : ?>
+							<p class="af-pc__line af-pc__purge"><span><?php echo esc_html( sprintf( /* translators: %s: date */ __( 'Se eliminará definitivamente el %s', 'arriendo-facil' ), date_i18n( get_option( 'date_format' ), Arriendo_Facil_Properties_Page::purge_timestamp( $pid ) ) ) ); ?></span></p>
+						<?php endif; ?>
 						<?php if ( $tenant ) : ?>
 							<p class="af-pc__line af-pc__tenant"><?php echo af_lucide( 'user', 14 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?><span><?php echo esc_html( $tenant ); ?></span></p>
 						<?php endif; ?>
@@ -222,11 +205,12 @@ $show_new    = ! $is_filtered && 1 === $paged;
 
 						<?php if ( $link ) : ?>
 							<a class="button af-btn af-btn--ghost af-btn--sm" href="<?php echo esc_url( $link ); ?>"><?php esc_html_e( 'Editar', 'arriendo-facil' ); ?></a>
-						<?php elseif ( $restore_url ) : ?>
-							<a class="button af-btn af-btn--ghost af-btn--sm" href="<?php echo esc_url( $restore_url ); ?>"><?php esc_html_e( 'Restaurar', 'arriendo-facil' ); ?></a>
+						<?php elseif ( $can_delete ) : ?>
+							<button type="button" class="button af-btn af-btn--ghost af-btn--sm" data-af-prop-action="restore" data-id="<?php echo esc_attr( $pid ); ?>"><?php esc_html_e( 'Restaurar', 'arriendo-facil' ); ?></button>
+							<button type="button" class="button af-btn af-btn--ghost af-btn--sm af-pc__danger" data-af-prop-action="delete" data-id="<?php echo esc_attr( $pid ); ?>" data-name="<?php echo esc_attr( $title ); ?>"><?php esc_html_e( 'Eliminar', 'arriendo-facil' ); ?></button>
 						<?php endif; ?>
 
-						<?php if ( ! $is_trashed && ( $owner_id || $trash_url ) ) : ?>
+						<?php if ( ! $is_trashed && ( $owner_id || $can_delete ) ) : ?>
 							<details class="af-pc__more">
 								<summary aria-label="<?php esc_attr_e( 'Más acciones', 'arriendo-facil' ); ?>">&#8943;</summary>
 								<div class="af-pc__menu">
@@ -239,8 +223,8 @@ $show_new    = ! $is_filtered && 1 === $paged;
 											<?php endforeach; ?>
 										</select>
 									<?php endif; ?>
-									<?php if ( $trash_url ) : ?>
-										<a class="af-pc__danger" href="<?php echo esc_url( $trash_url ); ?>" data-af-confirm="<?php esc_attr_e( '¿Mover este inmueble a la papelera?', 'arriendo-facil' ); ?>"><?php esc_html_e( 'Mover a la papelera', 'arriendo-facil' ); ?></a>
+									<?php if ( $can_delete ) : ?>
+										<button type="button" class="af-pc__danger" data-af-prop-action="trash" data-id="<?php echo esc_attr( $pid ); ?>" data-name="<?php echo esc_attr( $title ); ?>"><?php esc_html_e( 'Eliminar inmueble', 'arriendo-facil' ); ?></button>
 									<?php endif; ?>
 								</div>
 							</details>
@@ -284,4 +268,18 @@ $show_new    = ! $is_filtered && 1 === $paged;
 		<?php endif; ?>
 
 	<?php endif; ?>
+
+	<div class="af-pmodal" id="af-pmodal" hidden>
+		<div class="af-pmodal__backdrop" data-af-modal-close></div>
+		<div class="af-pmodal__dialog" role="dialog" aria-modal="true" aria-labelledby="af-pmodal-title" aria-describedby="af-pmodal-text" tabindex="-1">
+			<span class="af-pmodal__icon" aria-hidden="true"><?php echo af_lucide( 'trash-2', 26 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+			<h2 id="af-pmodal-title"></h2>
+			<p class="af-pmodal__name"></p>
+			<p id="af-pmodal-text"></p>
+			<div class="af-pmodal__actions">
+				<button type="button" class="button af-btn af-btn--ghost" data-af-modal-close><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
+				<button type="button" class="button af-btn af-pmodal__confirm" data-af-modal-confirm></button>
+			</div>
+		</div>
+	</div>
 </div>

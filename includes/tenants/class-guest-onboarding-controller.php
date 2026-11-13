@@ -51,7 +51,7 @@ class Arriendo_Facil_Guest_Onboarding_Controller {
 	public function ajax_send_guest_profile_link() {
 		check_ajax_referer( 'af_owner_contact_nonce', 'nonce' );
 
-		if ( ! current_user_can( 'edit_posts' ) ) {
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
@@ -63,6 +63,10 @@ class Arriendo_Facil_Guest_Onboarding_Controller {
 
 		if ( ! $guest_id ) {
 			wp_send_json_error( array( 'message' => __( 'ID de huesped invalido.', 'arriendo-facil' ) ), 400 );
+		}
+
+		if ( ! Arriendo_Facil_Tenancy::can_access_guest( $guest_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes acceso a este inquilino.', 'arriendo-facil' ) ), 403 );
 		}
 
 		global $wpdb;

@@ -213,6 +213,16 @@ class Arriendo_Facil_Maintenance {
 			$provider_id = 0;
 		}
 
+		// A contact typed by hand becomes part of "Mis técnicos" so it can be reused.
+		if ( ! $provider_id ) {
+			$provider_id = self::provider_from_contact(
+				isset( $data['contact_name'] ) ? (string) $data['contact_name'] : '',
+				isset( $data['contact_phone'] ) ? (string) $data['contact_phone'] : '',
+				$accommodation_id,
+				$type
+			);
+		}
+
 		$inserted = $wpdb->insert(
 			self::table(),
 			array(
@@ -252,6 +262,57 @@ class Arriendo_Facil_Maintenance {
 		}
 
 		return (int) $wpdb->insert_id;
+	}
+
+	/**
+	 * Finds or creates the catalog entry ("Mis técnicos") for a hand-typed contact.
+	 *
+	 * @param string $name             Contact name.
+	 * @param string $phone            Contact phone.
+	 * @param int    $accommodation_id Property the request belongs to.
+	 * @param string $request_type     Request type, used to guess the trade.
+	 * @return int Provider ID, or 0 when nothing could be stored.
+	 */
+	private static function provider_from_contact( $name, $phone, $accommodation_id, $request_type = '' ) {
+		global $wpdb;
+
+		$name  = sanitize_text_field( $name );
+		$phone = sanitize_text_field( $phone );
+
+		if ( '' === $name || ! class_exists( 'Arriendo_Facil_Service_Providers' ) ) {
+			return 0;
+		}
+
+		$owner_id = get_current_user_id();
+		if ( Arriendo_Facil_Tenancy::can_manage_all() ) {
+			$property_owner = (int) get_post_meta( absint( $accommodation_id ), '_af_owner_id', true );
+			$owner_id       = $property_owner ? $property_owner : $owner_id;
+		}
+
+		$existing = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				'SELECT id FROM ' . Arriendo_Facil_Service_Providers::table() . " WHERE owner_id = %d AND LOWER(name) = LOWER(%s) AND COALESCE(phone, '') = %s LIMIT 1", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+				$owner_id,
+				$name,
+				$phone
+			)
+		);
+		if ( $existing ) {
+			return $existing;
+		}
+
+		$trade = array_key_exists( $request_type, Arriendo_Facil_Service_Providers::trades() ) ? $request_type : 'general';
+		$id    = Arriendo_Facil_Service_Providers::create(
+			array(
+				'owner_id' => $owner_id,
+				'name'     => $name,
+				'phone'    => $phone,
+				'whatsapp' => $phone,
+				'trade'    => $trade,
+			)
+		);
+
+		return is_wp_error( $id ) ? 0 : (int) $id;
 	}
 
 	/**
@@ -333,6 +394,21 @@ class Arriendo_Facil_Maintenance {
 			if ( $provider_id && ! self::can_access_provider( $provider_id ) ) {
 				return new WP_Error( 'af_maintenance_provider_denied', __( 'Ese contacto no está en tu catálogo.', 'arriendo-facil' ) );
 			}
+
+			if ( ! $provider_id && ! empty( $data['contact_name'] ) ) {
+				$request_row = $wpdb->get_row(
+					$wpdb->prepare( 'SELECT accommodation_id, request_type FROM ' . self::table() . ' WHERE id = %d', $request_id ) // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+				);
+				$provider_id = $request_row
+					? self::provider_from_contact(
+						(string) $data['contact_name'],
+						isset( $data['contact_phone'] ) ? (string) $data['contact_phone'] : '',
+						(int) $request_row->accommodation_id,
+						(string) $request_row->request_type
+					)
+					: 0;
+			}
+
 			$updates['provider_id'] = $provider_id ? $provider_id : null;
 			$format[]              = '%d';
 		}

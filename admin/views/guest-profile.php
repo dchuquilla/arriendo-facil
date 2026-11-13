@@ -328,7 +328,7 @@ if ( $can_manage ) {
 
 			const btn = editForm.querySelector('button[type="submit"]');
 			btn.disabled = true;
-			setStatus(<?php echo wp_json_encode( __( 'Guardando…', 'arriendo-facil' ) ); ?>, '');
+			setStatusTo(editStatus, <?php echo wp_json_encode( __( 'Guardando…', 'arriendo-facil' ) ); ?>, '');
 
 			const body = new URLSearchParams(new FormData(editForm));
 			body.append('action', 'af_update_guest');
@@ -342,7 +342,11 @@ if ( $can_manage ) {
 					return;
 				}
 				setStatusTo(editStatus, json.data.message, 'success');
-				setTimeout(function () { window.location.reload(); }, 800);
+				// Without a re-verification there is nothing else on the page to refresh;
+				// reloading is what left some browsers on a blank screen.
+				if (json.data.identity_changed) {
+					setTimeout(function () { window.location.reload(); }, 800);
+				}
 			}).catch(function () {
 				btn.disabled = false;
 				setStatusTo(editStatus, <?php echo wp_json_encode( __( 'La solicitud falló.', 'arriendo-facil' ) ); ?>, 'error');

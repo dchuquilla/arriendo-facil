@@ -111,16 +111,9 @@ if ( $has_ledger ) {
 	$period_charged = isset( $period_totals->charged ) ? (float) $period_totals->charged : 0.0;
 	$period_paid    = isset( $period_totals->paid ) ? (float) $period_totals->paid : 0.0;
 
-	$overdue = $wpdb->get_row(
-		$wpdb->prepare(
-			"SELECT COUNT(*) AS total, COALESCE(SUM(amount - amount_paid), 0) AS balance
-			 FROM {$charges_table}
-			 WHERE status IN ('pending', 'partial', 'overdue') AND due_date < %s{$scope_clause}", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			gmdate( 'Y-m-d' )
-		)
-	);
-	$overdue_count  = isset( $overdue->total ) ? (int) $overdue->total : 0;
-	$overdue_amount = isset( $overdue->balance ) ? (float) $overdue->balance : 0.0;
+	$overdue = Arriendo_Facil_Billing_Ledger::overdue_summary( $scope_ids );
+	$overdue_count  = (int) $overdue['count'];
+	$overdue_amount = (float) $overdue['amount'];
 }
 
 // Contratos que vencen en los próximos 60 días.
@@ -305,7 +298,9 @@ if ( $is_management_model && $has_ledger ) {
 		 LEFT JOIN {$wpdb->prefix}af_leases l ON l.id = c.lease_id
 		 LEFT JOIN {$wpdb->posts} p ON p.ID = l.accommodation_id
 		 LEFT JOIN {$wpdb->prefix}af_guests g ON g.id = c.guest_id
-		 WHERE c.status IN ('pending', 'partial', 'overdue') AND c.due_date < CURDATE(){$semaforo_scope}
+		 WHERE c.status IN ('pending', 'partial', 'overdue') AND c.due_date < CURDATE() AND (c.amount - c.amount_paid) > 0.01
+		   AND l.status = 'active' AND l.deleted_at IS NULL
+		   AND l.accommodation_id NOT IN (SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_af_demo' AND meta_value = '1'){$semaforo_scope}
 		 GROUP BY c.lease_id, c.guest_id, p.post_title, g.first_name, g.last_name
 		 ORDER BY days_overdue DESC
 		 LIMIT 3" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
@@ -401,7 +396,7 @@ if ( $draft_leases > 0 ) {
 		'url'   => admin_url( 'admin.php?page=af-leases' ),
 	);
 }
-if ( $pending_cleaning > 0 ) {
+if ( $pending_cleaning > 0 && ! $is_management_model ) {
 	$tasks[] = array(
 		'label' => _n( 'solicitud de limpieza pendiente', 'solicitudes de limpieza pendientes', $pending_cleaning, 'arriendo-facil' ),
 		'count' => $pending_cleaning,
@@ -535,10 +530,7 @@ $recent_reviews        = (array) $wpdb->get_results(
 				<span class="af-btn__icon" aria-hidden="true">
 					<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
 				</span>
-				<?php esc_html_e( 'Nuevo alojamiento', 'arriendo-facil' ); ?>
-			</a>
-			<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-leases' ) ); ?>" class="button af-btn af-btn--ghost">
-				<?php esc_html_e( 'Ver contratos', 'arriendo-facil' ); ?>
+				<?php esc_html_e( 'Nuevo inmueble', 'arriendo-facil' ); ?>
 			</a>
 		</div>
 	</header>
@@ -599,17 +591,14 @@ $recent_reviews        = (array) $wpdb->get_results(
 			<div class="af-welcome__body">
 				<span class="af-welcome__eyebrow"><?php esc_html_e( 'Bienvenido a Arriendo Fácil', 'arriendo-facil' ); ?></span>
 				<h2 id="af-welcome-title" class="af-welcome__title">
-					<?php esc_html_e( 'Publica tu primera propiedad en minutos', 'arriendo-facil' ); ?>
+					<?php esc_html_e( 'Registra tu primer inmueble', 'arriendo-facil' ); ?>
 				</h2>
 				<p class="af-welcome__subtitle">
-					<?php esc_html_e( 'Añade fotos, describe los amenities y define tu tarifa. Nosotros te ayudamos a que aparezca donde importa.', 'arriendo-facil' ); ?>
+					<?php esc_html_e( 'Añade fotos, datos y el canon. Luego vincula a tu inquilino con un contrato y empieza a cobrar.', 'arriendo-facil' ); ?>
 				</p>
 				<div class="af-welcome__actions">
 					<a class="button af-btn af-btn--primary" href="<?php echo esc_url( admin_url( 'post-new.php?post_type=accommodation' ) ); ?>">
-						<?php esc_html_e( 'Publicar propiedad', 'arriendo-facil' ); ?>
-					</a>
-					<a class="button af-btn af-btn--ghost" href="<?php echo esc_url( admin_url( 'admin.php?page=af-guests' ) ); ?>">
-						<?php esc_html_e( 'Ver solicitudes de visita', 'arriendo-facil' ); ?>
+						<?php esc_html_e( 'Registrar inmueble', 'arriendo-facil' ); ?>
 					</a>
 				</div>
 			</div>

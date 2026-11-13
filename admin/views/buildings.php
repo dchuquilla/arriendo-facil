@@ -181,7 +181,7 @@ $cob_alerts   = $cob_snapshot['display'];
 		array(
 			'eyebrow'  => __( 'Cobranza', 'arriendo-facil' ),
 			'title'    => __( 'Cobranza de inmuebles', 'arriendo-facil' ),
-			'subtitle' => __( 'Cada tarjeta es un inmueble y su borde indica su estado de pago: rojo vencido, naranja por vencer, azul pendiente, verde al día y gris sin contrato. Pulsa una tarjeta para ver sus cobros, registrar pagos y pasar a facturar al SRI.', 'arriendo-facil' ),
+			'subtitle' => __( 'Cada tarjeta es un inmueble y su color indica el estado de pago. Ábrela para ver cobros y registrar pagos.', 'arriendo-facil' ),
 		)
 	);
 	?>

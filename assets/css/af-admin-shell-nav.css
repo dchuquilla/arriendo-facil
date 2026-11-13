@@ -202,8 +202,35 @@ body.af-sidebar-collapsed .af-app-sidebar__group-link {
 	padding: var(--af-space-3);
 }
 
-body.af-sidebar-collapsed .af-app-sidebar__subnav {
-	display: none;
+@media (min-width: 783px) {
+	/* Contraído: las secciones se vuelven un riel de iconos (cada pantalla a un clic). */
+	body.af-sidebar-collapsed .af-app-sidebar__group-link {
+		display: none;
+	}
+
+	body.af-sidebar-collapsed .af-app-sidebar__group {
+		padding-top: var(--af-space-2);
+		margin-top: var(--af-space-2);
+		border-top: 1px solid rgba(255, 255, 255, 0.08);
+	}
+
+	body.af-sidebar-collapsed .af-app-sidebar__group:first-child {
+		border-top: 0;
+		margin-top: 0;
+	}
+
+	body.af-sidebar-collapsed .af-app-sidebar__subnav {
+		display: block !important;
+		height: auto !important;
+		opacity: 1 !important;
+		margin: 0;
+	}
+
+	body.af-sidebar-collapsed .af-app-sidebar__subnav .af-app-sidebar__item a {
+		justify-content: center;
+		margin-left: 0;
+		padding: var(--af-space-3);
+	}
 }
 
 .af-app-sidebar__brand {
@@ -354,19 +381,30 @@ body.af-sidebar-collapsed .af-app-sidebar__toggle .af-icon {
 	padding: 0;
 }
 
+.af-app-sidebar__group {
+	margin-top: var(--af-space-3);
+}
+
 .af-app-sidebar__group-link {
 	display: flex;
 	align-items: center;
-	gap: var(--af-space-3);
-	padding: var(--af-space-3);
+	gap: var(--af-space-2);
+	padding: var(--af-space-2) var(--af-space-3);
 	margin-bottom: 2px;
 	border-radius: var(--af-radius-md);
-	color: var(--af-gray-300, #C3D1CE);
+	color: rgba(255, 255, 255, 0.58);
 	text-decoration: none;
-	font-size: var(--af-text-sm);
-	font-weight: 600;
+	font-size: 11.5px;
+	font-weight: 700;
+	letter-spacing: 0.07em;
+	text-transform: uppercase;
 	line-height: 1.3;
 	transition: background-color var(--af-motion-fast), color var(--af-motion-fast);
+}
+
+.af-app-sidebar__group-link .af-icon {
+	width: 16px;
+	height: 16px;
 }
 
 .af-app-sidebar__group-link:hover,
@@ -399,6 +437,7 @@ body.af-sidebar-collapsed .af-app-sidebar__toggle .af-icon {
 	margin: 0 0 var(--af-space-2);
 	padding: 0;
 	display: none;
+	overflow: hidden;
 }
 
 .af-app-sidebar__group.is-open .af-app-sidebar__subnav {
@@ -406,15 +445,34 @@ body.af-sidebar-collapsed .af-app-sidebar__toggle .af-icon {
 }
 
 .af-app-sidebar__subnav .af-app-sidebar__item a {
-	padding: var(--af-space-2) var(--af-space-3) var(--af-space-2) calc(var(--af-space-3) + 32px);
-	margin-bottom: 1px;
+	position: relative;
+	gap: var(--af-space-3);
+	padding: 9px var(--af-space-3);
+	margin-bottom: 2px;
 	font-weight: 500;
+	font-size: 14px;
+}
+
+.af-app-sidebar__subicon {
+	display: inline-flex;
+	flex-shrink: 0;
+	opacity: 0.85;
+}
+
+.af-app-sidebar__subicon .af-icon {
+	width: 18px;
+	height: 18px;
 }
 
 .af-app-sidebar__subnav .af-app-sidebar__item.is-active a {
-	background: var(--af-secondary-500, #2F7D73);
+	background: linear-gradient(90deg, rgba(61, 187, 160, 0.34), rgba(61, 187, 160, 0.12));
 	color: #fff;
-	box-shadow: var(--af-shadow-sm);
+	box-shadow: inset 3px 0 0 var(--af-primary-400, #3DBBA0);
+}
+
+.af-app-sidebar__subnav .af-app-sidebar__item.is-active .af-app-sidebar__subicon {
+	opacity: 1;
+	color: var(--af-primary-400, #3DBBA0);
 }
 
 .af-app-sidebar__section-label {
@@ -630,9 +688,6 @@ html body .af-app-sidebar.af-shell a.af-app-sidebar__logout:not(.x):not(.y):not(
 	color: var(--af-gray-400, #8A9799);
 }
 
-body.af-sidebar-collapsed .af-app-sidebar__group.is-open .af-app-sidebar__subnav {
-	display: none;
-}
 
 /* ── User dropdown (top bar) ───────────────────────────────────────────── */
 
@@ -740,4 +795,19 @@ body.af-sidebar-collapsed .af-app-sidebar__group.is-open .af-app-sidebar__subnav
 .af-app-topbar .af-user-menu__item--logout:hover {
 	background: rgba(208, 52, 44, 0.08);
 	color: var(--af-danger-600, #d0342c);
+}
+
+/* Los títulos de sección van atenuados para que las pantallas (sub-ítems) destaquen. */
+html body .af-app-sidebar.af-shell a.af-app-sidebar__group-link:not(.x):not(.y):not(.z):not(.w) {
+	color: rgba(255, 255, 255, 0.58);
+}
+
+html body .af-app-sidebar.af-shell a.af-app-sidebar__group-link:not(.x):not(.y):not(.z):not(.w):hover,
+html body .af-app-sidebar.af-shell a.af-app-sidebar__group-link:not(.x):not(.y):not(.z):not(.w):focus {
+	color: #fff;
+}
+
+.af-app-sidebar__nav {
+	scrollbar-width: thin;
+	scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
 }

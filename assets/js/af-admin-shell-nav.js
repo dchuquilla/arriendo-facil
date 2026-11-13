@@ -58,23 +58,70 @@
 			}
 		});
 
-		// Accordion: clicking a group header expands/collapses its sub-items.
-		// When the sidebar is collapsed to icons the header keeps navigating.
-		var groupLinks = document.querySelectorAll('.af-app-sidebar__group-link');
-		Array.prototype.forEach.call(groupLinks, function (link) {
-			link.addEventListener('click', function (event) {
-				if (body.classList.contains('af-sidebar-collapsed')) {
+		// Sections: every group starts open so all sub-sections are visible at a
+		// glance. A header folds/unfolds its own list (several can stay open) and
+		// the choice is remembered. The active group can never stay folded.
+		var groupsKey = 'af_admin_nav_groups';
+		var saved = {};
+		try {
+			saved = JSON.parse(window.localStorage.getItem(groupsKey) || '{}') || {};
+		} catch (e) {
+			saved = {};
+		}
+
+		var persistGroups = function () {
+			try {
+				window.localStorage.setItem(groupsKey, JSON.stringify(saved));
+			} catch (e) { /* storage blocked */ }
+		};
+
+		var hasGsap = !!window.gsap && !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+		var setGroup = function (group, open, animate) {
+			var link = group.firstElementChild;
+			var list = group.querySelector('.af-app-sidebar__subnav');
+			link.setAttribute('aria-expanded', open ? 'true' : 'false');
+
+			if (!list || !hasGsap || !animate) {
+				group.classList.toggle('is-open', open);
+				return;
+			}
+
+			if (open) {
+				group.classList.add('is-open');
+				window.gsap.fromTo(list,
+					{ height: 0, opacity: 0 },
+					{ height: 'auto', opacity: 1, duration: 0.3, ease: 'power2.out', clearProps: 'height,opacity', overwrite: true }
+				);
+			} else {
+				window.gsap.to(list, {
+					height: 0,
+					opacity: 0,
+					duration: 0.22,
+					ease: 'power2.in',
+					overwrite: true,
+					onComplete: function () {
+						group.classList.remove('is-open');
+						window.gsap.set(list, { clearProps: 'height,opacity' });
+					}
+				});
+			}
+		};
+
+		Array.prototype.forEach.call(document.querySelectorAll('.af-app-sidebar__group'), function (group) {
+			var slug = group.getAttribute('data-group') || '';
+			var active = group.classList.contains('is-active');
+			setGroup(group, active || saved[slug] !== false, false);
+
+			group.firstElementChild.addEventListener('click', function (event) {
+				if (body.classList.contains('af-sidebar-collapsed') && !mobileQuery.matches) {
 					return;
 				}
 				event.preventDefault();
-				var group = link.parentNode;
-				var open  = !group.classList.contains('is-open');
-				Array.prototype.forEach.call(document.querySelectorAll('.af-app-sidebar__group.is-open'), function (other) {
-					other.classList.remove('is-open');
-					other.firstElementChild.setAttribute('aria-expanded', 'false');
-				});
-				group.classList.toggle('is-open', open);
-				link.setAttribute('aria-expanded', open ? 'true' : 'false');
+				var willOpen = !group.classList.contains('is-open');
+				saved[slug] = willOpen;
+				persistGroups();
+				setGroup(group, willOpen, true);
 			});
 		});
 

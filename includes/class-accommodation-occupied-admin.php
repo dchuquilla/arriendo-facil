@@ -473,7 +473,8 @@ class Arriendo_Facil_Accommodation_Occupied_Admin {
 			return false;
 		}
 
-		return (int) $post->post_author === (int) get_current_user_id();
+		return (int) $post->post_author === (int) get_current_user_id()
+			|| Arriendo_Facil_Tenancy::can_access_accommodation( $post_id );
 	}
 
 	/**

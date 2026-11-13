@@ -490,3 +490,43 @@
 	.af-pill--pulse { animation: none !important; }
 	.af-reveal { opacity: 1; transform: none; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   GSAP — cuando af-gsap.js está activo, él coordina la entrada de la página
+   y de los modales; se apagan las animaciones CSS equivalentes para que no
+   se animen dos veces. Sin GSAP (o con prefers-reduced-motion) siguen vigentes.
+   ══════════════════════════════════════════════════════════════════════ */
+
+html.af-gsap .af-shell,
+html.af-gsap .af-shell > .af-page-header,
+html.af-gsap .af-shell > .af-section,
+html.af-gsap .af-shell > .af-split,
+html.af-gsap .af-shell > .af-kpi-grid {
+	animation: none;
+}
+
+html.af-gsap .af-modal:not([hidden]):not(.is-closing),
+html.af-gsap .af-modal:not(.is-closing) .af-modal__dialog {
+	animation: none;
+}
+
+/* Barra de progreso al cambiar de pantalla. */
+#af-nav-progress {
+	position: fixed;
+	top: 0;
+	left: 0;
+	z-index: 100100;
+	width: 0;
+	height: 3px;
+	opacity: 0;
+	pointer-events: none;
+	background: linear-gradient(90deg, var(--af-primary-400, #3DBBA0), var(--af-primary-600, #00926F));
+	box-shadow: 0 0 10px rgba(0, 168, 132, 0.45);
+	border-radius: 0 3px 3px 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	#af-nav-progress {
+		display: none;
+	}
+}

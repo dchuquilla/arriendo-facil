@@ -2161,3 +2161,79 @@
     align-items: center;
     gap: 2px;
 }
+
+/* ── Red de seguridad responsive (todas las pantallas) ───────────────────
+   Evita desbordes horizontales en tablets y móviles aunque una vista nueva
+   no traiga su propio breakpoint. */
+
+.af-shell {
+	max-width: 100%;
+}
+
+.af-shell img,
+.af-shell video,
+.af-shell canvas,
+.af-shell iframe {
+	max-width: 100%;
+}
+
+.af-shell input,
+.af-shell select,
+.af-shell textarea {
+	max-width: 100%;
+	min-width: 0;
+}
+
+.af-page-header__subtitle {
+	max-width: 70ch;
+	text-wrap: pretty;
+}
+
+@media (max-width: 960px) {
+	.af-shell .af-split,
+	.af-shell .af-charts-row,
+	.af-shell .af-pair-row {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
+@media (max-width: 782px) {
+	.af-shell table.widefat:not(.af-data-table),
+	.af-shell table.wp-list-table:not(.af-data-table) {
+		display: block;
+		max-width: 100%;
+		overflow-x: auto;
+		-webkit-overflow-scrolling: touch;
+	}
+
+	.af-page-header {
+		flex-direction: column;
+		align-items: stretch;
+		gap: var(--af-space-3);
+	}
+
+	.af-page-header__actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--af-space-2);
+	}
+
+	.af-page-header__actions > * {
+		flex: 1 1 auto;
+		justify-content: center;
+	}
+
+	.af-page-header__subtitle {
+		display: -webkit-box;
+		-webkit-line-clamp: 3;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+	}
+}
+
+@media (max-width: 480px) {
+	.af-shell .button,
+	.af-shell .af-btn {
+		min-height: 44px;
+	}
+}

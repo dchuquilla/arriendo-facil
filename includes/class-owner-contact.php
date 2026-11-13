@@ -840,7 +840,7 @@ class Arriendo_Facil_Owner_Contact {
 	public function ajax_get_contacts() {
 		check_ajax_referer( 'af_owner_contact_nonce', 'nonce' );
 
-		if ( ! current_user_can( 'edit_posts' ) ) {
+		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 

@@ -132,7 +132,7 @@ class Arriendo_Facil_Cleaning_Service {
 	public function ajax_create_request() {
 		check_ajax_referer( 'af_cleaning_request_nonce', 'nonce' );
 
-		if ( ! current_user_can( 'edit_posts' ) ) {
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
@@ -142,6 +142,10 @@ class Arriendo_Facil_Cleaning_Service {
 
 		if ( ! $accommodation_id || ! $requested_date ) {
 			wp_send_json_error( array( 'message' => __( 'Faltan campos obligatorios.', 'arriendo-facil' ) ) );
+		}
+
+		if ( ! Arriendo_Facil_Tenancy::can_access_accommodation( $accommodation_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes acceso a este inmueble.', 'arriendo-facil' ) ), 403 );
 		}
 
 		global $wpdb;
@@ -169,7 +173,7 @@ class Arriendo_Facil_Cleaning_Service {
 	public function ajax_update_request() {
 		check_ajax_referer( 'af_cleaning_request_nonce', 'nonce' );
 
-		if ( ! current_user_can( 'edit_posts' ) ) {
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
@@ -179,6 +183,10 @@ class Arriendo_Facil_Cleaning_Service {
 		$allowed_statuses = array( 'pending', 'in_progress', 'completed', 'cancelled' );
 		if ( ! $request_id || ! in_array( $status, $allowed_statuses, true ) ) {
 			wp_send_json_error( array( 'message' => __( 'Datos invalidos.', 'arriendo-facil' ) ) );
+		}
+
+		if ( ! Arriendo_Facil_Tenancy::can_access_maintenance( $request_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes acceso a esta solicitud.', 'arriendo-facil' ) ), 403 );
 		}
 
 		global $wpdb;
@@ -224,13 +232,17 @@ class Arriendo_Facil_Cleaning_Service {
 	public function ajax_generate_cleaning_contract_word() {
 		check_ajax_referer( 'af_cleaning_request_nonce', 'nonce' );
 
-		if ( ! current_user_can( 'edit_posts' ) ) {
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
 			wp_die( esc_html__( 'Permiso denegado.', 'arriendo-facil' ) );
 		}
 
 		$request_id = isset( $_GET['request_id'] ) ? absint( $_GET['request_id'] ) : 0;
 		if ( ! $request_id ) {
 			wp_die( esc_html__( 'Solicitud de limpieza invalida.', 'arriendo-facil' ) );
+		}
+
+		if ( ! Arriendo_Facil_Tenancy::can_access_maintenance( $request_id ) ) {
+			wp_die( esc_html__( 'Permiso denegado.', 'arriendo-facil' ), '', array( 'response' => 403 ) );
 		}
 
 		global $wpdb;

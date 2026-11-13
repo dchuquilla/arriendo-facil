@@ -68,10 +68,10 @@ $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data[
 		</a>
 		<div class="af-wizard__title">
 			<h1>
-				<?php echo 'edit' === $mode ? esc_html__( 'Editar inmueble', 'arriendo-facil' ) : esc_html__( 'Publicar un inmueble', 'arriendo-facil' ); ?>
+				<?php echo 'edit' === $mode ? esc_html__( 'Editar inmueble', 'arriendo-facil' ) : esc_html__( 'Registrar un inmueble', 'arriendo-facil' ); ?>
 			</h1>
 			<p class="af-wizard__subtitle">
-				<?php echo 'edit' === $mode ? esc_html__( 'Aquí vas rellenando los datos de la propiedad. Ve paso a paso y guarda los cambios cuando termines.', 'arriendo-facil' ) : esc_html__( 'Rellena esta ficha para dar de alta tu propiedad en arriendo: qué es, dónde está, cuánto vale y sus fotos. Puedes guardar un borrador y continuar después.', 'arriendo-facil' ); ?>
+				<?php echo 'edit' === $mode ? esc_html__( 'Actualiza los datos paso a paso y guarda al terminar.', 'arriendo-facil' ) : esc_html__( 'Seis pasos cortos: qué es, dónde está, sus fotos y el canon. Puedes guardar un borrador.', 'arriendo-facil' ); ?>
 			</p>
 		</div>
 	</header>

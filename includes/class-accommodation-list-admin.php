@@ -54,7 +54,13 @@ class Arriendo_Facil_Accommodation_List_Admin {
 			<?php af_catalog_flow( 1 ); ?>
 			<?php
 			if ( $owner_id && class_exists( 'Arriendo_Facil_Catalog_Share' ) ) {
-				af_catalog_groups_panel( $owner_id, Arriendo_Facil_Catalog_Share::group_counts_for_owner( $owner_id ) );
+				$group_counts = Arriendo_Facil_Catalog_Share::group_counts_for_owner( $owner_id );
+				?>
+				<details class="af-intro-more"<?php echo empty( $group_counts ) ? '' : ' open'; ?>>
+					<summary><?php esc_html_e( 'Agrupar por edificio o conjunto (opcional)', 'arriendo-facil' ); ?></summary>
+					<?php af_catalog_groups_panel( $owner_id, $group_counts ); ?>
+				</details>
+				<?php
 			}
 			?>
 		</div>

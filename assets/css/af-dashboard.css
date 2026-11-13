@@ -1024,3 +1024,56 @@
 		height: 64px;
 	}
 }
+/* ── Jerarquía del panel ─────────────────────────────────────────────────
+   Orden por importancia: 1) cobranza y lo que requiere atención, 2) estado de
+   cobros y últimos contratos, 3) agenda de la semana, 4) alertas y salidas,
+   5) accesos y 6) análisis (gráficos). Se ordena por CSS para no reescribir
+   el marcado de cada bloque. */
+
+.af-dashboard {
+	display: flex;
+	flex-direction: column;
+}
+
+.af-dashboard > * {
+	order: 50;
+}
+
+.af-dashboard > .af-page-header { order: 0; }
+.af-dashboard > .af-welcome { order: 5; }
+.af-dashboard > .af-overview { order: 10; }
+.af-dashboard > .af-pair-row { order: 20; }
+.af-dashboard > .af-agenda { order: 30; }
+.af-dashboard > details { order: 31; }
+.af-dashboard > #af-alerts { order: 40; }
+.af-dashboard > .af-schedule { order: 45; }
+.af-dashboard > .af-charts-row { order: 60; }
+.af-dashboard > .af-hero-media { order: 90; }
+
+/* El invitado a subir un video no debe competir con los datos del negocio. */
+.af-hero-media--empty {
+	padding: var(--af-space-2) var(--af-space-3);
+	opacity: 0.75;
+}
+
+.af-hero-media--empty p {
+	margin: 0;
+	font-size: var(--af-text-xs, 12px);
+}
+
+@media (max-width: 782px) {
+	.af-overview-hero {
+		grid-template-columns: 1fr;
+		padding: var(--af-space-4);
+	}
+
+	.af-overview-hero__side {
+		flex-direction: row;
+		align-items: center;
+		gap: var(--af-space-3);
+	}
+
+	.af-overview-chips {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}

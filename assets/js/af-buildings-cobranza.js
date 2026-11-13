@@ -224,6 +224,7 @@
 	}
 
 	function isPaid(c) {
+		if (c.virtual) { return 'paid' === c.status; }
 		return 'paid' === c.status || balanceOf(c) <= 0.01;
 	}
 
@@ -656,7 +657,9 @@
 			li.setAttribute('data-day', c.dueDate || '');
 
 			var action = '';
-			if (!paid) {
+			if (c.virtual) {
+				action = paid ? '' : '<button type="button" class="button af-btn af-btn--primary af-cobranza-svc-paid" data-schedule="' + c.scheduleId + '" data-period="' + escapeAttr(c.period || state.period) + '" data-amount="' + (Number(c.amount) || 0).toFixed(2) + '">' + (T.markServicePaid || 'Marcar pagado') + '</button>';
+			} else if (!paid) {
 				action = '<button type="button" class="button af-btn af-btn--primary af-cobranza-pay-open" data-charge="' + c.id + '" data-outstanding="' + bal.toFixed(2) + '">' + (T.recordPayment || 'Registrar pago') + '</button>';
 			} else if (noInvoice) {
 				action = '';
@@ -671,7 +674,7 @@
 			var payState = paid ? 'done' : 'todo';
 			var invState = noInvoice ? 'locked' : (!paid ? 'locked' : ('done' === stage ? 'done' : ('processing' === stage ? 'wip' : ('rejected' === stage ? 'bad' : 'todo'))));
 			var invText = noInvoice ? (T.stepNoInvoice || 'No se factura') : (!paid ? '' : ('done' === stage ? (T.stepDone || 'Listo') : ('processing' === stage ? (T.stepProcessing || 'En proceso') : ('rejected' === stage ? (T.stepRejected || 'Rechazada') : (T.stepWaiting || 'Falta')))));
-			var pipe =
+			var pipe = c.virtual ? '' :
 				'<ol class="af-cobranza-pipe">' +
 				'<li class="af-cobranza-pipe__s is-done">' + (T.stepCharge || 'Cobro') + '</li>' +
 				'<li class="af-cobranza-pipe__s is-' + payState + '">' + (T.stepPayment || 'Pago') + (paid ? '' : ' · ' + (T.stepWaiting || 'Falta')) + '</li>' +
@@ -1073,6 +1076,31 @@
 		payStatus.style.display = 'none';
 		payStatus.className = 'af-modal__status';
 	}
+
+	chargesEl.addEventListener('click', function (e) {
+		var svcBtn = e.target.closest('.af-cobranza-svc-paid');
+		if (!svcBtn) { return; }
+
+		svcBtn.disabled = true;
+		post('af_mark_service_paid', {
+			schedule_id: svcBtn.getAttribute('data-schedule'),
+			period: svcBtn.getAttribute('data-period'),
+			paid_on: state.today || '',
+			amount: svcBtn.getAttribute('data-amount')
+		}).then(function (json) {
+			if (!json || !json.success) {
+				svcBtn.disabled = false;
+				showStatus((json && json.data && json.data.message) || (T.payFailed || 'Error de red al registrar el pago.'), 'error');
+				return;
+			}
+			return refreshCurrent().then(function (ok) {
+				if (ok) { showStatus(json.data.message || '', 'success'); }
+			});
+		}).catch(function () {
+			svcBtn.disabled = false;
+			showStatus(T.payFailed || 'Error de red al registrar el pago.', 'error');
+		});
+	});
 
 	chargesEl.addEventListener('click', function (e) {
 		var btn = e.target.closest('.af-cobranza-pay-open');

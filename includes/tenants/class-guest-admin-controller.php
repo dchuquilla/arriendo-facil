@@ -31,7 +31,7 @@ class Arriendo_Facil_Guest_Admin_Controller {
 	public function ajax_create_guest() {
 		check_ajax_referer( 'af_guest_nonce', 'nonce' );
 
-		if ( ! current_user_can( 'edit_posts' ) ) {
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
@@ -395,7 +395,7 @@ class Arriendo_Facil_Guest_Admin_Controller {
 	public function ajax_get_guests() {
 		check_ajax_referer( 'af_guest_nonce', 'nonce' );
 
-		if ( ! current_user_can( 'edit_posts' ) ) {
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
@@ -405,7 +405,7 @@ class Arriendo_Facil_Guest_Admin_Controller {
 
 		global $wpdb;
 
-		if ( Arriendo_Facil_Accommodation::user_is_owner() ) {
+		if ( ! Arriendo_Facil_Tenancy::can_manage_all() ) {
 			Arriendo_Facil_Guest::ensure_guest_extra_columns();
 			$owner_ids = Arriendo_Facil_Accommodation::get_owner_accommodation_ids( get_current_user_id() );
 			$ids_sql   = $owner_ids ? implode( ',', array_map( 'intval', $owner_ids ) ) : '0';
@@ -436,13 +436,17 @@ class Arriendo_Facil_Guest_Admin_Controller {
 	public function ajax_score_guest() {
 		check_ajax_referer( 'af_guest_nonce', 'nonce' );
 
-		if ( ! current_user_can( 'edit_posts' ) ) {
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
 		$guest_id = isset( $_POST['guest_id'] ) ? absint( $_POST['guest_id'] ) : 0;
 		if ( ! $guest_id ) {
 			wp_send_json_error( array( 'message' => __( 'ID de huesped invalido.', 'arriendo-facil' ) ) );
+		}
+
+		if ( ! Arriendo_Facil_Tenancy::can_access_guest( $guest_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes acceso a este inquilino.', 'arriendo-facil' ) ), 403 );
 		}
 
 		global $wpdb;

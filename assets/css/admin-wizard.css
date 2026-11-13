@@ -487,3 +487,81 @@
 	font-size: 13px;
 	color: #647579;
 }
+
+/* ── Piel "tarjeta de catálogo" ───────────────────────────────────────────
+   Misma gramática visual que Mis catálogos: tarjetas de 14px, borde suave,
+   elevación al pasar el cursor y una tarjeta punteada para añadir. */
+
+.af-wizard__form {
+	border-radius: 16px;
+	box-shadow: 0 10px 28px -14px rgba(22, 74, 85, 0.22);
+}
+
+.af-prop-type-card,
+.af-amenity-chip {
+	border-radius: 14px;
+	transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.af-prop-type-card:hover,
+.af-amenity-chip:hover {
+	transform: translateY(-2px);
+	box-shadow: 0 10px 22px -12px rgba(22, 74, 85, 0.35);
+}
+
+.af-prop-type-card.is-selected,
+.af-amenity-chip.is-selected {
+	box-shadow: 0 0 0 2px rgba(0, 168, 132, 0.35), 0 10px 22px -12px rgba(22, 74, 85, 0.35);
+}
+
+.af-featured-preview {
+	border-radius: 14px;
+}
+
+.af-gallery-grid {
+	grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+
+.af-gallery-item {
+	border-radius: 14px;
+	transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.af-gallery-item:hover {
+	transform: translateY(-2px);
+	box-shadow: 0 12px 24px -14px rgba(22, 74, 85, 0.45);
+}
+
+.af-gallery-add-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	min-height: 64px;
+	padding: 0 22px;
+	border: 2px dashed #b7c4c1;
+	border-radius: 14px;
+	background: #fff;
+	color: #3b4f53;
+	transition: border-color 0.2s ease, color 0.2s ease, background-color 0.2s ease;
+}
+
+.af-gallery-add-btn:hover {
+	border-color: var(--af-primary-500, #00a884);
+	color: var(--af-primary-600, #00926f);
+	background: var(--af-primary-50, #e6f7f3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.af-prop-type-card,
+	.af-amenity-chip,
+	.af-gallery-item {
+		transition: none;
+	}
+
+	.af-prop-type-card:hover,
+	.af-amenity-chip:hover,
+	.af-gallery-item:hover {
+		transform: none;
+	}
+}

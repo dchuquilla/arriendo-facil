@@ -188,6 +188,55 @@ class Arriendo_Facil_Billing_Ledger {
 	}
 
 	/**
+	 * Due date of a service rule for a period, taking into account when the rule
+	 * was created: a rule registered after its day of the month has already
+	 * passed (day 5, created on the 10th) did not exist when that date fell
+	 * due, so its first obligation is the next month's and it must not appear
+	 * as overdue.
+	 *
+	 * @param string $created_at Rule creation timestamp.
+	 * @param string $period     Period in YYYY-MM format.
+	 * @param int    $due_day    Configured day of month.
+	 * @return array{due_date:string,applies:bool,deferred:bool} applies=false when the period predates the rule.
+	 */
+	public static function resolve_rule_due_date( $created_at, $period, $due_day ) {
+		$due          = self::resolve_due_date( $period, $due_day );
+		$created_date = substr( (string) $created_at, 0, 10 );
+
+		if ( '' === $due || ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $created_date ) || '0000-00-00' === $created_date ) {
+			return array(
+				'due_date' => $due,
+				'applies'  => true,
+				'deferred' => false,
+			);
+		}
+
+		if ( $period < substr( $created_date, 0, 7 ) ) {
+			return array(
+				'due_date' => $due,
+				'applies'  => false,
+				'deferred' => false,
+			);
+		}
+
+		if ( $due < $created_date ) {
+			$next = gmdate( 'Y-m', gmmktime( 0, 0, 0, (int) substr( $period, 5, 2 ) + 1, 1, (int) substr( $period, 0, 4 ) ) );
+
+			return array(
+				'due_date' => self::resolve_due_date( $next, $due_day ),
+				'applies'  => true,
+				'deferred' => true,
+			);
+		}
+
+		return array(
+			'due_date' => $due,
+			'applies'  => true,
+			'deferred' => false,
+		);
+	}
+
+	/**
 	 * Returns the service schedules table name.
 	 *
 	 * @return string
@@ -686,8 +735,20 @@ class Arriendo_Facil_Billing_Ledger {
 				continue;
 			}
 
-			$due_date = self::resolve_due_date( $period, (int) $schedule->due_day );
+			$rule     = self::resolve_rule_due_date( isset( $schedule->created_at ) ? $schedule->created_at : '', $period, (int) $schedule->due_day );
+			$due_date = $rule['due_date'];
 			$existing = self::get_charge_for_period( (int) $lease->id, $service, $period );
+
+			// The rule did not exist when this period's date fell due: the first
+			// charge is generated for the next period instead of an instant overdue one.
+			if ( ! $existing && ( ! $rule['applies'] || $rule['deferred'] ) ) {
+				++$skipped;
+				continue;
+			}
+
+			if ( $existing ) {
+				$due_date = self::resolve_due_date( $period, (int) $schedule->due_day );
+			}
 
 			if ( $existing ) {
 				// Only re-price while the charge is untouched. Once money moved
@@ -880,7 +941,8 @@ class Arriendo_Facil_Billing_Ledger {
 
 		$sql = $wpdb->prepare(
 			"SELECT s.id AS schedule_id, s.unit_id, s.accommodation_id, s.service, s.service_label, s.due_day,
-			        s.flat_amount, s.amount_mode, s.is_active, s.notes,
+			        s.flat_amount, s.amount_mode, s.is_active, s.notes, s.created_at AS schedule_created_at,
+			        COALESCE( NULLIF( s.accommodation_id, 0 ), u.accommodation_id ) AS resolved_accommodation_id,
 			        l.id AS lease_id, l.guest_id,
 			        c.id AS charge_id, c.amount, c.amount_paid, c.due_date, c.status AS charge_status,
 			        r.id AS reading_id, r.calculated_amount, r.consumption, r.current_reading, r.previous_reading, r.unit_rate,
@@ -928,10 +990,21 @@ class Arriendo_Facil_Billing_Ledger {
 			$has_charge      = (bool) ( $row->charge_id && 'void' !== $row->charge_status );
 
 			// The due date shown is the charge date when the obligation already
-			// exists, otherwise the date the rule would produce.
-			$due_date = ( $has_charge && $row->due_date )
-				? (string) $row->due_date
-				: self::resolve_due_date( $period, (int) $row->due_day );
+			// exists, otherwise the date the rule would produce. A rule created
+			// after its day passed rolls to the next month instead of starting overdue.
+			$deferred = false;
+			if ( $has_charge && $row->due_date ) {
+				$due_date = (string) $row->due_date;
+			} else {
+				$rule = self::resolve_rule_due_date( isset( $row->schedule_created_at ) ? $row->schedule_created_at : '', $period, (int) $row->due_day );
+
+				if ( ! $rule['applies'] && empty( $row->bill_id ) ) {
+					continue;
+				}
+
+				$due_date = $rule['due_date'];
+				$deferred = $rule['deferred'];
+			}
 
 			// Mixed pricing, mirroring generate_service_charges().
 			if ( 'fixed' === $row->amount_mode ) {
@@ -951,6 +1024,7 @@ class Arriendo_Facil_Billing_Ledger {
 				'schedule_id'      => (int) $row->schedule_id,
 				'unit_id'          => (int) $row->unit_id,
 				'accommodation_id' => (int) $row->accommodation_id,
+				'resolved_accommodation_id' => isset( $row->resolved_accommodation_id ) ? (int) $row->resolved_accommodation_id : (int) $row->accommodation_id,
 				'service'          => (string) $row->service,
 				'service_label'    => self::service_label( $row->service, isset( $row->service_label ) ? $row->service_label : '' ),
 				'due_day'          => (int) $row->due_day,
@@ -958,6 +1032,7 @@ class Arriendo_Facil_Billing_Ledger {
 				'amount_mode'      => (string) $row->amount_mode,
 				'notes'            => null === $row->notes ? '' : (string) $row->notes,
 				'due_date'         => $due_date,
+				'deferred'         => $deferred,
 				'accommodation_title' => (string) $row->accommodation_title,
 				'unit_code'        => (string) $row->unit_code,
 				'lease_id'         => (int) $row->lease_id,
@@ -1828,6 +1903,68 @@ class Arriendo_Facil_Billing_Ledger {
 	}
 
 	/**
+	 * Overdue money the operator really has to chase, for the dashboard alerts.
+	 *
+	 * Only counts charges of active, non-deleted leases and owner-paid services
+	 * of properties without tenant. Sample data seeded for new accounts is left
+	 * out so a fresh account never shows alerts for things it did not create.
+	 *
+	 * @param int[]|null $accommodation_ids Scope. Null = everything.
+	 * @return array{count:int,amount:float}
+	 */
+	public static function overdue_summary( $accommodation_ids = null ) {
+		global $wpdb;
+
+		$today = current_time( 'Y-m-d' );
+		$scope = '';
+
+		if ( is_array( $accommodation_ids ) ) {
+			$ids = array_values( array_unique( array_filter( array_map( 'absint', $accommodation_ids ) ) ) );
+			if ( empty( $ids ) ) {
+				return array( 'count' => 0, 'amount' => 0.0 );
+			}
+			$scope = ' AND l.accommodation_id IN (' . implode( ',', $ids ) . ')';
+		}
+
+		$demo = " AND l.accommodation_id NOT IN ( SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_af_demo' AND meta_value = '1' )";
+
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT COUNT(*) AS total, COALESCE(SUM(c.amount - c.amount_paid), 0) AS balance
+				 FROM " . self::charges_table() . " c
+				 INNER JOIN {$wpdb->prefix}af_leases l ON l.id = c.lease_id
+				 WHERE c.status IN ('pending', 'partial', 'overdue') AND c.due_date < %s
+				   AND (c.amount - c.amount_paid) > 0.01
+				   AND l.status = 'active' AND l.deleted_at IS NULL{$scope}{$demo}", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+				$today
+			)
+		);
+
+		$count  = $row ? (int) $row->total : 0;
+		$amount = $row ? (float) $row->balance : 0.0;
+
+		// Services of properties with no tenant are paid by the owner.
+		$demo_ids = array_map( 'absint', (array) $wpdb->get_col( "SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_af_demo' AND meta_value = '1'" ) );
+		foreach ( self::get_service_due_rows( current_time( 'Y-m' ), $accommodation_ids ) as $service_row ) {
+			if ( ! $service_row['is_active'] || $service_row['lease_id'] || $service_row['bill_paid'] ) {
+				continue;
+			}
+			if ( in_array( (int) $service_row['resolved_accommodation_id'], $demo_ids, true ) ) {
+				continue;
+			}
+			if ( $service_row['expected_amount'] > 0.01 && $service_row['due_date'] && $service_row['due_date'] < $today ) {
+				++$count;
+				$amount += (float) $service_row['expected_amount'];
+			}
+		}
+
+		return array(
+			'count'  => $count,
+			'amount' => round( $amount, 2 ),
+		);
+	}
+
+	/**
 	 * Presentation metadata for the per-property collection status.
 	 *
 	 * `card` is the CSS modifier that colours the card, `pill` the badge tone.
@@ -2022,6 +2159,27 @@ class Arriendo_Facil_Billing_Ledger {
 		$types  = self::accommodation_types();
 		$labels = self::charge_labels();
 
+		// Services of properties without an active lease have no charge to a
+		// tenant, but the owner still has to pay them: surface them as
+		// "virtual" obligations so the property is not silently missing here.
+		$service_by_acc = array();
+		$no_lease_ids   = array();
+		foreach ( $acc_ids as $candidate_id ) {
+			if ( ! isset( $leases[ (int) $candidate_id ] ) ) {
+				$no_lease_ids[] = (int) $candidate_id;
+			}
+		}
+		if ( ! empty( $no_lease_ids ) ) {
+			for ( $svc_period = $prev_pe; $svc_period <= $last_pe; $svc_period = gmdate( 'Y-m', strtotime( $svc_period . '-01 +1 month' ) ) ) {
+				foreach ( self::get_service_due_rows( $svc_period, $no_lease_ids ) as $svc_row ) {
+					if ( ! $svc_row['is_active'] || $svc_row['lease_id'] ) {
+						continue;
+					}
+					$service_by_acc[ (int) $svc_row['resolved_accommodation_id'] ][ $svc_period ][] = $svc_row;
+				}
+			}
+		}
+
 		$props = array();
 		foreach ( $acc_ids as $acc_id ) {
 			$acc_id = (int) $acc_id;
@@ -2038,6 +2196,43 @@ class Arriendo_Facil_Billing_Ledger {
 			$cur_charges  = array();
 			$cur_pending  = 0.0;
 			$periods      = array();
+
+			if ( isset( $service_by_acc[ $acc_id ] ) ) {
+				foreach ( $service_by_acc[ $acc_id ] as $svc_period => $svc_rows ) {
+					foreach ( $svc_rows as $svc_row ) {
+						$svc_paid   = (bool) $svc_row['bill_paid'];
+						$svc_amount = $svc_paid && $svc_row['bill_amount'] > 0 ? (float) $svc_row['bill_amount'] : (float) $svc_row['expected_amount'];
+						$svc_due    = (string) $svc_row['due_date'];
+
+						$periods[ $svc_period ][] = array(
+							'id'          => 0,
+							'virtual'     => true,
+							'scheduleId'  => (int) $svc_row['schedule_id'],
+							'period'      => $svc_period,
+							'type'        => (string) $svc_row['service'],
+							'label'       => (string) $svc_row['service_label'],
+							'desc'        => __( 'Pago del propietario (sin inquilino)', 'arriendo-facil' ),
+							'amount'      => $svc_amount,
+							'paid'        => $svc_paid ? $svc_amount : 0.0,
+							'dueDate'     => $svc_due,
+							'status'      => $svc_paid ? 'paid' : ( $svc_due && $svc_due < $today ? 'overdue' : 'pending' ),
+							'invoiceable' => false,
+							'payments'    => array(),
+							'invoice'     => null,
+						);
+
+						if ( $svc_period === $current_period ) {
+							$cur_charges[] = (object) array( 'virtual' => true );
+						}
+						if ( ! $svc_paid && $svc_amount > 0.01 ) {
+							$unpaid[] = array( 'balance' => $svc_amount, 'due' => $svc_due );
+							if ( $svc_period === $current_period ) {
+								$cur_pending += $svc_amount;
+							}
+						}
+					}
+				}
+			}
 
 			foreach ( $rows as $c ) {
 				$ctype = (string) $c->charge_type;
@@ -2061,7 +2256,9 @@ class Arriendo_Facil_Billing_Ledger {
 				if ( $per === $current_period ) {
 					$cur_charges[] = $c;
 				}
-				if ( in_array( (string) $c->status, array( 'pending', 'partial' ), true ) && $bal > 0.01 ) {
+				// The nightly cron rewrites unpaid past-due charges to "overdue", so that
+				// status must count as unpaid or the card would read "Al día" with debt.
+				if ( in_array( (string) $c->status, array( 'pending', 'partial', 'overdue' ), true ) && $bal > 0.01 ) {
 					$unpaid[] = array( 'balance' => $bal, 'due' => (string) $c->due_date );
 					if ( $per === $current_period ) {
 						$cur_pending += $bal;

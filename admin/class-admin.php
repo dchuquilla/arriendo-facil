@@ -1352,7 +1352,7 @@ array(
 							}
 						}
 						?>
-						<li class="af-app-sidebar__group<?php echo $group_active ? ' is-open is-active' : ''; ?>">
+						<li class="af-app-sidebar__group<?php echo $group_active ? ' is-open is-active' : ''; ?>" data-group="<?php echo esc_attr( $group_slug ); ?>">
 							<a class="af-app-sidebar__group-link" href="<?php echo esc_url( $grouped[ $group_slug ][0]['url'] ); ?>" aria-expanded="<?php echo $group_active ? 'true' : 'false'; ?>">
 								<?php echo af_lucide( $group_meta['icon'], 20 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
 								<span class="af-app-sidebar__group-label"><?php echo esc_html( $group_meta['label'] ); ?></span>
@@ -1361,7 +1361,8 @@ array(
 							<ul class="af-app-sidebar__subnav">
 								<?php foreach ( $grouped[ $group_slug ] as $nav_item ) : ?>
 									<li class="af-app-sidebar__item<?php echo $nav_item['active'] ? ' is-active' : ''; ?>">
-										<a href="<?php echo esc_url( $nav_item['url'] ); ?>">
+										<a href="<?php echo esc_url( $nav_item['url'] ); ?>" title="<?php echo esc_attr( $nav_item['label'] ); ?>"<?php echo $nav_item['active'] ? ' aria-current="page"' : ''; ?>>
+											<span class="af-app-sidebar__subicon" aria-hidden="true"><?php echo af_lucide( $nav_item['icon'], 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
 											<span class="af-app-sidebar__label"><?php echo esc_html( $nav_item['label'] ); ?></span>
 										</a>
 									</li>
@@ -1986,6 +1987,22 @@ array(
 			true
 		);
 
+		// GSAP is self-hosted (no third-party request, nothing to compromise via a CDN).
+		$gsap_js_path    = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/vendor/gsap.min.js';
+		$trigger_js_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/vendor/ScrollTrigger.min.js';
+		$engine_js_path  = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/af-gsap.js';
+		if ( file_exists( $gsap_js_path ) && file_exists( $engine_js_path ) ) {
+			wp_enqueue_script( 'gsap', ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/vendor/gsap.min.js', array(), '3.12.5', true );
+			wp_enqueue_script( 'gsap-scrolltrigger', ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/vendor/ScrollTrigger.min.js', array( 'gsap' ), '3.12.5', true );
+			wp_enqueue_script(
+				'af-gsap',
+				ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/af-gsap.js',
+				array( 'gsap', 'gsap-scrolltrigger', 'af-motion' ),
+				(string) filemtime( $engine_js_path ),
+				true
+			);
+		}
+
 		// Rebrand the WordPress native dashboard only on index.php.
 		if ( 'index.php' === $hook ) {
 			wp_enqueue_style(
@@ -2028,7 +2045,7 @@ array(
 			wp_enqueue_script(
 				'af-admin-shell-nav',
 				ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/af-admin-shell-nav.js',
-				array(),
+				wp_script_is( 'gsap', 'registered' ) ? array( 'gsap' ) : array(),
 				file_exists( $shell_nav_js_path ) ? (string) filemtime( $shell_nav_js_path ) : ARRIENDO_FACIL_VERSION,
 				true
 			);
@@ -2607,6 +2624,7 @@ array(
 			'noMatches'         => __( 'Ningún cargo coincide con el filtro.', 'arriendo-facil' ),
 			'tenant'            => __( 'Arrendatario:', 'arriendo-facil' ),
 			'recordPayment'     => __( 'Registrar pago', 'arriendo-facil' ),
+			'markServicePaid'   => __( 'Marcar pagado', 'arriendo-facil' ),
 			'noActiveLease'     => __( 'Sin contrato activo: este inmueble no genera cobros.', 'arriendo-facil' ),
 			'balance'           => __( 'Saldo', 'arriendo-facil' ),
 			'showAll'           => __( 'Ver todos los días', 'arriendo-facil' ),

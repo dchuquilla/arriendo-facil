@@ -1116,7 +1116,7 @@ class Arriendo_Facil_Review {
 	public function ajax_generate_review_test_link() {
 		check_ajax_referer( 'af_lease_nonce', 'nonce' );
 
-		if ( ! current_user_can( 'edit_posts' ) ) {
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
 			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
 		}
 
@@ -1125,6 +1125,10 @@ class Arriendo_Facil_Review {
 
 		if ( ! $lease_id ) {
 			wp_send_json_error( array( 'message' => __( 'Debes enviar un lease_id valido.', 'arriendo-facil' ) ), 400 );
+		}
+
+		if ( ! Arriendo_Facil_Tenancy::can_access_lease( $lease_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes acceso a este contrato.', 'arriendo-facil' ) ), 403 );
 		}
 
 		if ( '' === $reviewer_type || ! array_key_exists( $reviewer_type, self::reviewer_types() ) ) {

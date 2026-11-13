@@ -18,6 +18,9 @@ class Arriendo_Facil_Property_Trash_Relations {
 
 	const META_SNAPSHOT = '_af_trash_snapshot';
 
+	/** Same detach/reattach, used when a plan limit hides a property. */
+	const LOCK_SNAPSHOT = '_af_lock_snapshot';
+
 	/**
 	 * Statuses of a lease that tie a tenant to the property.
 	 */
@@ -29,12 +32,30 @@ class Arriendo_Facil_Property_Trash_Relations {
 	}
 
 	/**
+	 * Detaches the relations when a property goes to the trash.
+	 *
+	 * @param int $post_id Property ID.
+	 */
+	public function on_trashed( $post_id ) {
+		self::detach( $post_id, self::META_SNAPSHOT, 'property_trashed' );
+	}
+
+	/**
+	 * Re-attaches the relations when a property leaves the trash.
+	 *
+	 * @param int $post_id Property ID.
+	 */
+	public function on_untrashed( $post_id ) {
+		self::reattach( $post_id, self::META_SNAPSHOT, 'property_restored' );
+	}
+
+	/**
 	 * Whether the post is an accommodation.
 	 *
 	 * @param int $post_id Post ID.
 	 * @return bool
 	 */
-	private function is_accommodation( $post_id ) {
+	private static function is_accommodation( $post_id ) {
 		return 'accommodation' === get_post_type( $post_id );
 	}
 
@@ -45,20 +66,32 @@ class Arriendo_Facil_Property_Trash_Relations {
 	 * @param string $column Column name.
 	 * @return bool
 	 */
-	private function has_column( $table, $column ) {
+	private static function has_column( $table, $column ) {
 		global $wpdb;
 
 		return (bool) $wpdb->get_var( $wpdb->prepare( "SHOW COLUMNS FROM {$table} LIKE %s", $column ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- internal table name.
 	}
 
 	/**
-	 * Detaches the relations and stores what changed.
+	 * Release reason stamped on the reservations a given snapshot released.
 	 *
-	 * @param int $post_id Property ID.
+	 * @param string $snapshot_key Snapshot meta key.
+	 * @return string
 	 */
-	public function on_trashed( $post_id ) {
+	private static function release_reason( $snapshot_key ) {
+		return self::LOCK_SNAPSHOT === $snapshot_key ? 'property_locked' : 'property_trashed';
+	}
+
+	/**
+	 * Detaches the relations and stores what changed in $snapshot_key.
+	 *
+	 * @param int    $post_id      Property ID.
+	 * @param string $snapshot_key Post meta key of the snapshot.
+	 * @param string $event        Lease event logged for each lease.
+	 */
+	public static function detach( $post_id, $snapshot_key, $event ) {
 		$post_id = absint( $post_id );
-		if ( ! $post_id || ! $this->is_accommodation( $post_id ) ) {
+		if ( ! $post_id || ! self::is_accommodation( $post_id ) ) {
 			return;
 		}
 
@@ -103,7 +136,7 @@ class Arriendo_Facil_Property_Trash_Relations {
 			$wpdb->query( $wpdb->prepare( "UPDATE {$leases_table} SET deleted_at = %s WHERE id IN ({$in})", current_time( 'mysql' ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- ids are cast to int.
 		}
 
-		if ( $this->has_column( $guests_table, 'accommodation_id' ) ) {
+		if ( self::has_column( $guests_table, 'accommodation_id' ) ) {
 			$linked = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM {$guests_table} WHERE accommodation_id = %d", $post_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- internal table name.
 			if ( ! empty( $linked ) ) {
 				$wpdb->query( $wpdb->prepare( "UPDATE {$guests_table} SET accommodation_id = NULL WHERE accommodation_id = %d", $post_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- internal table name.
@@ -127,34 +160,36 @@ class Arriendo_Facil_Property_Trash_Relations {
 			$wpdb->query(
 				$wpdb->prepare(
 					"UPDATE {$reservations_table} SET status = 'released', reservation_status = 'released', release_reason = %s, released_at = %s WHERE accommodation_id = %d AND status = 'reserved'", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- internal table name.
-					'property_trashed',
+					self::release_reason( $snapshot_key ),
 					current_time( 'mysql' ),
 					$post_id
 				)
 			);
 		}
 
-		update_post_meta( $post_id, self::META_SNAPSHOT, wp_slash( wp_json_encode( $snapshot ) ) );
+		update_post_meta( $post_id, $snapshot_key, wp_slash( wp_json_encode( $snapshot ) ) );
 
 		if ( ! empty( $lease_ids ) ) {
 			foreach ( $lease_ids as $lease_id ) {
-				Arriendo_Facil_Rental_Workflow::log_lease_event( $lease_id, $post_id, 'property_trashed', array( 'detached_by' => get_current_user_id() ) );
+				Arriendo_Facil_Rental_Workflow::log_lease_event( $lease_id, $post_id, $event, array( 'detached_by' => get_current_user_id() ) );
 			}
 		}
 	}
 
 	/**
-	 * Re-attaches what on_trashed() detached.
+	 * Re-attaches what detach() stored in $snapshot_key.
 	 *
-	 * @param int $post_id Property ID.
+	 * @param int    $post_id      Property ID.
+	 * @param string $snapshot_key Post meta key of the snapshot.
+	 * @param string $event        Lease event logged for each lease.
 	 */
-	public function on_untrashed( $post_id ) {
+	public static function reattach( $post_id, $snapshot_key, $event ) {
 		$post_id = absint( $post_id );
-		if ( ! $post_id || ! $this->is_accommodation( $post_id ) ) {
+		if ( ! $post_id || ! self::is_accommodation( $post_id ) ) {
 			return;
 		}
 
-		$raw      = (string) get_post_meta( $post_id, self::META_SNAPSHOT, true );
+		$raw      = (string) get_post_meta( $post_id, $snapshot_key, true );
 		$snapshot = '' !== $raw ? json_decode( $raw, true ) : null;
 		if ( ! is_array( $snapshot ) ) {
 			return;
@@ -185,7 +220,7 @@ class Arriendo_Facil_Property_Trash_Relations {
 		}
 
 		// Only re-link tenants that were linked to this property and are still free.
-		if ( $this->has_column( $guests_table, 'accommodation_id' ) ) {
+		if ( self::has_column( $guests_table, 'accommodation_id' ) ) {
 			foreach ( array_map( 'intval', (array) ( $snapshot['linked'] ?? array() ) ) as $guest_id ) {
 				$wpdb->query( $wpdb->prepare( "UPDATE {$guests_table} SET accommodation_id = %d WHERE id = %d AND accommodation_id IS NULL", $post_id, $guest_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- internal table name.
 			}
@@ -201,13 +236,13 @@ class Arriendo_Facil_Property_Trash_Relations {
 		$reservation_ids = array_values( array_filter( array_map( 'intval', (array) ( $snapshot['reservations'] ?? array() ) ) ) );
 		if ( ! empty( $reservation_ids ) ) {
 			$in = implode( ',', $reservation_ids );
-			$wpdb->query( "UPDATE {$wpdb->prefix}af_reservations SET status = 'reserved', reservation_status = 'reserved', release_reason = NULL, released_at = NULL WHERE id IN ({$in}) AND release_reason = 'property_trashed'" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- ids are cast to int.
+			$wpdb->query( "UPDATE {$wpdb->prefix}af_reservations SET status = 'reserved', reservation_status = 'reserved', release_reason = NULL, released_at = NULL WHERE id IN ({$in}) AND release_reason = '" . self::release_reason( $snapshot_key ) . "'" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- ids are cast to int.
 		}
 
-		delete_post_meta( $post_id, self::META_SNAPSHOT );
+		delete_post_meta( $post_id, $snapshot_key );
 
 		foreach ( $lease_ids as $lease_id ) {
-			Arriendo_Facil_Rental_Workflow::log_lease_event( $lease_id, $post_id, 'property_restored', array( 'restored_by' => get_current_user_id() ) );
+			Arriendo_Facil_Rental_Workflow::log_lease_event( $lease_id, $post_id, $event, array( 'restored_by' => get_current_user_id() ) );
 		}
 	}
 }

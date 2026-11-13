@@ -19,8 +19,9 @@ class Arriendo_Facil_Plans {
 	const META_PLAN    = 'af_plan';
 	const META_SINCE   = 'af_plan_since';
 	const META_REQUEST = 'af_plan_request';
-	const META_PENDING = 'af_plan_selection_pending';
 	const META_LOCKED  = '_af_plan_locked';
+	const META_HISTORY = 'af_plan_history';
+	const OPT_MIGRATED = 'af_plans_legacy_migrated';
 	const PAGE_SLUG    = 'af-plan';
 	const NONCE        = 'af_plans';
 
@@ -60,6 +61,28 @@ class Arriendo_Facil_Plans {
 		'af_sri_ruc_lookup'           => 'billing',
 	);
 
+	/**
+	 * Action prefixes that also belong to a feature, so a new endpoint of a
+	 * locked module is blocked without having to be added to GATED_AJAX.
+	 */
+	const GATED_PREFIXES = array(
+		'af_catalog_'            => 'catalog',
+		'af_create_maintenance'  => 'maintenance',
+		'af_update_maintenance'  => 'maintenance',
+		'af_maintenance_'        => 'maintenance',
+		'af_sri_'                => 'billing',
+		'af_billing_'            => 'billing',
+		'af_issue_'              => 'billing',
+		'af_preview_'            => 'billing',
+		'af_retry_invoice'       => 'billing',
+	);
+
+	/** @var array<int,string> Resolved plan per user for this request. */
+	private static $plan_cache = array();
+
+	/** @var array<int,string> Advisory locks held by this request (user ID => lock name). */
+	private static $locks = array();
+
 	public function __construct() {
 		add_action( 'admin_menu', array( $this, 'register_page' ), 11 );
 		add_action( 'admin_init', array( $this, 'guard' ), 1 );
@@ -72,10 +95,16 @@ class Arriendo_Facil_Plans {
 		add_action( 'wp_ajax_af_plan_cancel_request', array( $this, 'ajax_cancel_request' ) );
 		add_action( 'wp_ajax_af_plan_cancel', array( $this, 'ajax_cancel' ) );
 		add_action( 'wp_ajax_af_plan_set', array( $this, 'ajax_set' ) );
-		add_action( 'wp_ajax_af_plan_select_properties', array( $this, 'ajax_select_properties' ) );
 
-		add_action( 'trashed_post', array( $this, 'on_property_trashed' ) );
-		add_action( 'untrashed_post', array( $this, 'on_property_untrashed' ) );
+		add_action( 'init', array( $this, 'maybe_migrate_legacy' ), 1 );
+		add_filter( 'map_meta_cap', array( $this, 'deny_locked_property_caps' ), 10, 4 );
+		add_filter( 'wp_insert_post_empty_content', array( $this, 'block_over_limit_insert' ), 10, 2 );
+		add_filter( 'rest_pre_insert_accommodation', array( $this, 'block_rest_create' ), 10, 2 );
+
+		// Después de Property_Trash_Relations (prioridad 10): primero se separan o devuelven
+		// las relaciones del inmueble y luego se recalcula qué inmuebles están activos.
+		add_action( 'trashed_post', array( $this, 'on_property_trashed' ), 20 );
+		add_action( 'untrashed_post', array( $this, 'on_property_untrashed' ), 20 );
 	}
 
 	/* ------------------------------------------------------------------
@@ -211,22 +240,43 @@ class Arriendo_Facil_Plans {
 			&& Arriendo_Facil_Tenancy::is_property_manager( $user_id );
 	}
 
-	/**
-	 * Current plan key of a user.
-	 *
-	 * @param int $user_id User ID. Defaults to the current user.
-	 * @return string
-	 */
 	public static function get_plan( $user_id = 0 ) {
 		$user_id = $user_id ? absint( $user_id ) : get_current_user_id();
 
+		if ( ! isset( self::$plan_cache[ $user_id ] ) ) {
+			self::$plan_cache[ $user_id ] = self::resolve_plan( $user_id );
+		}
+
+		return self::$plan_cache[ $user_id ];
+	}
+
+	/**
+	 * Drops the per-request plan memo of a user (after a change).
+	 *
+	 * @param int $user_id User ID.
+	 */
+	public static function forget( $user_id ) {
+		unset( self::$plan_cache[ absint( $user_id ) ] );
+	}
+
+	/**
+	 * Reads the plan from user meta.
+	 *
+	 * @param int $user_id User ID.
+	 * @return string
+	 */
+	private static function resolve_plan( $user_id ) {
 		if ( ! self::applies_to( $user_id ) ) {
 			return 'pro';
 		}
 
 		$stored = self::normalize( (string) get_user_meta( $user_id, self::META_PLAN, true ) );
+		if ( '' !== $stored ) {
+			return $stored;
+		}
 
-		return '' !== $stored ? $stored : 'pro';
+		// Cuentas sin plan: Profesional solo mientras no corra la migración; después, Free.
+		return get_option( self::OPT_MIGRATED ) ? 'free' : 'pro';
 	}
 
 	/**
@@ -239,14 +289,7 @@ class Arriendo_Facil_Plans {
 		return self::definitions()[ self::get_plan( $user_id ) ];
 	}
 
-	/**
-	 * Stores a plan, clears any pending request and logs the change.
-	 *
-	 * @param int    $user_id User ID.
-	 * @param string $plan    Plan key.
-	 * @return bool
-	 */
-	public static function set_plan( $user_id, $plan ) {
+	public static function set_plan( $user_id, $plan, array $args = array() ) {
 		$user_id = absint( $user_id );
 		$plan    = self::normalize( $plan );
 
@@ -254,17 +297,107 @@ class Arriendo_Facil_Plans {
 			return false;
 		}
 
+		$by       = isset( $args['by'] ) ? (int) $args['by'] : get_current_user_id();
+		$reason   = isset( $args['reason'] ) ? (string) $args['reason'] : 'admin';
 		$previous = self::get_plan( $user_id );
 
 		update_user_meta( $user_id, self::META_PLAN, $plan );
 		update_user_meta( $user_id, self::META_SINCE, time() );
 		delete_user_meta( $user_id, self::META_REQUEST );
+		self::forget( $user_id );
 
+		self::log_history( $user_id, $plan, $previous, $by, $reason );
 		self::apply_property_limit( $user_id );
+		self::flush_usage_cache( $user_id );
 
-		do_action( 'af_plan_changed', $user_id, $plan, $previous, get_current_user_id() );
+		do_action( 'af_plan_changed', $user_id, $plan, $previous, $by, $args );
 
 		return true;
+	}
+
+	/**
+	 * Forgets the short display cache of the usage meters.
+	 *
+	 * @param int $user_id User ID.
+	 */
+	public static function flush_usage_cache( $user_id ) {
+		foreach ( array_keys( self::definitions() ) as $plan ) {
+			delete_transient( 'af_plan_ur_' . absint( $user_id ) . '_' . $plan );
+		}
+	}
+
+	/**
+	 * Appends a change to the account's plan history (last 20 entries).
+	 *
+	 * @param int    $user_id User ID.
+	 * @param string $plan    Plan after the change.
+	 * @param string $from    Plan before the change.
+	 * @param int    $by      Acting user (0 = system).
+	 * @param string $reason  admin|cancel|lapsed|renew|signup.
+	 */
+	public static function log_history( $user_id, $plan, $from, $by, $reason ) {
+		$history = get_user_meta( $user_id, self::META_HISTORY, true );
+		$history = is_array( $history ) ? $history : array();
+
+		$history[] = array(
+			'plan'   => $plan,
+			'from'   => $from,
+			'by'     => (int) $by,
+			'reason' => sanitize_key( (string) $reason ),
+			'at'     => time(),
+		);
+
+		update_user_meta( $user_id, self::META_HISTORY, array_slice( $history, -20 ) );
+	}
+
+	/**
+	 * Advisory lock per user: serializes "check the limit, then create" so two
+	 * concurrent requests cannot both pass the check. Released at the end of the request.
+	 *
+	 * @param int $user_id User whose limits are being checked.
+	 * @return bool False when it could not be acquired in time.
+	 */
+	public static function lock( $user_id ) {
+		global $wpdb;
+
+		$user_id = absint( $user_id );
+		if ( ! $user_id ) {
+			return false;
+		}
+		if ( isset( self::$locks[ $user_id ] ) ) {
+			return true;
+		}
+
+		$name = 'af_plan_' . get_current_blog_id() . '_' . $user_id;
+		if ( 1 !== (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 5)', $name ) ) ) {
+			return false;
+		}
+
+		if ( empty( self::$locks ) ) {
+			register_shutdown_function( array( __CLASS__, 'release_locks' ) );
+		}
+		self::$locks[ $user_id ] = $name;
+
+		return true;
+	}
+
+	/**
+	 * Releases the advisory locks held by this request.
+	 */
+	public static function release_locks() {
+		global $wpdb;
+
+		foreach ( self::$locks as $name ) {
+			$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $name ) );
+		}
+		self::$locks = array();
+	}
+
+	/**
+	 * Response sent when the advisory lock cannot be taken.
+	 */
+	public static function send_busy_error() {
+		wp_send_json_error( array( 'message' => __( 'Estamos procesando otra operación de tu cuenta. Inténtalo de nuevo en unos segundos.', 'arriendo-facil' ) ), 409 );
 	}
 
 	/**
@@ -483,7 +616,7 @@ class Arriendo_Facil_Plans {
 			$title   = __( 'Inmueble bloqueado por tu plan', 'arriendo-facil' );
 			$message = sprintf(
 				/* translators: 1: plan, 2: limit */
-				__( 'Tu plan %1$s permite administrar %2$d inmuebles y este no está entre los activos. Tus datos están guardados: elige cuáles mantener activos o mejora tu plan.', 'arriendo-facil' ),
+				__( 'Tu plan %1$s permite administrar tus %2$d primeros inmuebles y este queda oculto. Sus datos están guardados: se reactiva al renovar o contratar un plan con capacidad suficiente.', 'arriendo-facil' ),
 				$current_lbl,
 				(int) self::limit( 'properties', $user_id )
 			);
@@ -532,7 +665,7 @@ class Arriendo_Facil_Plans {
 				'message'    => $message,
 				'target'     => $target,
 				'targetName' => $definitions[ $target ]['label'],
-				'url'        => self::url( array( 'af_target' => $target ) ) . ( 'locked' === $type ? '#af-plan-select' : '' ),
+				'url'        => self::url( array( 'af_target' => $target ) ),
 			),
 			$extra
 		);
@@ -626,6 +759,92 @@ class Arriendo_Facil_Plans {
 	}
 
 	/* ------------------------------------------------------------------
+	 * Endurecimiento: migración, REST/editor nativo y permisos
+	 * ------------------------------------------------------------------ */
+
+	/**
+	 * One-time grandfathering: managers that predate plans keep Profesional.
+	 * Any account without a plan afterwards is treated as Free (fail closed).
+	 */
+	public function maybe_migrate_legacy() {
+		if ( get_option( self::OPT_MIGRATED ) ) {
+			return;
+		}
+
+		foreach ( get_users( array( 'role' => Arriendo_Facil_Tenancy::PROPERTY_MANAGER_ROLE, 'fields' => 'ID' ) ) as $user_id ) {
+			if ( '' === self::normalize( (string) get_user_meta( (int) $user_id, self::META_PLAN, true ) ) ) {
+				update_user_meta( (int) $user_id, self::META_PLAN, 'pro' );
+			}
+		}
+
+		update_option( self::OPT_MIGRATED, 1, false );
+	}
+
+	/**
+	 * Locked properties cannot be edited or removed through native WP/REST routes.
+	 *
+	 * @param string[] $caps    Required primitive caps.
+	 * @param string   $cap     Requested capability.
+	 * @param int      $user_id User ID.
+	 * @param array    $args    Context (the post ID comes first).
+	 * @return string[]
+	 */
+	public function deny_locked_property_caps( $caps, $cap, $user_id, $args ) {
+		if ( ! in_array( $cap, array( 'edit_post', 'delete_post' ), true ) || empty( $args[0] ) ) {
+			return $caps;
+		}
+
+		$post_id = absint( $args[0] );
+		if ( 'accommodation' === get_post_type( $post_id ) && Arriendo_Facil_Tenancy::is_plan_locked( $post_id ) && self::applies_to( $user_id ) ) {
+			return array( 'do_not_allow' );
+		}
+
+		return $caps;
+	}
+
+	/**
+	 * Backstop: no route may create a property beyond the plan limit.
+	 *
+	 * @param bool  $maybe_empty Core's emptiness verdict.
+	 * @param array $postarr     Post data.
+	 * @return bool
+	 */
+	public function block_over_limit_insert( $maybe_empty, $postarr ) {
+		if ( $maybe_empty || ! is_array( $postarr ) || 'accommodation' !== ( isset( $postarr['post_type'] ) ? $postarr['post_type'] : '' ) ) {
+			return $maybe_empty;
+		}
+
+		if ( ! empty( $postarr['ID'] ) || 'auto-draft' === ( isset( $postarr['post_status'] ) ? $postarr['post_status'] : '' ) ) {
+			return $maybe_empty;
+		}
+
+		$author = isset( $postarr['post_author'] ) ? absint( $postarr['post_author'] ) : get_current_user_id();
+
+		if ( ! self::applies_to( $author ) ) {
+			return $maybe_empty;
+		}
+
+		// Sin bloqueo no se puede garantizar el tope: se rechaza.
+		return ! self::lock( $author ) || self::limit_gate( 'properties', $author ) ? true : $maybe_empty;
+	}
+
+	/**
+	 * Property managers register properties through the wizard only; REST
+	 * creation would skip the owner assignment the limits rely on.
+	 *
+	 * @param object          $prepared_post Prepared post.
+	 * @param WP_REST_Request $request       Request.
+	 * @return object|WP_Error
+	 */
+	public function block_rest_create( $prepared_post, $request ) {
+		if ( empty( $prepared_post->ID ) && self::applies_to() ) {
+			return new WP_Error( 'rest_forbidden', __( 'Registra inmuebles desde el asistente de Arriendo Fácil.', 'arriendo-facil' ), array( 'status' => 403 ) );
+		}
+
+		return $prepared_post;
+	}
+
+	/* ------------------------------------------------------------------
 	 * Inmuebles activos / bloqueados al bajar de plan
 	 * ------------------------------------------------------------------ */
 
@@ -654,136 +873,45 @@ class Arriendo_Facil_Plans {
 		);
 	}
 
-	/**
-	 * Keeps the number of active properties within the plan limit. Surplus
-	 * properties are locked (newest first), free slots unlock the oldest locked.
-	 *
-	 * @param int $user_id     User ID.
-	 * @param int $prefer_lock Property to lock first when there is a surplus.
-	 */
-	public static function apply_property_limit( $user_id, $prefer_lock = 0 ) {
+	public static function apply_property_limit( $user_id ) {
 		$user_id = absint( $user_id );
 		if ( ! $user_id || ! self::applies_to( $user_id ) ) {
 			return;
 		}
 
 		$limit  = self::limit( 'properties', $user_id );
-		$owned  = self::owned_ids( $user_id );
-		$locked = array_values(
-			array_filter(
-				$owned,
-				static function ( $id ) {
-					return Arriendo_Facil_Tenancy::is_plan_locked( $id );
-				}
-			)
-		);
-
-		if ( null === $limit || count( $owned ) <= $limit ) {
-			foreach ( $locked as $id ) {
-				delete_post_meta( $id, self::META_LOCKED );
-			}
-			delete_user_meta( $user_id, self::META_PENDING );
-			return;
-		}
-
-		$active   = array_values( array_diff( $owned, $locked ) );
-		$newly    = 0;
-		$surplus  = count( $active ) - $limit;
-
-		if ( $surplus > 0 ) {
-			rsort( $active );
-			if ( $prefer_lock && in_array( (int) $prefer_lock, $active, true ) ) {
-				$active = array_merge( array( (int) $prefer_lock ), array_diff( $active, array( (int) $prefer_lock ) ) );
-			}
-			foreach ( array_slice( $active, 0, $surplus ) as $id ) {
-				update_post_meta( $id, self::META_LOCKED, '1' );
-				++$newly;
-			}
-		} elseif ( $surplus < 0 ) {
-			sort( $locked );
-			foreach ( array_slice( $locked, 0, -$surplus ) as $id ) {
-				delete_post_meta( $id, self::META_LOCKED );
-			}
-		}
-
-		if ( $newly > 0 ) {
-			update_user_meta( $user_id, self::META_PENDING, 1 );
-		}
-	}
-
-	/**
-	 * Stores the properties the user chose to keep active.
-	 *
-	 * @param int   $user_id User ID.
-	 * @param int[] $ids     Chosen property IDs.
-	 * @return true|WP_Error
-	 */
-	public static function select_properties( $user_id, array $ids ) {
-		$user_id = absint( $user_id );
-		$limit   = self::limit( 'properties', $user_id );
-		$owned   = self::owned_ids( $user_id );
-		$ids     = array_values( array_unique( array_map( 'intval', $ids ) ) );
-
-		if ( null === $limit || count( $owned ) <= $limit ) {
-			self::apply_property_limit( $user_id );
-			return true;
-		}
-
-		if ( count( $ids ) !== $limit || array_diff( $ids, $owned ) ) {
-			return new WP_Error(
-				'af_plan_selection',
-				sprintf(
-					/* translators: %d: number of properties */
-					__( 'Elige exactamente %d inmuebles de los tuyos.', 'arriendo-facil' ),
-					$limit
-				)
-			);
-		}
+		$owned  = self::owned_ids( $user_id ); // Más antiguos primero.
+		$active = array_flip( null === $limit ? $owned : array_slice( $owned, 0, $limit ) );
 
 		foreach ( $owned as $id ) {
-			if ( in_array( $id, $ids, true ) ) {
-				delete_post_meta( $id, self::META_LOCKED );
-			} else {
+			$is_locked = Arriendo_Facil_Tenancy::is_plan_locked( $id );
+
+			if ( ! isset( $active[ $id ] ) && ! $is_locked ) {
 				update_post_meta( $id, self::META_LOCKED, '1' );
+				Arriendo_Facil_Property_Trash_Relations::detach( $id, Arriendo_Facil_Property_Trash_Relations::LOCK_SNAPSHOT, 'property_locked' );
+			} elseif ( isset( $active[ $id ] ) && $is_locked ) {
+				delete_post_meta( $id, self::META_LOCKED );
+				Arriendo_Facil_Property_Trash_Relations::reattach( $id, Arriendo_Facil_Property_Trash_Relations::LOCK_SNAPSHOT, 'property_unlocked' );
 			}
 		}
-		delete_user_meta( $user_id, self::META_PENDING );
-
-		return true;
 	}
 
-	/**
-	 * A property left the active set (trash): promote a locked one into the slot.
-	 *
-	 * @param int $post_id Post ID.
-	 */
 	public function on_property_trashed( $post_id ) {
-		$this->resync_owner_of( $post_id, 0 );
+		$this->resync_owner_of( $post_id );
 	}
 
-	/**
-	 * A restored property may exceed the limit: it is the one that gets locked.
-	 *
-	 * @param int $post_id Post ID.
-	 */
 	public function on_property_untrashed( $post_id ) {
-		$this->resync_owner_of( $post_id, (int) $post_id );
+		$this->resync_owner_of( $post_id );
 	}
 
-	/**
-	 * Re-applies the property limit to the owner of a property.
-	 *
-	 * @param int $post_id     Post ID.
-	 * @param int $prefer_lock Property to lock first.
-	 */
-	private function resync_owner_of( $post_id, $prefer_lock ) {
+	private function resync_owner_of( $post_id ) {
 		if ( 'accommodation' !== get_post_type( $post_id ) ) {
 			return;
 		}
 
 		$owner = (int) get_post_meta( $post_id, '_af_owner_id', true );
 		if ( $owner ) {
-			self::apply_property_limit( $owner, $prefer_lock );
+			self::apply_property_limit( $owner );
 		}
 	}
 
@@ -824,19 +952,27 @@ class Arriendo_Facil_Plans {
 			return;
 		}
 
-		if ( wp_doing_ajax() ) {
-			$action = isset( $_REQUEST['action'] ) ? sanitize_key( wp_unslash( $_REQUEST['action'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-			if ( isset( self::GATED_AJAX[ $action ] ) ) {
-				$gate = self::feature_gate( self::GATED_AJAX[ $action ] );
-				if ( $gate ) {
+		global $pagenow;
+
+		$action = isset( $_REQUEST['action'] ) ? sanitize_key( wp_unslash( $_REQUEST['action'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$route  = wp_doing_ajax() ? 'ajax' : ( 'admin-post.php' === $pagenow ? 'post' : '' );
+
+		if ( '' !== $route ) {
+			$feature = self::feature_for_action( $action );
+			$gate    = $feature ? self::feature_gate( $feature ) : null;
+			if ( $gate ) {
+				if ( 'ajax' === $route ) {
 					self::send_gate_error( $gate );
 				}
+				wp_safe_redirect( self::url( array( 'af_gate' => $feature ) ) );
+				exit;
 			}
 			return;
 		}
 
-		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		if ( '' === $page || 'GET' !== ( isset( $_SERVER['REQUEST_METHOD'] ) ? $_SERVER['REQUEST_METHOD'] : '' ) ) {
+		// Any method: a POST to a locked screen must not slip through.
+		$page = isset( $_REQUEST['page'] ) ? sanitize_key( wp_unslash( $_REQUEST['page'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if ( '' === $page ) {
 			return;
 		}
 
@@ -845,17 +981,44 @@ class Arriendo_Facil_Plans {
 			exit;
 		}
 
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		if ( Arriendo_Facil_Accommodation_Wizard::PAGE_SLUG === $page && ! empty( $_GET['id'] ) && Arriendo_Facil_Tenancy::is_plan_locked( absint( $_GET['id'] ) ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if ( Arriendo_Facil_Accommodation_Wizard::PAGE_SLUG !== $page ) {
+			return;
+		}
+
+		$property_id = isset( $_GET['id'] ) ? absint( $_GET['id'] ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if ( $property_id && Arriendo_Facil_Tenancy::is_plan_locked( $property_id ) ) {
 			wp_safe_redirect( Arriendo_Facil_Properties_Page::url( array( 'af_gate' => 'locked' ) ) );
 			exit;
 		}
 
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		if ( Arriendo_Facil_Accommodation_Wizard::PAGE_SLUG === $page && empty( $_GET['id'] ) && self::limit_gate( 'properties' ) ) {
+		if ( ! $property_id && self::limit_gate( 'properties' ) ) {
 			wp_safe_redirect( Arriendo_Facil_Properties_Page::url( array( 'af_gate' => 'properties' ) ) );
 			exit;
 		}
+	}
+
+	/**
+	 * Feature a request action belongs to (exact list first, then prefixes).
+	 *
+	 * @param string $action Action name.
+	 * @return string Empty when the action is not feature-gated.
+	 */
+	private static function feature_for_action( $action ) {
+		if ( '' === $action ) {
+			return '';
+		}
+
+		if ( isset( self::GATED_AJAX[ $action ] ) ) {
+			return self::GATED_AJAX[ $action ];
+		}
+
+		foreach ( self::GATED_PREFIXES as $prefix => $feature ) {
+			if ( 0 === strpos( $action, $prefix ) ) {
+				return $feature;
+			}
+		}
+
+		return '';
 	}
 
 	/**
@@ -907,7 +1070,7 @@ class Arriendo_Facil_Plans {
 		wp_enqueue_script(
 			'af-plans',
 			ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/af-plans.js',
-			wp_script_is( 'gsap', 'registered' ) ? array( 'jquery', 'gsap' ) : array( 'jquery' ),
+			wp_script_is( 'gsap', 'registered' ) ? array( 'jquery', 'heartbeat', 'gsap' ) : array( 'jquery', 'heartbeat' ),
 			file_exists( $js ) ? (string) filemtime( $js ) : ARRIENDO_FACIL_VERSION,
 			true
 		);
@@ -935,7 +1098,7 @@ class Arriendo_Facil_Plans {
 				'planUrl' => self::url(),
 				'gates'   => self::applies_to() ? self::locked_gates() : array(),
 				'boot'    => $gate,
-				'nudge'   => self::applies_to() && ! $this->is_plan_page() && 1 === (int) get_user_meta( get_current_user_id(), self::META_PENDING, true ),
+				'state'   => self::applies_to() ? Arriendo_Facil_Plan_Billing::client_state( get_current_user_id() ) : null,
 				'i18n'    => array(
 					'viewPlans'    => __( 'Ver planes', 'arriendo-facil' ),
 					'notNow'       => __( 'Ahora no', 'arriendo-facil' ),
@@ -944,19 +1107,17 @@ class Arriendo_Facil_Plans {
 					'networkError' => __( 'No se pudo completar la acción. Inténtalo de nuevo.', 'arriendo-facil' ),
 					'usage'        => __( '%1$d de %2$d', 'arriendo-facil' ),
 					'back'         => __( 'Volver', 'arriendo-facil' ),
-					'chooseProps'  => __( 'Elegir inmuebles', 'arriendo-facil' ),
-					'later'        => __( 'Más tarde', 'arriendo-facil' ),
-					'nudgeTitle'   => __( 'Elige tus inmuebles activos', 'arriendo-facil' ),
-					'nudgeText'    => __( 'Tu plan actual permite administrar menos inmuebles de los que tienes. Hemos dejado activos los más antiguos; elige cuáles quieres mantener. Los demás quedan guardados.', 'arriendo-facil' ),
-					'selectCount'  => __( '%1$d de %2$d seleccionados', 'arriendo-facil' ),
-					'saveSelection' => __( 'Guardar selección', 'arriendo-facil' ),
 					'requestTitle' => __( 'Solicitar plan %s', 'arriendo-facil' ),
 					'requestText'  => __( 'Te activaremos el plan %1$s ($%2$s al mes) cuando confirmemos el pago. Mientras tanto sigues con tu plan actual.', 'arriendo-facil' ),
 					'requestConfirm' => __( 'Solicitar plan', 'arriendo-facil' ),
-					'toFreeText'   => __( 'Volverás al plan Free de inmediato. Conservas tus datos; si tienes más inmuebles de los que permite Free, elegirás cuáles seguir administrando y el resto queda guardado.', 'arriendo-facil' ),
+					'toFreeText'   => __( 'Volverás al plan Free de inmediato. Conservas todos tus datos: se administran tus 4 primeros inmuebles y el resto queda oculto, sin borrarse, hasta que renueves o contrates un plan con capacidad suficiente.', 'arriendo-facil' ),
 					'toFreeConfirm' => __( 'Cambiar a Free', 'arriendo-facil' ),
 					'cancelTitle'  => __( '¿Cancelar tu plan %s?', 'arriendo-facil' ),
-					'cancelText'   => __( 'Volverás al plan Free de inmediato. Conservas todos tus datos: si tienes más inmuebles de los que permite Free, elegirás cuáles seguir administrando y el resto queda guardado, sin borrarse. Se reactivan si vuelves a mejorar tu plan.', 'arriendo-facil' ),
+					'cancelText'   => __( 'Volverás al plan Free de inmediato. Conservas todos tus datos: se administran tus 4 primeros inmuebles y el resto queda oculto, sin borrarse. Se reactivan al contratar de nuevo un plan con capacidad suficiente.', 'arriendo-facil' ),
+					'understood'   => __( 'Entendido', 'arriendo-facil' ),
+					'later'        => __( 'Más tarde', 'arriendo-facil' ),
+					'sendProof'    => __( 'Enviar comprobante', 'arriendo-facil' ),
+					'planChanged'  => __( 'Actualizar', 'arriendo-facil' ),
 					'cancelConfirm' => __( 'Sí, cancelar plan', 'arriendo-facil' ),
 					'keepPlan'     => __( 'Mantener plan', 'arriendo-facil' ),
 				),
@@ -992,13 +1153,14 @@ class Arriendo_Facil_Plans {
 		<?php
 	}
 
-	/**
-	 * Usage rows (label, used, limit, percent) of the user's plan.
-	 *
-	 * @param int $user_id User ID.
-	 * @return array<int,array<string,mixed>>
-	 */
 	private static function usage_rows( $user_id ) {
+		// Solo para mostrar (menú, perfil): una copia de 45 s evita 4 consultas por página.
+		$cache_key = 'af_plan_ur_' . absint( $user_id ) . '_' . self::get_plan( $user_id );
+		$cached    = get_transient( $cache_key );
+		if ( is_array( $cached ) ) {
+			return $cached;
+		}
+
 		$rows   = array();
 		$labels = self::limit_labels();
 
@@ -1016,22 +1178,21 @@ class Arriendo_Facil_Plans {
 			);
 		}
 
+		set_transient( $cache_key, $rows, 45 );
+
 		return $rows;
 	}
 
-	/**
-	 * Small plan pill next to the user name in the topbar.
-	 *
-	 * @return string HTML (empty when plans do not apply to the user).
-	 */
 	public static function topbar_pill() {
 		if ( ! self::applies_to() ) {
 			return '';
 		}
 
-		$plan = self::get_plan();
+		$plan  = self::get_plan();
+		$state = Arriendo_Facil_Plan_Billing::snapshot( get_current_user_id() )['state'];
+		$alert = in_array( $state, array( 'soon', 'due' ), true );
 
-		return '<span class="af-plan-pill af-plan-pill--' . esc_attr( $plan ) . '">'
+		return '<span class="af-plan-pill af-plan-pill--' . esc_attr( $plan ) . ( $alert ? ' has-alert' : '' ) . '">'
 			. ( 'pro' === $plan ? af_lucide( 'crown', 12 ) : '' )
 			. esc_html( self::get_definition()['label'] )
 			. '</span>';
@@ -1049,14 +1210,24 @@ class Arriendo_Facil_Plans {
 		$plan       = self::get_plan( $user_id );
 		$definition = self::get_definition( $user_id );
 		$rows       = self::usage_rows( $user_id );
-		$pending    = 1 === (int) get_user_meta( $user_id, self::META_PENDING, true );
+		$snap       = Arriendo_Facil_Plan_Billing::snapshot( $user_id );
 		?>
 		<a class="af-plan-mini af-plan-mini--<?php echo esc_attr( $plan ); ?>" href="<?php echo esc_url( self::url() ); ?>" role="menuitem">
 			<span class="af-plan-mini__head">
 				<span class="af-plan-mini__icon" aria-hidden="true"><?php echo af_lucide( 'crown', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
 				<span class="af-plan-mini__title">
 					<strong><?php echo esc_html( sprintf( /* translators: %s: plan name */ __( 'Plan %s', 'arriendo-facil' ), $definition['label'] ) ); ?></strong>
-					<small><?php echo $pending ? esc_html__( 'Elige tus inmuebles activos', 'arriendo-facil' ) : ( 'pro' === $plan ? esc_html__( 'Tienes todo incluido', 'arriendo-facil' ) : esc_html__( 'Mejorar plan', 'arriendo-facil' ) ); ?></small>
+					<small>
+						<?php
+						if ( $snap['expires'] ) {
+							echo esc_html( sprintf( /* translators: %s: phrase like "en 12 días" */ __( 'Se renueva %s', 'arriendo-facil' ), Arriendo_Facil_Plan_Billing::days_phrase( $snap['days'] ) ) );
+						} elseif ( 'pro' === $plan ) {
+							esc_html_e( 'Tienes todo incluido', 'arriendo-facil' );
+						} else {
+							esc_html_e( 'Mejorar plan', 'arriendo-facil' );
+						}
+						?>
+					</small>
 				</span>
 				<span class="af-plan-mini__arrow" aria-hidden="true"><?php echo af_lucide( 'arrow-right', 14 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
 			</span>
@@ -1086,7 +1257,7 @@ class Arriendo_Facil_Plans {
 		$definition = self::get_definition( $user_id );
 		$rows       = self::usage_rows( $user_id );
 		$request    = self::get_request( $user_id );
-		$pending    = 1 === (int) get_user_meta( $user_id, self::META_PENDING, true );
+		$snap       = Arriendo_Facil_Plan_Billing::snapshot( $user_id );
 		$locked     = count( array_filter( self::owned_ids( $user_id ), array( 'Arriendo_Facil_Tenancy', 'is_plan_locked' ) ) );
 		$defs       = self::definitions();
 		?>
@@ -1096,9 +1267,14 @@ class Arriendo_Facil_Plans {
 				<div>
 					<p class="af-plan-summary__eyebrow"><?php esc_html_e( 'Tu plan', 'arriendo-facil' ); ?></p>
 					<h2><?php echo esc_html( $definition['label'] ); ?> <small>$<?php echo esc_html( number_format_i18n( (float) $definition['price'], 0 ) ); ?> <?php esc_html_e( '/ mes', 'arriendo-facil' ); ?></small></h2>
+					<?php if ( $snap['expires'] && 'ok' === $snap['state'] && ! $request ) : ?>
+						<p class="af-plan-summary__meta"><?php echo esc_html( sprintf( /* translators: 1: date, 2: phrase */ __( 'Se renueva el %1$s (%2$s)', 'arriendo-facil' ), Arriendo_Facil_Plan_Billing::format_date( $snap['expires'] ), Arriendo_Facil_Plan_Billing::days_phrase( $snap['days'] ) ) ); ?></p>
+					<?php endif; ?>
 					<?php if ( $request ) : ?>
 						<p class="af-plan-summary__note"><?php echo esc_html( sprintf( /* translators: %s: plan */ __( 'Solicitud pendiente: plan %s', 'arriendo-facil' ), $defs[ $request['plan'] ]['label'] ) ); ?></p>
-					<?php elseif ( $pending || $locked > 0 ) : ?>
+					<?php elseif ( 'due' === $snap['state'] || 'soon' === $snap['state'] ) : ?>
+						<p class="af-plan-summary__note"><?php echo esc_html( sprintf( /* translators: 1: date, 2: phrase */ __( 'Vence el %1$s (%2$s)', 'arriendo-facil' ), Arriendo_Facil_Plan_Billing::format_date( $snap['expires'] ), Arriendo_Facil_Plan_Billing::days_phrase( $snap['days'] ) ) ); ?></p>
+					<?php elseif ( $locked > 0 ) : ?>
 						<p class="af-plan-summary__note"><?php echo esc_html( sprintf( /* translators: %d: number of locked properties */ _n( '%d inmueble guardado sin administrar', '%d inmuebles guardados sin administrar', $locked, 'arriendo-facil' ), $locked ) ); ?></p>
 					<?php endif; ?>
 				</div>
@@ -1140,9 +1316,9 @@ class Arriendo_Facil_Plans {
 		}
 		$target = isset( $_GET['af_target'] ) ? self::normalize( wp_unslash( $_GET['af_target'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 
-		$owned_ids      = $managed ? self::owned_ids( $user_id ) : array();
-		$prop_limit     = self::limit( 'properties', $user_id );
-		$needs_selection = $managed && null !== $prop_limit && count( $owned_ids ) > $prop_limit;
+		$billing    = Arriendo_Facil_Plan_Billing::snapshot( $user_id );
+		$owned_ids  = $managed ? self::owned_ids( $user_id ) : array();
+		$locked_cnt = count( array_filter( $owned_ids, array( 'Arriendo_Facil_Tenancy', 'is_plan_locked' ) ) );
 
 		include ARRIENDO_FACIL_PLUGIN_DIR . 'admin/views/plan.php';
 	}
@@ -1179,8 +1355,13 @@ class Arriendo_Facil_Plans {
 
 		// Volver a Free no necesita aprobación: es cancelar.
 		if ( 'free' === $plan ) {
-			self::set_plan( $user_id, 'free' );
+			self::set_plan( $user_id, 'free', array( 'reason' => 'cancel' ) );
 			wp_send_json_success( array( 'message' => __( 'Tu plan se canceló. Ahora estás en Free.', 'arriendo-facil' ) ) );
+		}
+
+		$previous = self::get_request( $user_id );
+		if ( $previous && $previous['plan'] === $plan && time() - $previous['at'] < 10 * MINUTE_IN_SECONDS ) {
+			wp_send_json_success( array( 'message' => __( 'Ya recibimos tu solicitud. Te activaremos el plan en breve.', 'arriendo-facil' ) ) );
 		}
 
 		update_user_meta( $user_id, self::META_REQUEST, array( 'plan' => $plan, 'at' => time() ) );
@@ -1240,23 +1421,8 @@ class Arriendo_Facil_Plans {
 			wp_send_json_error( array( 'message' => __( 'Ya estás en el plan Free.', 'arriendo-facil' ) ), 400 );
 		}
 
-		self::set_plan( $user_id, 'free' );
-		wp_send_json_success( array( 'message' => __( 'Tu plan se canceló. Ahora estás en Free; tus datos se conservan y puedes elegir tus inmuebles activos.', 'arriendo-facil' ) ) );
-	}
-
-	/**
-	 * Manager chooses which properties stay active under the plan limit.
-	 */
-	public function ajax_select_properties() {
-		$user_id = $this->authorize_manager();
-		$ids     = isset( $_POST['ids'] ) ? array_map( 'absint', (array) wp_unslash( $_POST['ids'] ) ) : array();
-
-		$result = self::select_properties( $user_id, $ids );
-		if ( is_wp_error( $result ) ) {
-			wp_send_json_error( array( 'message' => $result->get_error_message() ), 400 );
-		}
-
-		wp_send_json_success( array( 'message' => __( 'Listo: tus inmuebles activos quedaron actualizados.', 'arriendo-facil' ) ) );
+		self::set_plan( $user_id, 'free', array( 'reason' => 'cancel' ) );
+		wp_send_json_success( array( 'message' => __( 'Tu plan se canceló. Ahora estás en Free; tus datos se conservan y los inmuebles que superan el límite quedan ocultos, sin borrarse.', 'arriendo-facil' ) ) );
 	}
 
 	/**

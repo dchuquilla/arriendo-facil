@@ -243,6 +243,14 @@ $totals_platform = array(
 		<div id="af-property-admin-credentials" style="display:none; margin-top:12px; padding:12px; border-radius:8px; background:#f0f6fc; border:1px solid #c3d4e0;"></div>
 	</div>
 
+	<div class="af-plan-wa">
+		<strong><?php esc_html_e( 'WhatsApp para comprobantes de pago', 'arriendo-facil' ); ?></strong>
+		<?php $wa_masked = Arriendo_Facil_Plan_Billing::whatsapp_masked(); ?>
+		<input type="tel" id="af-plan-wa-input" inputmode="tel" autocomplete="off" placeholder="<?php echo esc_attr( '' !== $wa_masked ? $wa_masked : '+593…' ); ?>" aria-label="<?php esc_attr_e( 'Número de WhatsApp con código de país', 'arriendo-facil' ); ?>" />
+		<button type="button" class="button af-btn af-btn--ghost" data-af-plan-save-wa><?php esc_html_e( 'Guardar número', 'arriendo-facil' ); ?></button>
+		<span style="color:#647579;"><?php esc_html_e( 'Nunca se muestra a los gestores: solo se usa al abrir WhatsApp desde "Mi plan".', 'arriendo-facil' ); ?></span>
+	</div>
+
 	<div class="af-section">
 		<header class="af-section__header">
 			<div>
@@ -297,16 +305,28 @@ $totals_platform = array(
 								$<?php echo esc_html( number_format_i18n( $row['pending_period'], 2 ) ); ?>
 							</td>
 							<td data-label="<?php esc_attr_e( 'Plan', 'arriendo-facil' ); ?>">
-								<?php $row_plan = Arriendo_Facil_Plans::get_plan( (int) $admin_user->ID ); ?>
-								<select class="af-plan-select" data-user-id="<?php echo esc_attr( (string) $admin_user->ID ); ?>" aria-label="<?php esc_attr_e( 'Plan del gestor', 'arriendo-facil' ); ?>">
-									<?php foreach ( Arriendo_Facil_Plans::definitions() as $plan_key => $plan_def ) : ?>
-										<option value="<?php echo esc_attr( $plan_key ); ?>" <?php selected( $row_plan, $plan_key ); ?>><?php echo esc_html( $plan_def['label'] ); ?></option>
-									<?php endforeach; ?>
-								</select>
-								<?php $row_request = Arriendo_Facil_Plans::get_request( (int) $admin_user->ID ); ?>
-								<?php if ( $row_request ) : ?>
-									<span class="af-plan-badge-request"><?php echo esc_html( sprintf( /* translators: %s: plan */ __( 'Solicita: %s', 'arriendo-facil' ), Arriendo_Facil_Plans::definitions()[ $row_request['plan'] ]['label'] ) ); ?></span>
-								<?php endif; ?>
+								<?php
+								$row_uid     = (int) $admin_user->ID;
+								$row_plan    = Arriendo_Facil_Plans::get_plan( $row_uid );
+								$row_billing = Arriendo_Facil_Plan_Billing::admin_row( $row_uid );
+								$row_request = Arriendo_Facil_Plans::get_request( $row_uid );
+								?>
+								<div class="af-plan-cell">
+									<select class="af-plan-select" data-user-id="<?php echo esc_attr( (string) $row_uid ); ?>" aria-label="<?php esc_attr_e( 'Plan del gestor', 'arriendo-facil' ); ?>">
+										<?php foreach ( Arriendo_Facil_Plans::definitions() as $plan_key => $plan_def ) : ?>
+											<option value="<?php echo esc_attr( $plan_key ); ?>" <?php selected( $row_plan, $plan_key ); ?>><?php echo esc_html( $plan_def['label'] ); ?></option>
+										<?php endforeach; ?>
+									</select>
+									<?php if ( '' !== $row_billing['label'] ) : ?>
+										<span class="af-plan-due<?php echo '' !== $row_billing['tone'] ? ' is-' . esc_attr( $row_billing['tone'] ) : ''; ?>"><?php echo esc_html( $row_billing['label'] ); ?></span>
+									<?php endif; ?>
+									<?php if ( $row_billing['can_renew'] ) : ?>
+										<button type="button" class="af-plan-renew" data-user-id="<?php echo esc_attr( (string) $row_uid ); ?>" data-expires="<?php echo esc_attr( (string) $row_billing['expires'] ); ?>"><?php echo esc_html( isset( $row_billing['cta'] ) ? $row_billing['cta'] : __( 'Renovar 1 mes', 'arriendo-facil' ) ); ?></button>
+									<?php endif; ?>
+									<?php if ( $row_request ) : ?>
+										<span class="af-plan-badge-request"><?php echo esc_html( sprintf( /* translators: %s: plan */ __( 'Solicita: %s', 'arriendo-facil' ), Arriendo_Facil_Plans::definitions()[ $row_request['plan'] ]['label'] ) ); ?></span>
+									<?php endif; ?>
+								</div>
 							</td>
 							<td data-label="<?php esc_attr_e( 'Licencia', 'arriendo-facil' ); ?>">
 								<span class="af-pill <?php echo $is_active ? 'af-pill--success' : 'af-pill--danger'; ?>">

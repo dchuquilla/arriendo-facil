@@ -244,6 +244,22 @@ class Arriendo_Facil_Guest_Onboarding_Controller {
 		}
 
 		// Validación del nombre completo: solo letras, mínimo dos palabras, sin insultos.
+		// Plan del administrador del inmueble: el visitante no puede superar sus límites.
+		$plan_owner = (int) get_post_meta( $accommodation_id, '_af_owner_id', true );
+		if ( $plan_owner && Arriendo_Facil_Plans::applies_to( $plan_owner ) ) {
+			$unavailable = array( 'message' => __( 'Este inmueble no puede recibir más solicitudes por ahora. Comunícate con el administrador.', 'arriendo-facil' ) );
+
+			if ( ! Arriendo_Facil_Plans::lock( $plan_owner ) ) {
+				Arriendo_Facil_Plans::send_busy_error();
+			}
+			if ( Arriendo_Facil_Tenancy::is_plan_locked( $accommodation_id )
+				|| Arriendo_Facil_Plans::limit_gate( 'leases', $plan_owner )
+				|| ( empty( $guest->accommodation_id ) && Arriendo_Facil_Plans::limit_gate( 'guests', $plan_owner ) )
+			) {
+				wp_send_json_error( $unavailable, 409 );
+			}
+		}
+
 		$name_trimmed = trim( (string) $name_input );
 		if ( '' === $name_trimmed ) {
 			wp_send_json_error( array( 'message' => __( 'El nombre completo es obligatorio.', 'arriendo-facil' ) ), 400 );

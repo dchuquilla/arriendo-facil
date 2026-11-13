@@ -425,9 +425,13 @@ class Arriendo_Facil_Accommodation_Wizard {
 			exit;
 		}
 
-		if ( ! $post_id && Arriendo_Facil_Plans::applies_to() && Arriendo_Facil_Plans::limit_gate( 'properties' ) ) {
-			wp_safe_redirect( Arriendo_Facil_Properties_Page::url( array( 'af_gate' => 'properties' ) ) );
-			exit;
+		if ( ! $post_id && Arriendo_Facil_Plans::applies_to() ) {
+			// El bloqueo se mantiene hasta que termina la petición: la revisión y el alta quedan en serie.
+			$locked_ok = Arriendo_Facil_Plans::lock( get_current_user_id() );
+			if ( ! $locked_ok || Arriendo_Facil_Plans::limit_gate( 'properties' ) ) {
+				wp_safe_redirect( Arriendo_Facil_Properties_Page::url( array( 'af_gate' => 'properties' ) ) );
+				exit;
+			}
 		}
 
 		$title = isset( $_POST['post_title'] ) ? sanitize_text_field( wp_unslash( $_POST['post_title'] ) ) : '';

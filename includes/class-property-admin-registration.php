@@ -562,7 +562,7 @@ class Arriendo_Facil_Property_Admin_Registration {
 
 		update_user_meta( $user_id, 'af_signup_source', 'self' );
 		update_user_meta( $user_id, 'af_license_status', 'active' );
-		Arriendo_Facil_Plans::set_plan( $user_id, 'free' );
+		Arriendo_Facil_Plans::set_plan( $user_id, 'free', array( 'reason' => 'signup' ) );
 		update_user_meta( $user_id, 'af_admin_doc_status', 'pendiente' );
 		update_user_meta( $user_id, 'af_admin_doc_verified_by', 0 );
 		update_user_meta( $user_id, 'af_admin_identity_match_status', 'not_checked' );

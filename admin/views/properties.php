@@ -215,7 +215,7 @@ $show_new    = ! $is_filtered && 1 === $paged;
 						<?php if ( $link ) : ?>
 							<a class="button af-btn af-btn--ghost af-btn--sm" href="<?php echo esc_url( $link ); ?>"><?php esc_html_e( 'Editar', 'arriendo-facil' ); ?></a>
 						<?php elseif ( $is_locked ) : ?>
-							<a class="button af-btn af-btn--ghost af-btn--sm" href="<?php echo esc_url( Arriendo_Facil_Plans::url() . '#af-plan-select' ); ?>"><?php esc_html_e( 'Activar', 'arriendo-facil' ); ?></a>
+							<a class="button af-btn af-btn--ghost af-btn--sm" href="<?php echo esc_url( Arriendo_Facil_Plans::url() ); ?>"><?php esc_html_e( 'Reactivar', 'arriendo-facil' ); ?></a>
 						<?php elseif ( $can_delete ) : ?>
 							<button type="button" class="button af-btn af-btn--ghost af-btn--sm" data-af-prop-action="restore" data-id="<?php echo esc_attr( $pid ); ?>"><?php esc_html_e( 'Restaurar', 'arriendo-facil' ); ?></button>
 							<button type="button" class="button af-btn af-btn--ghost af-btn--sm af-pc__danger" data-af-prop-action="delete" data-id="<?php echo esc_attr( $pid ); ?>" data-name="<?php echo esc_attr( $title ); ?>"><?php esc_html_e( 'Eliminar', 'arriendo-facil' ); ?></button>

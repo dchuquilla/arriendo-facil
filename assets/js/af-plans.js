@@ -81,7 +81,7 @@
 		if (!modal || modal.hidden) { return; }
 		modal.classList.remove('is-open');
 		onConfirm = null;
-		setTimeout(function () { modal.hidden = true; }, 180);
+		setTimeout(function () { modal.hidden = true; if (queue.length) { showNext(); } }, 180);
 		if (lastFocus && lastFocus.focus) { try { lastFocus.focus(); } catch (e) { /* element gone */ } }
 	}
 
@@ -98,6 +98,7 @@
 		modal.querySelector('#af-plan-modal-title').textContent = o.title || '';
 		modal.querySelector('#af-plan-modal-text').textContent = o.text || '';
 		secondary.textContent = o.secondaryLabel || i18n.notNow;
+		secondary.hidden = !!o.hideSecondary;
 		primary.textContent = o.primaryLabel || i18n.viewPlans;
 		primary.disabled = false;
 
@@ -114,6 +115,9 @@
 		primary.onclick = function () {
 			if (onConfirm) {
 				onConfirm(primary);
+			} else if (o.primaryHref && o.newTab) {
+				window.open(o.primaryHref, '_blank', 'noopener,noreferrer');
+				closeModal();
 			} else if (o.primaryHref) {
 				window.location.href = o.primaryHref;
 			}
@@ -132,7 +136,7 @@
 			title: gate.title,
 			text: gate.message,
 			meter: gate.type === 'limit' ? { used: gate.used, limit: gate.limit } : null,
-			primaryLabel: gate.type === 'locked' ? i18n.chooseProps : i18n.viewPlans,
+			primaryLabel: i18n.viewPlans,
 			primaryHref: gate.url || cfg.planUrl
 		});
 	}
@@ -162,36 +166,88 @@
 		}).observe(panel, { attributes: true, attributeFilter: ['hidden'] });
 	}
 
-	/* ---------- Selección de inmuebles activos ---------- */
+	function animateRings() {
+		Array.prototype.forEach.call(document.querySelectorAll('[data-af-ring]'), function (ring) {
+			var pct = parseFloat(ring.getAttribute('data-af-ring')) || 0;
+			if (!gsap || reduced) { ring.style.setProperty('--p', pct); return; }
+			var state = { p: 0 };
+			gsap.to(state, {
+				p: pct, duration: 1.1, ease: 'power3.out', delay: 0.15,
+				onUpdate: function () { ring.style.setProperty('--p', state.p.toFixed(1)); }
+			});
+		});
+	}
 
-	function initSelection() {
-		var section = document.getElementById('af-plan-select');
-		if (!section) { return; }
+	/* ---------- Estado del plan: avisos de cambio y de renovación ---------- */
 
-		var limit = parseInt(section.getAttribute('data-limit'), 10) || 0;
-		var boxes = Array.prototype.slice.call(section.querySelectorAll('input[type="checkbox"]'));
-		var counter = section.querySelector('[data-af-select-count]');
-		var save = section.querySelector('[data-af-plan-save-selection]');
+	var queue = [];
 
-		function chosen() { return boxes.filter(function (b) { return b.checked; }); }
+	function showNext() {
+		var next = queue.shift();
+		if (next) { next(); }
+	}
 
-		function refresh() {
-			var count = chosen().length;
-			counter.textContent = String(i18n.selectCount || '%1$d / %2$d').replace('%1$d', count).replace('%2$d', limit);
-			counter.classList.toggle('is-ready', count === limit);
-			save.disabled = count !== limit;
-			boxes.forEach(function (b) {
-				// Con el cupo lleno solo se pueden desmarcar.
-				b.disabled = !b.checked && count >= limit;
-				b.closest('.af-plan-select__item').classList.toggle('is-on', b.checked);
+	function planNotice(notice, fromHeartbeat) {
+		if (!notice) { return; }
+		queue.push(function () {
+			openModal({
+				tone: notice.tone === 'danger' ? 'danger' : 'confirm',
+				title: notice.title,
+				text: notice.text,
+				primaryLabel: fromHeartbeat ? i18n.planChanged : i18n.understood,
+				secondaryLabel: fromHeartbeat ? i18n.later : null,
+				onConfirm: function () { window.location.reload(); }
+			});
+		});
+		if (modal && modal.hidden) { showNext(); }
+	}
+
+	function initPlanState() {
+		var state = cfg.state;
+		if (!state) { return; }
+
+		if (state.notice) {
+			// Se muestra tal cual y se queda en la página: ya cargó con el plan nuevo.
+			queue.push(function () {
+				openModal({
+					tone: state.notice.tone === 'danger' ? 'danger' : 'confirm',
+					title: state.notice.title,
+					text: state.notice.text,
+					primaryLabel: i18n.understood,
+					hideSecondary: true,
+					onConfirm: closeModal
+				});
 			});
 		}
 
-		boxes.forEach(function (b) { b.addEventListener('change', refresh); });
-		save.addEventListener('click', function () {
-			act('af_plan_select_properties', { ids: chosen().map(function (b) { return b.value; }) }, save);
+		if (state.renewal) {
+			queue.push(function () {
+				openModal({
+					tone: 'gate',
+					title: state.renewal.title,
+					text: state.renewal.text,
+					primaryLabel: i18n.sendProof,
+					primaryHref: state.renewal.url,
+					newTab: true,
+					secondaryLabel: i18n.later
+				});
+			});
+		}
+
+		if (!cfg.boot) { setTimeout(showNext, 600); }
+	}
+
+	// Cambios hechos mientras el usuario trabaja: Heartbeat (sin consultas extra si no hay cambios).
+	if (window.jQuery) {
+		window.jQuery(document).on('heartbeat-send', function (_e, data) {
+			if (cfg.state) { data.af_plan_rev = cfg.state.rev; }
 		});
-		refresh();
+		window.jQuery(document).on('heartbeat-tick', function (_e, data) {
+			if (data && data.af_plan) {
+				if (cfg.state) { cfg.state.rev = data.af_plan.rev; }
+				planNotice(data.af_plan.notice, true);
+			}
+		});
 	}
 
 	/* ---------- Peticiones ---------- */
@@ -348,32 +404,46 @@
 	window.afPlans = cfg;
 
 	showPending();
-	initSelection();
 	animateFills(document);
+	animateRings();
 	watchUserMenu();
+	initPlanState();
 
-	if (cfg.boot) {
-		openGate(cfg.boot);
-	} else if (cfg.nudge) {
-		var seen = false;
-		try { seen = sessionStorage.getItem('afPlanNudge') === '1'; } catch (e) { /* ignore */ }
-		if (!seen) {
-			try { sessionStorage.setItem('afPlanNudge', '1'); } catch (e) { /* ignore */ }
-			setTimeout(function () {
-				openModal({
-					tone: 'confirm',
-					title: i18n.nudgeTitle,
-					text: i18n.nudgeText,
-					primaryLabel: i18n.chooseProps,
-					primaryHref: (cfg.planUrl || '') + '#af-plan-select',
-					secondaryLabel: i18n.later
-				});
-			}, 700);
-		}
-	}
+	if (cfg.boot) { openGate(cfg.boot); }
 
 	var targetCard = document.querySelector('.af-plan-card.is-target');
 	if (targetCard && targetCard.scrollIntoView) {
 		targetCard.scrollIntoView({ block: 'center', behavior: 'smooth' });
 	}
+
+	/* ---------- Panel maestro: renovar y número de WhatsApp ---------- */
+
+	document.addEventListener('click', function (event) {
+		var renew = event.target.closest && event.target.closest('.af-plan-renew');
+		if (renew) {
+			renew.disabled = true;
+			post('af_plan_renew', { user_id: renew.getAttribute('data-user-id'), expires: renew.getAttribute('data-expires') || '0' }).then(function (res) {
+				flashOnNextLoad('success', res.message);
+				window.location.reload();
+			}).catch(function (err) {
+				renew.disabled = false;
+				toast('error', err && err.message ? err.message : i18n.networkError);
+			});
+			return;
+		}
+
+		var save = event.target.closest && event.target.closest('[data-af-plan-save-wa]');
+		if (save) {
+			var input = document.getElementById('af-plan-wa-input');
+			save.disabled = true;
+			post('af_plan_save_whatsapp', { number: input ? input.value : '' }).then(function (res) {
+				save.disabled = false;
+				if (input) { input.value = ''; input.placeholder = res.masked; }
+				toast('success', res.message);
+			}).catch(function (err) {
+				save.disabled = false;
+				toast('error', err && err.message ? err.message : i18n.networkError);
+			});
+		}
+	});
 }());

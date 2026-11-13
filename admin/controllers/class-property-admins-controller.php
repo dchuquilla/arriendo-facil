@@ -76,7 +76,7 @@ class Arriendo_Facil_Property_Admins_Controller {
 		update_user_meta( $user_id, 'af_contact_name', $contact_name );
 		update_user_meta( $user_id, 'af_contact_phone', $phone );
 		update_user_meta( $user_id, 'af_license_status', 'active' );
-		Arriendo_Facil_Plans::set_plan( $user_id, isset( $_POST['plan'] ) ? wp_unslash( $_POST['plan'] ) : 'free' ) || Arriendo_Facil_Plans::set_plan( $user_id, 'free' );
+		Arriendo_Facil_Plans::set_plan( $user_id, isset( $_POST['plan'] ) ? wp_unslash( $_POST['plan'] ) : 'free', array( 'reason' => 'signup' ) ) || Arriendo_Facil_Plans::set_plan( $user_id, 'free', array( 'reason' => 'signup' ) );
 		update_user_meta( $user_id, 'af_signup_source', 'manual' );
 		update_user_meta( $user_id, 'af_admin_email_verified', 1 );
 		update_user_meta( $user_id, 'af_admin_doc_status', 'manual' );

@@ -285,6 +285,9 @@ class Arriendo_Facil_Lease {
 		}
 
 		if ( Arriendo_Facil_Plans::applies_to() ) {
+			if ( ! Arriendo_Facil_Plans::lock( get_current_user_id() ) ) {
+				Arriendo_Facil_Plans::send_busy_error();
+			}
 			$plan_gate = Arriendo_Facil_Plans::limit_gate( 'leases' );
 			if ( $plan_gate ) {
 				Arriendo_Facil_Plans::send_gate_error( $plan_gate );

@@ -11,6 +11,9 @@
  * @var bool   $managed     Whether plan rules apply to this user.
  * @var array  $usage       Usage per resource: used / limit.
  * @var string $target      Plan highlighted by an upgrade prompt.
+ * @var array  $billing     Billing snapshot (Arriendo_Facil_Plan_Billing::snapshot()).
+ * @var int[]  $owned_ids   The manager's properties (oldest first).
+ * @var int    $locked_cnt  Properties hidden by the plan limit.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -100,53 +103,68 @@ $plan_lines = static function ( array $definition ) use ( $feature_lbls ) {
 		</section>
 	<?php endif; ?>
 
-	<?php if ( $needs_selection ) : ?>
-		<section class="af-plan-select" id="af-plan-select" data-limit="<?php echo esc_attr( (string) $prop_limit ); ?>">
-			<header class="af-plan-select__head">
-				<div>
-					<h2><?php esc_html_e( 'Elige tus inmuebles activos', 'arriendo-facil' ); ?></h2>
+	<?php if ( $managed && ( $billing['expires'] || ( ! $billing['paid'] && $billing['prev'] ) ) ) : ?>
+		<?php
+		$is_lapsed = ! $billing['paid'];
+		$ring      = $is_lapsed ? 0 : max( 0, min( 100, (int) round( $billing['days'] / 31 * 100 ) ) );
+		$wa_url    = Arriendo_Facil_Plan_Billing::whatsapp_url();
+		$ref_label = $is_lapsed && isset( $definitions[ $billing['prev'] ] ) ? $definitions[ $billing['prev'] ]['label'] : $current_def['label'];
+		?>
+		<section class="af-plan-renewal is-<?php echo esc_attr( $is_lapsed ? 'lapsed' : $billing['state'] ); ?>" aria-label="<?php esc_attr_e( 'Renovación', 'arriendo-facil' ); ?>">
+			<div class="af-plan-renewal__ring" style="--p:<?php echo esc_attr( (string) $ring ); ?>" data-af-ring="<?php echo esc_attr( (string) $ring ); ?>">
+				<span>
+					<?php if ( $is_lapsed ) : ?>
+						<?php echo af_lucide( 'lock', 22 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
+					<?php else : ?>
+						<b><?php echo esc_html( (string) max( 0, $billing['days'] ) ); ?></b>
+						<small><?php echo esc_html( _n( 'día', 'días', max( 0, $billing['days'] ), 'arriendo-facil' ) ); ?></small>
+					<?php endif; ?>
+				</span>
+			</div>
+			<div class="af-plan-renewal__body">
+				<?php if ( $is_lapsed ) : ?>
+					<h2><?php echo esc_html( sprintf( /* translators: %s: plan */ __( 'Tu plan %s venció', 'arriendo-facil' ), $ref_label ) ); ?></h2>
 					<p>
 						<?php
 						echo esc_html(
-							sprintf(
-								/* translators: 1: plan, 2: limit, 3: total */
-								__( 'Tu plan %1$s permite administrar %2$d de tus %3$d inmuebles. Los demás quedan guardados, con todos sus datos, y vuelven a activarse si cambias de plan.', 'arriendo-facil' ),
-								$current_def['label'],
-								$prop_limit,
-								count( $owned_ids )
-							)
+							$locked_cnt > 0
+								? sprintf( /* translators: %d: count */ _n( 'Tienes %d inmueble oculto por el límite del plan Free; se reactiva al renovar.', 'Tienes %d inmuebles ocultos por el límite del plan Free; se reactivan al renovar.', $locked_cnt, 'arriendo-facil' ), $locked_cnt )
+								: __( 'Renueva para recuperar las funciones de tu plan.', 'arriendo-facil' )
 						);
 						?>
 					</p>
-				</div>
-				<span class="af-plan-select__count" data-af-select-count aria-live="polite"></span>
-			</header>
-
-			<div class="af-plan-select__grid">
-				<?php foreach ( $owned_ids as $owned_id ) : ?>
-					<?php
-					$owned_thumb = get_the_post_thumbnail_url( $owned_id, 'medium' );
-					$owned_addr  = trim( (string) get_post_meta( $owned_id, '_af_address', true ) );
-					$owned_on    = ! Arriendo_Facil_Tenancy::is_plan_locked( $owned_id );
-					?>
-					<label class="af-plan-select__item">
-						<input type="checkbox" value="<?php echo esc_attr( (string) $owned_id ); ?>" <?php checked( $owned_on ); ?> />
-						<span class="af-plan-select__thumb"<?php echo $owned_thumb ? ' style="background-image:url(' . esc_url( $owned_thumb ) . ')"' : ''; ?>>
-							<?php echo $owned_thumb ? '' : af_lucide( 'building', 24 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
-						</span>
-						<span class="af-plan-select__text">
-							<strong><?php echo esc_html( get_the_title( $owned_id ) ? get_the_title( $owned_id ) : __( '(sin nombre)', 'arriendo-facil' ) ); ?></strong>
-							<small><?php echo esc_html( $owned_addr ); ?></small>
-						</span>
-						<span class="af-plan-select__check" aria-hidden="true"><?php echo af_lucide( 'check', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-					</label>
-				<?php endforeach; ?>
+				<?php else : ?>
+					<h2>
+						<?php
+						echo esc_html(
+							'ok' === $billing['state']
+								? sprintf( /* translators: %s: date */ __( 'Se renueva el %s', 'arriendo-facil' ), Arriendo_Facil_Plan_Billing::format_date( $billing['expires'] ) )
+								: sprintf( /* translators: %s: date */ __( 'Vence el %s', 'arriendo-facil' ), Arriendo_Facil_Plan_Billing::format_date( $billing['expires'] ) )
+						);
+						?>
+					</h2>
+					<p>
+						<?php
+						if ( 'due' === $billing['state'] ) {
+							echo esc_html( sprintf( /* translators: %s: date */ __( 'Tienes hasta el %s para renovar. Después tu cuenta pasará al plan Free.', 'arriendo-facil' ), Arriendo_Facil_Plan_Billing::format_date( $billing['grace_until'] ) ) );
+						} else {
+							echo esc_html( sprintf( /* translators: 1: phrase, 2: day */ __( 'Tu plan %1$s. Se cobra el día %2$d de cada mes.', 'arriendo-facil' ), Arriendo_Facil_Plan_Billing::days_phrase( $billing['days'] ), max( 1, (int) $billing['day'] ) ) );
+						}
+						?>
+					</p>
+				<?php endif; ?>
 			</div>
-
-			<footer class="af-plan-select__foot">
-				<button type="button" class="button af-btn af-btn--primary" data-af-plan-save-selection disabled><?php esc_html_e( 'Guardar selección', 'arriendo-facil' ); ?></button>
-			</footer>
+			<a class="button af-btn <?php echo ( $is_lapsed || 'ok' !== $billing['state'] ) ? 'af-btn--primary' : 'af-btn--ghost'; ?> af-plan-renewal__cta" href="<?php echo esc_url( $wa_url ); ?>" target="_blank" rel="noopener noreferrer">
+				<?php esc_html_e( 'Enviar comprobante por WhatsApp', 'arriendo-facil' ); ?>
+			</a>
 		</section>
+	<?php endif; ?>
+
+	<?php if ( $managed && $locked_cnt > 0 ) : ?>
+		<p class="af-plan-hidden-note">
+			<?php echo af_lucide( 'lock', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
+			<span><?php echo esc_html( sprintf( /* translators: %d: number of hidden properties */ _n( '%d inmueble está oculto: tu plan administra tus primeros inmuebles. Sus datos están guardados y se reactivan al renovar o al contratar un plan con capacidad suficiente.', '%d inmuebles están ocultos: tu plan administra tus primeros inmuebles. Sus datos están guardados y se reactivan al renovar o al contratar un plan con capacidad suficiente.', $locked_cnt, 'arriendo-facil' ), $locked_cnt ) ); ?></span>
+		</p>
 	<?php endif; ?>
 
 	<div class="af-plan-grid" id="af-plan-grid">
@@ -198,5 +216,14 @@ $plan_lines = static function ( array $definition ) use ( $feature_lbls ) {
 		<?php endforeach; ?>
 	</div>
 
-	<p class="af-plan-note"><?php esc_html_e( 'Activamos los cambios de plan de forma manual: tras tu solicitud te confirmamos el pago y habilitamos el plan. Si cancelas, vuelves a Free de inmediato y conservas tus datos; eliges cuáles inmuebles seguir administrando y el resto queda guardado.', 'arriendo-facil' ); ?></p>
+	<details class="af-plan-terms">
+		<summary><?php esc_html_e( 'Condiciones del plan', 'arriendo-facil' ); ?></summary>
+		<ul>
+			<li><?php esc_html_e( 'Los planes son mensuales y vencen siempre el mismo día de cada mes. El precio del plan es fijo.', 'arriendo-facil' ); ?></li>
+			<li><?php esc_html_e( 'El pago se hace fuera de la plataforma: envía tu comprobante por WhatsApp y activamos o renovamos tu plan de forma manual.', 'arriendo-facil' ); ?></li>
+			<li><?php esc_html_e( 'Te avisamos en la plataforma y por correo 7, 3 y 1 días antes, y el día del vencimiento. Después tienes 3 días de gracia.', 'arriendo-facil' ); ?></li>
+			<li><?php esc_html_e( 'Si no se renueva al terminar la gracia, tu cuenta pasa al plan Free. No borramos información: se administran tus 4 primeros inmuebles y el resto queda oculto hasta que renueves o contrates un plan con capacidad suficiente.', 'arriendo-facil' ); ?></li>
+			<li><?php esc_html_e( 'Puedes cancelar cuando quieras: vuelves a Free de inmediato y conservas tus datos. Aplican los Términos y Condiciones del servicio.', 'arriendo-facil' ); ?></li>
+		</ul>
+	</details>
 </div>

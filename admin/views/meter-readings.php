@@ -21,6 +21,12 @@ global $wpdb;
 
 $ledger  = 'Arriendo_Facil_Billing_Ledger';
 $catalog = $ledger::service_catalog();
+$svc_locked = static function ( $service_key ) {
+	return Arriendo_Facil_Plans::applies_to() && ! Arriendo_Facil_Plans::service_allowed( $service_key );
+};
+$crown      = static function () {
+	return '<span class="af-plan-lock-badge" title="' . esc_attr__( 'Disponible en un plan superior', 'arriendo-facil' ) . '">' . af_lucide( 'crown', 14 ) . '</span>';
+};
 
 $today  = current_time( 'Y-m-d' );
 $period = isset( $_GET['period'] ) ? sanitize_text_field( wp_unslash( $_GET['period'] ) ) : current_time( 'Y-m' );
@@ -414,7 +420,7 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 							<p><?php esc_html_e( '¿Qué servicios se pagan en este inmueble? Elige uno para indicar su día de pago:', 'arriendo-facil' ); ?></p>
 							<div class="af-sp-quick">
 								<?php foreach ( $catalog as $service_key => $service_meta ) : ?>
-									<button type="button" class="af-sp-quick__btn af-sp-chip--<?php echo esc_attr( $service_key ); ?>" <?php echo $open_attrs; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?> data-service="<?php echo esc_attr( $service_key ); ?>">
+									<button type="button" class="af-sp-quick__btn af-sp-chip--<?php echo esc_attr( $service_key ); ?><?php echo $svc_locked( $service_key ) ? ' is-plan-locked' : ''; ?>" <?php echo $open_attrs; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?> data-service="<?php echo esc_attr( $service_key ); ?>"<?php echo $svc_locked( $service_key ) ? ' data-af-plan-lock="services"' : ''; ?>>
 										<?php echo af_lucide( $service_meta['icon'], 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 										<?php echo esc_html( $service_meta['label'] ); ?>
 									</button>
@@ -674,17 +680,19 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 				<legend><?php esc_html_e( 'Servicio', 'arriendo-facil' ); ?></legend>
 				<div class="af-sp-picker__grid">
 					<?php foreach ( $catalog as $service_key => $service_meta ) : ?>
-						<label class="af-sp-picker__item af-sp-chip--<?php echo esc_attr( $service_key ); ?>">
+						<label class="af-sp-picker__item af-sp-chip--<?php echo esc_attr( $service_key ); ?><?php echo $svc_locked( $service_key ) ? ' is-plan-locked' : ''; ?>"<?php echo $svc_locked( $service_key ) ? ' data-af-plan-lock="services"' : ''; ?>>
 							<input type="radio" name="af-schedule-service" value="<?php echo esc_attr( $service_key ); ?>" />
 							<span class="af-sp-icon af-sp-icon--<?php echo esc_attr( $service_key ); ?>" aria-hidden="true"><?php echo af_lucide( $service_meta['icon'], 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
 							<span class="af-sp-picker__label"><?php echo esc_html( $service_meta['label'] ); ?></span>
+							<?php echo $svc_locked( $service_key ) ? $crown() : ''; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static markup. ?>
 							<span class="af-sp-picker__badge"><?php esc_html_e( 'ya existe', 'arriendo-facil' ); ?></span>
 						</label>
 					<?php endforeach; ?>
-					<label class="af-sp-picker__item">
+					<label class="af-sp-picker__item<?php echo $svc_locked( 'otro' ) ? ' is-plan-locked' : ''; ?>"<?php echo $svc_locked( 'otro' ) ? ' data-af-plan-lock="services"' : ''; ?>>
 						<input type="radio" name="af-schedule-service" value="otro" />
 						<span class="af-sp-icon" aria-hidden="true"><?php echo af_lucide( 'plus', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
 						<span class="af-sp-picker__label"><?php esc_html_e( 'Otro', 'arriendo-facil' ); ?></span>
+						<?php echo $svc_locked( 'otro' ) ? $crown() : ''; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static markup. ?>
 					</label>
 				</div>
 				<input type="text" id="af-schedule-custom" maxlength="60" hidden placeholder="<?php esc_attr_e( 'Nombre del servicio (Ej: Alícuota extra, Seguridad)', 'arriendo-facil' ); ?>" />

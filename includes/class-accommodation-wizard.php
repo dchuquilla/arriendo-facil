@@ -420,6 +420,16 @@ class Arriendo_Facil_Accommodation_Wizard {
 			}
 		}
 
+		if ( $post_id && Arriendo_Facil_Plans::applies_to() && Arriendo_Facil_Tenancy::is_plan_locked( $post_id ) ) {
+			wp_safe_redirect( Arriendo_Facil_Properties_Page::url( array( 'af_gate' => 'locked' ) ) );
+			exit;
+		}
+
+		if ( ! $post_id && Arriendo_Facil_Plans::applies_to() && Arriendo_Facil_Plans::limit_gate( 'properties' ) ) {
+			wp_safe_redirect( Arriendo_Facil_Properties_Page::url( array( 'af_gate' => 'properties' ) ) );
+			exit;
+		}
+
 		$title = isset( $_POST['post_title'] ) ? sanitize_text_field( wp_unslash( $_POST['post_title'] ) ) : '';
 		if ( '' === trim( $title ) ) {
 			$redirect = add_query_arg(

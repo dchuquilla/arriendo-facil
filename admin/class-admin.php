@@ -1124,6 +1124,7 @@ class Arriendo_Facil_Admin {
 				'group' => 'propiedades',
 				'cap'   => 'edit_posts',
 				'gate'  => true,
+				'feature' => 'catalog',
 			),
 			array(
 				'slug'  => 'af-leases',
@@ -1169,6 +1170,7 @@ array(
 				'group' => 'propiedades',
 				'cap'   => Arriendo_Facil_Tenancy::CAP,
 				'gate'  => true,
+				'feature' => 'maintenance',
 			),
 			array(
 				'slug'  => 'af-reviews',
@@ -1187,6 +1189,7 @@ array(
 				'group' => 'pagos',
 				'cap'   => $billing_cap,
 				'gate'  => true,
+				'feature' => 'billing',
 			),
 			array(
 				'slug'  => 'af-admin-profile',
@@ -1196,6 +1199,16 @@ array(
 				'group' => 'config',
 				'cap'   => 'edit_posts',
 				'gate'  => false,
+			),
+			array(
+				'slug'            => 'af-plan',
+				'label'           => __( 'Mi plan', 'arriendo-facil' ),
+				'url'             => Arriendo_Facil_Plans::url(),
+				'icon'            => 'crown',
+				'group'           => 'config',
+				'cap'             => Arriendo_Facil_Tenancy::CAP,
+				'gate'            => false,
+				'managers_only'   => true,
 			),
 			array(
 				'slug'  => 'af-alerts-center',
@@ -1238,7 +1251,12 @@ array(
 				continue;
 			}
 
-			$item['active'] = ( '' !== $current && $current === $item['slug'] );
+			if ( ! empty( $item['managers_only'] ) && ! Arriendo_Facil_Plans::applies_to() ) {
+				continue;
+			}
+
+			$item['gate_data'] = ! empty( $item['feature'] ) ? Arriendo_Facil_Plans::feature_gate( $item['feature'] ) : null;
+			$item['active']    = ( '' !== $current && $current === $item['slug'] );
 			$output[]        = $item;
 		}
 
@@ -1287,6 +1305,34 @@ array(
 				'icon'  => 'wrench',
 			),
 		);
+	}
+
+	/**
+	 * Attributes that turn a locked nav link into an upgrade prompt.
+	 *
+	 * @param array<string,mixed> $item Nav item.
+	 * @return string
+	 */
+	private function nav_lock_attrs( array $item ) {
+		if ( empty( $item['gate_data'] ) ) {
+			return '';
+		}
+
+		return ' class="is-plan-locked" data-af-plan-lock="' . esc_attr( (string) $item['feature'] ) . '"';
+	}
+
+	/**
+	 * Crown marker for locked nav links.
+	 *
+	 * @param array<string,mixed> $item Nav item.
+	 * @return string
+	 */
+	private function nav_crown( array $item ) {
+		if ( empty( $item['gate_data'] ) ) {
+			return '';
+		}
+
+		return '<span class="af-plan-crown" title="' . esc_attr__( 'Disponible en un plan superior', 'arriendo-facil' ) . '" aria-hidden="true">' . af_lucide( 'crown', 14 ) . '</span>';
 	}
 
 	/**
@@ -1343,9 +1389,10 @@ array(
 					<?php if ( $is_single ) : ?>
 						<?php $nav_item = $grouped[ $group_slug ][0]; ?>
 						<li class="af-app-sidebar__item<?php echo $nav_item['active'] ? ' is-active' : ''; ?>">
-							<a href="<?php echo esc_url( $nav_item['url'] ); ?>">
+							<a href="<?php echo esc_url( $nav_item['url'] ); ?>"<?php echo $this->nav_lock_attrs( $nav_item ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in helper. ?>>
 								<?php echo af_lucide( $nav_item['icon'], 20 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
 								<span class="af-app-sidebar__label"><?php echo esc_html( $nav_item['label'] ); ?></span>
+								<?php echo $this->nav_crown( $nav_item ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
 							</a>
 						</li>
 					<?php else : ?>
@@ -1366,9 +1413,10 @@ array(
 							<ul class="af-app-sidebar__subnav">
 								<?php foreach ( $grouped[ $group_slug ] as $nav_item ) : ?>
 									<li class="af-app-sidebar__item<?php echo $nav_item['active'] ? ' is-active' : ''; ?>">
-										<a href="<?php echo esc_url( $nav_item['url'] ); ?>" title="<?php echo esc_attr( $nav_item['label'] ); ?>"<?php echo $nav_item['active'] ? ' aria-current="page"' : ''; ?>>
+										<a href="<?php echo esc_url( $nav_item['url'] ); ?>" title="<?php echo esc_attr( $nav_item['label'] ); ?>"<?php echo $nav_item['active'] ? ' aria-current="page"' : ''; ?><?php echo $this->nav_lock_attrs( $nav_item ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in helper. ?>>
 											<span class="af-app-sidebar__subicon" aria-hidden="true"><?php echo af_lucide( $nav_item['icon'], 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
 											<span class="af-app-sidebar__label"><?php echo esc_html( $nav_item['label'] ); ?></span>
+											<?php echo $this->nav_crown( $nav_item ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
 										</a>
 									</li>
 								<?php endforeach; ?>
@@ -1390,6 +1438,16 @@ array(
 					<?php endforeach; ?>
 				</ul>
 			<?php endif; ?>
+			<?php if ( Arriendo_Facil_Plans::applies_to() ) : ?>
+				<?php $af_plan_def = Arriendo_Facil_Plans::get_definition(); ?>
+				<a class="af-plan-chip" href="<?php echo esc_url( Arriendo_Facil_Plans::url() ); ?>">
+					<?php echo af_lucide( 'crown', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
+					<span class="af-plan-chip__text">
+						<strong><?php echo esc_html( sprintf( /* translators: %s: plan name */ __( 'Plan %s', 'arriendo-facil' ), $af_plan_def['label'] ) ); ?></strong>
+						<small><?php echo 'pro' === Arriendo_Facil_Plans::get_plan() ? esc_html__( 'Administrar plan', 'arriendo-facil' ) : esc_html__( 'Mejorar plan', 'arriendo-facil' ); ?></small>
+					</span>
+				</a>
+			<?php endif; ?>
 			<div class="af-app-sidebar__footer">
 				<a class="af-app-sidebar__user" href="<?php echo esc_url( admin_url( 'admin.php?page=af-admin-profile' ) ); ?>">
 					<?php echo get_avatar( $current_user->ID, 32 ); ?>
@@ -1406,7 +1464,7 @@ array(
 
 		<div class="af-app-topbar af-shell">
 			<form class="af-app-topbar__search" method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" role="search">
-				<input type="hidden" name="page" value="af-catalog" />
+				<input type="hidden" name="page" value="<?php echo Arriendo_Facil_Plans::has_feature( 'catalog' ) ? 'af-catalog' : 'af-properties'; ?>" />
 				<?php echo af_lucide( 'search', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
 				<input type="search" name="s" placeholder="<?php esc_attr_e( 'Buscar propiedades, contratos…', 'arriendo-facil' ); ?>" aria-label="<?php esc_attr_e( 'Buscar', 'arriendo-facil' ); ?>" />
 			</form>
@@ -1461,6 +1519,7 @@ array(
 				<button type="button" class="af-app-topbar__user af-user-menu__toggle" id="af-user-menu-toggle" aria-expanded="false" aria-haspopup="true" aria-controls="af-user-menu-panel">
 					<?php echo get_avatar( $current_user->ID, 28 ); ?>
 					<span class="af-app-topbar__user-name"><?php echo esc_html( $this->get_user_display_name( $current_user ) ); ?></span>
+					<?php echo Arriendo_Facil_Plans::topbar_pill(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in helper. ?>
 					<?php echo af_lucide( 'chevron-down', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
 				</button>
 				<div class="af-user-menu__panel" id="af-user-menu-panel" role="menu" hidden>
@@ -1468,6 +1527,7 @@ array(
 						<span class="af-user-menu__name"><?php echo esc_html( $this->get_user_display_name( $current_user ) ); ?></span>
 						<span class="af-user-menu__email"><?php echo esc_html( $current_user->user_email ); ?></span>
 					</div>
+					<?php Arriendo_Facil_Plans::render_menu_card(); ?>
 					<a class="af-user-menu__item" role="menuitem" href="<?php echo esc_url( admin_url( 'admin.php?page=af-admin-profile' ) ); ?>">
 						<?php echo af_lucide( 'user', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
 						<span><?php esc_html_e( 'Ver perfil', 'arriendo-facil' ); ?></span>

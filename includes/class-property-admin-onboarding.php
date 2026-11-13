@@ -94,6 +94,9 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 			'data'    => array( __( 'Datos y verificación', 'arriendo-facil' ), admin_url( 'admin.php?page=' . self::PAGE_SLUG ) ),
 			'account' => array( __( 'Cuenta y seguridad', 'arriendo-facil' ), admin_url( 'profile.php' ) ),
 		);
+		if ( Arriendo_Facil_Plans::applies_to() ) {
+			$tabs['plan'] = array( __( 'Mi plan', 'arriendo-facil' ), Arriendo_Facil_Plans::url() );
+		}
 		echo '<nav class="af-profile-tabs" aria-label="' . esc_attr__( 'Secciones de mi perfil', 'arriendo-facil' ) . '">';
 		foreach ( $tabs as $key => $tab ) {
 			printf(
@@ -257,6 +260,7 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 			);
 
 			self::render_profile_tabs( 'data' );
+			Arriendo_Facil_Plans::render_summary();
 			?>
 
 			<div id="af-profile-alert" class="af-profile-alert" role="status" aria-live="polite" hidden></div>

@@ -149,6 +149,13 @@ class Arriendo_Facil_Guest_Admin_Controller {
 			wp_send_json_error( array( 'message' => __( 'Ya existe un inquilino registrado con ese correo.', 'arriendo-facil' ) ), 409 );
 		}
 
+		if ( Arriendo_Facil_Plans::applies_to() ) {
+			$plan_gate = Arriendo_Facil_Plans::limit_gate( 'guests' );
+			if ( $plan_gate ) {
+				Arriendo_Facil_Plans::send_gate_error( $plan_gate );
+			}
+		}
+
 		$inserted = $wpdb->insert(
 			$wpdb->prefix . 'af_guests',
 			array(

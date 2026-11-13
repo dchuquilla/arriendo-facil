@@ -230,6 +230,14 @@ $totals_platform = array(
 				<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Teléfono', 'arriendo-facil' ); ?></span>
 				<input type="text" name="phone" class="regular-text" style="width:100%;" />
 			</label>
+			<label>
+				<span style="display:block; font-weight:600; margin-bottom:4px;"><?php esc_html_e( 'Plan', 'arriendo-facil' ); ?></span>
+				<select name="plan" style="width:100%;">
+					<?php foreach ( Arriendo_Facil_Plans::definitions() as $plan_key => $plan_def ) : ?>
+						<option value="<?php echo esc_attr( $plan_key ); ?>"><?php echo esc_html( $plan_def['label'] ); ?></option>
+					<?php endforeach; ?>
+				</select>
+			</label>
 			<button type="submit" class="button af-btn af-btn--primary"><?php esc_html_e( 'Crear licencia', 'arriendo-facil' ); ?></button>
 		</form>
 		<div id="af-property-admin-credentials" style="display:none; margin-top:12px; padding:12px; border-radius:8px; background:#f0f6fc; border:1px solid #c3d4e0;"></div>
@@ -250,6 +258,7 @@ $totals_platform = array(
 					<th><?php esc_html_e( 'Inmuebles', 'arriendo-facil' ); ?></th>
 					<th><?php esc_html_e( 'Contratos activos', 'arriendo-facil' ); ?></th>
 					<th><?php esc_html_e( 'Cobrado / Pendiente (mes)', 'arriendo-facil' ); ?></th>
+					<th><?php esc_html_e( 'Plan', 'arriendo-facil' ); ?></th>
 					<th><?php esc_html_e( 'Licencia', 'arriendo-facil' ); ?></th>
 					<th><?php esc_html_e( 'Verificación', 'arriendo-facil' ); ?></th>
 					<th><?php esc_html_e( 'Acciones', 'arriendo-facil' ); ?></th>
@@ -257,7 +266,7 @@ $totals_platform = array(
 			</thead>
 			<tbody>
 				<?php if ( empty( $rows ) ) : ?>
-					<tr><td colspan="8"><?php esc_html_e( 'Aún no hay gestores de propiedades licenciados.', 'arriendo-facil' ); ?></td></tr>
+					<tr><td colspan="9"><?php esc_html_e( 'Aún no hay gestores de propiedades licenciados.', 'arriendo-facil' ); ?></td></tr>
 				<?php else : ?>
 					<?php foreach ( $rows as $row ) : ?>
 						<?php
@@ -286,6 +295,18 @@ $totals_platform = array(
 							<td data-label="<?php esc_attr_e( 'Cobrado / Pendiente', 'arriendo-facil' ); ?>">
 								$<?php echo esc_html( number_format_i18n( $row['collected_period'], 2 ) ); ?> /
 								$<?php echo esc_html( number_format_i18n( $row['pending_period'], 2 ) ); ?>
+							</td>
+							<td data-label="<?php esc_attr_e( 'Plan', 'arriendo-facil' ); ?>">
+								<?php $row_plan = Arriendo_Facil_Plans::get_plan( (int) $admin_user->ID ); ?>
+								<select class="af-plan-select" data-user-id="<?php echo esc_attr( (string) $admin_user->ID ); ?>" aria-label="<?php esc_attr_e( 'Plan del gestor', 'arriendo-facil' ); ?>">
+									<?php foreach ( Arriendo_Facil_Plans::definitions() as $plan_key => $plan_def ) : ?>
+										<option value="<?php echo esc_attr( $plan_key ); ?>" <?php selected( $row_plan, $plan_key ); ?>><?php echo esc_html( $plan_def['label'] ); ?></option>
+									<?php endforeach; ?>
+								</select>
+								<?php $row_request = Arriendo_Facil_Plans::get_request( (int) $admin_user->ID ); ?>
+								<?php if ( $row_request ) : ?>
+									<span class="af-plan-badge-request"><?php echo esc_html( sprintf( /* translators: %s: plan */ __( 'Solicita: %s', 'arriendo-facil' ), Arriendo_Facil_Plans::definitions()[ $row_request['plan'] ]['label'] ) ); ?></span>
+								<?php endif; ?>
 							</td>
 							<td data-label="<?php esc_attr_e( 'Licencia', 'arriendo-facil' ); ?>">
 								<span class="af-pill <?php echo $is_active ? 'af-pill--success' : 'af-pill--danger'; ?>">

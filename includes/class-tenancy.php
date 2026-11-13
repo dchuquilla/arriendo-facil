@@ -85,6 +85,52 @@ class Arriendo_Facil_Tenancy {
 	}
 
 	/**
+	 * Every accommodation of the user, including those their plan locked.
+	 * Null means unrestricted. Only the Inmuebles screen and the plan
+	 * selection need this; everything else must use accessible_accommodation_ids().
+	 *
+	 * @param int $user_id User ID. Defaults to current user.
+	 * @return int[]|null
+	 */
+	public static function managed_accommodation_ids( $user_id = 0 ) {
+		if ( self::can_manage_all( $user_id ) ) {
+			return null;
+		}
+
+		$user_id = $user_id ? absint( $user_id ) : get_current_user_id();
+
+		return array_map( 'absint', Arriendo_Facil_Accommodation::get_owner_accommodation_ids( $user_id, true ) );
+	}
+
+	/**
+	 * Whether the user's plan locked this accommodation (kept, but not manageable).
+	 *
+	 * @param int $accommodation_id Accommodation post ID.
+	 * @return bool
+	 */
+	public static function is_plan_locked( $accommodation_id ) {
+		return '' !== (string) get_post_meta( absint( $accommodation_id ), '_af_plan_locked', true );
+	}
+
+	/**
+	 * Whether the given user owns the accommodation, locked or not.
+	 *
+	 * @param int $accommodation_id Accommodation post ID.
+	 * @param int $user_id          User ID. Defaults to current user.
+	 * @return bool
+	 */
+	public static function owns_accommodation( $accommodation_id, $user_id = 0 ) {
+		if ( self::can_manage_all( $user_id ) ) {
+			return true;
+		}
+
+		$user_id = $user_id ? absint( $user_id ) : get_current_user_id();
+		$owner   = (int) get_post_meta( absint( $accommodation_id ), '_af_owner_id', true );
+
+		return $owner > 0 && $owner === $user_id;
+	}
+
+	/**
 	 * Whether the given user can operate on a specific accommodation.
 	 *
 	 * @param int $accommodation_id Accommodation post ID.
@@ -99,7 +145,7 @@ class Arriendo_Facil_Tenancy {
 		$user_id = $user_id ? absint( $user_id ) : get_current_user_id();
 		$owner   = (int) get_post_meta( absint( $accommodation_id ), '_af_owner_id', true );
 
-		return $owner > 0 && $owner === $user_id;
+		return $owner > 0 && $owner === $user_id && ! self::is_plan_locked( $accommodation_id );
 	}
 
 	/**

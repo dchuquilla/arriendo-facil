@@ -104,7 +104,7 @@ class Arriendo_Facil_Properties_Page {
 			wp_send_json_error( array( 'message' => __( 'No encontramos el inmueble.', 'arriendo-facil' ) ), 404 );
 		}
 
-		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) || ! Arriendo_Facil_Tenancy::can_access_accommodation( $post_id ) ) {
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) || ! Arriendo_Facil_Tenancy::owns_accommodation( $post_id ) ) {
 			wp_send_json_error( array( 'message' => __( 'No tienes permiso para esta acción.', 'arriendo-facil' ) ), 403 );
 		}
 
@@ -127,7 +127,7 @@ class Arriendo_Facil_Properties_Page {
 			array(
 				'message' => $message,
 				'id'      => $post_id,
-				'counts'  => $this->counts( Arriendo_Facil_Tenancy::accessible_accommodation_ids() ),
+				'counts'  => $this->counts( Arriendo_Facil_Tenancy::managed_accommodation_ids() ),
 			)
 		);
 	}
@@ -348,6 +348,7 @@ class Arriendo_Facil_Properties_Page {
 			'rented'      => 0,
 			'maintenance' => 0,
 			'draft'       => 0,
+			'locked'      => 0,
 			'trash'       => 0,
 		);
 
@@ -357,11 +358,12 @@ class Arriendo_Facil_Properties_Page {
 		}
 
 		$rows = (array) $wpdb->get_results(
-			"SELECT p.post_status AS post_status, COALESCE(pm.meta_value, 'available') AS af_status, COUNT(*) AS total
+			"SELECT p.post_status AS post_status, COALESCE(pm.meta_value, 'available') AS af_status, (lk.meta_id IS NOT NULL) AS is_locked, COUNT(*) AS total
 			 FROM {$wpdb->posts} p
 			 LEFT JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID AND pm.meta_key = '_af_status'
+			 LEFT JOIN {$wpdb->postmeta} lk ON lk.post_id = p.ID AND lk.meta_key = '_af_plan_locked'
 			 WHERE p.post_type = 'accommodation' AND p.post_status IN ('publish', 'private', 'draft', 'pending', 'trash'){$scope_sql}
-			 GROUP BY p.post_status, af_status" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- ids are cast with absint().
+			 GROUP BY p.post_status, af_status, is_locked" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- ids are cast with absint().
 		);
 
 		foreach ( $rows as $row ) {
@@ -373,6 +375,11 @@ class Arriendo_Facil_Properties_Page {
 			}
 
 			$counts['all'] += $total;
+
+			if ( (int) $row->is_locked ) {
+				$counts['locked'] += $total;
+				continue;
+			}
 
 			if ( in_array( $row->post_status, array( 'draft', 'pending' ), true ) ) {
 				$counts['draft'] += $total;
@@ -396,7 +403,7 @@ class Arriendo_Facil_Properties_Page {
 			wp_die( esc_html__( 'No tienes permiso para ver esta página.', 'arriendo-facil' ) );
 		}
 
-		$scope  = Arriendo_Facil_Tenancy::accessible_accommodation_ids();
+		$scope  = Arriendo_Facil_Tenancy::managed_accommodation_ids();
 		$counts = $this->counts( $scope );
 
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only filters.
@@ -448,6 +455,22 @@ class Arriendo_Facil_Properties_Page {
 					'compare' => 'IN',
 				),
 			);
+		}
+
+		if ( 'locked' === $filter ) {
+			$args['post_status'] = array( 'publish', 'private', 'draft', 'pending' );
+			$args['meta_query']  = array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+				array(
+					'key'     => '_af_plan_locked',
+					'compare' => 'EXISTS',
+				),
+			);
+		} elseif ( in_array( $filter, array( 'available', 'rented', 'maintenance', 'draft' ), true ) ) {
+			$lock_clause         = array(
+				'key'     => '_af_plan_locked',
+				'compare' => 'NOT EXISTS',
+			);
+			$args['meta_query'] = isset( $args['meta_query'] ) ? array( 'relation' => 'AND', $args['meta_query'], $lock_clause ) : array( $lock_clause ); // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
 		}
 
 		if ( 'name' === $order ) {

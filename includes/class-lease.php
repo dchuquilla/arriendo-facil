@@ -284,6 +284,13 @@ class Arriendo_Facil_Lease {
 			wp_send_json_error( array( 'message' => __( 'No tienes acceso al inmueble o al inquilino seleccionado.', 'arriendo-facil' ) ), 403 );
 		}
 
+		if ( Arriendo_Facil_Plans::applies_to() ) {
+			$plan_gate = Arriendo_Facil_Plans::limit_gate( 'leases' );
+			if ( $plan_gate ) {
+				Arriendo_Facil_Plans::send_gate_error( $plan_gate );
+			}
+		}
+
 		// ── Procesar Placeholders ─────────────────────────────────────────────
 		$placeholders = array();
 		if ( class_exists( 'Arriendo_Facil_Contract_Storage' ) ) {

@@ -1192,12 +1192,13 @@ class Arriendo_Facil_Accommodation {
 	/**
 	 * Returns accommodation post IDs owned by a given user.
 	 *
-	 * @param int $user_id User ID.
+	 * @param int  $user_id        User ID.
+	 * @param bool $include_locked Include properties locked by the owner's plan.
 	 * @return int[]
 	 */
-	public static function get_owner_accommodation_ids( $user_id ) {
+	public static function get_owner_accommodation_ids( $user_id, $include_locked = false ) {
 		$user_id   = absint( $user_id );
-		$cache_key = 'owner_accommodation_ids:' . $user_id . ':' . wp_cache_get_last_changed( self::CACHE_GROUP );
+		$cache_key = 'owner_accommodation_ids:' . $user_id . ':' . ( $include_locked ? 'all' : 'active' ) . ':' . wp_cache_get_last_changed( self::CACHE_GROUP );
 		$cached    = wp_cache_get( $cache_key, self::CACHE_GROUP );
 		if ( is_array( $cached ) ) {
 			return $cached;
@@ -1211,9 +1212,12 @@ class Arriendo_Facil_Accommodation {
 					'post_status'    => 'any',
 					'posts_per_page' => 500,
 					'fields'         => 'ids',
-					'meta_query'     => array(
-						array( 'key' => '_af_owner_id', 'value' => $user_id ),
-					),
+					'meta_query'     => $include_locked
+						? array( array( 'key' => '_af_owner_id', 'value' => $user_id ) )
+						: array(
+							array( 'key' => '_af_owner_id', 'value' => $user_id ),
+							array( 'key' => '_af_plan_locked', 'compare' => 'NOT EXISTS' ),
+						),
 				)
 			)
 		);
@@ -1242,7 +1246,7 @@ class Arriendo_Facil_Accommodation {
 	 * @return void
 	 */
 	public static function flush_ownership_cache_for_meta( $meta_id, $post_id, $meta_key ) {
-		if ( '_af_owner_id' === $meta_key ) {
+		if ( in_array( $meta_key, array( '_af_owner_id', '_af_plan_locked' ), true ) ) {
 			wp_cache_set_last_changed( self::CACHE_GROUP );
 		}
 	}

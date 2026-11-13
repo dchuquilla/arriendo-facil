@@ -207,6 +207,14 @@ class Arriendo_Facil_Billing_Ledger_Controller {
 			wp_send_json_error( array( 'message' => __( 'Selecciona un inmueble.', 'arriendo-facil' ) ), 400 );
 		}
 
+		if ( Arriendo_Facil_Plans::applies_to() ) {
+			$requested_service = isset( $_POST['service'] ) ? sanitize_key( wp_unslash( $_POST['service'] ) ) : '';
+			$plan_gate         = Arriendo_Facil_Plans::service_gate( $requested_service );
+			if ( $plan_gate ) {
+				Arriendo_Facil_Plans::send_gate_error( $plan_gate );
+			}
+		}
+
 		$result = Arriendo_Facil_Billing_Ledger::upsert_service_schedule(
 			array(
 				'unit_id'          => $unit_id,

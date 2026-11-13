@@ -52,8 +52,8 @@
 
 	/* ── Entrance ─────────────────────────────────────────────────────── */
 
-	var CARD = '.af-kpi, .af-property-card, .af-catalog-card, .af-maint-card, .af-prov-card, .af-sp-tile, .af-exit-card, .af-review-list__item, .af-cobranza-alert, .af-wiz-card, .af-choice-card';
-	var BLOCK = '.af-page-header, .af-section, .af-split > *, .af-info-strip, .af-status-tabs, .af-tabs__nav, .af-empty, .af-semaforo, .af-flow, .af-steps';
+	var CARD = '.af-kpi, .af-property-card, .af-catalog-card, .af-maint-card, .af-prov-card, .af-sp-tile, .af-exit-card, .af-review-list__item, .af-cobranza-alert, .af-wiz-card, .af-choice-card, .af-pc, .af-pnew';
+	var BLOCK = '.af-page-header, .af-section, .af-split > *, .af-info-strip, .af-status-tabs, .af-tabs__nav, .af-empty, .af-semaforo, .af-flow, .af-steps, .af-ptoolbar, .af-pempty-state';
 
 	function collectEntrance(root) {
 		var list = [];

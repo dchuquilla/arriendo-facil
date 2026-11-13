@@ -59,6 +59,7 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-media-isolation.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-input-validator.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-image-optimizer.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-list-admin.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-properties-page.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation-search-api.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-matching-engine.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-cleaning-service.php';
@@ -275,6 +276,7 @@ function arriendo_facil_init() {
 		'Arriendo_Facil_Accommodation_Featured_Admin',
 		'Arriendo_Facil_Accommodation_Occupied_Admin',
 		'Arriendo_Facil_Accommodation_List_Admin',
+		'Arriendo_Facil_Properties_Page',
 		'Arriendo_Facil_Cleaning_Service',
 		'Arriendo_Facil_Maintenance',
 		'Arriendo_Facil_Service_Providers',

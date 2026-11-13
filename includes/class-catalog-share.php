@@ -748,7 +748,8 @@ class Arriendo_Facil_Catalog_Share {
 	public function enqueue_admin_assets( $hook ) {
 		// Only the property listing still hosts the building-group tools.
 		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
-		if ( 'edit.php' !== $hook || ! $screen || 'accommodation' !== $screen->post_type ) {
+		$is_list = 'edit.php' === $hook && $screen && 'accommodation' === $screen->post_type;
+		if ( ! $is_list && 'admin_page_' . Arriendo_Facil_Properties_Page::PAGE_SLUG !== $hook ) {
 			return;
 		}
 

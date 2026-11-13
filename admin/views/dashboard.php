@@ -320,7 +320,7 @@ $money = static function ( $amount ) {
 				</span>
 			</a>
 
-			<a class="af-pk" href="<?php echo esc_url( admin_url( 'edit.php?post_type=accommodation' ) ); ?>">
+			<a class="af-pk" href="<?php echo esc_url( Arriendo_Facil_Properties_Page::url() ); ?>">
 				<span class="af-pk__ring" data-pring="<?php echo esc_attr( $occupancy_rate ); ?>" style="--pct: <?php echo esc_attr( $occupancy_rate ); ?>;" aria-hidden="true"><b><span data-pn="<?php echo esc_attr( $occupancy_rate ); ?>"><?php echo esc_html( $occupancy_rate ); ?></span>%</b></span>
 				<span class="af-pk__label"><?php esc_html_e( 'Ocupación', 'arriendo-facil' ); ?></span>
 				<span class="af-pk__meta"><?php echo esc_html( sprintf( /* translators: 1: occupied, 2: total */ __( '%1$d de %2$d inmuebles ocupados', 'arriendo-facil' ), $property_occupied, $property_total ) ); ?></span>

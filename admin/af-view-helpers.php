@@ -137,8 +137,8 @@ if ( ! function_exists( 'af_catalog_flow' ) ) {
 	 */
 	function af_catalog_flow( $current ) {
 		$steps = array(
-			1 => array( __( 'Registra tus inmuebles', 'arriendo-facil' ), admin_url( 'edit.php?post_type=accommodation' ) ),
-			2 => array( __( 'Agrúpalos por edificio (opcional)', 'arriendo-facil' ), admin_url( 'edit.php?post_type=accommodation#af-groups' ) ),
+			1 => array( __( 'Registra tus inmuebles', 'arriendo-facil' ), Arriendo_Facil_Properties_Page::url() ),
+			2 => array( __( 'Agrúpalos por edificio (opcional)', 'arriendo-facil' ), Arriendo_Facil_Properties_Page::url() . '#af-groups' ),
 			3 => array( __( 'Comparte tu catálogo', 'arriendo-facil' ), admin_url( 'admin.php?page=af-catalog' ) ),
 		);
 		?>

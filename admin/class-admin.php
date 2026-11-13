@@ -986,7 +986,12 @@ class Arriendo_Facil_Admin {
 		global $pagenow, $typenow;
 
 		if ( in_array( $pagenow, array( 'edit.php', 'post.php', 'post-new.php' ), true ) && 'accommodation' === $typenow ) {
-			return 'edit-accommodation';
+			return 'af-properties';
+		}
+
+		// The creation/edit wizard belongs to the Inmuebles section.
+		if ( isset( $_GET['page'] ) && Arriendo_Facil_Accommodation_Wizard::PAGE_SLUG === sanitize_key( wp_unslash( $_GET['page'] ) ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			return 'af-properties';
 		}
 
 		if ( 'profile.php' === $pagenow ) {
@@ -1103,9 +1108,9 @@ class Arriendo_Facil_Admin {
 				'gate'  => true,
 			),
 			array(
-				'slug'  => 'edit-accommodation',
+				'slug'  => 'af-properties',
 				'label' => __( 'Inmuebles', 'arriendo-facil' ),
-				'url'   => admin_url( 'edit.php?post_type=accommodation' ),
+				'url'   => Arriendo_Facil_Properties_Page::url(),
 				'icon'  => 'building-2',
 				'group' => 'propiedades',
 				'cap'   => 'edit_posts',

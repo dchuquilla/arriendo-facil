@@ -63,7 +63,7 @@ $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data[
 <div class="<?php echo esc_attr( $wizard_class ); ?>" data-mode="<?php echo esc_attr( $mode ); ?>">
 
 	<header class="af-wizard__header">
-		<a href="<?php echo esc_url( admin_url( 'edit.php?post_type=accommodation' ) ); ?>" class="af-wizard__back" data-af-cancel>
+		<a href="<?php echo esc_url( Arriendo_Facil_Properties_Page::url() ); ?>" class="af-wizard__back" data-af-cancel>
 			<span aria-hidden="true">&larr;</span> <?php esc_html_e( 'Volver a inmuebles', 'arriendo-facil' ); ?>
 		</a>
 		<div class="af-wizard__title">
@@ -830,7 +830,7 @@ $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data[
 						<?php esc_html_e( 'Siguiente →', 'arriendo-facil' ); ?>
 					</button>
 					<button type="submit" class="button button-primary af-wizard__publish" data-af-action="publish" disabled>
-						<?php echo 'edit' === $mode ? esc_html__( 'Guardar cambios', 'arriendo-facil' ) : esc_html__( 'Publicar inmueble', 'arriendo-facil' ); ?>
+						<?php echo 'edit' === $mode ? esc_html__( 'Guardar cambios', 'arriendo-facil' ) : esc_html__( 'Guardar inmueble', 'arriendo-facil' ); ?>
 					</button>
 				</div>
 			</div>

@@ -180,6 +180,17 @@ class Arriendo_Facil_Accommodation_Wizard {
 			true
 		);
 
+		$wizard_motion_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/af-wizard-motion.js';
+		if ( file_exists( $wizard_motion_path ) ) {
+			wp_enqueue_script(
+				'af-wizard-motion',
+				ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/af-wizard-motion.js',
+				array( 'af-admin-wizard' ),
+				(string) filemtime( $wizard_motion_path ),
+				true
+			);
+		}
+
 		// Input normalizer: capitalise address/city on blur.
 		$normalizer_path = get_stylesheet_directory() . '/assets/js/input-normalizer.js';
 		$normalizer_url  = get_stylesheet_directory_uri() . '/assets/js/input-normalizer.js';
@@ -198,7 +209,7 @@ class Arriendo_Facil_Accommodation_Wizard {
 			array(
 				'mode'       => $post_id ? 'edit' : 'create',
 				'postId'     => $post_id,
-				'listUrl'    => admin_url( 'edit.php?post_type=accommodation' ),
+				'listUrl'    => Arriendo_Facil_Properties_Page::url(),
 				'i18n'       => array(
 					'unsavedChanges'   => __( '¿Salir sin guardar los cambios?', 'arriendo-facil' ),
 					'missingTitle'     => __( 'Escribe un nombre para el inmueble.', 'arriendo-facil' ),
@@ -390,7 +401,7 @@ class Arriendo_Facil_Accommodation_Wizard {
 		$form_action = isset( $_POST['af_form_action'] ) ? sanitize_key( wp_unslash( $_POST['af_form_action'] ) ) : 'publish';
 
 		if ( 'cancel' === $form_action ) {
-			wp_safe_redirect( admin_url( 'edit.php?post_type=accommodation' ) );
+			wp_safe_redirect( Arriendo_Facil_Properties_Page::url() );
 			exit;
 		}
 
@@ -492,7 +503,7 @@ class Arriendo_Facil_Accommodation_Wizard {
 				),
 				60
 			);
-			$redirect = admin_url( 'edit.php?post_type=accommodation' );
+			$redirect = Arriendo_Facil_Properties_Page::url();
 		} else {
 			$redirect = add_query_arg(
 				array(

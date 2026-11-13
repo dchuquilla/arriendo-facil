@@ -2199,7 +2199,31 @@ array(
 		// Estilos del Panel (hero de cobranza, tarjetas de estado y métricas operativas).
 		// Se cargan también en el Calendario porque comparte el mismo diseño y
 		// desbloquea af-dashboard-calendar.css (depende de este handle).
-		if ( in_array( $hook, array( 'toplevel_page_arriendo-facil', 'arriendo-facil_page_af-calendar' ), true ) ) {
+		if ( 'toplevel_page_arriendo-facil' === $hook ) {
+			$panel_css_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-panel.css';
+			$panel_js_path  = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/af-panel.js';
+
+			wp_enqueue_style(
+				'af-panel',
+				ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/af-panel.css',
+				array( 'af-tokens', 'af-shell', 'af-admin-chrome', 'af-admin-shell-nav' ),
+				file_exists( $panel_css_path ) ? (string) filemtime( $panel_css_path ) : ARRIENDO_FACIL_VERSION
+			);
+
+			$panel_deps = array( 'chart-js' );
+			if ( wp_script_is( 'gsap', 'registered' ) ) {
+				$panel_deps[] = 'gsap';
+			}
+			wp_enqueue_script(
+				'af-panel',
+				ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/af-panel.js',
+				$panel_deps,
+				file_exists( $panel_js_path ) ? (string) filemtime( $panel_js_path ) : ARRIENDO_FACIL_VERSION,
+				true
+			);
+		}
+
+		if ( 'arriendo-facil_page_af-calendar' === $hook ) {
 			$dashboard_css_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-dashboard.css';
 			wp_enqueue_style(
 				'af-dashboard',

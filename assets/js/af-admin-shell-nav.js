@@ -22,7 +22,11 @@
 			}
 		};
 
-		if (window.localStorage && localStorage.getItem(storageKey) === '1') {
+		var stored = window.localStorage ? localStorage.getItem(storageKey) : null;
+		var tabletQuery = window.matchMedia('(min-width: 783px) and (max-width: 1100px)');
+
+		// Sin preferencia guardada, en tablets el menú arranca como riel de iconos para dar espacio al contenido.
+		if (stored === '1' || (stored === null && tabletQuery.matches)) {
 			body.classList.add('af-sidebar-collapsed');
 		}
 

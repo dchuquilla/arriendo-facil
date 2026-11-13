@@ -138,17 +138,6 @@ class Arriendo_Facil_Properties_Page {
 	public function ajax_trash() {
 		$post_id = $this->authorize_request( 'not-trash' );
 
-		global $wpdb;
-		$has_active_lease = (int) $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT COUNT(*) FROM {$wpdb->prefix}af_leases WHERE accommodation_id = %d AND status = 'active' AND deleted_at IS NULL",
-				$post_id
-			)
-		);
-		if ( $has_active_lease > 0 ) {
-			wp_send_json_error( array( 'message' => __( 'Tiene un contrato activo. Finalízalo antes de eliminar el inmueble.', 'arriendo-facil' ) ), 422 );
-		}
-
 		if ( ! wp_trash_post( $post_id ) ) {
 			wp_send_json_error( array( 'message' => __( 'No se pudo mover el inmueble a la papelera.', 'arriendo-facil' ) ), 500 );
 		}
@@ -330,7 +319,7 @@ class Arriendo_Facil_Properties_Page {
 				'i18n'    => array(
 					'trashTitle'    => __( '¿Eliminar este inmueble?', 'arriendo-facil' ),
 					/* translators: %d: days in the trash */
-					'trashText'     => sprintf( __( 'Se moverá a la papelera. Podrás restaurarlo durante %d días; después se eliminará definitivamente.', 'arriendo-facil' ), self::retention_days() ),
+					'trashText'     => sprintf( __( 'Se moverá a la papelera y se desvincularán su inquilino y contrato, si los tiene. Podrás restaurarlo con todo lo anterior durante %d días; después se eliminará definitivamente.', 'arriendo-facil' ), self::retention_days() ),
 					'trashConfirm'  => __( 'Mover a la papelera', 'arriendo-facil' ),
 					'deleteTitle'   => __( '¿Eliminar definitivamente?', 'arriendo-facil' ),
 					'deleteText'    => __( 'Esta acción no se puede deshacer.', 'arriendo-facil' ),

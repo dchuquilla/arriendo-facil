@@ -104,7 +104,7 @@ class Arriendo_Facil_Properties_Page {
 			wp_send_json_error( array( 'message' => __( 'No encontramos el inmueble.', 'arriendo-facil' ) ), 404 );
 		}
 
-		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) || ! Arriendo_Facil_Tenancy::can_access_accommodation( $post_id ) || ! current_user_can( 'delete_post', $post_id ) ) {
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) || ! Arriendo_Facil_Tenancy::can_access_accommodation( $post_id ) ) {
 			wp_send_json_error( array( 'message' => __( 'No tienes permiso para esta acción.', 'arriendo-facil' ) ), 403 );
 		}
 

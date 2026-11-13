@@ -149,7 +149,7 @@ $show_new    = ! $is_filtered && 1 === $paged;
 				$thumb       = get_the_post_thumbnail_url( $pid, 'medium_large' );
 				$title       = get_the_title( $pid );
 				$link        = $is_trashed ? '' : $edit_url( $pid );
-				$can_delete  = current_user_can( 'delete_post', $pid );
+				$can_delete  = current_user_can( Arriendo_Facil_Tenancy::CAP ) && Arriendo_Facil_Tenancy::can_access_accommodation( $pid );
 				$group_id    = $owner_id && class_exists( 'Arriendo_Facil_Catalog_Groups' ) ? (int) Arriendo_Facil_Catalog_Groups::get_group_id_for_property( $pid ) : 0;
 
 				if ( ! $thumb ) {

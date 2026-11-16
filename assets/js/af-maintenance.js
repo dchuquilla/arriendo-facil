@@ -264,7 +264,7 @@
 					// database rejected.
 					select.value = previous;
 
-					window.alert( ( json && json.data && json.data.message ) || afMaintenance.i18n.genericError );
+					window.afNotify( ( json && json.data && json.data.message ) || afMaintenance.i18n.genericError );
 					return;
 				}
 
@@ -286,7 +286,7 @@
 			} ).catch( function () {
 				select.disabled = false;
 				select.value = previous;
-				window.alert( afMaintenance.i18n.networkError );
+				window.afNotify( afMaintenance.i18n.networkError );
 			} );
 		} );
 
@@ -301,7 +301,7 @@
 				} );
 
 				if ( ! visible.length ) {
-					window.alert( afMaintenance.i18n.nothingToExport );
+					window.afNotify( afMaintenance.i18n.nothingToExport );
 					return;
 				}
 
@@ -945,10 +945,10 @@
 				}
 
 				btn.disabled = false;
-				window.alert( ( json && json.data && json.data.message ) || afMaintenance.i18n.genericError );
+				window.afNotify( ( json && json.data && json.data.message ) || afMaintenance.i18n.genericError );
 			} ).catch( function () {
 				btn.disabled = false;
-				window.alert( afMaintenance.i18n.networkError );
+				window.afNotify( afMaintenance.i18n.networkError );
 			} );
 		} );
 
@@ -976,10 +976,10 @@
 				}
 
 				btn.disabled = false;
-				window.alert( ( json && json.data && json.data.message ) || afMaintenance.i18n.genericError );
+				window.afNotify( ( json && json.data && json.data.message ) || afMaintenance.i18n.genericError );
 			} ).catch( function () {
 				btn.disabled = false;
-				window.alert( afMaintenance.i18n.networkError );
+				window.afNotify( afMaintenance.i18n.networkError );
 			} );
 		} );
 	}

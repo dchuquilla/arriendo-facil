@@ -389,7 +389,7 @@ if ( $can_manage ) {
 			post(body).then(function (json) {
 				btn.disabled = false;
 				if (!json || !json.success || !json.data || !json.data.url) {
-					window.alert((json && json.data && json.data.message) || <?php echo wp_json_encode( __( 'No se pudo abrir el documento.', 'arriendo-facil' ) ); ?>);
+					window.afNotify((json && json.data && json.data.message) || <?php echo wp_json_encode( __( 'No se pudo abrir el documento.', 'arriendo-facil' ) ); ?>);
 					return;
 				}
 				window.open(json.data.url, '_blank', 'noopener,noreferrer');

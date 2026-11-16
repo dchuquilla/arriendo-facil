@@ -324,7 +324,7 @@
 				if ( analyzeStatus ) {
 					analyzeStatus.style.display = 'none';
 				}
-				alert( err.message || 'Error al procesar la plantilla.' );
+				window.afNotify( err.message || 'Error al procesar la plantilla.' );
 			} );
 	} );
 

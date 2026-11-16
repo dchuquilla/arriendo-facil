@@ -459,7 +459,7 @@ $totals_platform = array(
 					window.location.reload();
 				} else {
 					btn.disabled = false;
-					alert((res && res.data && res.data.message) ? res.data.message : 'Error');
+					window.afNotify((res && res.data && res.data.message) ? res.data.message : 'Error');
 				}
 			});
 		});
@@ -573,7 +573,7 @@ $totals_platform = array(
 				window.location.reload();
 			} else {
 				btn.disabled = false;
-				alert((res && res.data && res.data.message) ? res.data.message : 'Error');
+				window.afNotify((res && res.data && res.data.message) ? res.data.message : 'Error');
 			}
 		});
 	});
@@ -595,7 +595,7 @@ $totals_platform = array(
 					window.location.reload();
 				} else {
 					btn.disabled = false;
-					alert((res && res.data && res.data.message) ? res.data.message : 'Error');
+					window.afNotify((res && res.data && res.data.message) ? res.data.message : 'Error');
 				}
 			});
 		});

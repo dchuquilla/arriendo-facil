@@ -367,7 +367,7 @@
 			if (res && res.success) {
 				refreshFor(SELECTED_DATE);
 			} else {
-				window.alert((res && res.data && res.data.message) ? res.data.message : 'No se pudo actualizar la mudanza.');
+				window.afNotify((res && res.data && res.data.message) ? res.data.message : 'No se pudo actualizar la mudanza.');
 			}
 		});
 	}
@@ -385,7 +385,7 @@
 			if (res && res.success) {
 				refreshFor(SELECTED_DATE);
 			} else {
-				window.alert((res && res.data && res.data.message) ? res.data.message : 'No se pudo quitar el registro.');
+				window.afNotify((res && res.data && res.data.message) ? res.data.message : 'No se pudo quitar el registro.');
 			}
 		});
 	}

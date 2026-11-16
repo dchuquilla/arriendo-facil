@@ -863,7 +863,7 @@ if ( $is_owner ) {
 			}).then(function (json) {
 				btn.disabled = false;
 				if (!json || !json.success || !json.data || !json.data.url) {
-					window.alert((json && json.data && json.data.message) || 'No se pudo abrir el documento.');
+					window.afNotify((json && json.data && json.data.message) || 'No se pudo abrir el documento.');
 					return;
 				}
 				window.open(json.data.url, '_blank', 'noopener,noreferrer');

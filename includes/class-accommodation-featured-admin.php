@@ -149,7 +149,7 @@ class Arriendo_Facil_Accommodation_Featured_Admin {
 					})
 					.catch(function(err){
 						input.checked = !desired;
-						window.alert(err.message || cfg.i18n.error);
+						window.afNotify(err.message || cfg.i18n.error);
 					})
 					.finally(function(){
 						if (wrap) wrap.classList.remove('is-loading');

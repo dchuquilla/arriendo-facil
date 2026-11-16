@@ -397,7 +397,7 @@ $pending_nonce = wp_create_nonce( 'af_billing_nonce' );
 	batchBtn.addEventListener( 'click', function () {
 		var todo = groups.filter( function ( g ) { return g.picked && selectedIds( g ).length; } );
 		if ( ! todo.length ) { return; }
-		if ( root.dataset.ready !== '1' ) { window.alert( T.notReady ); return; }
+		if ( root.dataset.ready !== '1' ) { window.afNotify( T.notReady ); return; }
 		if ( ! window.confirm( T.confirmBatch.replace( '%d', todo.length ) ) ) { return; }
 
 		var prog = document.getElementById( 'af-pending-progress' ), fill = document.getElementById( 'af-pending-progress-fill' ), txt = document.getElementById( 'af-pending-progress-text' );

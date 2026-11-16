@@ -872,13 +872,13 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 		post({ action: 'af_generate_service_charges', nonce: nonce, period: period }).then(function (json) {
 			if (target) { target.disabled = false; }
 			if (!json || !json.success) {
-				window.alert((json && json.data && json.data.message) || i18n.genericError);
+				window.afNotify((json && json.data && json.data.message) || i18n.genericError);
 				return;
 			}
 			window.location.reload();
 		}).catch(function () {
 			if (target) { target.disabled = false; }
-			window.alert(i18n.genericError);
+			window.afNotify(i18n.genericError);
 		});
 	}
 
@@ -1164,7 +1164,7 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 			post({ action: 'af_delete_service_schedule', nonce: nonce, schedule_id: btn.getAttribute('data-schedule') }).then(function (json) {
 				btn.disabled = false;
 				if (!json || !json.success) {
-					window.alert((json && json.data && json.data.message) || i18n.genericError);
+					window.afNotify((json && json.data && json.data.message) || i18n.genericError);
 					return;
 				}
 				window.location.reload();
@@ -1179,7 +1179,7 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 			post({ action: 'af_remove_service_schedule', nonce: nonce, schedule_id: btn.getAttribute('data-schedule') }).then(function (json) {
 				btn.disabled = false;
 				if (!json || !json.success) {
-					window.alert((json && json.data && json.data.message) || i18n.genericError);
+					window.afNotify((json && json.data && json.data.message) || i18n.genericError);
 					return;
 				}
 				window.location.reload();
@@ -1206,7 +1206,7 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 			}).then(function (json) {
 				btn.disabled = false;
 				if (!json || !json.success) {
-					window.alert((json && json.data && json.data.message) || i18n.genericError);
+					window.afNotify((json && json.data && json.data.message) || i18n.genericError);
 					return;
 				}
 				window.location.reload();
@@ -1322,7 +1322,7 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 			post({ action: 'af_unmark_service_paid', nonce: nonce, schedule_id: btn.getAttribute('data-schedule'), period: period }).then(function (json) {
 				btn.disabled = false;
 				if (!json || !json.success) {
-					window.alert((json && json.data && json.data.message) || i18n.genericError);
+					window.afNotify((json && json.data && json.data.message) || i18n.genericError);
 					return;
 				}
 				window.location.reload();

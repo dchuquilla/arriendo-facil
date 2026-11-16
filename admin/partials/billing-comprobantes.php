@@ -903,7 +903,7 @@ foreach ( $invoices as $inv_row ) {
 		previewOpenBtn.addEventListener( 'click', function () {
 			var leaseId = leaseIdFieldIssue ? parseInt( leaseIdFieldIssue.value || '0', 10 ) : 0;
 			if ( ! leaseId ) {
-				window.alert( '<?php echo esc_js( __( 'Selecciona un ID de contrato valido antes de emitir.', 'arriendo-facil' ) ); ?>' );
+				window.afNotify( '<?php echo esc_js( __( 'Selecciona un ID de contrato valido antes de emitir.', 'arriendo-facil' ) ); ?>' );
 				return;
 			}
 

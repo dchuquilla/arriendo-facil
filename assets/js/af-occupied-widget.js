@@ -140,7 +140,7 @@
 					setState(widget, true);
 				})
 				.catch(function (err) {
-					window.alert(err.message || i18n('error', 'No se pudo actualizar.'));
+					window.afNotify(err.message || i18n('error', 'No se pudo actualizar.'));
 				})
 				.finally(function () {
 					setBusy(widget, false);

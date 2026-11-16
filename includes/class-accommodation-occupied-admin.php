@@ -322,7 +322,7 @@ class Arriendo_Facil_Accommodation_Occupied_Admin {
 					})
 					.catch(function(err){
 						input.checked = !desired;
-						window.alert(err.message || cfg.i18n.error);
+						window.afNotify(err.message || cfg.i18n.error);
 					})
 					.finally(function(){
 						if (wrap) wrap.classList.remove('is-loading');
@@ -382,7 +382,7 @@ class Arriendo_Facil_Accommodation_Occupied_Admin {
 								var msg = (earlyRes.data && earlyRes.data.message)
 									? earlyRes.data.message
 									: cfg.i18n.yes;
-								window.alert(msg);
+								window.afNotify(msg);
 							})
 							.catch(function(){
 								/* Toggle meta failed — early termination already happened;

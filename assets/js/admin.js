@@ -3,14 +3,18 @@
 	'use strict';
 
 	// Mensajes de éxito/error: toast global (window.afToast, ver class-toast.php).
-	function notify( message, type ) {
-		type = type || 'error';
-		if ( window.afToast && typeof window.afToast[ type ] === 'function' ) {
-			window.afToast[ type ]( String( message ) );
-		} else {
-			window.alert( String( message ) ); // eslint-disable-line no-alert
-		}
+	// window.afNotify(message, type) queda disponible para el resto de scripts del panel.
+	if ( ! window.afNotify ) {
+		window.afNotify = function ( message, type ) {
+			type = type || 'error';
+			if ( window.afToast && typeof window.afToast[ type ] === 'function' ) {
+				window.afToast[ type ]( String( message ) );
+			} else {
+				window.alert( String( message ) ); // eslint-disable-line no-alert
+			}
+		};
 	}
+	var notify = window.afNotify;
 
 	// ── Predict accommodation rental cost (AI) ──────────────────────────────
 	$( document ).on( 'click', '.af-predict-cost', function () {

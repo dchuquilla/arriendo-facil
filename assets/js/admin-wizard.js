@@ -138,7 +138,7 @@
 	/* ---------- Per-step validation ---------- */
 
 	function showError( msg, fieldEl ) {
-		window.alert( msg ); // eslint-disable-line no-alert
+		window.afNotify( msg );
 		if ( fieldEl && fieldEl.focus ) fieldEl.focus();
 	}
 

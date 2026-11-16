@@ -132,7 +132,7 @@ $doc_status  = isset( $guest->doc_status ) && $guest->doc_status ? (string) $gue
 $doc_variant = 'verificado' === $doc_status ? 'success' : ( 'rechazado' === $doc_status ? 'danger' : 'warning' );
 
 $required_guest_docs = class_exists( 'Arriendo_Facil_Document_Verification' )
-	? Arriendo_Facil_Document_Verification::required_document_types()
+	? Arriendo_Facil_Document_Verification::required_document_types( $guest_id )
 	: array();
 $missing_guest_docs  = class_exists( 'Arriendo_Facil_Document_Verification' )
 	? Arriendo_Facil_Document_Verification::missing_required_documents( $guest_id )
@@ -485,6 +485,17 @@ if ( $can_manage ) {
 					<tr>
 						<th scope="row"><label for="af-profile-nationality"><?php esc_html_e( 'Nacionalidad', 'arriendo-facil' ); ?></label></th>
 						<td><input type="text" id="af-profile-nationality" name="nationality" class="regular-text" maxlength="100" value="<?php echo esc_attr( (string) $guest->nationality ); ?>" /></td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="af-profile-income-range"><?php esc_html_e( 'Rango de ingresos mensuales', 'arriendo-facil' ); ?></label></th>
+						<td>
+							<select id="af-profile-income-range" name="income_range" class="regular-text">
+								<option value=""><?php esc_html_e( '— Sin definir —', 'arriendo-facil' ); ?></option>
+								<?php foreach ( Arriendo_Facil_Guest::get_income_range_options() as $inc_value => $inc_label ) : ?>
+									<option value="<?php echo esc_attr( $inc_value ); ?>" <?php selected( (string) ( $guest->income_range ?? '' ), $inc_value ); ?>><?php echo esc_html( $inc_label ); ?></option>
+								<?php endforeach; ?>
+							</select>
+						</td>
 					</tr>
 					<tr>
 						<th scope="row"><label for="af-profile-birth-city"><?php esc_html_e( 'Ciudad de nacimiento', 'arriendo-facil' ); ?></label></th>

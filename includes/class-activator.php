@@ -440,7 +440,7 @@ class Arriendo_Facil_Activator {
 		"CREATE TABLE IF NOT EXISTS {$wpdb->prefix}af_guest_documents (
 				id                BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
 				guest_id          BIGINT(20) UNSIGNED NOT NULL,
-				doc_type          VARCHAR(40) NOT NULL COMMENT 'garantia_alicuota, cedula_papeleta, certificado_bancario, certificado_laboral',
+				doc_type          VARCHAR(40) NOT NULL COMMENT 'garantia_alicuota, cedula_papeleta, certificado_bancario, certificado_laboral, antecedentes_penales',
 				storage           VARCHAR(10) NOT NULL DEFAULT 'local' COMMENT 'r2 (privado) o local (fallback publico WP)',
 				object_key        VARCHAR(255) NOT NULL COMMENT 'clave R2 o attachment_id (fallback local)',
 				mime_type         VARCHAR(100) NOT NULL DEFAULT 'application/pdf',
@@ -605,6 +605,7 @@ class Arriendo_Facil_Activator {
 				id_number   VARCHAR(100) DEFAULT NULL,
 				id_type     CHAR(2) DEFAULT NULL COMMENT 'SRI: 04 RUC, 05 cedula, 06 pasaporte, 08 exterior',
 				nationality VARCHAR(100) DEFAULT NULL,
+				income_range VARCHAR(20) DEFAULT NULL,
 				birth_city  VARCHAR(150) DEFAULT NULL,
 				ai_score    DECIMAL(5,2) DEFAULT NULL,
 				created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1206,6 +1207,7 @@ class Arriendo_Facil_Activator {
 			'identity_match_status' => "ALTER TABLE {$guests_table} ADD COLUMN identity_match_status VARCHAR(20) NOT NULL DEFAULT 'not_checked'",
 			'nationality'     => "ALTER TABLE {$guests_table} ADD COLUMN nationality VARCHAR(100) DEFAULT NULL",
 			'birth_city'      => "ALTER TABLE {$guests_table} ADD COLUMN birth_city VARCHAR(150) DEFAULT NULL",
+			'income_range'    => "ALTER TABLE {$guests_table} ADD COLUMN income_range VARCHAR(20) DEFAULT NULL",
 		);
 
 		$schedules_table = $wpdb->prefix . 'af_service_schedules';

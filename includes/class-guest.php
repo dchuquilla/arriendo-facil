@@ -225,6 +225,45 @@ class Arriendo_Facil_Guest {
 	}
 
 	/**
+	 * Whether the nationality is a foreign one. Empty = not specified, not foreign.
+	 *
+	 * @param string $nationality Nationality value (see get_nationality_options()).
+	 * @return bool
+	 */
+	public static function is_foreign_nationality( $nationality ) {
+		$nationality = trim( (string) $nationality );
+		return '' !== $nationality && 0 !== strcasecmp( $nationality, 'Ecuatoriana' );
+	}
+
+	/**
+	 * Salario Básico Unificado de Ecuador (USD). Vigente 2026: $482 (Consejo Nacional
+	 * de Trabajo y Salarios). Actualizar cada enero; los rangos se recalculan solos.
+	 */
+	const SBU_USD = 482;
+
+	/**
+	 * Monthly income brackets expressed in SBU multiples, with the USD equivalent.
+	 * Keys are year-independent so stored values survive an SBU update.
+	 *
+	 * @return array<string,string> value => label
+	 */
+	public static function get_income_range_options() {
+		$sbu = (int) apply_filters( 'af_sbu_usd', self::SBU_USD );
+		$usd = static function ( $multiple ) use ( $sbu ) {
+			return '$' . number_format( $sbu * $multiple, 0, ',', '.' );
+		};
+
+		return array(
+			'sbu_lt_1' => sprintf( /* translators: %s: USD amount */ __( 'Menos de 1 SBU (menos de %s)', 'arriendo-facil' ), $usd( 1 ) ),
+			'sbu_1_2'  => sprintf( /* translators: 1,2: USD amounts */ __( '1 a 2 SBU (%1$s a %2$s)', 'arriendo-facil' ), $usd( 1 ), $usd( 2 ) ),
+			'sbu_2_3'  => sprintf( __( '2 a 3 SBU (%1$s a %2$s)', 'arriendo-facil' ), $usd( 2 ), $usd( 3 ) ),
+			'sbu_3_5'  => sprintf( __( '3 a 5 SBU (%1$s a %2$s)', 'arriendo-facil' ), $usd( 3 ), $usd( 5 ) ),
+			'sbu_5_8'  => sprintf( __( '5 a 8 SBU (%1$s a %2$s)', 'arriendo-facil' ), $usd( 5 ), $usd( 8 ) ),
+			'sbu_gt_8' => sprintf( __( 'Más de 8 SBU (más de %s)', 'arriendo-facil' ), $usd( 8 ) ),
+		);
+	}
+
+	/**
 	 * Adds any missing optional guest columns.
 	 *
 	 * @return true|WP_Error
@@ -250,6 +289,7 @@ class Arriendo_Facil_Guest {
 			'id_number_encrypted'  => 'ALTER TABLE ' . $table . ' ADD COLUMN id_number_encrypted LONGTEXT DEFAULT NULL',
 			'nationality'          => 'ALTER TABLE ' . $table . ' ADD COLUMN nationality VARCHAR(100) DEFAULT NULL',
 			'birth_city'           => 'ALTER TABLE ' . $table . ' ADD COLUMN birth_city VARCHAR(150) DEFAULT NULL',
+			'income_range'         => 'ALTER TABLE ' . $table . ' ADD COLUMN income_range VARCHAR(20) DEFAULT NULL',
 			'created_by'           => 'ALTER TABLE ' . $table . ' ADD COLUMN created_by BIGINT(20) UNSIGNED DEFAULT NULL',
 		);
 
@@ -300,6 +340,7 @@ class Arriendo_Facil_Guest {
 			'guest_cedula_papeleta_pdf'      => 'cedula_papeleta',
 			'guest_certificado_bancario_pdf' => 'certificado_bancario',
 			'guest_certificado_laboral_pdf'  => 'certificado_laboral',
+			'guest_antecedentes_penales_pdf' => 'antecedentes_penales',
 		);
 
 		require_once ABSPATH . 'wp-admin/includes/file.php';

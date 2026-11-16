@@ -1311,8 +1311,19 @@
 		}
 	} );
 
+	// Antecedentes penales: solo para nacionalidad extranjera (vacío = no definido, no se pide).
+	function afToggleForeignDocs() {
+		var nat = String( $( '#af_guest_nationality' ).val() || '' );
+		var foreign = '' !== nat && 'ecuatoriana' !== nat.toLowerCase();
+		$( '.af-guest-foreign-field' ).prop( 'hidden', ! foreign );
+		$( '#af_guest_antecedentes_penales_pdf' ).prop( 'required', foreign );
+		if ( ! foreign ) { $( '#af_guest_antecedentes_penales_pdf' ).val( '' ); }
+	}
+	$( document ).on( 'change', '#af_guest_nationality', afToggleForeignDocs );
+
 	$( document ).on( 'click', '#af-cancel-new-guest', function () {
 		$( '.af-guest-link-field' ).prop( 'hidden', true );
+		setTimeout( afToggleForeignDocs, 0 );
 	} );
 
 	$( document ).on( 'submit', '#af-guest-form', function ( event ) {

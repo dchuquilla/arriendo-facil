@@ -111,18 +111,33 @@ class Arriendo_Facil_Document_Verification {
 	/**
 	 * Document types required before a tenant's documents can be approved.
 	 *
-	 * Identity (cedula/papeleta) + income/security (laboral y bancario). El
-	 * administrador de propiedades solo necesita identidad (ver
-	 * Arriendo_Facil_Property_Admin_Onboarding::DOC_TYPES).
+	 * Copia de cédula (todos) + income/security (laboral y bancario). El
+	 * certificado de antecedentes penales se exige solo a inquilinos de
+	 * nacionalidad extranjera. El administrador de propiedades solo necesita
+	 * identidad (ver Arriendo_Facil_Property_Admin_Onboarding::DOC_TYPES).
 	 *
+	 * @param int $guest_id Optional. Guest ID, to apply nationality-based rules.
 	 * @return array<string,string>
 	 */
-	public static function required_document_types() {
-		return array(
-			'cedula_papeleta'     => __( 'Cédula o papeleta', 'arriendo-facil' ),
+	public static function required_document_types( $guest_id = 0 ) {
+		$types = array(
+			'cedula_papeleta'     => __( 'Copia de cédula', 'arriendo-facil' ),
 			'certificado_laboral' => __( 'Certificado laboral', 'arriendo-facil' ),
 			'certificado_bancario' => __( 'Certificado bancario', 'arriendo-facil' ),
 		);
+
+		$guest_id = absint( $guest_id );
+		if ( $guest_id ) {
+			global $wpdb;
+			$nationality = (string) $wpdb->get_var(
+				$wpdb->prepare( "SELECT nationality FROM {$wpdb->prefix}af_guests WHERE id = %d", $guest_id )
+			);
+			if ( Arriendo_Facil_Guest::is_foreign_nationality( $nationality ) ) {
+				$types['antecedentes_penales'] = __( 'Certificado de antecedentes penales', 'arriendo-facil' );
+			}
+		}
+
+		return $types;
 	}
 
 	/**
@@ -138,6 +153,7 @@ class Arriendo_Facil_Document_Verification {
 		if ( ! $guest_id ) {
 			return array_keys( self::required_document_types() );
 		}
+		$required = self::required_document_types( $guest_id );
 
 		$rows = (array) $wpdb->get_col(
 			$wpdb->prepare(
@@ -148,7 +164,7 @@ class Arriendo_Facil_Document_Verification {
 
 		$present = array_map( 'strval', $rows );
 
-		return array_values( array_diff( array_keys( self::required_document_types() ), $present ) );
+		return array_values( array_diff( array_keys( $required ), $present ) );
 	}
 
 	/**
@@ -176,11 +192,10 @@ class Arriendo_Facil_Document_Verification {
 		if ( 'verificado' === $status ) {
 			$missing = self::missing_required_documents( $guest_id );
 			if ( ! empty( $missing ) ) {
-				$labels = array();
+				$required_types = self::required_document_types( $guest_id );
+				$labels         = array();
 				foreach ( $missing as $doc_type ) {
-					$labels[] = self::required_document_types()[ $doc_type ]
-						? self::required_document_types()[ $doc_type ]
-						: $doc_type;
+					$labels[] = isset( $required_types[ $doc_type ] ) ? $required_types[ $doc_type ] : $doc_type;
 				}
 
 				return new WP_Error(

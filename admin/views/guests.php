@@ -252,7 +252,7 @@ if ( $is_owner ) {
 	<div id="af-guest-form-card" class="card" style="max-width: 900px; margin: 16px 0; padding: 16px; display: none;">
 		<h2><?php esc_html_e( 'Nuevo inquilino', 'arriendo-facil' ); ?></h2>
 		<p class="af-modal__hint" style="margin:0 0 16px;">
-			<?php esc_html_e( 'Registra al inquilino desde el panel. Puedes subir sus documentos ahora (certificados laboral y bancario, cédula/papeleta) para agilizar la verificación de identidad.', 'arriendo-facil' ); ?>
+			<?php esc_html_e( 'Registra al inquilino desde el panel. Puedes subir sus documentos ahora (copia de cédula, certificados laboral y bancario) para agilizar la verificación de identidad.', 'arriendo-facil' ); ?>
 		</p>
 		<form id="af-guest-form" method="post" action="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>" enctype="multipart/form-data">
 			<input type="hidden" name="action" value="af_create_guest" />
@@ -351,9 +351,9 @@ if ( $is_owner ) {
 			<h3 style="margin: 16px 0 8px;"><?php esc_html_e( 'Identidad', 'arriendo-facil' ); ?></h3>
 			<table class="form-table" role="presentation">
 				<tr>
-					<th scope="row"><label for="af_guest_nationality"><?php esc_html_e( 'Nacionalidad', 'arriendo-facil' ); ?></label></th>
+					<th scope="row"><label for="af_guest_nationality"><?php esc_html_e( 'Nacionalidad', 'arriendo-facil' ); ?> *</label></th>
 					<td>
-						<select id="af_guest_nationality" name="nationality" class="regular-text">
+						<select id="af_guest_nationality" name="nationality" class="regular-text" required>
 							<option value=""><?php esc_html_e( '— Seleccionar —', 'arriendo-facil' ); ?></option>
 							<?php foreach ( Arriendo_Facil_Guest::get_nationality_options() as $nat_value => $nat_label ) : ?>
 								<option value="<?php echo esc_attr( $nat_value ); ?>"><?php echo esc_html( $nat_label ); ?></option>
@@ -365,16 +365,35 @@ if ( $is_owner ) {
 					<th scope="row"><label for="af_guest_birth_city"><?php esc_html_e( 'Ciudad de nacimiento', 'arriendo-facil' ); ?></label></th>
 					<td><input type="text" id="af_guest_birth_city" name="birth_city" class="regular-text" maxlength="150" placeholder="<?php esc_attr_e( 'Ej: Quito', 'arriendo-facil' ); ?>" /></td>
 				</tr>
+				<tr>
+					<th scope="row"><label for="af_guest_income_range"><?php esc_html_e( 'Rango de ingresos mensuales', 'arriendo-facil' ); ?></label></th>
+					<td>
+						<select id="af_guest_income_range" name="income_range" class="regular-text">
+							<option value=""><?php esc_html_e( '— Seleccionar —', 'arriendo-facil' ); ?></option>
+							<?php foreach ( Arriendo_Facil_Guest::get_income_range_options() as $inc_value => $inc_label ) : ?>
+								<option value="<?php echo esc_attr( $inc_value ); ?>"><?php echo esc_html( $inc_label ); ?></option>
+							<?php endforeach; ?>
+						</select>
+						<p class="description"><?php esc_html_e( 'Referencial, para estadística y presupuesto. No reemplaza los certificados.', 'arriendo-facil' ); ?></p>
+					</td>
+				</tr>
 			</table>
 
 			<h3 style="margin: 16px 0 8px;"><?php esc_html_e( 'Documentos de identidad e ingresos', 'arriendo-facil' ); ?></h3>
 			<p class="af-modal__hint" style="margin: 0 0 8px;">
-				<?php esc_html_e( 'Todos en PDF. Con la cédula/papeleta, el certificado laboral y el certificado bancario subidos podrás verificar su identidad e ingresos sin enviarle nada.', 'arriendo-facil' ); ?>
+				<?php esc_html_e( 'Todos en PDF. Con la copia de cédula, el certificado laboral y el certificado bancario subidos podrás verificar su identidad e ingresos sin enviarle nada.', 'arriendo-facil' ); ?>
 			</p>
 			<table class="form-table" role="presentation">
 				<tr>
-					<th scope="row"><label for="af_guest_cedula_papeleta_pdf"><?php esc_html_e( 'Cédula o papeleta (PDF)', 'arriendo-facil' ); ?></label></th>
-					<td><input type="file" id="af_guest_cedula_papeleta_pdf" name="guest_cedula_papeleta_pdf" class="regular-text" accept="application/pdf,.pdf" /></td>
+					<th scope="row"><label for="af_guest_cedula_papeleta_pdf"><?php esc_html_e( 'Copia de cédula (PDF)', 'arriendo-facil' ); ?> *</label></th>
+					<td><input type="file" id="af_guest_cedula_papeleta_pdf" name="guest_cedula_papeleta_pdf" class="regular-text" accept="application/pdf,.pdf" required /></td>
+				</tr>
+				<tr class="af-guest-foreign-field" hidden>
+					<th scope="row"><label for="af_guest_antecedentes_penales_pdf"><?php esc_html_e( 'Certificado de antecedentes penales (PDF)', 'arriendo-facil' ); ?> *</label></th>
+					<td>
+						<input type="file" id="af_guest_antecedentes_penales_pdf" name="guest_antecedentes_penales_pdf" class="regular-text" accept="application/pdf,.pdf" />
+						<p class="description"><?php esc_html_e( 'Solo se solicita a inquilinos de nacionalidad extranjera.', 'arriendo-facil' ); ?></p>
+					</td>
 				</tr>
 				<tr>
 					<th scope="row"><label for="af_guest_certificado_laboral_pdf"><?php esc_html_e( 'Certificado laboral (PDF)', 'arriendo-facil' ); ?></label></th>

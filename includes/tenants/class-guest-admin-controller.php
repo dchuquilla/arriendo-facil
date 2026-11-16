@@ -54,6 +54,7 @@ class Arriendo_Facil_Guest_Admin_Controller {
 		$personas_viviran      = isset( $_POST['personas_viviran'] ) ? absint( wp_unslash( $_POST['personas_viviran'] ) ) : 0;
 		$nationality = isset( $_POST['nationality'] ) ? sanitize_text_field( wp_unslash( $_POST['nationality'] ) ) : '';
 		$birth_city  = isset( $_POST['birth_city'] ) ? sanitize_text_field( wp_unslash( $_POST['birth_city'] ) ) : '';
+		$income_range = isset( $_POST['income_range'] ) ? sanitize_key( wp_unslash( $_POST['income_range'] ) ) : '';
 
 		$name_parts = preg_split( '/\s+/', trim( $name ) );
 		$first_name = ! empty( $name_parts[0] ) ? $name_parts[0] : '';
@@ -81,8 +82,23 @@ class Arriendo_Facil_Guest_Admin_Controller {
 			wp_send_json_error( array( 'message' => __( 'Correo electronico invalido.', 'arriendo-facil' ) ) );
 		}
 
-		if ( $nationality && ! array_key_exists( $nationality, Arriendo_Facil_Guest::get_nationality_options() ) ) {
+		if ( ! $nationality || ! array_key_exists( $nationality, Arriendo_Facil_Guest::get_nationality_options() ) ) {
 			wp_send_json_error( array( 'message' => __( 'Selecciona una nacionalidad de la lista.', 'arriendo-facil' ) ) );
+		}
+
+		if ( $income_range && ! array_key_exists( $income_range, Arriendo_Facil_Guest::get_income_range_options() ) ) {
+			wp_send_json_error( array( 'message' => __( 'Selecciona un rango de ingresos de la lista.', 'arriendo-facil' ) ) );
+		}
+
+		// Copia de cédula (PDF) obligatoria para todos; antecedentes penales solo si es extranjero.
+		$has_pdf = static function ( $field ) {
+			return isset( $_FILES[ $field ]['error'] ) && UPLOAD_ERR_OK === (int) $_FILES[ $field ]['error'];
+		};
+		if ( ! $has_pdf( 'guest_cedula_papeleta_pdf' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Adjunta la copia de la cédula en PDF.', 'arriendo-facil' ) ) );
+		}
+		if ( Arriendo_Facil_Guest::is_foreign_nationality( $nationality ) && ! $has_pdf( 'guest_antecedentes_penales_pdf' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Para inquilinos extranjeros adjunta el certificado de antecedentes penales en PDF.', 'arriendo-facil' ) ) );
 		}
 
 		// Mismo criterio que el contrato: al vincular un inmueble se necesita la vigencia.
@@ -185,9 +201,10 @@ class Arriendo_Facil_Guest_Admin_Controller {
 				'personas_viviran'      => $personas_viviran,
 				'nationality'           => $nationality ? $nationality : null,
 				'birth_city'            => $birth_city ? $birth_city : null,
+				'income_range'          => $income_range ? $income_range : null,
 				'created_by'            => get_current_user_id(),
 			),
-			array( '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%d', '%s', '%s', '%d', '%s', '%s', '%d' )
+			array( '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%d', '%s', '%s', '%d', '%s', '%s', '%s', '%d' )
 		);
 
 		if ( $inserted ) {
@@ -250,6 +267,7 @@ class Arriendo_Facil_Guest_Admin_Controller {
 		$id_number  = isset( $_POST['id_number'] ) ? sanitize_text_field( wp_unslash( $_POST['id_number'] ) ) : '';
 		$nationality = isset( $_POST['nationality'] ) ? sanitize_text_field( wp_unslash( $_POST['nationality'] ) ) : '';
 		$birth_city  = isset( $_POST['birth_city'] ) ? sanitize_text_field( wp_unslash( $_POST['birth_city'] ) ) : '';
+		$income_range = isset( $_POST['income_range'] ) ? sanitize_key( wp_unslash( $_POST['income_range'] ) ) : '';
 		$accommodation_id = isset( $_POST['accommodation_id'] ) ? absint( wp_unslash( $_POST['accommodation_id'] ) ) : 0;
 
 		if ( ! $first_name ) {
@@ -306,6 +324,11 @@ class Arriendo_Facil_Guest_Admin_Controller {
 		$formats[]             = '%s';
 		$update['birth_city']  = $birth_city;
 		$formats[]             = '%s';
+		if ( isset( $_POST['income_range'] ) && ( '' === $income_range || array_key_exists( $income_range, Arriendo_Facil_Guest::get_income_range_options() ) ) ) {
+			Arriendo_Facil_Guest::ensure_guest_extra_columns();
+			$update['income_range'] = '' === $income_range ? null : $income_range;
+			$formats[]              = '%s';
+		}
 		// 0 = sin vincular, igual que en el alta.
 		$update['accommodation_id'] = $accommodation_id;
 		$formats[]                 = '%d';

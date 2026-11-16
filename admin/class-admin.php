@@ -2097,6 +2097,16 @@ array(
 		}
 
 		if ( $this->should_use_custom_shell() ) {
+			// Toast global (window.afToast) para mensajes de éxito/error en las vistas del panel.
+			if ( class_exists( 'Arriendo_Facil_Toast' ) ) {
+				add_action(
+					'admin_footer',
+					static function () {
+						echo Arriendo_Facil_Toast::inline_assets(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static, escaped markup.
+					},
+					5
+				);
+			}
 			$shell_nav_css_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-admin-shell-nav.css';
 			$shell_nav_js_path  = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/af-admin-shell-nav.js';
 			$alerts_css_path    = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-admin-alerts.css';

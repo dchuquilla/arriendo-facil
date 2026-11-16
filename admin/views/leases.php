@@ -587,6 +587,16 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 	</div>
 
 	<script>
+	/* Mensajes de éxito/error del módulo de contratos: siempre toast (window.afToast). */
+	window.afLeaseNotify = function (type, message) {
+		if (!message) { return; }
+		if (window.afToast && typeof window.afToast[type] === 'function') {
+			window.afToast[type](message);
+		} else {
+			window.alert(message);
+		}
+	};
+
 	(function () {
 		const card = document.getElementById('af-lease-form-card');
 		const form = document.getElementById('af-lease-form');
@@ -843,9 +853,11 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 		let autoValues = {};
 
 		function showError(msg) {
-			if (!errorBox) { return; }
-			errorBox.textContent = msg || '';
-			errorBox.classList.toggle('is-visible', !!msg);
+			if (errorBox) {
+				errorBox.textContent = '';
+				errorBox.classList.remove('is-visible');
+			}
+			if (msg) { window.afLeaseNotify('error', msg); }
 		}
 
 		/* Barra de progreso: ancho, porcentaje y texto "Paso X de Y — nombre". */
@@ -1237,20 +1249,14 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 			}).then((r) => r.json()).then(function (json) {
 				btn.disabled = false;
 				if (!json || !json.success) {
-					status.textContent = (json && json.data && json.data.message) || 'Error';
-					status.className = 'af-modal__status is-error';
-					status.style.display = 'block';
+					window.afLeaseNotify('error', (json && json.data && json.data.message) || <?php echo wp_json_encode( __( 'No se pudo crear el contrato.', 'arriendo-facil' ) ); ?>);
 					return;
 				}
-				status.textContent = <?php echo wp_json_encode( __( 'Contrato creado correctamente. Redirigiendo...', 'arriendo-facil' ) ); ?>;
-				status.className = 'af-modal__status is-success';
-				status.style.display = 'block';
+				window.afLeaseNotify('success', <?php echo wp_json_encode( __( 'Contrato creado correctamente. Redirigiendo...', 'arriendo-facil' ) ); ?>);
 				setTimeout(function () { window.location.reload(); }, 1200);
 			}).catch(function () {
 				btn.disabled = false;
-				status.textContent = 'Error de red';
-				status.className = 'af-modal__status is-error';
-				status.style.display = 'block';
+				window.afLeaseNotify('error', <?php echo wp_json_encode( __( 'Error de red. Intenta nuevamente.', 'arriendo-facil' ) ); ?>);
 			});
 		});
 	}());
@@ -1625,23 +1631,13 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 				// Re-show button so admin can retry (server lock released on error).
 				btn.disabled    = false;
 				btn.textContent = origLabel;
-				cell.querySelector( '.af-issue-error' ) && cell.querySelector( '.af-issue-error' ).remove();
-				var errSpan = document.createElement( 'span' );
-				errSpan.className = 'af-issue-error';
-				errSpan.style.cssText = 'display:block;color:#b03a36;font-size:11px;margin-top:2px;';
-				errSpan.title = msg;
-				errSpan.textContent = '⚠ ' + msg.substring( 0, 60 ) + ( msg.length > 60 ? '…' : '' );
-				cell.appendChild( errSpan );
+				window.afLeaseNotify( 'error', msg );
 			}
 		} )
 		.catch( function () {
 			btn.disabled    = false;
 			btn.textContent = origLabel;
-			var errSpan = document.createElement( 'span' );
-			errSpan.className = 'af-issue-error';
-			errSpan.style.cssText = 'display:block;color:#b03a36;font-size:11px;margin-top:2px;';
-			errSpan.textContent = '⚠ <?php echo esc_js( __( 'Error de red', 'arriendo-facil' ) ); ?>';
-			cell.appendChild( errSpan );
+			window.afLeaseNotify( 'error', '<?php echo esc_js( __( 'Error de red. Intenta nuevamente.', 'arriendo-facil' ) ); ?>' );
 		} );
 	} );
 
@@ -1701,7 +1697,7 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 
 			var reason = reasonArea.value.trim();
 			if ( '' === reason ) {
-				feedback.textContent = '<?php echo esc_js( __( 'Por favor, ingresa el motivo de terminacion.', 'arriendo-facil' ) ); ?>';
+				window.afLeaseNotify( 'error', '<?php echo esc_js( __( 'Por favor, ingresa el motivo de terminacion.', 'arriendo-facil' ) ); ?>' );
 				reasonArea.focus();
 				return;
 			}
@@ -1733,16 +1729,16 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 							}
 						}
 						closeModal();
-						alert( ( res.data && res.data.message ) ? res.data.message : '<?php echo esc_js( __( 'Contrato terminado.', 'arriendo-facil' ) ); ?>' );
+						window.afLeaseNotify( 'success', ( res.data && res.data.message ) ? res.data.message : '<?php echo esc_js( __( 'Contrato terminado.', 'arriendo-facil' ) ); ?>' );
 					} else {
 						var msg = ( res && res.data && res.data.message ) ? res.data.message : '<?php echo esc_js( __( 'No se pudo terminar el contrato.', 'arriendo-facil' ) ); ?>';
-						feedback.textContent = msg;
+						window.afLeaseNotify( 'error', msg );
 						btnConfirm.disabled = false;
 						btnConfirm.textContent = '<?php echo esc_js( __( 'Confirmar terminacion', 'arriendo-facil' ) ); ?>';
 					}
 				} )
 				.catch( function () {
-					feedback.textContent = '<?php echo esc_js( __( 'Error de red. Intenta nuevamente.', 'arriendo-facil' ) ); ?>';
+					window.afLeaseNotify( 'error', '<?php echo esc_js( __( 'Error de red. Intenta nuevamente.', 'arriendo-facil' ) ); ?>' );
 					btnConfirm.disabled = false;
 					btnConfirm.textContent = '<?php echo esc_js( __( 'Confirmar terminacion', 'arriendo-facil' ) ); ?>';
 				} );

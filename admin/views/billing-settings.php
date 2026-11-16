@@ -46,11 +46,11 @@ $af_ro_if_filled = function ( string $current_value ) use ( $af_is_owner ): stri
 $af_sri_notice = null;
 
 // Save general + environment settings.
-if ( isset( $_POST['af_save_sri_config'] ) ) {
+if ( isset( $_POST['af_save_sri_config'] ) && ! Arriendo_Facil_Consent::is_given() ) {
 	check_admin_referer( 'af_sri_settings_nonce' );
-	if ( ! Arriendo_Facil_Consent::is_given() ) {
-		wp_die( esc_html( Arriendo_Facil_Consent::error_message() ), '', array( 'back_link' => true ) );
-	}
+	$af_sri_notice = array( 'type' => 'error', 'msg' => Arriendo_Facil_Consent::error_message() );
+} elseif ( isset( $_POST['af_save_sri_config'] ) ) {
+	check_admin_referer( 'af_sri_settings_nonce' );
 	Arriendo_Facil_Consent::record( 'billing', get_current_user_id(), 'sri_config', get_current_user_id() );
 
 	// Load the current scoped config so we can protect owner-locked fields.
@@ -516,9 +516,13 @@ $af_points_ready     = ! empty( $emission_points );
 		</div>
 	<?php endif; ?>
 	<?php if ( $af_sri_notice ) : ?>
-		<div class="notice notice-<?php echo esc_attr( $af_sri_notice['type'] ); ?> is-dismissible">
-			<p><?php echo esc_html( $af_sri_notice['msg'] ); ?></p>
-		</div>
+		<script>
+	document.addEventListener('DOMContentLoaded', function () {
+		var kind = <?php echo wp_json_encode( 'success' === $af_sri_notice['type'] ? 'success' : ( 'error' === $af_sri_notice['type'] ? 'error' : 'info' ) ); ?>;
+		var msg = <?php echo wp_json_encode( (string) $af_sri_notice['msg'] ); ?>;
+		if (window.afToast && typeof window.afToast[kind] === 'function') { window.afToast[kind](msg); }
+	});
+	</script>
 		<?php if ( ! empty( $af_sri_notice['console_log'] ) ) : ?>
 		<script>
 		(function() {

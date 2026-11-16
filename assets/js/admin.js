@@ -2,6 +2,16 @@
 ( function ( $ ) {
 	'use strict';
 
+	// Mensajes de éxito/error: toast global (window.afToast, ver class-toast.php).
+	function notify( message, type ) {
+		type = type || 'error';
+		if ( window.afToast && typeof window.afToast[ type ] === 'function' ) {
+			window.afToast[ type ]( String( message ) );
+		} else {
+			window.alert( String( message ) ); // eslint-disable-line no-alert
+		}
+	}
+
 	// ── Predict accommodation rental cost (AI) ──────────────────────────────
 	$( document ).on( 'click', '.af-predict-cost', function () {
 		var $btn = $( this );
@@ -49,14 +59,14 @@
 		} )
 			.done( function ( response ) {
 				if ( response.success ) {
-					alert( 'Documento generado. Recargando…' );
-					window.location.reload();
+					notify( 'Documento generado. Recargando…', 'success' );
+					setTimeout( function () { window.location.reload(); }, 1200 );
 				} else {
-					alert( response.data && response.data.message ? response.data.message : 'Error al generar el documento.' );
+					notify( response.data && response.data.message ? response.data.message : 'Error al generar el documento.' );
 				}
 			} )
 			.fail( function () {
-				alert( 'La solicitud fallo.' );
+				notify( 'La solicitud fallo.' );
 			} )
 			.always( function () {
 				$btn.prop( 'disabled', false );
@@ -238,7 +248,7 @@
 		var activeVersion = parseInt( String( $btn.data( 'active-version' ) || 1 ), 10 );
 
 		if ( ! leaseId ) {
-			alert( 'Contrato invalido.' );
+			notify( 'Contrato invalido.' );
 			return;
 		}
 
@@ -255,14 +265,14 @@
 		} )
 			.done( function ( response ) {
 				if ( response && response.success ) {
-					alert( response.data && response.data.message ? response.data.message : 'Documento aprobado correctamente.' );
-					window.location.reload();
+					notify( response.data && response.data.message ? response.data.message : 'Documento aprobado correctamente.', 'success' );
+					setTimeout( function () { window.location.reload(); }, 1200 );
 				} else {
-					alert( response && response.data && response.data.message ? response.data.message : 'No se pudo aprobar el documento.' );
+					notify( response && response.data && response.data.message ? response.data.message : 'No se pudo aprobar el documento.' );
 				}
 			} )
 			.fail( function () {
-				alert( 'La solicitud fallo.' );
+				notify( 'La solicitud fallo.' );
 			} )
 			.always( function () {
 				$btn.prop( 'disabled', false ).text( 'Aprobar documento' );
@@ -286,11 +296,11 @@
 				if ( response.success ) {
 					window.location.reload();
 				} else {
-					alert( response.data && response.data.message ? response.data.message : 'Error al actualizar el contrato.' );
+					notify( response.data && response.data.message ? response.data.message : 'Error al actualizar el contrato.' );
 				}
 			} )
 			.fail( function () {
-				alert( 'La solicitud fallo.' );
+				notify( 'La solicitud fallo.' );
 			} )
 			.always( function () {
 				$btn.prop( 'disabled', false );
@@ -306,12 +316,12 @@
 		var originalText = $btn.text();
 
 		if ( ! leaseId ) {
-			alert( 'Contrato invalido.' );
+			notify( 'Contrato invalido.' );
 			return;
 		}
 
 		if ( 'tenant' !== reviewerType && 'owner' !== reviewerType ) {
-			alert( 'Tipo de revisor invalido.' );
+			notify( 'Tipo de revisor invalido.' );
 			return;
 		}
 
@@ -388,11 +398,11 @@
 				if ( response.success ) {
 					window.location.reload();
 				} else {
-					alert( response.data && response.data.message ? response.data.message : 'Error.' );
+					notify( response.data && response.data.message ? response.data.message : 'Error.' );
 				}
 			} )
 			.fail( function () {
-				alert( 'La solicitud fallo.' );
+				notify( 'La solicitud fallo.' );
 			} )
 			.always( function () {
 				$btn.prop( 'disabled', false );
@@ -480,10 +490,10 @@
 					return;
 				}
 
-				alert( response && response.data && response.data.message ? response.data.message : 'No se pudo crear la solicitud de limpieza.' );
+				notify( response && response.data && response.data.message ? response.data.message : 'No se pudo crear la solicitud de limpieza.' );
 			} )
 			.fail( function () {
-				alert( 'La solicitud fallo.' );
+				notify( 'La solicitud fallo.' );
 			} )
 			.always( function () {
 				$submit.prop( 'disabled', false );
@@ -617,13 +627,13 @@
 
 		requiredDocumentsValidation = validateRequiredOwnerDocuments( formEl );
 		if ( ! requiredDocumentsValidation.valid ) {
-			alert( requiredDocumentsValidation.message );
+			notify( requiredDocumentsValidation.message );
 			return;
 		}
 
 		fileValidation = validateOwnerUploadSize( formEl );
 		if ( ! fileValidation.valid ) {
-			alert( fileValidation.message );
+			notify( fileValidation.message );
 			return;
 		}
 
@@ -676,28 +686,28 @@
 
 					window.location.href = target;
                 } else {
-					alert( response && response.data && response.data.message ? response.data.message : 'Error al enviar el mensaje.' );
+					notify( response && response.data && response.data.message ? response.data.message : 'Error al enviar el mensaje.' );
                 }
             } )
 			.fail( function ( xhr ) {
 				var body = ( xhr && typeof xhr.responseText === 'string' ) ? xhr.responseText.trim() : '';
 
 				if ( xhr.status === 413 ) {
-					alert( 'Solicitud fallida (413): la carga es demasiado grande para los limites del servidor. Reduce el tamano de archivo o aumenta Nginx client_max_body_size y PHP post_max_size.' );
+					notify( 'Solicitud fallida (413): la carga es demasiado grande para los limites del servidor. Reduce el tamano de archivo o aumenta Nginx client_max_body_size y PHP post_max_size.' );
 					return;
 				}
 
 				if ( xhr.status === 400 && body === '0' ) {
-					alert( 'Solicitud fallida (400): admin-ajax no recibio una accion valida o tu sesion expiro. Recarga la pagina e intenta nuevamente.' );
+					notify( 'Solicitud fallida (400): admin-ajax no recibio una accion valida o tu sesion expiro. Recarga la pagina e intenta nuevamente.' );
 					return;
 				}
 
 				if ( xhr.status === 403 && body === '-1' ) {
-					alert( 'El nonce es invalido o expiro. Recarga la pagina e intenta nuevamente.' );
+					notify( 'El nonce es invalido o expiro. Recarga la pagina e intenta nuevamente.' );
 					return;
 				}
 
-				alert( 'Solicitud fallida (' + xhr.status + '): ' + ( body || 'sin detalles' ) );
+				notify( 'Solicitud fallida (' + xhr.status + '): ' + ( body || 'sin detalles' ) );
 			} )
             .always( function () {
                 $submit.prop( 'disabled', false );
@@ -834,7 +844,7 @@
 		var $row = $btn.closest( 'tr' );
 
 		if ( ! userId ) {
-			alert( 'Usuario invalido.' );
+			notify( 'Usuario invalido.' );
 			return;
 		}
 
@@ -857,10 +867,10 @@
 					return;
 				}
 
-				alert( response && response.data && response.data.message ? response.data.message : 'No se pudo deshabilitar la cuenta.' );
+				notify( response && response.data && response.data.message ? response.data.message : 'No se pudo deshabilitar la cuenta.' );
 			} )
 			.fail( function () {
-				alert( 'La solicitud fallo.' );
+				notify( 'La solicitud fallo.' );
 			} )
 			.always( function () {
 				$btn.prop( 'disabled', false );
@@ -1227,14 +1237,14 @@
 					var score = parseFloat( response.data.score ).toFixed( 2 );
 					$btn.closest( 'tr' ).find( 'td:nth-child(6)' ).text( score );
 					if ( response.data.summary ) {
-						alert( 'Resumen IA: ' + response.data.summary );
+						notify( 'Resumen IA: ' + response.data.summary, 'info' );
 					}
 				} else {
-					alert( response.data && response.data.message ? response.data.message : 'Error al calificar al huesped.' );
+					notify( response.data && response.data.message ? response.data.message : 'Error al calificar al huesped.' );
 				}
 			} )
 			.fail( function () {
-				alert( 'La solicitud fallo.' );
+				notify( 'La solicitud fallo.' );
 			} )
 			.always( function () {
 				$btn.prop( 'disabled', false );
@@ -1334,10 +1344,10 @@
 					return;
 				}
 
-				alert( response && response.data && response.data.message ? response.data.message : 'No se pudo crear el huesped.' );
+				notify( response && response.data && response.data.message ? response.data.message : 'No se pudo crear el huesped.' );
 			} )
 			.fail( function () {
-				alert( 'La solicitud fallo.' );
+				notify( 'La solicitud fallo.' );
 			} )
 			.always( function () {
 				$submit.prop( 'disabled', false );
@@ -1351,15 +1361,15 @@
 
 		// Example logic to show forms dynamically
 		if ( entryType === 'cleaning-request' ) {
-			alert( 'Mostrar formulario para nueva solicitud de limpieza' );
+			notify( 'Mostrar formulario para nueva solicitud de limpieza', 'info' );
 		} else if ( entryType === 'owner-contact' ) {
-			alert( 'Mostrar formulario para nuevo contacto de propietario' );
+			notify( 'Mostrar formulario para nuevo contacto de propietario', 'info' );
 		} else if ( entryType === 'lease' ) {
-			alert( 'Mostrar formulario para nuevo contrato' );
+			notify( 'Mostrar formulario para nuevo contrato', 'info' );
 		} else if ( entryType === 'guest' ) {
-			alert( 'Mostrar formulario para nuevo huesped' );
+			notify( 'Mostrar formulario para nuevo huesped', 'info' );
 		} else {
-			alert( 'Tipo de registro desconocido.' );
+			notify( 'Tipo de registro desconocido.' );
 		}
 	} );
 
@@ -1563,7 +1573,7 @@
 		var currentIds = getIds();
 		if ( currentIds.length >= MAX_PHOTOS ) {
 			// eslint-disable-next-line no-alert
-			alert( 'Máximo ' + MAX_PHOTOS + ' fotos permitidas.' );
+			notify( 'Máximo ' + MAX_PHOTOS + ' fotos permitidas.' );
 			return;
 		}
 

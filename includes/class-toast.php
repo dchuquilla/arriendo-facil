@@ -40,7 +40,7 @@ class Arriendo_Facil_Toast {
 		ob_start();
 		?>
 		<style id="af-toast-css">
-			.af-toast-stack{position:fixed;top:16px;right:16px;z-index:100000;display:flex;flex-direction:column;gap:12px;width:min(380px,calc(100vw - 32px));pointer-events:none;}
+			.af-toast-stack{position:fixed;top:16px;right:16px;z-index:100200;display:flex;flex-direction:column;gap:12px;width:min(380px,calc(100vw - 32px));pointer-events:none;}
 			body.admin-bar .af-toast-stack{top:48px;}
 			.af-toast{--af-toast-color:#164A55;--af-toast-bg:#F7F8F6;position:relative;display:flex;gap:12px;align-items:flex-start;box-sizing:border-box;padding:14px 40px 16px 14px;background:#FFFFFF;border:1px solid #DCE5E3;border-left:5px solid var(--af-toast-color);border-radius:12px;box-shadow:0 12px 32px rgba(25,50,56,.18);color:#193238;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;pointer-events:auto;overflow:hidden;opacity:0;transform:translateX(24px);transition:opacity .25s ease,transform .25s ease;}
 			.af-toast.is-visible{opacity:1;transform:none;}
@@ -144,6 +144,11 @@ class Arriendo_Facil_Toast {
 
 				return { dismiss: dismiss };
 			};
+
+			/* Atajos: afToast.error('msg'), afToast.success('msg'), afToast.info('msg'). */
+			window.afToast.success = function(message, title){ return window.afToast({ type:'approved', title:title || <?php echo wp_json_encode( __( 'Listo', 'arriendo-facil' ) ); ?>, message:message }); };
+			window.afToast.error = function(message, title){ return window.afToast({ type:'rejected', title:title || <?php echo wp_json_encode( __( 'No se pudo continuar', 'arriendo-facil' ) ); ?>, message:message }); };
+			window.afToast.info = function(message, title){ return window.afToast({ type:'info', title:title || <?php echo wp_json_encode( __( 'Aviso', 'arriendo-facil' ) ); ?>, message:message }); };
 		})();
 		</script>
 		<?php

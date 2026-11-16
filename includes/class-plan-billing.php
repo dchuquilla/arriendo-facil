@@ -464,8 +464,16 @@ class Arriendo_Facil_Plan_Billing {
 	 * Applies an expiry in real time on every admin request of a manager.
 	 */
 	public function sync_current_user() {
-		if ( is_user_logged_in() && ! wp_doing_cron() ) {
-			self::sync_user( get_current_user_id() );
+		if ( ! is_user_logged_in() || wp_doing_cron() ) {
+			return;
+		}
+
+		$user_id = get_current_user_id();
+		self::sync_user( $user_id );
+
+		// Cada respuesta AJAX del gestor lleva la revisión de su plan: es el aviso de cambio sin consultas extra.
+		if ( wp_doing_ajax() && ! headers_sent() && Arriendo_Facil_Plans::applies_to( $user_id ) ) {
+			header( 'X-AF-Plan-Rev: ' . (int) get_user_meta( $user_id, self::META_REV, true ) );
 		}
 	}
 
@@ -628,6 +636,7 @@ class Arriendo_Facil_Plan_Billing {
 			$response['af_plan'] = array(
 				'rev'    => $rev,
 				'notice' => self::take_notice( $user_id ),
+				'ui'     => Arriendo_Facil_Plans::ui_payload(),
 			);
 		}
 

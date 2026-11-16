@@ -187,6 +187,71 @@
 		if (next) { next(); }
 	}
 
+	/* ---------- Refresco en vivo de lo que depende del plan (sin recargar) ---------- */
+
+	function swap(selector, html) {
+		var current = document.querySelector(selector);
+		if (!current || !html) { return; }
+
+		var holder = document.createElement('div');
+		holder.innerHTML = html;
+		var next = holder.firstElementChild;
+		if (next) {
+			current.parentNode.replaceChild(next, current);
+			if (gsap && !reduced) { gsap.from(next, { opacity: 0, y: 6, duration: 0.35, ease: 'power2.out', clearProps: 'all' }); }
+		}
+	}
+
+	function applyUi(ui) {
+		if (!ui) { return; }
+		cfg.gates = ui.gates || {};
+
+		// Menú lateral: corona y bloqueo según el plan actual.
+		Array.prototype.forEach.call(document.querySelectorAll('[data-af-feature]'), function (link) {
+			var feature = link.getAttribute('data-af-feature');
+			var locked = !!cfg.gates[feature];
+			var crown = link.querySelector('.af-plan-crown');
+
+			link.classList.toggle('is-plan-locked', locked);
+			if (locked) {
+				link.setAttribute('data-af-plan-lock', feature);
+				if (!crown) {
+					crown = document.createElement('span');
+					crown.className = 'af-plan-crown';
+					crown.setAttribute('aria-hidden', 'true');
+					crown.innerHTML = cfg.crown || '';
+					link.appendChild(crown);
+					if (gsap && !reduced) { gsap.from(crown, { scale: 0, rotate: -25, duration: 0.5, ease: 'back.out(2.4)' }); }
+				}
+			} else {
+				link.removeAttribute('data-af-plan-lock');
+				if (crown) { crown.parentNode.removeChild(crown); }
+			}
+		});
+
+		// Servicios con corona dentro de Pagos de servicios.
+		if (!cfg.gates.services) {
+			Array.prototype.forEach.call(document.querySelectorAll('[data-af-plan-lock="services"]'), function (el) {
+				el.removeAttribute('data-af-plan-lock');
+				el.classList.remove('is-plan-locked');
+				var badge = el.querySelector('.af-plan-lock-badge');
+				if (badge) { badge.parentNode.removeChild(badge); }
+			});
+		}
+
+		swap('.af-plan-pill', ui.pill);
+		swap('.af-plan-mini', ui.menu);
+
+		if (chip) {
+			var title = chip.querySelector('strong');
+			var hint = chip.querySelector('small');
+			if (title) { title.textContent = String(i18n.planName || '%s').replace('%s', ui.label); }
+			if (hint) { hint.textContent = ui.hint; }
+		}
+
+		animateFills(document);
+	}
+
 	function planNotice(notice, fromHeartbeat) {
 		if (!notice) { return; }
 		queue.push(function () {
@@ -237,17 +302,50 @@
 		if (!cfg.boot) { setTimeout(showNext, 600); }
 	}
 
-	// Cambios hechos mientras el usuario trabaja: Heartbeat (sin consultas extra si no hay cambios).
+	/*
+	 * Detección de cambios de plan sin consultar de forma constante: el servidor añade la
+	 * cabecera X-AF-Plan-Rev a cada respuesta AJAX del gestor, y solo si esa revisión difiere
+	 * de la de la página (o al volver a la pestaña tras un rato) se pide UNA comprobación.
+	 * Heartbeat de WordPress se baja a su cadencia más lenta como respaldo para quien no hace nada.
+	 */
+	var lastContact = Date.now();
+	var checking = false;
+
+	function checkNow() {
+		if (checking || !window.wp || !window.wp.heartbeat) { return; }
+		checking = true;
+		lastContact = Date.now();
+		setTimeout(function () { checking = false; }, 10000);
+		window.wp.heartbeat.connectNow();
+	}
+
+	function noteRev(rev) {
+		lastContact = Date.now();
+		if (!cfg.state || rev === null || rev === undefined || rev === '') { return; }
+		if (parseInt(rev, 10) !== cfg.state.rev) { checkNow(); }
+	}
+
+	if (cfg.state && window.wp && window.wp.heartbeat) {
+		window.wp.heartbeat.interval(120);
+		document.addEventListener('visibilitychange', function () {
+			if (!document.hidden && Date.now() - lastContact > 30000) { checkNow(); }
+		});
+	}
+
 	if (window.jQuery) {
 		window.jQuery(document).on('heartbeat-send', function (_e, data) {
 			if (cfg.state) { data.af_plan_rev = cfg.state.rev; }
 		});
 		window.jQuery(document).on('heartbeat-tick', function (_e, data) {
+			checking = false;
+			lastContact = Date.now();
 			if (data && data.af_plan) {
 				if (cfg.state) { cfg.state.rev = data.af_plan.rev; }
+				applyUi(data.af_plan.ui);
 				planNotice(data.af_plan.notice, true);
 			}
 		});
+		window.jQuery(document).on('heartbeat-error', function () { checking = false; });
 	}
 
 	/* ---------- Peticiones ---------- */
@@ -376,7 +474,9 @@
 
 	/* Respuestas AJAX de otros módulos con un bloqueo de plan (HTTP 403 + plan_gate). */
 	if (window.jQuery) {
-		window.jQuery(document).ajaxComplete(function (_event, xhr) {
+		window.jQuery(document).ajaxComplete(function (_event, xhr, settings) {
+			var isHeartbeat = settings && typeof settings.data === 'string' && settings.data.indexOf('action=heartbeat') !== -1;
+			if (xhr && !isHeartbeat && xhr.getResponseHeader) { noteRev(xhr.getResponseHeader('X-AF-Plan-Rev')); }
 			if (!xhr || xhr.status !== 403) { return; }
 			try {
 				var json = xhr.responseJSON || JSON.parse(xhr.responseText);
@@ -389,6 +489,7 @@
 		var nativeFetch = window.fetch;
 		window.fetch = function () {
 			return nativeFetch.apply(this, arguments).then(function (res) {
+				if (res.headers && res.headers.get) { noteRev(res.headers.get('X-AF-Plan-Rev')); }
 				if (res.status === 403) {
 					res.clone().json().then(function (json) {
 						if (json && json.data && json.data.plan_gate) { openGate(json.data.plan_gate); }

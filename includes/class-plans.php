@@ -1099,6 +1099,7 @@ class Arriendo_Facil_Plans {
 				'gates'   => self::applies_to() ? self::locked_gates() : array(),
 				'boot'    => $gate,
 				'state'   => self::applies_to() ? Arriendo_Facil_Plan_Billing::client_state( get_current_user_id() ) : null,
+				'crown'   => af_lucide( 'crown', 14 ),
 				'i18n'    => array(
 					'viewPlans'    => __( 'Ver planes', 'arriendo-facil' ),
 					'notNow'       => __( 'Ahora no', 'arriendo-facil' ),
@@ -1116,6 +1117,7 @@ class Arriendo_Facil_Plans {
 					'cancelText'   => __( 'Volverás al plan Free de inmediato. Conservas todos tus datos: se administran tus 4 primeros inmuebles y el resto queda oculto, sin borrarse. Se reactivan al contratar de nuevo un plan con capacidad suficiente.', 'arriendo-facil' ),
 					'understood'   => __( 'Entendido', 'arriendo-facil' ),
 					'later'        => __( 'Más tarde', 'arriendo-facil' ),
+					'planName'     => __( 'Plan %s', 'arriendo-facil' ),
 					'sendProof'    => __( 'Enviar comprobante', 'arriendo-facil' ),
 					'planChanged'  => __( 'Actualizar', 'arriendo-facil' ),
 					'cancelConfirm' => __( 'Sí, cancelar plan', 'arriendo-facil' ),
@@ -1183,6 +1185,33 @@ class Arriendo_Facil_Plans {
 		return $rows;
 	}
 
+	/**
+	 * Everything the plan-dependent chrome needs to refresh itself without a reload.
+	 *
+	 * @return array<string,mixed>
+	 */
+	public static function ui_payload() {
+		$plan = self::get_plan();
+
+		ob_start();
+		self::render_menu_card();
+		$menu = (string) ob_get_clean();
+
+		return array(
+			'plan'  => $plan,
+			'label' => self::get_definition()['label'],
+			'gates' => self::locked_gates(),
+			'pill'  => self::topbar_pill(),
+			'menu'  => $menu,
+			'hint'  => 'pro' === $plan ? __( 'Administrar plan', 'arriendo-facil' ) : __( 'Mejorar plan', 'arriendo-facil' ),
+		);
+	}
+
+	/**
+	 * Small plan pill next to the user name in the topbar.
+	 *
+	 * @return string HTML (empty when plans do not apply to the user).
+	 */
 	public static function topbar_pill() {
 		if ( ! self::applies_to() ) {
 			return '';

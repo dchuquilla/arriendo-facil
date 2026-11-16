@@ -1314,11 +1314,13 @@ array(
 	 * @return string
 	 */
 	private function nav_lock_attrs( array $item ) {
-		if ( empty( $item['gate_data'] ) ) {
+		if ( empty( $item['feature'] ) ) {
 			return '';
 		}
 
-		return ' class="is-plan-locked" data-af-plan-lock="' . esc_attr( (string) $item['feature'] ) . '"';
+		$feature = ' data-af-feature="' . esc_attr( (string) $item['feature'] ) . '"';
+
+		return empty( $item['gate_data'] ) ? $feature : ' class="is-plan-locked" data-af-plan-lock="' . esc_attr( (string) $item['feature'] ) . '"' . $feature;
 	}
 
 	/**

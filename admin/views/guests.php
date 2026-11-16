@@ -232,7 +232,7 @@ if ( $is_owner ) {
 		array(
 			'eyebrow'  => __( 'Personas', 'arriendo-facil' ),
 			'title'    => __( 'Inquilinos', 'arriendo-facil' ),
-			'subtitle' => __( 'Inquilinos bajo administración. Regístralos, sube sus documentos y verifica su identidad e ingresos.', 'arriendo-facil' ),
+			'subtitle' => __( 'Inquilinos bajo administración. Regístralos y verifica su identidad con los documentos necesarios.', 'arriendo-facil' ),
 			'actions'  => array(
 				current_user_can( Arriendo_Facil_Tenancy::CAP ) ? sprintf(
 					'<button type="button" class="button af-btn af-btn--primary" id="af-new-guest"><span class="af-btn__icon" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>%s</button>',
@@ -252,7 +252,7 @@ if ( $is_owner ) {
 	<div id="af-guest-form-card" class="card" style="max-width: 900px; margin: 16px 0; padding: 16px; display: none;">
 		<h2><?php esc_html_e( 'Nuevo inquilino', 'arriendo-facil' ); ?></h2>
 		<p class="af-modal__hint" style="margin:0 0 16px;">
-			<?php esc_html_e( 'Registra al inquilino desde el panel. Puedes subir sus documentos ahora (copia de cédula, certificados laboral y bancario) para agilizar la verificación de identidad.', 'arriendo-facil' ); ?>
+			<?php esc_html_e( 'Registra al inquilino desde el panel. Puedes subir sus documentos ahora (copia de cédula y un comprobante de ingresos) para agilizar la verificación de identidad.', 'arriendo-facil' ); ?>
 		</p>
 		<form id="af-guest-form" method="post" action="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>" enctype="multipart/form-data">
 			<input type="hidden" name="action" value="af_create_guest" />
@@ -366,26 +366,26 @@ if ( $is_owner ) {
 					<td><input type="text" id="af_guest_birth_city" name="birth_city" class="regular-text" maxlength="150" placeholder="<?php esc_attr_e( 'Ej: Quito', 'arriendo-facil' ); ?>" /></td>
 				</tr>
 				<tr>
-					<th scope="row"><label for="af_guest_income_range"><?php esc_html_e( 'Rango de ingresos mensuales', 'arriendo-facil' ); ?></label></th>
+					<th scope="row"><label for="af_guest_income_range"><?php esc_html_e( 'Rango de ingresos mensuales', 'arriendo-facil' ); ?> *</label></th>
 					<td>
-						<select id="af_guest_income_range" name="income_range" class="regular-text">
+						<select id="af_guest_income_range" name="income_range" class="regular-text" required>
 							<option value=""><?php esc_html_e( '— Seleccionar —', 'arriendo-facil' ); ?></option>
 							<?php foreach ( Arriendo_Facil_Guest::get_income_range_options() as $inc_value => $inc_label ) : ?>
 								<option value="<?php echo esc_attr( $inc_value ); ?>"><?php echo esc_html( $inc_label ); ?></option>
 							<?php endforeach; ?>
 						</select>
-						<p class="description"><?php esc_html_e( 'Referencial, para estadística y presupuesto. No reemplaza los certificados.', 'arriendo-facil' ); ?></p>
+						<p class="description"><?php esc_html_e( 'Se contrasta con el comprobante de ingresos para evaluar la capacidad de pago.', 'arriendo-facil' ); ?></p>
 					</td>
 				</tr>
 			</table>
 
-			<h3 style="margin: 16px 0 8px;"><?php esc_html_e( 'Documentos de identidad e ingresos', 'arriendo-facil' ); ?></h3>
+			<h3 style="margin: 16px 0 8px;"><?php esc_html_e( 'Identidad e ingresos', 'arriendo-facil' ); ?></h3>
 			<p class="af-modal__hint" style="margin: 0 0 8px;">
-				<?php esc_html_e( 'Todos en PDF. Con la copia de cédula, el certificado laboral y el certificado bancario subidos podrás verificar su identidad e ingresos sin enviarle nada.', 'arriendo-facil' ); ?>
+				<?php esc_html_e( 'Solo pedimos lo mínimo para verificar la identidad del inquilino (evitar suplantaciones) y confirmar que puede sostener el arriendo: copia de cédula y un comprobante de ingresos. Todo en PDF.', 'arriendo-facil' ); ?>
 			</p>
 			<table class="form-table" role="presentation">
 				<tr>
-					<th scope="row"><label for="af_guest_cedula_papeleta_pdf"><?php esc_html_e( 'Copia de cédula (PDF)', 'arriendo-facil' ); ?> *</label></th>
+					<th scope="row"><label for="af_guest_cedula_papeleta_pdf"><span id="af_guest_cedula_label" data-cedula="<?php echo esc_attr__( 'Copia de cédula (PDF)', 'arriendo-facil' ); ?>" data-pasaporte="<?php echo esc_attr__( 'Copia de pasaporte (PDF)', 'arriendo-facil' ); ?>"><?php esc_html_e( 'Copia de cédula (PDF)', 'arriendo-facil' ); ?></span> *</label></th>
 					<td><input type="file" id="af_guest_cedula_papeleta_pdf" name="guest_cedula_papeleta_pdf" class="regular-text" accept="application/pdf,.pdf" required /></td>
 				</tr>
 				<tr class="af-guest-foreign-field" hidden>
@@ -397,15 +397,14 @@ if ( $is_owner ) {
 				</tr>
 				<tr>
 					<th scope="row"><label for="af_guest_certificado_laboral_pdf"><?php esc_html_e( 'Certificado laboral (PDF)', 'arriendo-facil' ); ?></label></th>
-					<td><input type="file" id="af_guest_certificado_laboral_pdf" name="guest_certificado_laboral_pdf" class="regular-text" accept="application/pdf,.pdf" /></td>
+					<td><input type="file" id="af_guest_certificado_laboral_pdf" name="guest_certificado_laboral_pdf" class="regular-text af-guest-income-proof" accept="application/pdf,.pdf" /></td>
 				</tr>
 				<tr>
 					<th scope="row"><label for="af_guest_certificado_bancario_pdf"><?php esc_html_e( 'Certificado bancario (PDF)', 'arriendo-facil' ); ?></label></th>
-					<td><input type="file" id="af_guest_certificado_bancario_pdf" name="guest_certificado_bancario_pdf" class="regular-text" accept="application/pdf,.pdf" /></td>
-				</tr>
-				<tr>
-					<th scope="row"><label for="af_guest_garantia_alicuota_pdf"><?php esc_html_e( 'Garantía y alícuota (PDF)', 'arriendo-facil' ); ?></label></th>
-					<td><input type="file" id="af_guest_garantia_alicuota_pdf" name="guest_garantia_alicuota_pdf" class="regular-text" accept="application/pdf,.pdf" /></td>
+					<td>
+						<input type="file" id="af_guest_certificado_bancario_pdf" name="guest_certificado_bancario_pdf" class="regular-text af-guest-income-proof" accept="application/pdf,.pdf" />
+						<p class="description"><?php esc_html_e( 'Sube al menos uno de los dos: sirve para confirmar que el inquilino puede sostener el arriendo.', 'arriendo-facil' ); ?></p>
+					</td>
 				</tr>
 			</table>
 

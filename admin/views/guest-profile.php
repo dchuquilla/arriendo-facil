@@ -139,6 +139,10 @@ $missing_guest_docs  = class_exists( 'Arriendo_Facil_Document_Verification' )
 	: array();
 $missing_guest_labels = array();
 foreach ( $missing_guest_docs as $missing_doc_type ) {
+	if ( Arriendo_Facil_Document_Verification::INCOME_PROOF === $missing_doc_type ) {
+		$missing_guest_labels[] = Arriendo_Facil_Document_Verification::income_proof_label();
+		continue;
+	}
 	$missing_guest_labels[] = isset( $required_guest_docs[ $missing_doc_type ] )
 		? $required_guest_docs[ $missing_doc_type ]
 		: $missing_doc_type;
@@ -147,7 +151,9 @@ foreach ( $missing_guest_docs as $missing_doc_type ) {
 $guest_doc_labels = array_merge(
 	$required_guest_docs,
 	array(
-		'garantia_alicuota' => __( 'Garantía y alícuota', 'arriendo-facil' ),
+		'certificado_laboral'  => __( 'Certificado laboral', 'arriendo-facil' ),
+		'certificado_bancario' => __( 'Certificado bancario', 'arriendo-facil' ),
+		'garantia_alicuota'    => __( 'Garantía y alícuota', 'arriendo-facil' ),
 	)
 );
 
@@ -532,7 +538,7 @@ if ( $can_manage ) {
 		<header class="af-section__header">
 			<div>
 				<h2 class="af-section__title" id="af-profile-docs"><?php esc_html_e( 'Documentos del inquilino', 'arriendo-facil' ); ?></h2>
-				<p class="af-section__subtitle"><?php esc_html_e( 'Carga aquí la identidad y los ingresos. No necesitas enviarle ningún enlace.', 'arriendo-facil' ); ?></p>
+				<p class="af-section__subtitle"><?php esc_html_e( 'Se requiere la copia de cédula, un comprobante de ingresos (certificado laboral o bancario, basta uno) y, si es extranjero, antecedentes penales.', 'arriendo-facil' ); ?></p>
 			</div>
 			<span class="af-pill af-pill--<?php echo esc_attr( $doc_variant ); ?>"><?php echo esc_html( ucfirst( $doc_status ) ); ?></span>
 		</header>
@@ -573,7 +579,7 @@ if ( $can_manage ) {
 							<td data-label="<?php esc_attr_e( 'Documento', 'arriendo-facil' ); ?>">
 								<strong><?php echo esc_html( $doc_type_label ); ?></strong>
 								<?php if ( ! $is_required ) : ?>
-									<span class="af-td-meta"><?php esc_html_e( 'opcional', 'arriendo-facil' ); ?></span>
+									<span class="af-td-meta"><?php echo in_array( $doc_type_key, array( 'certificado_laboral', 'certificado_bancario' ), true ) ? esc_html__( 'sube al menos uno de los dos', 'arriendo-facil' ) : esc_html__( 'opcional', 'arriendo-facil' ); ?></span>
 								<?php endif; ?>
 							</td>
 							<td data-label="<?php esc_attr_e( 'Estado', 'arriendo-facil' ); ?>">

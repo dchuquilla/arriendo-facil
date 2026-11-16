@@ -111,19 +111,17 @@ class Arriendo_Facil_Document_Verification {
 	/**
 	 * Document types required before a tenant's documents can be approved.
 	 *
-	 * Copia de cédula (todos) + income/security (laboral y bancario). El
-	 * certificado de antecedentes penales se exige solo a inquilinos de
-	 * nacionalidad extranjera. El administrador de propiedades solo necesita
-	 * identidad (ver Arriendo_Facil_Property_Admin_Onboarding::DOC_TYPES).
+	 * Mínimo necesario (identidad + capacidad de pago): copia de cédula (o
+	 * pasaporte) para todos y, únicamente si el inquilino es extranjero, el
+	 * certificado de antecedentes penales. Además se exige UN comprobante de
+	 * ingresos a elegir (ver income_proof_types()); no se piden ambos.
 	 *
 	 * @param int $guest_id Optional. Guest ID, to apply nationality-based rules.
 	 * @return array<string,string>
 	 */
 	public static function required_document_types( $guest_id = 0 ) {
 		$types = array(
-			'cedula_papeleta'     => __( 'Copia de cédula', 'arriendo-facil' ),
-			'certificado_laboral' => __( 'Certificado laboral', 'arriendo-facil' ),
-			'certificado_bancario' => __( 'Certificado bancario', 'arriendo-facil' ),
+			'cedula_papeleta' => __( 'Copia de cédula', 'arriendo-facil' ),
 		);
 
 		$guest_id = absint( $guest_id );
@@ -140,6 +138,26 @@ class Arriendo_Facil_Document_Verification {
 		return $types;
 	}
 
+	/** Pseudo-tipo usado en la lista de faltantes cuando no hay ningún comprobante de ingresos. */
+	const INCOME_PROOF = 'comprobante_ingresos';
+
+	/**
+	 * Comprobantes de ingresos aceptados: basta con uno de ellos.
+	 *
+	 * @return array<string,string>
+	 */
+	public static function income_proof_types() {
+		return array(
+			'certificado_laboral'  => __( 'Certificado laboral', 'arriendo-facil' ),
+			'certificado_bancario' => __( 'Certificado bancario', 'arriendo-facil' ),
+		);
+	}
+
+	/** Etiqueta del requisito "al menos un comprobante de ingresos". */
+	public static function income_proof_label() {
+		return __( 'Comprobante de ingresos (certificado laboral o bancario)', 'arriendo-facil' );
+	}
+
 	/**
 	 * Required document types that are still missing for a tenant.
 	 *
@@ -151,7 +169,7 @@ class Arriendo_Facil_Document_Verification {
 
 		$guest_id = absint( $guest_id );
 		if ( ! $guest_id ) {
-			return array_keys( self::required_document_types() );
+			return array_merge( array_keys( self::required_document_types() ), array( self::INCOME_PROOF ) );
 		}
 		$required = self::required_document_types( $guest_id );
 
@@ -164,7 +182,12 @@ class Arriendo_Facil_Document_Verification {
 
 		$present = array_map( 'strval', $rows );
 
-		return array_values( array_diff( array_keys( $required ), $present ) );
+		$missing = array_values( array_diff( array_keys( $required ), $present ) );
+		if ( ! array_intersect( array_keys( self::income_proof_types() ), $present ) ) {
+			$missing[] = self::INCOME_PROOF;
+		}
+
+		return $missing;
 	}
 
 	/**
@@ -195,7 +218,9 @@ class Arriendo_Facil_Document_Verification {
 				$required_types = self::required_document_types( $guest_id );
 				$labels         = array();
 				foreach ( $missing as $doc_type ) {
-					$labels[] = isset( $required_types[ $doc_type ] ) ? $required_types[ $doc_type ] : $doc_type;
+					$labels[] = self::INCOME_PROOF === $doc_type
+						? self::income_proof_label()
+						: ( isset( $required_types[ $doc_type ] ) ? $required_types[ $doc_type ] : $doc_type );
 				}
 
 				return new WP_Error(

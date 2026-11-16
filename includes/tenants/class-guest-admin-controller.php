@@ -86,7 +86,7 @@ class Arriendo_Facil_Guest_Admin_Controller {
 			wp_send_json_error( array( 'message' => __( 'Selecciona una nacionalidad de la lista.', 'arriendo-facil' ) ) );
 		}
 
-		if ( $income_range && ! array_key_exists( $income_range, Arriendo_Facil_Guest::get_income_range_options() ) ) {
+		if ( ! $income_range || ! array_key_exists( $income_range, Arriendo_Facil_Guest::get_income_range_options() ) ) {
 			wp_send_json_error( array( 'message' => __( 'Selecciona un rango de ingresos de la lista.', 'arriendo-facil' ) ) );
 		}
 
@@ -96,6 +96,9 @@ class Arriendo_Facil_Guest_Admin_Controller {
 		};
 		if ( ! $has_pdf( 'guest_cedula_papeleta_pdf' ) ) {
 			wp_send_json_error( array( 'message' => __( 'Adjunta la copia de la cédula en PDF.', 'arriendo-facil' ) ) );
+		}
+		if ( ! $has_pdf( 'guest_certificado_laboral_pdf' ) && ! $has_pdf( 'guest_certificado_bancario_pdf' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Adjunta un comprobante de ingresos en PDF: certificado laboral o certificado bancario.', 'arriendo-facil' ) ) );
 		}
 		if ( Arriendo_Facil_Guest::is_foreign_nationality( $nationality ) && ! $has_pdf( 'guest_antecedentes_penales_pdf' ) ) {
 			wp_send_json_error( array( 'message' => __( 'Para inquilinos extranjeros adjunta el certificado de antecedentes penales en PDF.', 'arriendo-facil' ) ) );

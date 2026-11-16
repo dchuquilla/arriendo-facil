@@ -1295,6 +1295,8 @@
 			pasaporte: 'Letras y números, de 6 a 12 caracteres.'
 		};
 		$( '#af_guest_id_hint' ).text( hints[ type ] || '' );
+		var $docLabel = $( '#af_guest_cedula_label' );
+		$docLabel.text( $docLabel.data( 'pasaporte' ) && 'pasaporte' === type ? $docLabel.data( 'pasaporte' ) : $docLabel.data( 'cedula' ) );
 		afSanitizeIdNumber( $( '#af_guest_id_number' ), type );
 	} );
 

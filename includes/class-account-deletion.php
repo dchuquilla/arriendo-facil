@@ -25,6 +25,9 @@ class Arriendo_Facil_Account_Deletion {
 	const STATUS_META  = 'af_account_status';
 	const CONFIRM = 'ELIMINAR';
 
+	const GRACE_DAYS     = 30;
+	const RETENTION_CRON = 'af_account_retention_cron';
+
 	/**
 	 * Registers hooks.
 	 *
@@ -37,6 +40,50 @@ class Arriendo_Facil_Account_Deletion {
 		add_action( 'admin_post_' . self::ACTION, array( __CLASS__, 'handle_request' ) );
 		add_action( 'admin_post_' . self::ADMIN_ACTION, array( __CLASS__, 'handle_admin_action' ) );
 		add_filter( 'wp_authenticate_user', array( __CLASS__, 'block_deactivated_login' ), 4, 1 );
+		add_action( self::RETENTION_CRON, array( __CLASS__, 'purge_expired_retention' ) );
+		if ( ! wp_next_scheduled( self::RETENTION_CRON ) ) {
+			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', self::RETENTION_CRON );
+		}
+	}
+
+	/** Años de retención legal para planes premium (acotado a 8-10). */
+	public static function retention_years() {
+		return min( 10, max( 8, (int) apply_filters( 'af_premium_retention_years', 10 ) ) );
+	}
+
+	public static function is_premium( $user_id ) {
+		return 'pro' === Arriendo_Facil_Plans::get_plan( absint( $user_id ) );
+	}
+
+	/** Fecha (timestamp) desde la cual se permite procesar o borrar la cuenta. */
+	public static function eligible_at( $user_id ) {
+		return (int) get_user_meta( absint( $user_id ), 'af_deletion_eligible_at', true );
+	}
+
+	public static function in_grace_period( $user_id ) {
+		return self::eligible_at( $user_id ) > time();
+	}
+
+	/** Timestamp hasta el cual deben conservarse contratos, adjuntos y auditorías (0 = sin retención). */
+	public static function retention_until( $user_id ) {
+		return (int) get_user_meta( absint( $user_id ), 'af_retention_until', true );
+	}
+
+	public static function must_retain( $user_id ) {
+		return self::retention_until( $user_id ) > time();
+	}
+
+	/** Bitácora de auditoría de la baja, conservada en la cuenta. */
+	private static function audit( $user_id, $event ) {
+		$log   = get_user_meta( $user_id, 'af_account_audit', true );
+		$log   = is_array( $log ) ? $log : array();
+		$log[] = array(
+			'event' => sanitize_key( $event ),
+			'at'    => current_time( 'mysql' ),
+			'by'    => get_current_user_id(),
+		);
+		update_user_meta( $user_id, 'af_account_audit', array_slice( $log, -50 ) );
+		do_action( 'af_account_audit', $user_id, $event );
 	}
 
 	/**
@@ -91,7 +138,8 @@ class Arriendo_Facil_Account_Deletion {
 			<p class="af-danger-card__lead"><?php esc_html_e( 'Tu cuenta se desactivará y perderás el acceso de inmediato.', 'arriendo-facil' ); ?></p>
 			<ul class="af-danger-card__list">
 				<li><?php esc_html_e( 'Tus propiedades dejarán de mostrarse y no podrás iniciar sesión.', 'arriendo-facil' ); ?></li>
-				<li><?php esc_html_e( 'Tus datos no se borran en este momento: el administrador de la plataforma decidirá si reactiva tu cuenta o la elimina definitivamente.', 'arriendo-facil' ); ?></li>
+				<li><?php esc_html_e( 'Tus datos se conservan 30 días de gracia; durante ese plazo no se procesan ni se eliminan. Luego el administrador decidirá si reactiva tu cuenta o la elimina.', 'arriendo-facil' ); ?></li>
+			<li><?php esc_html_e( 'Si tienes un plan premium, contratos, adjuntos y auditorías se conservan de 8 a 10 años por obligación legal.', 'arriendo-facil' ); ?></li>
 				<li><?php esc_html_e( 'Si quieres volver, contacta al administrador.', 'arriendo-facil' ); ?></li>
 			</ul>
 			<button type="button" class="af-danger-card__open" aria-expanded="false" aria-controls="af-danger-confirm"><?php esc_html_e( 'Quiero dar de baja mi cuenta', 'arriendo-facil' ); ?></button>
@@ -226,6 +274,11 @@ class Arriendo_Facil_Account_Deletion {
 		update_user_meta( $user_id, 'af_license_status', 'suspended' );
 		update_user_meta( $user_id, self::STATUS_META, 'deactivated' );
 		update_user_meta( $user_id, 'af_deactivated_at', current_time( 'mysql' ) );
+		update_user_meta( $user_id, 'af_deletion_eligible_at', time() + self::GRACE_DAYS * DAY_IN_SECONDS );
+		if ( self::is_premium( $user_id ) ) {
+			update_user_meta( $user_id, 'af_retention_until', strtotime( '+' . self::retention_years() . ' years' ) );
+		}
+		self::audit( $user_id, 'deactivated' );
 
 		$acc_ids = get_posts(
 			array(
@@ -271,6 +324,9 @@ class Arriendo_Facil_Account_Deletion {
 		delete_user_meta( $user_id, 'af_prev_license_status' );
 		delete_user_meta( $user_id, self::STATUS_META );
 		delete_user_meta( $user_id, 'af_deactivated_at' );
+		delete_user_meta( $user_id, 'af_deletion_eligible_at' );
+		delete_user_meta( $user_id, 'af_retention_until' );
+		self::audit( $user_id, 'reactivated' );
 
 		$acc_ids = get_posts(
 			array(
@@ -310,7 +366,7 @@ class Arriendo_Facil_Account_Deletion {
 	 * @return bool
 	 */
 	public static function is_deactivated( $user_id ) {
-		return 'deactivated' === get_user_meta( absint( $user_id ), self::STATUS_META, true );
+		return in_array( get_user_meta( absint( $user_id ), self::STATUS_META, true ), array( 'deactivated', 'archived' ), true );
 	}
 
 	/**
@@ -336,7 +392,8 @@ class Arriendo_Facil_Account_Deletion {
 			array(
 				'role'       => Arriendo_Facil_Tenancy::PROPERTY_MANAGER_ROLE,
 				'meta_key'   => self::STATUS_META, // phpcs:ignore WordPress.DB.SlowDBQuery
-				'meta_value' => 'deactivated', // phpcs:ignore WordPress.DB.SlowDBQuery
+				'meta_value' => array( 'deactivated', 'archived' ), // phpcs:ignore WordPress.DB.SlowDBQuery
+				'meta_compare' => 'IN',
 				'orderby'    => 'ID',
 			)
 		);
@@ -368,10 +425,15 @@ class Arriendo_Facil_Account_Deletion {
 			self::reactivate_user( $user_id );
 			$result = 'reactivated';
 		} elseif ( $allowed && 'purge' === $op ) {
-			self::purge_user_data( $user_id );
-			require_once ABSPATH . 'wp-admin/includes/user.php';
-			wp_delete_user( $user_id );
-			$result = 'purged';
+			if ( self::in_grace_period( $user_id ) ) {
+				$result = 'grace';
+			} elseif ( self::must_retain( $user_id ) ) {
+				self::archive_user_data( $user_id );
+				$result = 'archived';
+			} else {
+				self::finalize_purge( $user_id );
+				$result = 'purged';
+			}
 		}
 
 		wp_safe_redirect( add_query_arg( 'af_acc_result', $result, admin_url( 'admin.php?page=af-property-admins' ) ) );
@@ -392,6 +454,8 @@ class Arriendo_Facil_Account_Deletion {
 		$labels = array(
 			'reactivated' => array( 'success', __( 'La cuenta fue reactivada.', 'arriendo-facil' ) ),
 			'purged'      => array( 'success', __( 'La cuenta y sus datos fueron eliminados definitivamente.', 'arriendo-facil' ) ),
+			'grace'       => array( 'error', __( 'La cuenta sigue en periodo de gracia de 30 días; aún no se puede procesar ni eliminar.', 'arriendo-facil' ) ),
+			'archived'    => array( 'success', __( 'Se eliminaron los datos no sujetos a retención. Contratos, adjuntos y auditorías se conservan por obligación legal.', 'arriendo-facil' ) ),
 			'error'       => array( 'error', __( 'No se pudo completar la acción.', 'arriendo-facil' ) ),
 		);
 		?>
@@ -411,25 +475,29 @@ class Arriendo_Facil_Account_Deletion {
 						<th><?php esc_html_e( 'Gestor', 'arriendo-facil' ); ?></th>
 						<th><?php esc_html_e( 'Correo', 'arriendo-facil' ); ?></th>
 						<th><?php esc_html_e( 'Dada de baja', 'arriendo-facil' ); ?></th>
+						<th><?php esc_html_e( 'Elegible desde', 'arriendo-facil' ); ?></th>
+						<th><?php esc_html_e( 'Retención legal hasta', 'arriendo-facil' ); ?></th>
 						<th><?php esc_html_e( 'Decisión', 'arriendo-facil' ); ?></th>
 					</tr>
 				</thead>
 				<tbody>
 				<?php if ( empty( $users ) ) : ?>
-					<tr><td colspan="4"><?php esc_html_e( 'No hay cuentas pendientes de decisión.', 'arriendo-facil' ); ?></td></tr>
+					<tr><td colspan="6"><?php esc_html_e( 'No hay cuentas pendientes de decisión.', 'arriendo-facil' ); ?></td></tr>
 				<?php endif; ?>
 				<?php foreach ( $users as $u ) : ?>
 					<tr>
 						<td><?php echo esc_html( $u->display_name ); ?></td>
 						<td><?php echo esc_html( $u->user_email ); ?></td>
 						<td><?php echo esc_html( (string) get_user_meta( $u->ID, 'af_deactivated_at', true ) ); ?></td>
+						<td><?php echo esc_html( self::eligible_at( $u->ID ) ? wp_date( 'd/m/Y', self::eligible_at( $u->ID ) ) : '—' ); ?></td>
+						<td><?php echo esc_html( self::retention_until( $u->ID ) ? wp_date( 'd/m/Y', self::retention_until( $u->ID ) ) : '—' ); ?></td>
 						<td>
 							<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="display:inline-flex;gap:8px;flex-wrap:wrap;">
 								<input type="hidden" name="action" value="<?php echo esc_attr( self::ADMIN_ACTION ); ?>" />
 								<input type="hidden" name="user_id" value="<?php echo esc_attr( $u->ID ); ?>" />
 								<?php wp_nonce_field( self::ADMIN_ACTION . '_' . $u->ID, 'af_account_nonce' ); ?>
 								<button type="submit" name="op" value="reactivate" class="button"><?php esc_html_e( 'Reactivar', 'arriendo-facil' ); ?></button>
-								<button type="submit" name="op" value="purge" class="button" style="color:#b4443f;border-color:#d9534f;"
+								<button type="submit" name="op" value="purge" class="button" <?php disabled( self::in_grace_period( $u->ID ) ); ?> style="color:#b4443f;border-color:#d9534f;"
 									onclick="return window.confirm(<?php echo esc_attr( wp_json_encode( __( 'Se eliminarán definitivamente la cuenta y todos sus datos. Esta acción no se puede deshacer. ¿Continuar?', 'arriendo-facil' ) ) ); ?>);"><?php esc_html_e( 'Eliminar definitivamente', 'arriendo-facil' ); ?></button>
 							</form>
 						</td>
@@ -452,6 +520,13 @@ class Arriendo_Facil_Account_Deletion {
 
 		$user_id = absint( $user_id );
 		if ( ! $user_id || user_can( $user_id, 'manage_options' ) ) {
+			return;
+		}
+		if ( self::in_grace_period( $user_id ) ) {
+			return;
+		}
+		if ( self::must_retain( $user_id ) ) {
+			self::archive_user_data( $user_id );
 			return;
 		}
 
@@ -583,6 +658,73 @@ class Arriendo_Facil_Account_Deletion {
 		$avatar_id = (int) get_user_meta( $user_id, 'af_avatar_id', true );
 		if ( $avatar_id ) {
 			wp_delete_attachment( $avatar_id, true );
+		}
+	}
+
+	/**
+	 * Borrado definitivo (solo fuera de gracia y sin retención vigente).
+	 *
+	 * @param int $user_id User ID.
+	 * @return void
+	 */
+	public static function finalize_purge( $user_id ) {
+		$user_id = absint( $user_id );
+		if ( ! $user_id || self::in_grace_period( $user_id ) || self::must_retain( $user_id ) ) {
+			return;
+		}
+		self::audit( $user_id, 'purged' );
+		self::purge_user_data( $user_id );
+		require_once ABSPATH . 'wp-admin/includes/user.php';
+		wp_delete_user( $user_id );
+	}
+
+	/**
+	 * Retención legal: elimina solo datos sensibles no obligatorios y conserva
+	 * contratos, adjuntos, cobros, inquilinos, comprobantes y auditorías.
+	 *
+	 * @param int $user_id User ID.
+	 * @return void
+	 */
+	public static function archive_user_data( $user_id ) {
+		$user_id = absint( $user_id );
+		if ( ! $user_id || user_can( $user_id, 'manage_options' ) || self::in_grace_period( $user_id ) ) {
+			return;
+		}
+		global $wpdb;
+		$p = $wpdb->prefix;
+		foreach ( array( 'af_ota_credentials', 'af_catalog_groups' ) as $table ) {
+			self::delete_in( $p . $table, 'owner_id', array( $user_id ) );
+		}
+		self::delete_in( $p . 'af_ai_processing_queue', 'user_id', array( $user_id ) );
+		self::delete_in( $p . 'af_alerts', 'user_id', array( $user_id ) );
+		self::delete_in( $p . 'af_idempotency_keys', 'user_id', array( $user_id ) );
+
+		$avatar_id = (int) get_user_meta( $user_id, 'af_avatar_id', true );
+		if ( $avatar_id ) {
+			wp_delete_attachment( $avatar_id, true );
+		}
+		update_user_meta( $user_id, self::STATUS_META, 'archived' );
+		self::audit( $user_id, 'archived' );
+	}
+
+	/**
+	 * Cron: borra definitivamente cuentas archivadas cuyo plazo de retención venció.
+	 *
+	 * @return void
+	 */
+	public static function purge_expired_retention() {
+		$ids = get_users(
+			array(
+				'meta_key'   => self::STATUS_META, // phpcs:ignore WordPress.DB.SlowDBQuery
+				'meta_value' => 'archived', // phpcs:ignore WordPress.DB.SlowDBQuery
+				'fields'     => 'ID',
+				'number'     => 20,
+			)
+		);
+		foreach ( $ids as $id ) {
+			if ( self::retention_until( (int) $id ) && ! self::must_retain( (int) $id ) ) {
+				self::finalize_purge( (int) $id );
+			}
 		}
 	}
 

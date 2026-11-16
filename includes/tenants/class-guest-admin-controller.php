@@ -63,6 +63,10 @@ class Arriendo_Facil_Guest_Admin_Controller {
 			wp_send_json_error( array( 'message' => __( 'Faltan campos obligatorios.', 'arriendo-facil' ) ) );
 		}
 
+		if ( empty( $_POST['accept_data_responsibility'] ) ) {
+			wp_send_json_error( array( 'message' => __( 'Debes confirmar que cuentas con el consentimiento del inquilino.', 'arriendo-facil' ) ), 400 );
+		}
+
 		if ( $accommodation_id ) {
 			if ( 'accommodation' !== get_post_type( $accommodation_id ) ) {
 				wp_send_json_error( array( 'message' => __( 'ID de alojamiento invalido.', 'arriendo-facil' ) ) );

@@ -111,7 +111,7 @@ class Arriendo_Facil_Tenant_Signup {
 						<?php
 						echo wp_kses_post(
 							sprintf(
-								__( 'Acepto los <a href="%1$s" target="_blank" rel="noopener noreferrer">Terminos y Condiciones</a> y la <a href="%2$s" target="_blank" rel="noopener noreferrer">Politica de Privacidad</a> para el tratamiento de mis datos.', 'arriendo-facil' ),
+								__( 'He leído y acepto los <a href="%1$s" target="_blank" rel="noopener noreferrer">Términos y Condiciones</a> y la <a href="%2$s" target="_blank" rel="noopener noreferrer">Política de Privacidad</a>, y autorizo el tratamiento de mis datos personales. Declaro que la información que proporciono es veraz y que soy responsable de ella.', 'arriendo-facil' ),
 								esc_url( $terms_url ),
 								esc_url( $privacy_url )
 							)

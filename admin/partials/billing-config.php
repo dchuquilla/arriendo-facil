@@ -47,6 +47,9 @@ $af_sri_notice = null;
 // Save general + environment settings.
 if ( isset( $_POST['af_save_sri_config'] ) ) {
 	check_admin_referer( 'af_sri_settings_nonce' );
+	if ( empty( $_POST['accept_billing_responsibility'] ) ) {
+		wp_die( esc_html__( 'Debes aceptar la declaración de responsabilidad para guardar la configuración.', 'arriendo-facil' ), '', array( 'back_link' => true ) );
+	}
 
 	// Load the current scoped config so we can protect owner-locked fields.
 	$af_current_cfg = Arriendo_Facil_SRI_Config::get( $af_owner_scope_arg );
@@ -776,6 +779,11 @@ $af_check_txt  = ! $af_has_check ? __( 'Sin comprobar', 'arriendo-facil' ) : ( !
 
 		<div class="af-sri-form__actions af-sticky-save">
 			<span class="af-dirty-flag" hidden><?php esc_html_e( 'Cambios sin guardar', 'arriendo-facil' ); ?></span>
+			<label class="af-consent">
+				<input type="checkbox" name="accept_billing_responsibility" value="1" required />
+				<span><?php esc_html_e( 'Declaro que la información tributaria, certificados y comprobantes que gestiono son de mi exclusiva responsabilidad. Arriendo Fácil solo facilita la herramienta y no responde por su contenido ni por obligaciones ante el SRI.', 'arriendo-facil' ); ?></span>
+			</label>
+
 			<button type="submit" name="af_save_sri_config" class="button af-btn af-btn--primary">
 				<?php echo af_lucide( 'save', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
 				<?php esc_html_e( 'Guardar Configuración', 'arriendo-facil' ); ?>

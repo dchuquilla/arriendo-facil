@@ -571,6 +571,10 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 						<?php esc_html_e( 'Al crear el contrato se generará el DOCX con los datos de arriba y quedará en estado Borrador para que lo revises y actives.', 'arriendo-facil' ); ?>
 					</div>
 				</div>
+				<label class="af-consent">
+					<input type="checkbox" name="accept_contract_responsibility" value="1" id="af-accept-contract" required />
+					<span><?php esc_html_e( 'Declaro que el contenido del contrato y los datos de las partes son de mi exclusiva responsabilidad. Arriendo Fácil solo facilita la gestión administrativa, no es parte del contrato ni asume responsabilidad solidaria por él.', 'arriendo-facil' ); ?></span>
+				</label>
 			</section>
 
 			<!-- Navegación -->
@@ -1211,6 +1215,12 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 					showError(err);
 					return;
 				}
+			}
+
+			const consent = document.getElementById('af-accept-contract');
+			if (consent && !consent.checked) {
+				showError(<?php echo wp_json_encode( __( 'Debes aceptar la declaración de responsabilidad para crear el contrato.', 'arriendo-facil' ) ); ?>);
+				return;
 			}
 
 			const btn = submitBtn;

@@ -165,7 +165,7 @@ class Arriendo_Facil_Property_Admin_Registration {
 						<?php
 						echo wp_kses_post(
 							sprintf(
-								__( 'Acepto los <a href="%1$s" target="_blank" rel="noopener noreferrer">Terminos y Condiciones</a> y la <a href="%2$s" target="_blank" rel="noopener noreferrer">Politica de Privacidad</a> para el tratamiento de mis datos.', 'arriendo-facil' ),
+								__( 'He leído y acepto los <a href="%1$s" target="_blank" rel="noopener noreferrer">Términos y Condiciones</a> y la <a href="%2$s" target="_blank" rel="noopener noreferrer">Política de Privacidad</a>. Entiendo que Arriendo Fácil es solo un facilitador administrativo y que soy el único responsable de los datos, contratos y documentos que gestione.', 'arriendo-facil' ),
 								esc_url( $terms_url ),
 								esc_url( $privacy_url )
 							)

@@ -279,6 +279,10 @@ class Arriendo_Facil_Lease {
 			wp_send_json_error( array( 'message' => __( 'Faltan campos obligatorios.', 'arriendo-facil' ) ) );
 		}
 
+		if ( empty( $_POST['accept_contract_responsibility'] ) ) {
+			wp_send_json_error( array( 'message' => __( 'Debes aceptar la declaración de responsabilidad para crear el contrato.', 'arriendo-facil' ) ), 400 );
+		}
+
 		// Both sides of the contract must belong to the operator's own portfolio.
 		if ( ! Arriendo_Facil_Tenancy::can_access_accommodation( $accommodation_id ) || ! Arriendo_Facil_Tenancy::can_access_guest( $guest_id ) ) {
 			wp_send_json_error( array( 'message' => __( 'No tienes acceso al inmueble o al inquilino seleccionado.', 'arriendo-facil' ) ), 403 );

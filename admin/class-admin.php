@@ -2394,6 +2394,25 @@ array(
 			);
 		}
 
+		// Tarjetas de carga de documentos (Identidad e ingresos al registrar inquilinos).
+		if ( false !== strpos( (string) $hook, 'af-guests' ) ) {
+			$doc_css_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-doc-upload.css';
+			$doc_js_path  = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/af-doc-upload.js';
+			wp_enqueue_style(
+				'af-doc-upload',
+				ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/af-doc-upload.css',
+				array( 'af-tokens', 'af-shell', 'af-admin-chrome' ),
+				file_exists( $doc_css_path ) ? (string) filemtime( $doc_css_path ) : ARRIENDO_FACIL_VERSION
+			);
+			wp_enqueue_script(
+				'af-doc-upload',
+				ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/af-doc-upload.js',
+				wp_script_is( 'gsap', 'registered' ) ? array( 'gsap', 'af-admin' ) : array( 'af-admin' ),
+				file_exists( $doc_js_path ) ? (string) filemtime( $doc_js_path ) : ARRIENDO_FACIL_VERSION,
+				true
+			);
+		}
+
 		if ( 'arriendo-facil_page_af-reviews' === $hook ) {
 			$reviews_css_path = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-reviews.css';
 			wp_enqueue_style(

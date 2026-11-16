@@ -383,30 +383,84 @@ if ( $is_owner ) {
 			<p class="af-modal__hint" style="margin: 0 0 8px;">
 				<?php esc_html_e( 'Solo pedimos lo mínimo para verificar la identidad del inquilino (evitar suplantaciones) y confirmar que puede sostener el arriendo: copia de cédula y un comprobante de ingresos. Todo en PDF.', 'arriendo-facil' ); ?>
 			</p>
-			<table class="form-table" role="presentation">
-				<tr>
-					<th scope="row"><label for="af_guest_cedula_papeleta_pdf"><span id="af_guest_cedula_label" data-cedula="<?php echo esc_attr__( 'Copia de cédula (PDF)', 'arriendo-facil' ); ?>" data-pasaporte="<?php echo esc_attr__( 'Copia de pasaporte (PDF)', 'arriendo-facil' ); ?>"><?php esc_html_e( 'Copia de cédula (PDF)', 'arriendo-facil' ); ?></span> *</label></th>
-					<td><input type="file" id="af_guest_cedula_papeleta_pdf" name="guest_cedula_papeleta_pdf" class="regular-text" accept="application/pdf,.pdf" required /></td>
-				</tr>
-				<tr class="af-guest-foreign-field" hidden>
-					<th scope="row"><label for="af_guest_antecedentes_penales_pdf"><?php esc_html_e( 'Certificado de antecedentes penales (PDF)', 'arriendo-facil' ); ?> *</label></th>
-					<td>
-						<input type="file" id="af_guest_antecedentes_penales_pdf" name="guest_antecedentes_penales_pdf" class="regular-text" accept="application/pdf,.pdf" />
-						<p class="description"><?php esc_html_e( 'Solo se solicita a inquilinos de nacionalidad extranjera.', 'arriendo-facil' ); ?></p>
-					</td>
-				</tr>
-				<tr>
-					<th scope="row"><label for="af_guest_certificado_laboral_pdf"><?php esc_html_e( 'Certificado laboral (PDF)', 'arriendo-facil' ); ?></label></th>
-					<td><input type="file" id="af_guest_certificado_laboral_pdf" name="guest_certificado_laboral_pdf" class="regular-text af-guest-income-proof" accept="application/pdf,.pdf" /></td>
-				</tr>
-				<tr>
-					<th scope="row"><label for="af_guest_certificado_bancario_pdf"><?php esc_html_e( 'Certificado bancario (PDF)', 'arriendo-facil' ); ?></label></th>
-					<td>
-						<input type="file" id="af_guest_certificado_bancario_pdf" name="guest_certificado_bancario_pdf" class="regular-text af-guest-income-proof" accept="application/pdf,.pdf" />
-						<p class="description"><?php esc_html_e( 'Sube al menos uno de los dos: sirve para confirmar que el inquilino puede sostener el arriendo.', 'arriendo-facil' ); ?></p>
-					</td>
-				</tr>
-			</table>
+			<?php
+			$af_doc_card = static function ( $id, $name, $title_html, $badge, $badge_class, $hint, $extra = '', $required = false ) {
+				?>
+				<div class="af-doc <?php echo esc_attr( $extra ); ?>" data-af-doc <?php echo false !== strpos( $extra, 'af-guest-foreign-field' ) ? 'hidden' : ''; ?>>
+					<div class="af-doc__zone">
+						<input type="file" class="af-doc__input" id="<?php echo esc_attr( $id ); ?>" name="<?php echo esc_attr( $name ); ?>" accept="application/pdf,.pdf" <?php echo $required ? 'required' : ''; ?> aria-describedby="<?php echo esc_attr( $id ); ?>_hint" />
+						<span class="af-doc__icon" aria-hidden="true">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 17v-6m0 0-2.5 2.5M12 11l2.5 2.5"/></svg>
+						</span>
+						<span class="af-doc__body">
+							<span class="af-doc__title"><?php echo $title_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped by caller. ?></span>
+							<span class="af-doc__badge <?php echo esc_attr( $badge_class ); ?>"><?php echo esc_html( $badge ); ?></span>
+							<span class="af-doc__hint" id="<?php echo esc_attr( $id ); ?>_hint"><?php echo esc_html( $hint ); ?></span>
+						</span>
+						<span class="af-doc__check" aria-hidden="true">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+						</span>
+					</div>
+					<div class="af-doc__file" hidden>
+						<span class="af-doc__file-name"></span>
+						<span class="af-doc__file-size"></span>
+						<button type="button" class="af-doc__remove"><?php esc_html_e( 'Quitar', 'arriendo-facil' ); ?></button>
+					</div>
+				</div>
+				<?php
+			};
+			?>
+			<div class="af-docs" data-af-docs>
+				<?php
+				$af_doc_card(
+					'af_guest_cedula_papeleta_pdf',
+					'guest_cedula_papeleta_pdf',
+					'<span id="af_guest_cedula_label" data-cedula="' . esc_attr__( 'Copia de cédula', 'arriendo-facil' ) . '" data-pasaporte="' . esc_attr__( 'Copia de pasaporte', 'arriendo-facil' ) . '">' . esc_html__( 'Copia de cédula', 'arriendo-facil' ) . '</span>',
+					__( 'Obligatorio', 'arriendo-facil' ),
+					'is-required',
+					__( 'Arrastra el PDF aquí o toca para elegirlo. Máx. 10 MB.', 'arriendo-facil' ),
+					'',
+					true
+				);
+				$af_doc_card(
+					'af_guest_antecedentes_penales_pdf',
+					'guest_antecedentes_penales_pdf',
+					esc_html__( 'Antecedentes penales', 'arriendo-facil' ),
+					__( 'Solo extranjeros', 'arriendo-facil' ),
+					'is-info',
+					__( 'Certificado vigente en PDF. Máx. 10 MB.', 'arriendo-facil' ),
+					'af-guest-foreign-field'
+				);
+				?>
+				<fieldset class="af-docs__group" data-af-doc-group>
+					<legend class="af-docs__legend">
+						<?php esc_html_e( 'Comprobante de ingresos', 'arriendo-facil' ); ?>
+						<span class="af-docs__legend-note"><?php esc_html_e( 'Sube al menos uno: confirma que puede sostener el arriendo.', 'arriendo-facil' ); ?></span>
+					</legend>
+					<div class="af-docs__group-grid">
+						<?php
+						$af_doc_card(
+							'af_guest_certificado_laboral_pdf',
+							'guest_certificado_laboral_pdf',
+							esc_html__( 'Certificado laboral', 'arriendo-facil' ),
+							__( 'Uno de los dos', 'arriendo-facil' ),
+							'is-required',
+							__( 'PDF emitido por su empleador. Máx. 10 MB.', 'arriendo-facil' ),
+							'af-guest-income-proof'
+						);
+						$af_doc_card(
+							'af_guest_certificado_bancario_pdf',
+							'guest_certificado_bancario_pdf',
+							esc_html__( 'Certificado bancario', 'arriendo-facil' ),
+							__( 'Uno de los dos', 'arriendo-facil' ),
+							'is-required',
+							__( 'PDF emitido por su banco. Máx. 10 MB.', 'arriendo-facil' ),
+							'af-guest-income-proof'
+						);
+						?>
+					</div>
+				</fieldset>
+			</div>
 
 			<?php Arriendo_Facil_Consent::render( 'tenant_record' ); ?>
 

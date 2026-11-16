@@ -105,20 +105,7 @@ class Arriendo_Facil_Tenant_Signup {
 				<input type="hidden" name="form_ts" value="<?php echo esc_attr( (string) $form_ts ); ?>" />
 				<input type="hidden" name="form_sig" value="<?php echo esc_attr( (string) $form_sig ); ?>" />
 
-				<label class="af-tenant-signup__legal">
-					<input type="checkbox" name="accept_terms" value="1" required class="af-tenant-signup__checkbox" />
-					<span>
-						<?php
-						echo wp_kses_post(
-							sprintf(
-								__( 'He leído y acepto los <a href="%1$s" target="_blank" rel="noopener noreferrer">Términos y Condiciones</a> y la <a href="%2$s" target="_blank" rel="noopener noreferrer">Política de Privacidad</a>, y autorizo el tratamiento de mis datos personales. Declaro que la información que proporciono es veraz y que soy responsable de ella.', 'arriendo-facil' ),
-								esc_url( $terms_url ),
-								esc_url( $privacy_url )
-							)
-						);
-						?>
-					</span>
-				</label>
+				<?php Arriendo_Facil_Consent::render( 'tenant_signup' ); ?>
 
 				<div class="af-tenant-signup__actions">
 					<button type="submit" data-af-submit-signup class="af-tenant-signup__submit">
@@ -341,9 +328,9 @@ class Arriendo_Facil_Tenant_Signup {
 			wp_send_json_error( array( 'message' => __( 'Demasiados intentos. Espera unos minutos e intenta nuevamente.', 'arriendo-facil' ) ), 429 );
 		}
 
-		if ( 1 !== $accept_terms ) {
-			wp_send_json_error( array( 'message' => __( 'Debes aceptar el tratamiento de datos para crear la cuenta.', 'arriendo-facil' ) ), 400 );
-		}
+		if ( ! Arriendo_Facil_Consent::is_given() ) {
+				wp_send_json_error( array( 'message' => Arriendo_Facil_Consent::error_message() ), 400 );
+			}
 
 		if ( $password !== $password_confirm ) {
 			wp_send_json_error( array( 'message' => __( 'Las contrasenas no coinciden.', 'arriendo-facil' ) ), 400 );
@@ -425,6 +412,7 @@ class Arriendo_Facil_Tenant_Signup {
 		update_user_meta( $user_id, 'af_tenant_email_verified', 0 );
 		update_user_meta( $user_id, 'af_tenant_terms_accepted_at', current_time( 'mysql' ) );
 		update_user_meta( $user_id, 'af_tenant_terms_version', '2026-08-owasp-hardened' );
+		Arriendo_Facil_Consent::record( 'tenant_signup', $user_id, 'user', $user_id );
 
 		$schema_result = Arriendo_Facil_Guest::ensure_guest_extra_columns();
 		if ( is_wp_error( $schema_result ) ) {

@@ -279,8 +279,8 @@ class Arriendo_Facil_Lease {
 			wp_send_json_error( array( 'message' => __( 'Faltan campos obligatorios.', 'arriendo-facil' ) ) );
 		}
 
-		if ( empty( $_POST['accept_contract_responsibility'] ) ) {
-			wp_send_json_error( array( 'message' => __( 'Debes aceptar la declaración de responsabilidad para crear el contrato.', 'arriendo-facil' ) ), 400 );
+		if ( ! Arriendo_Facil_Consent::is_given() ) {
+			wp_send_json_error( array( 'message' => Arriendo_Facil_Consent::error_message() ), 400 );
 		}
 
 		// Both sides of the contract must belong to the operator's own portfolio.
@@ -422,6 +422,7 @@ class Arriendo_Facil_Lease {
 		}
 
 		$new_id = (int) $wpdb->insert_id;
+		Arriendo_Facil_Consent::record( 'contract', get_current_user_id(), 'lease', $new_id );
 
 		// ── Guardar Placeholders ─────────────────────────────────────────────
 		if ( ! empty( $placeholders ) ) {

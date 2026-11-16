@@ -2065,9 +2065,3 @@ body.post-type-accommodation #titlediv {
 		min-width: 0;
 	}
 }
-
-/* Casillas de consentimiento obligatorias */
-.af-consent{display:flex;align-items:flex-start;gap:10px;margin:16px 0;padding:12px 14px;border:1px solid #d5e0e3;border-radius:10px;background:#f6fafb;color:#2e4046;font-size:13px;line-height:1.5;cursor:pointer}
-.af-consent input[type=checkbox]{flex:0 0 auto;margin:2px 0 0}
-.af-consent:has(input:focus-visible){outline:2px solid #164a55;outline-offset:2px}
-@media (max-width:600px){.af-consent{font-size:12.5px;padding:10px 12px}}

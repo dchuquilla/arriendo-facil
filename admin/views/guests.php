@@ -390,10 +390,7 @@ if ( $is_owner ) {
 				</tr>
 			</table>
 
-			<label class="af-consent">
-				<input type="checkbox" name="accept_data_responsibility" value="1" required />
-				<span><?php esc_html_e( 'Declaro contar con el consentimiento del inquilino para registrar y tratar sus datos personales y documentos. Esta información es de mi exclusiva responsabilidad, no de Arriendo Fácil.', 'arriendo-facil' ); ?></span>
-			</label>
+			<?php Arriendo_Facil_Consent::render( 'tenant_record' ); ?>
 
 			<p class="submit">
 				<button type="submit" class="button button-primary"><?php esc_html_e( 'Guardar inquilino', 'arriendo-facil' ); ?></button>

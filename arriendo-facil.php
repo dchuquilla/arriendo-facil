@@ -37,6 +37,7 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/contracts/class-contract-text
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/contracts/class-contract-file-store.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/contracts/class-contract-generator.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-idempotency.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-consent.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-tenancy.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-accommodation.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-property-structure.php';

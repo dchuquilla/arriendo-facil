@@ -63,8 +63,8 @@ class Arriendo_Facil_Guest_Admin_Controller {
 			wp_send_json_error( array( 'message' => __( 'Faltan campos obligatorios.', 'arriendo-facil' ) ) );
 		}
 
-		if ( empty( $_POST['accept_data_responsibility'] ) ) {
-			wp_send_json_error( array( 'message' => __( 'Debes confirmar que cuentas con el consentimiento del inquilino.', 'arriendo-facil' ) ), 400 );
+		if ( ! Arriendo_Facil_Consent::is_given() ) {
+			wp_send_json_error( array( 'message' => Arriendo_Facil_Consent::error_message() ), 400 );
 		}
 
 		if ( $accommodation_id ) {
@@ -192,6 +192,7 @@ class Arriendo_Facil_Guest_Admin_Controller {
 
 		if ( $inserted ) {
 			$guest_id      = (int) $wpdb->insert_id;
+				Arriendo_Facil_Consent::record( 'tenant_record', get_current_user_id(), 'guest', $guest_id );
 			$upload_result = Arriendo_Facil_Guest::upload_guest_documents( $guest_id );
 
 			if ( is_wp_error( $upload_result ) ) {

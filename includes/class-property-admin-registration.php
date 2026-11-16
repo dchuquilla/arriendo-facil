@@ -159,20 +159,7 @@ class Arriendo_Facil_Property_Admin_Registration {
 				<input type="hidden" name="form_ts" value="<?php echo esc_attr( (string) $form_ts ); ?>" />
 				<input type="hidden" name="form_sig" value="<?php echo esc_attr( (string) $form_sig ); ?>" />
 
-				<label class="af-admin-signup__legal">
-					<input type="checkbox" name="accept_terms" value="1" required class="af-admin-signup__checkbox" />
-					<span>
-						<?php
-						echo wp_kses_post(
-							sprintf(
-								__( 'He leído y acepto los <a href="%1$s" target="_blank" rel="noopener noreferrer">Términos y Condiciones</a> y la <a href="%2$s" target="_blank" rel="noopener noreferrer">Política de Privacidad</a>. Entiendo que Arriendo Fácil es solo un facilitador administrativo y que soy el único responsable de los datos, contratos y documentos que gestione.', 'arriendo-facil' ),
-								esc_url( $terms_url ),
-								esc_url( $privacy_url )
-							)
-						);
-						?>
-					</span>
-				</label>
+				<?php Arriendo_Facil_Consent::render( 'admin_signup' ); ?>
 
 				<div class="af-admin-signup__actions">
 					<button type="submit" data-af-admin-submit class="af-admin-signup__submit">
@@ -464,9 +451,9 @@ class Arriendo_Facil_Property_Admin_Registration {
 			wp_send_json_error( array( 'message' => __( 'Demasiados intentos. Espera unos minutos e intenta nuevamente.', 'arriendo-facil' ) ), 429 );
 		}
 
-		if ( 1 !== $accept_terms ) {
-			wp_send_json_error( array( 'message' => __( 'Debes aceptar el tratamiento de datos para crear la cuenta.', 'arriendo-facil' ) ), 400 );
-		}
+		if ( ! Arriendo_Facil_Consent::is_given() ) {
+				wp_send_json_error( array( 'message' => Arriendo_Facil_Consent::error_message() ), 400 );
+			}
 
 		if ( $password !== $password_confirm ) {
 			wp_send_json_error( array( 'message' => __( 'Las contrasenas no coinciden.', 'arriendo-facil' ) ), 400 );
@@ -559,6 +546,7 @@ class Arriendo_Facil_Property_Admin_Registration {
 		update_user_meta( $user_id, 'af_admin_email_verified', 0 );
 		update_user_meta( $user_id, 'af_admin_terms_accepted_at', current_time( 'mysql' ) );
 		update_user_meta( $user_id, 'af_admin_terms_version', '2026-09-owasp-hardened' );
+		Arriendo_Facil_Consent::record( 'admin_signup', $user_id, 'user', $user_id );
 
 		update_user_meta( $user_id, 'af_signup_source', 'self' );
 		update_user_meta( $user_id, 'af_license_status', 'active' );

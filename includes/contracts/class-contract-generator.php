@@ -69,6 +69,16 @@ class Arriendo_Facil_Contract_Generator {
 	}
 
 	/**
+	 * Whether the last background generation attempt failed recently (retries are throttled).
+	 *
+	 * @param int $lease_id Lease ID.
+	 * @return bool
+	 */
+	public static function has_failed( $lease_id ) {
+		return (bool) get_transient( self::failure_key( $lease_id ) );
+	}
+
+	/**
 	 * Whether a background generation job is pending for the lease.
 	 *
 	 * @param int $lease_id Lease ID.

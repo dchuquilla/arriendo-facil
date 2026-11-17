@@ -27,6 +27,84 @@ class Arriendo_Facil_Lease {
 		add_action( 'wp_ajax_af_download_lease_contract', array( $this, 'ajax_download_lease_contract' ) );
 		add_action( 'wp_ajax_af_upload_lease_contract_version', array( $this, 'ajax_upload_lease_contract_version' ) );
 		add_action( 'wp_ajax_af_approve_lease_contract', array( $this, 'ajax_approve_lease_contract' ) );
+		add_action( 'wp_ajax_af_lease_document_status', array( $this, 'ajax_lease_document_status' ) );
+	}
+
+	/**
+	 * Reports whether the background contract generation of each given lease has finished,
+	 * so the leases list can update itself without a manual page reload.
+	 *
+	 * Defense: nonce + capability + per-lease ownership check; read-only apart from
+	 * re-queuing the (deduplicated, failure-throttled) generation job. Unauthorized lease
+	 * IDs are reported as "forbidden" without revealing anything about them.
+	 */
+	public function ajax_lease_document_status() {
+		check_ajax_referer( 'af_lease_nonce', 'nonce' );
+
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$raw_ids = isset( $_POST['lease_ids'] ) ? (array) wp_unslash( $_POST['lease_ids'] ) : array();
+		$ids     = array_slice( array_values( array_unique( array_filter( array_map( 'absint', $raw_ids ) ) ) ), 0, 25 );
+
+		$generator = new Arriendo_Facil_Contract_Generator();
+		$statuses  = array();
+		$pending   = false;
+
+		foreach ( $ids as $lease_id ) {
+			if ( ! Arriendo_Facil_Tenancy::can_access_lease( $lease_id ) ) {
+				$statuses[ $lease_id ] = array( 'status' => 'forbidden' );
+				continue;
+			}
+
+			if ( ! $this->get_lease( $lease_id ) ) {
+				$statuses[ $lease_id ] = array( 'status' => 'forbidden' );
+				continue;
+			}
+
+			if ( $generator->lease_has_document( $lease_id ) ) {
+				$versions_data = $this->get_contract_versions( $lease_id );
+				$versions      = isset( $versions_data['versions'] ) && is_array( $versions_data['versions'] ) ? $versions_data['versions'] : array();
+				$active        = isset( $versions_data['active_version'] ) ? max( 1, (int) $versions_data['active_version'] ) : 1;
+
+				$statuses[ $lease_id ] = array(
+					'status'         => 'ready',
+					'view_url'       => add_query_arg(
+						array(
+							'action'   => 'af_download_lease_contract',
+							'lease_id' => $lease_id,
+							'nonce'    => wp_create_nonce( 'af_lease_nonce' ),
+						),
+						admin_url( 'admin-ajax.php' )
+					),
+					'versions_count' => count( $versions ),
+					'version_label'  => $versions
+						? sprintf( __( 'Version activa: v%d (%d en total)', 'arriendo-facil' ), $active, count( $versions ) )
+						: '',
+					'active_version' => $active,
+				);
+				continue;
+			}
+
+			if ( Arriendo_Facil_Contract_Generator::has_failed( $lease_id ) ) {
+				$statuses[ $lease_id ] = array( 'status' => 'failed' );
+				continue;
+			}
+
+			if ( Arriendo_Facil_Contract_Generator::schedule( $lease_id ) ) {
+				$statuses[ $lease_id ] = array( 'status' => 'pending' );
+				$pending               = true;
+			} else {
+				$statuses[ $lease_id ] = array( 'status' => 'failed' );
+			}
+		}
+
+		if ( $pending && function_exists( 'spawn_cron' ) ) {
+			spawn_cron();
+		}
+
+		wp_send_json_success( array( 'statuses' => $statuses ) );
 	}
 
 	/**

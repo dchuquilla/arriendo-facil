@@ -1361,7 +1361,7 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 						admin_url( 'admin-ajax.php' )
 					);
 					?>
-					<tr class="af-lease-row" data-tab-group="<?php echo esc_attr( $row_tab_group ); ?>">
+					<tr class="af-lease-row" data-lease-id="<?php echo esc_attr( $lease->id ); ?>" data-tab-group="<?php echo esc_attr( $row_tab_group ); ?>">
 						<td data-label="<?php esc_attr_e( 'ID', 'arriendo-facil' ); ?>"><?php echo esc_html( $lease->id ); ?></td>
 							<td data-label="<?php esc_attr_e( 'Inmueble', 'arriendo-facil' ); ?>">
 								<strong><?php echo esc_html( ( isset( $lease->accommodation_title ) ? $lease->accommodation_title : null ) ?: ( isset( $lease->accommodation_id ) ? get_the_title( (int) $lease->accommodation_id ) : '' ) ?: $lease->accommodation_id ); ?></strong>
@@ -1432,7 +1432,7 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 						<?php elseif ( ! $binfo && ! $can_bill ) : ?>
 							<span style="color:#aaa; font-size:12px;">&mdash;</span>
 						<?php endif; ?>
-					</td>					<td class="af-lease-document-cell" data-label="<?php esc_attr_e( 'Documento', 'arriendo-facil' ); ?>">
+					</td>					<td class="af-lease-document-cell" data-label="<?php esc_attr_e( 'Documento', 'arriendo-facil' ); ?>"<?php echo $document_queued ? ' data-document-pending="1" aria-live="polite"' : ''; ?>>
 							<?php if ( $versions_count > 0 || $lease->document_url ) : ?>
 								<a class="af-lease-view-link" href="<?php echo esc_url( $download_active ); ?>" target="_blank">
 									<?php esc_html_e( 'Ver', 'arriendo-facil' ); ?>
@@ -1448,7 +1448,7 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 									<?php endif; ?>
 								<?php endif; ?>
 							<?php elseif ( $document_queued ) : ?>
-								<span class="af-lease-empty-document"><?php esc_html_e( 'Generando documento en segundo plano. Recarga en unos segundos.', 'arriendo-facil' ); ?></span>
+								<span class="af-lease-empty-document af-lease-document-pending"><?php esc_html_e( 'Generando documento…', 'arriendo-facil' ); ?></span>
 							<?php else : ?>
 								<span class="af-lease-empty-document"><?php esc_html_e( 'Aun no hay contrato. Sube una version Word desde Acciones.', 'arriendo-facil' ); ?></span>
 							<?php endif; ?>
@@ -1465,10 +1465,12 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 											data-next-version="<?php echo esc_attr( $next_version ); ?>">
 											<?php echo esc_html( sprintf( __( 'Subir v%d', 'arriendo-facil' ), $next_version ) ); ?>
 										</button>
-										<?php if ( $versions_count > 0 || $lease->document_url ) : ?>
+										<?php $has_document = $versions_count > 0 || $lease->document_url; ?>
+										<?php if ( $has_document || $document_queued ) : ?>
 											<button type="button" class="button button-primary af-approve-lease-document"
 												data-lease-id="<?php echo esc_attr( $lease->id ); ?>"
 												data-active-version="<?php echo esc_attr( max( 1, $active_version ) ); ?>"
+												<?php echo $has_document ? '' : 'style="display:none"'; ?>
 												<?php disabled( $has_approved_pdf ); ?>>
 												<?php echo esc_html( $has_approved_pdf ? __( 'Documento aprobado', 'arriendo-facil' ) : __( 'Aprobar documento', 'arriendo-facil' ) ); ?>
 											</button>
@@ -1560,6 +1562,102 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 		</div>
 	</div>
 </div>
+
+<script>
+(function () {
+	// Polls the generation status of contracts being built in the background and updates
+	// the "Documento" cell in place (no manual reload needed).
+	var cells = Array.prototype.slice.call( document.querySelectorAll( '.af-lease-document-cell[data-document-pending="1"]' ) );
+	if ( ! cells.length ) return;
+
+	var ajaxUrl  = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
+	var nonce    = <?php echo wp_json_encode( wp_create_nonce( 'af_lease_nonce' ) ); ?>;
+	var i18n     = {
+		view:    <?php echo wp_json_encode( __( 'Ver', 'arriendo-facil' ) ); ?>,
+		failed:  <?php echo wp_json_encode( __( 'No se pudo generar el documento automaticamente. Sube una version Word desde Acciones.', 'arriendo-facil' ) ); ?>,
+		slow:    <?php echo wp_json_encode( __( 'La generacion esta tardando mas de lo esperado. Vuelve a revisar en unos minutos.', 'arriendo-facil' ) ); ?>
+	};
+	var MAX_MS   = 5 * 60 * 1000;
+	var started  = Date.now();
+	var delay    = 3000;
+	var inFlight = false;
+
+	function leaseIdOf( cell ) {
+		var row = cell.closest( 'tr[data-lease-id]' );
+		return row ? row.getAttribute( 'data-lease-id' ) : '';
+	}
+
+	function setText( cell, text ) {
+		cell.removeAttribute( 'data-document-pending' );
+		cell.textContent = '';
+		var span = document.createElement( 'span' );
+		span.className = 'af-lease-empty-document';
+		span.textContent = text;
+		cell.appendChild( span );
+	}
+
+	function showReady( cell, info ) {
+		cell.removeAttribute( 'data-document-pending' );
+		cell.textContent = '';
+		var link = document.createElement( 'a' );
+		link.className = 'af-lease-view-link';
+		link.href = info.view_url;
+		link.target = '_blank';
+		link.rel = 'noopener';
+		link.textContent = i18n.view;
+		cell.appendChild( link );
+		if ( info.version_label ) {
+			var meta = document.createElement( 'div' );
+			meta.className = 'af-lease-version-meta';
+			meta.textContent = info.version_label;
+			cell.appendChild( meta );
+		}
+		var row = cell.closest( 'tr' );
+		var approve = row ? row.querySelector( '.af-approve-lease-document' ) : null;
+		if ( approve ) {
+			approve.style.display = '';
+			approve.setAttribute( 'data-active-version', String( info.active_version || 1 ) );
+		}
+	}
+
+	function tick() {
+		var open = cells.filter( function ( c ) { return c.getAttribute( 'data-document-pending' ) === '1'; } );
+		if ( ! open.length ) return;
+
+		if ( Date.now() - started > MAX_MS ) {
+			open.forEach( function ( c ) { setText( c, i18n.slow ); } );
+			return;
+		}
+
+		if ( document.hidden || inFlight ) { return schedule(); }
+
+		var body = new URLSearchParams();
+		body.append( 'action', 'af_lease_document_status' );
+		body.append( 'nonce', nonce );
+		open.forEach( function ( c ) { body.append( 'lease_ids[]', leaseIdOf( c ) ); } );
+
+		inFlight = true;
+		fetch( ajaxUrl, { method: 'POST', credentials: 'same-origin', body: body } )
+			.then( function ( r ) { return r.json(); } )
+			.then( function ( res ) {
+				if ( ! res || ! res.success || ! res.data ) return;
+				var statuses = res.data.statuses || {};
+				open.forEach( function ( c ) {
+					var info = statuses[ leaseIdOf( c ) ];
+					if ( ! info ) return;
+					if ( 'ready' === info.status ) { showReady( c, info ); }
+					else if ( 'failed' === info.status || 'forbidden' === info.status ) { setText( c, i18n.failed ); }
+				} );
+			} )
+			.catch( function () {} )
+			.then( function () { inFlight = false; delay = Math.min( delay + 1000, 10000 ); schedule(); } );
+	}
+
+	function schedule() { window.setTimeout( tick, delay ); }
+
+	schedule();
+})();
+</script>
 
 <script>
 (function () {

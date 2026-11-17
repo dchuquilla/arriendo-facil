@@ -539,4 +539,30 @@ class AuditRun3FixesTest extends TestCase {
 		$this->assertStringContainsString( 'accommodation_id IN (100)', $lease_query );
 		$this->assertStringContainsString( 'deleted_at IS NULL', $lease_query );
 	}
+
+	/**
+	 * The document-status poll must not reveal anything about leases the user cannot access.
+	 */
+	public function test_document_status_poll_reports_forbidden_for_unowned_lease() {
+		$this->boot( array( 'caps' => array( 'af_manage_properties' ) ) );
+		if ( ! class_exists( 'Arriendo_Facil_Accommodation' ) ) {
+			eval( 'class Arriendo_Facil_Accommodation { public static function get_owner_accommodation_ids( $u ) { return array( 100 ); } }' );
+		}
+		require_once dirname( __DIR__, 2 ) . '/includes/class-tenancy.php';
+		require_once dirname( __DIR__, 2 ) . '/includes/class-lease.php';
+		require_once dirname( __DIR__, 2 ) . '/includes/contracts/class-contract-generator.php';
+
+		// Lease 5 belongs to accommodation 999, which this manager does not own.
+		$GLOBALS['wpdb']->rows['SELECT accommodation_id FROM wp_af_leases'] = (object) array( 'id' => 999 );
+		$_POST['lease_ids']                                                  = array( '5' );
+
+		$lease = ( new \ReflectionClass( 'Arriendo_Facil_Lease' ) )->newInstanceWithoutConstructor();
+		try {
+			$lease->ajax_lease_document_status();
+			$this->fail( 'Expected a JSON response.' );
+		} catch ( \AF_T_Json $e ) {
+			$this->assertTrue( $e->ok );
+			$this->assertSame( array( 'status' => 'forbidden' ), $e->data['statuses'][5] );
+		}
+	}
 }

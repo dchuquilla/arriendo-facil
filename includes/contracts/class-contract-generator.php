@@ -1184,7 +1184,8 @@ class Arriendo_Facil_Contract_Generator {
 			'owner_email'   => $owner_user ? (string) $owner_user->user_email : '',
 			'file_name'     => $path ? wp_basename( $path ) : '',
 			'mime_type'     => $mime_type,
-			'url'           => wp_get_attachment_url( $attachment_id ),
+			// A template kept in the private store has no public URL (and must never become a document link).
+			'url'           => ( $path && Arriendo_Facil_Local_Private_Storage::is_private_path( $path ) ) ? '' : wp_get_attachment_url( $attachment_id ),
 			'template_text' => $template_text,
 		);
 	}

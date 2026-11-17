@@ -28,6 +28,7 @@ class Arriendo_Facil_Local_Private_Storage {
 	const CATEGORY_GUESTS = 'huespedes';
 	const CATEGORY_ADMINS = 'gestores';
 	const CATEGORY_CONTRACTS = 'contratos';
+	const CATEGORY_TEMPLATES = 'plantillas';
 
 	/**
 	 * Allowed stored file types and their content types.
@@ -38,6 +39,7 @@ class Arriendo_Facil_Local_Private_Storage {
 		'pdf'  => 'application/pdf',
 		'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 		'doc'  => 'application/msword',
+		'md'   => 'text/markdown',
 	);
 
 	/**
@@ -118,7 +120,7 @@ class Arriendo_Facil_Local_Private_Storage {
 			return new WP_Error( 'af_local_storage_bad_type', __( 'Tipo de archivo no permitido.', 'arriendo-facil' ) );
 		}
 
-		if ( ! in_array( $category, array( self::CATEGORY_GUESTS, self::CATEGORY_ADMINS, self::CATEGORY_CONTRACTS ), true ) ) {
+		if ( ! in_array( $category, array( self::CATEGORY_GUESTS, self::CATEGORY_ADMINS, self::CATEGORY_CONTRACTS, self::CATEGORY_TEMPLATES ), true ) ) {
 			return new WP_Error( 'af_local_storage_bad_category', __( 'Categoría de almacenamiento inválida.', 'arriendo-facil' ) );
 		}
 
@@ -143,6 +145,123 @@ class Arriendo_Facil_Local_Private_Storage {
 		@chmod( $path, 0640 ); // phpcs:ignore WordPress.PHP.NoSilencedErrors, WordPress.WP.AlternativeFunctions.chmod_chmod
 
 		return $category . '/' . $folder . '/' . $name;
+	}
+
+	/**
+	 * Absolute path of a person's folder for a category (created when missing). Used by modules
+	 * that write their own files (e.g. processed contract templates) so they land in the private
+	 * store with a readable per-owner folder.
+	 *
+	 * @param string $category    CATEGORY_* constant.
+	 * @param int    $owner_id    User or record ID.
+	 * @param string $person_name Display name for the folder.
+	 * @return string|WP_Error
+	 */
+	public static function directory( $category, $owner_id, $person_name ) {
+		$root = self::root();
+		if ( is_wp_error( $root ) ) {
+			return $root;
+		}
+
+		if ( ! in_array( $category, array( self::CATEGORY_GUESTS, self::CATEGORY_ADMINS, self::CATEGORY_CONTRACTS, self::CATEGORY_TEMPLATES ), true ) ) {
+			return new WP_Error( 'af_local_storage_bad_category', __( 'Categoría de almacenamiento inválida.', 'arriendo-facil' ) );
+		}
+
+		$dir = $root . '/' . $category . '/' . self::person_folder( $owner_id, $person_name );
+
+		return wp_mkdir_p( $dir ) ? $dir : new WP_Error( 'af_local_storage_mkdir', __( 'No se pudo crear la carpeta privada.', 'arriendo-facil' ) );
+	}
+
+	/**
+	 * Whether a path is inside the private store.
+	 *
+	 * @param string $path Absolute path.
+	 * @return bool
+	 */
+	public static function is_private_path( $path ) {
+		$root = self::root();
+		if ( is_wp_error( $root ) ) {
+			return false;
+		}
+
+		$real_root = realpath( $root );
+		$real_path = realpath( (string) $path );
+
+		return false !== $real_root && false !== $real_path && 0 === strpos( $real_path, $real_root . DIRECTORY_SEPARATOR );
+	}
+
+	/**
+	 * Moves a media-library attachment's file into the private store and points the attachment at
+	 * the new absolute path (WordPress resolves absolute _wp_attached_file values as they are).
+	 * The copy is verified before the public original is deleted; any failure leaves it untouched.
+	 *
+	 * @param int    $attachment_id Attachment ID.
+	 * @param string $category      CATEGORY_* constant.
+	 * @param int    $owner_id      Owner user ID.
+	 * @param string $person_name   Owner display name.
+	 * @param string $prefix        Readable file-name prefix (e.g. plantilla).
+	 * @return bool True when the file now lives in the private store.
+	 */
+	public static function relocate_attachment( $attachment_id, $category, $owner_id, $person_name, $prefix ) {
+		$attachment_id = absint( $attachment_id );
+		$path          = $attachment_id ? get_attached_file( $attachment_id, true ) : '';
+		if ( ! $path || ! is_file( $path ) ) {
+			return false;
+		}
+		if ( self::is_private_path( $path ) ) {
+			return true;
+		}
+
+		$ext = strtolower( pathinfo( $path, PATHINFO_EXTENSION ) );
+		if ( ! isset( self::TYPES[ $ext ] ) ) {
+			return false;
+		}
+
+		$contents = file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		if ( false === $contents || '' === $contents ) {
+			return false;
+		}
+
+		$key = self::store( $contents, $category, $owner_id, $person_name, $prefix . '-' . pathinfo( $path, PATHINFO_FILENAME ), $ext );
+		if ( is_wp_error( $key ) ) {
+			return false;
+		}
+
+		$new_path = self::resolve( $key );
+		$copy     = is_wp_error( $new_path ) ? false : file_get_contents( $new_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		if ( false === $copy || ! hash_equals( hash( 'sha256', $contents ), hash( 'sha256', $copy ) ) ) {
+			self::delete( $key );
+			return false;
+		}
+
+		$original = (string) get_post_meta( $attachment_id, '_wp_attached_file', true );
+		update_post_meta( $attachment_id, '_af_original_attached_file', $original );
+		update_post_meta( $attachment_id, '_wp_attached_file', $new_path );
+
+		// Only delete the public original once the attachment resolves to the private copy.
+		if ( get_attached_file( $attachment_id, true ) === $new_path ) {
+			wp_delete_file( $path );
+			return true;
+		}
+
+		update_post_meta( $attachment_id, '_wp_attached_file', $original );
+		self::delete( $key );
+
+		return false;
+	}
+
+	/**
+	 * Moves an owner's uploaded contract template out of the public media library into the
+	 * owner's private folder (see relocate_attachment()).
+	 *
+	 * @param int $attachment_id Template attachment ID.
+	 * @param int $user_id       Owner user ID.
+	 * @return bool
+	 */
+	public static function relocate_owner_template( $attachment_id, $user_id ) {
+		$user = get_userdata( absint( $user_id ) );
+
+		return self::relocate_attachment( $attachment_id, self::CATEGORY_TEMPLATES, absint( $user_id ), $user ? (string) $user->display_name : '', 'plantilla' );
 	}
 
 	/**
@@ -236,7 +355,7 @@ class Arriendo_Facil_Local_Private_Storage {
 	 */
 	public static function resolve( $key ) {
 		$key = (string) $key;
-		if ( '' === $key || false !== strpos( $key, '..' ) || false !== strpos( $key, "\0" ) || ! preg_match( '#^[a-z]+/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+\.(pdf|docx|doc)$#', $key ) ) {
+		if ( '' === $key || false !== strpos( $key, '..' ) || false !== strpos( $key, "\0" ) || ! preg_match( '#^[a-z]+/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+\.(pdf|docx|doc|md)$#', $key ) ) {
 			return new WP_Error( 'af_local_storage_bad_key', __( 'Clave de archivo inválida.', 'arriendo-facil' ) );
 		}
 

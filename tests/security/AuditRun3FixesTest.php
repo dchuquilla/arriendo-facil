@@ -412,4 +412,51 @@ class AuditRun3FixesTest extends TestCase {
 		$this->assertTrue( is_wp_error( \Arriendo_Facil_Local_Private_Storage::resolve( 'contratos/0017-ana-torres/x.php' ) ) );
 		$this->assertTrue( is_wp_error( \Arriendo_Facil_Local_Private_Storage::resolve( 'contratos/../../etc/passwd.pdf' ) ) );
 	}
+
+	/**
+	 * An uploaded owner template leaves the public folder: it is copied, verified, the attachment
+	 * points at the private copy, and the public original is deleted. Unsupported files stay put.
+	 */
+	public function test_owner_template_is_relocated_to_private_store() {
+		$this->boot();
+		$base = sys_get_temp_dir() . '/af-tpl-' . uniqid();
+		$priv = $base . '/private';
+		$pub  = $base . '/public';
+		mkdir( $pub, 0755, true );
+		define( 'AF_PRIVATE_STORAGE_DIR', $priv );
+		foreach ( array(
+			'remove_accents'     => 'function remove_accents( $s ) { return $s; }',
+			'wp_mkdir_p'         => 'function wp_mkdir_p( $d ) { return is_dir( $d ) || mkdir( $d, 0755, true ); }',
+			'get_userdata'       => 'function get_userdata( $id ) { return (object) array( "display_name" => "Carlos Perez" ); }',
+			'get_attached_file'  => 'function get_attached_file( $id, $u = false ) { return isset( $GLOBALS["af_t_meta"][ (int) $id ]["_wp_attached_file"] ) ? $GLOBALS["af_t_meta"][ (int) $id ]["_wp_attached_file"] : false; }',
+			'update_post_meta'   => 'function update_post_meta( $id, $k, $v ) { $GLOBALS["af_t_meta"][ (int) $id ][ $k ] = $v; return true; }',
+			'wp_delete_file'     => 'function wp_delete_file( $f ) { if ( is_file( $f ) ) { unlink( $f ); } }',
+		) as $name => $code ) {
+			if ( ! function_exists( $name ) ) {
+				eval( $code );
+			}
+		}
+		require_once dirname( __DIR__, 2 ) . '/includes/storage/class-local-private-storage.php';
+
+		$original = $pub . '/Contrato-modelo.docx';
+		file_put_contents( $original, 'PK-template-bytes' );
+		$GLOBALS['af_t_meta'][55]['_wp_attached_file'] = $original;
+
+		$this->assertTrue( \Arriendo_Facil_Local_Private_Storage::relocate_owner_template( 55, 9 ) );
+
+		$new = $GLOBALS['af_t_meta'][55]['_wp_attached_file'];
+		$this->assertTrue( \Arriendo_Facil_Local_Private_Storage::is_private_path( $new ) );
+		$this->assertStringContainsString( '/plantillas/0009-carlos-perez/', $new );
+		$this->assertSame( 'PK-template-bytes', file_get_contents( $new ) );
+		$this->assertFileDoesNotExist( $original, 'The public original must be deleted.' );
+		$this->assertSame( $original, $GLOBALS['af_t_meta'][55]['_af_original_attached_file'] );
+
+		// Already private: nothing to do. Unsupported type: untouched.
+		$this->assertTrue( \Arriendo_Facil_Local_Private_Storage::relocate_owner_template( 55, 9 ) );
+		$exe = $pub . '/shell.php';
+		file_put_contents( $exe, '<?php' );
+		$GLOBALS['af_t_meta'][56]['_wp_attached_file'] = $exe;
+		$this->assertFalse( \Arriendo_Facil_Local_Private_Storage::relocate_owner_template( 56, 9 ) );
+		$this->assertFileExists( $exe );
+	}
 }

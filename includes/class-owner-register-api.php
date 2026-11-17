@@ -394,6 +394,9 @@ class Arriendo_Facil_Owner_Register_API {
 			}
 		}
 
+		// The contract template is sensitive business data: keep it out of the public media library.
+		Arriendo_Facil_Local_Private_Storage::relocate_owner_template( (int) $attachment_id, (int) $user_id );
+
 		$this->uploaded_document_ids['contract_example'] = (int) $attachment_id;
 		return true;
 	}

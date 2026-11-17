@@ -2650,16 +2650,59 @@ class Arriendo_Facil_DOCX_Template_Processor {
 	 * @return string
 	 */
 	private function generate_output_path( $source_path ) {
-		$uploads = wp_upload_dir();
+		// Processed templates are derived from the owner's contract: they go to the private store,
+		// in the owner's readable folder, never to a web-served directory.
+		$attachment_id = $this->attachment_id_for_path( $source_path );
+		$dir           = $this->private_templates_dir( $attachment_id );
 
-		if ( ! empty( $uploads['error'] ) || empty( $uploads['basedir'] ) ) {
+		if ( '' === $dir ) {
 			return sys_get_temp_dir() . '/af_processed_' . md5( $source_path ) . '.docx';
 		}
 
-		$dir = trailingslashit( $uploads['basedir'] ) . 'arriendo-facil/owner-templates';
-		wp_mkdir_p( $dir );
+		$id_part = $attachment_id ? $attachment_id : substr( md5( $source_path ), 0, 8 );
 
-		return trailingslashit( $dir ) . 'processed-' . md5( $source_path ) . '-' . basename( $source_path );
+		return trailingslashit( $dir ) . 'plantilla-procesada_' . $id_part . '_' . sanitize_file_name( basename( $source_path ) );
+	}
+
+	/**
+	 * Finds the attachment whose file is the given path (relative or absolute _wp_attached_file).
+	 *
+	 * @param string $path File path.
+	 * @return int Attachment ID, or 0.
+	 */
+	private function attachment_id_for_path( $path ) {
+		global $wpdb;
+
+		$candidates = array( (string) $path );
+		$uploads    = wp_upload_dir();
+		if ( is_array( $uploads ) && empty( $uploads['error'] ) && ! empty( $uploads['basedir'] ) ) {
+			$base = trailingslashit( $uploads['basedir'] );
+			if ( 0 === strpos( (string) $path, $base ) ) {
+				$candidates[] = substr( (string) $path, strlen( $base ) );
+			}
+		}
+
+		$placeholders = implode( ',', array_fill( 0, count( $candidates ), '%s' ) );
+
+		return (int) $wpdb->get_var( $wpdb->prepare( "SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_wp_attached_file' AND meta_value IN ({$placeholders}) LIMIT 1", $candidates ) ); // phpcs:ignore WordPress.DB.PreparedSQL
+	}
+
+	/**
+	 * Private, readable folder for an owner's template files ('' when unavailable).
+	 *
+	 * @param int $attachment_id Template attachment (its owner decides the folder), or 0.
+	 * @return string
+	 */
+	private function private_templates_dir( $attachment_id ) {
+		if ( ! class_exists( 'Arriendo_Facil_Local_Private_Storage' ) ) {
+			return '';
+		}
+
+		$owner_id = $attachment_id ? (int) get_post_meta( $attachment_id, '_af_owner_user_id', true ) : 0;
+		$owner    = $owner_id ? get_userdata( $owner_id ) : false;
+		$dir      = Arriendo_Facil_Local_Private_Storage::directory( Arriendo_Facil_Local_Private_Storage::CATEGORY_TEMPLATES, $owner_id, $owner ? (string) $owner->display_name : '' );
+
+		return is_wp_error( $dir ) ? '' : $dir;
 	}
 
 	/**
@@ -2809,16 +2852,12 @@ class Arriendo_Facil_DOCX_Template_Processor {
 			return '';
 		}
 
-		$uploads = wp_upload_dir();
-		if ( ! empty( $uploads['error'] ) || empty( $uploads['basedir'] ) ) {
+		$md_dir = $this->private_templates_dir( (int) $attachment_id );
+		if ( '' === $md_dir ) {
 			return '';
 		}
 
-		$md_dir = trailingslashit( $uploads['basedir'] ) . 'arriendo-facil/owner-templates';
-		wp_mkdir_p( $md_dir );
-
-		$md_filename = 'template-' . $attachment_id . '-' . md5( $docx_path ) . '.md';
-		$md_path     = trailingslashit( $md_dir ) . $md_filename;
+		$md_path = trailingslashit( $md_dir ) . 'plantilla-markdown_' . (int) $attachment_id . '.md';
 
 		if ( false === file_put_contents( $md_path, $md_content ) ) {
 			return '';

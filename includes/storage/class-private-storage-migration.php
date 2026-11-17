@@ -42,6 +42,7 @@ class Arriendo_Facil_Private_Storage_Migration {
 
 		$count += count( self::legacy_rides() );
 		$count += count( self::legacy_contract_options() );
+		$count += count( self::legacy_templates() );
 
 		$users = (array) $wpdb->get_col( "SELECT user_id FROM {$wpdb->usermeta} WHERE meta_key = 'af_admin_documents'" ); // phpcs:ignore WordPress.DB.PreparedSQL
 		foreach ( $users as $user_id ) {
@@ -228,6 +229,97 @@ class Arriendo_Facil_Private_Storage_Migration {
 			$result  = self::move_contract_option( $option_name );
 			$moved  += $result['moved'];
 			$failed += $result['failed'];
+		}
+
+		// Owners' contract templates (original, processed copy and markdown copy).
+		foreach ( self::legacy_templates() as $attachment_id ) {
+			$result  = self::move_template( (int) $attachment_id );
+			$moved  += $result['moved'];
+			$failed += $result['failed'];
+		}
+
+		return array(
+			'moved'  => $moved,
+			'failed' => $failed,
+		);
+	}
+
+	/**
+	 * Template attachments whose original, processed copy or markdown copy is outside the private store.
+	 *
+	 * @return int[]
+	 */
+	private static function legacy_templates() {
+		global $wpdb;
+
+		$ids = (array) $wpdb->get_col( "SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_af_owner_contract_example' AND meta_value = '1'" ); // phpcs:ignore WordPress.DB.PreparedSQL
+		$out = array();
+		foreach ( array_unique( array_map( 'intval', $ids ) ) as $attachment_id ) {
+			$paths   = array( (string) get_attached_file( $attachment_id, true ) );
+			$paths[] = (string) get_post_meta( $attachment_id, '_af_processed_template_path', true );
+			$paths[] = (string) get_post_meta( $attachment_id, '_af_template_markdown_path', true );
+			foreach ( $paths as $path ) {
+				if ( '' !== $path && is_file( $path ) && ! Arriendo_Facil_Local_Private_Storage::is_private_path( $path ) ) {
+					$out[] = $attachment_id;
+					break;
+				}
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Moves one template (and its derived files) into the owner's private folder.
+	 *
+	 * @param int $attachment_id Template attachment ID.
+	 * @return array{moved:int,failed:int}
+	 */
+	private static function move_template( $attachment_id ) {
+		$moved    = 0;
+		$failed   = 0;
+		$owner_id = (int) get_post_meta( $attachment_id, '_af_owner_user_id', true );
+		$user     = $owner_id ? get_userdata( $owner_id ) : false;
+		$label    = $user ? (string) $user->display_name : '';
+
+		$original = (string) get_attached_file( $attachment_id, true );
+		if ( '' !== $original && is_file( $original ) && ! Arriendo_Facil_Local_Private_Storage::is_private_path( $original ) ) {
+			if ( Arriendo_Facil_Local_Private_Storage::relocate_owner_template( $attachment_id, $owner_id ) ) {
+				++$moved;
+			} else {
+				++$failed;
+			}
+		}
+
+		// Derived copies are regenerated from the original if they ever go missing, but move them
+		// so nothing derived from the contract stays public.
+		$dir = Arriendo_Facil_Local_Private_Storage::directory( Arriendo_Facil_Local_Private_Storage::CATEGORY_TEMPLATES, $owner_id, $label );
+		foreach ( array(
+			'_af_processed_template_path' => 'plantilla-procesada_' . $attachment_id . '_',
+			'_af_template_markdown_path'  => 'plantilla-markdown_' . $attachment_id . '.',
+		) as $meta_key => $prefix ) {
+			$old = (string) get_post_meta( $attachment_id, $meta_key, true );
+			if ( '' === $old || ! is_file( $old ) || Arriendo_Facil_Local_Private_Storage::is_private_path( $old ) ) {
+				continue;
+			}
+			if ( is_wp_error( $dir ) ) {
+				++$failed;
+				continue;
+			}
+
+			$contents = file_get_contents( $old ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+			$new      = trailingslashit( $dir ) . $prefix . ( 0 === strpos( $prefix, 'plantilla-markdown' ) ? 'md' : sanitize_file_name( preg_replace( '/^processed-[a-f0-9]{32}-/', '', basename( $old ) ) ) );
+			if ( false === $contents || false === file_put_contents( $new, $contents, LOCK_EX ) || ! hash_equals( hash( 'sha256', $contents ), hash( 'sha256', (string) file_get_contents( $new ) ) ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions
+				if ( file_exists( $new ) ) {
+					unlink( $new ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+				}
+				++$failed;
+				continue;
+			}
+
+			update_post_meta( $attachment_id, $meta_key, $new );
+			wp_delete_file( $old );
+			++$moved;
 		}
 
 		return array(

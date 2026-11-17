@@ -21,7 +21,7 @@ Se han detectado **credenciales de Cloudflare y AWS** expuestas en el historial 
 
 | # | Tipo | Valor | Formato | Estado |
 |---|------|-------|---------|--------|
-| 1 | Cloudflare API Token | `cfat_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX` | cfat_* | ⚠️ ACTIVO |
+| 1 | Cloudflare API Token | `cfat_[REDACTED]` | cfat_* | ⚠️ ACTIVO |
 | 2 | AWS Access Key ID | `XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX` | Hex 32 chars | ⚠️ ACTIVO |
 | 3 | AWS Secret Key | `XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX` | SHA256-like | ⚠️ ACTIVO |
 | 4 | R2 Endpoint URL | `https://8088bc29e75206bf131252a55578c8b5.r2.cloudflarestorage.com` | URL | 🔍 IDENTIFIER |
@@ -39,7 +39,7 @@ includes/other
 ```
 //no tomar en cuenta el siguiente código, es solo para pruebas
 //Credenciales de bucket cloudflare
-token Value= cfat_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+token Value= cfat_[REDACTED]
 
 credenciales del s3 de r2
 Access Key ID= XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
@@ -113,7 +113,7 @@ https://8088bc29e75206bf131252a55578c8b5.r2.cloudflarestorage.com
 #### Cloudflare (10 min)
 ```
 1. Ir a: https://dash.cloudflare.com/profile/api-tokens
-2. Buscar: "cfat_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+2. Buscar: "cfat_[REDACTED]"
 3. Hacer clic: "Edit" o "Revoke"
 4. Seleccionar: "Revoke"
 5. Confirmar: "Yes, revoke"
@@ -163,11 +163,11 @@ https://8088bc29e75206bf131252a55578c8b5.r2.cloudflarestorage.com
 #### Cloudflare
 ```
 Email: security@cloudflare.com
-Asunto: API Token Exposure - cfat_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+Asunto: API Token Exposure - cfat_[REDACTED]
 
 Mensaje:
 - Descripción: Token expuesto en public git repository
-- Token: cfat_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+- Token: cfat_[REDACTED]
 - Duración exposición: Marzo 24, 2026 - Septiembre 30, 2026
 - Acción tomada: Token revocado hoy
 - Solicitud: Auditar accesos a token en el período
@@ -291,7 +291,7 @@ CONTACTO: [Tu nombre] - [Email/Teléfono]
 ## 📝 CHECKLIST DE REMEDIACIÓN
 
 ### Inmediato (HOY - 1 hora)
-- [ ] Revocar Cloudflare API Token: `cfat_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX`
+- [ ] Revocar Cloudflare API Token: `cfat_[REDACTED]`
 - [ ] Generar nuevo token de Cloudflare
 - [ ] Actualizar código/config con nuevo token
 - [ ] Probar funcionamiento de Cloudflare R2
@@ -343,7 +343,7 @@ git log --all --full-history -- includes/other
 
 # 2. Verificar que credenciales antiguas no funcionan
 # Intentar con token viejo en Cloudflare API
-curl -H "Authorization: Bearer cfat_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" \
+curl -H "Authorization: Bearer cfat_[REDACTED]" \
   https://api.cloudflare.com/client/v4/user
 
 # Resultado esperado: { "success": false, "errors": [...], "result": null }

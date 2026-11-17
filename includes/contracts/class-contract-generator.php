@@ -915,8 +915,9 @@ class Arriendo_Facil_Contract_Generator {
 			$chosen = get_post( $template_attachment_id );
 			if ( $chosen && 'attachment' === $chosen->post_type ) {
 				$attachment_owner = (int) get_post_meta( $template_attachment_id, '_af_owner_user_id', true );
-				$is_owner_doc     = ( $attachment_owner && $attachment_owner === $owner_user_id )
-					|| (int) get_post_meta( $template_attachment_id, '_af_owner_contract_example', true ) === 1;
+				// The template must belong to the accommodation's owner; the shared
+				// _af_owner_contract_example flag marks a type of document, not ownership.
+				$is_owner_doc     = $attachment_owner && $attachment_owner === $owner_user_id;
 				if ( $is_owner_doc ) {
 					return $this->build_contract_template_context_from_attachment( $template_attachment_id, $owner_user_id );
 				}

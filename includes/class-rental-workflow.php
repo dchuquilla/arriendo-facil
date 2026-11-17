@@ -906,6 +906,8 @@ class Arriendo_Facil_Rental_Workflow {
 			wp_send_json_error( array( 'message' => __( 'La nueva fecha de fin debe ser posterior a la fecha de fin actual.', 'arriendo-facil' ) ), 400 );
 		}
 
+		$lease_service->enforce_quota_for_transition( $lease_id, 'active' );
+
 		global $wpdb;
 		$updated = $wpdb->update(
 			$wpdb->prefix . 'af_leases',
@@ -1669,12 +1671,13 @@ class Arriendo_Facil_Rental_Workflow {
 			return true;
 		}
 
-		if ( class_exists( 'Arriendo_Facil_Accommodation' ) && Arriendo_Facil_Accommodation::user_is_owner() ) {
-			$owner_ids = Arriendo_Facil_Accommodation::get_owner_accommodation_ids( get_current_user_id() );
-			return in_array( $accommodation_id, $owner_ids, true );
+		// Fail closed: only a user holding the property-management capability who owns
+		// the accommodation (and whose plan does not lock it) may operate on it.
+		if ( ! class_exists( 'Arriendo_Facil_Tenancy' ) || ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
+			return false;
 		}
 
-		return true;
+		return Arriendo_Facil_Tenancy::can_access_accommodation( $accommodation_id );
 	}
 
 	/**

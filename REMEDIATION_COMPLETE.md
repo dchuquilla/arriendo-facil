@@ -264,7 +264,7 @@ git filter-branch -f --tree-filter 'rm -f includes/other' -- --all
 ✅ **Resultado**: Archivo `includes/other` eliminado del historio completo
 
 **Credenciales Removidas:**
-- `cfat_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX` (Cloudflare API Token)
+- `cfat_[REDACTED]` (Cloudflare API Token)
 - `XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX` (AWS Access Key ID)
 - `XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX` (AWS Secret Key)
 
@@ -322,7 +322,7 @@ git reset --hard origin/main
 
 ## 🔐 ESTADO DE CREDENCIALES
 
-### Cloudflare API Token: `cfat_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX`
+### Cloudflare API Token: `cfat_[REDACTED]`
 - ⚠️ **TODAVÍA ACTIVO** en Cloudflare
 - **ACCIÓN REQUERIDA**: Revocar en dashboard de Cloudflare
 - **URL**: https://dash.cloudflare.com/profile/api-tokens
@@ -375,7 +375,7 @@ git reset --hard origin/main
 1. **Rotar Credenciales** (CRÍTICO)
    ```
    Cloudflare:
-   - Revocar: cfat_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+   - Revocar: cfat_[REDACTED]
    - Generar nuevo token
    - Actualizar en producción
    

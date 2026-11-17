@@ -11,7 +11,7 @@
 
 ### Cloudflare API Token
 ```
-ACTUAL (COMPROMETIDO): cfat_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+ACTUAL (COMPROMETIDO): cfat_[REDACTED]
 ESTADO: ⚠️ ACTIVO - DEBE REVOCARSE AHORA
 ```
 
@@ -106,7 +106,7 @@ PERIODO: 24 Marzo 2026 - 7 Octubre 2026
 ### Notificar a Cloudflare
 ```
 Email: security@cloudflare.com
-Asunto: Exposed API Token - cfat_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+Asunto: Exposed API Token - cfat_[REDACTED]
 ```
 
 **TEMPLATE:**
@@ -118,7 +118,7 @@ Dear Cloudflare Security Team,
 We discovered an API token was accidentally committed to a public git repository.
 
 Details:
-- Token: cfat_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+- Token: cfat_[REDACTED]
 - Format: cfat_* (Cloudflare API Token)
 - Exposure Period: March 24, 2026 - September 30, 2026
 - Discovered: October 7, 2026

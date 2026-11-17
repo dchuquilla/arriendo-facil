@@ -29,8 +29,9 @@ class Arriendo_Facil_iCal_Parser {
 			return new WP_Error( 'empty_url', 'iCal URL is empty' );
 		}
 
-		// Download the .ics file
-		$response = wp_remote_get(
+		// Download the .ics file. wp_safe_remote_get rejects loopback/private/link-local
+		// destinations (also on redirects), so a user-supplied URL cannot reach internal hosts.
+		$response = wp_safe_remote_get(
 			$ical_url,
 			array(
 				'timeout'   => 15,

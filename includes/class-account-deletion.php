@@ -595,7 +595,24 @@ class Arriendo_Facil_Account_Deletion {
 					}
 					$others = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$p}af_leases WHERE guest_id = %d", $guest_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL
 					$mine   = $acc_ids ? self::count_in( $p . 'af_leases', 'accommodation_id', $acc_ids, 'guest_id = ' . (int) $guest_id ) : 0;
-					return $others <= $mine;
+					if ( $others > $mine ) {
+						return false;
+					}
+
+					// A guest row is shared across managers (unique e-mail, no owner column):
+					// keep it when any other manager's reservation or onboarding token still points at it.
+					$outside = $acc_ids ? ' AND accommodation_id NOT IN (' . implode( ',', array_map( 'absint', $acc_ids ) ) . ')' : '';
+					foreach ( array( 'af_reservations', 'af_guest_onboarding_tokens' ) as $shared_table ) {
+						if ( ! self::table_has( $p . $shared_table, 'guest_id' ) || ! self::table_has( $p . $shared_table, 'accommodation_id' ) ) {
+							continue;
+						}
+						$refs = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$p}{$shared_table} WHERE guest_id = %d" . $outside, $guest_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL
+						if ( $refs > 0 ) {
+							return false;
+						}
+					}
+
+					return true;
 				}
 			)
 		);

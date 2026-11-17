@@ -1261,14 +1261,15 @@ class Arriendo_Facil_Billing_Ledger {
 			$wpdb->prepare(
 				"SELECT id FROM " . self::charges_table() . "
 				 WHERE charge_type = %s AND period = %s AND status <> 'void'
+				   AND lease_id IN ( SELECT id FROM {$wpdb->prefix}af_leases WHERE accommodation_id = %d )
 				   AND ( ( unit_id > 0 AND unit_id = %d )
-				         OR ( ( unit_id IS NULL OR unit_id = 0 ) AND lease_id IN ( SELECT id FROM {$wpdb->prefix}af_leases WHERE accommodation_id = %d ) ) )
+				         OR ( unit_id IS NULL OR unit_id = 0 ) )
 				   AND description LIKE %s
 				 ORDER BY id DESC LIMIT 1",
 				$reading->service,
 				$reading->period,
-				(int) $reading->unit_id,
 				(int) $reading->accommodation_id,
+				(int) $reading->unit_id,
 				'Consumo%'
 			)
 		);

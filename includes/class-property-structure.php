@@ -226,7 +226,7 @@ class Arriendo_Facil_Property_Structure {
 
 		return $wpdb->get_row(
 			$wpdb->prepare(
-				'SELECT * FROM ' . self::units_table() . ' WHERE accommodation_id = %d LIMIT 1',
+				'SELECT * FROM ' . self::units_table() . ' WHERE accommodation_id = %d ORDER BY id ASC LIMIT 1',
 				$accommodation_id
 			)
 		);
@@ -347,13 +347,18 @@ class Arriendo_Facil_Property_Structure {
 			wp_send_json_error( array( 'message' => __( 'No tienes acceso a este edificio.', 'arriendo-facil' ) ), 403 );
 		}
 
+		$accommodation_id = isset( $_POST['accommodation_id'] ) ? absint( wp_unslash( $_POST['accommodation_id'] ) ) : 0;
+		if ( $accommodation_id && ! Arriendo_Facil_Tenancy::can_access_accommodation( $accommodation_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes acceso a este inmueble.', 'arriendo-facil' ) ), 403 );
+		}
+
 		$result = self::create_unit(
 			array(
 				'building_id'      => $building_id,
 				'unit_code'        => isset( $_POST['unit_code'] ) ? sanitize_text_field( wp_unslash( $_POST['unit_code'] ) ) : '',
 				'hoa_coefficient'  => isset( $_POST['hoa_coefficient'] ) ? (float) wp_unslash( $_POST['hoa_coefficient'] ) : 0,
 				'area_m2'          => isset( $_POST['area_m2'] ) ? (float) wp_unslash( $_POST['area_m2'] ) : 0,
-				'accommodation_id' => isset( $_POST['accommodation_id'] ) ? absint( wp_unslash( $_POST['accommodation_id'] ) ) : 0,
+				'accommodation_id' => $accommodation_id,
 			)
 		);
 

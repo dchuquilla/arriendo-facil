@@ -111,11 +111,19 @@ class Arriendo_Facil_Billing_Ledger_Controller {
 			wp_send_json_error( array( 'message' => __( 'No tienes acceso a este contrato.', 'arriendo-facil' ) ), 403 );
 		}
 
+		// unit_id and guest_id are derived from the authorized lease, never taken from the request:
+		// later lookups (meter-reading voids, purge) trust them as identity keys.
+		$lease_row = class_exists( 'Arriendo_Facil_Lease' ) ? ( new Arriendo_Facil_Lease() )->get_lease( $lease_id ) : null;
+		if ( ! $lease_row ) {
+			wp_send_json_error( array( 'message' => __( 'Contrato no encontrado.', 'arriendo-facil' ) ), 404 );
+		}
+		$lease_unit = class_exists( 'Arriendo_Facil_Property_Structure' ) ? Arriendo_Facil_Property_Structure::get_unit_by_accommodation( (int) $lease_row->accommodation_id ) : null;
+
 		$result = Arriendo_Facil_Billing_Ledger::create_charge(
 			array(
 				'lease_id'    => $lease_id,
-				'unit_id'     => isset( $_POST['unit_id'] ) ? absint( wp_unslash( $_POST['unit_id'] ) ) : 0,
-				'guest_id'    => isset( $_POST['guest_id'] ) ? absint( wp_unslash( $_POST['guest_id'] ) ) : 0,
+				'unit_id'     => $lease_unit ? (int) $lease_unit->id : 0,
+				'guest_id'    => (int) $lease_row->guest_id,
 				'charge_type' => isset( $_POST['charge_type'] ) ? sanitize_key( wp_unslash( $_POST['charge_type'] ) ) : '',
 				'period'      => isset( $_POST['period'] ) ? sanitize_text_field( wp_unslash( $_POST['period'] ) ) : '',
 				'amount'      => isset( $_POST['amount'] ) ? (float) wp_unslash( $_POST['amount'] ) : 0,

@@ -105,26 +105,50 @@ class Arriendo_Facil_Rate_Limiter {
 	 * @return string
 	 */
 	private static function get_client_ip() {
-		// CloudFlare.
-		if ( ! empty( $_SERVER['HTTP_CF_CONNECTING_IP'] ) ) {
-			return sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_CONNECTING_IP'] ) );
+		$remote = ! empty( $_SERVER['REMOTE_ADDR'] ) ? trim( sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) ) : '';
+		if ( '' !== $remote && false === filter_var( $remote, FILTER_VALIDATE_IP ) ) {
+			$remote = '';
 		}
 
-		// Standard headers.
-		if ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
-			$ips = explode( ',', sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) );
-			return trim( $ips[0] );
+		// Forwarded-for headers are client-controlled unless the immediate peer is a proxy we
+		// trust: a loopback/private address (local reverse proxy or tunnel connector) or an
+		// address listed in AF_TRUSTED_PROXIES (comma-separated). Anything else uses REMOTE_ADDR.
+		if ( '' !== $remote && self::is_trusted_proxy( $remote ) ) {
+			$candidates = array();
+			if ( ! empty( $_SERVER['HTTP_CF_CONNECTING_IP'] ) ) {
+				$candidates[] = sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_CONNECTING_IP'] ) );
+			}
+			if ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
+				$ips          = explode( ',', sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) );
+				$candidates[] = $ips[0];
+			}
+			foreach ( $candidates as $candidate ) {
+				$candidate = trim( $candidate );
+				if ( false !== filter_var( $candidate, FILTER_VALIDATE_IP ) ) {
+					return $candidate;
+				}
+			}
 		}
 
-		if ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
-			return sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_FORWARDED_FOR'] ) );
+		return '' !== $remote ? $remote : '0.0.0.0';
+	}
+
+	/**
+	 * Whether the immediate peer address is a proxy whose forwarded headers can be trusted.
+	 *
+	 * @param string $addr Validated REMOTE_ADDR.
+	 * @return bool
+	 */
+	private static function is_trusted_proxy( $addr ) {
+		if ( defined( 'AF_TRUSTED_PROXIES' ) && is_string( AF_TRUSTED_PROXIES ) && '' !== AF_TRUSTED_PROXIES ) {
+			$list = array_map( 'trim', explode( ',', AF_TRUSTED_PROXIES ) );
+			if ( in_array( $addr, $list, true ) ) {
+				return true;
+			}
 		}
 
-		if ( ! empty( $_SERVER['REMOTE_ADDR'] ) ) {
-			return sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) );
-		}
-
-		return '0.0.0.0';
+		// Not a public address (loopback, RFC1918, link-local, unique-local) => local proxy/tunnel.
+		return false === filter_var( $addr, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE );
 	}
 
 	/**

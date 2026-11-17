@@ -671,12 +671,20 @@ class Arriendo_Facil_Tenant_Signup {
 		$masked_phone = $this->mask_sensitive_phone( $phone );
 		$masked_id    = $this->mask_sensitive_id_number( $id_number );
 
-		$existing_guest_id = (int) $wpdb->get_var(
+		$existing = $wpdb->get_row(
 			$wpdb->prepare(
-				"SELECT id FROM {$wpdb->prefix}af_guests WHERE email = %s ORDER BY id DESC LIMIT 1",
+				"SELECT id, user_id FROM {$wpdb->prefix}af_guests WHERE email = %s ORDER BY id DESC LIMIT 1",
 				$email
 			)
 		);
+		$existing_guest_id = $existing ? (int) $existing->id : 0;
+
+		// A guest row that predates this signup (created by a manager or a booking) is shared
+		// data: anonymous signup must never rewrite it before the e-mail is verified. It is
+		// linked to the account only after verification (see link_guest_row_after_verification).
+		if ( $existing_guest_id > 0 && (int) $existing->user_id !== (int) $user_id ) {
+			return;
+		}
 
 		if ( $existing_guest_id > 0 ) {
 			$wpdb->update(
@@ -710,6 +718,26 @@ class Arriendo_Facil_Tenant_Signup {
 				'id_number_encrypted' => $encrypted_id,
 			),
 			array( '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
+		);
+	}
+
+	/**
+	 * Links an existing, still-unlinked guest row to the tenant once the e-mail is verified.
+	 * Never overwrites names or identity fields and never re-links a row owned by another user.
+	 *
+	 * @param int    $user_id Tenant user ID.
+	 * @param string $email   Verified e-mail.
+	 * @return void
+	 */
+	private function link_guest_row_after_verification( $user_id, $email ) {
+		global $wpdb;
+
+		$wpdb->query(
+			$wpdb->prepare(
+				"UPDATE {$wpdb->prefix}af_guests SET user_id = %d WHERE email = %s AND ( user_id IS NULL OR user_id = 0 )",
+				$user_id,
+				$email
+			)
 		);
 	}
 
@@ -1043,6 +1071,7 @@ class Arriendo_Facil_Tenant_Signup {
 
 		update_user_meta( $user_id, 'af_tenant_email_verified', 1 );
 		update_user_meta( $user_id, 'af_tenant_email_verified_at', current_time( 'mysql' ) );
+		$this->link_guest_row_after_verification( (int) $user_id, (string) $user->user_email );
 		delete_user_meta( $user_id, 'af_tenant_email_verify_hash' );
 		delete_user_meta( $user_id, 'af_tenant_email_verify_expires' );
 		delete_user_meta( $user_id, 'af_tenant_email_verify_requested_at' );

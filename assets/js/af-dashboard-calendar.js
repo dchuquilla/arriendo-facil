@@ -216,7 +216,9 @@
 	function escapeHtml(str) {
 		var div = document.createElement('div');
 		div.textContent = str == null ? '' : String(str);
-		return div.innerHTML;
+		// innerHTML only encodes & < >; quotes must be encoded too because this helper
+		// also builds double/single-quoted HTML attribute values.
+		return div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 	}
 
 	function selectDay(dateStr) {

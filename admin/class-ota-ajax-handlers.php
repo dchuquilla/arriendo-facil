@@ -36,6 +36,10 @@ class Arriendo_Facil_OTA_AJAX_Handlers {
 	public function test_ical_url() {
 		check_ajax_referer( 'af_ota_nonce', 'nonce', true );
 
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
+			wp_send_json_error( 'Permiso denegado', 403 );
+		}
+
 		$platform = sanitize_key( $_POST['platform'] ?? '' );
 		$ical_url = esc_url_raw( $_POST['ical_url'] ?? '' );
 		$accommodation_id = absint( $_POST['accommodation_id'] ?? 0 );
@@ -44,11 +48,16 @@ class Arriendo_Facil_OTA_AJAX_Handlers {
 			wp_send_json_error( 'Datos incompletos' );
 		}
 
+		if ( ! Arriendo_Facil_Tenancy::can_access_accommodation( $accommodation_id ) ) {
+			wp_send_json_error( 'No tienes acceso a este inmueble', 403 );
+		}
+
 		// Test the iCal URL by parsing it
 		$result = Arriendo_Facil_iCal_Parser::parse_ical_url( $ical_url );
 
 		if ( is_wp_error( $result ) ) {
-			wp_send_json_error( $result->get_error_message() );
+			// Generic message: connection errors would otherwise act as an internal network oracle.
+			wp_send_json_error( __( 'No se pudo leer el calendario iCal de esa URL.', 'arriendo-facil' ) );
 		}
 
 		// Return the parsed result
@@ -81,11 +90,9 @@ class Arriendo_Facil_OTA_AJAX_Handlers {
 			wp_send_json_error( 'Acomodación no encontrada' );
 		}
 
-		// For owners, only allow syncing their own accommodations
-		if ( current_user_can( 'edit_post', $accommodation_id ) ) {
-			// User can sync this accommodation
-		} else {
-			wp_send_json_error( 'No tienes permisos para sincronizar esta acomodación' );
+		// Only the owner (or a platform administrator) may sync an accommodation.
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) || ! current_user_can( 'edit_post', $accommodation_id ) || ! Arriendo_Facil_Tenancy::can_access_accommodation( $accommodation_id ) ) {
+			wp_send_json_error( 'No tienes permisos para sincronizar esta acomodación', 403 );
 		}
 
 		// Perform the sync

@@ -385,12 +385,24 @@ class Arriendo_Facil_Aviso {
 			$params[] = $accommodation_id;
 		} elseif ( $accommodation_id ) {
 			wp_send_json_error( array( 'message' => __( 'Sin acceso al inmueble.', 'arriendo-facil' ) ), 403 );
+		} else {
+			// Without an explicit accommodation, scope to what the caller can access
+			// (null = superadmin, unrestricted).
+			$scope = Arriendo_Facil_Tenancy::accessible_accommodation_ids();
+			if ( null !== $scope ) {
+				if ( empty( $scope ) ) {
+					wp_send_json_success( array( 'avisos' => array() ) );
+				}
+				$where .= ' AND accommodation_id IN (' . Arriendo_Facil_Tenancy::ids_in_clause( $scope ) . ')';
+			}
 		}
 
 		$where  .= ' ORDER BY id DESC LIMIT %d';
 		$params[] = $limit;
 
-		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM ' . self::table() . ' WHERE ' . $where, $params ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		// Explicit columns: never return the confirmation selector or token hash.
+		$columns = 'id, accommodation_id, lease_id, guest_id, type, subject, body, status, recipient_email, read_at, created_at, updated_at';
+		$rows    = $wpdb->get_results( $wpdb->prepare( 'SELECT ' . $columns . ' FROM ' . self::table() . ' WHERE ' . $where, $params ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 
 		wp_send_json_success( array( 'avisos' => $rows ) );
 	}

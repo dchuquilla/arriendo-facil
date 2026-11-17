@@ -369,6 +369,14 @@ class Arriendo_Facil_Accommodation_Wizard {
 		$unit_id = absint( wp_unslash( $_POST['af_unit_id'] ) );
 		$table   = Arriendo_Facil_Property_Structure::units_table();
 
+		// The unit must belong to a building the caller manages and the accommodation
+		// must be the caller's own; otherwise leave existing links untouched.
+		if ( ! class_exists( 'Arriendo_Facil_Tenancy' )
+			|| ! Arriendo_Facil_Tenancy::can_access_accommodation( $post_id )
+			|| ( $unit_id && ! Arriendo_Facil_Tenancy::can_access_unit( $unit_id ) ) ) {
+			return;
+		}
+
 		$wpdb->update(
 			$table,
 			array( 'accommodation_id' => null ),

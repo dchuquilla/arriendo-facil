@@ -35,7 +35,7 @@ DURACIÓN DE EXPOSICIÓN: ~6 meses (Marzo 24 - Octubre 7, 2026)
 │                                                                                 │
 │  Tipo:            Cloudflare API Token                                         │
 │  Formato:         cfat_* (Cloudflare Format)                                   │
-│  Valor:           cfat_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX      │
+│  Valor:           cfat_[REDACTED]      │
 │  Estado:          ⚠️ ACTIVO - REVOCACIÓN REQUERIDA                           │
 │  Riesgo:          🔴 CRÍTICO (acceso completo a Cloudflare)                   │
 │                                                                                 │
@@ -170,7 +170,7 @@ TIEMPO CRÍTICO: Deben completarse en LAS PRÓXIMAS 2 HORAS
 
 Prioridad 1 (10 minutos):
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ [ ] 1.1 Revocar Cloudflare API Token: cfat_SmYDRP5DLmGj6QKkErlmvgy5Ulx... │
+│ [ ] 1.1 Revocar Cloudflare API Token: cfat_[REDACTED]... │
 │ [ ] 1.2 Generar NUEVO token de Cloudflare                                  │
 │ [ ] 1.3 Revocar AWS Access Key: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX          │
 │ [ ] 1.4 Generar NUEVAS AWS Keys                                            │

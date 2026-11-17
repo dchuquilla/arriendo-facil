@@ -48,6 +48,8 @@ class Arriendo_Facil_Lease {
 			wp_send_json_error( array( 'message' => __( 'No tienes acceso a este contrato.', 'arriendo-facil' ) ), 403 );
 		}
 
+		$this->enforce_quota_for_transition( $lease_id, 'active' );
+
 		$pdf_password = $this->get_approved_pdf_password();
 
 		$versions_data = $this->get_contract_versions( $lease_id );
@@ -286,6 +288,15 @@ class Arriendo_Facil_Lease {
 		// Both sides of the contract must belong to the operator's own portfolio.
 		if ( ! Arriendo_Facil_Tenancy::can_access_accommodation( $accommodation_id ) || ! Arriendo_Facil_Tenancy::can_access_guest( $guest_id ) ) {
 			wp_send_json_error( array( 'message' => __( 'No tienes acceso al inmueble o al inquilino seleccionado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		// An explicit template must be one of the accommodation owner's own templates.
+		if ( $template_attachment_id && class_exists( 'Arriendo_Facil_Contract_Generator' ) ) {
+			$allowed_templates = ( new Arriendo_Facil_Contract_Generator() )->get_owner_contract_templates_for_accommodation( $accommodation_id );
+			$allowed_ids       = array_map( 'absint', wp_list_pluck( $allowed_templates, 'id' ) );
+			if ( ! in_array( $template_attachment_id, $allowed_ids, true ) ) {
+				wp_send_json_error( array( 'message' => __( 'La plantilla seleccionada no pertenece a este propietario.', 'arriendo-facil' ) ), 403 );
+			}
 		}
 
 		if ( Arriendo_Facil_Plans::applies_to() ) {
@@ -548,6 +559,8 @@ class Arriendo_Facil_Lease {
 			wp_send_json_error( array( 'message' => __( 'No tienes acceso a este contrato.', 'arriendo-facil' ) ), 403 );
 		}
 
+		$this->enforce_quota_for_transition( $lease_id, $status );
+
 		global $wpdb;
 		$updated = $wpdb->update(
 			$wpdb->prefix . 'af_leases',
@@ -595,6 +608,41 @@ class Arriendo_Facil_Lease {
 		);
 
 		wp_send_json_success( $leases );
+	}
+
+	/**
+	 * Statuses that consume the plan's lease quota (mirrors Arriendo_Facil_Plans::usage).
+	 *
+	 * @var string[]
+	 */
+	const QUOTA_STATUSES = array( 'draft', 'active', 'pending_release' );
+
+	/**
+	 * Re-checks the plan lease limit when a lease moves from a status that does not
+	 * count toward the quota (expired/terminated) into one that does. Sends a JSON
+	 * error and exits when the plan has no room; otherwise returns.
+	 *
+	 * @param int    $lease_id   Lease ID.
+	 * @param string $new_status Target status.
+	 * @return void
+	 */
+	public function enforce_quota_for_transition( $lease_id, $new_status ) {
+		if ( ! in_array( $new_status, self::QUOTA_STATUSES, true ) || ! class_exists( 'Arriendo_Facil_Plans' ) || ! Arriendo_Facil_Plans::applies_to() ) {
+			return;
+		}
+
+		$lease = $this->get_lease( absint( $lease_id ) );
+		if ( ! $lease || in_array( (string) $lease->status, self::QUOTA_STATUSES, true ) ) {
+			return; // Already counted: no additional quota is consumed.
+		}
+
+		if ( ! Arriendo_Facil_Plans::lock( get_current_user_id() ) ) {
+			Arriendo_Facil_Plans::send_busy_error();
+		}
+		$plan_gate = Arriendo_Facil_Plans::limit_gate( 'leases' );
+		if ( $plan_gate ) {
+			Arriendo_Facil_Plans::send_gate_error( $plan_gate );
+		}
 	}
 
 	/**

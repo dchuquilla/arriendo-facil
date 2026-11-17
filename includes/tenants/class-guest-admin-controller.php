@@ -452,7 +452,7 @@ class Arriendo_Facil_Guest_Admin_Controller {
 			$ids_sql   = $owner_ids ? implode( ',', array_map( 'intval', $owner_ids ) ) : '0';
 			$guests    = $wpdb->get_results(
 				$wpdb->prepare(
-					"SELECT * FROM {$wpdb->prefix}af_guests WHERE accommodation_id IN ($ids_sql) OR created_by = %d ORDER BY created_at DESC LIMIT %d OFFSET %d",
+					"SELECT * FROM {$wpdb->prefix}af_guests WHERE accommodation_id IN ($ids_sql) OR created_by = %d OR id IN ( SELECT guest_id FROM {$wpdb->prefix}af_leases WHERE accommodation_id IN ($ids_sql) AND deleted_at IS NULL AND guest_id IS NOT NULL ) ORDER BY created_at DESC LIMIT %d OFFSET %d",
 					get_current_user_id(),
 					$per_page,
 					$offset

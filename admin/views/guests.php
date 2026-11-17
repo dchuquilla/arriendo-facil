@@ -188,9 +188,13 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['af_queue_action'], 
 if ( $is_owner ) {
 	// Incluye a los inquilinos que el propio usuario registró aún sin inmueble.
 	Arriendo_Facil_Guest::ensure_guest_extra_columns();
-	$guest_scope_sql = $owner_ids
-		? 'accommodation_id IN (' . implode( ',', array_map( 'intval', $owner_ids ) ) . ') OR '
-		: '';
+	// Also guests that hold a lease on one of the manager's properties: the guest row is global and its
+	// single accommodation_id may point elsewhere, which used to hide a tenant that shows up in Contratos.
+	$guest_scope_sql = '';
+	if ( $owner_ids ) {
+		$owner_ids_sql   = implode( ',', array_map( 'intval', $owner_ids ) );
+		$guest_scope_sql = "accommodation_id IN ({$owner_ids_sql}) OR id IN ( SELECT guest_id FROM {$wpdb->prefix}af_leases WHERE accommodation_id IN ({$owner_ids_sql}) AND deleted_at IS NULL AND guest_id IS NOT NULL ) OR ";
+	}
 	$guests = $wpdb->get_results(
 		$wpdb->prepare(
 			"SELECT * FROM {$wpdb->prefix}af_guests WHERE {$guest_scope_sql}created_by = %d ORDER BY created_at DESC LIMIT 100", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- ids casteados a int.

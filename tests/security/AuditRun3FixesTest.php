@@ -508,4 +508,35 @@ class AuditRun3FixesTest extends TestCase {
 		$this->assertFalse( \Arriendo_Facil_Local_Private_Storage::relocate_attachment( 71, 'inmuebles', 100, 'Casa Centro', 'otro' ) );
 		$this->assertFileExists( $odd );
 	}
+
+	/**
+	 * A guest row is global with a single accommodation_id. A manager must still reach a guest who
+	 * holds a lease on one of their properties (it shows in Contratos), but not unrelated guests.
+	 */
+	public function test_guest_with_lease_on_own_property_is_accessible_even_if_row_points_elsewhere() {
+		$this->boot( array( 'caps' => array( 'af_manage_properties' ) ) );
+		if ( ! class_exists( 'Arriendo_Facil_Accommodation' ) ) {
+			eval( 'class Arriendo_Facil_Accommodation { public static function get_owner_accommodation_ids( $u ) { return array( 100 ); } }' );
+		}
+		require_once dirname( __DIR__, 2 ) . '/includes/class-tenancy.php';
+
+		// Guest 7 points at somebody else's accommodation (999) and was created by another user.
+		$GLOBALS['wpdb']->rows['af_guests WHERE id'] = (object) array( 'id' => 7, 'accommodation_id' => 999, 'created_by' => 3 );
+
+		// No lease with this manager: no access.
+		$this->assertFalse( \Arriendo_Facil_Tenancy::can_access_guest( 7 ) );
+
+		// A lease on accommodation 100 (the manager's own) makes the guest accessible.
+		$GLOBALS['wpdb']->rows['af_leases WHERE guest_id'] = (object) array( 'id' => 1 );
+		$this->assertTrue( \Arriendo_Facil_Tenancy::can_access_guest( 7 ) );
+
+		$lease_query = '';
+		foreach ( $GLOBALS['wpdb']->queries as $q ) {
+			if ( false !== strpos( (string) $q, 'af_leases WHERE guest_id' ) ) {
+				$lease_query = (string) $q;
+			}
+		}
+		$this->assertStringContainsString( 'accommodation_id IN (100)', $lease_query );
+		$this->assertStringContainsString( 'deleted_at IS NULL', $lease_query );
+	}
 }

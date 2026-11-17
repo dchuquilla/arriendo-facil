@@ -277,8 +277,24 @@ class Arriendo_Facil_Tenancy {
 		}
 
 		$accommodation_id = (int) $row->accommodation_id;
+		if ( $accommodation_id > 0 && self::can_access_accommodation( $accommodation_id, $user_id ) ) {
+			return true;
+		}
 
-		return $accommodation_id > 0 && self::can_access_accommodation( $accommodation_id, $user_id );
+		// A guest row is global (one per e-mail) and carries a single accommodation_id, which can
+		// point at another property. Whoever holds a lease with this guest on one of their own
+		// accommodations must still see and manage them, exactly as the lease form already does.
+		$ids = self::accessible_accommodation_ids( $user_id );
+		if ( empty( $ids ) ) {
+			return false;
+		}
+
+		return (bool) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT 1 FROM {$wpdb->prefix}af_leases WHERE guest_id = %d AND deleted_at IS NULL AND accommodation_id IN (" . self::ids_in_clause( $ids ) . ') LIMIT 1', // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- ids cast to int.
+				absint( $guest_id )
+			)
+		);
 	}
 
 	/**

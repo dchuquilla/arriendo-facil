@@ -24,6 +24,7 @@ class Arriendo_Facil_Document_Verification {
 	public function __construct() {
 		add_action( 'wp_ajax_af_set_document_status', array( $this, 'ajax_set_document_status' ) );
 		add_action( 'wp_ajax_af_download_guest_document', array( $this, 'ajax_download_guest_document' ) );
+		add_action( 'wp_ajax_af_stream_guest_document', array( $this, 'ajax_stream_guest_document' ) );
 	}
 
 	/**
@@ -87,12 +88,58 @@ class Arriendo_Facil_Document_Verification {
 			wp_send_json_success( array( 'url' => $url, 'expires_in' => 300 ) );
 		}
 
-		// Fallback local: el archivo vive en la libreria de medios publica de WP.
+		if ( Arriendo_Facil_Local_Private_Storage::STORAGE_ID === $document->storage ) {
+			// Almacenamiento local privado: se entrega solo por el manejador autenticado.
+			$url = add_query_arg(
+				array(
+					'action'      => 'af_stream_guest_document',
+					'document_id' => (int) $document->id,
+					'_wpnonce'    => wp_create_nonce( 'af_stream_guest_document_' . (int) $document->id ),
+				),
+				admin_url( 'admin-ajax.php' )
+			);
+			wp_send_json_success( array( 'url' => $url, 'expires_in' => 0 ) );
+		}
+
+		// Documentos anteriores: el archivo vive en la libreria de medios publica de WP.
 		$url = wp_get_attachment_url( absint( $document->object_key ) );
 		if ( ! $url ) {
 			wp_send_json_error( array( 'message' => __( 'No se pudo resolver el archivo.', 'arriendo-facil' ) ), 404 );
 		}
 		wp_send_json_success( array( 'url' => $url, 'expires_in' => 0 ) );
+	}
+
+	/**
+	 * Streams a guest document stored in private local storage. Same authorisation as
+	 * the download link: property-management capability plus access to that guest.
+	 *
+	 * @return void
+	 */
+	public function ajax_stream_guest_document() {
+		$document_id = isset( $_GET['document_id'] ) ? absint( wp_unslash( $_GET['document_id'] ) ) : 0;
+
+		if ( ! $document_id || ! check_ajax_referer( 'af_stream_guest_document_' . $document_id, '_wpnonce', false ) ) {
+			wp_die( esc_html__( 'Solicitud inválida.', 'arriendo-facil' ), '', array( 'response' => 403 ) );
+		}
+
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
+			wp_die( esc_html__( 'Permiso denegado.', 'arriendo-facil' ), '', array( 'response' => 403 ) );
+		}
+
+		global $wpdb;
+		$document = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}af_guest_documents WHERE id = %d", $document_id ) );
+		if ( ! $document || Arriendo_Facil_Local_Private_Storage::STORAGE_ID !== $document->storage ) {
+			wp_die( esc_html__( 'Documento no encontrado.', 'arriendo-facil' ), '', array( 'response' => 404 ) );
+		}
+
+		if ( ! Arriendo_Facil_Tenancy::can_access_guest( (int) $document->guest_id ) ) {
+			wp_die( esc_html__( 'No tienes acceso a este documento.', 'arriendo-facil' ), '', array( 'response' => 403 ) );
+		}
+
+		$result = Arriendo_Facil_Local_Private_Storage::stream( (string) $document->object_key, Arriendo_Facil_Local_Private_Storage::display_name( (string) $document->object_key ) );
+		if ( is_wp_error( $result ) ) {
+			wp_die( esc_html( $result->get_error_message() ), '', array( 'response' => 404 ) );
+		}
 	}
 
 	/**

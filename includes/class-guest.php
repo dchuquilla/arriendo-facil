@@ -396,26 +396,18 @@ class Arriendo_Facil_Guest {
 
 				$storage = 'r2';
 			} else {
-				// Fallback: sin credenciales de almacenamiento privado configuradas.
-				// El archivo queda en la libreria de medios publica de WordPress —
-				// menos seguro, pero evita que la captura de documentos se rompa.
-				$attachment_id = media_handle_upload(
-					$field_name,
-					0,
-					array( 'post_title' => sprintf( 'guest-%d-%s', (int) $guest_id, $doc_type ) ),
-					array(
-						'test_form' => false,
-						'mimes'     => array( 'pdf' => 'application/pdf' ),
-					)
-				);
+				// Sin R2: almacenamiento local PRIVADO (fuera del directorio web cuando es posible),
+				// en la carpeta del propio huésped y con nombre legible. Nunca la biblioteca de medios.
+				$guest_row = $wpdb->get_row( $wpdb->prepare( "SELECT first_name, last_name FROM {$wpdb->prefix}af_guests WHERE id = %d", (int) $guest_id ) );
+				$person    = $guest_row ? trim( $guest_row->first_name . ' ' . $guest_row->last_name ) : '';
+				$stored    = Arriendo_Facil_Local_Private_Storage::store( $contents, Arriendo_Facil_Local_Private_Storage::CATEGORY_GUESTS, (int) $guest_id, $person, $doc_type );
 
-				if ( is_wp_error( $attachment_id ) ) {
+				if ( is_wp_error( $stored ) ) {
 					return new WP_Error( 'af_guest_pdf_save_failed', __( 'No se pudo guardar uno de los documentos PDF del huesped.', 'arriendo-facil' ) );
 				}
 
-				update_post_meta( (int) $attachment_id, '_af_guest_id', (int) $guest_id );
-				update_post_meta( (int) $attachment_id, '_af_guest_doc_type', $doc_type );
-				$object_key = (string) $attachment_id;
+				$storage    = Arriendo_Facil_Local_Private_Storage::STORAGE_ID;
+				$object_key = $stored;
 			}
 
 			$wpdb->insert(

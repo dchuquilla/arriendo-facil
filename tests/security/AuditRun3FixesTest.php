@@ -235,4 +235,43 @@ class AuditRun3FixesTest extends TestCase {
 		$_SERVER['HTTP_X_FORWARDED_FOR']  = '198.51.100.7, 10.0.0.1';
 		$this->assertSame( '198.51.100.7', $method->invoke( null ) );
 	}
+
+	/**
+	 * Private local storage: readable per-person names, no overwrite, no traversal.
+	 */
+	public function test_local_private_storage_uses_readable_per_person_names_and_rejects_traversal() {
+		$this->boot();
+		$dir = sys_get_temp_dir() . '/af-priv-test-' . uniqid();
+		define( 'AF_PRIVATE_STORAGE_DIR', $dir );
+		if ( ! function_exists( 'remove_accents' ) ) {
+			eval( 'function remove_accents( $s ) { return strtr( $s, array( "á"=>"a","é"=>"e","í"=>"i","ó"=>"o","ú"=>"u","ñ"=>"n","Á"=>"A","É"=>"E","Í"=>"I","Ó"=>"O","Ú"=>"U","Ñ"=>"N" ) ); }' );
+		}
+		if ( ! function_exists( 'wp_mkdir_p' ) ) {
+			eval( 'function wp_mkdir_p( $d ) { return is_dir( $d ) || mkdir( $d, 0755, true ); }' );
+		}
+		require_once dirname( __DIR__, 2 ) . '/includes/storage/class-local-private-storage.php';
+
+		$pdf = "%PDF-1.4\nbody";
+		$key = \Arriendo_Facil_Local_Private_Storage::store( $pdf, 'huespedes', 42, 'María García Pérez', 'cedula_papeleta' );
+		$this->assertIsString( $key );
+		$this->assertSame( 'huespedes/0042-maria-garcia-perez/cedula-papeleta_' . gmdate( 'Y-m-d' ) . '.pdf', $key );
+		$this->assertSame( $pdf, \Arriendo_Facil_Local_Private_Storage::read( $key ) );
+		$this->assertFileExists( $dir . '/index.php' );
+
+		// A second upload the same day never overwrites the first.
+		$key2 = \Arriendo_Facil_Local_Private_Storage::store( 'second', 'huespedes', 42, 'María García Pérez', 'cedula_papeleta' );
+		$this->assertStringEndsWith( '-v2.pdf', $key2 );
+		$this->assertSame( $pdf, \Arriendo_Facil_Local_Private_Storage::read( $key ) );
+
+		// Traversal, absolute paths, wrong extension and unknown categories are rejected.
+		foreach ( array( '../../etc/passwd', '/etc/passwd', 'huespedes/../../x.pdf', 'huespedes/0042-x/notes.txt', "huespedes/0042-x/a.pdf\0.txt", '' ) as $bad ) {
+			$this->assertTrue( is_wp_error( \Arriendo_Facil_Local_Private_Storage::resolve( $bad ) ), 'accepted: ' . $bad );
+		}
+		$this->assertTrue( is_wp_error( \Arriendo_Facil_Local_Private_Storage::store( 'x', '../escape', 1, 'a', 'b' ) ) );
+
+		// Deleting removes the file; the folder goes away when empty.
+		$this->assertTrue( \Arriendo_Facil_Local_Private_Storage::delete( $key2 ) );
+		$this->assertTrue( \Arriendo_Facil_Local_Private_Storage::delete( $key ) );
+		$this->assertDirectoryDoesNotExist( $dir . '/huespedes/0042-maria-garcia-perez' );
+	}
 }

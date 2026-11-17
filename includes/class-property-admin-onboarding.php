@@ -76,6 +76,7 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 		add_action( 'wp_ajax_af_review_admin_verification', array( $this, 'ajax_review_verification' ) );
 		add_action( 'wp_ajax_af_admin_review_detail', array( $this, 'ajax_review_detail' ) );
 		add_action( 'wp_ajax_af_admin_recompute_status', array( $this, 'ajax_recompute_status' ) );
+		add_action( 'wp_ajax_af_stream_admin_document', array( $this, 'ajax_stream_document' ) );
 
 		add_action( 'admin_notices', array( $this, 'render_demo_banner' ) );
 
@@ -829,26 +830,14 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 
 			$storage = 'r2';
 		} else {
-			$field_key  = 'document_' . $doc_type . '_' . $user_id; // unique field per upload round
-			$_FILES[ $field_key ] = $file_data;
-			$attachment_id = media_handle_upload(
-				$field_key,
-				0,
-				array( 'post_title' => sprintf( 'property-admin-%d-%s', (int) $user_id, $doc_type ) ),
-				array(
-					'test_form' => false,
-					'mimes'     => array( 'pdf' => 'application/pdf' ),
-				)
-			);
-			unset( $_FILES[ $field_key ] );
-
-			if ( is_wp_error( $attachment_id ) ) {
+			// Sin R2: almacenamiento local privado, carpeta y nombre legibles del propio gestor.
+			$stored = Arriendo_Facil_Local_Private_Storage::store( $contents, Arriendo_Facil_Local_Private_Storage::CATEGORY_ADMINS, (int) $user_id, (string) $user->display_name, $doc_type );
+			if ( is_wp_error( $stored ) ) {
 				wp_send_json_error( array( 'message' => __( 'No se pudo guardar el documento.', 'arriendo-facil' ) ), 500 );
 			}
 
-			update_post_meta( (int) $attachment_id, '_af_property_admin_doc', (int) $user_id );
-			update_post_meta( (int) $attachment_id, '_af_property_admin_doc_type', $doc_type );
-			$object_key = (string) $attachment_id;
+			$storage    = Arriendo_Facil_Local_Private_Storage::STORAGE_ID;
+			$object_key = $stored;
 		}
 
 		$documents = (array) get_user_meta( $user_id, 'af_admin_documents', true );
@@ -872,6 +861,36 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 		}
 
 		wp_send_json_success( array( 'message' => __( 'Documento subido correctamente.', 'arriendo-facil' ) ) );
+	}
+
+	/**
+	 * Streams a property manager's identity document from private local storage.
+	 * Allowed for platform administrators and for the document's own owner.
+	 *
+	 * @return void
+	 */
+	public function ajax_stream_document() {
+		$user_id  = isset( $_GET['user_id'] ) ? absint( wp_unslash( $_GET['user_id'] ) ) : 0;
+		$doc_type = isset( $_GET['doc_type'] ) ? sanitize_key( wp_unslash( $_GET['doc_type'] ) ) : '';
+
+		if ( ! $user_id || ! in_array( $doc_type, self::DOC_TYPES, true ) || ! check_ajax_referer( 'af_stream_admin_document_' . $user_id . '_' . $doc_type, '_wpnonce', false ) ) {
+			wp_die( esc_html__( 'Solicitud inválida.', 'arriendo-facil' ), '', array( 'response' => 403 ) );
+		}
+
+		if ( ! is_user_logged_in() || ( ! current_user_can( 'manage_options' ) && get_current_user_id() !== $user_id ) ) {
+			wp_die( esc_html__( 'Permiso denegado.', 'arriendo-facil' ), '', array( 'response' => 403 ) );
+		}
+
+		$documents = (array) get_user_meta( $user_id, 'af_admin_documents', true );
+		$doc       = isset( $documents[ $doc_type ] ) && is_array( $documents[ $doc_type ] ) ? $documents[ $doc_type ] : array();
+		if ( empty( $doc['object_key'] ) || Arriendo_Facil_Local_Private_Storage::STORAGE_ID !== ( isset( $doc['storage'] ) ? $doc['storage'] : '' ) ) {
+			wp_die( esc_html__( 'Documento no encontrado.', 'arriendo-facil' ), '', array( 'response' => 404 ) );
+		}
+
+		$result = Arriendo_Facil_Local_Private_Storage::stream( (string) $doc['object_key'], Arriendo_Facil_Local_Private_Storage::display_name( (string) $doc['object_key'] ) );
+		if ( is_wp_error( $result ) ) {
+			wp_die( esc_html( $result->get_error_message() ), '', array( 'response' => 404 ) );
+		}
 	}
 
 	/**
@@ -1053,6 +1072,16 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 					if ( is_string( $signed ) && '' !== $signed ) {
 						$item['download_url'] = $signed;
 					}
+				} elseif ( Arriendo_Facil_Local_Private_Storage::STORAGE_ID === $item['storage'] && '' !== $object_key ) {
+					$item['download_url'] = add_query_arg(
+						array(
+							'action'   => 'af_stream_admin_document',
+							'user_id'  => $user_id,
+							'doc_type' => $doc_type,
+							'_wpnonce' => wp_create_nonce( 'af_stream_admin_document_' . $user_id . '_' . $doc_type ),
+						),
+						admin_url( 'admin-ajax.php' )
+					);
 				} elseif ( 'local' === $item['storage'] && '' !== $object_key ) {
 					$attachment_url = wp_get_attachment_url( (int) $object_key );
 					if ( is_string( $attachment_url ) && '' !== $attachment_url ) {

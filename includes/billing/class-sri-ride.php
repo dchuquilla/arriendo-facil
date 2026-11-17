@@ -104,11 +104,36 @@ class Arriendo_Facil_SRI_Ride {
 	}
 
 	/**
-	 * Returns (and creates if needed) the local folder used for RIDE files.
+	 * Returns (and creates if needed) the folder used for new RIDE files.
+	 *
+	 * RIDE PDFs carry buyer identity and amounts, so they go to the private local store
+	 * (outside the web root when possible) and are only delivered by the authenticated
+	 * download handlers. The old public uploads folder is used only when no private
+	 * directory can be created, so invoicing never stops.
 	 *
 	 * @return string|WP_Error
 	 */
 	public function ride_dir() {
+		if ( class_exists( 'Arriendo_Facil_Local_Private_Storage' ) ) {
+			$root = Arriendo_Facil_Local_Private_Storage::root();
+			if ( ! is_wp_error( $root ) ) {
+				$dir = $root . '/facturas-ride';
+				if ( is_dir( $dir ) || wp_mkdir_p( $dir ) ) {
+					return $dir;
+				}
+			}
+		}
+
+		return $this->legacy_ride_dir();
+	}
+
+	/**
+	 * Folder where RIDE files were written before the private store existed
+	 * (inside wp-content/uploads). Kept so already issued invoices still resolve.
+	 *
+	 * @return string|WP_Error
+	 */
+	public function legacy_ride_dir() {
 		$base = '';
 
 		if ( function_exists( 'wp_upload_dir' ) ) {
@@ -133,6 +158,28 @@ class Arriendo_Facil_SRI_Ride {
 		}
 
 		return $dir;
+	}
+
+	/**
+	 * Whether a path is a file inside one of the RIDE folders (current or legacy).
+	 *
+	 * @param string $path File path.
+	 * @return string Real path, or '' when it is outside the RIDE folders.
+	 */
+	public function allowed_real_path( $path ) {
+		$real = '' !== (string) $path ? realpath( (string) $path ) : false;
+		if ( false === $real ) {
+			return '';
+		}
+
+		foreach ( array( $this->ride_dir(), $this->legacy_ride_dir() ) as $dir ) {
+			$dir_real = is_string( $dir ) ? realpath( $dir ) : false;
+			if ( false !== $dir_real && 0 === strpos( $real, $dir_real . DIRECTORY_SEPARATOR ) ) {
+				return $real;
+			}
+		}
+
+		return '';
 	}
 
 	/**

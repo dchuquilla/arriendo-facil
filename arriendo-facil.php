@@ -32,6 +32,8 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-text-normalizer.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-identity-validator.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/support/class-job-lock.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/storage/class-private-storage.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/storage/class-local-private-storage.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/storage/class-private-storage-migration.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-contract-storage.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/contracts/class-contract-text-extractor.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/contracts/class-contract-file-store.php';
@@ -307,6 +309,7 @@ function arriendo_facil_init() {
 		'Arriendo_Facil_Catalog_Share',
 		'Arriendo_Facil_Security_Hardening',
 		'Arriendo_Facil_Media_Isolation',
+		'Arriendo_Facil_Private_Storage_Migration',
 		'Arriendo_Facil_Email',
 		'Arriendo_Facil_Aviso',
 		'Arriendo_Facil_Calendar',

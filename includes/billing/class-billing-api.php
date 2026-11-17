@@ -421,10 +421,8 @@ class Arriendo_Facil_Billing_API {
 			wp_die( esc_html__( 'Archivo RIDE no encontrado.', 'arriendo-facil' ), 404 );
 		}
 
-		$ride_dir = ( new Arriendo_Facil_SRI_Ride() )->ride_dir();
-		$path_real = realpath( $path );
-		$dir_real  = is_string( $ride_dir ) ? realpath( $ride_dir ) : false;
-		if ( false === $path_real || false === $dir_real || 0 !== strpos( $path_real, $dir_real . DIRECTORY_SEPARATOR ) ) {
+		$path_real = ( new Arriendo_Facil_SRI_Ride() )->allowed_real_path( $path );
+		if ( '' === $path_real ) {
 			wp_die( esc_html__( 'Ruta de archivo no autorizada.', 'arriendo-facil' ), 403 );
 		}
 
@@ -538,10 +536,8 @@ class Arriendo_Facil_Billing_API {
 		}
 
 		$path      = $this->manager->regenerate_ride( $invoice );
-		$ride_dir  = ( new Arriendo_Facil_SRI_Ride() )->ride_dir();
-		$path_real = '' !== $path ? realpath( $path ) : false;
-		$dir_real  = is_string( $ride_dir ) ? realpath( $ride_dir ) : false;
-		if ( false === $path_real || false === $dir_real || 0 !== strpos( $path_real, $dir_real . DIRECTORY_SEPARATOR ) ) {
+		$path_real = ( new Arriendo_Facil_SRI_Ride() )->allowed_real_path( $path );
+		if ( '' === $path_real ) {
 			wp_die( esc_html__( 'RIDE no disponible.', 'arriendo-facil' ), 404 );
 		}
 		header( 'Content-Type: application/pdf' );

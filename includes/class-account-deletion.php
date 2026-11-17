@@ -640,6 +640,15 @@ class Arriendo_Facil_Account_Deletion {
 		self::delete_in( $p . 'af_reservations', 'accommodation_id', $acc_ids );
 		self::delete_in( $p . 'af_guest_onboarding_tokens', 'accommodation_id', $acc_ids );
 		self::delete_in( $p . 'af_guest_onboarding_tokens', 'guest_id', $guest_ids );
+		// Delete the stored private files together with their index rows.
+		if ( $guest_ids && class_exists( 'Arriendo_Facil_Local_Private_Storage' ) ) {
+			$stored_docs = (array) $wpdb->get_results( "SELECT storage, object_key FROM {$p}af_guest_documents WHERE guest_id IN (" . implode( ',', array_map( 'absint', $guest_ids ) ) . ')' ); // phpcs:ignore WordPress.DB.PreparedSQL
+			foreach ( $stored_docs as $stored_doc ) {
+				if ( Arriendo_Facil_Local_Private_Storage::STORAGE_ID === $stored_doc->storage ) {
+					Arriendo_Facil_Local_Private_Storage::delete( (string) $stored_doc->object_key );
+				}
+			}
+		}
 		self::delete_in( $p . 'af_guest_documents', 'guest_id', $guest_ids );
 		self::delete_in( $p . 'af_otas_sync_log', 'accommodation_id', $acc_ids );
 		self::delete_in( $p . 'af_leases', 'id', $lease_ids );

@@ -459,4 +459,53 @@ class AuditRun3FixesTest extends TestCase {
 		$this->assertFalse( \Arriendo_Facil_Local_Private_Storage::relocate_owner_template( 56, 9 ) );
 		$this->assertFileExists( $exe );
 	}
+
+	/**
+	 * Property documents (PDF/images) go to a readable per-property folder; streaming refuses
+	 * anything outside the private store.
+	 */
+	public function test_property_documents_use_property_folder_and_stream_is_confined() {
+		$this->boot();
+		$base = sys_get_temp_dir() . '/af-prop-' . uniqid();
+		$pub  = $base . '/public';
+		mkdir( $pub, 0755, true );
+		define( 'AF_PRIVATE_STORAGE_DIR', $base . '/private' );
+		foreach ( array(
+			'remove_accents'    => 'function remove_accents( $s ) { return $s; }',
+			'wp_mkdir_p'        => 'function wp_mkdir_p( $d ) { return is_dir( $d ) || mkdir( $d, 0755, true ); }',
+			'get_attached_file' => 'function get_attached_file( $id, $u = false ) { return isset( $GLOBALS["af_t_meta"][ (int) $id ]["_wp_attached_file"] ) ? $GLOBALS["af_t_meta"][ (int) $id ]["_wp_attached_file"] : false; }',
+			'update_post_meta'  => 'function update_post_meta( $id, $k, $v ) { $GLOBALS["af_t_meta"][ (int) $id ][ $k ] = $v; return true; }',
+			'wp_delete_file'    => 'function wp_delete_file( $f ) { if ( is_file( $f ) ) { unlink( $f ); } }',
+			'sanitize_file_name' => 'function sanitize_file_name( $n ) { return preg_replace( "/[^A-Za-z0-9._-]/", "", $n ); }',
+			'nocache_headers'   => 'function nocache_headers() {}',
+		) as $name => $code ) {
+			if ( ! function_exists( $name ) ) {
+				eval( $code );
+			}
+		}
+		require_once dirname( __DIR__, 2 ) . '/includes/storage/class-local-private-storage.php';
+
+		$scan = $pub . '/Escritura Casa Centro.JPG';
+		file_put_contents( $scan, 'JPEG-bytes' );
+		$GLOBALS['af_t_meta'][70]['_wp_attached_file'] = $scan;
+
+		$this->assertTrue( \Arriendo_Facil_Local_Private_Storage::relocate_attachment( 70, 'inmuebles', 100, 'Casa Centro', 'escritura' ) );
+		$new = $GLOBALS['af_t_meta'][70]['_wp_attached_file'];
+		$this->assertStringContainsString( '/inmuebles/0100-casa-centro/escritura-escritura-casa-centro_', $new );
+		$this->assertStringEndsWith( '.jpg', $new );
+		$this->assertFileDoesNotExist( $scan );
+
+		// Streaming only serves files inside the private store.
+		$outside = $pub . '/other.pdf';
+		file_put_contents( $outside, '%PDF' );
+		$this->assertTrue( is_wp_error( \Arriendo_Facil_Local_Private_Storage::stream_path( $outside ) ) );
+		$this->assertTrue( is_wp_error( \Arriendo_Facil_Local_Private_Storage::stream_path( $base . '/private/../public/other.pdf' ) ) );
+
+		// A type outside the allow-list is neither moved nor streamed.
+		$odd = $pub . '/macro.xlsm';
+		file_put_contents( $odd, 'x' );
+		$GLOBALS['af_t_meta'][71]['_wp_attached_file'] = $odd;
+		$this->assertFalse( \Arriendo_Facil_Local_Private_Storage::relocate_attachment( 71, 'inmuebles', 100, 'Casa Centro', 'otro' ) );
+		$this->assertFileExists( $odd );
+	}
 }

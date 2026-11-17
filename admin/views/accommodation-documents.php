@@ -20,10 +20,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 		<?php foreach ( $documents as $document ) : ?>
 			<?php
 			$attachment_id  = absint( $document['attachment_id'] ?? 0 );
-			$attachment_url = $attachment_id ? wp_get_attachment_url( $attachment_id ) : '';
+			$attachment_url = $attachment_id ? Arriendo_Facil_Accommodation::property_document_url( $attachment_id, isset( $post->ID ) ? (int) $post->ID : 0 ) : '';
 			if ( ! $attachment_url ) {
 				continue;
 			}
+			$attachment_file = $attachment_id ? wp_basename( (string) get_attached_file( $attachment_id, true ) ) : '';
 			?>
 			<li class="af-documents-item"
 				data-type="<?php echo esc_attr( $document['type'] ?? 'otro' ); ?>"
@@ -32,7 +33,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 				data-expires="<?php echo esc_attr( $document['expires_at'] ?? '' ); ?>">
 				<span class="af-documents-item__type"><?php echo esc_html( $document_types[ $document['type'] ?? 'otro' ] ?? '' ); ?></span>
 				<a href="<?php echo esc_url( $attachment_url ); ?>" target="_blank" rel="noopener">
-					<?php echo esc_html( $document['label'] ? $document['label'] : basename( $attachment_url ) ); ?>
+					<?php echo esc_html( $document['label'] ? $document['label'] : $attachment_file ); ?>
 				</a>
 				<?php if ( ! empty( $document['expires_at'] ) ) : ?>
 					<span class="af-documents-item__expires">
@@ -76,6 +77,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 	let frame = null;
 
+	function esc(value) {
+		return String(value == null ? '' : value)
+			.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+	}
+
 	function bindRemove(item) {
 		item.querySelector('.af-documents-item__remove').addEventListener('click', function () {
 			item.remove();
@@ -112,23 +119,41 @@ if ( ! defined( 'ABSPATH' ) ) {
 			const attachment = frame.state().get('selection').first().toJSON();
 			const type = typeSelect.value;
 			const expires = expiresInput.value;
-
-			const item = document.createElement('li');
-			item.className = 'af-documents-item';
-			item.setAttribute('data-type', type);
-			item.setAttribute('data-id', attachment.id);
-			item.setAttribute('data-label', attachment.filename || attachment.title || '');
-			item.setAttribute('data-expires', expires);
-			item.innerHTML =
-				'<span class="af-documents-item__type">' + typeSelect.options[typeSelect.selectedIndex].text + '</span>' +
-				'<a href="' + attachment.url + '" target="_blank" rel="noopener">' + (attachment.filename || attachment.title) + '</a>' +
-				(expires ? '<span class="af-documents-item__expires"><?php echo esc_js( __( 'Vence:', 'arriendo-facil' ) ); ?> ' + expires + '</span>' : '') +
-				'<button type="button" class="af-documents-item__remove">&times;</button>';
-
-			list.appendChild(item);
-			bindRemove(item);
-			sync();
+			const typeText = typeSelect.options[typeSelect.selectedIndex].text;
 			expiresInput.value = '';
+
+			function addItem(url) {
+				const item = document.createElement('li');
+				item.className = 'af-documents-item';
+				item.setAttribute('data-type', type);
+				item.setAttribute('data-id', attachment.id);
+				item.setAttribute('data-label', attachment.filename || attachment.title || '');
+				item.setAttribute('data-expires', expires);
+				item.innerHTML =
+					'<span class="af-documents-item__type">' + esc(typeText) + '</span>' +
+					'<a href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(attachment.filename || attachment.title) + '</a>' +
+					(expires ? '<span class="af-documents-item__expires"><?php echo esc_js( __( 'Vence:', 'arriendo-facil' ) ); ?> ' + esc(expires) + '</span>' : '') +
+					'<button type="button" class="af-documents-item__remove">&times;</button>';
+
+				list.appendChild(item);
+				bindRemove(item);
+				sync();
+			}
+
+			// Move the file to the private store right away so it is not public until the property is
+			// saved, then show the authenticated link. If that is not possible (other file type,
+			// network error) the item is added exactly as before.
+			const body = new URLSearchParams({
+				action: 'af_secure_property_document',
+				nonce: <?php echo wp_json_encode( wp_create_nonce( 'af_secure_property_document' ) ); ?>,
+				attachment_id: attachment.id,
+				post_id: <?php echo (int) ( isset( $post->ID ) ? $post->ID : 0 ); ?>,
+				type: type
+			});
+			fetch(<?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>, { method: 'POST', credentials: 'same-origin', body: body })
+				.then(function (r) { return r.json(); })
+				.then(function (res) { addItem(res && res.success && res.data && res.data.url ? res.data.url : attachment.url); })
+				.catch(function () { addItem(attachment.url); });
 		});
 
 		frame.open();

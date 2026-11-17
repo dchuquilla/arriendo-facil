@@ -595,6 +595,10 @@ class Arriendo_Facil_Owner_Contact {
 				return;
 			}
 
+			// Identity PDFs are never left in the public media library.
+			$owner_user = get_userdata( (int) $user_id );
+			Arriendo_Facil_Local_Private_Storage::relocate_attachment( (int) $attachment_id, Arriendo_Facil_Local_Private_Storage::CATEGORY_ADMINS, (int) $user_id, $owner_user ? (string) $owner_user->display_name : '', (string) $doc_type );
+
 			$this->uploaded_document_ids[ $doc_type ] = (int) $attachment_id;
 		}
 

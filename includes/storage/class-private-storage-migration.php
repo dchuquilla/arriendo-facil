@@ -43,6 +43,8 @@ class Arriendo_Facil_Private_Storage_Migration {
 		$count += count( self::legacy_rides() );
 		$count += count( self::legacy_contract_options() );
 		$count += count( self::legacy_templates() );
+		$count += count( self::legacy_property_documents() );
+		$count += count( self::legacy_identity_pdfs() );
 
 		$users = (array) $wpdb->get_col( "SELECT user_id FROM {$wpdb->usermeta} WHERE meta_key = 'af_admin_documents'" ); // phpcs:ignore WordPress.DB.PreparedSQL
 		foreach ( $users as $user_id ) {
@@ -238,10 +240,80 @@ class Arriendo_Facil_Private_Storage_Migration {
 			$failed += $result['failed'];
 		}
 
+		// Property legal documents (deeds, insurance, ...).
+		foreach ( self::legacy_property_documents() as $doc ) {
+			if ( Arriendo_Facil_Accommodation::secure_property_document( $doc['attachment_id'], $doc['post_id'], $doc['type'] ) ) {
+				++$moved;
+			} else {
+				++$failed;
+			}
+		}
+
+		// Identity PDFs uploaded through the owner contact form.
+		foreach ( self::legacy_identity_pdfs() as $attachment_id ) {
+			$owner_id = (int) get_post_meta( $attachment_id, '_af_owner_user_id', true );
+			$user     = $owner_id ? get_userdata( $owner_id ) : false;
+			$type     = sanitize_key( (string) get_post_meta( $attachment_id, '_af_sensitive_doc_type', true ) );
+			if ( Arriendo_Facil_Local_Private_Storage::relocate_attachment( $attachment_id, Arriendo_Facil_Local_Private_Storage::CATEGORY_ADMINS, $owner_id, $user ? (string) $user->display_name : '', '' !== $type ? $type : 'documento' ) ) {
+				++$moved;
+			} else {
+				++$failed;
+			}
+		}
+
 		return array(
 			'moved'  => $moved,
 			'failed' => $failed,
 		);
+	}
+
+	/**
+	 * Listed property documents that are still public files of a supported type.
+	 *
+	 * @return array<int,array{attachment_id:int,post_id:int,type:string}>
+	 */
+	private static function legacy_property_documents() {
+		global $wpdb;
+
+		$out  = array();
+		$rows = (array) $wpdb->get_results( "SELECT post_id, meta_value FROM {$wpdb->postmeta} WHERE meta_key = '_af_documents'" ); // phpcs:ignore WordPress.DB.PreparedSQL
+		foreach ( $rows as $row ) {
+			$documents = maybe_unserialize( $row->meta_value );
+			foreach ( is_array( $documents ) ? $documents : array() as $document ) {
+				$attachment_id = is_array( $document ) && isset( $document['attachment_id'] ) ? absint( $document['attachment_id'] ) : 0;
+				$path          = $attachment_id ? (string) get_attached_file( $attachment_id, true ) : '';
+				$ext           = strtolower( pathinfo( $path, PATHINFO_EXTENSION ) );
+				if ( '' !== $path && is_file( $path ) && isset( Arriendo_Facil_Local_Private_Storage::TYPES[ $ext ] ) && ! Arriendo_Facil_Local_Private_Storage::is_private_path( $path ) ) {
+					$out[] = array(
+						'attachment_id' => $attachment_id,
+						'post_id'       => (int) $row->post_id,
+						'type'          => isset( $document['type'] ) ? sanitize_key( (string) $document['type'] ) : 'otro',
+					);
+				}
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Identity PDFs (owner contact form) still sitting in the public media library.
+	 *
+	 * @return int[]
+	 */
+	private static function legacy_identity_pdfs() {
+		global $wpdb;
+
+		$ids = (array) $wpdb->get_col( "SELECT p.post_id FROM {$wpdb->postmeta} p INNER JOIN {$wpdb->postmeta} t ON t.post_id = p.post_id AND t.meta_key = '_af_sensitive_doc_type' AND t.meta_value <> 'contract_example' WHERE p.meta_key = '_af_sensitive_doc' AND p.meta_value = '1'" ); // phpcs:ignore WordPress.DB.PreparedSQL
+		$out = array();
+		foreach ( array_unique( array_map( 'intval', $ids ) ) as $attachment_id ) {
+			$path = (string) get_attached_file( $attachment_id, true );
+			if ( '' !== $path && is_file( $path ) && ! Arriendo_Facil_Local_Private_Storage::is_private_path( $path ) ) {
+				$out[] = $attachment_id;
+			}
+		}
+
+		return $out;
 	}
 
 	/**

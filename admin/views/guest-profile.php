@@ -97,7 +97,7 @@ foreach ( $leases as $lease_row ) {
 
 	foreach ( $decoded as $doc ) {
 		$attachment_id = isset( $doc['attachment_id'] ) ? absint( $doc['attachment_id'] ) : 0;
-		$doc_url       = $attachment_id ? wp_get_attachment_url( $attachment_id ) : '';
+		$doc_url       = $attachment_id ? Arriendo_Facil_Accommodation::property_document_url( $attachment_id, (int) $accommodation_id ) : '';
 		if ( ! $doc_url ) {
 			continue;
 		}

@@ -33,6 +33,8 @@ class Arriendo_Facil_Accommodation {
 		add_action( 'pre_get_posts', array( $this, 'force_home_queries_to_accommodations' ) );
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_frontend_styles' ) );
 		add_action( 'wp_ajax_af_estimate_rent', array( $this, 'ajax_estimate_rent' ) );
+		add_action( 'wp_ajax_af_stream_property_document', array( $this, 'ajax_stream_property_document' ) );
+		add_action( 'wp_ajax_af_secure_property_document', array( $this, 'ajax_secure_property_document' ) );
 
 		add_action( 'clean_post_cache', array( __CLASS__, 'flush_ownership_cache_for_post' ) );
 		foreach ( array( 'added_post_meta', 'updated_post_meta', 'deleted_post_meta' ) as $meta_hook ) {
@@ -372,7 +374,127 @@ class Arriendo_Facil_Accommodation {
 			}
 		}
 
+		// Legal documents are sensitive: keep every listed file out of the public media library.
+		foreach ( $sanitized as $document ) {
+			self::secure_property_document( (int) $document['attachment_id'], (int) $post_id, (string) $document['type'] );
+		}
+
 		update_post_meta( $post_id, '_af_documents', $sanitized );
+	}
+
+	/**
+	 * Moves a property document attachment into the private store (folder per property, readable
+	 * name such as inmuebles/0100-casa-centro/escritura-<archivo>_2026-11-17.pdf). Files of other
+	 * types, or that the user cannot edit, are left as they are.
+	 *
+	 * @param int    $attachment_id Attachment ID.
+	 * @param int    $post_id       Accommodation ID.
+	 * @param string $type          Document type slug.
+	 * @return bool Whether the file is now private.
+	 */
+	public static function secure_property_document( $attachment_id, $post_id, $type ) {
+		$attachment_id = absint( $attachment_id );
+		if ( ! $attachment_id || 'attachment' !== get_post_type( $attachment_id ) || ! current_user_can( 'edit_post', $attachment_id ) ) {
+			return false;
+		}
+
+		return Arriendo_Facil_Local_Private_Storage::relocate_attachment(
+			$attachment_id,
+			Arriendo_Facil_Local_Private_Storage::CATEGORY_PROPERTIES,
+			absint( $post_id ),
+			(string) get_the_title( $post_id ),
+			sanitize_key( $type )
+		);
+	}
+
+	/**
+	 * Link for a property document: an authenticated stream for private files, the normal media URL
+	 * for anything that still lives in the library.
+	 *
+	 * @param int $attachment_id Attachment ID.
+	 * @param int $post_id       Accommodation ID.
+	 * @return string
+	 */
+	public static function property_document_url( $attachment_id, $post_id ) {
+		$attachment_id = absint( $attachment_id );
+		$path          = $attachment_id ? (string) get_attached_file( $attachment_id, true ) : '';
+
+		if ( '' !== $path && Arriendo_Facil_Local_Private_Storage::is_private_path( $path ) ) {
+			return add_query_arg(
+				array(
+					'action'   => 'af_stream_property_document',
+					'id'       => $attachment_id,
+					'post'     => absint( $post_id ),
+					'_wpnonce' => wp_create_nonce( 'af_stream_property_document_' . $attachment_id ),
+				),
+				admin_url( 'admin-ajax.php' )
+			);
+		}
+
+		return (string) wp_get_attachment_url( $attachment_id );
+	}
+
+	/**
+	 * AJAX: moves a just-selected document into the private store and returns its link, so the
+	 * file does not stay public until the property is saved.
+	 *
+	 * @return void
+	 */
+	public function ajax_secure_property_document() {
+		check_ajax_referer( 'af_secure_property_document', 'nonce' );
+
+		$attachment_id = isset( $_POST['attachment_id'] ) ? absint( wp_unslash( $_POST['attachment_id'] ) ) : 0;
+		$post_id       = isset( $_POST['post_id'] ) ? absint( wp_unslash( $_POST['post_id'] ) ) : 0;
+		$type          = isset( $_POST['type'] ) ? sanitize_key( wp_unslash( $_POST['type'] ) ) : 'otro';
+
+		if ( ! $attachment_id || ! $post_id || 'accommodation' !== get_post_type( $post_id ) || ! current_user_can( 'edit_post', $post_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$secured = self::secure_property_document( $attachment_id, $post_id, $type );
+
+		wp_send_json_success(
+			array(
+				'secured' => $secured,
+				'url'     => self::property_document_url( $attachment_id, $post_id ),
+				'name'    => wp_basename( (string) get_attached_file( $attachment_id, true ) ),
+			)
+		);
+	}
+
+	/**
+	 * AJAX: streams a private property document to a user who may edit that property and only if
+	 * the file is one of the property's listed documents.
+	 *
+	 * @return void
+	 */
+	public function ajax_stream_property_document() {
+		$attachment_id = isset( $_GET['id'] ) ? absint( wp_unslash( $_GET['id'] ) ) : 0;
+		$post_id       = isset( $_GET['post'] ) ? absint( wp_unslash( $_GET['post'] ) ) : 0;
+
+		if ( ! $attachment_id || ! $post_id || ! check_ajax_referer( 'af_stream_property_document_' . $attachment_id, '_wpnonce', false ) ) {
+			wp_die( esc_html__( 'Solicitud inválida.', 'arriendo-facil' ), '', array( 'response' => 403 ) );
+		}
+
+		if ( 'accommodation' !== get_post_type( $post_id ) || ! is_user_logged_in() || ( ! Arriendo_Facil_Tenancy::can_access_accommodation( $post_id ) && ! current_user_can( 'manage_options' ) ) ) {
+			wp_die( esc_html__( 'Permiso denegado.', 'arriendo-facil' ), '', array( 'response' => 403 ) );
+		}
+
+		$listed = false;
+		foreach ( (array) get_post_meta( $post_id, '_af_documents', true ) as $document ) {
+			if ( is_array( $document ) && isset( $document['attachment_id'] ) && absint( $document['attachment_id'] ) === $attachment_id ) {
+				$listed = true;
+				break;
+			}
+		}
+		if ( ! $listed ) {
+			wp_die( esc_html__( 'Documento no encontrado.', 'arriendo-facil' ), '', array( 'response' => 404 ) );
+		}
+
+		$result = Arriendo_Facil_Local_Private_Storage::stream_path( (string) get_attached_file( $attachment_id, true ), wp_basename( (string) get_attached_file( $attachment_id, true ) ) );
+		if ( is_wp_error( $result ) ) {
+			wp_die( esc_html( $result->get_error_message() ), '', array( 'response' => 404 ) );
+		}
 	}
 
 	/**

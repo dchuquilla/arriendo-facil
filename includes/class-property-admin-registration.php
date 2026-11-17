@@ -33,6 +33,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+if ( ! class_exists( 'Arriendo_Facil_Crypto' ) ) {
+	require_once __DIR__ . '/class-crypto.php';
+}
+
 class Arriendo_Facil_Property_Admin_Registration {
 
 	const NONCE_ACTION   = 'af_admin_signup_frontend_nonce';
@@ -487,7 +491,7 @@ class Arriendo_Facil_Property_Admin_Registration {
 		}
 
 		$id_fingerprint = $this->build_identity_fingerprint( $id_number );
-		if ( '' === $id_fingerprint || $this->identity_fingerprint_exists( $id_fingerprint ) ) {
+		if ( '' === $id_fingerprint || $this->identity_fingerprint_exists( $id_fingerprint ) || $this->identity_fingerprint_exists( $this->build_identity_fingerprint_legacy( $id_number ) ) ) {
 			$this->log_signup_security_event( 'duplicate_identity_fingerprint', $email );
 			wp_send_json_error(
 				array(
@@ -1161,7 +1165,20 @@ class Arriendo_Facil_Property_Admin_Registration {
 			return '';
 		}
 
-		return hash_hmac( 'sha256', $normalized, wp_salt( 'secure_auth' ) . 'af_admin_id_fp_v1' );
+		return Arriendo_Facil_Crypto::fingerprint( $normalized, 'admin-id-fp', wp_salt( 'secure_auth' ) . 'af_admin_id_fp_v1' );
+	}
+
+	/**
+	 * Fingerprint as computed before AF_ENCRYPTION_KEY existed (salt-derived), for duplicate checks
+	 * against accounts that have not been re-keyed yet.
+	 *
+	 * @param string $id_number Identity value.
+	 * @return string
+	 */
+	private function build_identity_fingerprint_legacy( $id_number ) {
+		$normalized = strtoupper( preg_replace( '/[^A-Za-z0-9]/', '', (string) $id_number ) );
+
+		return '' === $normalized ? '' : hash_hmac( 'sha256', $normalized, wp_salt( 'secure_auth' ) . 'af_admin_id_fp_v1' );
 	}
 
 	/**
@@ -1243,6 +1260,13 @@ class Arriendo_Facil_Property_Admin_Registration {
 		$value = (string) $value;
 		if ( '' === trim( $value ) ) {
 			return '';
+		}
+
+		if ( Arriendo_Facil_Crypto::has_master() ) {
+			$sealed = Arriendo_Facil_Crypto::seal( $value, Arriendo_Facil_Crypto::PURPOSE_ADMIN );
+			if ( '' !== $sealed ) {
+				return $sealed;
+			}
 		}
 
 		if ( ! function_exists( 'sodium_crypto_secretbox' ) || ! function_exists( 'random_bytes' ) ) {

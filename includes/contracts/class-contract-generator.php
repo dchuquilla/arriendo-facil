@@ -427,7 +427,7 @@ class Arriendo_Facil_Contract_Generator {
 			return '';
 		}
 
-		$contracts_dir = trailingslashit( $uploads['basedir'] ) . 'arriendo-facil/contracts';
+		$contracts_dir = untrailingslashit( get_temp_dir() ); // Temporary build folder: the file is handed to the private store and deleted.
 		if ( ! wp_mkdir_p( $contracts_dir ) ) {
 			if ( $tmp_downloaded ) {
 				@unlink( $template_path );
@@ -547,9 +547,7 @@ class Arriendo_Facil_Contract_Generator {
 			return '';
 		}
 
-		$local_url = trailingslashit( $uploads['baseurl'] ) . 'arriendo-facil/contracts/' . rawurlencode( $file_name );
-
-		return Arriendo_Facil_Contract_File_Store::persist( $lease_id, $file_path, $file_name, $local_url, Arriendo_Facil_Contract_Text_Extractor::DOCX_MIME );
+		return Arriendo_Facil_Contract_File_Store::persist( $lease_id, $file_path, $file_name, '', Arriendo_Facil_Contract_Text_Extractor::DOCX_MIME );
 	}
 
 	/**
@@ -641,7 +639,7 @@ class Arriendo_Facil_Contract_Generator {
 			return '';
 		}
 
-		$contracts_dir = trailingslashit( $uploads['basedir'] ) . 'arriendo-facil/contracts';
+		$contracts_dir = untrailingslashit( get_temp_dir() ); // Temporary build folder: the file is handed to the private store and deleted.
 		if ( ! wp_mkdir_p( $contracts_dir ) ) {
 			return '';
 		}
@@ -653,7 +651,7 @@ class Arriendo_Facil_Contract_Generator {
 			return '';
 		}
 
-		return esc_url_raw( trailingslashit( $uploads['baseurl'] ) . 'arriendo-facil/contracts/' . rawurlencode( $file_name ) );
+		return Arriendo_Facil_Contract_File_Store::persist( $lease_id, $file_path, $file_name, '', Arriendo_Facil_Contract_Text_Extractor::DOCX_MIME );
 	}
 
 	/**
@@ -1210,7 +1208,7 @@ class Arriendo_Facil_Contract_Generator {
 			return '';
 		}
 
-		$contracts_dir = trailingslashit( $uploads['basedir'] ) . 'arriendo-facil/contracts';
+		$contracts_dir = untrailingslashit( get_temp_dir() ); // Temporary build folder: the file is handed to the private store and deleted.
 		if ( ! wp_mkdir_p( $contracts_dir ) ) {
 			return '';
 		}
@@ -1229,9 +1227,7 @@ class Arriendo_Facil_Contract_Generator {
 			}
 		}
 
-		$local_url = trailingslashit( $uploads['baseurl'] ) . 'arriendo-facil/contracts/' . rawurlencode( $file_name );
-
-		return Arriendo_Facil_Contract_File_Store::persist( $lease_id, $file_path, $file_name, $local_url, $mime_type );
+		return Arriendo_Facil_Contract_File_Store::persist( $lease_id, $file_path, $file_name, '', $mime_type );
 	}
 
 	/**

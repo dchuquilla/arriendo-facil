@@ -27,6 +27,18 @@ class Arriendo_Facil_Local_Private_Storage {
 
 	const CATEGORY_GUESTS = 'huespedes';
 	const CATEGORY_ADMINS = 'gestores';
+	const CATEGORY_CONTRACTS = 'contratos';
+
+	/**
+	 * Allowed stored file types and their content types.
+	 *
+	 * @var array<string,string>
+	 */
+	const TYPES = array(
+		'pdf'  => 'application/pdf',
+		'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+		'doc'  => 'application/msword',
+	);
 
 	/**
 	 * Resolves (and prepares) the storage root.
@@ -49,6 +61,13 @@ class Arriendo_Facil_Local_Private_Storage {
 			$candidates[] = array( dirname( rtrim( ABSPATH, '/\\' ) ) . '/af-private-storage', false );
 		}
 		$candidates[] = array( rtrim( WP_CONTENT_DIR, '/\\' ) . '/af-private/' . self::site_secret(), true );
+		// wp-content itself is often read-only while uploads is writable.
+		if ( function_exists( 'wp_upload_dir' ) ) {
+			$uploads = wp_upload_dir();
+			if ( is_array( $uploads ) && empty( $uploads['error'] ) && ! empty( $uploads['basedir'] ) ) {
+				$candidates[] = array( rtrim( (string) $uploads['basedir'], '/\\' ) . '/af-private/' . self::site_secret(), true );
+			}
+		}
 
 		foreach ( $candidates as $candidate ) {
 			list( $path, $inside_web_root ) = $candidate;
@@ -85,15 +104,21 @@ class Arriendo_Facil_Local_Private_Storage {
 	 * @param int    $owner_id      Guest ID or user ID.
 	 * @param string $person_name   Person's display name (used for the folder name).
 	 * @param string $doc_type      Document type slug (e.g. cedula_papeleta).
+	 * @param string $ext           File extension: pdf (default), docx or doc.
 	 * @return string|WP_Error Storage key relative to the root.
 	 */
-	public static function store( $contents, $category, $owner_id, $person_name, $doc_type ) {
+	public static function store( $contents, $category, $owner_id, $person_name, $doc_type, $ext = 'pdf' ) {
 		$root = self::root();
 		if ( is_wp_error( $root ) ) {
 			return $root;
 		}
 
-		if ( ! in_array( $category, array( self::CATEGORY_GUESTS, self::CATEGORY_ADMINS ), true ) ) {
+		$ext = strtolower( (string) $ext );
+		if ( ! isset( self::TYPES[ $ext ] ) ) {
+			return new WP_Error( 'af_local_storage_bad_type', __( 'Tipo de archivo no permitido.', 'arriendo-facil' ) );
+		}
+
+		if ( ! in_array( $category, array( self::CATEGORY_GUESTS, self::CATEGORY_ADMINS, self::CATEGORY_CONTRACTS ), true ) ) {
 			return new WP_Error( 'af_local_storage_bad_category', __( 'Categoría de almacenamiento inválida.', 'arriendo-facil' ) );
 		}
 
@@ -104,11 +129,11 @@ class Arriendo_Facil_Local_Private_Storage {
 		}
 
 		$base    = self::slug( str_replace( '_', '-', (string) $doc_type ), 'documento' ) . '_' . gmdate( 'Y-m-d' );
-		$name    = $base . '.pdf';
+		$name    = $base . '.' . $ext;
 		$version = 1;
 		while ( file_exists( $dir . '/' . $name ) ) {
 			++$version;
-			$name = $base . '-v' . $version . '.pdf';
+			$name = $base . '-v' . $version . '.' . $ext;
 		}
 
 		$path = $dir . '/' . $name;
@@ -182,8 +207,9 @@ class Arriendo_Facil_Local_Private_Storage {
 		}
 
 		nocache_headers();
-		header( 'Content-Type: application/pdf' );
-		header( 'Content-Disposition: inline; filename="' . str_replace( '"', '', $name ) . '"' );
+		$ext = strtolower( pathinfo( $path, PATHINFO_EXTENSION ) );
+		header( 'Content-Type: ' . ( isset( self::TYPES[ $ext ] ) ? self::TYPES[ $ext ] : 'application/octet-stream' ) );
+		header( 'Content-Disposition: ' . ( 'pdf' === $ext ? 'inline' : 'attachment' ) . '; filename="' . str_replace( '"', '', $name ) . '"' );
 		header( 'X-Content-Type-Options: nosniff' );
 		header( 'Cache-Control: private, no-store, max-age=0' );
 		header( 'Content-Length: ' . (string) filesize( $path ) );
@@ -210,7 +236,7 @@ class Arriendo_Facil_Local_Private_Storage {
 	 */
 	public static function resolve( $key ) {
 		$key = (string) $key;
-		if ( '' === $key || false !== strpos( $key, '..' ) || false !== strpos( $key, "\0" ) || ! preg_match( '#^[a-z]+/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+\.pdf$#', $key ) ) {
+		if ( '' === $key || false !== strpos( $key, '..' ) || false !== strpos( $key, "\0" ) || ! preg_match( '#^[a-z]+/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+\.(pdf|docx|doc)$#', $key ) ) {
 			return new WP_Error( 'af_local_storage_bad_key', __( 'Clave de archivo inválida.', 'arriendo-facil' ) );
 		}
 

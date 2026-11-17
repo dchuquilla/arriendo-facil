@@ -35,53 +35,109 @@ class Arriendo_Facil_Contract_File_Store {
 	}
 
 	/**
-	 * Registers a freshly generated contract file: uploads it to R2 when
-	 * enabled and stores the lease storage metadata.
+	 * Registers a freshly generated contract file and stores it privately: in the R2 bucket when
+	 * enabled, otherwise (or when the upload fails) in the private local store. A contract is never
+	 * left in a public folder.
 	 *
 	 * @param int    $lease_id  Lease ID.
-	 * @param string $file_path Absolute local path of the generated file.
-	 * @param string $file_name File name.
-	 * @param string $local_url Public uploads URL of the local copy.
+	 * @param string $file_path Absolute path of the temporary generated file (deleted afterwards).
+	 * @param string $file_name File name (extension decides the stored type).
+	 * @param string $local_url Unused; kept for backward compatibility.
 	 * @param string $mime_type Mime type.
-	 * @return string URL to hand out for the document.
+	 * @return string URL to hand out for the document ('' when it could not be stored safely).
 	 */
 	public static function persist( $lease_id, $file_path, $file_name, $local_url, $mime_type ) {
-		$lease_id     = absint( $lease_id );
-		$document_url = $local_url;
-		$storage_meta = array(
-			'provider'  => 'local',
-			'file_name' => $file_name,
-			'local_url' => $local_url,
-			'mime_type' => $mime_type,
-		);
+		$lease_id = absint( $lease_id );
+
+		$contents = file_get_contents( $file_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		if ( false === $contents || '' === $contents ) {
+			self::discard_local_copy( $file_path );
+			return '';
+		}
+
+		$storage_meta = null;
 
 		if ( Arriendo_Facil_Private_Storage::is_r2_enabled() ) {
-			$contents = file_get_contents( $file_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
-			if ( false !== $contents ) {
-				$object_key = sprintf( 'lease-contracts/%d/%s', $lease_id, sanitize_file_name( $file_name ) );
-				$upload     = Arriendo_Facil_Private_Storage::upload( $contents, $object_key, $mime_type );
+			$object_key = sprintf( 'lease-contracts/%d/%s', $lease_id, sanitize_file_name( $file_name ) );
+			$upload     = Arriendo_Facil_Private_Storage::upload( $contents, $object_key, $mime_type );
 
-				if ( is_wp_error( $upload ) ) {
-					error_log( 'Arriendo Facil contract R2 upload failed for lease ' . $lease_id . ': ' . $upload->get_error_message() ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-				} else {
-					$document_url = self::download_url( $lease_id );
-					$storage_meta = array(
-						'provider'   => Arriendo_Facil_Private_Storage::PROVIDER_R2,
-						'object_key' => $object_key,
-						'file_name'  => $file_name,
-						'local_url'  => '',
-						'mime_type'  => $mime_type,
-					);
-					self::discard_local_copy( $file_path );
-				}
+			if ( is_wp_error( $upload ) ) {
+				error_log( 'Arriendo Facil contract R2 upload failed for lease ' . $lease_id . ': ' . $upload->get_error_message() ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			} else {
+				$storage_meta = array(
+					'provider'   => Arriendo_Facil_Private_Storage::PROVIDER_R2,
+					'object_key' => $object_key,
+					'file_name'  => $file_name,
+					'local_url'  => '',
+					'mime_type'  => $mime_type,
+				);
 			}
 		}
+
+		if ( null === $storage_meta ) {
+			$ext = strtolower( pathinfo( $file_name, PATHINFO_EXTENSION ) );
+			$key = self::store_private( $lease_id, $contents, 'contrato', 'doc' === $ext ? 'doc' : 'docx' );
+			if ( is_wp_error( $key ) ) {
+				error_log( 'Arriendo Facil contract private storage failed for lease ' . $lease_id . ': ' . $key->get_error_message() ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+				self::discard_local_copy( $file_path );
+				return '';
+			}
+
+			$storage_meta = array(
+				'provider'   => Arriendo_Facil_Local_Private_Storage::STORAGE_ID,
+				'object_key' => $key,
+				'file_name'  => basename( $key ),
+				'local_url'  => '',
+				'mime_type'  => $mime_type,
+			);
+		}
+
+		self::discard_local_copy( $file_path );
 
 		if ( class_exists( 'Arriendo_Facil_Lease' ) ) {
 			( new Arriendo_Facil_Lease() )->set_contract_storage_meta( $lease_id, $storage_meta );
 		}
 
-		return $document_url;
+		return self::download_url( $lease_id );
+	}
+
+	/**
+	 * Saves a contract file in the private local store under the lease's readable folder.
+	 *
+	 * @param int    $lease_id Lease ID.
+	 * @param string $contents File bytes.
+	 * @param string $doc_type Readable type slug (e.g. contrato, contrato-aprobado-v2).
+	 * @param string $ext      pdf, docx or doc.
+	 * @return string|WP_Error Storage key.
+	 */
+	public static function store_private( $lease_id, $contents, $doc_type, $ext ) {
+		return Arriendo_Facil_Local_Private_Storage::store(
+			$contents,
+			Arriendo_Facil_Local_Private_Storage::CATEGORY_CONTRACTS,
+			absint( $lease_id ),
+			self::lease_person_label( $lease_id ),
+			$doc_type,
+			$ext
+		);
+	}
+
+	/**
+	 * Tenant name of a lease, used for the readable folder name.
+	 *
+	 * @param int $lease_id Lease ID.
+	 * @return string
+	 */
+	private static function lease_person_label( $lease_id ) {
+		global $wpdb;
+
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT g.first_name, g.last_name FROM {$wpdb->prefix}af_leases l LEFT JOIN {$wpdb->prefix}af_guests g ON g.id = l.guest_id WHERE l.id = %d",
+				absint( $lease_id )
+			)
+		);
+
+		return $row ? trim( (string) $row->first_name . ' ' . (string) $row->last_name ) : '';
 	}
 
 	/**

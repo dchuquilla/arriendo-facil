@@ -13,6 +13,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+if ( ! class_exists( 'Arriendo_Facil_Crypto' ) ) {
+	require_once dirname( __DIR__ ) . '/class-crypto.php';
+}
+
 /**
  * Class Arriendo_Facil_SRI_Config
  */
@@ -1125,7 +1129,7 @@ class Arriendo_Facil_SRI_Config {
 	 * @return string Plain-text password, or empty string on failure.
 	 */
 	public static function decrypt_password( string $encrypted ): string {
-		if ( self::starts_with( $encrypted, self::AEAD_PREFIX ) ) {
+		if ( self::starts_with( $encrypted, self::AEAD_PREFIX ) || Arriendo_Facil_Crypto::is_sealed( $encrypted ) ) {
 			return self::unprotect_sensitive( $encrypted );
 		}
 
@@ -1163,6 +1167,15 @@ class Arriendo_Facil_SRI_Config {
 			return '';
 		}
 
+		// With AF_ENCRYPTION_KEY configured, new secrets are sealed with the dedicated key
+		// instead of the (leak-prone) WordPress salts.
+		if ( Arriendo_Facil_Crypto::has_master() ) {
+			$sealed = Arriendo_Facil_Crypto::seal( $plain, Arriendo_Facil_Crypto::PURPOSE_SRI );
+			if ( '' !== $sealed ) {
+				return $sealed;
+			}
+		}
+
 		$key = substr( hash( 'sha256', AUTH_KEY . SECURE_AUTH_KEY, true ), 0, 32 );
 
 		$iv_len = (int) openssl_cipher_iv_length( self::AEAD_CIPHER );
@@ -1191,6 +1204,11 @@ class Arriendo_Facil_SRI_Config {
 			return '';
 		}
 
+		if ( Arriendo_Facil_Crypto::is_sealed( $protected ) ) {
+			$opened = Arriendo_Facil_Crypto::open( $protected, Arriendo_Facil_Crypto::PURPOSE_SRI );
+			return false === $opened ? '' : $opened;
+		}
+
 		if ( self::starts_with( $protected, self::AEAD_PREFIX ) ) {
 			$protected = substr( $protected, strlen( self::AEAD_PREFIX ) );
 		} elseif ( self::starts_with( $protected, self::LEGACY_PREFIX ) ) {
@@ -1215,6 +1233,32 @@ class Arriendo_Facil_SRI_Config {
 
 		$plain = openssl_decrypt( $ciphertext, self::AEAD_CIPHER, $key, OPENSSL_RAW_DATA, $iv, $tag );
 		return false === $plain ? '' : (string) $plain;
+	}
+
+	/**
+	 * Converts a stored value protected with a salt-derived key (ENC1/ENC2/unprefixed) into a value
+	 * sealed with the master key, verifying that it opens to the same plain text.
+	 *
+	 * @param string $stored Stored value.
+	 * @return string New payload, or '' when nothing should change (already sealed, empty,
+	 *                unreadable, or no master key).
+	 */
+	public static function rekey_stored( string $stored ): string {
+		if ( '' === $stored || Arriendo_Facil_Crypto::is_sealed( $stored ) || ! Arriendo_Facil_Crypto::has_master() ) {
+			return '';
+		}
+
+		$plain = self::unprotect_sensitive( $stored );
+		if ( '' === $plain ) {
+			$plain = self::decrypt_password( $stored );
+		}
+		if ( '' === $plain ) {
+			return '';
+		}
+
+		$sealed = Arriendo_Facil_Crypto::seal( $plain, Arriendo_Facil_Crypto::PURPOSE_SRI );
+
+		return ( '' !== $sealed && Arriendo_Facil_Crypto::open( $sealed, Arriendo_Facil_Crypto::PURPOSE_SRI ) === $plain ) ? $sealed : '';
 	}
 
 	/**

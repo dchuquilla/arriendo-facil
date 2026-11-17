@@ -12,6 +12,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+if ( ! class_exists( 'Arriendo_Facil_Crypto' ) ) {
+	require_once __DIR__ . '/class-crypto.php';
+}
+
 /**
  * Class Arriendo_Facil_OTA_Credentials
  *
@@ -225,6 +229,12 @@ class Arriendo_Facil_OTA_Credentials {
 			return false;
 		}
 
+		// Dedicated master key (AF_ENCRYPTION_KEY) when configured.
+		if ( Arriendo_Facil_Crypto::has_master() ) {
+			$sealed = Arriendo_Facil_Crypto::seal( $data, Arriendo_Facil_Crypto::PURPOSE_OTA );
+			return '' !== $sealed ? $sealed : false;
+		}
+
 		// Prefer Sodium if available (PHP 7.2+)
 		if ( function_exists( 'sodium_crypto_secretbox' ) ) {
 			try {
@@ -234,7 +244,7 @@ class Arriendo_Facil_OTA_Credentials {
 				}
 
 				$nonce = random_bytes( SODIUM_CRYPTO_SECRETBOX_NONCEBYTES );
-				$encrypted = sodium_crypto_secretbox( $data, $nonce );
+				$encrypted = sodium_crypto_secretbox( $data, $nonce, $key );
 
 				// Encode: nonce + encrypted data, all in base64
 				return base64_encode( $nonce . $encrypted );
@@ -249,6 +259,28 @@ class Arriendo_Facil_OTA_Credentials {
 	}
 
 	/**
+	 * Converts a stored credential encrypted with the salt-derived key into one sealed with the
+	 * master key, verifying the round trip.
+	 *
+	 * @param string $stored Stored value.
+	 * @return string New payload, or '' when nothing should change.
+	 */
+	public static function rekey_stored( $stored ) {
+		if ( ! is_string( $stored ) || '' === $stored || Arriendo_Facil_Crypto::is_sealed( $stored ) || ! Arriendo_Facil_Crypto::has_master() ) {
+			return '';
+		}
+
+		$plain = self::decrypt( $stored );
+		if ( ! is_string( $plain ) || '' === $plain ) {
+			return '';
+		}
+
+		$sealed = Arriendo_Facil_Crypto::seal( $plain, Arriendo_Facil_Crypto::PURPOSE_OTA );
+
+		return ( '' !== $sealed && Arriendo_Facil_Crypto::open( $sealed, Arriendo_Facil_Crypto::PURPOSE_OTA ) === $plain ) ? $sealed : '';
+	}
+
+	/**
 	 * Decrypts data encrypted with encrypt().
 	 *
 	 * @param string $data Encrypted data (base64).
@@ -257,6 +289,10 @@ class Arriendo_Facil_OTA_Credentials {
 	private static function decrypt( $data ) {
 		if ( ! is_string( $data ) || empty( $data ) ) {
 			return false;
+		}
+
+		if ( Arriendo_Facil_Crypto::is_sealed( $data ) ) {
+			return Arriendo_Facil_Crypto::open( $data, Arriendo_Facil_Crypto::PURPOSE_OTA );
 		}
 
 		// Try Sodium decryption first

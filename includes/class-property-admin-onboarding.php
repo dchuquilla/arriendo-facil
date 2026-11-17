@@ -25,6 +25,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+if ( ! class_exists( 'Arriendo_Facil_Crypto' ) ) {
+	require_once __DIR__ . '/class-crypto.php';
+}
+
 class Arriendo_Facil_Property_Admin_Onboarding {
 
 	const PREFIX           = 'af_admin_';
@@ -1319,6 +1323,11 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 	 */
 	private function decrypt_sensitive_value( $encrypted ) {
 		$encrypted = (string) $encrypted;
+		if ( Arriendo_Facil_Crypto::is_sealed( $encrypted ) ) {
+			$opened = Arriendo_Facil_Crypto::open( $encrypted, Arriendo_Facil_Crypto::PURPOSE_ADMIN );
+			return false === $opened ? '' : $opened;
+		}
+
 		if ( '' === $encrypted || 0 !== strpos( $encrypted, 'v1:' ) ) {
 			return '';
 		}
@@ -1463,6 +1472,13 @@ class Arriendo_Facil_Property_Admin_Onboarding {
 		$value = (string) $value;
 		if ( '' === trim( $value ) ) {
 			return '';
+		}
+
+		if ( Arriendo_Facil_Crypto::has_master() ) {
+			$sealed = Arriendo_Facil_Crypto::seal( $value, Arriendo_Facil_Crypto::PURPOSE_ADMIN );
+			if ( '' !== $sealed ) {
+				return $sealed;
+			}
 		}
 
 		if ( ! function_exists( 'sodium_crypto_secretbox' ) || ! function_exists( 'random_bytes' ) ) {

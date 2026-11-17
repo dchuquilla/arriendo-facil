@@ -9,6 +9,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+if ( ! class_exists( 'Arriendo_Facil_Crypto' ) ) {
+	require_once dirname( __DIR__ ) . '/class-crypto.php';
+}
+
 /**
  * Class Arriendo_Facil_Tenant_Signup
  */
@@ -363,7 +367,7 @@ class Arriendo_Facil_Tenant_Signup {
 			wp_send_json_error( array( 'message' => __( 'No se pudo validar tu identificacion. Intenta nuevamente.', 'arriendo-facil' ) ), 400 );
 		}
 
-		if ( $this->tenant_identity_fingerprint_exists( $id_fingerprint ) ) {
+		if ( $this->tenant_identity_fingerprint_exists( $id_fingerprint ) || $this->tenant_identity_fingerprint_exists( $this->build_tenant_identity_fingerprint_legacy( $id_number ) ) ) {
 			$this->log_tenant_signup_security_event( 'duplicate_identity_fingerprint', $email );
 			wp_send_json_error(
 				array(
@@ -625,7 +629,20 @@ class Arriendo_Facil_Tenant_Signup {
 			return '';
 		}
 
-		return hash_hmac( 'sha256', $normalized, wp_salt( 'secure_auth' ) . 'af_tenant_id_fp_v1' );
+		return Arriendo_Facil_Crypto::fingerprint( $normalized, 'tenant-id-fp', wp_salt( 'secure_auth' ) . 'af_tenant_id_fp_v1' );
+	}
+
+	/**
+	 * Fingerprint as computed before AF_ENCRYPTION_KEY existed (salt-derived), for duplicate checks
+	 * against accounts that have not been re-keyed yet.
+	 *
+	 * @param string $id_number Identity value.
+	 * @return string
+	 */
+	private function build_tenant_identity_fingerprint_legacy( $id_number ) {
+		$normalized = strtoupper( preg_replace( '/[^A-Za-z0-9]/', '', (string) $id_number ) );
+
+		return '' === $normalized ? '' : hash_hmac( 'sha256', $normalized, wp_salt( 'secure_auth' ) . 'af_tenant_id_fp_v1' );
 	}
 
 	/**
@@ -784,6 +801,13 @@ class Arriendo_Facil_Tenant_Signup {
 		$value = (string) $value;
 		if ( '' === trim( $value ) ) {
 			return '';
+		}
+
+		if ( Arriendo_Facil_Crypto::has_master() ) {
+			$sealed = Arriendo_Facil_Crypto::seal( $value, Arriendo_Facil_Crypto::PURPOSE_TENANT );
+			if ( '' !== $sealed ) {
+				return $sealed;
+			}
 		}
 
 		if ( ! function_exists( 'sodium_crypto_secretbox' ) || ! function_exists( 'random_bytes' ) ) {

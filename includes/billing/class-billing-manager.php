@@ -17,6 +17,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+if ( ! class_exists( 'Arriendo_Facil_Crypto' ) ) {
+	require_once dirname( __DIR__ ) . '/class-crypto.php';
+}
+
 /**
  * Class Arriendo_Facil_Billing_Manager
  */
@@ -1170,16 +1174,29 @@ class Arriendo_Facil_Billing_Manager {
 	}
 
 	public function verify_file_token( int $invoice_id, string $type, int $expires, string $token ): bool {
-		return $expires > time() && in_array( $type, array( 'ride', 'xml' ), true ) && hash_equals( $this->file_token( $invoice_id, $type, $expires ), $token );
+		if ( $expires <= time() || ! in_array( $type, array( 'ride', 'xml' ), true ) ) {
+			return false;
+		}
+
+		if ( hash_equals( $this->file_token( $invoice_id, $type, $expires ), $token ) ) {
+			return true;
+		}
+
+		// Links e-mailed before AF_ENCRYPTION_KEY was set were signed with the WordPress salts.
+		// Accepting them is opt-in (and only while the salts are still trusted).
+		return Arriendo_Facil_Crypto::has_master()
+			&& defined( 'AF_ACCEPT_LEGACY_INVOICE_LINKS' ) && AF_ACCEPT_LEGACY_INVOICE_LINKS
+			&& hash_equals( $this->file_token( $invoice_id, $type, $expires, true ), $token );
 	}
 
-	private function file_token( int $invoice_id, string $type, int $expires ): string {
+	private function file_token( int $invoice_id, string $type, int $expires, bool $legacy = false ): string {
 		$payload = $invoice_id . '|' . $type . '|' . $expires;
 		$version = $this->link_version( $invoice_id );
 		if ( $version > 0 ) {
 			$payload .= '|v' . $version; // Sin versión (0) el formato es el original: los enlaces ya enviados siguen válidos.
 		}
-		return hash_hmac( 'sha256', $payload, wp_salt( 'auth' ) );
+		$secret = $legacy ? wp_salt( 'auth' ) : Arriendo_Facil_Crypto::hmac_secret( 'invoice-link', wp_salt( 'auth' ) );
+		return hash_hmac( 'sha256', $payload, $secret );
 	}
 
 	const LINK_VERSION_OPTION = 'af_invoice_link_versions';
@@ -2133,7 +2150,7 @@ class Arriendo_Facil_Billing_Manager {
 			return '';
 		}
 
-		if ( 0 === strpos( $value, Arriendo_Facil_SRI_Config::AEAD_PREFIX ) || 0 === strpos( $value, Arriendo_Facil_SRI_Config::LEGACY_PREFIX ) ) {
+		if ( 0 === strpos( $value, Arriendo_Facil_SRI_Config::AEAD_PREFIX ) || 0 === strpos( $value, Arriendo_Facil_SRI_Config::LEGACY_PREFIX ) || Arriendo_Facil_Crypto::is_sealed( $value ) ) {
 			$dec = Arriendo_Facil_SRI_Config::unprotect_sensitive( $value );
 			return '' !== $dec ? $dec : '';
 		}

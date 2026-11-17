@@ -41,6 +41,7 @@ class Arriendo_Facil_Private_Storage_Migration {
 		$count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_guest_documents WHERE storage = 'local'" ); // phpcs:ignore WordPress.DB.PreparedSQL
 
 		$count += count( self::legacy_rides() );
+		$count += count( self::legacy_contract_options() );
 
 		$users = (array) $wpdb->get_col( "SELECT user_id FROM {$wpdb->usermeta} WHERE meta_key = 'af_admin_documents'" ); // phpcs:ignore WordPress.DB.PreparedSQL
 		foreach ( $users as $user_id ) {
@@ -219,6 +220,185 @@ class Arriendo_Facil_Private_Storage_Migration {
 				++$moved;
 			} else {
 				++$failed;
+			}
+		}
+
+		// Lease contracts (Word and approved PDF) left in the public uploads folder.
+		foreach ( self::legacy_contract_options() as $option_name ) {
+			$result  = self::move_contract_option( $option_name );
+			$moved  += $result['moved'];
+			$failed += $result['failed'];
+		}
+
+		return array(
+			'moved'  => $moved,
+			'failed' => $failed,
+		);
+	}
+
+	/**
+	 * Option names of leases that still reference a contract file in a public folder.
+	 *
+	 * @return string[]
+	 */
+	private static function legacy_contract_options() {
+		global $wpdb;
+
+		$names = (array) $wpdb->get_col( "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE 'af\\_lease\\_contract\\_storage\\_%'" ); // phpcs:ignore WordPress.DB.PreparedSQL
+		$out   = array();
+		foreach ( $names as $name ) {
+			$stored = get_option( $name, false );
+			if ( ! is_array( $stored ) ) {
+				continue;
+			}
+			foreach ( self::contract_entries( $stored ) as $ref ) {
+				if ( 'local' === ( isset( $ref['provider'] ) ? $ref['provider'] : '' ) && ! empty( $ref['local_url'] ) ) {
+					$out[] = $name;
+					break;
+				}
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Flat list of every file reference held by a lease's contract storage option
+	 * (legacy single-file format, versions, and approved PDFs).
+	 *
+	 * @param array $stored Option value.
+	 * @return array<int,array> References (copies; used only for detection).
+	 */
+	private static function contract_entries( array $stored ) {
+		$refs = array();
+		if ( isset( $stored['provider'] ) && ! isset( $stored['versions'] ) ) {
+			$refs[] = $stored;
+			return $refs;
+		}
+		foreach ( (array) ( isset( $stored['versions'] ) ? $stored['versions'] : array() ) as $entry ) {
+			if ( ! is_array( $entry ) ) {
+				continue;
+			}
+			$refs[] = $entry;
+			if ( isset( $entry['approved_pdf'] ) && is_array( $entry['approved_pdf'] ) ) {
+				$refs[] = $entry['approved_pdf'];
+			}
+		}
+
+		return $refs;
+	}
+
+	/**
+	 * Maps a public uploads URL to its file path, only inside the uploads directory.
+	 *
+	 * @param string $url File URL.
+	 * @return string Path, or '' when it does not resolve to an uploads file.
+	 */
+	private static function uploads_url_to_path( $url ) {
+		$uploads = wp_upload_dir();
+		if ( ! is_array( $uploads ) || ! empty( $uploads['error'] ) || empty( $uploads['baseurl'] ) || empty( $uploads['basedir'] ) ) {
+			return '';
+		}
+
+		$base = trailingslashit( $uploads['baseurl'] );
+		if ( 0 !== strpos( (string) $url, $base ) ) {
+			return '';
+		}
+
+		$path = realpath( trailingslashit( $uploads['basedir'] ) . rawurldecode( substr( (string) $url, strlen( $base ) ) ) );
+		$root = realpath( $uploads['basedir'] );
+
+		return ( false !== $path && false !== $root && 0 === strpos( $path, $root . DIRECTORY_SEPARATOR ) && is_file( $path ) ) ? $path : '';
+	}
+
+	/**
+	 * Moves the contract files of one lease into the private store, then rewrites its metadata.
+	 * Each file is copied and verified before the metadata changes; originals are deleted last.
+	 *
+	 * @param string $option_name af_lease_contract_storage_<id>.
+	 * @return array{moved:int,failed:int}
+	 */
+	private static function move_contract_option( $option_name ) {
+		global $wpdb;
+
+		$moved   = 0;
+		$failed  = 0;
+		$stored  = get_option( $option_name, false );
+		$lease_id = (int) preg_replace( '/\D/', '', (string) $option_name );
+		if ( ! is_array( $stored ) || ! $lease_id ) {
+			return array( 'moved' => 0, 'failed' => 0 );
+		}
+
+		$to_delete = array();
+		$convert   = static function ( array &$entry, $doc_type ) use ( $lease_id, &$to_delete, &$moved, &$failed ) {
+			if ( 'local' !== ( isset( $entry['provider'] ) ? $entry['provider'] : '' ) || empty( $entry['local_url'] ) ) {
+				return;
+			}
+
+			$path = self::uploads_url_to_path( (string) $entry['local_url'] );
+			$ext  = strtolower( pathinfo( $path, PATHINFO_EXTENSION ) );
+			if ( '' === $path || ! in_array( $ext, array( 'pdf', 'docx', 'doc' ), true ) ) {
+				++$failed;
+				return;
+			}
+
+			$contents = file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+			if ( false === $contents || '' === $contents ) {
+				++$failed;
+				return;
+			}
+
+			$key = Arriendo_Facil_Contract_File_Store::store_private( $lease_id, $contents, $doc_type, $ext );
+			if ( is_wp_error( $key ) ) {
+				++$failed;
+				return;
+			}
+
+			$copy = Arriendo_Facil_Local_Private_Storage::read( $key );
+			if ( is_wp_error( $copy ) || ! hash_equals( hash( 'sha256', $contents ), hash( 'sha256', $copy ) ) ) {
+				Arriendo_Facil_Local_Private_Storage::delete( $key );
+				++$failed;
+				return;
+			}
+
+			$entry['provider']   = Arriendo_Facil_Local_Private_Storage::STORAGE_ID;
+			$entry['object_key'] = $key;
+			$entry['file_name']  = basename( $key );
+			$entry['local_url']  = '';
+			$to_delete[]         = $path;
+			++$moved;
+		};
+
+		if ( isset( $stored['provider'] ) && ! isset( $stored['versions'] ) ) {
+			$convert( $stored, 'contrato' );
+		} else {
+			foreach ( (array) ( isset( $stored['versions'] ) ? $stored['versions'] : array() ) as $i => $entry ) {
+				if ( ! is_array( $entry ) ) {
+					continue;
+				}
+				$version = isset( $entry['version'] ) ? (int) $entry['version'] : ( $i + 1 );
+				$convert( $entry, 'contrato-v' . $version );
+				if ( isset( $entry['approved_pdf'] ) && is_array( $entry['approved_pdf'] ) ) {
+					$convert( $entry['approved_pdf'], 'contrato-aprobado-v' . $version );
+				}
+				$stored['versions'][ $i ] = $entry;
+			}
+		}
+
+		if ( $to_delete ) {
+			update_option( $option_name, $stored );
+
+			// The lease row may hold the old public URL; point it at the authenticated download.
+			$wpdb->update(
+				$wpdb->prefix . 'af_leases',
+				array( 'document_url' => Arriendo_Facil_Contract_File_Store::download_url( $lease_id ) ),
+				array( 'id' => $lease_id ),
+				array( '%s' ),
+				array( '%d' )
+			);
+
+			foreach ( $to_delete as $path ) {
+				wp_delete_file( $path );
 			}
 		}
 

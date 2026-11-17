@@ -274,4 +274,142 @@ class AuditRun3FixesTest extends TestCase {
 		$this->assertTrue( \Arriendo_Facil_Local_Private_Storage::delete( $key ) );
 		$this->assertDirectoryDoesNotExist( $dir . '/huespedes/0042-maria-garcia-perez' );
 	}
+
+	/**
+	 * Master-key encryption: round trip, purpose binding, tamper detection.
+	 */
+	public function test_crypto_seals_binds_purpose_and_detects_tampering() {
+		define( 'AF_ENCRYPTION_KEY', str_repeat( 'a1b2c3d4', 8 ) );
+		require_once dirname( __DIR__, 2 ) . '/includes/class-crypto.php';
+
+		$this->assertTrue( \Arriendo_Facil_Crypto::has_master() );
+		$sealed = \Arriendo_Facil_Crypto::seal( 'cedula 1712345678', 'tenant-pii' );
+		$this->assertStringStartsWith( 'ENC3:', $sealed );
+		$this->assertNotSame( $sealed, \Arriendo_Facil_Crypto::seal( 'cedula 1712345678', 'tenant-pii' ), 'IV must be random.' );
+		$this->assertSame( 'cedula 1712345678', \Arriendo_Facil_Crypto::open( $sealed, 'tenant-pii' ) );
+
+		// A value sealed for one purpose does not open under another.
+		$this->assertFalse( \Arriendo_Facil_Crypto::open( $sealed, 'admin-pii' ) );
+
+		// Flipping any byte of the payload makes it unreadable.
+		$raw      = base64_decode( substr( $sealed, 5 ) );
+		$raw[40 % strlen( $raw )] = chr( ord( $raw[40 % strlen( $raw )] ) ^ 1 );
+		$this->assertFalse( \Arriendo_Facil_Crypto::open( 'ENC3:' . base64_encode( $raw ), 'tenant-pii' ) );
+
+		// Derived HMAC keys are per purpose and independent from the legacy secret.
+		$a = \Arriendo_Facil_Crypto::hmac_secret( 'invoice-link', 'legacy-salt' );
+		$b = \Arriendo_Facil_Crypto::hmac_secret( 'other', 'legacy-salt' );
+		$this->assertSame( 32, strlen( $a ) );
+		$this->assertNotSame( $a, $b );
+		$this->assertNotSame( 'legacy-salt', $a );
+	}
+
+	/**
+	 * Weak or malformed master keys are rejected; without a key nothing is sealed.
+	 */
+	public function test_crypto_rejects_weak_master_key() {
+		define( 'AF_ENCRYPTION_KEY', str_repeat( 'ab', 32 ) . 'zz' ); // Not hex, wrong length.
+		require_once dirname( __DIR__, 2 ) . '/includes/class-crypto.php';
+
+		$this->assertFalse( \Arriendo_Facil_Crypto::has_master() );
+		$this->assertNotSame( '', \Arriendo_Facil_Crypto::master_problem() );
+		$this->assertSame( '', \Arriendo_Facil_Crypto::seal( 'x', 'sri' ) );
+		$this->assertSame( 'legacy', \Arriendo_Facil_Crypto::hmac_secret( 'p', 'legacy' ) );
+	}
+
+	/**
+	 * Legacy salt-derived 'v1:' payloads convert to the master key, verified by round trip,
+	 * and identity fingerprints become independent from the salts.
+	 */
+	public function test_crypto_rekeys_legacy_payload_and_fingerprint() {
+		if ( ! function_exists( 'sodium_crypto_secretbox' ) ) {
+			$this->markTestSkipped( 'sodium not available' );
+		}
+		define( 'AF_ENCRYPTION_KEY', str_repeat( '0f1e2d3c', 8 ) );
+		$this->boot();
+		if ( ! function_exists( 'wp_salt' ) ) {
+			eval( 'function wp_salt( $scheme = "auth" ) { return "salt-" . $scheme . "-" . ( isset( $GLOBALS["af_t_salt"] ) ? $GLOBALS["af_t_salt"] : "one" ); }' );
+		}
+		require_once dirname( __DIR__, 2 ) . '/includes/class-crypto.php';
+
+		// Build a legacy payload exactly like the old encrypt_sensitive_tenant_value().
+		$nonce  = random_bytes( SODIUM_CRYPTO_SECRETBOX_NONCEBYTES );
+		$legacy = 'v1:' . base64_encode( $nonce . sodium_crypto_secretbox( '0991234567', $nonce, \Arriendo_Facil_Crypto::legacy_v1_key( 'af_tenant_sensitive_v1' ) ) );
+
+		$this->assertSame( '0991234567', \Arriendo_Facil_Crypto::open_legacy_v1( $legacy, 'af_tenant_sensitive_v1' ) );
+		$sealed = \Arriendo_Facil_Crypto::rekey_legacy_v1( $legacy, 'af_tenant_sensitive_v1', 'tenant-pii' );
+		$this->assertStringStartsWith( 'ENC3:', $sealed );
+		$this->assertSame( '0991234567', \Arriendo_Facil_Crypto::open( $sealed, 'tenant-pii' ) );
+
+		// A payload that does not open (wrong slug) is never converted.
+		$this->assertSame( '', \Arriendo_Facil_Crypto::rekey_legacy_v1( $legacy, 'af_admin_sensitive_v1', 'admin-pii' ) );
+
+		// With the master key the fingerprint does not depend on the (possibly leaked) salts.
+		$one = \Arriendo_Facil_Crypto::fingerprint( '1712345678', 'tenant-id-fp', 'salt-one' );
+		$two = \Arriendo_Facil_Crypto::fingerprint( '1712345678', 'tenant-id-fp', 'salt-two' );
+		$this->assertSame( $one, $two );
+	}
+
+	/**
+	 * SRI secrets: an existing ENC2 value stays readable, converts to the master key, and new
+	 * values are sealed with it.
+	 */
+	public function test_sri_secrets_migrate_from_salt_key_to_master_key() {
+		$this->boot();
+		if ( ! defined( 'AUTH_KEY' ) ) {
+			define( 'AUTH_KEY', 'test-auth-key-0123456789abcdef0123456789abcdef' );
+		}
+		if ( ! defined( 'SECURE_AUTH_KEY' ) ) {
+			define( 'SECURE_AUTH_KEY', 'test-secure-auth-key-0123456789abcdef0123456789' );
+		}
+		require_once dirname( __DIR__, 2 ) . '/includes/class-crypto.php';
+		require_once dirname( __DIR__, 2 ) . '/includes/billing/class-sri-config.php';
+
+		// Before the master key exists: legacy ENC2 payload (existing production data).
+		$legacy = \Arriendo_Facil_SRI_Config::protect_sensitive( 'cert-password' );
+		$this->assertStringStartsWith( 'ENC2:', $legacy );
+
+		define( 'AF_ENCRYPTION_KEY', str_repeat( '9a8b7c6d', 8 ) );
+
+		// Still readable after the key is configured.
+		$this->assertSame( 'cert-password', \Arriendo_Facil_SRI_Config::unprotect_sensitive( $legacy ) );
+
+		// Conversion is verified and idempotent.
+		$sealed = \Arriendo_Facil_SRI_Config::rekey_stored( $legacy );
+		$this->assertStringStartsWith( 'ENC3:', $sealed );
+		$this->assertSame( 'cert-password', \Arriendo_Facil_SRI_Config::unprotect_sensitive( $sealed ) );
+		$this->assertSame( '', \Arriendo_Facil_SRI_Config::rekey_stored( $sealed ) );
+		$this->assertSame( 'cert-password', \Arriendo_Facil_SRI_Config::decrypt_password( $sealed ) );
+
+		// New values use the master key.
+		$this->assertStringStartsWith( 'ENC3:', \Arriendo_Facil_SRI_Config::protect_sensitive( 'another' ) );
+	}
+
+	/**
+	 * Contracts: stored privately with readable per-lease names, Word types accepted, executables rejected.
+	 */
+	public function test_contract_files_are_stored_privately_with_readable_names() {
+		$this->boot();
+		$dir = sys_get_temp_dir() . '/af-priv-contracts-' . uniqid();
+		define( 'AF_PRIVATE_STORAGE_DIR', $dir );
+		if ( ! function_exists( 'remove_accents' ) ) {
+			eval( 'function remove_accents( $s ) { return $s; }' );
+		}
+		if ( ! function_exists( 'wp_mkdir_p' ) ) {
+			eval( 'function wp_mkdir_p( $d ) { return is_dir( $d ) || mkdir( $d, 0755, true ); }' );
+		}
+		require_once dirname( __DIR__, 2 ) . '/includes/storage/class-local-private-storage.php';
+
+		$key = \Arriendo_Facil_Local_Private_Storage::store( 'PK-docx-bytes', 'contratos', 17, 'Ana Torres', 'contrato-v1', 'docx' );
+		$this->assertSame( 'contratos/0017-ana-torres/contrato-v1_' . gmdate( 'Y-m-d' ) . '.docx', $key );
+		$this->assertSame( 'PK-docx-bytes', \Arriendo_Facil_Local_Private_Storage::read( $key ) );
+
+		$pdf_key = \Arriendo_Facil_Local_Private_Storage::store( '%PDF-1', 'contratos', 17, 'Ana Torres', 'contrato-aprobado-v1', 'pdf' );
+		$this->assertStringEndsWith( '.pdf', $pdf_key );
+
+		// Nothing executable can be stored or resolved.
+		$this->assertTrue( is_wp_error( \Arriendo_Facil_Local_Private_Storage::store( '<?php', 'contratos', 17, 'x', 'shell', 'php' ) ) );
+		$this->assertTrue( is_wp_error( \Arriendo_Facil_Local_Private_Storage::resolve( 'contratos/0017-ana-torres/x.php' ) ) );
+		$this->assertTrue( is_wp_error( \Arriendo_Facil_Local_Private_Storage::resolve( 'contratos/../../etc/passwd.pdf' ) ) );
+	}
 }

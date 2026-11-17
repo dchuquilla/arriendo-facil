@@ -183,58 +183,52 @@ class Arriendo_Facil_Lease {
 			wp_send_json_error( array( 'message' => __( 'Solo se permiten archivos Word (.doc, .docx).', 'arriendo-facil' ) ), 400 );
 		}
 
-		require_once ABSPATH . 'wp-admin/includes/file.php';
-		$upload = wp_handle_upload(
-			$file_data,
-			array(
-				'test_form' => false,
-				'mimes'     => $allowed_mimes,
-			)
-		);
-
-		if ( ! is_array( $upload ) || isset( $upload['error'] ) ) {
-			$error_msg = is_array( $upload ) && isset( $upload['error'] ) ? (string) $upload['error'] : __( 'No se pudo guardar el archivo Word cargado.', 'arriendo-facil' );
-			wp_send_json_error( array( 'message' => $error_msg ) );
-		}
-
-		$file_path = isset( $upload['file'] ) ? (string) $upload['file'] : '';
-		$file_url  = isset( $upload['url'] ) ? esc_url_raw( (string) $upload['url'] ) : '';
-		if ( '' === $file_path || ! file_exists( $file_path ) ) {
+		// The uploaded Word file never goes to a public folder: it is read from PHP's temporary
+		// upload and stored privately (R2 bucket, or the private local store).
+		$contents = file_get_contents( $file_data['tmp_name'] ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		if ( false === $contents || '' === $contents ) {
 			wp_send_json_error( array( 'message' => __( 'El archivo cargado no existe en el servidor.', 'arriendo-facil' ) ) );
 		}
 
 		$versions_data = $this->get_contract_versions( $lease_id );
 		$next_version  = count( isset( $versions_data['versions'] ) && is_array( $versions_data['versions'] ) ? $versions_data['versions'] : array() ) + 1;
 
-		$final_document_url = $file_url;
-		$storage_meta       = array(
-			'provider'  => 'local',
-			'file_name' => wp_basename( $file_path ),
-			'local_url' => $file_url,
-			'mime_type' => (string) $checked['type'],
-		);
+		$contract_ext  = (string) $checked['ext'];
+		$contract_mime = '' !== (string) $checked['type'] ? (string) $checked['type'] : Arriendo_Facil_Contract_Text_Extractor::DOCX_MIME;
+		$safe_name     = sanitize_file_name( wp_basename( (string) $file_data['name'] ) );
+		$storage_meta  = null;
 
 		if ( Arriendo_Facil_Private_Storage::is_r2_enabled() ) {
-			$contents = file_get_contents( $file_path );
-			if ( false !== $contents ) {
-				$safe_name     = sanitize_file_name( wp_basename( $file_path ) );
-				$object_key    = sprintf( 'lease-contracts/%d/v%d/%s', $lease_id, $next_version, $safe_name );
-				$contract_mime = '' !== (string) $checked['type'] ? (string) $checked['type'] : Arriendo_Facil_Contract_Text_Extractor::DOCX_MIME;
-				$upload_r2     = Arriendo_Facil_Private_Storage::upload( $contents, $object_key, $contract_mime );
+			$object_key = sprintf( 'lease-contracts/%d/v%d/%s', $lease_id, $next_version, $safe_name );
+			$upload_r2  = Arriendo_Facil_Private_Storage::upload( $contents, $object_key, $contract_mime );
 
-				if ( ! is_wp_error( $upload_r2 ) ) {
-					$final_document_url = Arriendo_Facil_Contract_File_Store::download_url( $lease_id );
-					$storage_meta       = array(
-						'provider'   => Arriendo_Facil_Private_Storage::PROVIDER_R2,
-						'object_key' => $object_key,
-						'file_name'  => $safe_name,
-						'local_url'  => '',
-						'mime_type'  => $contract_mime,
-					);
-					Arriendo_Facil_Contract_File_Store::discard_local_copy( $file_path );
-				}
+			if ( ! is_wp_error( $upload_r2 ) ) {
+				$storage_meta = array(
+					'provider'   => Arriendo_Facil_Private_Storage::PROVIDER_R2,
+					'object_key' => $object_key,
+					'file_name'  => $safe_name,
+					'local_url'  => '',
+					'mime_type'  => $contract_mime,
+				);
 			}
 		}
+
+		if ( null === $storage_meta ) {
+			$key = Arriendo_Facil_Contract_File_Store::store_private( $lease_id, $contents, 'contrato-v' . $next_version, $contract_ext );
+			if ( is_wp_error( $key ) ) {
+				wp_send_json_error( array( 'message' => __( 'No se pudo guardar el archivo Word cargado.', 'arriendo-facil' ) ), 500 );
+			}
+
+			$storage_meta = array(
+				'provider'   => Arriendo_Facil_Local_Private_Storage::STORAGE_ID,
+				'object_key' => $key,
+				'file_name'  => basename( $key ),
+				'local_url'  => '',
+				'mime_type'  => $contract_mime,
+			);
+		}
+
+		$final_document_url = Arriendo_Facil_Contract_File_Store::download_url( $lease_id );
 
 		$this->set_contract_storage_meta( $lease_id, $storage_meta );
 		$this->attach_document(
@@ -957,6 +951,10 @@ class Arriendo_Facil_Lease {
 			$approved_object_key = isset( $version_entry['approved_pdf']['object_key'] ) ? sanitize_text_field( (string) $version_entry['approved_pdf']['object_key'] ) : '';
 			$approved_local_url  = isset( $version_entry['approved_pdf']['local_url'] ) ? esc_url_raw( (string) $version_entry['approved_pdf']['local_url'] ) : '';
 
+			if ( Arriendo_Facil_Local_Private_Storage::STORAGE_ID === $approved_provider && '' !== $approved_object_key ) {
+				$this->stream_private_contract( $approved_object_key );
+			}
+
 			if ( 'cloudflare_r2' === $approved_provider && '' !== $approved_object_key ) {
 				$presigned_url = Arriendo_Facil_Private_Storage::presigned_get_url( $approved_object_key, 600 );
 				if ( ! is_wp_error( $presigned_url ) && is_string( $presigned_url ) && '' !== $presigned_url ) {
@@ -967,6 +965,10 @@ class Arriendo_Facil_Lease {
 			if ( '' !== $approved_local_url ) {
 				$this->redirect_to_contract_url( $approved_local_url );
 			}
+		}
+
+		if ( is_array( $version_entry ) && isset( $version_entry['provider'], $version_entry['object_key'] ) && Arriendo_Facil_Local_Private_Storage::STORAGE_ID === $version_entry['provider'] && '' !== trim( (string) $version_entry['object_key'] ) ) {
+			$this->stream_private_contract( (string) $version_entry['object_key'] );
 		}
 
 		if ( is_array( $version_entry ) && isset( $version_entry['provider'], $version_entry['object_key'] ) && 'cloudflare_r2' === $version_entry['provider'] && '' !== trim( (string) $version_entry['object_key'] ) ) {
@@ -986,6 +988,19 @@ class Arriendo_Facil_Lease {
 		}
 
 		wp_die( esc_html__( 'El documento del contrato no esta disponible.', 'arriendo-facil' ), 404 );
+	}
+
+	/**
+	 * Streams a contract kept in the private local store (the caller already verified access to the lease).
+	 *
+	 * @param string $key Storage key.
+	 * @return void
+	 */
+	private function stream_private_contract( $key ) {
+		$result = Arriendo_Facil_Local_Private_Storage::stream( $key, Arriendo_Facil_Local_Private_Storage::display_name( $key ) );
+		if ( is_wp_error( $result ) ) {
+			wp_die( esc_html( $result->get_error_message() ), '', array( 'response' => 404 ) );
+		}
 	}
 
 	/**
@@ -1061,6 +1076,18 @@ class Arriendo_Facil_Lease {
 			$body = Arriendo_Facil_Private_Storage::download( $object_key, 45 );
 			if ( is_wp_error( $body ) ) {
 				return new WP_Error( 'af_lease_source_download_failed', __( 'No se pudo descargar la version activa del contrato desde almacenamiento privado.', 'arriendo-facil' ) );
+			}
+
+			return array(
+				'contents'  => $body,
+				'mime_type' => $mime_type,
+			);
+		}
+
+		if ( Arriendo_Facil_Local_Private_Storage::STORAGE_ID === $provider && '' !== $object_key ) {
+			$body = Arriendo_Facil_Local_Private_Storage::read( $object_key );
+			if ( is_wp_error( $body ) ) {
+				return new WP_Error( 'af_lease_source_unavailable', __( 'No se pudo acceder al archivo fuente de la version activa del contrato.', 'arriendo-facil' ) );
 			}
 
 			return array(
@@ -1150,49 +1177,55 @@ class Arriendo_Facil_Lease {
 	 * @return array|WP_Error
 	 */
 	private function create_approved_pdf_for_version( $lease_id, $version, $contract_text, $pdf_password ) {
-		$uploads = wp_upload_dir();
-		if ( ! empty( $uploads['error'] ) || empty( $uploads['basedir'] ) || empty( $uploads['baseurl'] ) ) {
-			return new WP_Error( 'af_lease_pdf_uploads_unavailable', __( 'WordPress uploads directory is not available.', 'arriendo-facil' ) );
-		}
-
-		$approved_dir = trailingslashit( $uploads['basedir'] ) . 'arriendo-facil/contracts-approved';
-		if ( ! wp_mkdir_p( $approved_dir ) ) {
-			return new WP_Error( 'af_lease_pdf_dir_failed', __( 'No se pudo crear el directorio de contratos aprobados.', 'arriendo-facil' ) );
-		}
-
+		// Built in a temporary folder, then stored privately; never written to a public directory.
+		$temp_dir  = trailingslashit( get_temp_dir() );
 		$file_name = sprintf( 'lease-%d-v%d-approved-%s.pdf', absint( $lease_id ), absint( $version ), gmdate( 'Ymd-His' ) );
-		$file_path = trailingslashit( $approved_dir ) . $file_name;
+		$file_path = $temp_dir . wp_unique_filename( $temp_dir, $file_name );
 
 		$written = $this->write_password_protected_pdf_file( $file_path, (string) $contract_text, (string) $pdf_password );
 		if ( ! $written ) {
 			return new WP_Error( 'af_lease_pdf_write_failed', __( 'No se pudo generar el documento PDF protegido.', 'arriendo-facil' ) );
 		}
 
-		$local_url    = trailingslashit( $uploads['baseurl'] ) . 'arriendo-facil/contracts-approved/' . rawurlencode( $file_name );
+		$pdf_contents = file_get_contents( $file_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		if ( false === $pdf_contents || '' === $pdf_contents ) {
+			Arriendo_Facil_Contract_File_Store::discard_local_copy( $file_path );
+			return new WP_Error( 'af_lease_pdf_write_failed', __( 'No se pudo generar el documento PDF protegido.', 'arriendo-facil' ) );
+		}
+
 		$approved_pdf = array(
-			'provider'   => 'local',
-			'object_key' => '',
-			'mime_type'  => 'application/pdf',
-			'file_name'  => $file_name,
-			'local_url'  => $local_url,
+			'provider'    => '',
+			'object_key'  => '',
+			'mime_type'   => 'application/pdf',
+			'file_name'   => $file_name,
+			'local_url'   => '',
 			'approved_at' => current_time( 'mysql' ),
 			'approved_by' => get_current_user_id(),
 		);
 
 		if ( Arriendo_Facil_Private_Storage::is_r2_enabled() ) {
-			$pdf_contents = file_get_contents( $file_path );
-			if ( false !== $pdf_contents && '' !== $pdf_contents ) {
-				$object_key = sprintf( 'lease-contracts/%d/v%d/approved/%s', absint( $lease_id ), absint( $version ), sanitize_file_name( $file_name ) );
-				$upload_r2  = Arriendo_Facil_Private_Storage::upload( $pdf_contents, $object_key, 'application/pdf' );
+			$object_key = sprintf( 'lease-contracts/%d/v%d/approved/%s', absint( $lease_id ), absint( $version ), sanitize_file_name( $file_name ) );
+			$upload_r2  = Arriendo_Facil_Private_Storage::upload( $pdf_contents, $object_key, 'application/pdf' );
 
-				if ( ! is_wp_error( $upload_r2 ) ) {
-					$approved_pdf['provider']   = Arriendo_Facil_Private_Storage::PROVIDER_R2;
-					$approved_pdf['object_key'] = $object_key;
-					$approved_pdf['local_url']  = '';
-					Arriendo_Facil_Contract_File_Store::discard_local_copy( $file_path );
-				}
+			if ( ! is_wp_error( $upload_r2 ) ) {
+				$approved_pdf['provider']   = Arriendo_Facil_Private_Storage::PROVIDER_R2;
+				$approved_pdf['object_key'] = $object_key;
 			}
 		}
+
+		if ( '' === $approved_pdf['provider'] ) {
+			$key = Arriendo_Facil_Contract_File_Store::store_private( $lease_id, $pdf_contents, 'contrato-aprobado-v' . absint( $version ), 'pdf' );
+			if ( is_wp_error( $key ) ) {
+				Arriendo_Facil_Contract_File_Store::discard_local_copy( $file_path );
+				return new WP_Error( 'af_lease_pdf_dir_failed', __( 'No se pudo guardar el contrato aprobado en el almacenamiento privado.', 'arriendo-facil' ) );
+			}
+
+			$approved_pdf['provider']   = Arriendo_Facil_Local_Private_Storage::STORAGE_ID;
+			$approved_pdf['object_key'] = $key;
+			$approved_pdf['file_name']  = basename( $key );
+		}
+
+		Arriendo_Facil_Contract_File_Store::discard_local_copy( $file_path );
 
 		return $approved_pdf;
 	}

@@ -75,89 +75,104 @@ class Arriendo_Facil_Property_Admin_Registration {
 		$instance_id  = 'af-admin-signup-' . wp_rand( 1000, 999999 );
 		$form_ts      = time();
 		$form_sig     = hash_hmac( 'sha256', (string) $form_ts, wp_salt( 'nonce' ) . self::FORM_SECRET_SLUG );
-		$terms_page   = get_page_by_path( 'terminos-y-condiciones' );
-		$terms_url    = $terms_page instanceof WP_Post ? get_permalink( $terms_page ) : home_url( '/terminos-y-condiciones/' );
-		$privacy_url  = function_exists( 'get_privacy_policy_url' ) ? get_privacy_policy_url() : home_url( '/politica-de-privacidad/' );
 
 		ob_start();
 		?>
 		<div id="<?php echo esc_attr( $instance_id ); ?>" class="af-admin-signup">
-			<div>
-				<h3 class="af-admin-signup__title"><?php echo esc_html__( 'Crea tu cuenta y comienza a gestionar', 'arriendo-facil' ); ?></h3>
-				<p class="af-admin-signup__subtitle"><?php echo esc_html__( 'Crea tu cuenta como gestor de propiedades. Verifica tu correo y empieza hoy con datos de ejemplo: cobros, contratos, mantenimiento e inquilinos.', 'arriendo-facil' ); ?></p>
+			<div class="af-admin-signup__head">
+				<h2 class="af-admin-signup__title"><?php echo esc_html__( 'Crea tu cuenta de gestor', 'arriendo-facil' ); ?></h2>
+				<p class="af-admin-signup__subtitle"><?php echo esc_html__( 'Completa tus datos en pocos minutos. Antes de ingresar, te enviaremos un correo para confirmar que la cuenta es tuya.', 'arriendo-facil' ); ?></p>
+				<div class="af-admin-signup__progress" aria-hidden="true"><span class="af-admin-signup__progress-bar" data-af-progress-bar></span></div>
+				<p class="af-admin-signup__progress-label" data-af-progress-label aria-live="off"></p>
 			</div>
 
-			<div data-af-admin-alert class="af-admin-signup__alert"></div>
+			<div data-af-admin-alert class="af-admin-signup__alert" role="alert" tabindex="-1" hidden></div>
 
-			<form data-af-admin-form class="af-admin-signup__form">
-				<div class="af-admin-signup__grid">
-					<label class="af-admin-signup__field af-admin-signup__full">
-						<span class="af-admin-signup__label"><?php echo esc_html__( 'Nombre de la empresa', 'arriendo-facil' ); ?></span>
-						<input type="text" name="company_name" required maxlength="190" class="af-admin-signup__input" />
-					</label>
-					<label class="af-admin-signup__field af-admin-signup__full">
-						<span class="af-admin-signup__label"><?php echo esc_html__( 'Nombre y apellido del responsable', 'arriendo-facil' ); ?></span>
-						<input type="text" name="contact_name" required maxlength="190" class="af-admin-signup__input" />
-					</label>
-					<label class="af-admin-signup__field">
-						<span class="af-admin-signup__label"><?php echo esc_html__( 'Correo electronico', 'arriendo-facil' ); ?></span>
-						<input type="email" name="email" required maxlength="190" class="af-admin-signup__input" />
-					</label>
-					<label class="af-admin-signup__field">
-						<span class="af-admin-signup__label"><?php echo esc_html__( 'Telefono', 'arriendo-facil' ); ?></span>
-						<input type="text" name="phone" required maxlength="20" pattern="[0-9+\s-]{7,20}" class="af-admin-signup__input" />
-					</label>
-					<label class="af-admin-signup__field">
-						<span class="af-admin-signup__label"><?php echo esc_html__( 'Tipo de identificacion', 'arriendo-facil' ); ?></span>
-						<select name="id_type" required class="af-admin-signup__input">
-							<option value=""><?php echo esc_html__( 'Selecciona', 'arriendo-facil' ); ?></option>
-							<option value="cedula"><?php echo esc_html__( 'Cedula', 'arriendo-facil' ); ?></option>
-							<option value="ruc"><?php echo esc_html__( 'RUC', 'arriendo-facil' ); ?></option>
-							<option value="pasaporte"><?php echo esc_html__( 'Pasaporte', 'arriendo-facil' ); ?></option>
-						</select>
-					</label>
-					<label class="af-admin-signup__field">
-						<span class="af-admin-signup__label"><?php echo esc_html__( 'Numero de identificacion', 'arriendo-facil' ); ?></span>
-						<input type="text" name="id_number" required maxlength="20" pattern="[A-Za-z0-9-]{5,20}" class="af-admin-signup__input" />
-						<span class="af-admin-signup__hint" style="display:block;font-size:12px;line-height:1.4;color:#647579;margin-top:4px;"><?php echo esc_html__( 'Cedula (10 digitos), RUC (13 digitos) o Pasaporte (6 a 12 caracteres alfanumericos).', 'arriendo-facil' ); ?></span>
-					</label>
-					<label class="af-admin-signup__field">
-						<span class="af-admin-signup__label"><?php echo esc_html__( 'Nacionalidad', 'arriendo-facil' ); ?></span>
-						<input type="text" name="nationality" required maxlength="100" class="af-admin-signup__input" value="Ecuador" />
-					</label>
-					<label class="af-admin-signup__field">
-						<span class="af-admin-signup__label"><?php echo esc_html__( 'Ciudad de nacimiento', 'arriendo-facil' ); ?></span>
-						<input type="text" name="birth_city" required maxlength="150" class="af-admin-signup__input" />
-					</label>
-					<label class="af-admin-signup__field">
-						<span class="af-admin-signup__label"><?php echo esc_html__( 'Contrasena', 'arriendo-facil' ); ?></span>
-						<span class="af-admin-signup__control">
-							<input type="password" name="password" required minlength="10" maxlength="72" autocomplete="new-password" class="af-admin-signup__input af-admin-signup__input--reveal" />
-							<?php $this->render_password_reveal_button(); ?>
-						</span>
-						<span class="af-admin-signup__strength" data-af-strength hidden>
-							<span class="af-admin-signup__strength-track"><span class="af-admin-signup__strength-bar" data-af-strength-bar></span></span>
-							<span class="af-admin-signup__strength-label" data-af-strength-label></span>
-						</span>
-					</label>
-					<label class="af-admin-signup__field">
-						<span class="af-admin-signup__label"><?php echo esc_html__( 'Confirmar contrasena', 'arriendo-facil' ); ?></span>
-						<span class="af-admin-signup__control">
-							<input type="password" name="password_confirm" required minlength="10" maxlength="72" autocomplete="new-password" class="af-admin-signup__input af-admin-signup__input--reveal" />
-							<?php $this->render_password_reveal_button(); ?>
-						</span>
-						<span class="af-admin-signup__match" data-af-match hidden aria-live="polite"></span>
-					</label>
+			<form data-af-admin-form class="af-admin-signup__form" autocomplete="on">
+
+				<div class="af-admin-signup__group" role="group" aria-labelledby="<?php echo esc_attr( $instance_id ); ?>-g1">
+					<h3 class="af-admin-signup__group-title" id="<?php echo esc_attr( $instance_id ); ?>-g1"><span class="af-admin-signup__num" aria-hidden="true">1</span><?php echo esc_html__( 'Tu empresa o gestión', 'arriendo-facil' ); ?></h3>
+					<div class="af-admin-signup__grid">
+						<label class="af-admin-signup__field af-admin-signup__full">
+							<span class="af-admin-signup__label"><?php echo esc_html__( 'Nombre de la empresa', 'arriendo-facil' ); ?></span>
+							<input type="text" name="company_name" required maxlength="190" autocomplete="organization" class="af-admin-signup__input" />
+						</label>
+						<label class="af-admin-signup__field af-admin-signup__full">
+							<span class="af-admin-signup__label"><?php echo esc_html__( 'Nombre y apellido del responsable', 'arriendo-facil' ); ?></span>
+							<input type="text" name="contact_name" required maxlength="190" autocomplete="name" class="af-admin-signup__input" />
+						</label>
+						<label class="af-admin-signup__field">
+							<span class="af-admin-signup__label"><?php echo esc_html__( 'Correo electrónico', 'arriendo-facil' ); ?></span>
+							<input type="email" name="email" required maxlength="190" autocomplete="email" inputmode="email" class="af-admin-signup__input" />
+						</label>
+						<label class="af-admin-signup__field">
+							<span class="af-admin-signup__label"><?php echo esc_html__( 'Teléfono', 'arriendo-facil' ); ?></span>
+							<input type="tel" name="phone" required maxlength="20" pattern="[0-9+\s\-]{7,20}" autocomplete="tel" inputmode="tel" class="af-admin-signup__input" />
+						</label>
+					</div>
 				</div>
 
-				<p class="af-admin-signup__rules-title"><?php echo esc_html__( 'Requisitos de contrasena:', 'arriendo-facil' ); ?></p>
-				<ul class="af-admin-signup__rules" data-af-rules>
-					<li class="af-admin-signup__rule" data-rule="length"><?php echo esc_html__( 'Minimo 10 caracteres', 'arriendo-facil' ); ?></li>
-					<li class="af-admin-signup__rule" data-rule="upper"><?php echo esc_html__( 'Al menos 1 mayuscula', 'arriendo-facil' ); ?></li>
-					<li class="af-admin-signup__rule" data-rule="lower"><?php echo esc_html__( 'Al menos 1 minuscula', 'arriendo-facil' ); ?></li>
-					<li class="af-admin-signup__rule" data-rule="number"><?php echo esc_html__( 'Al menos 1 numero', 'arriendo-facil' ); ?></li>
-					<li class="af-admin-signup__rule" data-rule="symbol"><?php echo esc_html__( 'Al menos 1 simbolo (ej: !@#$%)', 'arriendo-facil' ); ?></li>
-				</ul>
+				<div class="af-admin-signup__group" role="group" aria-labelledby="<?php echo esc_attr( $instance_id ); ?>-g2">
+					<h3 class="af-admin-signup__group-title" id="<?php echo esc_attr( $instance_id ); ?>-g2"><span class="af-admin-signup__num" aria-hidden="true">2</span><?php echo esc_html__( 'Identificación', 'arriendo-facil' ); ?></h3>
+					<div class="af-admin-signup__grid">
+						<label class="af-admin-signup__field">
+							<span class="af-admin-signup__label"><?php echo esc_html__( 'Tipo de identificación', 'arriendo-facil' ); ?></span>
+							<select name="id_type" required class="af-admin-signup__input">
+								<option value=""><?php echo esc_html__( 'Selecciona', 'arriendo-facil' ); ?></option>
+								<option value="cedula"><?php echo esc_html__( 'Cédula', 'arriendo-facil' ); ?></option>
+								<option value="ruc"><?php echo esc_html__( 'RUC', 'arriendo-facil' ); ?></option>
+								<option value="pasaporte"><?php echo esc_html__( 'Pasaporte', 'arriendo-facil' ); ?></option>
+							</select>
+						</label>
+						<label class="af-admin-signup__field">
+							<span class="af-admin-signup__label"><?php echo esc_html__( 'Número de identificación', 'arriendo-facil' ); ?></span>
+							<input type="text" name="id_number" required maxlength="20" pattern="[A-Za-z0-9\-]{5,20}" autocomplete="off" aria-describedby="<?php echo esc_attr( $instance_id ); ?>-idhint" class="af-admin-signup__input" />
+							<span class="af-admin-signup__hint" id="<?php echo esc_attr( $instance_id ); ?>-idhint" data-af-idhint><?php echo esc_html__( 'Cédula (10 dígitos), RUC (13 dígitos) o pasaporte (6 a 12 caracteres alfanuméricos).', 'arriendo-facil' ); ?></span>
+						</label>
+						<label class="af-admin-signup__field">
+							<span class="af-admin-signup__label"><?php echo esc_html__( 'Nacionalidad', 'arriendo-facil' ); ?></span>
+							<input type="text" name="nationality" required maxlength="100" autocomplete="country-name" class="af-admin-signup__input" value="Ecuador" />
+						</label>
+						<label class="af-admin-signup__field">
+							<span class="af-admin-signup__label"><?php echo esc_html__( 'Ciudad de nacimiento', 'arriendo-facil' ); ?></span>
+							<input type="text" name="birth_city" required maxlength="150" autocomplete="off" class="af-admin-signup__input" />
+						</label>
+					</div>
+				</div>
+
+				<div class="af-admin-signup__group" role="group" aria-labelledby="<?php echo esc_attr( $instance_id ); ?>-g3">
+					<h3 class="af-admin-signup__group-title" id="<?php echo esc_attr( $instance_id ); ?>-g3"><span class="af-admin-signup__num" aria-hidden="true">3</span><?php echo esc_html__( 'Seguridad de la cuenta', 'arriendo-facil' ); ?></h3>
+					<div class="af-admin-signup__grid">
+						<label class="af-admin-signup__field">
+							<span class="af-admin-signup__label"><?php echo esc_html__( 'Contraseña', 'arriendo-facil' ); ?></span>
+							<span class="af-admin-signup__control">
+								<input type="password" name="password" required minlength="10" maxlength="72" autocomplete="new-password" class="af-admin-signup__input af-admin-signup__input--reveal" />
+								<?php $this->render_password_reveal_button(); ?>
+							</span>
+							<span class="af-admin-signup__strength" data-af-strength hidden>
+								<span class="af-admin-signup__strength-track"><span class="af-admin-signup__strength-bar" data-af-strength-bar></span></span>
+								<span class="af-admin-signup__strength-label" data-af-strength-label></span>
+							</span>
+						</label>
+						<label class="af-admin-signup__field">
+							<span class="af-admin-signup__label"><?php echo esc_html__( 'Confirmar contraseña', 'arriendo-facil' ); ?></span>
+							<span class="af-admin-signup__control">
+								<input type="password" name="password_confirm" required minlength="10" maxlength="72" autocomplete="new-password" class="af-admin-signup__input af-admin-signup__input--reveal" />
+								<?php $this->render_password_reveal_button(); ?>
+							</span>
+							<span class="af-admin-signup__match" data-af-match hidden aria-live="polite"></span>
+						</label>
+					</div>
+
+					<p class="af-admin-signup__rules-title"><?php echo esc_html__( 'Requisitos de contraseña', 'arriendo-facil' ); ?></p>
+					<ul class="af-admin-signup__rules" data-af-rules>
+						<li class="af-admin-signup__rule" data-rule="length"><?php echo esc_html__( 'Mínimo 10 caracteres', 'arriendo-facil' ); ?></li>
+						<li class="af-admin-signup__rule" data-rule="upper"><?php echo esc_html__( 'Al menos 1 mayúscula', 'arriendo-facil' ); ?></li>
+						<li class="af-admin-signup__rule" data-rule="lower"><?php echo esc_html__( 'Al menos 1 minúscula', 'arriendo-facil' ); ?></li>
+						<li class="af-admin-signup__rule" data-rule="number"><?php echo esc_html__( 'Al menos 1 número', 'arriendo-facil' ); ?></li>
+						<li class="af-admin-signup__rule" data-rule="symbol"><?php echo esc_html__( 'Al menos 1 símbolo (ej: !@#$%)', 'arriendo-facil' ); ?></li>
+					</ul>
+				</div>
 
 				<input type="text" name="website" value="" tabindex="-1" autocomplete="off" aria-hidden="true" class="af-admin-signup__honeypot" />
 				<input type="hidden" name="form_ts" value="<?php echo esc_attr( (string) $form_ts ); ?>" />
@@ -167,13 +182,29 @@ class Arriendo_Facil_Property_Admin_Registration {
 
 				<div class="af-admin-signup__actions">
 					<button type="submit" data-af-admin-submit class="af-admin-signup__submit">
-						<?php echo esc_html__( 'Crear mi cuenta', 'arriendo-facil' ); ?>
+						<span class="af-admin-signup__submit-text"><?php echo esc_html__( 'Crear mi cuenta', 'arriendo-facil' ); ?></span>
 					</button>
-					<a class="af-admin-signup__link af-admin-signup__link--secondary" href="#" data-af-admin-resend><?php echo esc_html__( 'Reenviar correo de verificacion', 'arriendo-facil' ); ?></a>
-					<a class="af-admin-signup__link af-admin-signup__link--primary" href="<?php echo esc_url( $login_url ); ?>"><?php echo esc_html__( 'Ya tengo cuenta, iniciar sesion', 'arriendo-facil' ); ?></a>
-					<a class="af-admin-signup__link af-admin-signup__link--secondary" href="<?php echo esc_url( $recover_url ); ?>"><?php echo esc_html__( 'Recuperar contrasena', 'arriendo-facil' ); ?></a>
 				</div>
+
+				<nav class="af-admin-signup__links" aria-label="<?php echo esc_attr__( 'Otras opciones de acceso', 'arriendo-facil' ); ?>">
+					<a class="af-admin-signup__link af-admin-signup__link--primary" href="<?php echo esc_url( $login_url ); ?>"><?php echo esc_html__( 'Ya tengo cuenta, iniciar sesión', 'arriendo-facil' ); ?></a>
+					<button type="button" class="af-admin-signup__link af-admin-signup__link--button" data-af-admin-resend><?php echo esc_html__( 'Reenviar correo de verificación', 'arriendo-facil' ); ?></button>
+					<a class="af-admin-signup__link" href="<?php echo esc_url( $recover_url ); ?>"><?php echo esc_html__( 'Recuperar contraseña', 'arriendo-facil' ); ?></a>
+				</nav>
 			</form>
+
+			<div class="af-admin-signup__done" data-af-admin-done hidden tabindex="-1">
+				<span class="af-admin-signup__done-icon" aria-hidden="true">
+					<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="3"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+				</span>
+				<h3 class="af-admin-signup__done-title"><?php echo esc_html__( 'Revisa tu correo', 'arriendo-facil' ); ?></h3>
+				<p class="af-admin-signup__done-text"><?php echo esc_html__( 'Te enviamos un enlace de verificación a', 'arriendo-facil' ); ?> <strong data-af-done-email></strong>. <?php echo esc_html__( 'Debes confirmarlo antes de iniciar sesión. El enlace vence en 24 horas.', 'arriendo-facil' ); ?></p>
+				<p class="af-admin-signup__done-note"><?php echo esc_html__( '¿No lo ves? Revisa la carpeta de spam o correo no deseado.', 'arriendo-facil' ); ?></p>
+				<div class="af-admin-signup__done-actions">
+					<a class="af-admin-signup__submit af-admin-signup__submit--link" href="<?php echo esc_url( $login_url ); ?>"><?php echo esc_html__( 'Ir a iniciar sesión', 'arriendo-facil' ); ?></a>
+					<button type="button" class="af-admin-signup__link af-admin-signup__link--button" data-af-admin-resend><?php echo esc_html__( 'Reenviar correo de verificación', 'arriendo-facil' ); ?></button>
+				</div>
+			</div>
 		</div>
 
 		<?php echo Arriendo_Facil_Toast::inline_assets(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static, escaped markup. ?>
@@ -186,22 +217,24 @@ class Arriendo_Facil_Property_Admin_Registration {
 			const nonce = <?php echo wp_json_encode( $nonce ); ?>;
 			const form = app.querySelector('[data-af-admin-form]');
 			const submitBtn = app.querySelector('[data-af-admin-submit]');
-			const resendLink = app.querySelector('[data-af-admin-resend]');
+			const resendButtons = app.querySelectorAll('[data-af-admin-resend]');
 			const alertBox = app.querySelector('[data-af-admin-alert]');
+			const doneBox = app.querySelector('[data-af-admin-done]');
+			const doneEmail = app.querySelector('[data-af-done-email]');
 			const emailInput = form.querySelector('input[name="email"]');
+			let lastEmail = '';
+			let resendCooldown = null;
 
 			function showAlert(message, type){
-				alertBox.style.display = 'block';
+				alertBox.hidden = false;
+				alertBox.dataset.type = type === 'success' ? 'success' : 'error';
 				alertBox.textContent = String(message || '');
-				if(type === 'success'){
-					alertBox.style.background = '#eaf4f2';
-					alertBox.style.border = '1px solid #9cc3c0';
-					alertBox.style.color = '#1f5a52';
-				} else {
-					alertBox.style.background = '#fbeceb';
-					alertBox.style.border = '1px solid #eba8a5';
-					alertBox.style.color = '#b03a36';
-				}
+				if(typeof alertBox.scrollIntoView === 'function'){ alertBox.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+			}
+
+			function hideAlert(){
+				alertBox.hidden = true;
+				alertBox.textContent = '';
 			}
 
 			function rejectRegistration(message){
@@ -213,13 +246,9 @@ class Arriendo_Facil_Property_Admin_Registration {
 				if(typeof window.afToast !== 'function'){ return; }
 				window.afToast({
 					type: approved ? 'approved' : 'rejected',
-					title: approved ? <?php echo wp_json_encode( __( '¡Registro aprobado!', 'arriendo-facil' ) ); ?> : <?php echo wp_json_encode( __( 'Registro rechazado', 'arriendo-facil' ) ); ?>,
+					title: approved ? <?php echo wp_json_encode( __( '¡Registro exitoso!', 'arriendo-facil' ) ); ?> : <?php echo wp_json_encode( __( 'No se pudo completar el registro', 'arriendo-facil' ) ); ?>,
 					message: String(message || '')
 				});
-			}
-
-			function validatePasswordClientSide(password){
-				return passwordChecks(password).every(Boolean);
 			}
 
 			function passwordChecks(password){
@@ -232,6 +261,10 @@ class Arriendo_Facil_Property_Admin_Registration {
 				];
 			}
 
+			function validatePasswordClientSide(password){
+				return passwordChecks(password).every(Boolean);
+			}
+
 			const pwInput = form.querySelector('input[name="password"]');
 			const pwConfirmInput = form.querySelector('input[name="password_confirm"]');
 			const ruleItems = app.querySelectorAll('[data-af-rules] [data-rule]');
@@ -240,11 +273,11 @@ class Arriendo_Facil_Property_Admin_Registration {
 			const strengthLabel = app.querySelector('[data-af-strength-label]');
 			const matchBox = app.querySelector('[data-af-match]');
 			const strengthLevels = [
-				{ label: <?php echo wp_json_encode( __( 'Muy debil', 'arriendo-facil' ) ); ?>, color: '#d9534f' },
-				{ label: <?php echo wp_json_encode( __( 'Debil', 'arriendo-facil' ) ); ?>, color: '#f97316' },
-				{ label: <?php echo wp_json_encode( __( 'Media', 'arriendo-facil' ) ); ?>, color: '#eab308' },
-				{ label: <?php echo wp_json_encode( __( 'Buena', 'arriendo-facil' ) ); ?>, color: '#84cc16' },
-				{ label: <?php echo wp_json_encode( __( 'Fuerte', 'arriendo-facil' ) ); ?>, color: '#2f7d73' }
+				{ label: <?php echo wp_json_encode( __( 'Muy débil', 'arriendo-facil' ) ); ?>, color: '#c0392b' },
+				{ label: <?php echo wp_json_encode( __( 'Débil', 'arriendo-facil' ) ); ?>, color: '#e0742b' },
+				{ label: <?php echo wp_json_encode( __( 'Media', 'arriendo-facil' ) ); ?>, color: '#d9a62b' },
+				{ label: <?php echo wp_json_encode( __( 'Buena', 'arriendo-facil' ) ); ?>, color: '#8aa94f' },
+				{ label: <?php echo wp_json_encode( __( 'Fuerte', 'arriendo-facil' ) ); ?>, color: '#426747' }
 			];
 
 			function updatePasswordUi(){
@@ -271,14 +304,49 @@ class Arriendo_Facil_Property_Admin_Registration {
 					matchBox.classList.toggle('is-ok', same);
 					matchBox.classList.toggle('is-error', !same);
 					matchBox.textContent = same
-						? <?php echo wp_json_encode( __( 'Las contrasenas coinciden', 'arriendo-facil' ) ); ?>
-						: <?php echo wp_json_encode( __( 'Las contrasenas no coinciden', 'arriendo-facil' ) ); ?>;
+						? <?php echo wp_json_encode( __( 'Las contraseñas coinciden', 'arriendo-facil' ) ); ?>
+						: <?php echo wp_json_encode( __( 'Las contraseñas no coinciden', 'arriendo-facil' ) ); ?>;
 				}
 			}
 
+			/* Avance del formulario: campos obligatorios completos / total. */
+			const progressBar = app.querySelector('[data-af-progress-bar]');
+			const progressLabel = app.querySelector('[data-af-progress-label]');
+			const requiredFields = Array.prototype.slice.call(form.querySelectorAll('input[required], select[required]'));
+			const progressTpl = <?php echo wp_json_encode( __( '%1$s de %2$s requisitos completos', 'arriendo-facil' ) ); ?>;
+
+			function fieldDone(field){
+				if(field.type === 'checkbox'){ return field.checked; }
+				if(field.name === 'password'){ return validatePasswordClientSide(String(field.value || '')); }
+				if(field.name === 'password_confirm'){ return field.value !== '' && field.value === pwInput.value; }
+				return String(field.value || '').trim() !== '' && field.checkValidity();
+			}
+
+			function updateProgress(){
+				const done = requiredFields.filter(fieldDone).length;
+				progressBar.style.width = Math.round((done / requiredFields.length) * 100) + '%';
+				progressLabel.textContent = progressTpl.replace('%1$s', done).replace('%2$s', requiredFields.length);
+			}
+
+			/* Pista del número de identificación según el tipo elegido. */
+			const idType = form.querySelector('select[name="id_type"]');
+			const idHint = app.querySelector('[data-af-idhint]');
+			const idHints = {
+				'': idHint.textContent,
+				cedula: <?php echo wp_json_encode( __( 'La cédula tiene 10 dígitos.', 'arriendo-facil' ) ); ?>,
+				ruc: <?php echo wp_json_encode( __( 'El RUC tiene 13 dígitos.', 'arriendo-facil' ) ); ?>,
+				pasaporte: <?php echo wp_json_encode( __( 'El pasaporte admite de 6 a 12 caracteres alfanuméricos.', 'arriendo-facil' ) ); ?>
+			};
+			idType.addEventListener('change', function(){
+				idHint.textContent = idHints[idType.value] || idHints[''];
+			});
+
 			pwInput.addEventListener('input', updatePasswordUi);
 			pwConfirmInput.addEventListener('input', updatePasswordUi);
-			form.addEventListener('reset', function(){ setTimeout(updatePasswordUi, 0); });
+			form.addEventListener('input', updateProgress);
+			form.addEventListener('change', updateProgress);
+			form.addEventListener('reset', function(){ setTimeout(function(){ updatePasswordUi(); updateProgress(); }, 0); });
+			updateProgress();
 
 			app.querySelectorAll('[data-af-reveal]').forEach(function(btn){
 				btn.addEventListener('click', function(){
@@ -293,22 +361,21 @@ class Arriendo_Facil_Property_Admin_Registration {
 
 			form.addEventListener('submit', async function(e){
 				e.preventDefault();
+				if(submitBtn.disabled){ return; }
 
-				const passwordInput = form.querySelector('input[name="password"]');
-				const passwordConfirmInput = form.querySelector('input[name="password_confirm"]');
-
-				if(!validatePasswordClientSide(String(passwordInput && passwordInput.value ? passwordInput.value : ''))){
-					rejectRegistration(<?php echo wp_json_encode( __( 'La contrasena no cumple los requisitos: minimo 10 caracteres, mayuscula, minuscula, numero y simbolo.', 'arriendo-facil' ) ); ?>);
+				if(!validatePasswordClientSide(String(pwInput.value || ''))){
+					rejectRegistration(<?php echo wp_json_encode( __( 'La contraseña no cumple los requisitos: mínimo 10 caracteres, mayúscula, minúscula, número y símbolo.', 'arriendo-facil' ) ); ?>);
 					return;
 				}
 
-				if(String(passwordInput.value || '') !== String(passwordConfirmInput.value || '')){
-					rejectRegistration(<?php echo wp_json_encode( __( 'Las contrasenas no coinciden.', 'arriendo-facil' ) ); ?>);
+				if(String(pwInput.value || '') !== String(pwConfirmInput.value || '')){
+					rejectRegistration(<?php echo wp_json_encode( __( 'Las contraseñas no coinciden.', 'arriendo-facil' ) ); ?>);
 					return;
 				}
 
 				submitBtn.disabled = true;
-				alertBox.style.display = 'none';
+				app.classList.add('is-loading');
+				hideAlert();
 
 				const data = new URLSearchParams(new FormData(form));
 				data.set('action', 'af_register_property_admin');
@@ -324,11 +391,13 @@ class Arriendo_Facil_Property_Admin_Registration {
 					json = await response.json();
 				} catch (err) {
 					submitBtn.disabled = false;
-					rejectRegistration(<?php echo wp_json_encode( __( 'No se pudo conectar con el servidor. Intenta nuevamente.', 'arriendo-facil' ) ); ?>);
+					app.classList.remove('is-loading');
+					rejectRegistration(<?php echo wp_json_encode( __( 'No se pudo conectar con el servidor. Inténtalo nuevamente.', 'arriendo-facil' ) ); ?>);
 					return;
 				}
 
 				submitBtn.disabled = false;
+				app.classList.remove('is-loading');
 				if(!json || !json.success){
 					const message = json && json.data && json.data.message ? json.data.message : <?php echo wp_json_encode( __( 'No se pudo crear la cuenta.', 'arriendo-facil' ) ); ?>;
 					rejectRegistration(message);
@@ -336,32 +405,65 @@ class Arriendo_Facil_Property_Admin_Registration {
 				}
 
 				const okMessage = (json.data && json.data.message) ? json.data.message : <?php echo wp_json_encode( __( 'Cuenta creada correctamente.', 'arriendo-facil' ) ); ?>;
-				showAlert(okMessage, 'success');
+				lastEmail = String(emailInput.value || '').trim();
+				doneEmail.textContent = lastEmail;
 				notifyRegistration(true, okMessage);
 				form.reset();
+				app.classList.add('is-done');
+				form.hidden = true;
+				alertBox.hidden = true;
+				app.querySelector('.af-admin-signup__head').hidden = true;
+				doneBox.hidden = false;
+				doneBox.focus({ preventScroll: true });
+				doneBox.scrollIntoView({ block: 'center', behavior: 'smooth' });
+				document.dispatchEvent(new CustomEvent('af:signup-done', { detail: { app: app } }));
 				if(json.data && json.data.should_redirect && json.data.login_url){
 					setTimeout(function(){ window.location.href = String(json.data.login_url); }, 900);
 				}
 			});
 
-			if(resendLink){
-				resendLink.addEventListener('click', async function(e){
-					e.preventDefault();
+			if(window.location.hash === '#reenviar'){
+				showAlert(<?php echo wp_json_encode( __( 'Escribe el correo con el que te registraste en el formulario y pulsa «Reenviar correo de verificación».', 'arriendo-facil' ) ); ?>, 'success');
+				emailInput.focus({ preventScroll: true });
+			}
 
-					const emailValue = String(emailInput && emailInput.value ? emailInput.value : '').trim();
-					if(!emailValue || !/^\S+@\S+\.\S+$/.test(emailValue)){
-						showAlert(<?php echo wp_json_encode( __( 'Ingresa un correo valido para reenviar la verificacion.', 'arriendo-facil' ) ); ?>, 'error');
+			function startResendCooldown(seconds){
+				let left = seconds;
+				const labels = [];
+				resendButtons.forEach(function(btn){
+					labels.push(btn.textContent);
+					btn.disabled = true;
+				});
+				clearInterval(resendCooldown);
+				resendCooldown = setInterval(function(){
+					left -= 1;
+					if(left <= 0){
+						clearInterval(resendCooldown);
+						resendButtons.forEach(function(btn, i){ btn.disabled = false; btn.textContent = labels[i]; });
 						return;
 					}
+					resendButtons.forEach(function(btn, i){ btn.textContent = labels[i] + ' (' + left + ' s)'; });
+				}, 1000);
+				resendButtons.forEach(function(btn, i){ btn.textContent = labels[i] + ' (' + left + ' s)'; });
+			}
 
-					resendLink.setAttribute('aria-disabled', 'true');
-					resendLink.style.pointerEvents = 'none';
-					resendLink.style.opacity = '0.6';
+			resendButtons.forEach(function(resendBtn){
+				resendBtn.addEventListener('click', async function(){
+					if(resendBtn.disabled){ return; }
+
+					const emailValue = String(emailInput.value || '').trim() || lastEmail;
+					if(!emailValue || !/^\S+@\S+\.\S+$/.test(emailValue)){
+						showAlert(<?php echo wp_json_encode( __( 'Escribe tu correo electrónico en el formulario para reenviar la verificación.', 'arriendo-facil' ) ); ?>, 'error');
+						emailInput.focus();
+						return;
+					}
 
 					const data = new URLSearchParams();
 					data.set('action', 'af_resend_admin_verification_email');
 					data.set('nonce', nonce);
 					data.set('email', emailValue);
+
+					resendBtn.disabled = true;
 
 					let json;
 					try {
@@ -372,28 +474,25 @@ class Arriendo_Facil_Property_Admin_Registration {
 						});
 						json = await response.json();
 					} catch (err) {
-						resendLink.removeAttribute('aria-disabled');
-						resendLink.style.pointerEvents = '';
-						resendLink.style.opacity = '';
-						showAlert(<?php echo wp_json_encode( __( 'No se pudo reenviar el correo en este momento. Intenta nuevamente.', 'arriendo-facil' ) ); ?>, 'error');
+						resendBtn.disabled = false;
+						showAlert(<?php echo wp_json_encode( __( 'No se pudo reenviar el correo en este momento. Inténtalo nuevamente.', 'arriendo-facil' ) ); ?>, 'error');
 						return;
 					}
 
-					setTimeout(function(){
-						resendLink.removeAttribute('aria-disabled');
-						resendLink.style.pointerEvents = '';
-						resendLink.style.opacity = '';
-					}, 1200);
-
 					if(!json || !json.success){
-						const message = json && json.data && json.data.message ? json.data.message : <?php echo wp_json_encode( __( 'No se pudo procesar el reenvio.', 'arriendo-facil' ) ); ?>;
+						resendBtn.disabled = false;
+						const message = json && json.data && json.data.message ? json.data.message : <?php echo wp_json_encode( __( 'No se pudo procesar el reenvío.', 'arriendo-facil' ) ); ?>;
 						showAlert(message, 'error');
 						return;
 					}
 
-					showAlert((json.data && json.data.message) ? json.data.message : <?php echo wp_json_encode( __( 'Si tu cuenta esta pendiente, te enviaremos un nuevo correo.', 'arriendo-facil' ) ); ?>, 'success');
+					alertBox.hidden = false;
+					alertBox.dataset.type = 'success';
+					alertBox.textContent = (json.data && json.data.message) ? json.data.message : <?php echo wp_json_encode( __( 'Si tu cuenta está pendiente, te enviaremos un nuevo correo.', 'arriendo-facil' ) ); ?>;
+					if(app.classList.contains('is-done')){ doneBox.parentNode.insertBefore(alertBox, doneBox); }
+					startResendCooldown(60);
 				});
-			}
+			});
 		})();
 		</script>
 		<?php
@@ -408,7 +507,7 @@ class Arriendo_Facil_Property_Admin_Registration {
 	 */
 	public function ajax_register_property_admin() {
 		if ( false === check_ajax_referer( self::NONCE_ACTION, 'nonce', false ) ) {
-			wp_send_json_error( array( 'message' => __( 'La sesion expiro. Recarga la pagina e intenta nuevamente.', 'arriendo-facil' ) ), 403 );
+			wp_send_json_error( array( 'message' => __( 'La sesión expiró. Recarga la página e intenta nuevamente.', 'arriendo-facil' ) ), 403 );
 		}
 
 		$company_name     = isset( $_POST['company_name'] ) ? sanitize_text_field( wp_unslash( $_POST['company_name'] ) ) : '';
@@ -440,15 +539,15 @@ class Arriendo_Facil_Property_Admin_Registration {
 
 		if ( ! $this->validate_form_proof( $form_ts, $form_sig ) ) {
 			$this->log_signup_security_event( 'invalid_form_proof', $email );
-			wp_send_json_error( array( 'message' => __( 'No se pudo validar la solicitud. Recarga la pagina e intenta nuevamente.', 'arriendo-facil' ) ), 400 );
+			wp_send_json_error( array( 'message' => __( 'No se pudo validar la solicitud. Recarga la página e intenta nuevamente.', 'arriendo-facil' ) ), 400 );
 		}
 
 		if ( ! is_email( $email ) ) {
-			wp_send_json_error( array( 'message' => __( 'Correo electronico invalido.', 'arriendo-facil' ) ), 400 );
+			wp_send_json_error( array( 'message' => __( 'Correo electrónico inválido.', 'arriendo-facil' ) ), 400 );
 		}
 
 		if ( ! in_array( $id_type, array( 'cedula', 'ruc', 'pasaporte' ), true ) ) {
-			wp_send_json_error( array( 'message' => __( 'Tipo de identificacion invalido.', 'arriendo-facil' ) ), 400 );
+			wp_send_json_error( array( 'message' => __( 'Tipo de identificación inválido.', 'arriendo-facil' ) ), 400 );
 		}
 
 		if ( ! $this->signup_within_rate_limit( $email ) ) {
@@ -460,7 +559,7 @@ class Arriendo_Facil_Property_Admin_Registration {
 			}
 
 		if ( $password !== $password_confirm ) {
-			wp_send_json_error( array( 'message' => __( 'Las contrasenas no coinciden.', 'arriendo-facil' ) ), 400 );
+			wp_send_json_error( array( 'message' => __( 'Las contraseñas no coinciden.', 'arriendo-facil' ) ), 400 );
 		}
 
 		$password_policy_errors = $this->validate_password_policy( $password );
@@ -470,14 +569,14 @@ class Arriendo_Facil_Property_Admin_Registration {
 
 		if ( ! class_exists( 'Arriendo_Facil_Identity_Validator' )
 			|| ! Arriendo_Facil_Identity_Validator::validate_format( $id_type, $id_number ) ) {
-			wp_send_json_error( array( 'message' => __( 'El numero de identificacion no es valido para el tipo seleccionado.', 'arriendo-facil' ) ), 400 );
+			wp_send_json_error( array( 'message' => __( 'El número de identificación no es válido para el tipo seleccionado.', 'arriendo-facil' ) ), 400 );
 		}
 
 		if ( email_exists( $email ) ) {
 			wp_send_json_error(
 				array(
 					'code'    => 'email_exists',
-					'message' => __( 'Ese correo ya tiene una cuenta. Inicia sesion o recupera tu contrasena.', 'arriendo-facil' ),
+					'message' => __( 'Ese correo ya tiene una cuenta. Inicia sesión o recupera tu contraseña.', 'arriendo-facil' ),
 				),
 				409
 			);
@@ -487,7 +586,7 @@ class Arriendo_Facil_Property_Admin_Registration {
 		$encrypted_id    = $this->encrypt_sensitive_value( $id_number );
 		if ( '' === $encrypted_phone || '' === $encrypted_id ) {
 			$this->log_signup_security_event( 'encryption_failed', $email );
-			wp_send_json_error( array( 'message' => __( 'No se pudo proteger la informacion sensible. Intenta nuevamente.', 'arriendo-facil' ) ), 500 );
+			wp_send_json_error( array( 'message' => __( 'No se pudo proteger la información sensible. Intenta nuevamente.', 'arriendo-facil' ) ), 500 );
 		}
 
 		$id_fingerprint = $this->build_identity_fingerprint( $id_number );
@@ -496,7 +595,7 @@ class Arriendo_Facil_Property_Admin_Registration {
 			wp_send_json_error(
 				array(
 					'code'    => 'identity_exists',
-					'message' => __( 'La identificacion ya esta asociada a una cuenta. Si necesitas ayuda, contacta soporte.', 'arriendo-facil' ),
+					'message' => __( 'La identificación ya está asociada a una cuenta. Si necesitas ayuda, contacta soporte.', 'arriendo-facil' ),
 				),
 				409
 			);
@@ -519,7 +618,7 @@ class Arriendo_Facil_Property_Admin_Registration {
 		}
 
 		if ( username_exists( $user_login ) ) {
-			wp_send_json_error( array( 'message' => __( 'No se pudo generar un usuario valido. Intenta con otro correo.', 'arriendo-facil' ) ), 500 );
+			wp_send_json_error( array( 'message' => __( 'No se pudo generar un usuario válido. Intenta con otro correo.', 'arriendo-facil' ) ), 500 );
 		}
 
 		$user_id = wp_insert_user(
@@ -570,7 +669,7 @@ class Arriendo_Facil_Property_Admin_Registration {
 		if ( ! $this->send_admin_email_verification_email( $user_id, (string) $verification_token ) ) {
 			$this->log_signup_security_event( 'verification_email_failed', $email );
 			$this->delete_admin_user_safely( $user_id );
-			wp_send_json_error( array( 'message' => __( 'No se pudo enviar el correo de verificacion. Intenta nuevamente en unos minutos.', 'arriendo-facil' ) ), 500 );
+			wp_send_json_error( array( 'message' => __( 'No se pudo enviar el correo de verificación. Intenta nuevamente en unos minutos.', 'arriendo-facil' ) ), 500 );
 		}
 
 		$this->notify_team_new_signup( $user_id, $email );
@@ -583,7 +682,7 @@ class Arriendo_Facil_Property_Admin_Registration {
 				'login_url'             => wp_login_url( admin_url() ),
 				'should_redirect'       => false,
 				'requires_verification' => true,
-				'message'               => __( 'Te enviamos un correo para verificar tu cuenta. Debes confirmar ese enlace antes de iniciar sesion.', 'arriendo-facil' ),
+				'message'               => __( 'Te enviamos un correo para verificar tu cuenta. Debes confirmar ese enlace antes de iniciar sesión.', 'arriendo-facil' ),
 			)
 		);
 	}
@@ -595,32 +694,32 @@ class Arriendo_Facil_Property_Admin_Registration {
 	 */
 	public function ajax_resend_admin_verification_email() {
 		if ( false === check_ajax_referer( self::NONCE_ACTION, 'nonce', false ) ) {
-			wp_send_json_error( array( 'message' => __( 'La sesion expiro. Recarga la pagina e intenta nuevamente.', 'arriendo-facil' ) ), 403 );
+			wp_send_json_error( array( 'message' => __( 'La sesión expiró. Recarga la página e intenta nuevamente.', 'arriendo-facil' ) ), 403 );
 		}
 
 		$email = isset( $_POST['email'] ) ? AF_Text_Normalizer::email( wp_unslash( $_POST['email'] ) ) : '';
 		if ( ! is_email( $email ) ) {
-			wp_send_json_error( array( 'message' => __( 'Ingresa un correo valido para reenviar la verificacion.', 'arriendo-facil' ) ), 400 );
+			wp_send_json_error( array( 'message' => __( 'Ingresa un correo válido para reenviar la verificación.', 'arriendo-facil' ) ), 400 );
 		}
 
 		if ( ! $this->resend_verification_within_rate_limit( $email ) ) {
-			wp_send_json_error( array( 'message' => __( 'Espera unos minutos antes de volver a solicitar el reenvio.', 'arriendo-facil' ) ), 429 );
+			wp_send_json_error( array( 'message' => __( 'Espera unos minutos antes de volver a solicitar el reenvío.', 'arriendo-facil' ) ), 429 );
 		}
 
 		$user = get_user_by( 'email', $email );
 		if ( ! ( $user instanceof WP_User ) || ! in_array( 'af_property_admin', (array) $user->roles, true ) ) {
 			$this->log_signup_security_event( 'resend_verification_email_unknown_account', $email );
-			wp_send_json_success( array( 'message' => __( 'Si tu cuenta esta pendiente de verificacion, te enviaremos un nuevo correo.', 'arriendo-facil' ) ) );
+			wp_send_json_success( array( 'message' => __( 'Si tu cuenta está pendiente de verificación, te enviaremos un nuevo correo. Si ya la verificaste, puedes iniciar sesión.', 'arriendo-facil' ) ) );
 		}
 
 		if ( 1 === (int) get_user_meta( $user->ID, 'af_admin_email_verified', true ) ) {
-			wp_send_json_success( array( 'message' => __( 'Tu correo ya esta verificado. Puedes iniciar sesion.', 'arriendo-facil' ) ) );
+			wp_send_json_success( array( 'message' => __( 'Si tu cuenta está pendiente de verificación, te enviaremos un nuevo correo. Si ya la verificaste, puedes iniciar sesión.', 'arriendo-facil' ) ) );
 		}
 
 		$token = $this->create_admin_email_verification_token( (int) $user->ID );
 		if ( is_wp_error( $token ) ) {
 			$this->log_signup_security_event( 'resend_verification_token_generation_failed', $email );
-			wp_send_json_error( array( 'message' => __( 'No se pudo generar el correo de verificacion. Intenta nuevamente.', 'arriendo-facil' ) ), 500 );
+			wp_send_json_error( array( 'message' => __( 'No se pudo generar el correo de verificación. Intenta nuevamente.', 'arriendo-facil' ) ), 500 );
 		}
 
 		if ( ! $this->send_admin_email_verification_email( (int) $user->ID, (string) $token ) ) {
@@ -630,7 +729,7 @@ class Arriendo_Facil_Property_Admin_Registration {
 
 		$this->log_signup_security_event( 'resend_verification_email_success', $email );
 
-		wp_send_json_success( array( 'message' => __( 'Te enviamos un nuevo correo de verificacion. Revisa tu bandeja de entrada.', 'arriendo-facil' ) ) );
+		wp_send_json_success( array( 'message' => __( 'Te enviamos un nuevo correo de verificación. Revisa tu bandeja de entrada.', 'arriendo-facil' ) ) );
 	}
 
 	/**
@@ -669,28 +768,28 @@ class Arriendo_Facil_Property_Admin_Registration {
 		$token   = (string) $token;
 
 		if ( ! $user_id || '' === $token ) {
-			return new WP_Error( 'af_invalid_verification_request', __( 'Solicitud de verificacion invalida.', 'arriendo-facil' ) );
+			return new WP_Error( 'af_invalid_verification_request', __( 'Solicitud de verificación inválida.', 'arriendo-facil' ) );
 		}
 
 		$user = get_user_by( 'id', $user_id );
 		if ( ! $user || ! in_array( 'af_property_admin', (array) $user->roles, true ) ) {
-			return new WP_Error( 'af_verification_user_not_found', __( 'No se encontro el usuario a verificar.', 'arriendo-facil' ) );
+			return new WP_Error( 'af_verification_user_not_found', __( 'No se encontró el usuario a verificar.', 'arriendo-facil' ) );
 		}
 
 		$stored_hash  = (string) get_user_meta( $user_id, 'af_admin_email_verify_hash', true );
 		$expires_at   = (int) get_user_meta( $user_id, 'af_admin_email_verify_expires', true );
 
 		if ( '' === $stored_hash ) {
-			return new WP_Error( 'af_no_verification_request', __( 'No hay una verificacion pendiente para este usuario.', 'arriendo-facil' ) );
+			return new WP_Error( 'af_no_verification_request', __( 'No hay una verificación pendiente para este usuario.', 'arriendo-facil' ) );
 		}
 
 		if ( time() > $expires_at ) {
-			return new WP_Error( 'af_verification_token_expired', __( 'El enlace de verificacion vencio. Solicita un reenvio.', 'arriendo-facil' ) );
+			return new WP_Error( 'af_verification_token_expired', __( 'El enlace de verificación venció. Solicita un reenvío.', 'arriendo-facil' ) );
 		}
 
 		$expected_hash = hash_hmac( 'sha256', $token, wp_salt( 'auth' ) . 'af_admin_email_verify_v1' );
 		if ( ! hash_equals( (string) $stored_hash, (string) $expected_hash ) ) {
-			return new WP_Error( 'af_verification_token_mismatch', __( 'El enlace de verificacion no es valido.', 'arriendo-facil' ) );
+			return new WP_Error( 'af_verification_token_mismatch', __( 'El enlace de verificación no es válido.', 'arriendo-facil' ) );
 		}
 
 		update_user_meta( $user_id, 'af_admin_email_verified', 1 );
@@ -732,7 +831,7 @@ class Arriendo_Facil_Property_Admin_Registration {
 
 		return new WP_Error(
 			'af_admin_email_pending',
-			__( 'Tu correo aun no ha sido verificado. Revisa tu bandeja de entrada y usa el enlace enviado, o solicita un reenvio desde la pagina de registro.', 'arriendo-facil' )
+			__( 'Tu correo aún no ha sido verificado. Revisa tu bandeja de entrada y usa el enlace enviado, o solicita un reenvío desde la página de registro.', 'arriendo-facil' )
 		);
 	}
 
@@ -804,7 +903,7 @@ class Arriendo_Facil_Property_Admin_Registration {
 	private function create_admin_email_verification_token( $user_id ) {
 		$user_id = absint( $user_id );
 		if ( ! $user_id ) {
-			return new WP_Error( 'af_invalid_user', __( 'Usuario invalido para verificacion.', 'arriendo-facil' ) );
+			return new WP_Error( 'af_invalid_user', __( 'Usuario inválido para verificación.', 'arriendo-facil' ) );
 		}
 
 		try {
@@ -853,7 +952,7 @@ class Arriendo_Facil_Property_Admin_Registration {
 			wp_login_url( admin_url() )
 		);
 
-		$subject = __( '[Arriendo Facil] Verifica tu correo para activar tu cuenta', 'arriendo-facil' );
+		$subject = __( '[Arriendo Fácil] Verifica tu correo para activar tu cuenta', 'arriendo-facil' );
 
 		return Arriendo_Facil_Email::send(
 			$recipient,
@@ -902,7 +1001,7 @@ class Arriendo_Facil_Property_Admin_Registration {
 		}
 
 		$admin_url = admin_url( 'admin.php?page=af-property-admins' );
-		$subject   = __( '[Arriendo Facil] Nuevo registro: ' . sanitize_text_field( $email ), 'arriendo-facil' );
+		$subject   = __( '[Arriendo Fácil] Nuevo registro: ' . sanitize_text_field( $email ), 'arriendo-facil' );
 
 		foreach ( array_unique( array_filter( $admins ) ) as $admin_email ) {
 			Arriendo_Facil_Email::send(
@@ -935,7 +1034,7 @@ class Arriendo_Facil_Property_Admin_Registration {
 			return;
 		}
 
-		$subject = __( '[Arriendo Facil] Falta verificar tu correo para activar tu cuenta', 'arriendo-facil' );
+		$subject = __( '[Arriendo Fácil] Falta verificar tu correo para activar tu cuenta', 'arriendo-facil' );
 		Arriendo_Facil_Email::send(
 			sanitize_email( (string) $user->user_email ),
 			$subject,
@@ -970,7 +1069,7 @@ class Arriendo_Facil_Property_Admin_Registration {
 		}
 
 		$profile_url = admin_url( 'admin.php?page=af-admin-profile' );
-		$subject     = __( '[Arriendo Facil] Completa tu perfil de gestor', 'arriendo-facil' );
+		$subject     = __( '[Arriendo Fácil] Completa tu perfil de gestor', 'arriendo-facil' );
 
 		Arriendo_Facil_Email::send(
 			sanitize_email( (string) $user->user_email ),
@@ -1011,7 +1110,7 @@ class Arriendo_Facil_Property_Admin_Registration {
 			return;
 		}
 
-		$subject = __( '[Arriendo Facil] Documentos de gestores pendientes de revision', 'arriendo-facil' );
+		$subject = __( '[Arriendo Fácil] Documentos de gestores pendientes de revisión', 'arriendo-facil' );
 		foreach ( array_unique( array_filter( $admins ) ) as $admin_email ) {
 			Arriendo_Facil_Email::send(
 				sanitize_email( $admin_email ),
@@ -1210,7 +1309,7 @@ class Arriendo_Facil_Property_Admin_Registration {
 	 */
 	private function render_password_reveal_button() {
 		?>
-		<button type="button" class="af-admin-signup__reveal" data-af-reveal aria-pressed="false" aria-label="<?php echo esc_attr__( 'Mostrar contrasena', 'arriendo-facil' ); ?>" data-label-show="<?php echo esc_attr__( 'Mostrar contrasena', 'arriendo-facil' ); ?>" data-label-hide="<?php echo esc_attr__( 'Ocultar contrasena', 'arriendo-facil' ); ?>">
+		<button type="button" class="af-admin-signup__reveal" data-af-reveal aria-pressed="false" aria-label="<?php echo esc_attr__( 'Mostrar contraseña', 'arriendo-facil' ); ?>" data-label-show="<?php echo esc_attr__( 'Mostrar contraseña', 'arriendo-facil' ); ?>" data-label-hide="<?php echo esc_attr__( 'Ocultar contraseña', 'arriendo-facil' ); ?>">
 			<svg class="af-admin-signup__eye--off" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
 			<svg class="af-admin-signup__eye--on" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
 		</button>
@@ -1228,23 +1327,23 @@ class Arriendo_Facil_Property_Admin_Registration {
 		$errors   = array();
 
 		if ( strlen( $password ) < 10 ) {
-			$errors[] = __( 'La contrasena debe tener minimo 10 caracteres.', 'arriendo-facil' );
+			$errors[] = __( 'La contraseña debe tener mínimo 10 caracteres.', 'arriendo-facil' );
 		}
 
 		if ( ! preg_match( '/[A-Z]/', $password ) ) {
-			$errors[] = __( 'Incluye al menos una letra mayuscula.', 'arriendo-facil' );
+			$errors[] = __( 'Incluye al menos una letra mayúscula.', 'arriendo-facil' );
 		}
 
 		if ( ! preg_match( '/[a-z]/', $password ) ) {
-			$errors[] = __( 'Incluye al menos una letra minuscula.', 'arriendo-facil' );
+			$errors[] = __( 'Incluye al menos una letra minúscula.', 'arriendo-facil' );
 		}
 
 		if ( ! preg_match( '/[0-9]/', $password ) ) {
-			$errors[] = __( 'Incluye al menos un numero.', 'arriendo-facil' );
+			$errors[] = __( 'Incluye al menos un número.', 'arriendo-facil' );
 		}
 
 		if ( ! preg_match( '/[^A-Za-z0-9]/', $password ) ) {
-			$errors[] = __( 'Incluye al menos un simbolo especial (ej: !@#$%).', 'arriendo-facil' );
+			$errors[] = __( 'Incluye al menos un símbolo especial (ej: !@#$%).', 'arriendo-facil' );
 		}
 
 		return $errors;

@@ -114,7 +114,7 @@ class Arriendo_Facil_Consent {
 			<label class="af-consent__row">
 				<input type="checkbox" name="consent_read" value="1" required />
 				<span>
-					<?php esc_html_e( 'Lo leí.', 'arriendo-facil' ); ?>
+					<?php esc_html_e( 'Declaro que he leído y comprendido la información sobre esta aceptación.', 'arriendo-facil' ); ?>
 					<button type="button" class="af-consent__link" data-af-consent-open="<?php echo esc_attr( $id ); ?>"><?php esc_html_e( 'Ver por qué se solicita', 'arriendo-facil' ); ?></button>
 				</span>
 			</label>
@@ -151,7 +151,7 @@ class Arriendo_Facil_Consent {
 	}
 
 	public static function error_message() {
-		return __( 'Debes marcar "Lo leí" y "Estoy de acuerdo" para continuar.', 'arriendo-facil' );
+		return __( 'Debe marcar ambas declaraciones (haber leído la información y estar de acuerdo) para continuar.', 'arriendo-facil' );
 	}
 
 	/** Guarda la constancia vinculada al usuario gestor. */

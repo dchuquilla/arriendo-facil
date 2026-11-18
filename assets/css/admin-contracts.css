@@ -4,141 +4,88 @@
  */
 
 /* ──────────────────────────────────────────────────────────────────────────
-   CONTRACTS TABLE IMPROVEMENTS
+   Tabla de contratos. La apariencia base (cabecera, reglas, filas en el
+   teléfono) la pone af-app.css; aquí solo lo propio de esta tabla.
    ────────────────────────────────────────────────────────────────────────── */
 
-.af-leases-table {
-  border-collapse: separate !important;
-  border-spacing: 0 !important;
-  background: #fff !important;
-}
-
-.af-leases-table thead tr {
-  background: linear-gradient(to right, #f7f8f6, #eef2f0) !important;
-  border-bottom: 2px solid #dce5e3 !important;
-}
-
 .af-leases-table thead th {
-  padding: 12px 14px !important;
-  font-weight: 600 !important;
-  font-size: 13px !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.3px !important;
-  color: #2e4046 !important;
-  white-space: nowrap !important;
-}
-
-.af-leases-table tbody tr {
-  border-bottom: 1px solid #eef2f0 !important;
-  transition: background-color 150ms ease !important;
-}
-
-.af-leases-table tbody tr:hover {
-  background-color: #f7f8f6 !important;
-}
-
-.af-leases-table td {
-  padding: 12px 14px !important;
-  font-size: 13px !important;
-  vertical-align: middle !important;
+  white-space: nowrap;
 }
 
 .af-leases-table td strong {
-  display: block !important;
-  font-weight: 600 !important;
-  color: #111 !important;
-  margin-bottom: 2px !important;
+  font-weight: 600;
+  color: var(--af-text, #142A30);
 }
 
 .af-leases-table td small {
-  display: block !important;
-  font-size: 11px !important;
-  color: #647579 !important;
-  margin-top: 2px !important;
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--af-text-muted, #4F6267);
 }
 
-/* Status pills */
-.af-pill {
-  display: inline-block !important;
-  padding: 4px 10px !important;
-  border-radius: 12px !important;
-  font-size: 12px !important;
-  font-weight: 500 !important;
-  white-space: nowrap !important;
+/* Menú de acciones por fila */
+.af-lease-actions-cell {
+  position: relative;
+  overflow: visible;
+  white-space: nowrap;
+  min-width: 116px;
 }
 
-.af-pill--success {
-  background-color: #eaf4f2 !important;
-  color: #1f5a52 !important;
-}
-
-.af-pill--attention {
-  background-color: #fbeceb !important;
-  color: #b03a36 !important;
-}
-
-.af-pill--pending {
-  background-color: #f5e9da !important;
-  color: #a16207 !important;
-}
-
-/* Actions cell improvements */
 .af-lease-actions-menu {
-  list-style: none;
+  position: relative;
   margin: 0;
   padding: 0;
-  position: relative;
+  list-style: none;
 }
 
 .af-lease-actions-menu summary {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px !important;
-  border: 1px solid #c3d1ce !important;
-  border-radius: 4px !important;
-  background: #fff !important;
-  color: #2e4046 !important;
-  font-size: 13px !important;
-  font-weight: 500 !important;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--af-control, #C9D5D2);
+  border-radius: var(--af-radius-sm, 6px);
+  background: var(--af-surface, #fff);
+  color: var(--af-text, #142A30);
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
   user-select: none;
-  transition: all 150ms ease;
+  list-style: none;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.af-lease-actions-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.af-lease-actions-menu summary:hover,
+.af-lease-actions-menu[open] summary,
+.af-lease-actions-menu.is-open summary {
+  background: var(--af-raised, #EEF3F2);
+}
+
+.af-lease-actions-menu summary:focus-visible {
   outline: none;
-}
-
-.af-lease-actions-menu summary:hover {
-  background: #eef2f0 !important;
-  border-color: #8a9799 !important;
-}
-
-.af-lease-actions-menu summary:focus {
-  outline: 2px solid #3882f6;
-  outline-offset: 2px;
-}
-
-.af-lease-actions-menu[open] summary {
-  background: #f7f8f6 !important;
-  border-color: #647579 !important;
-  color: #111 !important;
+  box-shadow: var(--af-focus-ring, 0 0 0 2px #fff, 0 0 0 4px #164A55);
 }
 
 .af-lease-actions-dropdown {
   position: fixed;
-  background: #fff !important;
-  border: 1px solid #dce5e3 !important;
-  border-radius: 6px !important;
-  padding: 8px !important;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15) !important;
-  width: 240px !important;
-  max-width: calc(100vw - 24px) !important;
-  z-index: var(--af-z-dropdown, 100100);
-  /* Visibility is toggled by [hidden] from the menu controller, never with
-     inline styles: the old `display: none !important` here beat the JS's
-     inline `display: grid` and made every action button disappear. */
+  z-index: var(--af-z-drawer, 100060);
+  /* Visibility is toggled by [hidden]/.is-open from the menu controller, never with inline styles. */
   display: none;
   grid-auto-flow: row;
-  gap: 4px;
+  gap: 2px;
+  width: 248px;
+  max-width: calc(100vw - 24px);
+  padding: 6px;
+  border: 1px solid var(--af-border, #E1E9E7);
+  border-radius: var(--af-radius-md, 8px);
+  background: var(--af-surface, #fff);
+  box-shadow: var(--af-shadow-float, 0 12px 32px rgba(20, 42, 48, 0.14));
 }
 
 .af-lease-actions-menu.is-open > .af-lease-actions-dropdown,
@@ -146,229 +93,110 @@ details.af-lease-actions-menu[open] > .af-lease-actions-dropdown {
   display: grid;
 }
 
+body.af-custom-shell .af-lease-actions-dropdown button,
 .af-lease-actions-dropdown button {
-  display: block !important;
-  width: 100% !important;
-  text-align: left !important;
-  margin: 0 !important;
-  padding: 10px 12px !important;
-  font-size: 13px !important;
-  font-weight: 500 !important;
-  border: 1px solid transparent !important;
-  border-radius: 4px !important;
-  background: #fff !important;
-  color: #2e4046 !important;
-  cursor: pointer !important;
-  transition: all 150ms ease !important;
-  white-space: normal !important;
-  line-height: 1.4;
+  display: flex;
+  justify-content: flex-start;
+  width: 100%;
+  min-height: 38px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--af-radius-sm, 6px);
+  background: transparent;
+  color: var(--af-text, #142A30);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: left;
+  white-space: normal;
+  cursor: pointer;
 }
 
+body.af-custom-shell .af-lease-actions-dropdown button:hover,
 .af-lease-actions-dropdown button:hover {
-  background-color: #eef2f0 !important;
-  border-color: #dce5e3 !important;
-  color: #111 !important;
-}
-
-.af-lease-actions-dropdown button:active {
-  background-color: #dce5e3 !important;
+  background: var(--af-raised, #EEF3F2);
+  color: var(--af-text, #142A30);
 }
 
 .af-lease-actions-dropdown button:disabled {
-  opacity: 0.6;
+  color: var(--af-text-faint, #5E7074);
   cursor: not-allowed;
 }
 
+body.af-custom-shell .af-lease-actions-dropdown button.button-primary,
 .af-lease-actions-dropdown button.button-primary {
-  background-color: #3882f6 !important;
-  color: #fff !important;
-  border-color: #3882f6 !important;
+  background: var(--af-accent, #164A55);
+  color: #fff;
 }
 
+body.af-custom-shell .af-lease-actions-dropdown button.button-primary:hover,
 .af-lease-actions-dropdown button.button-primary:hover {
-  background-color: #3882f6 !important;
-  border-color: #3882f6 !important;
+  background: var(--af-accent-hover, #0F3D47);
+  color: #fff;
 }
 
-.af-lease-actions-dropdown button.button-secondary {
-  background-color: #fff !important;
-  color: #2e4046 !important;
-  border-color: #c3d1ce !important;
+body.af-custom-shell .af-lease-actions-dropdown button.af-btn--danger,
+.af-lease-actions-dropdown button.af-btn--danger {
+  background: transparent;
+  color: var(--af-pill-negative-ink, #8E2B27);
 }
 
-.af-lease-actions-dropdown button.button-secondary:hover {
-  background-color: #eef2f0 !important;
-  border-color: #8a9799 !important;
+body.af-custom-shell .af-lease-actions-dropdown button.af-btn--danger:hover,
+.af-lease-actions-dropdown button.af-btn--danger:hover {
+  background: var(--af-pill-negative-bg, #FBECEB);
+  color: var(--af-pill-negative-ink, #8E2B27);
 }
 
-/* Actions cell positioning */
-.af-lease-actions-cell {
-  position: relative;
-  overflow: visible !important;
-  white-space: nowrap;
-  vertical-align: top;
-  /* Last column: never clipped and always reachable on narrow screens. */
-  min-width: 116px;
-}
-
-.af-lease-actions-menu {
-  position: relative;
-}
-
-/* Table scroll container */
+/* Contenedor con scroll horizontal */
 .af-table-scroll {
+  position: relative;
   overflow-x: auto;
   overflow-y: visible;
-  border: 1px solid #dce5e3;
-  border-radius: 6px;
-  background: #fff;
   -webkit-overflow-scrolling: touch;
-  position: relative;
 }
 
 .af-table-scroll table {
   width: 100%;
-  border-collapse: collapse;
 }
 
-/* Ensure dropdown is visible on scroll */
 .af-table-scroll .af-lease-actions-cell {
-  overflow: visible !important;
+  overflow: visible;
 }
 
-/* Button styles in dropdown - danger button */
-.af-lease-actions-dropdown button.af-btn--danger {
-  background-color: #d9534f !important;
-  color: #fff !important;
-  border-color: #b03a36 !important;
-}
-
-.af-lease-actions-dropdown button.af-btn--danger:hover {
-  background-color: #b03a36 !important;
-  border-color: #8a2f2b !important;
-}
-/* ── Responsive column strategy ───────────────────────────────────────────
-   Column order: 1 ID · 2 Inmueble · 3 Unidad · 4 Inquilino · 5 Inicio ·
-   6 Fin · 7 Canon mensual · 8 Día de pago · 9 Saldo · 10 Estado ·
-   11 Factura · 12 Documento · 13 Acciones.
-
-   Never drop Estado (10), Saldo (9) or Acciones (13): they are the columns
-   the operator needs to act on. The previous `nth-child(n+8)` rule hid
-   columns 8-13 below 1200px, which removed the action menu entirely.
+/* ── Columnas por ancho ────────────────────────────────────────────────────
+   Orden: 1 ID · 2 Inmueble · 3 Unidad · 4 Inquilino · 5 Inicio · 6 Fin ·
+   7 Canon mensual · 8 Día de pago · 9 Saldo · 10 Estado · 11 Factura ·
+   12 Documento · 13 Acciones. Estado, Saldo y Acciones nunca se ocultan.
+   En el teléfono (≤ 782px) la tabla pasa a filas de dos líneas (af-app.css)
+   y todas las columnas vuelven como pares etiqueta-valor.
    ────────────────────────────────────────────────────────────────────────── */
-@media (max-width: 1280px) {
+@media (min-width: 783px) and (max-width: 1280px) {
   .af-leases-table th:nth-child(1),
   .af-leases-table td:nth-child(1),
   .af-leases-table th:nth-child(3),
   .af-leases-table td:nth-child(3),
   .af-leases-table th:nth-child(8),
   .af-leases-table td:nth-child(8) {
-    display: none !important;
+    display: none;
   }
 }
 
-@media (max-width: 1080px) {
+@media (min-width: 783px) and (max-width: 1080px) {
   .af-leases-table th:nth-child(5),
   .af-leases-table td:nth-child(5),
   .af-leases-table th:nth-child(6),
   .af-leases-table td:nth-child(6),
   .af-leases-table th:nth-child(12),
   .af-leases-table td:nth-child(12) {
-    display: none !important;
+    display: none;
   }
 }
 
-@media (max-width: 940px) {
+@media (min-width: 783px) and (max-width: 940px) {
   .af-leases-table th:nth-child(11),
   .af-leases-table td:nth-child(11) {
-    display: none !important;
-  }
-}
-
-@media (max-width: 768px) {
-  /* Stacked cards: every value comes back, labeled — actions included. */
-  .af-leases-table {
-    border: 1px solid #dce5e3 !important;
-  }
-
-  .af-leases-table thead {
-    display: none !important;
-  }
-
-  .af-leases-table tbody,
-  .af-leases-table tr,
-  .af-leases-table td {
-    display: block !important;
-    width: 100% !important;
-  }
-
-  .af-leases-table td:nth-child(1),
-  .af-leases-table td:nth-child(3),
-  .af-leases-table td:nth-child(5),
-  .af-leases-table td:nth-child(6),
-  .af-leases-table td:nth-child(8),
-  .af-leases-table td:nth-child(9),
-  .af-leases-table td:nth-child(11),
-  .af-leases-table td:nth-child(12) {
-    display: block !important;
-  }
-
-  .af-leases-table tr {
-    margin-bottom: 16px !important;
-    border: 1px solid #dce5e3 !important;
-    border-radius: 6px !important;
-    padding: 12px !important;
-    background: #fff !important;
-  }
-
-  .af-leases-table td {
-    text-align: left !important;
-    padding-left: 44% !important;
-    position: relative !important;
-    border: none !important;
-    min-height: 30px;
-  }
-
-  .af-leases-table td::before {
-    content: attr(data-label) !important;
-    position: absolute !important;
-    left: 0 !important;
-    top: 12px !important;
-    width: 42% !important;
-    font-weight: 600 !important;
-    text-transform: uppercase !important;
-    font-size: 11px !important;
-    color: #647579 !important;
-    padding-right: 8px !important;
-    box-sizing: border-box !important;
-    white-space: normal !important;
-  }
-
-  /* Actions row spans the card and keeps the trigger finger-friendly. */
-  .af-leases-table .af-lease-actions-cell {
-    padding-left: 0 !important;
-    padding-top: 10px !important;
-    margin-top: 8px;
-    border-top: 1px dashed #dce5e3 !important;
-    white-space: normal !important;
-  }
-
-  .af-leases-table .af-lease-actions-cell::before {
-    position: static !important;
-    display: block !important;
-    width: auto !important;
-    margin-bottom: 8px;
-    padding-right: 0 !important;
-  }
-
-  .af-leases-table .af-lease-actions-menu,
-  .af-leases-table .af-lease-actions-menu > summary {
-    display: flex !important;
-    width: 100% !important;
-    justify-content: space-between !important;
-    box-sizing: border-box !important;
-    font-size: 14px !important;
-    padding: 10px 14px !important;
+    display: none;
   }
 }
 

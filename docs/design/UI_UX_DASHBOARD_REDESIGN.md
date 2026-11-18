@@ -8,6 +8,83 @@
 
 ---
 
+## 0. Estado actual — App shell y sistema "Escalera petróleo" (nov. 2026)
+
+> Esta sección **reemplaza** la paleta (§3.1), los radios/sombras (§3.3) y la navegación (§5) descritos más abajo, que quedan como historia del plan original.
+
+### 0.1 Idea
+
+Un solo tono de marca, **petróleo `#164A55`**, a plena fuerza solo en marcas pequeñas (acción primaria, icono activo, dato principal). Sus tintes pálidos (`#EEF5F3`, `#DDEEEB`) hacen el trabajo de área: fila activa del menú, plan, pistas de progreso, la cifra principal del Panel. Superficies planas (borde de 1px o un paso de tono), sin degradados, sin sombras en reposo, sin etiquetas en mayúsculas espaciadas, sin emoji. Ámbar (`#D89B5B`) solo para avisos y la corona del plan.
+
+### 0.2 Archivos
+
+| Archivo | Rol |
+|---|---|
+| `assets/css/af-tokens.css` | Tokens del sistema. Los nombres antiguos (`--af-primary-500`, `--af-gray-200`, `--af-radius-md`…) siguen como alias. `--af-control` es el **color** del borde de controles; la altura es `--af-control-h`. |
+| `assets/css/af-app-shell.css` | Shell: barra lateral clara (230px, riel de 72px), barra superior, barra inferior del teléfono, hojas. |
+| `assets/js/af-app-shell.js` | Comportamiento del shell (riel, menú de cuenta, hojas con arrastre, píldora de la barra inferior, título acoplado, `?af_quick=`). |
+| `assets/css/af-app.css` | Capa de sistema: se carga **la última** (`enqueue_app_layer`, prioridad 100) y redefine los componentes compartidos dentro de `#wpbody-content` (cabecera, botones, paneles, KPIs, píldoras, tablas, formularios, pestañas, avisos, vacíos, modales, asistente). |
+| `assets/js/af-gsap.js` | Motor de movimiento GSAP (ver §0.5). API pública: `window.afMotion.reveal(nodes)`, `window.afMotion.pop(node)`. |
+
+Retirados: `af-admin-shell-nav.css/js`, `af-taste.css`, `af-motion.css/js`.
+
+### 0.3 Navegación
+
+- **Escritorio (≥ 1101px):** marco en T. Barra lateral y barra superior sobre el mismo fondo, separadas por reglas de 1px. Grupos: Panel · Propiedades · Contratos e inquilinos · Cobranza y facturación · Configuración (+ WordPress para `manage_options`).
+- **Tableta (783–1100px):** la barra lateral arranca como riel de iconos; las tablas anchas se desplazan dentro de su marco.
+- **Teléfono (≤ 782px):** barra superior de 56px (marca, título acoplado, alertas, cuenta) y **barra inferior**: `Inicio · Inmuebles · [+] · Contratos · Menú`.
+  - Una subpantalla mantiene encendida la pestaña de su grupo (Calendario → Inicio; Catálogo, Mantenimiento, Calificaciones → Inmuebles; Inquilinos → Contratos). Cobranza y Configuración encienden **Menú**.
+  - Si una pestaña no está disponible (capacidad o verificación pendiente) se usa la siguiente de `get_tabbar_items()`.
+  - **Menú** abre una hoja con todas las secciones agrupadas, el plan y la cuenta.
+  - El asistente de inmueble oculta la barra inferior (tarea enfocada).
+  - El título de la pantalla aparece en la barra superior cuando el `h1` se desplaza bajo ella.
+
+### 0.4 Botón central "+" (acciones rápidas)
+
+`Arriendo_Facil_Admin::get_quick_actions()` arma la hoja con las tareas del gestor, filtradas por las mismas capacidades/compuertas del menú (las bloqueadas por plan muestran la corona y abren el aviso de mejora):
+
+| Acción | Destino |
+|---|---|
+| Nuevo inmueble | `admin.php?page=af-accommodation-form` |
+| Nuevo contrato | `af-leases&af_quick=new-lease` → abre `#af-new-lease` |
+| Nuevo inquilino | `af-guests&af_quick=new-guest` → abre `#af-new-guest` |
+| Registrar un cobro | `af-buildings` |
+| Reportar mantenimiento | `af-maintenance&af_quick=new-request` → abre `#af-maint-new-request` |
+
+Para añadir una: agrega el candidato en `get_quick_actions()` y, si debe abrir un formulario, su par `{ button, target }` en `QUICK` de `af-app-shell.js`.
+
+### 0.5 Movimiento (GSAP 3, auto-alojado)
+
+- Entrada escalonada por pantalla (título → bloques → filas), lo de abajo al llegar con el scroll (`IntersectionObserver` nativo; ScrollTrigger ya no se carga); el Panel usa su propia coreografía (`af-panel.js`).
+- Cifras que cuentan (enteros, % y dinero), barras que se llenan, modales que suben como hoja en el teléfono.
+- Respuesta al toque en botones y tarjetas; transición entre pantallas con barra de progreso que **nunca retrasa** la navegación (el clic navega de inmediato).
+- Shell: hojas con resorte y arrastre para cerrar, píldora que viaja entre pestañas, "+" que rota a "×".
+- Con `prefers-reduced-motion` o sin GSAP no se oculta ni se mueve nada.
+
+### 0.6 Rendimiento
+
+Medido en local (usuario gestor, pantalla Contratos), antes → después:
+
+| Métrica | Antes | Después |
+|---|---|---|
+| Peso descargado por pantalla | 4,75 MB / 82 peticiones | 1,12 MB / 40 peticiones |
+| Consultas SQL por pantalla | ~190–220 | ~85–95 |
+| Tiempo de servidor | 130–190 ms | 70–120 ms |
+
+- `Arriendo_Facil_Admin::trim_unused_shell_assets()` quita en las pantallas del shell la paleta de comandos de WP (React + editor de bloques, ~2,7 MB), la detección de emoji y los assets globales de ACF (solo en `admin.php`).
+- Logo del shell: `assets/images/arriendo-facil-mark-64.png` (5 KB) en vez del PNG de 353 px (163 KB).
+- Imágenes de listas con `loading="lazy"`; revelado bajo el pliegue con `IntersectionObserver`.
+- Auto-reparaciones que corren en cada petición, ahora en una consulta: `sync_existing_owner_users_to_role()` (antes 2 consultas por propietario), `restore_protected_admin_accounts()` (usuarios y meta en un lote) y `ensure_guest_extra_columns()` (un `SHOW COLUMNS` y una vez por petición).
+- Pendiente fuera de este repositorio: el tema hijo ejecuta `af_ensure_*_page()` en cada `init` (~29 consultas); conviene guardarlo tras una opción con versión.
+
+### 0.7 Reglas para pantallas nuevas
+
+- Envolver la vista en `<div class="wrap af-shell">` y usar `af_page_header()` (imprime `wp-header-end`, así los avisos de WordPress quedan debajo de la cabecera).
+- Tablas: `wp-list-table widefat af-data-table` con `data-label` en cada `<td>`; en el teléfono pasan a filas de dos líneas (la primera celda es la identidad).
+- Estados: `af_pill()`. Iconos: `af_lucide()` (sin emoji).
+
+---
+
 ## 1. Análisis del backend (contexto)
 
 ### 1.1 Arquitectura del panel

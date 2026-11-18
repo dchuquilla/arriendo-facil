@@ -1,21 +1,26 @@
 /**
- * Arriendo Fácil — GSAP motion engine for the admin.
+ * Arriendo Fácil — Motor de movimiento (GSAP).
  *
- * One place owns every animation so screens stay consistent and calm:
- *  - staggered entrance of headers, KPIs, cards and tiles (scroll-revealed below the fold)
- *  - count-up for plain numeric KPIs
- *  - modal open and tab panel switch
- *  - soft page transition (+ progress bar) between admin screens
- *  - window.afMotion.reveal(nodes) for content rendered later by JS
+ * Un solo lugar decide cómo se mueve el panel, para que todas las pantallas
+ * se sientan iguales: rápidas, suaves y sin esconder nada.
  *
- * If GSAP is missing or the user prefers reduced motion nothing is hidden or
- * moved, so the CSS fallback in af-motion.css keeps working.
+ *  - Entrada escalonada de cada pantalla: título, luego bloques, luego filas.
+ *    Lo que está bajo el pliegue aparece al llegar con el scroll (IntersectionObserver).
+ *  - Cifras que cuentan hasta su valor (enteros, porcentajes y dinero).
+ *  - Barras de progreso que se llenan hasta su porcentaje.
+ *  - Modales: en el teléfono suben como hoja; en escritorio aparecen con escala.
+ *  - Respuesta al toque en botones, tarjetas y filas.
+ *  - Transición entre pantallas con barra de progreso.
+ *  - window.afMotion.reveal(nodes) / .pop(node) para contenido que llega luego.
+ *
+ * Sin GSAP o con prefers-reduced-motion no se oculta ni se mueve nada.
  */
 (function () {
 	'use strict';
 
 	var g = window.gsap;
 	var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+	var phone = window.matchMedia('(max-width: 782px)');
 
 	window.afMotion = {
 		reveal: function () {},
@@ -27,11 +32,7 @@
 		return;
 	}
 
-	if (window.ScrollTrigger) {
-		g.registerPlugin(window.ScrollTrigger);
-	}
-
-	g.defaults({ ease: 'power3.out', duration: 0.5 });
+	g.defaults({ ease: 'power3.out', duration: 0.45 });
 	document.documentElement.classList.add('af-gsap');
 	window.afMotion.enabled = true;
 
@@ -47,33 +48,50 @@
 
 	function inViewport(el) {
 		var r = el.getBoundingClientRect();
-		return r.top < window.innerHeight * 0.96 && r.bottom > 0;
+		return r.top < window.innerHeight * 0.95 && r.bottom > 0;
 	}
 
-	/* ── Entrance ─────────────────────────────────────────────────────── */
+	function outsideOverlays(el) {
+		return !el.closest('.af-modal, .af-sheet, .af-alerts-panel, .af-user-menu__panel');
+	}
 
-	var CARD = '.af-kpi, .af-property-card, .af-catalog-card, .af-maint-card, .af-prov-card, .af-sp-tile, .af-exit-card, .af-review-list__item, .af-cobranza-alert, .af-wiz-card, .af-choice-card, .af-pc, .af-pnew, .af-plan-card, .af-plan-summary, .af-plan-current, .af-plan-meter';
-	var BLOCK = '.af-page-header, .af-section, .af-split > *, .af-info-strip, .af-status-tabs, .af-tabs__nav, .af-empty, .af-semaforo, .af-flow, .af-steps, .af-ptoolbar, .af-pempty-state, .af-plan-select';
+	/* ── Entrada de la pantalla ─────────────────────────────────────── */
 
-	function collectEntrance(root) {
+	var HEAD = '.af-page-header, .wrap > h1, .wrap > .wp-heading-inline, .af-dash-head, .af-greeting';
+	var CARD = [
+		'.af-kpi', '.af-property-card', '.af-catalog-card', '.af-maint-card', '.af-prov-card',
+		'.af-sp-tile', '.af-exit-card', '.af-review-list__item', '.af-cobranza-alert', '.af-wiz-card',
+		'.af-choice-card', '.af-pc', '.af-pnew', '.af-plan-card', '.af-plan-summary', '.af-plan-current',
+		'.af-plan-meter', '.af-rv-card', '.af-integration-card', '.af-sri-status-card', '.af-pcard'
+	].join(', ');
+	var BLOCK = [
+		'.af-section', '.af-split > *', '.af-info-strip', '.af-info-banner', '.af-status-tabs', '.af-tabs__nav',
+		'.af-empty', '.af-semaforo', '.af-flow', '.af-steps', '.af-ptoolbar', '.af-pempty-state',
+		'.af-plan-select', '.af-kpi-grid', '.wrap > .card', '.wrap > form', '.wrap > .notice',
+		'.af-dash-grid > *'
+	].join(', ');
+	var ROWS = '.af-data-table tbody tr, .wp-list-table tbody tr';
+
+	function collect(root) {
 		var list = [];
+		var push = function (el) {
+			if (outsideOverlays(el) && isShown(el)) { list.push(el); }
+		};
+
+		$$(HEAD, root).forEach(push);
 
 		$$(BLOCK, root).forEach(function (block) {
-			if (block.closest('.af-modal') || !isShown(block)) { return; }
+			// Un bloque que contiene tarjetas se queda quieto: se animan sus tarjetas.
 			if (block.querySelector(CARD)) {
-				var head = block.querySelector(':scope > .af-section__header, :scope > header');
-				if (head) { list.push(head); }
+				var head = block.querySelector(':scope > .af-section__header, :scope > header, :scope > h2, :scope > h3');
+				if (head) { push(head); }
 				return;
 			}
-			list.push(block);
+			push(block);
 		});
 
-		$$(CARD, root).forEach(function (card) {
-			if (card.closest('.af-modal') || !isShown(card)) { return; }
-			list.push(card);
-		});
+		$$(CARD, root).forEach(push);
 
-		// Drop nodes that live inside another animated node and dedupe, keeping DOM order.
 		var unique = list.filter(function (el, i) {
 			return list.indexOf(el) === i && !list.some(function (other) { return other !== el && other.contains(el); });
 		});
@@ -85,16 +103,18 @@
 		return unique;
 	}
 
-	function revealList(list, opts) {
+	function reveal(list, opts) {
 		if (!list.length) { return; }
 		opts = opts || {};
+		var each = opts.each || 0.04;
 		g.fromTo(list,
-			{ opacity: 0, y: opts.y === undefined ? 18 : opts.y },
+			{ opacity: 0, y: opts.y === undefined ? 12 : opts.y },
 			{
 				opacity: 1,
 				y: 0,
-				duration: opts.duration || 0.55,
-				stagger: { each: opts.each || 0.05, amount: Math.min(opts.amount || 0.6, list.length * (opts.each || 0.05)) },
+				duration: opts.duration || 0.38,
+				ease: 'power3.out',
+				stagger: { each: each, amount: Math.min(opts.amount || 0.3, list.length * each) },
 				delay: opts.delay || 0,
 				clearProps: CLEAR,
 				overwrite: 'auto'
@@ -102,129 +122,210 @@
 		);
 	}
 
+	function revealRows(root, delay) {
+		$$('.af-data-table tbody, .wp-list-table tbody', root).forEach(function (tbody) {
+			if (!outsideOverlays(tbody) || !isShown(tbody) || !inViewport(tbody)) { return; }
+			var rows = $$(':scope > tr', tbody).filter(isShown).slice(0, 12);
+			if (rows.length) {
+				g.fromTo(rows, { opacity: 0, y: 6 }, { opacity: 1, y: 0, duration: 0.3, stagger: 0.025, delay: delay || 0.1, clearProps: CLEAR });
+			}
+		});
+	}
+
 	function runEntrance() {
-		var all = collectEntrance(document);
+		// Pantallas con coreografía propia (el Panel usa af-panel.js).
+		if (document.querySelector('.wrap.af-panel')) { return; }
+
+		var host = document.getElementById('wpbody-content') || document.body;
+		var all = collect(host);
 		var visible = all.filter(inViewport);
 		var below = all.filter(function (el) { return visible.indexOf(el) === -1; });
 
-		revealList(visible, { delay: 0.05 });
+		reveal(visible);
+		revealRows(host, 0.1);
 
-		if (!below.length) { return; }
+		if (!below.length || !('IntersectionObserver' in window)) { return; }
 
-		if (!window.ScrollTrigger) {
-			return;
-		}
-
-		g.set(below, { opacity: 0, y: 18 });
-		window.ScrollTrigger.batch(below, {
-			start: 'top 94%',
-			once: true,
-			onEnter: function (batch) {
-				g.to(batch, { opacity: 1, y: 0, duration: 0.55, stagger: 0.06, clearProps: CLEAR, overwrite: 'auto' });
-			}
-		});
-
-		// Safety net: never leave content hidden if scrolling never triggers (e.g. print, zoom).
-		window.setTimeout(function () {
-			below.forEach(function (el) {
-				if (parseFloat(g.getProperty(el, 'opacity')) === 0 && inViewport(el)) {
-					g.to(el, { opacity: 1, y: 0, duration: 0.4, clearProps: CLEAR });
-				}
+		// Lo que está bajo el pliegue se anima al entrar en pantalla (observador nativo:
+		// sin cálculos en cada scroll). Los que entran juntos se escalonan.
+		g.set(below, { opacity: 0, y: 14 });
+		var pending = [];
+		var flush = function () {
+			g.to(pending, { opacity: 1, y: 0, duration: 0.38, stagger: 0.05, clearProps: CLEAR, overwrite: 'auto' });
+			pending = [];
+		};
+		var io = new IntersectionObserver(function (entries) {
+			entries.forEach(function (entry) {
+				if (!entry.isIntersecting) { return; }
+				io.unobserve(entry.target);
+				if (!pending.length) { window.requestAnimationFrame(flush); }
+				pending.push(entry.target);
 			});
-		}, 2500);
-
-		window.addEventListener('load', function () {
-			window.ScrollTrigger.refresh();
-		});
+		}, { rootMargin: '0px 0px -6% 0px' });
+		below.forEach(function (el) { io.observe(el); });
 	}
 
-	/* ── Counters (plain integers and percentages only) ───────────────── */
+	/* ── Cifras que cuentan ─────────────────────────────────────────── */
+
+	// "$1,234.56", "1.234,56 $", "85%", "12": se cuenta solo si el texto es una cifra limpia.
+	var FIGURE = /^([^\d\-]{0,3})(\d{1,3}(?:[.,]\d{3})*|\d+)([.,]\d{1,2})?(\s?%|\s?\$)?$/;
 
 	function runCounters() {
-		$$('.af-kpi__value, [data-af-count]').forEach(function (el) {
-			if (el.children.length || el.closest('.af-modal')) { return; }
+		$$('.af-kpi__value, [data-af-count], .af-hero-value, .af-dash-kpi__value').forEach(function (el) {
+			if (el.children.length || !outsideOverlays(el) || el.dataset.afCounted) { return; }
 			var text = el.textContent.trim();
-			var match = /^(\d{1,7})(%?)$/.exec(text);
-			if (!match) { return; }
-			var target = parseInt(match[1], 10);
-			if (target < 2) { return; }
-			var obj = { v: 0 };
-			el.textContent = '0' + match[2];
-			g.to(obj, {
-				v: target,
-				duration: 1,
-				delay: 0.2,
-				ease: 'power2.out',
-				onUpdate: function () { el.textContent = Math.round(obj.v) + match[2]; },
-				onComplete: function () { el.textContent = text; }
-			});
+			var m = FIGURE.exec(text);
+			if (!m) { return; }
+
+			var prefix = m[1] || '';
+			var intPart = m[2];
+			var decPart = m[3] || '';
+			var suffix = m[4] || '';
+			var thousands = /[.,]/.test(intPart) ? intPart.replace(/\d/g, '').charAt(0) : (decPart.charAt(0) === ',' ? '.' : ',');
+			var decimalSep = decPart ? decPart.charAt(0) : '';
+			var decimals = decPart ? decPart.length - 1 : 0;
+			var target = parseFloat(intPart.replace(/[.,]/g, '') + (decPart ? '.' + decPart.slice(1) : ''));
+			if (!isFinite(target) || target < 2) { return; }
+
+			var format = function (v) {
+				var fixed = v.toFixed(decimals).split('.');
+				var whole = fixed[0].replace(/\B(?=(\d{3})+(?!\d))/g, /[.,]/.test(intPart) ? thousands : '');
+				return prefix + whole + (decimals ? decimalSep + fixed[1] : '') + suffix;
+			};
+
+			el.dataset.afCounted = '1';
+			var start = function () {
+				var obj = { v: 0 };
+				el.textContent = format(0);
+				g.to(obj, {
+					v: target,
+					duration: Math.min(1.4, 0.7 + String(Math.round(target)).length * 0.08),
+					ease: 'power2.out',
+					onUpdate: function () { el.textContent = format(obj.v); },
+					onComplete: function () { el.textContent = text; }
+				});
+			};
+
+			if (inViewport(el) || !('IntersectionObserver' in window)) {
+				g.delayedCall(0.1, start);
+			} else {
+				var watch = new IntersectionObserver(function (entries) {
+					if (entries[0].isIntersecting) { watch.disconnect(); start(); }
+				});
+				watch.observe(el);
+			}
 		});
 	}
 
-	/* ── Shell chrome (first visit of the session only) ───────────────── */
+	/* ── Barras de progreso ─────────────────────────────────────────── */
 
-	function runChrome() {
-		var played = false;
-		try { played = window.sessionStorage.getItem('af_chrome_in') === '1'; } catch (e) { played = false; }
-		if (played) { return; }
-		try { window.sessionStorage.setItem('af_chrome_in', '1'); } catch (e) { /* storage blocked */ }
-
-		var items = $$('.af-app-sidebar__group, .af-app-sidebar > .af-app-sidebar__nav > .af-app-sidebar__item');
-		if (items.length) {
-			g.from(items, { x: -14, opacity: 0, duration: 0.5, stagger: 0.07, delay: 0.1, clearProps: CLEAR });
-		}
-		var topbar = document.querySelector('.af-app-topbar');
-		if (topbar) {
-			g.from(topbar, { y: -14, opacity: 0, duration: 0.5, clearProps: CLEAR });
-		}
+	function runBars(root) {
+		$$('.af-progress__bar, .af-kpi__bar > i, .af-hero-progress > i', root || document).forEach(function (bar) {
+			if (!outsideOverlays(bar) && !root) { return; }
+			var width = bar.style.width;
+			if (!width || width === '0%' || bar.dataset.afFilled) { return; }
+			bar.dataset.afFilled = '1';
+			g.fromTo(bar, { width: '0%' }, { width: width, duration: 0.9, delay: 0.25, ease: 'power3.out' });
+		});
 	}
 
-	/* ── Modals ───────────────────────────────────────────────────────── */
+	/* ── Respuesta al toque ─────────────────────────────────────────── */
+
+	var PRESSABLE = '.af-btn, .button, .af-kpi, .af-property-card, .af-catalog-card, .af-pc, .af-quick-list__link, .af-menu-group__link, .af-sheet__foot-link, .af-app-nav__link';
+
+	function pressFeedback() {
+		var held = null;
+
+		document.addEventListener('pointerdown', function (event) {
+			var el = event.target.closest(PRESSABLE);
+			if (!el || el.disabled || el.getAttribute('aria-disabled') === 'true') { return; }
+			held = el;
+			var big = el.offsetWidth > 260;
+			g.to(el, { scale: big ? 0.985 : 0.96, duration: 0.12, ease: 'power2.out', overwrite: 'auto' });
+		}, { passive: true });
+
+		var release = function () {
+			if (!held) { return; }
+			var el = held;
+			held = null;
+			g.to(el, { scale: 1, duration: 0.45, ease: 'elastic.out(1, 0.5)', overwrite: 'auto', clearProps: 'transform' });
+		};
+
+		document.addEventListener('pointerup', release, { passive: true });
+		document.addEventListener('pointercancel', release, { passive: true });
+		document.addEventListener('dragstart', release, { passive: true });
+	}
+
+	/* ── Modales ────────────────────────────────────────────────────── */
 
 	function animateModalIn(modal) {
-		var dialog = modal.querySelector('.af-modal__dialog, .af-modal__container');
-		var backdrop = modal.querySelector('.af-modal__backdrop');
+		var dialog = modal.querySelector('.af-modal__dialog, .af-modal__container, .af-modal__content');
+		var backdrop = modal.querySelector('.af-modal__backdrop, .af-modal__overlay');
+
 		if (backdrop) {
 			g.fromTo(backdrop, { opacity: 0 }, { opacity: 1, duration: 0.25, clearProps: 'opacity', overwrite: 'auto' });
 		}
-		if (dialog) {
+		if (!dialog) { return; }
+
+		if (phone.matches) {
+			g.fromTo(dialog, { yPercent: 100 }, { yPercent: 0, duration: 0.5, ease: 'expo.out', clearProps: 'transform', overwrite: 'auto' });
+		} else {
 			g.fromTo(dialog,
-				{ opacity: 0, y: 28, scale: 0.97 },
-				{ opacity: 1, y: 0, scale: 1, duration: 0.45, ease: 'back.out(1.25)', clearProps: CLEAR, overwrite: 'auto' }
+				{ opacity: 0, y: 18, scale: 0.97 },
+				{ opacity: 1, y: 0, scale: 1, duration: 0.42, ease: 'back.out(1.3)', clearProps: CLEAR, overwrite: 'auto' }
 			);
-			var rows = $$('.af-modal__field, .af-choice, .af-cobranza-flow__step', dialog).slice(0, 10);
-			if (rows.length) {
-				g.from(rows, { opacity: 0, y: 10, duration: 0.35, stagger: 0.04, delay: 0.12, clearProps: CLEAR });
-			}
 		}
+
+		var rows = $$('.af-modal__field, .af-field, .af-form-field, .af-choice, .af-cobranza-flow__step', dialog).filter(isShown).slice(0, 10);
+		if (rows.length) {
+			g.fromTo(rows, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.32, stagger: 0.035, delay: 0.12, clearProps: CLEAR });
+		}
+		runBars(dialog);
 	}
 
 	function watchModals() {
 		if (!('MutationObserver' in window)) { return; }
 		var seen = new WeakMap();
 
-		function wasOpen(modal) {
-			return !modal.hidden && !modal.classList.contains('is-closing') && window.getComputedStyle(modal).display !== 'none';
-		}
+		var isOpen = function (modal) {
+			return !modal.hidden && window.getComputedStyle(modal).display !== 'none';
+		};
 
 		var observer = new MutationObserver(function (mutations) {
 			mutations.forEach(function (m) {
 				var modal = m.target;
-				var open = wasOpen(modal);
-				if (open && !seen.get(modal)) {
-					animateModalIn(modal);
-				}
+				var open = isOpen(modal);
+				if (open && !seen.get(modal)) { animateModalIn(modal); }
 				seen.set(modal, open);
 			});
 		});
 
 		$$('.af-modal').forEach(function (modal) {
-			seen.set(modal, wasOpen(modal));
+			seen.set(modal, isOpen(modal));
 			observer.observe(modal, { attributes: true, attributeFilter: ['class', 'hidden', 'style'] });
 		});
 	}
 
-	/* ── Tabs ─────────────────────────────────────────────────────────── */
+	/* ── Tarjetas que se despliegan (formularios "nuevo …") ─────────── */
+
+	function watchInlineCards() {
+		if (!('MutationObserver' in window)) { return; }
+		var cards = $$('#af-lease-form-card, #af-guest-form-card, .af-maint-formcard, [data-af-animate-open]');
+		cards.forEach(function (card) {
+			var open = isShown(card);
+			new MutationObserver(function () {
+				var now = isShown(card);
+				if (now && !open) {
+					g.fromTo(card, { opacity: 0, y: -8 }, { opacity: 1, y: 0, duration: 0.4, clearProps: CLEAR });
+					var fields = $$('.af-field, .af-form-field, tr, .af-field-group', card).filter(isShown).slice(0, 12);
+					g.fromTo(fields, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.3, stagger: 0.03, delay: 0.08, clearProps: CLEAR });
+				}
+				open = now;
+			}).observe(card, { attributes: true, attributeFilter: ['style', 'hidden', 'class'] });
+		});
+	}
+
+	/* ── Pestañas ───────────────────────────────────────────────────── */
 
 	function watchTabs() {
 		document.addEventListener('change', function (event) {
@@ -232,20 +333,20 @@
 			if (!radio.classList || !radio.classList.contains('af-tabs__radio') || !radio.id) { return; }
 			var panel = document.querySelector('.af-tabs__panel[aria-labelledby="' + radio.id + '"]');
 			if (!panel) { return; }
-			var kids = $$('.af-kpi, .af-property-card, .af-catalog-card, .af-section, .af-data-table tbody tr', panel).slice(0, 18);
-			g.fromTo(panel, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.35, clearProps: CLEAR });
+			g.fromTo(panel, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.32, clearProps: CLEAR });
+			var kids = $$(CARD + ', .af-section, ' + ROWS, panel).filter(isShown).slice(0, 18);
 			if (kids.length) {
-				g.from(kids, { opacity: 0, y: 12, duration: 0.4, stagger: 0.03, delay: 0.05, clearProps: CLEAR });
+				g.fromTo(kids, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.36, stagger: 0.03, delay: 0.04, clearProps: CLEAR });
 			}
+			runBars(panel);
 		});
 
 		document.addEventListener('click', function (event) {
-			var tab = event.target.closest('.af-status-tabs__tab, [data-tab-group-target]');
+			var tab = event.target.closest('.af-status-tabs__tab, .af-status-tabs__btn, [data-tab-group-target], .af-rv-tab, .af-maint-seg button');
 			if (!tab) { return; }
 			window.setTimeout(function () {
-				var rows = $$('tbody tr, .af-sp-tile', tab.closest('.af-section, .wrap') || document).filter(function (el) {
-					return isShown(el);
-				}).slice(0, 16);
+				var scope = tab.closest('.af-section, .wrap') || document;
+				var rows = $$(ROWS + ', .af-sp-tile, .af-maint-card, .af-rv-card', scope).filter(isShown).slice(0, 16);
 				if (rows.length) {
 					g.fromTo(rows, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.3, stagger: 0.025, clearProps: CLEAR, overwrite: 'auto' });
 				}
@@ -253,7 +354,7 @@
 		});
 	}
 
-	/* ── Page transition ──────────────────────────────────────────────── */
+	/* ── Transición entre pantallas ─────────────────────────────────── */
 
 	function pageTransitions() {
 		var bar = document.createElement('div');
@@ -263,60 +364,55 @@
 
 		var leaving = false;
 
-		function content() {
-			return document.getElementById('wpbody-content');
-		}
-
 		document.addEventListener('click', function (event) {
 			if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) { return; }
 			var a = event.target.closest('a[href]');
 			if (!a || leaving) { return; }
 			if ((a.target && a.target !== '_self') || a.hasAttribute('download') || a.hasAttribute('data-no-transition')) { return; }
-			if (a.closest('.af-modal, .af-alerts-panel')) { return; }
+			if (a.closest('.af-modal, .af-alerts-panel') || a.hasAttribute('data-af-plan-lock')) { return; }
 
 			var href = a.getAttribute('href') || '';
 			if (!href || href.charAt(0) === '#' || /^(mailto:|tel:|javascript:)/i.test(href)) { return; }
 
 			var url;
 			try { url = new URL(a.href, window.location.href); } catch (e) { return; }
-			if (url.origin !== window.location.origin || !/\/wp-admin\/(admin|edit|index)\.php$/.test(url.pathname)) { return; }
-			if (url.searchParams.has('action') || url.searchParams.has('af_download')) { return; }
+			if (url.origin !== window.location.origin || !/\/wp-admin\/(admin|edit|post|post-new|profile|index)\.php$/.test(url.pathname)) { return; }
+			if (url.searchParams.has('action') || url.searchParams.has('af_download') || url.searchParams.has('_wpnonce')) { return; }
 			if (url.pathname === window.location.pathname && url.search === window.location.search) { return; }
 
-			var host = content();
+			var host = document.getElementById('wpbody-content');
 			if (!host) { return; }
 
 			event.preventDefault();
 			leaving = true;
 
-			var go = (function () {
-				var done = false;
-				return function () {
-					if (done) { return; }
-					done = true;
-					window.location.href = url.href;
-				};
-			}());
+			// La navegación arranca ya: la animación corre mientras llega la página
+			// siguiente, nunca la retrasa.
+			window.location.href = url.href;
 
-			g.to(bar, { width: '72%', opacity: 1, duration: 0.9, ease: 'power1.out' });
-			g.to(host, { opacity: 0, y: -8, duration: 0.18, ease: 'power2.in', onComplete: go });
-			window.setTimeout(go, 450);
+			var sheet = document.querySelector('.af-sheet:not([hidden])');
+			g.fromTo(bar, { width: '0%', opacity: 1 }, { width: '78%', duration: 1.2, ease: 'power2.out' });
+			g.to(host, { opacity: 0.35, y: phone.matches ? 6 : -4, duration: 0.18, ease: 'power2.in' });
+			if (sheet) {
+				g.to(sheet.querySelector('.af-sheet__panel'), { yPercent: 100, duration: 0.22, ease: 'power3.in' });
+				g.to(sheet.querySelector('.af-sheet__scrim'), { opacity: 0, duration: 0.2 });
+			}
 		});
 
 		window.addEventListener('pageshow', function (event) {
 			leaving = false;
-			var host = content();
+			var host = document.getElementById('wpbody-content');
 			if (host) { g.set(host, { clearProps: CLEAR }); }
 			g.set(bar, { width: 0, opacity: 0 });
 			if (event.persisted) { runEntrance(); }
 		});
 	}
 
-	/* ── Public helpers ───────────────────────────────────────────────── */
+	/* ── Ayudantes públicos ─────────────────────────────────────────── */
 
 	window.afMotion.reveal = function (nodes, opts) {
 		var list = Array.prototype.slice.call(nodes || []).filter(function (n) { return n && n.nodeType === 1; });
-		revealList(list, opts || { each: 0.035, y: 12, duration: 0.4, amount: 0.5 });
+		reveal(list, opts || { each: 0.035, y: 10, duration: 0.38, amount: 0.45 });
 	};
 
 	window.afMotion.pop = function (node) {
@@ -339,14 +435,16 @@
 	}
 
 	function init() {
-		var shell = !!document.getElementById('af-app-sidebar');
+		var shell = document.body.classList.contains('af-custom-shell');
 
-		if (shell) { runChrome(); }
 		runEntrance();
 		runCounters();
+		runBars();
 		watchModals();
+		watchInlineCards();
 		watchTabs();
 		watchDynamicLists();
+		pressFeedback();
 		if (shell) { pageTransitions(); }
 	}
 

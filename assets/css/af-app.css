@@ -1,0 +1,1881 @@
+/**
+ * Arriendo Fácil — Capa de sistema (af-app.css).
+ *
+ * Se carga después de todas las hojas de cada pantalla (prioridad 100) y
+ * redefine los componentes compartidos con el sistema "Escalera petróleo":
+ * lienzo, títulos, botones, paneles, cifras, píldoras, tablas, formularios,
+ * pestañas, avisos, modales y estados vacíos.
+ *
+ * Reglas de la casa que se aplican aquí:
+ *  - Superficies planas: borde de 1px o un paso de tono; sombra solo en lo que flota.
+ *  - El petróleo pleno solo en marcas pequeñas (acción primaria, dato, icono activo).
+ *  - Sin degradados, sin etiquetas en mayúsculas espaciadas, sin cebras.
+ *  - En el teléfono: tablas → filas de dos líneas, modales → hojas, controles de 44px.
+ *
+ * Alcance: body.af-custom-shell (pantallas propias con el shell de la app).
+ */
+
+/* ══ 1. Lienzo ═══════════════════════════════════════════════════════ */
+
+body.af-custom-shell #wpbody-content > .wrap,
+body.af-custom-shell #wpbody-content > .af-shell {
+	box-sizing: border-box;
+	max-width: calc(var(--af-page-max, 1320px) + 2 * var(--af-page-gutter, 29px));
+	margin: 0 auto;
+	padding: 28px var(--af-page-gutter, 29px) 0;
+}
+
+body.af-custom-shell #wpbody-content .af-shell {
+	font-family: var(--af-font-family);
+	font-size: 14px;
+	line-height: 1.5;
+	color: var(--af-text);
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	font-feature-settings: "cv11", "ss01";
+}
+
+body.af-custom-shell #wpbody-content .af-shell p,
+body.af-custom-shell #wpbody-content .af-shell li,
+body.af-custom-shell #wpbody-content .af-shell td,
+body.af-custom-shell #wpbody-content .af-shell label {
+	color: inherit;
+}
+
+body.af-custom-shell #wpbody-content .af-shell a {
+	color: var(--af-accent);
+	text-decoration-thickness: 1px;
+	text-underline-offset: 2px;
+}
+
+body.af-custom-shell #wpbody-content .af-shell a:hover {
+	color: var(--af-accent-hover);
+}
+
+body.af-custom-shell #wpbody-content .af-shell :focus-visible {
+	outline: none;
+	box-shadow: var(--af-focus-ring);
+}
+
+/* ══ 2. Tipografía ═══════════════════════════════════════════════════ */
+
+body.af-custom-shell #wpbody-content .af-shell h1,
+body.af-custom-shell #wpbody-content .af-shell .wp-heading-inline {
+	margin: 0;
+	padding: 0;
+	font-size: 32px;
+	font-weight: 700;
+	line-height: 1.15;
+	letter-spacing: -0.02em;
+	color: var(--af-text);
+}
+
+body.af-custom-shell #wpbody-content .af-shell h2 {
+	font-size: 18px;
+	font-weight: 600;
+	line-height: 1.35;
+	letter-spacing: -0.01em;
+	color: var(--af-text);
+}
+
+body.af-custom-shell #wpbody-content .af-shell h3 {
+	font-size: 16px;
+	font-weight: 600;
+	line-height: 1.4;
+	color: var(--af-text);
+}
+
+body.af-custom-shell #wpbody-content .af-shell h4 {
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--af-text);
+}
+
+body.af-custom-shell #wpbody-content .af-shell .description,
+body.af-custom-shell #wpbody-content .af-shell small {
+	color: var(--af-text-muted);
+}
+
+/* Las etiquetas pequeñas en mayúsculas espaciadas pasan a frase normal. */
+body.af-custom-shell #wpbody-content .af-shell .af-section__eyebrow,
+body.af-custom-shell #wpbody-content .af-shell .af-flow__title,
+body.af-custom-shell #wpbody-content .af-shell .af-kpi__label,
+body.af-custom-shell #wpbody-content .af-shell th {
+	text-transform: none;
+	letter-spacing: 0;
+}
+
+/* Etiquetas heredadas de cada pantalla: en frase normal, sin espaciado, legibles. */
+body.af-custom-shell #wpbody-content .af-shell :is(
+	.af-calendar-filters__field span, .af-cwiz__group-title, .af-cwiz__badge, .af-cwiz__review-label,
+	.af-sri-hero__eyebrow, .af-sri-status-card__label, .af-accom-section__title, .af-field__label,
+	.af-inventory-table th, .af-documents-item__type, .af-leases-table--compact thead th,
+	.af-error-details__head, .af-pending-buyer dt, .af-onboard__eyebrow, .af-sri-conn__label, .af-bx-eyebrow,
+	.af-totals-label, .af-catalog-card__type, .af-calendar-mini__wd, .af-cobranza-summary__k,
+	.af-cobranza-charges__title, .af-form-field__label, .af-cal__week span, .af-overview-hero__eyebrow,
+	.af-maint-table thead th, .af-maint-detail__label, .af-maint-form__legend, .af-prov-card__trade-label,
+	.af-pdate small, .af-plan-current__eyebrow, .af-plan-summary__eyebrow, .af-pc__type, .af-rv-eyebrow,
+	.af-sp-month__label span, .af-sp-tab__label, .af-semaforo__label, .af-maint-card__type, .af-schedule__days,
+	.af-code-block__label, .af-welcome__eyebrow, .af-occupied-badge
+) {
+	text-transform: none;
+	letter-spacing: 0;
+	font-size: max(12px, 0.8125rem);
+}
+
+/* ══ 3. Cabecera de pantalla ═════════════════════════════════════════ */
+
+body.af-custom-shell #wpbody-content .af-shell .af-page-header {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: 16px 24px;
+	margin: 0 0 24px;
+	padding: 0;
+	border: 0;
+	background: none;
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-page-header__title {
+	flex: 1 1 420px;
+	min-width: 0;
+}
+
+/* Sin "eyebrows": la categoría ya la dice el menú. */
+body.af-custom-shell #wpbody-content .af-shell .af-page-header__eyebrow {
+	display: none;
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-page-header__subtitle {
+	max-width: 68ch;
+	margin: 8px 0 0;
+	font-size: 15px;
+	line-height: 1.5;
+	color: var(--af-text-muted);
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-page-header__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	align-items: center;
+}
+
+/* ══ 4. Botones ══════════════════════════════════════════════════════ */
+
+body.af-custom-shell #wpbody-content .af-shell .button,
+body.af-custom-shell #wpbody-content .af-shell .af-btn,
+body.af-custom-shell .af-modal .button,
+body.af-custom-shell .af-modal .af-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	min-height: 36px;
+	height: auto;
+	padding: 0 14px;
+	border: 1px solid var(--af-control);
+	border-radius: var(--af-radius-sm);
+	background: var(--af-surface);
+	color: var(--af-text);
+	font: 600 14px/1.2 var(--af-font-family);
+	text-decoration: none;
+	text-shadow: none;
+	box-shadow: none;
+	white-space: nowrap;
+	vertical-align: middle;
+	cursor: pointer;
+	transition: background-color var(--af-motion-fast), border-color var(--af-motion-fast), color var(--af-motion-fast);
+	will-change: transform;
+}
+
+body.af-custom-shell #wpbody-content .af-shell .button:hover,
+body.af-custom-shell #wpbody-content .af-shell .af-btn:hover,
+body.af-custom-shell .af-modal .button:hover,
+body.af-custom-shell .af-modal .af-btn:hover {
+	background: var(--af-raised);
+	border-color: var(--af-control);
+	color: var(--af-text);
+	box-shadow: none;
+	transform: none;
+}
+
+body.af-custom-shell #wpbody-content .af-shell .button:focus-visible,
+body.af-custom-shell #wpbody-content .af-shell .af-btn:focus-visible,
+body.af-custom-shell .af-modal .button:focus-visible,
+body.af-custom-shell .af-modal .af-btn:focus-visible {
+	outline: none;
+	box-shadow: var(--af-focus-ring);
+}
+
+body.af-custom-shell #wpbody-content .af-shell .button-primary,
+body.af-custom-shell #wpbody-content .af-shell .af-btn--primary,
+body.af-custom-shell .af-modal .button-primary,
+body.af-custom-shell .af-modal .af-btn--primary {
+	border-color: var(--af-accent);
+	background: var(--af-accent);
+	color: #fff;
+}
+
+body.af-custom-shell #wpbody-content .af-shell .button-primary:hover,
+body.af-custom-shell #wpbody-content .af-shell .af-btn--primary:hover,
+body.af-custom-shell .af-modal .button-primary:hover,
+body.af-custom-shell .af-modal .af-btn--primary:hover {
+	border-color: var(--af-accent-hover);
+	background: var(--af-accent-hover);
+	color: #fff;
+}
+
+body.af-custom-shell #wpbody-content .af-shell .button-primary:active,
+body.af-custom-shell #wpbody-content .af-shell .af-btn--primary:active {
+	background: var(--af-accent-press);
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-btn--accent {
+	border-color: var(--af-active);
+	background: var(--af-active);
+	color: var(--af-accent-ink);
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-btn--accent:hover {
+	border-color: var(--af-primary-200);
+	background: var(--af-primary-200);
+	color: var(--af-accent-ink);
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-btn--danger,
+body.af-custom-shell .af-modal .af-btn--danger,
+body.af-custom-shell #wpbody-content .af-shell .button.button-link-delete,
+body.af-custom-shell #wpbody-content .af-shell .button.delete {
+	border-color: var(--af-danger-100);
+	background: var(--af-pill-negative-bg);
+	color: var(--af-pill-negative-ink);
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-btn--danger:hover,
+body.af-custom-shell .af-modal .af-btn--danger:hover {
+	border-color: var(--af-negative);
+	background: var(--af-negative);
+	color: #fff;
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-btn--sm,
+body.af-custom-shell #wpbody-content .af-shell .button-small,
+body.af-custom-shell .af-modal .af-btn--sm {
+	min-height: 30px;
+	padding: 0 10px;
+	font-size: 13px;
+}
+
+body.af-custom-shell #wpbody-content .af-shell .button[disabled],
+body.af-custom-shell #wpbody-content .af-shell .button:disabled,
+body.af-custom-shell #wpbody-content .af-shell .af-btn:disabled,
+body.af-custom-shell #wpbody-content .af-shell .af-btn[aria-disabled="true"] {
+	border-color: var(--af-border);
+	background: var(--af-raised);
+	color: var(--af-text-faint);
+	cursor: not-allowed;
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-btn__icon {
+	display: inline-flex;
+	width: 16px;
+	height: 16px;
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-btn__icon svg {
+	width: 16px;
+	height: 16px;
+}
+
+body.af-custom-shell #wpbody-content .af-shell .button-link {
+	min-height: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--af-accent);
+}
+
+/* ══ 5. Paneles ══════════════════════════════════════════════════════ */
+
+body.af-custom-shell #wpbody-content .af-shell .af-section,
+body.af-custom-shell #wpbody-content .af-shell .af-pcard,
+body.af-custom-shell #wpbody-content .af-shell > .card,
+body.af-custom-shell #wpbody-content .af-shell .card.af-card,
+body.af-custom-shell #wpbody-content .af-shell .postbox,
+body.af-custom-shell #wpbody-content .af-shell .af-sri-section,
+body.af-custom-shell #wpbody-content .af-shell .af-integration-card {
+	margin-bottom: 0;
+	padding: var(--af-pad, 24px);
+	border: 1px solid var(--af-border);
+	border-radius: var(--af-radius-md);
+	background: var(--af-surface);
+	box-shadow: none;
+}
+
+body.af-custom-shell #wpbody-content .af-shell > .card {
+	max-width: none;
+	margin-top: 0;
+}
+
+body.af-custom-shell #wpbody-content .af-shell > * + .af-section,
+body.af-custom-shell #wpbody-content .af-shell > * + .card,
+body.af-custom-shell #wpbody-content .af-shell > * + .af-split,
+body.af-custom-shell #wpbody-content .af-shell > * + .af-kpi-grid,
+body.af-custom-shell #wpbody-content .af-shell > * + .af-tabs,
+body.af-custom-shell #wpbody-content .af-shell > * + form {
+	margin-top: var(--af-gap, 24px);
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-section__header,
+body.af-custom-shell #wpbody-content .af-shell .af-pcard__head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 8px 16px;
+	margin: 0 0 16px;
+	padding: 0;
+	border: 0;
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-section__title,
+body.af-custom-shell #wpbody-content .af-shell .af-pcard__title {
+	margin: 0;
+	font-size: 18px;
+	font-weight: 600;
+	line-height: 1.35;
+	color: var(--af-text);
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-section__subtitle,
+body.af-custom-shell #wpbody-content .af-shell .af-pcard__sub {
+	margin: 4px 0 0;
+	font-size: 14px;
+	color: var(--af-text-muted);
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-split {
+	gap: var(--af-gap, 24px);
+}
+
+/* ══ 6. Cifras (KPI) ═════════════════════════════════════════════════
+   Un contenedor dividido por reglas de 1px: las celdas comparten borde. */
+
+body.af-custom-shell #wpbody-content .af-shell .af-kpi-grid {
+	gap: 1px;
+	padding: 0;
+	overflow: hidden;
+	border: 1px solid var(--af-border);
+	border-radius: var(--af-radius-md);
+	background: var(--af-border);
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-kpi {
+	min-height: 0;
+	padding: 20px 24px;
+	border: 0;
+	border-radius: 0;
+	background: var(--af-surface);
+	box-shadow: none;
+	transform: none;
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-kpi:hover {
+	border: 0;
+	background: var(--af-surface);
+	box-shadow: none;
+	transform: none;
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-kpi::before,
+body.af-custom-shell #wpbody-content .af-shell .af-kpi::after,
+body.af-custom-shell #wpbody-content .af-shell .af-kpi__icon,
+body.af-custom-shell #wpbody-content .af-shell .af-pk__icon {
+	display: none;
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-kpi--attention,
+body.af-custom-shell #wpbody-content .af-shell .af-kpi--success,
+body.af-custom-shell #wpbody-content .af-shell .af-kpi--info,
+body.af-custom-shell #wpbody-content .af-shell .af-kpi--accent {
+	border: 0;
+	background: var(--af-surface);
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-kpi__label {
+	font-size: 13px;
+	font-weight: 500;
+	color: var(--af-text-muted);
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-kpi__value {
+	margin-top: 6px;
+	font-size: 26px;
+	font-weight: 600;
+	line-height: 1.15;
+	letter-spacing: -0.015em;
+	color: var(--af-text);
+	font-variant-numeric: tabular-nums;
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-kpi--attention .af-kpi__value {
+	color: var(--af-warning);
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-kpi__hint {
+	margin-top: 4px;
+	font-size: 13px;
+	color: var(--af-text-muted);
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-kpi__footer {
+	border-top: 0;
+	padding-top: 8px;
+}
+
+/* Panel de inicio (af-panel.css): el mismo sistema. */
+
+body.af-custom-shell #wpbody-content .af-panel .af-pk-grid {
+	gap: 1px;
+	overflow: hidden;
+	border: 1px solid var(--af-border);
+	border-radius: var(--af-radius-md);
+	background: var(--af-border);
+}
+
+body.af-custom-shell #wpbody-content .af-panel .af-pk {
+	padding: 20px 24px;
+	border: 0;
+	border-radius: 0;
+	background: var(--af-surface);
+	box-shadow: none;
+	transform: none;
+	transition: background-color var(--af-motion-fast);
+}
+
+body.af-custom-shell #wpbody-content .af-panel .af-pk:hover,
+body.af-custom-shell #wpbody-content .af-panel .af-pk:focus-visible {
+	transform: none;
+	border: 0;
+	background: var(--af-raised);
+	box-shadow: none;
+}
+
+body.af-custom-shell #wpbody-content .af-panel .af-pk__label {
+	font-size: 13px;
+	font-weight: 500;
+	color: var(--af-text-muted);
+}
+
+body.af-custom-shell #wpbody-content .af-panel .af-pk__value {
+	font-size: 26px;
+	font-weight: 600;
+	letter-spacing: -0.015em;
+	color: var(--af-text);
+}
+
+body.af-custom-shell #wpbody-content .af-panel .af-pk__meta {
+	color: var(--af-text-muted);
+}
+
+/* La cifra que responde la pregunta de la pantalla: tinte pálido, dato en petróleo. */
+body.af-custom-shell #wpbody-content .af-panel .af-pk--hero {
+	color: var(--af-accent-ink);
+	background: var(--af-accent-soft);
+}
+
+body.af-custom-shell #wpbody-content .af-panel .af-pk--hero:hover,
+body.af-custom-shell #wpbody-content .af-panel .af-pk--hero:focus-visible {
+	color: var(--af-accent-ink);
+	background: var(--af-active);
+}
+
+body.af-custom-shell #wpbody-content .af-panel .af-pk--hero::after {
+	display: none;
+}
+
+body.af-custom-shell #wpbody-content .af-panel .af-pk--hero .af-pk__label,
+body.af-custom-shell #wpbody-content .af-panel .af-pk--hero .af-pk__meta {
+	color: var(--af-gray-700);
+}
+
+body.af-custom-shell #wpbody-content .af-panel .af-pk--hero .af-pk__value {
+	font-size: 32px;
+	font-weight: 700;
+	color: var(--af-accent);
+}
+
+body.af-custom-shell #wpbody-content .af-panel .af-pk--hero .af-pk__chip {
+	background: var(--af-surface);
+	color: var(--af-accent-ink);
+	font-size: 13px;
+}
+
+body.af-custom-shell #wpbody-content .af-panel .af-pk__bar {
+	height: 6px;
+	background: var(--af-accent-track);
+}
+
+body.af-custom-shell #wpbody-content .af-panel .af-pk__bar i {
+	background: var(--af-accent);
+}
+
+body.af-custom-shell #wpbody-content .af-panel .af-pk--danger {
+	background: var(--af-surface);
+}
+
+body.af-custom-shell #wpbody-content .af-panel .af-pk--danger .af-pk__value {
+	color: var(--af-negative);
+}
+
+body.af-custom-shell #wpbody-content .af-panel .af-panel__eyebrow {
+	font-size: 14px;
+	font-weight: 500;
+	letter-spacing: 0;
+	text-transform: none;
+	color: var(--af-text-muted);
+}
+
+body.af-custom-shell #wpbody-content .af-panel .af-panel__title {
+	font-size: 32px;
+	font-weight: 700;
+	letter-spacing: -0.02em;
+}
+
+body.af-custom-shell #wpbody-content .af-panel .af-panel__grid,
+body.af-custom-shell #wpbody-content .af-panel .af-panel__col {
+	gap: var(--af-gap, 24px);
+}
+
+body.af-custom-shell #wpbody-content .af-panel .af-plist__item {
+	border-radius: var(--af-radius-sm);
+}
+
+body.af-custom-shell #wpbody-content .af-panel .af-plist__icon {
+	background: transparent;
+}
+
+body.af-custom-shell #wpbody-content .af-panel .af-pempty {
+	border: 1px dashed var(--af-control);
+	border-radius: var(--af-radius-md);
+	background: transparent;
+	color: var(--af-text-muted);
+}
+
+/* ══ 7. Píldoras de estado ═══════════════════════════════════════════ */
+
+body.af-custom-shell #wpbody-content .af-shell .af-pill,
+body.af-custom-shell .af-modal .af-pill {
+	display: inline-flex;
+	flex: none;
+	align-items: center;
+	gap: 6px;
+	height: 22px;
+	padding: 0 9px;
+	border: 0;
+	border-radius: 999px;
+	font-size: 12px;
+	font-weight: 600;
+	line-height: 1;
+	letter-spacing: 0;
+	text-transform: none;
+	white-space: nowrap;
+	box-shadow: none;
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-pill::before {
+	content: "";
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: currentColor;
+	opacity: 0.8;
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-pill--success { background: var(--af-pill-positive-bg); color: var(--af-pill-positive-ink); }
+body.af-custom-shell #wpbody-content .af-shell .af-pill--warning { background: var(--af-pill-warning-bg); color: var(--af-pill-warning-ink); }
+body.af-custom-shell #wpbody-content .af-shell .af-pill--danger  { background: var(--af-pill-negative-bg); color: var(--af-pill-negative-ink); }
+body.af-custom-shell #wpbody-content .af-shell .af-pill--info    { background: var(--af-pill-info-bg); color: var(--af-pill-info-ink); }
+body.af-custom-shell #wpbody-content .af-shell .af-pill--neutral { background: var(--af-pill-neutral-bg); color: var(--af-pill-neutral-ink); }
+body.af-custom-shell #wpbody-content .af-shell .af-pill--accent  { background: var(--af-accent-soft); color: var(--af-accent-ink); }
+
+body.af-custom-shell #wpbody-content .af-shell .af-pill--pulse {
+	animation: none;
+}
+
+/* ══ 8. Tablas ═══════════════════════════════════════════════════════ */
+
+body.af-custom-shell #wpbody-content .af-shell table.widefat,
+body.af-custom-shell #wpbody-content .af-shell table.wp-list-table {
+	border: 1px solid var(--af-border);
+	border-radius: var(--af-radius-md);
+	border-collapse: separate;
+	border-spacing: 0;
+	overflow: hidden;
+	background: var(--af-surface);
+	box-shadow: none;
+}
+
+body.af-custom-shell #wpbody-content .af-shell table.widefat thead th,
+body.af-custom-shell #wpbody-content .af-shell table.widefat thead td,
+body.af-custom-shell #wpbody-content .af-shell table.widefat tfoot th,
+body.af-custom-shell #wpbody-content .af-shell table.widefat tfoot td {
+	padding: 12px 16px;
+	border-bottom: 1px solid var(--af-border);
+	background: var(--af-surface);
+	color: var(--af-text-muted);
+	font-size: 12px;
+	font-weight: 500;
+	line-height: 1.4;
+	text-transform: none;
+	letter-spacing: 0;
+}
+
+body.af-custom-shell #wpbody-content .af-shell table.widefat thead th a,
+body.af-custom-shell #wpbody-content .af-shell table.widefat thead th a span {
+	color: var(--af-text-muted);
+}
+
+body.af-custom-shell #wpbody-content .af-shell table.widefat tbody td,
+body.af-custom-shell #wpbody-content .af-shell table.widefat tbody th {
+	padding: 14px 16px;
+	border-top: 1px solid var(--af-rule);
+	font-size: 14px;
+	line-height: 1.45;
+	color: var(--af-text);
+	vertical-align: middle;
+	box-shadow: none;
+}
+
+body.af-custom-shell #wpbody-content .af-shell table.widefat tbody tr:first-child td,
+body.af-custom-shell #wpbody-content .af-shell table.widefat tbody tr:first-child th {
+	border-top: 0;
+}
+
+/* Sin cebra. */
+body.af-custom-shell #wpbody-content .af-shell .striped > tbody > :nth-child(odd),
+body.af-custom-shell #wpbody-content .af-shell ul.striped > :nth-child(odd),
+body.af-custom-shell #wpbody-content .af-shell .alternate {
+	background: transparent;
+}
+
+body.af-custom-shell #wpbody-content .af-shell table.widefat tbody tr {
+	transition: background-color var(--af-motion-fast);
+}
+
+body.af-custom-shell #wpbody-content .af-shell table.widefat tbody tr:hover {
+	background: var(--af-raised);
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-td-meta,
+body.af-custom-shell #wpbody-content .af-shell table.widefat .row-actions,
+body.af-custom-shell #wpbody-content .af-shell table.widefat td small {
+	font-size: 13px;
+	color: var(--af-text-muted);
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-table-scroll {
+	border-radius: var(--af-radius-md);
+}
+
+/* ══ 9. Formularios ══════════════════════════════════════════════════ */
+
+body.af-custom-shell #wpbody-content .af-shell input[type="text"],
+body.af-custom-shell #wpbody-content .af-shell input[type="email"],
+body.af-custom-shell #wpbody-content .af-shell input[type="url"],
+body.af-custom-shell #wpbody-content .af-shell input[type="tel"],
+body.af-custom-shell #wpbody-content .af-shell input[type="number"],
+body.af-custom-shell #wpbody-content .af-shell input[type="password"],
+body.af-custom-shell #wpbody-content .af-shell input[type="search"],
+body.af-custom-shell #wpbody-content .af-shell input[type="date"],
+body.af-custom-shell #wpbody-content .af-shell input[type="datetime-local"],
+body.af-custom-shell #wpbody-content .af-shell input[type="month"],
+body.af-custom-shell #wpbody-content .af-shell select,
+body.af-custom-shell #wpbody-content .af-shell textarea,
+body.af-custom-shell .af-modal input[type="text"],
+body.af-custom-shell .af-modal input[type="email"],
+body.af-custom-shell .af-modal input[type="tel"],
+body.af-custom-shell .af-modal input[type="number"],
+body.af-custom-shell .af-modal input[type="date"],
+body.af-custom-shell .af-modal select,
+body.af-custom-shell .af-modal textarea {
+	min-height: 40px;
+	padding: 8px 12px;
+	border: 1px solid var(--af-control);
+	border-radius: var(--af-radius-sm);
+	background-color: var(--af-surface);
+	color: var(--af-text);
+	font: 400 14px/1.4 var(--af-font-family);
+	box-shadow: none;
+	transition: border-color var(--af-motion-fast), box-shadow var(--af-motion-fast);
+}
+
+body.af-custom-shell #wpbody-content .af-shell select,
+body.af-custom-shell .af-modal select {
+	padding-right: 32px;
+}
+
+body.af-custom-shell #wpbody-content .af-shell textarea,
+body.af-custom-shell .af-modal textarea {
+	min-height: 96px;
+	line-height: 1.5;
+}
+
+body.af-custom-shell #wpbody-content .af-shell input::placeholder,
+body.af-custom-shell #wpbody-content .af-shell textarea::placeholder,
+body.af-custom-shell .af-modal input::placeholder,
+body.af-custom-shell .af-modal textarea::placeholder {
+	color: var(--af-text-faint);
+	opacity: 1;
+}
+
+body.af-custom-shell #wpbody-content .af-shell input:focus,
+body.af-custom-shell #wpbody-content .af-shell select:focus,
+body.af-custom-shell #wpbody-content .af-shell textarea:focus,
+body.af-custom-shell .af-modal input:focus,
+body.af-custom-shell .af-modal select:focus,
+body.af-custom-shell .af-modal textarea:focus {
+	border-color: var(--af-accent);
+	outline: none;
+	box-shadow: 0 0 0 3px var(--af-accent-track);
+}
+
+body.af-custom-shell #wpbody-content .af-shell input[readonly],
+body.af-custom-shell #wpbody-content .af-shell input:disabled,
+body.af-custom-shell #wpbody-content .af-shell select:disabled,
+body.af-custom-shell #wpbody-content .af-shell textarea:disabled {
+	background-color: var(--af-raised);
+	color: var(--af-text-muted);
+}
+
+body.af-custom-shell #wpbody-content .af-shell input[type="checkbox"],
+body.af-custom-shell #wpbody-content .af-shell input[type="radio"],
+body.af-custom-shell .af-modal input[type="checkbox"],
+body.af-custom-shell .af-modal input[type="radio"] {
+	width: 18px;
+	height: 18px;
+	min-height: 0;
+	border: 1.5px solid var(--af-control);
+	box-shadow: none;
+	accent-color: var(--af-accent);
+}
+
+body.af-custom-shell #wpbody-content .af-shell input[type="checkbox"]:checked,
+body.af-custom-shell .af-modal input[type="checkbox"]:checked {
+	border-color: var(--af-accent);
+	background: var(--af-accent);
+}
+
+body.af-custom-shell #wpbody-content .af-shell input[type="checkbox"]:checked::before,
+body.af-custom-shell .af-modal input[type="checkbox"]:checked::before {
+	filter: brightness(0) invert(1);
+}
+
+body.af-custom-shell #wpbody-content .af-shell input[type="radio"]:checked::before,
+body.af-custom-shell .af-modal input[type="radio"]:checked::before {
+	background: var(--af-accent);
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-field > label,
+body.af-custom-shell #wpbody-content .af-shell .af-form-field > label,
+body.af-custom-shell #wpbody-content .af-shell .af-field__label,
+body.af-custom-shell #wpbody-content .af-shell .form-table th,
+body.af-custom-shell .af-modal .af-field > label,
+body.af-custom-shell .af-modal .af-modal__field > label {
+	font-size: 14px;
+	font-weight: 500;
+	color: var(--af-text);
+}
+
+body.af-custom-shell #wpbody-content .af-shell .form-table {
+	margin-top: 8px;
+}
+
+body.af-custom-shell #wpbody-content .af-shell .form-table th {
+	padding: 16px 24px 16px 0;
+	vertical-align: top;
+}
+
+body.af-custom-shell #wpbody-content .af-shell .form-table td {
+	padding: 12px 0;
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-required,
+body.af-custom-shell #wpbody-content .af-shell .required {
+	color: var(--af-negative);
+}
+
+/* ══ 10. Pestañas ════════════════════════════════════════════════════ */
+
+body.af-custom-shell #wpbody-content .af-shell .af-status-tabs,
+body.af-custom-shell #wpbody-content .af-shell .af-tabs__nav,
+body.af-custom-shell #wpbody-content .af-shell .subsubsub {
+	display: flex;
+	flex-wrap: nowrap;
+	gap: 4px;
+	margin: 0 0 16px;
+	padding: 0;
+	overflow-x: auto;
+	scrollbar-width: none;
+	border: 0;
+	border-bottom: 1px solid var(--af-border);
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-status-tabs::-webkit-scrollbar,
+body.af-custom-shell #wpbody-content .af-shell .af-tabs__nav::-webkit-scrollbar {
+	display: none;
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-status-tabs__btn,
+body.af-custom-shell #wpbody-content .af-shell .af-status-tabs__tab,
+body.af-custom-shell #wpbody-content .af-shell .af-tabs__tab {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	flex: none;
+	min-height: 40px;
+	margin: 0 0 -1px;
+	padding: 0 12px;
+	border: 0;
+	border-bottom: 2px solid transparent;
+	border-radius: 0;
+	background: transparent;
+	color: var(--af-text-muted);
+	font-size: 14px;
+	font-weight: 500;
+	box-shadow: none;
+	cursor: pointer;
+	transition: color var(--af-motion-fast), border-color var(--af-motion-base);
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-status-tabs__btn:hover,
+body.af-custom-shell #wpbody-content .af-shell .af-status-tabs__tab:hover,
+body.af-custom-shell #wpbody-content .af-shell .af-tabs__tab:hover {
+	background: transparent;
+	color: var(--af-text);
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-status-tabs__btn.is-active,
+body.af-custom-shell #wpbody-content .af-shell .af-status-tabs__tab.is-active,
+body.af-custom-shell #wpbody-content .af-shell .af-status-tabs__btn[aria-selected="true"],
+body.af-custom-shell #wpbody-content .af-shell .af-status-tabs__tab[aria-selected="true"],
+body.af-custom-shell #wpbody-content .af-shell .af-tabs__tab.is-active,
+body.af-custom-shell #wpbody-content .af-shell .af-tabs__radio:checked + .af-tabs__tab {
+	border-bottom-color: var(--af-accent);
+	background: transparent;
+	color: var(--af-text);
+	font-weight: 600;
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-status-tabs__count {
+	min-width: 20px;
+	height: 20px;
+	padding: 0 6px;
+	border-radius: 999px;
+	background: var(--af-raised);
+	color: var(--af-text-muted);
+	font-size: 12px;
+	font-weight: 600;
+	line-height: 20px;
+	text-align: center;
+	font-variant-numeric: tabular-nums;
+}
+
+/* ══ 11. Avisos ══════════════════════════════════════════════════════ */
+
+body.af-custom-shell #wpbody-content .af-shell .notice,
+body.af-custom-shell #wpbody-content > .notice,
+body.af-custom-shell #wpbody-content .af-shell div.updated,
+body.af-custom-shell #wpbody-content .af-shell div.error {
+	position: relative;
+	margin: 0 0 16px;
+	padding: 12px 44px 12px 16px;
+	border: 1px solid var(--af-border);
+	border-radius: var(--af-radius-md);
+	background: var(--af-surface);
+	color: var(--af-text);
+	box-shadow: none;
+}
+
+body.af-custom-shell #wpbody-content > .notice {
+	max-width: var(--af-page-max, 1320px);
+	margin: 16px var(--af-page-gutter, 29px) 0;
+}
+
+body.af-custom-shell #wpbody-content .af-shell .notice p,
+body.af-custom-shell #wpbody-content > .notice p {
+	margin: 0;
+	padding: 0;
+	font-size: 14px;
+	line-height: 1.5;
+}
+
+body.af-custom-shell #wpbody-content .af-shell .notice-success,
+body.af-custom-shell #wpbody-content > .notice-success,
+body.af-custom-shell #wpbody-content .af-shell div.updated {
+	border-color: var(--af-success-100);
+	background: var(--af-pill-positive-bg);
+	color: var(--af-pill-positive-ink);
+}
+
+body.af-custom-shell #wpbody-content .af-shell .notice-warning,
+body.af-custom-shell #wpbody-content > .notice-warning {
+	border-color: var(--af-warning-100);
+	background: var(--af-pill-warning-bg);
+	color: var(--af-pill-warning-ink);
+}
+
+body.af-custom-shell #wpbody-content .af-shell .notice-error,
+body.af-custom-shell #wpbody-content > .notice-error,
+body.af-custom-shell #wpbody-content .af-shell div.error {
+	border-color: var(--af-danger-100);
+	background: var(--af-pill-negative-bg);
+	color: var(--af-pill-negative-ink);
+}
+
+body.af-custom-shell #wpbody-content .af-shell .notice-info,
+body.af-custom-shell #wpbody-content > .notice-info {
+	border-color: var(--af-border);
+	background: var(--af-accent-soft);
+	color: var(--af-accent-ink);
+}
+
+body.af-custom-shell #wpbody-content .af-shell .notice .button,
+body.af-custom-shell #wpbody-content > .notice .button {
+	margin: 0 0 0 8px;
+}
+
+body.af-custom-shell .notice-dismiss {
+	top: 50%;
+	transform: translateY(-50%);
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-info-banner,
+body.af-custom-shell #wpbody-content .af-shell .af-info-strip {
+	border: 1px solid var(--af-border);
+	border-left-width: 1px;
+	border-radius: var(--af-radius-md);
+	background: var(--af-accent-soft);
+	color: var(--af-accent-ink);
+	box-shadow: none;
+}
+
+/* ══ 12. Vacíos ══════════════════════════════════════════════════════ */
+
+body.af-custom-shell #wpbody-content .af-shell .af-empty,
+body.af-custom-shell #wpbody-content .af-shell .af-pempty-state {
+	padding: 32px 24px;
+	border: 1px dashed var(--af-control);
+	border-radius: var(--af-radius-md);
+	background: transparent;
+	box-shadow: none;
+	text-align: center;
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-empty__icon {
+	width: auto;
+	height: auto;
+	margin: 0 auto 8px;
+	background: transparent;
+	color: var(--af-text-faint);
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-empty__title {
+	font-size: 16px;
+	font-weight: 600;
+	color: var(--af-text);
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-empty__text {
+	max-width: 52ch;
+	margin-inline: auto;
+	font-size: 14px;
+	color: var(--af-text-muted);
+}
+
+/* ══ 12b. Pasos de un flujo (lista ordenada real) ═════════════════════ */
+
+body.af-custom-shell #wpbody-content .wp-header-end {
+	margin: 0;
+	visibility: hidden;
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-flow-steps {
+	margin: 0 0 var(--af-gap, 24px);
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-flow-steps__title {
+	margin: 0 0 12px;
+	font-size: 16px;
+	font-weight: 600;
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-flow-steps__list {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 1px;
+	margin: 0;
+	padding: 0;
+	overflow: hidden;
+	list-style: none;
+	counter-reset: af-step;
+	border: 1px solid var(--af-border);
+	border-radius: var(--af-radius-md);
+	background: var(--af-border);
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-flow-steps__step {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	margin: 0;
+	padding: 16px 20px 16px 56px;
+	background: var(--af-surface);
+	counter-increment: af-step;
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-flow-steps__step::before {
+	content: counter(af-step);
+	position: absolute;
+	top: 16px;
+	left: 20px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	border-radius: 50%;
+	background: var(--af-active);
+	color: var(--af-accent-ink);
+	font-size: 13px;
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-flow-steps__step strong {
+	font-size: 14px;
+	font-weight: 600;
+	line-height: 24px;
+	color: var(--af-text);
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-flow-steps__step span {
+	font-size: 13px;
+	color: var(--af-text-muted);
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-flow-steps__action {
+	align-self: flex-start;
+	margin-top: 4px;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--af-accent);
+	font: 600 13px/1.4 var(--af-font-family);
+	text-decoration: none;
+	cursor: pointer;
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-flow-steps__action::after {
+	content: " →";
+}
+
+body.af-custom-shell #wpbody-content .af-shell .af-flow-steps__action:hover {
+	text-decoration: underline;
+}
+
+/* ══ 12c. Asistente de inmueble (af-wizard) ══════════════════════════ */
+
+body.af-custom-shell #wpbody-content .af-wizard {
+	min-height: 0;
+	margin: 0;
+	padding: 0 0 48px;
+	background: transparent;
+	color: var(--af-text);
+}
+
+body.af-custom-shell #wpbody-content .af-wizard__header {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 8px;
+	max-width: var(--af-page-max, 1320px);
+	margin: 0 auto;
+	padding: 0 0 20px;
+	border: 0;
+	background: transparent;
+}
+
+body.af-custom-shell #wpbody-content .af-wizard__back {
+	justify-self: start;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--af-text-muted);
+	font-size: 14px;
+	font-weight: 500;
+}
+
+body.af-custom-shell #wpbody-content .af-wizard__back:hover {
+	color: var(--af-accent);
+}
+
+body.af-custom-shell #wpbody-content .af-wizard__title h1 {
+	font-size: 32px;
+	font-weight: 700;
+}
+
+body.af-custom-shell #wpbody-content .af-wizard__subtitle {
+	margin-top: 6px;
+	font-size: 15px;
+	color: var(--af-text-muted);
+}
+
+body.af-custom-shell #wpbody-content .af-wizard__progress-meta {
+	color: var(--af-text-muted);
+}
+
+body.af-custom-shell #wpbody-content .af-wizard__progress-bar {
+	background: var(--af-accent-track);
+}
+
+body.af-custom-shell #wpbody-content .af-wizard__progress-bar > i {
+	background: var(--af-accent);
+}
+
+body.af-custom-shell #wpbody-content .af-wizard__layout {
+	grid-template-columns: 240px minmax(0, 1fr);
+	gap: var(--af-gap, 24px);
+	max-width: var(--af-page-max, 1320px);
+	margin: 0 auto;
+	padding: 0;
+}
+
+body.af-custom-shell #wpbody-content .af-wizard__nav {
+	top: 88px;
+	padding: 8px;
+	border: 1px solid var(--af-border);
+	border-radius: var(--af-radius-md);
+	background: var(--af-surface);
+	box-shadow: none;
+}
+
+body.af-custom-shell #wpbody-content .af-wizard__step-btn {
+	min-height: 40px;
+	border-radius: var(--af-radius-sm);
+	color: var(--af-gray-700);
+}
+
+body.af-custom-shell #wpbody-content .af-wizard__step-btn:hover {
+	background: var(--af-raised);
+	color: var(--af-text);
+}
+
+body.af-custom-shell #wpbody-content .af-wizard__step-item.is-current .af-wizard__step-btn {
+	background: var(--af-active);
+	color: var(--af-accent-ink);
+}
+
+body.af-custom-shell #wpbody-content .af-wizard__step-num {
+	background: var(--af-raised);
+	color: var(--af-gray-700);
+}
+
+body.af-custom-shell #wpbody-content .af-wizard__step-item.is-current .af-wizard__step-num {
+	background: var(--af-accent);
+	color: #fff;
+}
+
+body.af-custom-shell #wpbody-content .af-wizard__step-item.is-done .af-wizard__step-btn {
+	color: var(--af-positive);
+}
+
+body.af-custom-shell #wpbody-content .af-wizard__step-item.is-done .af-wizard__step-num {
+	background: var(--af-pill-positive-bg);
+	color: var(--af-pill-positive-ink);
+}
+
+body.af-custom-shell #wpbody-content .af-wizard__form {
+	border: 1px solid var(--af-border);
+	border-radius: var(--af-radius-md);
+	background: var(--af-surface);
+	box-shadow: none;
+}
+
+body.af-custom-shell #wpbody-content .af-wizard__step {
+	border-bottom-color: var(--af-rule);
+}
+
+body.af-custom-shell #wpbody-content .af-wizard__step-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 44px;
+	height: 44px;
+	border-radius: 50%;
+	background: var(--af-raised);
+	color: var(--af-accent);
+	font-size: 0;
+}
+
+body.af-custom-shell #wpbody-content .af-prop-type-card,
+body.af-custom-shell #wpbody-content .af-amenity-chip {
+	border: 1px solid var(--af-control);
+	border-radius: var(--af-radius-md);
+	background: var(--af-surface);
+	color: var(--af-text);
+	box-shadow: none;
+	transition: border-color var(--af-motion-fast), background-color var(--af-motion-fast);
+}
+
+body.af-custom-shell #wpbody-content .af-prop-type-card:hover,
+body.af-custom-shell #wpbody-content .af-amenity-chip:hover {
+	border-color: var(--af-accent);
+	transform: none;
+	box-shadow: none;
+}
+
+body.af-custom-shell #wpbody-content .af-prop-type-card.is-selected,
+body.af-custom-shell #wpbody-content .af-amenity-chip.is-selected {
+	border-color: var(--af-accent);
+	background: var(--af-accent-soft);
+	color: var(--af-accent-ink);
+	box-shadow: inset 0 0 0 1px var(--af-accent);
+}
+
+body.af-custom-shell #wpbody-content .af-prop-type-card__icon,
+body.af-custom-shell #wpbody-content .af-amenity-chip__icon {
+	display: inline-flex;
+	color: var(--af-accent);
+	font-size: 0;
+	background: transparent;
+}
+
+body.af-custom-shell #wpbody-content .af-wizard__actions {
+	padding: 12px 24px;
+	border-top: 1px solid var(--af-border);
+	background: var(--af-surface);
+	-webkit-backdrop-filter: none;
+	backdrop-filter: none;
+	box-shadow: none;
+}
+
+body.af-custom-shell #wpbody-content .af-wizard__publish.button-primary,
+body.af-custom-shell #wpbody-content .af-wizard__next.button-primary {
+	min-height: 40px;
+	padding: 0 20px;
+	border: 1px solid var(--af-accent);
+	border-radius: var(--af-radius-sm);
+	background: var(--af-accent);
+	color: #fff;
+	box-shadow: none;
+	filter: none;
+	transform: none;
+}
+
+body.af-custom-shell #wpbody-content .af-wizard__publish.button-primary:hover,
+body.af-custom-shell #wpbody-content .af-wizard__next.button-primary:hover {
+	border-color: var(--af-accent-hover);
+	background: var(--af-accent-hover);
+}
+
+body.af-custom-shell #wpbody-content .af-wizard__prev,
+body.af-custom-shell #wpbody-content .af-wizard__draft {
+	min-height: 40px;
+	border-radius: var(--af-radius-sm);
+}
+
+body.af-custom-shell #wpbody-content .af-wizard__spinner {
+	border-top-color: var(--af-accent);
+}
+
+/* ══ 13. Modales ═════════════════════════════════════════════════════ */
+
+body.af-custom-shell .af-modal {
+	z-index: var(--af-z-modal, 100080);
+	font-family: var(--af-font-family);
+}
+
+body.af-custom-shell .af-modal .af-modal__backdrop,
+body.af-custom-shell .af-modal .af-modal__overlay {
+	background: rgba(10, 28, 32, 0.48) !important;
+	-webkit-backdrop-filter: none;
+	backdrop-filter: none;
+}
+
+body.af-custom-shell .af-modal .af-modal__dialog {
+	border: 0;
+	border-radius: var(--af-radius-xl);
+	background: var(--af-surface);
+	color: var(--af-text);
+	box-shadow: var(--af-shadow-lg);
+}
+
+body.af-custom-shell .af-modal .af-modal__title,
+body.af-custom-shell .af-modal h2 {
+	font-size: 20px;
+	font-weight: 700;
+	letter-spacing: -0.01em;
+	color: var(--af-text);
+}
+
+body.af-custom-shell .af-modal .af-modal__hint {
+	color: var(--af-text-muted);
+}
+
+body.af-custom-shell .af-modal .af-modal__close {
+	width: 36px;
+	height: 36px;
+	border-radius: 50%;
+	background: var(--af-raised);
+	color: var(--af-text);
+}
+
+/* ══ 14. Movimiento ══════════════════════════════════════════════════ */
+
+/* GSAP coordina las entradas: se apagan las animaciones CSS heredadas. */
+html.af-gsap body.af-custom-shell #wpbody-content .af-shell,
+html.af-gsap body.af-custom-shell #wpbody-content .af-shell > *,
+html.af-gsap body.af-custom-shell .af-kpi,
+html.af-gsap body.af-custom-shell .af-section,
+html.af-gsap body.af-custom-shell .af-modal,
+html.af-gsap body.af-custom-shell .af-modal .af-modal__dialog,
+html.af-gsap body.af-custom-shell .af-modal .af-modal__backdrop {
+	animation: none;
+}
+
+#af-nav-progress {
+	position: fixed;
+	top: 0;
+	left: 0;
+	z-index: 100110;
+	width: 0;
+	height: 3px;
+	opacity: 0;
+	pointer-events: none;
+	background: #164A55;
+	border-radius: 0 3px 3px 0;
+}
+
+/* ══ 15. Teléfono ════════════════════════════════════════════════════ */
+
+@media (min-width: 783px) and (max-width: 1100px) {
+	/* Tableta: una tabla ancha se desplaza dentro de su marco, nunca fuera de la tarjeta. */
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table:not(.af-leases-table) {
+		display: block;
+		max-width: 100%;
+		overflow-x: auto;
+		-webkit-overflow-scrolling: touch;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table:not(.af-leases-table) td,
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table:not(.af-leases-table) th {
+		white-space: nowrap;
+	}
+}
+
+@media (max-width: 1100px) {
+	body.af-custom-shell #wpbody-content .af-alerts-center__grid,
+	body.af-custom-shell #wpbody-content .af-cal {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
+@media (max-width: 782px) {
+	/* Un elemento ancho nunca debe ensanchar la página y arrastrar las barras fijas. */
+	body.af-custom-shell #wpbody-content {
+		overflow-x: clip;
+	}
+
+	body.af-custom-shell #wpbody-content .af-alerts-center__item {
+		flex-wrap: wrap;
+	}
+
+	body.af-custom-shell #wpbody-content .af-alerts-center__body {
+		flex: 1 1 calc(100% - 40px);
+		min-width: 0;
+	}
+
+	body.af-custom-shell #wpbody-content .af-alerts-center__actions {
+		display: flex;
+		flex: 1 1 100%;
+		flex-wrap: wrap;
+		gap: 8px;
+		padding-left: 32px;
+	}
+
+	body.af-custom-shell #wpbody-content .af-cal__grid {
+		grid-template-columns: repeat(7, minmax(0, 1fr));
+		gap: 3px;
+	}
+
+	body.af-custom-shell #wpbody-content .af-cal__day {
+		min-width: 0;
+		min-height: 52px;
+		padding: 4px;
+		border-radius: 6px;
+		overflow: hidden;
+	}
+
+	body.af-custom-shell #wpbody-content > .wrap,
+	body.af-custom-shell #wpbody-content > .af-shell {
+		padding: 20px 16px 0;
+	}
+
+	body.af-custom-shell #wpbody-content > .notice {
+		margin: 12px 16px 0;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell h1,
+	body.af-custom-shell #wpbody-content .af-shell .wp-heading-inline,
+	body.af-custom-shell #wpbody-content .af-panel .af-panel__title {
+		font-size: 24px;
+		letter-spacing: -0.015em;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell .af-page-header {
+		margin-bottom: 20px;
+		align-items: stretch;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell .af-page-header__title {
+		flex-basis: 100%;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell .af-page-header__subtitle {
+		font-size: 14px;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell .af-page-header__actions {
+		width: 100%;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell .af-page-header__actions > .button,
+	body.af-custom-shell #wpbody-content .af-shell .af-page-header__actions > .af-btn {
+		flex: 1 1 auto;
+	}
+
+	/* Objetivos de toque de 44px; 16px en campos evita el zoom de iOS. */
+	body.af-custom-shell #wpbody-content .af-shell .button,
+	body.af-custom-shell #wpbody-content .af-shell .af-btn,
+	body.af-custom-shell .af-modal .button,
+	body.af-custom-shell .af-modal .af-btn {
+		min-height: 44px;
+		padding: 0 16px;
+		font-size: 15px;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell .af-btn--sm,
+	body.af-custom-shell #wpbody-content .af-shell .button-small {
+		min-height: 38px;
+		font-size: 14px;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell input[type="text"],
+	body.af-custom-shell #wpbody-content .af-shell input[type="email"],
+	body.af-custom-shell #wpbody-content .af-shell input[type="url"],
+	body.af-custom-shell #wpbody-content .af-shell input[type="tel"],
+	body.af-custom-shell #wpbody-content .af-shell input[type="number"],
+	body.af-custom-shell #wpbody-content .af-shell input[type="password"],
+	body.af-custom-shell #wpbody-content .af-shell input[type="search"],
+	body.af-custom-shell #wpbody-content .af-shell input[type="date"],
+	body.af-custom-shell #wpbody-content .af-shell input[type="datetime-local"],
+	body.af-custom-shell #wpbody-content .af-shell input[type="month"],
+	body.af-custom-shell #wpbody-content .af-shell select,
+	body.af-custom-shell #wpbody-content .af-shell textarea,
+	body.af-custom-shell .af-modal input[type="text"],
+	body.af-custom-shell .af-modal input[type="email"],
+	body.af-custom-shell .af-modal input[type="tel"],
+	body.af-custom-shell .af-modal input[type="number"],
+	body.af-custom-shell .af-modal input[type="date"],
+	body.af-custom-shell .af-modal select,
+	body.af-custom-shell .af-modal textarea {
+		min-height: 44px;
+		font-size: 16px;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell .af-section,
+	body.af-custom-shell #wpbody-content .af-shell .af-pcard,
+	body.af-custom-shell #wpbody-content .af-shell > .card,
+	body.af-custom-shell #wpbody-content .af-shell .postbox {
+		padding: 16px;
+	}
+
+	/* Cifras: rejilla de dos columnas; una celda impar ocupa la fila. */
+	body.af-custom-shell #wpbody-content .af-shell .af-kpi-grid,
+	body.af-custom-shell #wpbody-content .af-panel .af-pk-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell .af-kpi-grid > :last-child:nth-child(odd),
+	body.af-custom-shell #wpbody-content .af-panel .af-pk-grid > .af-pk--hero,
+	body.af-custom-shell #wpbody-content .af-panel .af-pk-grid > .af-pk--hero:first-child ~ .af-pk:last-child:nth-child(even) {
+		grid-column: 1 / -1;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell .af-kpi,
+	body.af-custom-shell #wpbody-content .af-panel .af-pk {
+		padding: 16px;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell .af-kpi__value,
+	body.af-custom-shell #wpbody-content .af-panel .af-pk__value {
+		font-size: 22px;
+	}
+
+	body.af-custom-shell #wpbody-content .af-panel .af-pk--hero .af-pk__value {
+		font-size: 30px;
+	}
+
+	/* Tablas → lista de filas de dos líneas. */
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table {
+		display: block;
+		border: 1px solid var(--af-border);
+		border-radius: var(--af-radius-md);
+		background: var(--af-surface);
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table thead,
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table tfoot {
+		display: none;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table tbody {
+		display: block;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table tbody tr {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 4px 12px;
+		margin: 0;
+		padding: 14px 16px;
+		border: 0;
+		border-top: 1px solid var(--af-rule);
+		border-radius: 0;
+		background: transparent;
+		box-shadow: none;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table tbody tr:first-child {
+		border-top: 0;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table tbody td,
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table tbody th {
+		display: flex;
+		align-items: baseline;
+		justify-content: flex-start;
+		gap: 6px;
+		width: auto;
+		min-height: 0;
+		margin: 0;
+		padding: 0;
+		border: 0;
+		font-size: 13px;
+		color: var(--af-text-muted);
+		text-align: left;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table tbody td::before {
+		content: attr(data-label) ":";
+		flex: none;
+		width: auto;
+		margin: 0;
+		padding: 0;
+		position: static;
+		font-size: 13px;
+		font-weight: 400;
+		color: var(--af-text-faint);
+		text-transform: none;
+		letter-spacing: 0;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table tbody td:not([data-label])::before,
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table tbody td[data-label=""]::before {
+		content: none;
+	}
+
+	/* Primera celda: la identidad de la fila, a lo ancho y en tinta. */
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table tbody td:first-child,
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table tbody th:first-child {
+		flex: 1 1 100%;
+		order: -1;
+		font-size: 15px;
+		font-weight: 600;
+		color: var(--af-text);
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table tbody td:first-child::before {
+		content: none;
+	}
+
+	/* Tablas cuya identidad está en la segunda columna (la primera es un ID). */
+	body.af-custom-shell #wpbody-content .af-shell table.af-leases-table tbody td:first-child,
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table--guests tbody td:first-child {
+		flex: 0 1 auto;
+		order: 0;
+		font-size: 13px;
+		font-weight: 400;
+		color: var(--af-text-muted);
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell table.af-leases-table tbody td:first-child::before,
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table--guests tbody td:first-child::before {
+		content: attr(data-label) ":";
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell table.af-leases-table tbody td:nth-child(2),
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table--guests tbody td:nth-child(2) {
+		flex: 1 1 100%;
+		order: -1;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px;
+		font-size: 15px;
+		font-weight: 600;
+		color: var(--af-text);
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell table.af-leases-table tbody td:nth-child(2)::before,
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table--guests tbody td:nth-child(2)::before {
+		content: none;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table tbody td .af-pill {
+		font-size: 12px;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table tbody td.af-td-actions,
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table tbody td.af-account-actions,
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table tbody td.column-actions,
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table tbody td:last-child:has(.button, .af-btn) {
+		flex: 1 1 100%;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px;
+		margin-top: 8px;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table tbody td.af-td-actions::before,
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table tbody td.af-account-actions::before,
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table tbody td:last-child:has(.button, .af-btn)::before {
+		content: none;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table tbody td.af-td-actions .button,
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table tbody td.af-td-actions .af-btn,
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table tbody td:last-child .button,
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table tbody td:last-child .af-btn {
+		width: auto;
+		flex: 0 1 auto;
+		min-height: 38px;
+		font-size: 14px;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table tbody td form {
+		display: inline-flex;
+		margin: 0;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table tbody td.af-lease-actions-cell {
+		flex: 1 1 100%;
+		margin-top: 8px;
+		min-width: 0;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell table.af-data-table tbody td.af-lease-actions-cell::before {
+		content: none;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell .af-lease-actions-menu,
+	body.af-custom-shell #wpbody-content .af-shell .af-lease-actions-menu > summary {
+		width: 100%;
+		justify-content: center;
+		min-height: 40px;
+		font-size: 14px;
+	}
+
+	/* Pasos: carrusel que se desliza con el pulgar. */
+	body.af-custom-shell #wpbody-content .af-shell .af-flow-steps__list {
+		display: flex;
+		gap: 8px;
+		margin: 0 -16px;
+		padding: 0 16px 4px;
+		overflow-x: auto;
+		scroll-snap-type: x mandatory;
+		scroll-padding: 0 16px;
+		scrollbar-width: none;
+		border: 0;
+		border-radius: 0;
+		background: transparent;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell .af-flow-steps__list::-webkit-scrollbar {
+		display: none;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell .af-flow-steps__step {
+		flex: 0 0 78%;
+		scroll-snap-align: start;
+		border: 1px solid var(--af-border);
+		border-radius: var(--af-radius-md);
+	}
+
+	/* Tablas sin etiquetas: se desplazan dentro de su marco. */
+	body.af-custom-shell #wpbody-content .af-shell table.widefat:not(.af-data-table) {
+		display: block;
+		overflow-x: auto;
+		-webkit-overflow-scrolling: touch;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell .form-table,
+	body.af-custom-shell #wpbody-content .af-shell .form-table tbody,
+	body.af-custom-shell #wpbody-content .af-shell .form-table tr,
+	body.af-custom-shell #wpbody-content .af-shell .form-table th,
+	body.af-custom-shell #wpbody-content .af-shell .form-table td {
+		display: block;
+		width: 100%;
+		padding-left: 0;
+		padding-right: 0;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell .form-table th {
+		padding: 12px 0 6px;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell .form-table td {
+		padding: 0 0 12px;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell .form-table input[type="text"],
+	body.af-custom-shell #wpbody-content .af-shell .form-table input[type="email"],
+	body.af-custom-shell #wpbody-content .af-shell .form-table input[type="url"],
+	body.af-custom-shell #wpbody-content .af-shell .form-table input[type="number"],
+	body.af-custom-shell #wpbody-content .af-shell .form-table select,
+	body.af-custom-shell #wpbody-content .af-shell .form-table textarea,
+	body.af-custom-shell #wpbody-content .af-shell .form-table .regular-text {
+		width: 100%;
+		max-width: none;
+	}
+
+	/* Modales → hojas desde abajo. */
+	body.af-custom-shell .af-modal .af-modal__dialog,
+	body.af-custom-shell #wpbody-content .af-shell .af-modal__dialog {
+		position: fixed;
+		inset: auto 0 0 0;
+		width: 100%;
+		max-width: none;
+		max-height: min(92vh, 92dvh);
+		margin: 0;
+		padding-bottom: calc(16px + env(safe-area-inset-bottom));
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		border-radius: var(--af-radius-xl) var(--af-radius-xl) 0 0;
+	}
+
+	body.af-custom-shell .af-modal .af-modal__dialog::before {
+		background: var(--af-control);
+	}
+
+	body.af-custom-shell .af-modal .af-modal__footer {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		border-top: 1px solid var(--af-rule);
+		background: var(--af-surface);
+	}
+
+	body.af-custom-shell .af-modal .af-modal__footer > .button,
+	body.af-custom-shell .af-modal .af-modal__footer > .af-btn {
+		flex: 1 1 auto;
+	}
+
+	/* Asistente: tarea enfocada; la barra inferior se aparta y la de acciones va abajo. */
+	body.af-custom-shell.admin_page_af-accommodation-form .af-tabbar {
+		display: none;
+	}
+
+	body.af-custom-shell.admin_page_af-accommodation-form #wpbody-content {
+		padding-bottom: 24px;
+	}
+
+	body.af-custom-shell #wpbody-content .af-wizard__title h1 {
+		font-size: 24px;
+	}
+
+	body.af-custom-shell #wpbody-content .af-wizard__layout {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 16px;
+	}
+
+	body.af-custom-shell #wpbody-content .af-wizard__nav {
+		position: static;
+		margin: 0 -16px;
+		padding: 0 16px;
+		border: 0;
+		border-radius: 0;
+		background: transparent;
+	}
+
+	body.af-custom-shell #wpbody-content .af-wizard__steps {
+		display: flex;
+		gap: 6px;
+		overflow-x: auto;
+		scroll-snap-type: x proximity;
+		scrollbar-width: none;
+	}
+
+	body.af-custom-shell #wpbody-content .af-wizard__step-btn {
+		min-height: 40px;
+		border: 1px solid var(--af-border);
+		border-radius: 999px;
+		background: var(--af-surface);
+		white-space: nowrap;
+		scroll-snap-align: start;
+	}
+
+	body.af-custom-shell #wpbody-content .af-wizard__step {
+		padding: 20px 16px;
+	}
+
+	body.af-custom-shell #wpbody-content .af-wizard__actions {
+		position: sticky;
+		bottom: 0;
+		margin: 0 -1px;
+		padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+	}
+
+	/* Lo fijo abajo convive con la barra inferior. */
+	body.af-custom-shell .af-sticky-actions {
+		bottom: calc(var(--af-tabbar-h, 64px) + env(safe-area-inset-bottom));
+		background: var(--af-surface);
+		-webkit-backdrop-filter: none;
+		backdrop-filter: none;
+		box-shadow: none;
+		border-top: 1px solid var(--af-border);
+	}
+
+	body.af-custom-shell .af-toast-stack {
+		top: auto;
+		right: 12px;
+		left: 12px;
+		bottom: calc(80px + env(safe-area-inset-bottom));
+		width: auto;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	body.af-custom-shell #wpbody-content .af-shell *,
+	body.af-custom-shell .af-modal * {
+		transition-duration: 0ms !important;
+	}
+}

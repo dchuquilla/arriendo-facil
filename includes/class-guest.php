@@ -293,15 +293,17 @@ class Arriendo_Facil_Guest {
 			'created_by'           => 'ALTER TABLE ' . $table . ' ADD COLUMN created_by BIGINT(20) UNSIGNED DEFAULT NULL',
 		);
 
-		foreach ( $columns as $column_name => $sql ) {
-			$exists = $wpdb->get_var(
-				$wpdb->prepare(
-					"SHOW COLUMNS FROM {$table} LIKE %s",
-					$column_name
-				)
-			);
+		// Called by several screens and handlers per request: check once, with one query.
+		static $checked = false;
+		if ( $checked ) {
+			return true;
+		}
 
-			if ( $exists ) {
+		$existing = $wpdb->get_col( "SHOW COLUMNS FROM {$table}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name built from $wpdb->prefix.
+		$existing = is_array( $existing ) ? array_flip( array_map( 'strtolower', $existing ) ) : array();
+
+		foreach ( $columns as $column_name => $sql ) {
+			if ( isset( $existing[ $column_name ] ) ) {
 				continue;
 			}
 
@@ -311,6 +313,7 @@ class Arriendo_Facil_Guest {
 			}
 		}
 
+		$checked = true;
 		return true;
 	}
 

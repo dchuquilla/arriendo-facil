@@ -229,27 +229,27 @@ class Arriendo_Facil_Activator {
 			"SELECT DISTINCT wp_user_id FROM {$wpdb->prefix}af_owner_contacts WHERE wp_user_id IS NOT NULL AND wp_user_id > 0"
 		);
 
-		if ( ! is_array( $owner_user_ids ) || empty( $owner_user_ids ) ) {
+		$owner_user_ids = is_array( $owner_user_ids ) ? array_filter( array_map( 'absint', $owner_user_ids ) ) : array();
+		if ( empty( $owner_user_ids ) ) {
 			return;
 		}
 
-		foreach ( $owner_user_ids as $owner_user_id ) {
-			$owner_user_id = absint( $owner_user_id );
-			if ( ! $owner_user_id ) {
-				continue;
-			}
+		// Runs on every request: one query returns only the owners still missing
+		// the role, instead of loading every owner user (2 queries each).
+		$pending_ids = get_users(
+			array(
+				'include'      => $owner_user_ids,
+				'role__not_in' => array( 'administrator', 'af_property_admin' ),
+				'fields'       => 'ID',
+				'count_total'  => false,
+			)
+		);
 
-			$user = get_userdata( $owner_user_id );
-			if ( ! $user instanceof WP_User ) {
-				continue;
+		foreach ( $pending_ids as $owner_user_id ) {
+			$user = get_userdata( absint( $owner_user_id ) );
+			if ( $user instanceof WP_User ) {
+				$user->set_role( 'af_property_admin' );
 			}
-
-			$roles = isset( $user->roles ) && is_array( $user->roles ) ? $user->roles : array();
-			if ( in_array( 'administrator', $roles, true ) || in_array( 'af_property_admin', $roles, true ) ) {
-				continue;
-			}
-
-			$user->set_role( 'af_property_admin' );
 		}
 	}
 

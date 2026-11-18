@@ -55,31 +55,24 @@ class Arriendo_Facil_Owner_Contact {
 	 * @return void
 	 */
 	public function restore_protected_admin_accounts() {
+		// Runs on every request: full user objects are loaded in one batch (users +
+		// meta primed together), so the capability check below costs no extra queries.
 		$disabled_users = get_users(
 			array(
-				'fields'     => array( 'ID' ),
-				'meta_key'   => 'af_owner_account_status',
-				'meta_value' => 'disabled',
-				'number'     => 200,
+				'fields'      => 'all',
+				'meta_key'    => 'af_owner_account_status',
+				'meta_value'  => 'disabled',
+				'number'      => 200,
+				'count_total' => false,
 			)
 		);
 
-		if ( empty( $disabled_users ) ) {
-			return;
-		}
-
-		foreach ( $disabled_users as $disabled_user ) {
-			$user_id = isset( $disabled_user->ID ) ? absint( $disabled_user->ID ) : 0;
-			if ( ! $user_id ) {
-				continue;
-			}
-
-			$user = get_user_by( 'id', $user_id );
+		foreach ( $disabled_users as $user ) {
 			if ( ! ( $user instanceof WP_User ) || ! $this->is_protected_admin_user( $user ) ) {
 				continue;
 			}
 
-			update_user_meta( $user_id, 'af_owner_account_status', 'active' );
+			update_user_meta( (int) $user->ID, 'af_owner_account_status', 'active' );
 		}
 	}
 

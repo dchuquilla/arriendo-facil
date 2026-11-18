@@ -26,38 +26,38 @@ $statuses = array(
 );
 
 $property_types = array(
-	'apartment'  => array( 'label' => __( 'Apartamento', 'arriendo-facil' ), 'icon' => '&#x1F3E2;' ),
-	'house'      => array( 'label' => __( 'Casa', 'arriendo-facil' ), 'icon' => '&#x1F3E0;' ),
-	'office'     => array( 'label' => __( 'Oficina', 'arriendo-facil' ), 'icon' => '&#x1F3D7;' ),
-	'room'       => array( 'label' => __( 'Habitación', 'arriendo-facil' ), 'icon' => '&#x1F6CF;' ),
-	'commercial' => array( 'label' => __( 'Comercial', 'arriendo-facil' ), 'icon' => '&#x1F3EA;' ),
+	'apartment'  => array( 'label' => __( 'Apartamento', 'arriendo-facil' ), 'icon' => 'building' ),
+	'house'      => array( 'label' => __( 'Casa', 'arriendo-facil' ), 'icon' => 'home' ),
+	'office'     => array( 'label' => __( 'Oficina', 'arriendo-facil' ), 'icon' => 'building-2' ),
+	'room'       => array( 'label' => __( 'Habitación', 'arriendo-facil' ), 'icon' => 'bed' ),
+	'commercial' => array( 'label' => __( 'Comercial', 'arriendo-facil' ), 'icon' => 'store' ),
 );
 
 $amenities_options = array(
-	'pet-friendly' => array( 'label' => __( 'Mascotas', 'arriendo-facil' ), 'icon' => '&#x1F43E;' ),
-	'wifi'         => array( 'label' => __( 'WiFi', 'arriendo-facil' ), 'icon' => '&#x1F4F6;' ),
-	'parking'      => array( 'label' => __( 'Parqueadero', 'arriendo-facil' ), 'icon' => '&#x1F17F;' ),
-	'pool'         => array( 'label' => __( 'Piscina', 'arriendo-facil' ), 'icon' => '&#x1F3CA;' ),
-	'gym'          => array( 'label' => __( 'Gimnasio', 'arriendo-facil' ), 'icon' => '&#x1F3CB;' ),
-	'kitchen'      => array( 'label' => __( 'Cocina', 'arriendo-facil' ), 'icon' => '&#x1F373;' ),
-	'balcony'      => array( 'label' => __( 'Balcón', 'arriendo-facil' ), 'icon' => '&#x1F305;' ),
-	'ac'           => array( 'label' => __( 'Aire Acond.', 'arriendo-facil' ), 'icon' => '&#x2744;' ),
+	'pet-friendly' => array( 'label' => __( 'Mascotas', 'arriendo-facil' ), 'icon' => 'paw-print' ),
+	'wifi'         => array( 'label' => __( 'WiFi', 'arriendo-facil' ), 'icon' => 'wifi' ),
+	'parking'      => array( 'label' => __( 'Parqueadero', 'arriendo-facil' ), 'icon' => 'square-parking' ),
+	'pool'         => array( 'label' => __( 'Piscina', 'arriendo-facil' ), 'icon' => 'waves' ),
+	'gym'          => array( 'label' => __( 'Gimnasio', 'arriendo-facil' ), 'icon' => 'dumbbell' ),
+	'kitchen'      => array( 'label' => __( 'Cocina', 'arriendo-facil' ), 'icon' => 'utensils' ),
+	'balcony'      => array( 'label' => __( 'Balcón', 'arriendo-facil' ), 'icon' => 'sun' ),
+	'ac'           => array( 'label' => __( 'Aire Acond.', 'arriendo-facil' ), 'icon' => 'snowflake' ),
 );
 
 $steps = array(
-	1 => array( 'title' => __( 'Tipo y nombre', 'arriendo-facil' ),    'icon' => '&#x1F3E0;' ),
-	2 => array( 'title' => __( 'Ubicación', 'arriendo-facil' ),        'icon' => '&#x1F4CD;' ),
-	3 => array( 'title' => __( 'Características', 'arriendo-facil' ),  'icon' => '&#x1F4D0;' ),
-	4 => array( 'title' => __( 'Fotos', 'arriendo-facil' ),            'icon' => '&#x1F4F7;' ),
-	5 => array( 'title' => __( 'Precio y propietario', 'arriendo-facil' ), 'icon' => '&#x1F4B0;' ),
-	6 => array( 'title' => __( 'Resumen y publicar', 'arriendo-facil' ),   'icon' => '&#x1F4DD;' ),
+	1 => array( 'title' => __( 'Tipo y nombre', 'arriendo-facil' ),    'icon' => 'home' ),
+	2 => array( 'title' => __( 'Ubicación', 'arriendo-facil' ),        'icon' => 'map-pin' ),
+	3 => array( 'title' => __( 'Características', 'arriendo-facil' ),  'icon' => 'ruler' ),
+	4 => array( 'title' => __( 'Fotos', 'arriendo-facil' ),            'icon' => 'camera' ),
+	5 => array( 'title' => __( 'Precio y propietario', 'arriendo-facil' ), 'icon' => 'banknote' ),
+	6 => array( 'title' => __( 'Resumen y publicar', 'arriendo-facil' ),   'icon' => 'clipboard-check' ),
 );
 
 if ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) {
-	$steps[7] = array( 'title' => __( 'Sincronización OTA', 'arriendo-facil' ), 'icon' => '&#x1F4F1;' );
+	$steps[7] = array( 'title' => __( 'Sincronización OTA', 'arriendo-facil' ), 'icon' => 'smartphone' );
 }
 
-$wizard_class = 'af-wizard af-wizard--' . esc_attr( $mode );
+$wizard_class = 'af-wizard af-shell af-wizard--' . esc_attr( $mode );
 $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data['featured_id'], 'medium' ) : '';
 ?>
 <div class="<?php echo esc_attr( $wizard_class ); ?>" data-mode="<?php echo esc_attr( $mode ); ?>">
@@ -119,7 +119,7 @@ $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data[
 			<!-- ============ PASO 1: TIPO Y NOMBRE ============ -->
 			<section class="af-wizard__step" data-step="1">
 				<div class="af-wizard__step-head">
-					<span class="af-wizard__step-icon"><?php echo $steps[1]['icon']; // phpcs:ignore WordPress.Security.EscapeOutput ?></span>
+					<span class="af-wizard__step-icon"><?php echo af_lucide( $steps[1]['icon'], 22 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
 					<div>
 						<h2><?php esc_html_e( 'Tipo y nombre', 'arriendo-facil' ); ?></h2>
 						<p><?php esc_html_e( 'Empecemos por lo básico: qué tipo de propiedad es y cómo se llamará en la publicación.', 'arriendo-facil' ); ?></p>
@@ -142,7 +142,7 @@ $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data[
 							<label class="af-prop-type-card <?php echo ( $data['property_type'] === $type_value ) ? 'is-selected' : ''; ?>">
 								<input type="radio" name="af_property_type" value="<?php echo esc_attr( $type_value ); ?>"
 									<?php checked( $data['property_type'], $type_value ); ?> />
-								<span class="af-prop-type-card__icon"><?php echo $type_data['icon']; // phpcs:ignore WordPress.Security.EscapeOutput ?></span>
+								<span class="af-prop-type-card__icon"><?php echo af_lucide( $type_data['icon'], 26 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
 								<span class="af-prop-type-card__label"><?php echo esc_html( $type_data['label'] ); ?></span>
 							</label>
 						<?php endforeach; ?>
@@ -169,7 +169,7 @@ $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data[
 			<!-- ============ PASO 2: UBICACIÓN ============ -->
 			<section class="af-wizard__step" data-step="2">
 				<div class="af-wizard__step-head">
-					<span class="af-wizard__step-icon"><?php echo $steps[2]['icon']; // phpcs:ignore WordPress.Security.EscapeOutput ?></span>
+					<span class="af-wizard__step-icon"><?php echo af_lucide( $steps[2]['icon'], 22 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
 					<div>
 						<h2><?php esc_html_e( 'Ubicación', 'arriendo-facil' ); ?></h2>
 						<p><?php esc_html_e( 'Indica la dirección y marca el inmueble en el mapa para que los inquilinos lo encuentren.', 'arriendo-facil' ); ?></p>
@@ -233,7 +233,7 @@ $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data[
 			<!-- ============ PASO 3: CARACTERÍSTICAS ============ -->
 			<section class="af-wizard__step" data-step="3">
 				<div class="af-wizard__step-head">
-					<span class="af-wizard__step-icon"><?php echo $steps[3]['icon']; // phpcs:ignore WordPress.Security.EscapeOutput ?></span>
+					<span class="af-wizard__step-icon"><?php echo af_lucide( $steps[3]['icon'], 22 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
 					<div>
 						<h2><?php esc_html_e( 'Características', 'arriendo-facil' ); ?></h2>
 						<p><?php esc_html_e( 'Cuéntale al inquilino cuántos espacios tiene y qué amenidades incluye.', 'arriendo-facil' ); ?></p>
@@ -283,7 +283,7 @@ $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data[
 						?>
 							<label class="af-amenity-chip <?php echo $is_checked ? 'is-selected' : ''; ?>">
 								<input type="checkbox" name="af_amenities[]" value="<?php echo esc_attr( $amenity_value ); ?>" <?php checked( $is_checked ); ?> />
-								<span class="af-amenity-chip__icon"><?php echo $amenity_data['icon']; // phpcs:ignore WordPress.Security.EscapeOutput ?></span>
+								<span class="af-amenity-chip__icon"><?php echo af_lucide( $amenity_data['icon'], 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
 								<span class="af-amenity-chip__label"><?php echo esc_html( $amenity_data['label'] ); ?></span>
 							</label>
 						<?php endforeach; ?>
@@ -384,7 +384,7 @@ $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data[
 			<!-- ============ PASO 4: FOTOS ============ -->
 			<section class="af-wizard__step" data-step="4">
 				<div class="af-wizard__step-head">
-					<span class="af-wizard__step-icon"><?php echo $steps[4]['icon']; // phpcs:ignore WordPress.Security.EscapeOutput ?></span>
+					<span class="af-wizard__step-icon"><?php echo af_lucide( $steps[4]['icon'], 22 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
 					<div>
 						<h2><?php esc_html_e( 'Fotos', 'arriendo-facil' ); ?></h2>
 						<p><?php esc_html_e( 'Una buena galería triplica las consultas. Sube fotos claras y bien iluminadas.', 'arriendo-facil' ); ?></p>
@@ -458,7 +458,7 @@ $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data[
 			<!-- ============ PASO 5: PRECIO Y PUBLICACIÓN ============ -->
 			<section class="af-wizard__step" data-step="5">
 				<div class="af-wizard__step-head">
-					<span class="af-wizard__step-icon"><?php echo $steps[5]['icon']; // phpcs:ignore WordPress.Security.EscapeOutput ?></span>
+					<span class="af-wizard__step-icon"><?php echo af_lucide( $steps[5]['icon'], 22 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
 					<div>
 						<h2><?php esc_html_e( 'Precio y publicación', 'arriendo-facil' ); ?></h2>
 						<p><?php esc_html_e( 'Define el arriendo mensual y publica el inmueble.', 'arriendo-facil' ); ?></p>
@@ -605,7 +605,7 @@ $featured_url = $data['featured_id'] ? wp_get_attachment_image_url( (int) $data[
 			<!-- ============ PASO 6: RESUMEN ============ -->
 			<section class="af-wizard__step" data-step="6">
 				<div class="af-wizard__step-head">
-					<span class="af-wizard__step-icon"><?php echo $steps[6]['icon']; // phpcs:ignore WordPress.Security.EscapeOutput ?></span>
+					<span class="af-wizard__step-icon"><?php echo af_lucide( $steps[6]['icon'], 22 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
 					<div>
 						<h2><?php esc_html_e( 'Resumen', 'arriendo-facil' ); ?></h2>
 						<p><?php esc_html_e( 'Revisa toda la información antes de publicar. Puedes volver a cualquier paso para corregir.', 'arriendo-facil' ); ?></p>

@@ -261,6 +261,7 @@ $money = static function ( $amount ) {
 			<?php esc_html_e( 'Nuevo inmueble', 'arriendo-facil' ); ?>
 		</a>
 	</header>
+	<hr class="wp-header-end" />
 
 	<?php if ( 0 === $property_total ) : ?>
 

@@ -234,38 +234,25 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 	}
 	?>
 
-	<!-- Contract Process Steps -->
-	<div class="af-section" style="padding: var(--af-space-4); margin-bottom: var(--af-space-5); background:#f7f8f6; border-radius: 8px;">
-		<h3 style="margin: 0 0 var(--af-space-3); font-size: 14px; font-weight: 600; text-transform: uppercase; color: #647579;">
-			<?php esc_html_e( 'Flujo de Contratos', 'arriendo-facil' ); ?>
-		</h3>
-		<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--af-space-3);">
-			<div style="padding: var(--af-space-3); background: #fff; border-radius: 6px; border-left: 3px solid #2f7d73;">
-				<div style="font-weight: 600; font-size: 13px; color: #111; margin-bottom: 4px;">1. <?php esc_html_e( 'Registrar Inquilino', 'arriendo-facil' ); ?></div>
-				<p style="margin: 0; font-size: 12px; color: #647579;">
-					<?php esc_html_e( 'Completa datos de identidad y referencias.', 'arriendo-facil' ); ?>
-				</p>
-				<a href="<?php echo esc_url( admin_url( 'admin.php?page=af-guests' ) ); ?>" style="display: inline-block; margin-top: 6px; font-size: 12px; color: #2f7d73; text-decoration: none; font-weight: 500;">
-					<?php esc_html_e( 'Ir a Inquilinos →', 'arriendo-facil' ); ?>
-				</a>
-			</div>
-			<div style="padding: var(--af-space-3); background: #fff; border-radius: 6px; border-left: 3px solid #3882f6;">
-				<div style="font-weight: 600; font-size: 13px; color: #111; margin-bottom: 4px;">2. <?php esc_html_e( 'Crear Contrato', 'arriendo-facil' ); ?></div>
-				<p style="margin: 0; font-size: 12px; color: #647579;">
-					<?php esc_html_e( 'Vincula inmueble + inquilino + datos financieros.', 'arriendo-facil' ); ?>
-				</p>
-				<button type="button" id="af-new-lease-from-steps" style="display: inline-block; margin-top: 6px; font-size: 12px; background: none; border: none; color: #2f7d73; text-decoration: none; font-weight: 500; cursor: pointer; padding: 0;">
-					<?php esc_html_e( 'Crear Contrato →', 'arriendo-facil' ); ?>
-				</button>
-			</div>
-			<div style="padding: var(--af-space-3); background: #fff; border-radius: 6px; border-left: 3px solid #8b5cf6;">
-				<div style="font-weight: 600; font-size: 13px; color: #111; margin-bottom: 4px;">3. <?php esc_html_e( 'Activar', 'arriendo-facil' ); ?></div>
-				<p style="margin: 0; font-size: 12px; color: #647579;">
-					<?php esc_html_e( 'Sube documento y activa para emitir facturas.', 'arriendo-facil' ); ?>
-				</p>
-			</div>
-		</div>
-	</div>
+	<section class="af-flow-steps" aria-labelledby="af-lease-flow-title">
+		<h2 class="af-flow-steps__title" id="af-lease-flow-title"><?php esc_html_e( 'Cómo se activa un contrato', 'arriendo-facil' ); ?></h2>
+		<ol class="af-flow-steps__list">
+			<li class="af-flow-steps__step">
+				<strong><?php esc_html_e( 'Registra al inquilino', 'arriendo-facil' ); ?></strong>
+				<span><?php esc_html_e( 'Datos de identidad y referencias.', 'arriendo-facil' ); ?></span>
+				<a class="af-flow-steps__action" href="<?php echo esc_url( admin_url( 'admin.php?page=af-guests' ) ); ?>"><?php esc_html_e( 'Ir a Inquilinos', 'arriendo-facil' ); ?></a>
+			</li>
+			<li class="af-flow-steps__step">
+				<strong><?php esc_html_e( 'Crea el contrato', 'arriendo-facil' ); ?></strong>
+				<span><?php esc_html_e( 'Vincula inmueble, inquilino y datos financieros.', 'arriendo-facil' ); ?></span>
+				<button type="button" class="af-flow-steps__action" id="af-new-lease-from-steps"><?php esc_html_e( 'Crear contrato', 'arriendo-facil' ); ?></button>
+			</li>
+			<li class="af-flow-steps__step">
+				<strong><?php esc_html_e( 'Actívalo', 'arriendo-facil' ); ?></strong>
+				<span><?php esc_html_e( 'Sube el documento firmado para emitir facturas.', 'arriendo-facil' ); ?></span>
+			</li>
+		</ol>
+	</section>
 
 	<div id="af-lease-form-card" class="af-section" style="padding: var(--af-space-5); margin-bottom: var(--af-space-4); display:none;">
 		<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--af-space-3);">

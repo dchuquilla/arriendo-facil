@@ -702,7 +702,10 @@ body.af-custom-shell .af-modal input[type="date"],
 body.af-custom-shell .af-modal select,
 body.af-custom-shell .af-modal textarea {
 	min-height: 40px;
-	padding: 8px 12px;
+	max-width: 100%;
+	padding-top: 8px;
+	padding-bottom: 8px;
+	padding-right: 12px;
 	border: 1px solid var(--af-control);
 	border-radius: var(--af-radius-sm);
 	background-color: var(--af-surface);
@@ -805,6 +808,27 @@ body.af-custom-shell #wpbody-content .af-shell .form-table td {
 body.af-custom-shell #wpbody-content .af-shell .af-required,
 body.af-custom-shell #wpbody-content .af-shell .required {
 	color: var(--af-negative);
+}
+
+/* Campos que dibujan su borde en el contenedor (búsqueda de Inmuebles). */
+body.af-custom-shell #wpbody-content .af-shell .af-psearch__field input[type="search"] {
+	flex: 1 1 auto;
+	width: auto;
+	min-width: 0;
+	min-height: 0;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	box-shadow: none;
+}
+
+/* Rejillas y barras: sus hijos pueden encoger; ningún control supera su contenedor. */
+body.af-custom-shell #wpbody-content .af-shell :is([class*="grid"], [class*="layout"], [class*="toolbar"], .af-split) > * {
+	min-width: 0;
+}
+
+body.af-custom-shell #wpbody-content .af-shell :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+	box-sizing: border-box;
 }
 
 /* ══ 10. Pestañas ════════════════════════════════════════════════════ */
@@ -1797,6 +1821,60 @@ html.af-gsap body.af-custom-shell .af-modal .af-modal__backdrop {
 	body.af-custom-shell .af-modal .af-modal__footer > .button,
 	body.af-custom-shell .af-modal .af-modal__footer > .af-btn {
 		flex: 1 1 auto;
+	}
+
+	/* Contenedores de pantalla: nunca más anchos que el teléfono. */
+	body.af-custom-shell #wpbody-content .af-shell :is(.af-ptoolbar, .af-ptabs, .af-psearch, .af-profile-layout, .af-profile-tabs, .af-tabs__nav, .af-maint-formcard, form) {
+		min-width: 0;
+		max-width: 100%;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell .af-profile-layout {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell :is(.af-profile-tabs, .af-bx-nav) {
+		max-width: 100%;
+		overflow-x: auto;
+		scrollbar-width: none;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell .af-psearch__field {
+		flex: 1 1 100%;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell .af-psearch select {
+		flex: 1 1 100%;
+		width: 100%;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea) {
+		width: 100%;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell input[type="file"] {
+		max-width: 100%;
+		font-size: 14px;
+		white-space: normal;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell :is(p, .description, small) {
+		overflow-wrap: anywhere;
+	}
+
+	/* Acciones del asistente: dos filas limpias que caben en el ancho. */
+	body.af-custom-shell #wpbody-content .af-wizard__actions,
+	body.af-custom-shell #wpbody-content .af-wizard__actions-left,
+	body.af-custom-shell #wpbody-content .af-wizard__actions-right {
+		flex-wrap: wrap;
+		gap: 8px;
+		min-width: 0;
+	}
+
+	body.af-custom-shell #wpbody-content .af-wizard__actions-right > .button {
+		flex: 1 1 calc(50% - 4px);
+		min-width: 0;
+		padding-inline: 12px;
 	}
 
 	/* Asistente: tarea enfocada; la barra inferior se aparta y la de acciones va abajo. */

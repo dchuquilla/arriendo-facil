@@ -1092,12 +1092,16 @@ body.af-sheet-open {
 		box-shadow: 0 0 0 2px var(--af-surface);
 	}
 
-	.af-user-menu__panel {
+	.af-user-menu__panel,
+	.af-app-topbar .af-alerts-panel {
 		position: fixed;
 		top: calc(60px + env(safe-area-inset-top));
 		left: 12px;
 		right: 12px;
 		width: auto;
+		max-width: none;
+		max-height: calc(100dvh - 160px);
+		overflow-y: auto;
 	}
 
 	/* Barra inferior */

@@ -80,6 +80,9 @@ if ( ! empty( $admin_ids ) ) {
 $rows = array();
 foreach ( $property_admins as $admin_user ) {
 	$user_id         = (int) $admin_user->ID;
+	if ( Arriendo_Facil_Account_Deletion::is_deactivated( $user_id ) ) {
+		continue;
+	}
 	$buildings_count = isset( $buildings_by_admin[ $user_id ] ) ? $buildings_by_admin[ $user_id ] : 0;
 	$active_leases   = isset( $leases_by_admin[ $user_id ] ) ? $leases_by_admin[ $user_id ] : 0;
 	$collected       = isset( $totals_by_admin[ $user_id ] ) ? (float) $totals_by_admin[ $user_id ]->paid : 0.0;
@@ -240,7 +243,41 @@ $totals_platform = array(
 			</label>
 			<button type="submit" class="button af-btn af-btn--primary"><?php esc_html_e( 'Crear licencia', 'arriendo-facil' ); ?></button>
 		</form>
-		<div id="af-property-admin-credentials" style="display:none; margin-top:12px; padding:12px; border-radius:8px; background:#f0f6fc; border:1px solid #c3d4e0;"></div>
+		<div id="af-property-admin-credentials" class="af-creds" role="region" aria-live="polite" aria-labelledby="af-creds-title" hidden>
+			<p class="af-creds__title" id="af-creds-title"><?php esc_html_e( 'Credenciales del nuevo gestor', 'arriendo-facil' ); ?></p>
+			<p class="af-creds__hint"><?php esc_html_e( 'Cópialas y compártelas por un canal seguro: no se volverán a mostrar ni se reenvían. El gestor deberá cambiar la contraseña en su primer ingreso. Por seguridad se ocultan solas en 10 minutos o al salir de esta pantalla.', 'arriendo-facil' ); ?></p>
+			<div class="af-creds__row">
+				<span class="af-creds__label"><?php esc_html_e( 'Usuario', 'arriendo-facil' ); ?></span>
+				<code class="af-creds__value" data-af-cred="username"></code>
+				<button type="button" class="button af-creds__copy" data-af-copy="username"><?php esc_html_e( 'Copiar', 'arriendo-facil' ); ?></button>
+			</div>
+			<div class="af-creds__row">
+				<span class="af-creds__label"><?php esc_html_e( 'Contraseña temporal', 'arriendo-facil' ); ?></span>
+				<code class="af-creds__value" data-af-cred="password" aria-label="<?php esc_attr_e( 'Contraseña oculta', 'arriendo-facil' ); ?>">••••••••••••••</code>
+				<button type="button" class="button af-creds__copy" data-af-copy="password"><?php esc_html_e( 'Copiar', 'arriendo-facil' ); ?></button>
+				<button type="button" class="button" data-af-reveal aria-pressed="false"><?php esc_html_e( 'Mostrar', 'arriendo-facil' ); ?></button>
+			</div>
+			<div class="af-creds__actions">
+				<button type="button" class="button" data-af-copy="both"><?php esc_html_e( 'Copiar ambos', 'arriendo-facil' ); ?></button>
+				<button type="button" class="button button-primary" data-af-creds-done><?php esc_html_e( 'Listo, ya las guardé', 'arriendo-facil' ); ?></button>
+			</div>
+			<style>
+				.af-creds { margin-top: 16px; padding: 16px; border: 1px solid var(--af-border, #E1E9E7); border-radius: var(--af-radius-md, 8px); background: var(--af-accent-soft, #EEF5F3); }
+				.af-creds[hidden] { display: none; }
+				.af-creds__title { margin: 0; font-weight: 600; font-size: 15px; }
+				.af-creds__hint { margin: 4px 0 12px; color: var(--af-text-muted, #4F6267); }
+				.af-creds__row { display: grid; grid-template-columns: 150px minmax(0, 1fr) auto auto; align-items: center; gap: 8px 12px; padding: 8px 0; border-top: 1px solid var(--af-border, #E1E9E7); }
+				.af-creds__label { color: var(--af-text-muted, #4F6267); }
+				.af-creds__value { padding: 6px 10px; border-radius: 6px; background: #fff; font-size: 15px; overflow-wrap: anywhere; }
+				.af-creds__copy.is-copied { border-color: var(--af-positive, #1F6E63); color: var(--af-positive, #1F6E63); }
+				.af-creds__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+				@media (max-width: 600px) {
+					.af-creds__row { grid-template-columns: minmax(0, 1fr) auto auto; }
+					.af-creds__label { grid-column: 1 / -1; }
+					.af-creds__actions .button { flex: 1 1 auto; }
+				}
+			</style>
+		</div>
 	</div>
 
 	<div class="af-plan-wa">
@@ -356,6 +393,9 @@ $totals_platform = array(
 								<button type="button" class="button af-toggle-license" data-user-id="<?php echo esc_attr( $admin_user->ID ); ?>" data-next-status="<?php echo $is_active ? 'suspended' : 'active'; ?>">
 									<?php echo $is_active ? esc_html__( 'Suspender', 'arriendo-facil' ) : esc_html__( 'Activar', 'arriendo-facil' ); ?>
 								</button>
+								<button type="button" class="button af-btn--danger af-delete-license" data-user-id="<?php echo esc_attr( $admin_user->ID ); ?>" data-user-name="<?php echo esc_attr( $row['contact_name'] ? $row['contact_name'] : $admin_user->display_name ); ?>" data-user-email="<?php echo esc_attr( $admin_user->user_email ); ?>">
+									<?php esc_html_e( 'Eliminar', 'arriendo-facil' ); ?>
+								</button>
 								<?php if ( $needs_review ) : ?>
 									<button type="button" class="button af-review-admin" data-user-id="<?php echo esc_attr( $admin_user->ID ); ?>" data-user-name="<?php echo esc_attr( $row['contact_name'] ? $row['contact_name'] : $admin_user->display_name ); ?>">
 										<?php esc_html_e( 'Revisar', 'arriendo-facil' ); ?>
@@ -370,6 +410,47 @@ $totals_platform = array(
 	</div>
 
 	<?php Arriendo_Facil_Account_Deletion::render_admin_section(); ?>
+</div>
+
+<div class="af-modal af-delete-license-modal" id="af-delete-license-modal" role="dialog" aria-modal="true" aria-labelledby="af-delete-license-title" hidden>
+	<div class="af-modal__backdrop" data-af-delete-close></div>
+	<div class="af-modal__dialog">
+		<h2 class="af-modal__title" id="af-delete-license-title"><?php esc_html_e( 'Eliminar licencia', 'arriendo-facil' ); ?></h2>
+		<p><?php esc_html_e( 'Vas a eliminar la licencia de', 'arriendo-facil' ); ?> <strong data-af-delete-name></strong>.</p>
+		<ul class="af-delete-license-modal__effects">
+			<li><?php esc_html_e( 'Pierde el acceso de inmediato y se cierran todas sus sesiones.', 'arriendo-facil' ); ?></li>
+			<li><?php esc_html_e( 'Sus inmuebles dejan de publicarse.', 'arriendo-facil' ); ?></li>
+			<li><?php esc_html_e( 'La cuenta pasa a "Cuentas dadas de baja": puedes reactivarla durante 30 días; después puedes borrarla definitivamente.', 'arriendo-facil' ); ?></li>
+			<li><?php esc_html_e( 'Contratos y facturas se conservan mientras dure la retención legal.', 'arriendo-facil' ); ?></li>
+		</ul>
+		<label class="af-delete-license-modal__confirm" for="af-delete-license-input">
+			<?php esc_html_e( 'Para confirmar, escribe el correo del gestor:', 'arriendo-facil' ); ?>
+			<code data-af-delete-email></code>
+		</label>
+		<input type="email" id="af-delete-license-input" autocomplete="off" spellcheck="false" />
+		<p class="af-modal__status" id="af-delete-license-status" role="alert"></p>
+		<div class="af-modal__footer">
+			<button type="button" class="button" data-af-delete-close><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
+			<button type="button" class="button af-btn--danger" id="af-delete-license-confirm" disabled><?php esc_html_e( 'Eliminar licencia', 'arriendo-facil' ); ?></button>
+		</div>
+	</div>
+	<style>
+		.af-delete-license-modal { position: fixed; inset: 0; z-index: 100080; display: flex; align-items: center; justify-content: center; }
+		.af-delete-license-modal[hidden] { display: none; }
+		.af-delete-license-modal .af-modal__backdrop { position: absolute; inset: 0; }
+		.af-delete-license-modal *, .af-delete-license-modal *::before { box-sizing: border-box; }
+		.af-delete-license-modal .af-modal__dialog { position: relative; display: block; width: min(520px, 92vw); padding: 24px; }
+		.af-delete-license-modal .af-modal__dialog::before { content: none; }
+		.af-delete-license-modal .af-modal__footer .button { flex: 1 1 auto; }
+		@media (min-width: 783px) { .af-delete-license-modal .af-modal__footer .button { flex: 0 0 auto; } }
+		.af-delete-license-modal__effects { margin: 12px 0 16px; padding-left: 18px; list-style: disc; }
+		.af-delete-license-modal__effects li { margin: 0 0 6px; }
+		.af-delete-license-modal__confirm { display: block; margin-bottom: 8px; font-weight: 500; }
+		.af-delete-license-modal__confirm code { display: inline-block; margin-top: 4px; overflow-wrap: anywhere; }
+		.af-delete-license-modal input { width: 100%; }
+		.af-delete-license-modal .af-modal__status { min-height: 1.4em; margin: 8px 0 0; color: var(--af-negative, #B03A36); }
+		.af-delete-license-modal .af-modal__footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+	</style>
 </div>
 
 <div id="af-admin-review-modal" style="display:none;">
@@ -432,23 +513,104 @@ $totals_platform = array(
 			const btn = form.querySelector('button[type="submit"]');
 			btn.disabled = true;
 			status.textContent = '';
-			credsBox.style.display = 'none';
+			credsBox.hidden = true;
 
 			post('af_create_property_admin', new FormData(form)).then((res) => {
 				btn.disabled = false;
 				if (res && res.success) {
 					status.textContent = res.data.message;
-					credsBox.style.display = 'block';
-					credsBox.innerHTML = '<strong><?php echo esc_js( __( 'Credenciales (compártelas de forma segura, no se reenviarán):', 'arriendo-facil' ) ); ?></strong><br>' +
-						'<?php echo esc_js( __( 'Usuario:', 'arriendo-facil' ) ); ?> <code>' + res.data.username + '</code><br>' +
-						'<?php echo esc_js( __( 'Contraseña temporal:', 'arriendo-facil' ) ); ?> <code>' + res.data.password + '</code>';
+					showCreds(res.data.username, res.data.password);
+					credsBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
 					form.reset();
-					setTimeout(() => window.location.reload(), 4000);
 				} else {
 					status.textContent = (res && res.data && res.data.message) ? res.data.message : '<?php echo esc_js( __( 'Error inesperado.', 'arriendo-facil' ) ); ?>';
 				}
-			});
+						});
 		});
+	}
+
+	// Las credenciales viven solo en memoria de esta pestaña: nunca en el HTML,
+	// localStorage ni la URL. La contraseña se muestra oculta y se borra sola.
+	let creds = null;
+	let credsTimer = null;
+	const MASK = '••••••••••••••';
+	const passEl = credsBox ? credsBox.querySelector('[data-af-cred="password"]') : null;
+	const revealBtn = credsBox ? credsBox.querySelector('[data-af-reveal]') : null;
+
+	function setReveal(on) {
+		if (!creds || !passEl) { return; }
+		passEl.textContent = on ? creds.p : MASK;
+		passEl.setAttribute('aria-label', on ? '' : <?php echo wp_json_encode( __( 'Contraseña oculta', 'arriendo-facil' ) ); ?>);
+		revealBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+		revealBtn.textContent = on ? <?php echo wp_json_encode( __( 'Ocultar', 'arriendo-facil' ) ); ?> : <?php echo wp_json_encode( __( 'Mostrar', 'arriendo-facil' ) ); ?>;
+	}
+
+	function wipeCreds() {
+		creds = null;
+		clearTimeout(credsTimer);
+		if (!credsBox) { return; }
+		credsBox.querySelector('[data-af-cred="username"]').textContent = '';
+		passEl.textContent = MASK;
+		credsBox.hidden = true;
+	}
+
+	function showCreds(user, pass) {
+		creds = { u: user, p: pass };
+		credsBox.querySelector('[data-af-cred="username"]').textContent = user;
+		setReveal(false);
+		credsBox.hidden = false;
+		clearTimeout(credsTimer);
+		credsTimer = setTimeout(wipeCreds, 10 * 60 * 1000);
+	}
+
+	if (credsBox) {
+		const copyText = function (text) {
+			if (navigator.clipboard && window.isSecureContext) {
+				return navigator.clipboard.writeText(text);
+			}
+			// Sin HTTPS no hay API de portapapeles: se copia con una selección temporal que se elimina al instante.
+			const area = document.createElement('textarea');
+			area.value = text;
+			area.setAttribute('readonly', '');
+			area.setAttribute('aria-hidden', 'true');
+			area.style.position = 'fixed';
+			area.style.opacity = '0';
+			document.body.appendChild(area);
+			area.select();
+			const ok = document.execCommand('copy');
+			area.value = '';
+			document.body.removeChild(area);
+			return ok ? Promise.resolve() : Promise.reject();
+		};
+
+		credsBox.addEventListener('click', function (e) {
+			if (e.target.closest('[data-af-reveal]')) {
+				setReveal(revealBtn.getAttribute('aria-pressed') !== 'true');
+				return;
+			}
+			const btn = e.target.closest('[data-af-copy]');
+			if (btn && creds) {
+				const which = btn.dataset.afCopy;
+				const text = which === 'username' ? creds.u : (which === 'password' ? creds.p : <?php echo wp_json_encode( __( 'Usuario:', 'arriendo-facil' ) ); ?> + ' ' + creds.u + '\n' + <?php echo wp_json_encode( __( 'Contraseña temporal:', 'arriendo-facil' ) ); ?> + ' ' + creds.p);
+				const label = btn.textContent;
+				copyText(text).then(function () {
+					btn.textContent = <?php echo wp_json_encode( __( 'Copiado ✓', 'arriendo-facil' ) ); ?>;
+					btn.classList.add('is-copied');
+					setTimeout(function () { btn.textContent = label; btn.classList.remove('is-copied'); }, 2000);
+				}).catch(function () {
+					setReveal(true);
+					window.afNotify(<?php echo wp_json_encode( __( 'No se pudo copiar. Selecciona el texto y cópialo manualmente.', 'arriendo-facil' ) ); ?>);
+				});
+				return;
+			}
+			if (e.target.closest('[data-af-creds-done]')) {
+				wipeCreds();
+				window.location.reload();
+			}
+		});
+
+		// Al salir o al guardarse en la caché de "atrás", no queda nada en pantalla.
+		window.addEventListener('pagehide', wipeCreds);
 	}
 
 	document.querySelectorAll('.af-toggle-license').forEach(function (btn) {
@@ -464,6 +626,63 @@ $totals_platform = array(
 			});
 		});
 	});
+
+	const delModal = document.getElementById('af-delete-license-modal');
+	if (delModal) {
+		const delInput = document.getElementById('af-delete-license-input');
+		const delBtn = document.getElementById('af-delete-license-confirm');
+		const delStatus = document.getElementById('af-delete-license-status');
+		let delTarget = null;
+
+		const closeDel = function () {
+			delModal.hidden = true;
+			if (delTarget) { delTarget.focus(); }
+			delTarget = null;
+		};
+
+		document.querySelectorAll('.af-delete-license').forEach(function (btn) {
+			btn.addEventListener('click', function () {
+				delTarget = btn;
+				delModal.querySelector('[data-af-delete-name]').textContent = btn.dataset.userName;
+				delModal.querySelector('[data-af-delete-email]').textContent = btn.dataset.userEmail;
+				delInput.value = '';
+				delStatus.textContent = '';
+				delBtn.disabled = true;
+				delModal.hidden = false;
+				delInput.focus();
+			});
+		});
+
+		delInput.addEventListener('input', function () {
+			delBtn.disabled = !delTarget || delInput.value.trim().toLowerCase() !== delTarget.dataset.userEmail.toLowerCase();
+		});
+
+		delModal.querySelectorAll('[data-af-delete-close]').forEach(function (el) {
+			el.addEventListener('click', closeDel);
+		});
+
+		document.addEventListener('keydown', function (e) {
+			if (e.key === 'Escape' && !delModal.hidden) { closeDel(); }
+		});
+
+		delBtn.addEventListener('click', function () {
+			if (!delTarget) { return; }
+			delBtn.disabled = true;
+			delStatus.textContent = '';
+			post('af_delete_property_admin', { user_id: delTarget.dataset.userId, confirm: delInput.value.trim() }).then(function (res) {
+				if (res && res.success) {
+					window.location.hash = 'af-deactivated-accounts';
+					window.location.reload();
+				} else {
+					delBtn.disabled = false;
+					delStatus.textContent = (res && res.data && res.data.message) ? res.data.message : <?php echo wp_json_encode( __( 'Error inesperado.', 'arriendo-facil' ) ); ?>;
+				}
+			}).catch(function () {
+				delBtn.disabled = false;
+				delStatus.textContent = <?php echo wp_json_encode( __( 'Error de red. Intenta nuevamente.', 'arriendo-facil' ) ); ?>;
+			});
+		});
+	}
 
 	const reviewModal = document.getElementById('af-admin-review-modal');
 	const reviewNotes = document.getElementById('af-admin-review-notes');

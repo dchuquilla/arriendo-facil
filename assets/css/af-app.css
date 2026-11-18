@@ -18,7 +18,7 @@
 /* ══ 1. Lienzo ═══════════════════════════════════════════════════════ */
 
 body.af-custom-shell #wpbody-content > .wrap,
-body.af-custom-shell #wpbody-content > .af-shell {
+body.af-custom-shell #wpbody-content > .af-shell:not([role="dialog"]):not(.af-modal) {
 	box-sizing: border-box;
 	max-width: calc(var(--af-page-max, 1320px) + 2 * var(--af-page-gutter, 29px));
 	margin: 0 auto;
@@ -1449,7 +1449,7 @@ html.af-gsap body.af-custom-shell .af-modal .af-modal__backdrop {
 	}
 
 	body.af-custom-shell #wpbody-content > .wrap,
-	body.af-custom-shell #wpbody-content > .af-shell {
+	body.af-custom-shell #wpbody-content > .af-shell:not([role="dialog"]):not(.af-modal) {
 		padding: 20px 16px 0;
 	}
 

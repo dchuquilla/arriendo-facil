@@ -56,7 +56,8 @@ class Arriendo_Facil_Security_Headers {
 	}
 
 	/**
-	 * Caps auth cookie lifetime (12h regular session, 7 days with "remember me").
+	 * Caps auth cookie lifetime: 12h regular session; with "remember me",
+	 * 2 days for property admins (gestores) and 7 days for everyone else.
 	 *
 	 * @param int  $seconds  WP default.
 	 * @param int  $user_id  Target user.
@@ -64,7 +65,16 @@ class Arriendo_Facil_Security_Headers {
 	 * @return int
 	 */
 	public static function clamp_cookie_lifetime( $seconds, $user_id, $remember ) {
-		return $remember ? min( (int) $seconds, 7 * DAY_IN_SECONDS ) : min( (int) $seconds, 12 * HOUR_IN_SECONDS );
+		if ( ! $remember ) {
+			return min( (int) $seconds, 12 * HOUR_IN_SECONDS );
+		}
+
+		$user = get_userdata( (int) $user_id );
+		if ( $user && in_array( 'af_property_admin', (array) $user->roles, true ) && ! user_can( $user, 'manage_options' ) ) {
+			return min( (int) $seconds, 2 * DAY_IN_SECONDS );
+		}
+
+		return min( (int) $seconds, 7 * DAY_IN_SECONDS );
 	}
 
 	/**

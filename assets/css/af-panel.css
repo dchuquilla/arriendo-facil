@@ -680,3 +680,324 @@
 #wpbody-content:has(.af-panel) {
 	overflow-x: clip;
 }
+
+/* ── Accesos rápidos ────────────────────────────────────────────────────
+   Las funciones de gestión de todos los días, a un toque. Cada una con su
+   color para reconocerla sin leer; en móvil se reparten en 3 columnas. */
+
+.af-quick {
+	display: grid;
+	grid-template-columns: repeat(6, minmax(0, 1fr));
+	gap: 12px;
+}
+
+.af-quick__item {
+	--q-bg: #e6f2f1;
+	--q-ink: #0f5a64;
+	--q-solid: #1f7a78;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+	min-height: 84px;
+	padding: 14px 8px 12px;
+	border: 1px solid var(--af-border, #e1e9e7);
+	border-radius: 16px;
+	background: #fff;
+	color: var(--af-text, #142a30);
+	text-align: center;
+	text-decoration: none;
+	transition: transform 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.af-quick__item:hover,
+.af-quick__item:focus-visible {
+	transform: translateY(-2px);
+	border-color: var(--q-solid);
+	color: var(--af-text, #142a30);
+}
+
+.af-quick__item:active {
+	transform: scale(0.97);
+}
+
+.af-quick__item.is-teal   { --q-bg: #dcf1ee; --q-ink: #0f5a64; --q-solid: #1f7a78; }
+.af-quick__item.is-blue   { --q-bg: #e0ecfb; --q-ink: #1d4f91; --q-solid: #2f6fc0; }
+.af-quick__item.is-violet { --q-bg: #ece6fa; --q-ink: #5b3ba3; --q-solid: #7650c4; }
+.af-quick__item.is-green  { --q-bg: #def3e3; --q-ink: #1b6b3a; --q-solid: #2d9055; }
+.af-quick__item.is-amber  { --q-bg: #fdecd0; --q-ink: #8a5418; --q-solid: #d08a2b; }
+.af-quick__item.is-rose   { --q-bg: #fbe3e6; --q-ink: #9b2c3c; --q-solid: #cf4a5e; }
+
+.af-quick__icon {
+	display: grid;
+	place-items: center;
+	width: 44px;
+	height: 44px;
+	border-radius: 14px;
+	background: var(--q-bg);
+	color: var(--q-ink);
+	transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.af-quick__item:hover .af-quick__icon,
+.af-quick__item:focus-visible .af-quick__icon {
+	background: var(--q-solid);
+	color: #fff;
+}
+
+.af-quick__label {
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 13px;
+	font-weight: 700;
+	line-height: 1.2;
+}
+
+/* ── KPIs: cada uno con su color ────────────────────────────────────── */
+
+.af-pk--pending .af-pk__icon {
+	background: #fdecd0;
+	color: #8a5418;
+}
+
+.af-pk--pending .af-pk__value {
+	color: #7a4a14;
+}
+
+.af-pk--occupancy .af-pk__ring {
+	background:
+		radial-gradient(closest-side, #fff 76%, transparent 78%),
+		conic-gradient(#2f6fc0 calc(var(--pct) * 1%), #e0ecfb 0);
+}
+
+.af-pk--occupancy .af-pk__ring b {
+	color: #1d4f91;
+}
+
+.af-pk--ok .af-pk__value {
+	color: #1b6b3a;
+}
+
+/* ── Tarjetas desplegables ──────────────────────────────────────────── */
+
+.af-pfold > summary {
+	list-style: none;
+	cursor: pointer;
+	-webkit-user-select: none;
+	user-select: none;
+	-webkit-tap-highlight-color: transparent;
+}
+
+.af-pfold > summary::-webkit-details-marker {
+	display: none;
+}
+
+.af-pfold > summary:focus-visible {
+	outline: 2px solid var(--af-accent, #164a55);
+	outline-offset: 4px;
+	border-radius: 10px;
+}
+
+.af-pfold:not([open]) > summary.af-pcard__head {
+	margin-bottom: 0;
+}
+
+.af-pcard__headtext {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.af-pcard__headtext .af-pcard__sub {
+	display: block;
+}
+
+.af-pcard__count--warn {
+	background: #fdecd0;
+	color: #8a5418;
+}
+
+.af-pcard__count--info {
+	background: #e0ecfb;
+	color: #1d4f91;
+}
+
+.af-pfold__chev {
+	flex-shrink: 0;
+	width: 28px;
+	height: 28px;
+	border-radius: 50%;
+	background: var(--af-raised, #eef3f2);
+	position: relative;
+	transition: transform 0.25s ease, background-color 0.2s ease;
+}
+
+.af-pfold__chev::before {
+	content: "";
+	position: absolute;
+	top: 9px;
+	left: 10px;
+	width: 7px;
+	height: 7px;
+	border-right: 2px solid var(--af-text-muted, #4f6267);
+	border-bottom: 2px solid var(--af-text-muted, #4f6267);
+	transform: rotate(45deg);
+}
+
+.af-pfold[open] > summary .af-pfold__chev {
+	transform: rotate(180deg);
+}
+
+/* ── Atención: el número como insignia de color ─────────────────────── */
+
+.af-plist__main--task {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	gap: 10px;
+}
+
+.af-plist__main--task strong {
+	display: inline-grid;
+	place-items: center;
+	flex-shrink: 0;
+	min-width: 30px;
+	height: 30px;
+	padding: 0 8px;
+	border-radius: 10px;
+	background: #fff;
+	font-size: 15px;
+	font-variant-numeric: tabular-nums;
+}
+
+.af-plist__link.is-danger .af-plist__main--task strong {
+	background: #dc2626;
+	color: #fff;
+}
+
+.af-plist__link.is-warn .af-plist__main--task strong {
+	background: #d97706;
+	color: #fff;
+}
+
+.af-plist__main--task span {
+	min-width: 0;
+	font-weight: 600;
+}
+
+.af-plist__link {
+	border: 1px solid transparent;
+}
+
+.af-plist__link.is-danger {
+	border-color: #fcd5d5;
+}
+
+.af-plist__link.is-warn {
+	border-color: #f8e2b4;
+}
+
+/* ── Teléfono: menos texto, más toque ───────────────────────────────── */
+
+@container panel (max-width: 1040px) {
+	.af-quick {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}
+
+@container panel (max-width: 560px) {
+	.af-quick {
+		gap: 10px;
+	}
+
+	.af-quick__item {
+		min-height: 88px;
+		border-radius: 16px;
+	}
+
+	/* El saludo y el botón primario ocupan menos. */
+	.af-panel__title {
+		font-size: 22px;
+	}
+
+	.af-panel__head .button {
+		min-height: 48px;
+		font-size: 15px;
+	}
+
+	/* KPIs secundarios: dato y etiqueta; el texto de apoyo sobra. */
+	.af-pk:not(.af-pk--hero) .af-pk__meta {
+		font-size: 12px;
+	}
+
+	.af-pk--occupancy .af-pk__meta {
+		display: block;
+	}
+
+	.af-pk--pending .af-pk__meta,
+	.af-pk--ok .af-pk__meta,
+	.af-pk--danger .af-pk__meta {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.af-pk__icon {
+		width: 32px;
+		height: 32px;
+	}
+
+	.af-pcard__sub {
+		font-size: 12px;
+	}
+
+	.af-pcard__link {
+		display: none;
+	}
+
+	.af-pcard__head {
+		align-items: center;
+		flex-wrap: nowrap;
+	}
+
+	.af-pfold > summary.af-pcard__head {
+		min-height: 44px;
+	}
+
+	.af-pfold[open] > summary.af-pcard__head {
+		margin-bottom: 12px;
+	}
+
+	.af-plist__main--task span {
+		font-size: 14px;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.af-quick__item,
+	.af-quick__icon,
+	.af-pfold__chev {
+		transition: none;
+	}
+
+	.af-quick__item:hover,
+	.af-quick__item:active {
+		transform: none;
+	}
+}
+
+@media (hover: none) {
+	.af-quick__item:hover {
+		transform: none;
+		border-color: var(--af-border, #e1e9e7);
+	}
+
+	.af-quick__item:hover .af-quick__icon {
+		background: var(--q-bg);
+		color: var(--q-ink);
+	}
+}

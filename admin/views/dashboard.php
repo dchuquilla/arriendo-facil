@@ -246,6 +246,27 @@ $day_names  = array( 'domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'vier
 $mon_names  = array( 1 => 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre' );
 $today_str  = ucfirst( $day_names[ (int) wp_date( 'w' ) ] ) . ', ' . wp_date( 'j' ) . ' de ' . $mon_names[ (int) wp_date( 'n' ) ];
 
+// ── Accesos rápidos: las funciones de gestión de uso diario ──────────────
+$quick = array();
+foreach (
+	array(
+		array( 'label' => __( 'Inmuebles', 'arriendo-facil' ), 'icon' => 'building-2', 'tone' => 'teal', 'url' => Arriendo_Facil_Properties_Page::url(), 'cap' => 'edit_posts', 'feature' => '' ),
+		array( 'label' => __( 'Contratos', 'arriendo-facil' ), 'icon' => 'file-text', 'tone' => 'blue', 'url' => admin_url( 'admin.php?page=af-leases' ), 'cap' => 'edit_posts', 'feature' => '' ),
+		array( 'label' => __( 'Inquilinos', 'arriendo-facil' ), 'icon' => 'users', 'tone' => 'violet', 'url' => admin_url( 'admin.php?page=af-guests' ), 'cap' => 'edit_posts', 'feature' => '' ),
+		array( 'label' => __( 'Cobros', 'arriendo-facil' ), 'icon' => 'credit-card', 'tone' => 'green', 'url' => admin_url( 'admin.php?page=af-buildings' ), 'cap' => Arriendo_Facil_Tenancy::CAP, 'feature' => '' ),
+		array( 'label' => __( 'Mantenimiento', 'arriendo-facil' ), 'icon' => 'wrench', 'tone' => 'amber', 'url' => admin_url( 'admin.php?page=af-maintenance' ), 'cap' => Arriendo_Facil_Tenancy::CAP, 'feature' => 'maintenance' ),
+		array( 'label' => __( 'Calendario', 'arriendo-facil' ), 'icon' => 'calendar', 'tone' => 'rose', 'url' => admin_url( 'admin.php?page=af-calendar' ), 'cap' => Arriendo_Facil_Tenancy::CAP, 'feature' => '' ),
+	) as $shortcut
+) {
+	if ( ! current_user_can( $shortcut['cap'] ) ) {
+		continue;
+	}
+	if ( $shortcut['feature'] && class_exists( 'Arriendo_Facil_Plans' ) && ! Arriendo_Facil_Plans::has_feature( $shortcut['feature'] ) ) {
+		continue;
+	}
+	$quick[] = $shortcut;
+}
+
 $money = static function ( $amount ) {
 	return '$' . number_format_i18n( (float) $amount, 2 );
 };
@@ -290,6 +311,17 @@ $money = static function ( $amount ) {
 
 	<?php else : ?>
 
+		<?php if ( ! empty( $quick ) ) : ?>
+			<nav class="af-quick" aria-label="<?php esc_attr_e( 'Accesos rápidos', 'arriendo-facil' ); ?>">
+				<?php foreach ( $quick as $shortcut ) : ?>
+					<a class="af-quick__item is-<?php echo esc_attr( $shortcut['tone'] ); ?>" href="<?php echo esc_url( $shortcut['url'] ); ?>">
+						<span class="af-quick__icon" aria-hidden="true"><?php echo af_lucide( $shortcut['icon'], 22 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
+						<span class="af-quick__label"><?php echo esc_html( $shortcut['label'] ); ?></span>
+					</a>
+				<?php endforeach; ?>
+			</nav>
+		<?php endif; ?>
+
 		<section class="af-pk-grid" aria-label="<?php esc_attr_e( 'Resumen del mes', 'arriendo-facil' ); ?>">
 
 			<a class="af-pk af-pk--hero" href="<?php echo esc_url( admin_url( 'admin.php?page=af-buildings' ) ); ?>">
@@ -304,7 +336,7 @@ $money = static function ( $amount ) {
 				<span class="af-pk__icon" aria-hidden="true"><?php echo af_lucide( 'clock', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
 				<span class="af-pk__label"><?php esc_html_e( 'Por cobrar', 'arriendo-facil' ); ?></span>
 				<span class="af-pk__value" data-pn="<?php echo esc_attr( $period_pending ); ?>" data-pn-money="1"><?php echo esc_html( $money( $period_pending ) ); ?></span>
-				<span class="af-pk__meta"><?php esc_html_e( 'Pendiente del mes en curso', 'arriendo-facil' ); ?></span>
+				<span class="af-pk__meta"><?php esc_html_e( 'Este mes', 'arriendo-facil' ); ?></span>
 			</a>
 
 			<a class="af-pk <?php echo $overdue_count > 0 ? 'af-pk--danger' : 'af-pk--ok'; ?>" href="<?php echo esc_url( admin_url( 'admin.php?page=af-buildings' ) ); ?>">
@@ -322,10 +354,10 @@ $money = static function ( $amount ) {
 				</span>
 			</a>
 
-			<a class="af-pk" href="<?php echo esc_url( Arriendo_Facil_Properties_Page::url() ); ?>">
+			<a class="af-pk af-pk--occupancy" href="<?php echo esc_url( Arriendo_Facil_Properties_Page::url() ); ?>">
 				<span class="af-pk__ring" data-pring="<?php echo esc_attr( $occupancy_rate ); ?>" style="--pct: <?php echo esc_attr( $occupancy_rate ); ?>;" aria-hidden="true"><b><span data-pn="<?php echo esc_attr( $occupancy_rate ); ?>"><?php echo esc_html( $occupancy_rate ); ?></span>%</b></span>
 				<span class="af-pk__label"><?php esc_html_e( 'Ocupación', 'arriendo-facil' ); ?></span>
-				<span class="af-pk__meta"><?php echo esc_html( sprintf( /* translators: 1: occupied, 2: total */ __( '%1$d de %2$d inmuebles ocupados', 'arriendo-facil' ), $property_occupied, $property_total ) ); ?></span>
+				<span class="af-pk__meta"><?php echo esc_html( sprintf( /* translators: 1: occupied, 2: total */ __( '%1$d de %2$d ocupados', 'arriendo-facil' ), $property_occupied, $property_total ) ); ?></span>
 			</a>
 
 		</section>
@@ -334,28 +366,33 @@ $money = static function ( $amount ) {
 
 			<div class="af-panel__col">
 
-				<section class="af-pcard" aria-labelledby="af-p-revenue">
-					<header class="af-pcard__head">
-						<div>
+				<details class="af-pcard af-pfold" open data-af-fold="collapse-mobile" aria-labelledby="af-p-revenue">
+					<summary class="af-pcard__head">
+						<span class="af-pcard__headtext">
 							<h2 class="af-pcard__title" id="af-p-revenue"><?php esc_html_e( 'Ingresos cobrados', 'arriendo-facil' ); ?></h2>
-							<p class="af-pcard__sub"><?php esc_html_e( 'Últimos 6 meses', 'arriendo-facil' ); ?></p>
-						</div>
-					</header>
+							<span class="af-pcard__sub"><?php esc_html_e( 'Últimos 6 meses', 'arriendo-facil' ); ?></span>
+						</span>
+						<span class="af-pfold__chev" aria-hidden="true"></span>
+					</summary>
 					<?php if ( $has_revenue ) : ?>
 						<div class="af-pchart"><canvas id="af-p-revenue-chart" role="img" aria-label="<?php esc_attr_e( 'Ingresos cobrados por mes', 'arriendo-facil' ); ?>"></canvas></div>
 					<?php else : ?>
-						<p class="af-pempty"><?php esc_html_e( 'Aún no hay cobros registrados. Cuando registres pagos aparecerán aquí.', 'arriendo-facil' ); ?></p>
+						<p class="af-pempty"><?php esc_html_e( 'Aún no hay cobros registrados.', 'arriendo-facil' ); ?></p>
 					<?php endif; ?>
-				</section>
+				</details>
 
-				<section class="af-pcard" aria-labelledby="af-p-expiring">
-					<header class="af-pcard__head">
-						<div>
+				<details class="af-pcard af-pfold" open aria-labelledby="af-p-expiring">
+					<summary class="af-pcard__head">
+						<span class="af-pcard__headtext">
 							<h2 class="af-pcard__title" id="af-p-expiring"><?php esc_html_e( 'Contratos por vencer', 'arriendo-facil' ); ?></h2>
-							<p class="af-pcard__sub"><?php esc_html_e( 'Próximos 60 días', 'arriendo-facil' ); ?></p>
-						</div>
-						<a class="af-pcard__link" href="<?php echo esc_url( admin_url( 'admin.php?page=af-leases' ) ); ?>"><?php esc_html_e( 'Ver contratos', 'arriendo-facil' ); ?></a>
-					</header>
+							<span class="af-pcard__sub"><?php esc_html_e( 'Próximos 60 días', 'arriendo-facil' ); ?></span>
+						</span>
+						<?php if ( ! empty( $expiring_leases ) ) : ?>
+							<span class="af-pcard__count af-pcard__count--warn"><?php echo esc_html( number_format_i18n( $expiring_count ) ); ?></span>
+						<?php endif; ?>
+						<a class="af-pcard__link" href="<?php echo esc_url( admin_url( 'admin.php?page=af-leases' ) ); ?>"><?php esc_html_e( 'Ver todos', 'arriendo-facil' ); ?></a>
+						<span class="af-pfold__chev" aria-hidden="true"></span>
+					</summary>
 					<?php if ( empty( $expiring_leases ) ) : ?>
 						<p class="af-pempty"><?php esc_html_e( 'Ningún contrato vence pronto.', 'arriendo-facil' ); ?></p>
 					<?php else : ?>
@@ -378,7 +415,7 @@ $money = static function ( $amount ) {
 							<?php endforeach; ?>
 						</ul>
 					<?php endif; ?>
-				</section>
+				</details>
 
 			</div>
 
@@ -399,7 +436,7 @@ $money = static function ( $amount ) {
 								<li class="af-plist__item">
 									<a class="af-plist__link <?php echo esc_attr( $task['tone'] ? 'is-' . $task['tone'] : '' ); ?>" href="<?php echo esc_url( $task['url'] ); ?>">
 										<span class="af-plist__icon" aria-hidden="true"><?php echo af_lucide( $task['icon'], 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
-										<span class="af-plist__main"><strong><?php echo esc_html( number_format_i18n( $task['count'] ) ); ?></strong> <?php echo esc_html( $task['label'] ); ?></span>
+										<span class="af-plist__main af-plist__main--task"><strong><?php echo esc_html( number_format_i18n( $task['count'] ) ); ?></strong> <span><?php echo esc_html( $task['label'] ); ?></span></span>
 										<span class="af-plist__arrow" aria-hidden="true">&rarr;</span>
 									</a>
 								</li>
@@ -408,14 +445,18 @@ $money = static function ( $amount ) {
 					<?php endif; ?>
 				</section>
 
-				<section class="af-pcard" aria-labelledby="af-p-agenda">
-					<header class="af-pcard__head">
-						<div>
+				<details class="af-pcard af-pfold" open data-af-fold="collapse-mobile" aria-labelledby="af-p-agenda">
+					<summary class="af-pcard__head">
+						<span class="af-pcard__headtext">
 							<h2 class="af-pcard__title" id="af-p-agenda"><?php esc_html_e( 'Esta semana', 'arriendo-facil' ); ?></h2>
-							<p class="af-pcard__sub"><?php esc_html_e( 'Mudanzas, salidas y pagos de servicios', 'arriendo-facil' ); ?></p>
-						</div>
+							<span class="af-pcard__sub"><?php esc_html_e( 'Mudanzas, salidas y pagos', 'arriendo-facil' ); ?></span>
+						</span>
+						<?php if ( ! empty( $agenda ) ) : ?>
+							<span class="af-pcard__count af-pcard__count--info"><?php echo esc_html( number_format_i18n( count( $agenda ) ) ); ?></span>
+						<?php endif; ?>
 						<a class="af-pcard__link" href="<?php echo esc_url( admin_url( 'admin.php?page=af-calendar' ) ); ?>"><?php esc_html_e( 'Calendario', 'arriendo-facil' ); ?></a>
-					</header>
+						<span class="af-pfold__chev" aria-hidden="true"></span>
+					</summary>
 					<?php if ( empty( $agenda ) ) : ?>
 						<p class="af-pempty"><?php esc_html_e( 'Sin eventos en los próximos 7 días.', 'arriendo-facil' ); ?></p>
 					<?php else : ?>
@@ -437,7 +478,7 @@ $money = static function ( $amount ) {
 							<?php endforeach; ?>
 						</ul>
 					<?php endif; ?>
-				</section>
+				</details>
 
 			</div>
 		</div>

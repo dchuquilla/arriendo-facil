@@ -109,9 +109,19 @@
 		});
 	}
 
+	/* En móvil las tarjetas secundarias arrancan cerradas: menos texto de entrada,
+	   un toque para abrirlas. En pantallas grandes siempre abiertas. */
+	function foldForPhone() {
+		if (!window.matchMedia || !window.matchMedia('(max-width: 782px)').matches) { return; }
+		$$('details.af-pfold[data-af-fold="collapse-mobile"]').forEach(function (card) {
+			card.removeAttribute('open');
+		});
+	}
+
 	function init() {
 		if (!document.querySelector('.af-panel')) { return; }
 		drawChart();
+		foldForPhone();
 		motion();
 	}
 

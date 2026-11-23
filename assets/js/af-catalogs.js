@@ -3,6 +3,25 @@
 
 	var i18n = window.afCatalogs || {};
 
+	// Menú "⋯" de cada tarjeta: se cierra al tocar fuera, con Esc o al abrir otro.
+	function openMenus() {
+		return Array.prototype.slice.call( document.querySelectorAll( 'details.af-cats-more[open]' ) );
+	}
+	document.addEventListener( 'click', function ( e ) {
+		openMenus().forEach( function ( menu ) {
+			if ( ! menu.contains( e.target ) ) {
+				menu.removeAttribute( 'open' );
+			}
+		} );
+	} );
+	document.addEventListener( 'keydown', function ( e ) {
+		if ( 'Escape' === e.key ) {
+			openMenus().forEach( function ( menu ) {
+				menu.removeAttribute( 'open' );
+			} );
+		}
+	} );
+
 	function copy( text, btn ) {
 		var done = function () {
 			var old = btn.textContent;

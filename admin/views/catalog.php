@@ -106,8 +106,8 @@ $af_cat_action = static function ( $id, $do, $label, $class = '', $confirm = fal
 					<?php if ( $used ) : ?>
 						<p class="af-cats-card__meta">
 							<?php
-							/* translators: %s: relative time */
-							printf( esc_html__( 'Usado hace %s', 'arriendo-facil' ), esc_html( human_time_diff( $used ) ) );
+							/* translators: %s: relative time, e.g. "hace 2 semanas" */
+							printf( esc_html__( 'Usado %s', 'arriendo-facil' ), esc_html( af_time_ago( $used ) ) );
 							?>
 						</p>
 					<?php endif; ?>

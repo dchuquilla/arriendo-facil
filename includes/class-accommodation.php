@@ -1316,11 +1316,12 @@ class Arriendo_Facil_Accommodation {
 	 *
 	 * @param int  $user_id        User ID.
 	 * @param bool $include_locked Include properties locked by the owner's plan.
+	 * @param bool $include_trash  Include trashed properties (Inmuebles screen only).
 	 * @return int[]
 	 */
-	public static function get_owner_accommodation_ids( $user_id, $include_locked = false ) {
+	public static function get_owner_accommodation_ids( $user_id, $include_locked = false, $include_trash = false ) {
 		$user_id   = absint( $user_id );
-		$cache_key = 'owner_accommodation_ids:' . $user_id . ':' . ( $include_locked ? 'all' : 'active' ) . ':' . wp_cache_get_last_changed( self::CACHE_GROUP );
+		$cache_key = 'owner_accommodation_ids:' . $user_id . ':' . ( $include_locked ? 'all' : 'active' ) . ':' . ( $include_trash ? 'trash' : 'live' ) . ':' . wp_cache_get_last_changed( self::CACHE_GROUP );
 		$cached    = wp_cache_get( $cache_key, self::CACHE_GROUP );
 		if ( is_array( $cached ) ) {
 			return $cached;
@@ -1331,7 +1332,8 @@ class Arriendo_Facil_Accommodation {
 			get_posts(
 				array(
 					'post_type'      => 'accommodation',
-					'post_status'    => 'any',
+					// 'any' leaves the trash out; the Inmuebles screen needs it to list and restore.
+					'post_status'    => $include_trash ? array( 'publish', 'private', 'draft', 'pending', 'future', 'trash' ) : 'any',
 					'posts_per_page' => 500,
 					'fields'         => 'ids',
 					'meta_query'     => $include_locked

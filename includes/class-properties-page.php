@@ -426,11 +426,16 @@ class Arriendo_Facil_Properties_Page {
 			'post_status'    => 'trash' === $filter ? 'trash' : ( 'draft' === $filter ? array( 'draft', 'pending' ) : array( 'publish', 'private', 'draft', 'pending' ) ),
 			'posts_per_page' => self::PER_PAGE,
 			'paged'          => $paged,
-			's'              => $search,
 		);
 
 		if ( null !== $scope ) {
 			$args['post__in'] = ! empty( $scope ) ? array_map( 'absint', $scope ) : array( 0 );
+		}
+
+		// Same matching as the global search: title, address and city, every word, no accents.
+		if ( '' !== $search ) {
+			$matches          = Arriendo_Facil_Global_Search::property_ids( $search, (array) $args['post_status'], $scope );
+			$args['post__in'] = ! empty( $matches ) ? $matches : array( 0 );
 		}
 
 		if ( 'available' === $filter ) {

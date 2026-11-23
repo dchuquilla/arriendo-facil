@@ -206,8 +206,10 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 
 	if ( null === $accessible_acc_ids ) {
 		// Sin restricciones (puede gestionar todo): todos los inquilinos.
+		Arriendo_Facil_Guest::ensure_guest_extra_columns();
 		$lease_guests = $wpdb->get_results(
 			$af_guest_columns . '
+			 WHERE g.deleted_at IS NULL
 			 ORDER BY g.first_name ASC
 			 LIMIT 300'
 		);
@@ -217,14 +219,15 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 		Arriendo_Facil_Guest::ensure_guest_extra_columns();
 		$lease_guests = $wpdb->get_results(
 			$af_guest_columns . "
-			 WHERE g.accommodation_id IN ($ids_sql)
+			 WHERE g.deleted_at IS NULL AND (
+			    g.accommodation_id IN ($ids_sql)
 			    OR g.created_by = " . (int) get_current_user_id() . "
 			    OR EXISTS (
 			        SELECT 1 FROM {$wpdb->prefix}af_leases l
 			         WHERE l.guest_id = g.id
 			           AND l.accommodation_id IN ($ids_sql)
 			           AND l.deleted_at IS NULL
-			    )
+			    ) )
 			 ORDER BY g.first_name ASC
 			 LIMIT 300" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- $ids_sql es enteros casteados arriba.
 		);
@@ -1279,6 +1282,10 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 			}
 		}
 		?>
+		<div class="af-listfilter">
+			<label class="screen-reader-text" for="af-leases-filter"><?php esc_html_e( 'Buscar contrato', 'arriendo-facil' ); ?></label>
+			<input type="search" id="af-leases-filter" data-af-listfilter="#af-leases-tbody tr.af-lease-row" data-af-empty="<?php esc_attr_e( 'Ningún contrato coincide con tu búsqueda.', 'arriendo-facil' ); ?>" placeholder="<?php esc_attr_e( 'Buscar por inquilino, inmueble o estado…', 'arriendo-facil' ); ?>" autocomplete="off" />
+		</div>
 		<div class="af-status-tabs" data-tabs-target="#af-leases-tbody">
 			<button type="button" class="af-status-tabs__btn is-active" data-tab-value=""><?php esc_html_e( 'Todos', 'arriendo-facil' ); ?> <span class="af-status-tabs__count"><?php echo esc_html( number_format_i18n( $total_leases ) ); ?></span></button>
 			<button type="button" class="af-status-tabs__btn" data-tab-value="active"><?php esc_html_e( 'Activos', 'arriendo-facil' ); ?> <span class="af-status-tabs__count"><?php echo esc_html( number_format_i18n( $lease_tab_counts['active'] ) ); ?></span></button>

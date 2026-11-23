@@ -199,8 +199,13 @@ if ( $can_manage ) {
 			'eyebrow'  => __( 'Ficha del inquilino', 'arriendo-facil' ),
 			'title'    => $full_name ? $full_name : __( 'Inquilino', 'arriendo-facil' ),
 			'subtitle' => esc_html( $guest->email ) . ( $guest->phone ? ' · ' . esc_html( $guest->phone ) : '' ),
-			'actions'  => array(
-				sprintf( '<a href="%s" class="button af-btn af-btn--ghost">%s</a>', esc_url( $back_url ), esc_html__( '← Volver a inquilinos', 'arriendo-facil' ) ),
+			'actions'  => array_merge(
+				array(
+					sprintf( '<a href="%s" class="button af-btn af-btn--ghost">%s</a>', esc_url( $back_url ), esc_html__( '← Volver a inquilinos', 'arriendo-facil' ) ),
+				),
+				$can_manage ? array(
+					sprintf( '<button type="button" class="button af-btn af-btn--ghost" id="af-profile-delete">%s</button>', esc_html__( 'Eliminar inquilino', 'arriendo-facil' ) ),
+				) : array()
 			),
 		)
 	);
@@ -356,6 +361,31 @@ if ( $can_manage ) {
 			}).catch(function () {
 				btn.disabled = false;
 				setStatusTo(editStatus, <?php echo wp_json_encode( __( 'La solicitud falló.', 'arriendo-facil' ) ); ?>, 'error');
+			});
+		});
+	}
+
+	const deleteBtn = document.getElementById('af-profile-delete');
+	if (deleteBtn) {
+		deleteBtn.addEventListener('click', function () {
+			if (!window.confirm(<?php echo wp_json_encode( __( '¿Eliminar a este inquilino? Dejará de aparecer en las listas, pero se conserva su historial de contratos y cobros.', 'arriendo-facil' ) ); ?>)) { return; }
+
+			deleteBtn.disabled = true;
+			const body = new URLSearchParams();
+			body.append('action', 'af_delete_guest');
+			body.append('nonce', editNonce);
+			body.append('guest_id', guestId);
+
+			post(body).then(function (json) {
+				if (!json || !json.success) {
+					deleteBtn.disabled = false;
+					window.afNotify((json && json.data && json.data.message) || <?php echo wp_json_encode( __( 'No se pudo eliminar al inquilino.', 'arriendo-facil' ) ); ?>, 'error');
+					return;
+				}
+				window.location.href = <?php echo wp_json_encode( $back_url ); ?>;
+			}).catch(function () {
+				deleteBtn.disabled = false;
+				window.afNotify(<?php echo wp_json_encode( __( 'La solicitud falló.', 'arriendo-facil' ) ); ?>, 'error');
 			});
 		});
 	}

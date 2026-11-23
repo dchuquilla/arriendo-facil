@@ -608,6 +608,31 @@ $active_providers = array_values(
 											<?php endif; ?>
 
 											<footer class="af-maint-card__foot">
+											<button type="button" class="af-maint-iconbtn af-maint-edit" title="<?php esc_attr_e( 'Editar', 'arriendo-facil' ); ?>" data-edit="<?php
+												echo esc_attr(
+													wp_json_encode(
+														array(
+															'id'               => $request_id,
+															'accommodation_id' => (int) $request->accommodation_id,
+															'unit_id'          => (int) $request->unit_id,
+															'asset_location'   => (string) $request->asset_location,
+															'asset_category'   => (string) $request->asset_category,
+															'asset_name'       => (string) $request->asset_name,
+															'damage_details'   => (string) $request->damage_details,
+															'asset_specs'      => (string) $request->asset_specs,
+															'priority'         => $request_priority,
+															'request_type'     => $request_type,
+															'provider_id'      => (int) $request->provider_id,
+															'contact_name'     => (string) $request->contact_name,
+															'contact_phone'    => (string) $request->contact_phone,
+															'scheduled_date'   => (string) $request->scheduled_date,
+															'cost'             => (float) $request->cost > 0 ? (string) (float) $request->cost : '',
+															'notes'            => (string) $request->notes,
+														)
+													)
+												);
+											?>"><span class="dashicons dashicons-edit" aria-hidden="true"></span><span class="screen-reader-text"><?php esc_html_e( 'Editar', 'arriendo-facil' ); ?></span></button>
+											<button type="button" class="af-maint-iconbtn af-maint-delete" data-request="<?php echo esc_attr( $request_id ); ?>" title="<?php esc_attr_e( 'Eliminar', 'arriendo-facil' ); ?>"><span class="dashicons dashicons-trash" aria-hidden="true"></span><span class="screen-reader-text"><?php esc_html_e( 'Eliminar', 'arriendo-facil' ); ?></span></button>
 												<?php if ( $contact_phone ) : ?>
 													<a class="af-maint-iconbtn" href="tel:<?php echo esc_attr( $contact_phone ); ?>" title="<?php echo esc_attr( $contact_phone ); ?>"><span class="dashicons dashicons-phone" aria-hidden="true"></span><span class="screen-reader-text"><?php esc_html_e( 'Llamar', 'arriendo-facil' ); ?></span></a>
 													<a class="af-maint-iconbtn af-maint-iconbtn--wa" href="https://wa.me/<?php echo esc_attr( preg_replace( '/\D+/', '', $contact_phone ) ); ?>" target="_blank" rel="noopener noreferrer" title="WhatsApp"><span class="dashicons dashicons-format-chat" aria-hidden="true"></span><span class="screen-reader-text"><?php esc_html_e( 'WhatsApp', 'arriendo-facil' ); ?></span></a>
@@ -1015,6 +1040,9 @@ wp_localize_script(
 			'editContactTitle' => __( 'Editar contacto de mantenimiento', 'arriendo-facil' ),
 			'saveContact' => __( 'Guardar contacto', 'arriendo-facil' ),
 			'saveChanges' => __( 'Guardar cambios', 'arriendo-facil' ),
+			'confirmDeleteRequest' => __( '¿Eliminar esta solicitud? Esta acción no se puede deshacer.', 'arriendo-facil' ),
+			'editRequestTitle'     => __( 'Editar solicitud de reparación', 'arriendo-facil' ),
+			'editRequestSub'       => __( 'El inmueble no se puede cambiar. Si te equivocaste de inmueble, elimina la solicitud y crea otra.', 'arriendo-facil' ),
 			'genericError'  => __( 'Ocurrió un error. Intenta de nuevo.', 'arriendo-facil' ),
 			'noFace'        => __( 'No detectamos un rostro en la foto. Sube una foto real donde se vea claramente la cara.', 'arriendo-facil' ),
 			'photoTooBig'   => __( 'La foto pesa más de 5 MB.', 'arriendo-facil' ),

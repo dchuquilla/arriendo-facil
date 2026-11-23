@@ -1606,9 +1606,9 @@ array(
 			<p class="af-app-topbar__title"><?php echo esc_html( $screen_title ); ?></p>
 
 			<form class="af-app-topbar__search" method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" role="search">
-				<input type="hidden" name="page" value="<?php echo Arriendo_Facil_Plans::has_feature( 'catalog' ) ? 'af-catalog' : 'af-properties'; ?>" />
+				<input type="hidden" name="page" value="<?php echo esc_attr( Arriendo_Facil_Global_Search::PAGE_SLUG ); ?>" />
 				<?php echo af_lucide( 'search', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
-				<input type="search" name="s" placeholder="<?php esc_attr_e( 'Buscar inmuebles', 'arriendo-facil' ); ?>" aria-label="<?php esc_attr_e( 'Buscar inmuebles', 'arriendo-facil' ); ?>" />
+				<input type="search" name="q" placeholder="<?php esc_attr_e( 'Buscar en todo el sistema', 'arriendo-facil' ); ?>" aria-label="<?php esc_attr_e( 'Buscar en todo el sistema', 'arriendo-facil' ); ?>" autocomplete="off" />
 			</form>
 
 			<div class="af-app-topbar__actions">

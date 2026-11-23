@@ -83,7 +83,8 @@ $draft_count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$leases_t} WHERE sta
 $docs_pending = 0;
 if ( class_exists( 'Arriendo_Facil_Document_Verification' ) ) {
 	$docs_scope   = null === $ids_sql ? '' : " AND accommodation_id IN ({$ids_sql})";
-	$docs_pending = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_guests WHERE (doc_status IS NULL OR doc_status = 'pendiente'){$docs_scope}" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	Arriendo_Facil_Guest::ensure_guest_extra_columns();
+	$docs_pending = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}af_guests WHERE deleted_at IS NULL AND (doc_status IS NULL OR doc_status = 'pendiente'){$docs_scope}" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 }
 
 $maintenance_open   = 0;

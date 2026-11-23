@@ -42,6 +42,9 @@ class Arriendo_Facil_Guest {
 		global $wpdb;
 		$now = time();
 
+		// A removed tenant must not keep receiving reminders.
+		self::ensure_guest_extra_columns();
+
 		// 1) Documento pendiente: avisa a inquilinos que aún no completan su
 		// documentación desde hace al menos 3 días. Máximo una vez por semana.
 		$doc_cutoff = gmdate( 'Y-m-d H:i:s', $now - 3 * DAY_IN_SECONDS );
@@ -50,6 +53,7 @@ class Arriendo_Facil_Guest {
 				"SELECT id, first_name, last_name, email
 				 FROM {$wpdb->prefix}af_guests
 				 WHERE doc_status IN ('pendiente','rechazado')
+				   AND deleted_at IS NULL
 				   AND created_at < %s
 				   AND email <> ''
 				 ORDER BY id DESC
@@ -291,6 +295,8 @@ class Arriendo_Facil_Guest {
 			'birth_city'           => 'ALTER TABLE ' . $table . ' ADD COLUMN birth_city VARCHAR(150) DEFAULT NULL',
 			'income_range'         => 'ALTER TABLE ' . $table . ' ADD COLUMN income_range VARCHAR(20) DEFAULT NULL',
 			'created_by'           => 'ALTER TABLE ' . $table . ' ADD COLUMN created_by BIGINT(20) UNSIGNED DEFAULT NULL',
+			'deleted_at'           => 'ALTER TABLE ' . $table . ' ADD COLUMN deleted_at DATETIME DEFAULT NULL',
+			'deleted_by'           => 'ALTER TABLE ' . $table . ' ADD COLUMN deleted_by BIGINT(20) UNSIGNED DEFAULT NULL',
 		);
 
 		// Called by several screens and handlers per request: check once, with one query.

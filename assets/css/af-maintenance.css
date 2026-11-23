@@ -856,6 +856,12 @@ body.wp-admin .af-maint .af-maint-money input[type="number"] { width: 100%; padd
 	text-decoration: none;
 	transition: all var(--af-motion-fast);
 }
+button.af-maint-iconbtn {
+	padding: 0;
+	background: transparent;
+	cursor: pointer;
+}
+.af-maint-iconbtn.af-maint-delete:hover { border-color: var(--af-danger-500, #b03a36); color: var(--af-danger-600, #b03a36); background: transparent; }
 .af-maint-iconbtn:hover { border-color: var(--af-primary-500); color: var(--af-primary-600); background: var(--af-primary-50); }
 .af-maint-iconbtn--wa:hover { border-color: #25d366; color: #128c4b; background: #eaf4f2; }
 .af-maint-iconbtn .dashicons { font-size: 16px; width: 16px; height: 16px; }

@@ -47,6 +47,7 @@ class Arriendo_Facil_Plans {
 		'af_create_maintenance'       => 'maintenance',
 		'af_update_maintenance'       => 'maintenance',
 		'af_update_maintenance_status' => 'maintenance',
+		'af_delete_maintenance'       => 'maintenance',
 		'af_billing_lease_search'     => 'billing',
 		'af_billing_pending'          => 'billing',
 		'af_get_invoices_async'       => 'billing',
@@ -540,9 +541,11 @@ class Arriendo_Facil_Plans {
 				return 0;
 			}
 
+			$alive = self::has_column( $guests, 'deleted_at' ) ? 'g.deleted_at IS NULL AND ' : '';
+
 			return (int) $wpdb->get_var(
 				$wpdb->prepare(
-					"SELECT COUNT(DISTINCT g.id) FROM {$guests} g{$join} WHERE " . implode( ' OR ', $where ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- fixed fragments.
+					"SELECT COUNT(DISTINCT g.id) FROM {$guests} g{$join} WHERE {$alive}(" . implode( ' OR ', $where ) . ')', // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- fixed fragments.
 					$args
 				)
 			);

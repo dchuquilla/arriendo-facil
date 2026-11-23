@@ -85,7 +85,8 @@ class Arriendo_Facil_Tenancy {
 	}
 
 	/**
-	 * Every accommodation of the user, including those their plan locked.
+	 * Every accommodation of the user, including those their plan locked and
+	 * those in the trash.
 	 * Null means unrestricted. Only the Inmuebles screen and the plan
 	 * selection need this; everything else must use accessible_accommodation_ids().
 	 *
@@ -99,7 +100,7 @@ class Arriendo_Facil_Tenancy {
 
 		$user_id = $user_id ? absint( $user_id ) : get_current_user_id();
 
-		return array_map( 'absint', Arriendo_Facil_Accommodation::get_owner_accommodation_ids( $user_id, true ) );
+		return array_map( 'absint', Arriendo_Facil_Accommodation::get_owner_accommodation_ids( $user_id, true, true ) );
 	}
 
 	/**
@@ -266,7 +267,7 @@ class Arriendo_Facil_Tenancy {
 			)
 		);
 
-		if ( ! $row ) {
+		if ( ! $row || ! empty( $row->deleted_at ) ) {
 			return false;
 		}
 

@@ -197,7 +197,7 @@ if ( $is_owner ) {
 	}
 	$guests = $wpdb->get_results(
 		$wpdb->prepare(
-			"SELECT * FROM {$wpdb->prefix}af_guests WHERE {$guest_scope_sql}created_by = %d ORDER BY created_at DESC LIMIT 100", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- ids casteados a int.
+			"SELECT * FROM {$wpdb->prefix}af_guests WHERE deleted_at IS NULL AND ( {$guest_scope_sql}created_by = %d ) ORDER BY created_at DESC LIMIT 100", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- ids casteados a int.
 			get_current_user_id()
 		)
 	);
@@ -216,8 +216,9 @@ if ( $is_owner ) {
 		$visit_requests = array();
 	}
 } else {
+	Arriendo_Facil_Guest::ensure_guest_extra_columns();
 	$guests = $wpdb->get_results(
-		"SELECT * FROM {$wpdb->prefix}af_guests ORDER BY created_at DESC LIMIT 100"
+		"SELECT * FROM {$wpdb->prefix}af_guests WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 100"
 	);
 	$visit_requests = $wpdb->get_results(
 		"SELECT q.id, q.accommodation_id, q.name, q.email, q.phone, q.message, q.status, q.created_at,
@@ -650,6 +651,10 @@ if ( $is_owner ) {
 						}
 					}
 					?>
+					<div class="af-listfilter">
+						<label class="screen-reader-text" for="af-guests-filter"><?php esc_html_e( 'Buscar inquilino', 'arriendo-facil' ); ?></label>
+						<input type="search" id="af-guests-filter" data-af-listfilter="#af-guests-tbody tr" data-af-empty="<?php esc_attr_e( 'Ningún inquilino coincide con tu búsqueda.', 'arriendo-facil' ); ?>" placeholder="<?php esc_attr_e( 'Buscar por nombre, cédula, correo o teléfono…', 'arriendo-facil' ); ?>" autocomplete="off" />
+					</div>
 					<div class="af-status-tabs" data-tabs-target="#af-guests-tbody">
 						<button type="button" class="af-status-tabs__btn is-active" data-tab-value=""><?php esc_html_e( 'Todos', 'arriendo-facil' ); ?> <span class="af-status-tabs__count"><?php echo esc_html( number_format_i18n( count( $guests ) ) ); ?></span></button>
 						<button type="button" class="af-status-tabs__btn" data-tab-value="pendiente"><?php esc_html_e( 'Pendientes', 'arriendo-facil' ); ?> <span class="af-status-tabs__count"><?php echo esc_html( number_format_i18n( $guest_tab_counts['pendiente'] ) ); ?></span></button>
@@ -747,6 +752,13 @@ if ( $is_owner ) {
 										<?php else : ?>
 											<span class="af-td-meta">—</span>
 										<?php endif; ?>
+										<?php if ( current_user_can( Arriendo_Facil_Tenancy::CAP ) ) : ?>
+											<button type="button" class="button af-btn af-btn--ghost af-btn--sm af-delete-guest"
+												data-guest-id="<?php echo esc_attr( $guest->id ); ?>"
+												data-guest-name="<?php echo esc_attr( trim( $guest->first_name . ' ' . $guest->last_name ) ); ?>">
+												<?php esc_html_e( 'Eliminar', 'arriendo-facil' ); ?>
+											</button>
+										<?php endif; ?>
 										<?php if ( defined( 'AF_LEGACY_MODULES' ) && AF_LEGACY_MODULES ) : ?>
 											<button type="button" class="button af-btn af-btn--ghost af-btn--sm af-score-guest"
 												data-guest-id="<?php echo esc_attr( $guest->id ); ?>">
@@ -828,6 +840,7 @@ if ( $is_owner ) {
 (function () {
 	const ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
 	const docNonce = <?php echo wp_json_encode( wp_create_nonce( 'af_document_nonce' ) ); ?>;
+	const guestEditNonce = <?php echo wp_json_encode( wp_create_nonce( 'af_guest_edit_nonce' ) ); ?>;
 
 	function post(payload) {
 		const body = new URLSearchParams();
@@ -925,6 +938,31 @@ if ( $is_owner ) {
 			}
 			setStatus(verifyStatus, json.data.message, 'success');
 			setTimeout(function () { window.location.reload(); }, 900);
+		});
+	});
+
+	// ---- Eliminar inquilino (borrado lógico: conserva contratos y cobros) ----
+	document.querySelectorAll('.af-delete-guest').forEach(function (btn) {
+		btn.addEventListener('click', function () {
+			const name = btn.getAttribute('data-guest-name') || '';
+			if (!window.confirm(<?php echo wp_json_encode( __( '¿Eliminar al inquilino', 'arriendo-facil' ) ); ?> + ' ' + name + '? ' + <?php echo wp_json_encode( __( 'Dejará de aparecer en las listas, pero se conserva su historial de contratos y cobros.', 'arriendo-facil' ) ); ?>)) { return; }
+
+			btn.disabled = true;
+			post({
+				action: 'af_delete_guest',
+				nonce: guestEditNonce,
+				guest_id: btn.getAttribute('data-guest-id')
+			}).then(function (json) {
+				if (!json || !json.success) {
+					btn.disabled = false;
+					window.afNotify((json && json.data && json.data.message) || <?php echo wp_json_encode( __( 'No se pudo eliminar al inquilino.', 'arriendo-facil' ) ); ?>, 'error');
+					return;
+				}
+				window.location.reload();
+			}).catch(function () {
+				btn.disabled = false;
+				window.afNotify(<?php echo wp_json_encode( __( 'La solicitud falló.', 'arriendo-facil' ) ); ?>, 'error');
+			});
 		});
 	});
 

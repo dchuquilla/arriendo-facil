@@ -42,6 +42,35 @@
 	}
 
 	/**
+	 * Lower-cases and strips accents so "baño" matches "BANO" and "Cañería" matches "caneria".
+	 *
+	 * @param {string} text Any text.
+	 * @return {string}
+	 */
+	function fold( text ) {
+		return String( text || '' ).normalize( 'NFD' ).replace( /[\u0300-\u036f]/g, '' ).toLowerCase();
+	}
+
+	/**
+	 * Every word of the term must appear in the haystack, in any order.
+	 *
+	 * @param {string} haystack Text to search in.
+	 * @param {string} term     What the user typed.
+	 * @return {boolean}
+	 */
+	function matchesTerm( haystack, term ) {
+		var words = fold( term ).split( /\s+/ ).filter( Boolean );
+		if ( ! words.length ) {
+			return true;
+		}
+		var text = fold( haystack );
+
+		return words.every( function ( word ) {
+			return -1 !== text.indexOf( word );
+		} );
+	}
+
+	/**
 	 * Mirrors the variant part of the af_pill() server helper. A status the
 	 * server does not map falls back to 'neutral' there, so it must here too.
 	 *
@@ -88,7 +117,7 @@
 		var quickFilter = '';
 
 		function rowText( row ) {
-			return ( row.dataset.search || row.textContent ).toLowerCase();
+			return row.dataset.search || row.textContent;
 		}
 
 		function isOpen( row ) {
@@ -167,9 +196,9 @@
 		}
 
 		function matches( row ) {
-			var term = search ? search.value.trim().toLowerCase() : '';
+			var term = search ? search.value.trim() : '';
 
-			if ( term && rowText( row ).indexOf( term ) === -1 ) {
+			if ( term && ! matchesTerm( rowText( row ), term ) ) {
 				return false;
 			}
 
@@ -286,6 +315,37 @@
 			} ).catch( function () {
 				select.disabled = false;
 				select.value = previous;
+				window.afNotify( afMaintenance.i18n.networkError );
+			} );
+		} );
+
+		// Delete a request. The server refuses billed ones and says why.
+		root.addEventListener( 'click', function ( e ) {
+			var btn = e.target.closest( '.af-maint-delete' );
+			if ( ! btn ) {
+				return;
+			}
+
+			if ( ! window.confirm( afMaintenance.i18n.confirmDeleteRequest ) ) {
+				return;
+			}
+
+			btn.disabled = true;
+
+			post( {
+				action: 'af_delete_maintenance',
+				nonce: afMaintenance.maintenanceNonce,
+				request_id: btn.getAttribute( 'data-request' )
+			} ).then( function ( json ) {
+				if ( json && json.success ) {
+					window.location.reload();
+					return;
+				}
+
+				btn.disabled = false;
+				window.afNotify( ( json && json.data && json.data.message ) || afMaintenance.i18n.genericError );
+			} ).catch( function () {
+				btn.disabled = false;
 				window.afNotify( afMaintenance.i18n.networkError );
 			} );
 		} );
@@ -481,7 +541,14 @@
 			return;
 		}
 
+		var editingId = 0;
+
 		function openCard() {
+			if ( editingId ) {
+				// "New request" while editing: start from a clean form.
+				form.reset();
+				form.dispatchEvent( new Event( 'af:reset' ) );
+			}
 			var tab = document.getElementById( 'af-tab-solicitudes' );
 			if ( tab ) {
 				tab.checked = true;
@@ -573,9 +640,118 @@
 		}
 		syncUnits();
 
+		var titleEl = card.querySelector( '.af-maint-formcard__title' );
+		var subEl = card.querySelector( '.af-maint-formcard__sub' );
+		var submitBtn = form.querySelector( 'button[type="submit"]' );
+		var defaults = {
+			title: titleEl ? titleEl.textContent : '',
+			sub: subEl ? subEl.textContent : '',
+			submit: submitBtn ? submitBtn.textContent : ''
+		};
+		// The cost is settled through the status flow (it feeds the deposit), never edited here.
+		var lockedWhileEditing = [ 'accommodation_id', 'unit_id', 'request_type', 'reported_by', 'cost' ];
+		var dateInput = form.querySelector( '[name="scheduled_date"]' );
+		var dateMin = dateInput ? dateInput.getAttribute( 'min' ) : null;
+
+		function setLocked( locked ) {
+			lockedWhileEditing.forEach( function ( name ) {
+				var field = form.querySelector( '[name="' + name + '"]' );
+				if ( field ) {
+					field.disabled = locked;
+				}
+			} );
+			if ( dateInput ) {
+				if ( locked ) {
+					dateInput.removeAttribute( 'min' );
+				} else if ( dateMin ) {
+					dateInput.setAttribute( 'min', dateMin );
+				}
+			}
+		}
+
+		function leaveEdit() {
+			editingId = 0;
+			setLocked( false );
+			if ( titleEl ) {
+				titleEl.textContent = defaults.title;
+			}
+			if ( subEl ) {
+				subEl.textContent = defaults.sub;
+			}
+			if ( submitBtn ) {
+				submitBtn.textContent = defaults.submit;
+			}
+		}
+
 		form.addEventListener( 'af:reset', function () {
+			leaveEdit();
 			syncUnits();
 			syncManual();
+		} );
+
+		function setField( name, value ) {
+			var fields = form.querySelectorAll( '[name="' + name + '"]' );
+			fields.forEach( function ( field ) {
+				if ( 'radio' === field.type ) {
+					field.checked = field.value === String( value );
+				} else {
+					field.value = value;
+				}
+			} );
+		}
+
+		// Edit an existing request in the same card.
+		document.addEventListener( 'click', function ( e ) {
+			var btn = e.target.closest( '.af-maint-edit' );
+			if ( ! btn ) {
+				return;
+			}
+
+			var data;
+			try {
+				data = JSON.parse( btn.getAttribute( 'data-edit' ) || '{}' );
+			} catch ( err ) {
+				return;
+			}
+
+			form.reset();
+			form.dispatchEvent( new Event( 'af:reset' ) );
+
+			setField( 'accommodation_id', data.accommodation_id || '' );
+			syncUnits();
+			setField( 'unit_id', data.unit_id || '' );
+			[ 'asset_location', 'asset_name', 'damage_details', 'asset_specs', 'notes', 'scheduled_date', 'cost', 'contact_name', 'contact_phone', 'asset_category', 'priority', 'request_type', 'reported_by' ].forEach( function ( name ) {
+				if ( undefined !== data[ name ] && null !== data[ name ] ) {
+					setField( name, data[ name ] );
+				}
+			} );
+			setField( 'provider_id', data.provider_id ? data.provider_id : ( data.contact_name ? 'manual' : '' ) );
+			syncManual();
+
+			// Optional section holds most of these fields: open it when any is filled.
+			var optional = form.querySelector( '.af-maint-optional' );
+			if ( optional ) {
+				optional.open = !! ( data.provider_id || data.contact_name || data.scheduled_date || data.cost || data.asset_specs || data.notes );
+			}
+
+			editingId = parseInt( data.id, 10 ) || 0;
+			setLocked( true );
+			if ( titleEl ) {
+				titleEl.textContent = afMaintenance.i18n.editRequestTitle;
+			}
+			if ( subEl ) {
+				subEl.textContent = afMaintenance.i18n.editRequestSub;
+			}
+			if ( submitBtn ) {
+				submitBtn.textContent = afMaintenance.i18n.saveChanges;
+			}
+
+			var tab = document.getElementById( 'af-tab-solicitudes' );
+			if ( tab ) {
+				tab.checked = true;
+			}
+			card.hidden = false;
+			card.scrollIntoView( { behavior: 'smooth', block: 'start' } );
 		} );
 
 		form.addEventListener( 'submit', function ( e ) {
@@ -593,7 +769,16 @@
 			}
 
 			var body = new URLSearchParams( new FormData( form ) );
-			body.append( 'action', 'af_create_maintenance' );
+			if ( editingId ) {
+				body.append( 'action', 'af_update_maintenance' );
+				body.append( 'request_id', editingId );
+				// An emptied provider/contact must clear the assignment, not be skipped.
+				if ( 'manual' === body.get( 'provider_id' ) ) {
+					body.set( 'provider_id', '0' );
+				}
+			} else {
+				body.append( 'action', 'af_create_maintenance' );
+			}
 			body.append( 'nonce', afMaintenance.maintenanceNonce );
 
 			post( Object.fromEntries( body ) )
@@ -644,14 +829,14 @@
 		var countEl = document.getElementById( 'af-prov-count' );
 
 		function refresh() {
-			var term = search ? search.value.trim().toLowerCase() : '';
+			var term = search ? search.value.trim() : '';
 			var trade = tradeFilter ? tradeFilter.value : '';
 			var visible = 0;
 
 			cards.forEach( function ( card ) {
 				var show = true;
 
-				if ( term && ( card.dataset.search || '' ).indexOf( term ) === -1 ) {
+				if ( term && ! matchesTerm( card.dataset.search || card.textContent, term ) ) {
 					show = false;
 				}
 				if ( trade && card.dataset.trade !== trade ) {

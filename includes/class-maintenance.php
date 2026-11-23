@@ -24,6 +24,7 @@ class Arriendo_Facil_Maintenance {
 		add_action( 'wp_ajax_af_create_maintenance', array( $this, 'ajax_create_maintenance' ) );
 		add_action( 'wp_ajax_af_update_maintenance_status', array( $this, 'ajax_update_status' ) );
 		add_action( 'wp_ajax_af_update_maintenance', array( $this, 'ajax_update_request' ) );
+		add_action( 'wp_ajax_af_delete_maintenance', array( $this, 'ajax_delete_request' ) );
 	}
 
 	/**
@@ -436,6 +437,64 @@ class Arriendo_Facil_Maintenance {
 	}
 
 	/**
+	 * Why a request cannot be deleted, or '' when it can.
+	 *
+	 * A request already billed (electronic invoice) or whose cost was charged to
+	 * the lease deposit is part of the financial record and must stay.
+	 *
+	 * @param int $request_id Request ID.
+	 * @return string Reason in Spanish, empty when deletable.
+	 */
+	public static function deletion_block_reason( $request_id ) {
+		global $wpdb;
+
+		$request_id = absint( $request_id );
+
+		$invoiced = (int) $wpdb->get_var(
+			$wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}af_electronic_invoices WHERE cleaning_request_id = %d", $request_id )
+		);
+		if ( $invoiced > 0 ) {
+			return __( 'Esta solicitud ya tiene una factura electrónica asociada, por eso no se puede eliminar.', 'arriendo-facil' );
+		}
+
+		$request = $wpdb->get_row(
+			$wpdb->prepare( 'SELECT status, cost, lease_id FROM ' . self::table() . ' WHERE id = %d', $request_id ) // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		);
+		if ( $request && 'completed' === $request->status && (float) $request->cost > 0 && (int) $request->lease_id > 0 ) {
+			return __( 'Esta solicitud completada ya descontó su costo de la garantía de un contrato, por eso no se puede eliminar.', 'arriendo-facil' );
+		}
+
+		return '';
+	}
+
+	/**
+	 * Permanently deletes a request that has no financial footprint.
+	 *
+	 * @param int $request_id Request ID.
+	 * @return true|WP_Error
+	 */
+	public static function delete( $request_id ) {
+		global $wpdb;
+
+		$request_id = absint( $request_id );
+		if ( ! $request_id ) {
+			return new WP_Error( 'af_maintenance_not_found', __( 'Incidencia no encontrada.', 'arriendo-facil' ) );
+		}
+
+		$reason = self::deletion_block_reason( $request_id );
+		if ( '' !== $reason ) {
+			return new WP_Error( 'af_maintenance_delete_blocked', $reason );
+		}
+
+		$deleted = $wpdb->delete( self::table(), array( 'id' => $request_id ), array( '%d' ) );
+		if ( false === $deleted ) {
+			return new WP_Error( 'af_maintenance_delete_failed', __( 'No se pudo eliminar la solicitud.', 'arriendo-facil' ) );
+		}
+
+		return true;
+	}
+
+	/**
 	 * Updates the status of a request, stamping the completion date when closed.
 	 *
 	 * @param int    $request_id Request ID.
@@ -631,6 +690,31 @@ class Arriendo_Facil_Maintenance {
 		}
 
 		wp_send_json_success( array( 'message' => __( 'Incidencia actualizada.', 'arriendo-facil' ) ) );
+	}
+
+	/**
+	 * AJAX: deletes a request.
+	 *
+	 * @return void
+	 */
+	public function ajax_delete_request() {
+		check_ajax_referer( 'af_maintenance_nonce', 'nonce' );
+
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$request_id = isset( $_POST['request_id'] ) ? absint( wp_unslash( $_POST['request_id'] ) ) : 0;
+		if ( ! $request_id || ! Arriendo_Facil_Tenancy::can_access_maintenance( $request_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes acceso a esta incidencia.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$result = self::delete( $request_id );
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ), 409 );
+		}
+
+		wp_send_json_success( array( 'message' => __( 'Solicitud eliminada.', 'arriendo-facil' ) ) );
 	}
 
 	/**

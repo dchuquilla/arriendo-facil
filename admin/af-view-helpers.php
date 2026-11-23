@@ -9,6 +9,42 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+if ( ! function_exists( 'af_time_ago' ) ) {
+	/**
+	 * Relative time in Spanish ("hace 3 días"), independent of the site locale.
+	 *
+	 * human_time_diff() prints "1 week" when the WordPress language pack is
+	 * missing, which leaks English into the Spanish-only UI.
+	 *
+	 * @param int $timestamp Unix timestamp in the past.
+	 * @param int $now       Reference time (defaults to now).
+	 * @return string
+	 */
+	function af_time_ago( $timestamp, $now = 0 ) {
+		$now     = $now ? (int) $now : time();
+		$seconds = max( 0, $now - (int) $timestamp );
+
+		$units = array(
+			array( YEAR_IN_SECONDS, 'año', 'años' ),
+			array( MONTH_IN_SECONDS, 'mes', 'meses' ),
+			array( WEEK_IN_SECONDS, 'semana', 'semanas' ),
+			array( DAY_IN_SECONDS, 'día', 'días' ),
+			array( HOUR_IN_SECONDS, 'hora', 'horas' ),
+			array( MINUTE_IN_SECONDS, 'minuto', 'minutos' ),
+		);
+
+		foreach ( $units as $unit ) {
+			if ( $seconds >= $unit[0] ) {
+				$count = (int) floor( $seconds / $unit[0] );
+
+				return 'hace ' . $count . ' ' . ( 1 === $count ? $unit[1] : $unit[2] );
+			}
+		}
+
+		return 'hace un momento';
+	}
+}
+
 if ( ! function_exists( 'af_pill' ) ) {
 	/**
 	 * Renders a status pill mapped from DB status strings to semantic variants.

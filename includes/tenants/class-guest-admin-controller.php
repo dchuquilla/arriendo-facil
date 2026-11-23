@@ -20,6 +20,7 @@ class Arriendo_Facil_Guest_Admin_Controller {
 	public function __construct() {
 		add_action( 'wp_ajax_af_create_guest', array( $this, 'ajax_create_guest' ) );
 		add_action( 'wp_ajax_af_update_guest', array( $this, 'ajax_update_guest' ) );
+		add_action( 'wp_ajax_af_delete_guest', array( $this, 'ajax_delete_guest' ) );
 		add_action( 'wp_ajax_af_update_guest_documents', array( $this, 'ajax_update_guest_documents' ) );
 		add_action( 'wp_ajax_af_get_guests', array( $this, 'ajax_get_guests' ) );
 		add_action( 'wp_ajax_af_score_guest', array( $this, 'ajax_score_guest' ) );
@@ -165,11 +166,25 @@ class Arriendo_Facil_Guest_Admin_Controller {
 
 		global $wpdb;
 
-		$email_taken = (int) $wpdb->get_var(
-			$wpdb->prepare( "SELECT id FROM {$wpdb->prefix}af_guests WHERE email = %s LIMIT 1", $email )
+		$existing = $wpdb->get_row(
+			$wpdb->prepare( "SELECT id, deleted_at FROM {$wpdb->prefix}af_guests WHERE email = %s LIMIT 1", $email )
 		);
-		if ( $email_taken ) {
+		// A tenant removed earlier is brought back with the new data instead of blocking the e-mail.
+		$reactivate_id = ( $existing && ! empty( $existing->deleted_at ) ) ? (int) $existing->id : 0;
+		if ( $existing && ! $reactivate_id ) {
 			wp_send_json_error( array( 'message' => __( 'Ya existe un inquilino registrado con ese correo.', 'arriendo-facil' ) ), 409 );
+		}
+		if ( $reactivate_id && ! Arriendo_Facil_Tenancy::can_manage_all() ) {
+			$mine = (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*) FROM {$wpdb->prefix}af_guests WHERE id = %d AND deleted_by = %d",
+					$reactivate_id,
+					get_current_user_id()
+				)
+			);
+			if ( ! $mine ) {
+				wp_send_json_error( array( 'message' => __( 'Ya existe un inquilino registrado con ese correo.', 'arriendo-facil' ) ), 409 );
+			}
 		}
 
 		if ( Arriendo_Facil_Plans::applies_to() ) {
@@ -182,36 +197,43 @@ class Arriendo_Facil_Guest_Admin_Controller {
 			}
 		}
 
-		$inserted = $wpdb->insert(
-			$wpdb->prefix . 'af_guests',
-			array(
-				'first_name' => $first_name,
-				'last_name'  => $last_name,
-				'email'      => $email,
-				'phone'      => $phone,
-				'id_number'  => $id_number,
-				'accommodation_id' => $accommodation_id,
-				'rental_mode'       => $rental_mode,
-				'rental_start_date' => $rental_start_date ? $rental_start_date : null,
-				'rental_end_date'   => $rental_end_date ? $rental_end_date : null,
-				'rental_months'     => $rental_months ? $rental_months : null,
-				'rental_years'      => $rental_years ? $rental_years : null,
-				'desired_price'     => $desired_price,
-				'guarantee_text'    => $guarantee_text,
-				'mascotas'   => $mascotas,
-				'referencia_personal_1' => $referencia_personal_1,
-				'referencia_personal_2' => $referencia_personal_2,
-				'personas_viviran'      => $personas_viviran,
-				'nationality'           => $nationality ? $nationality : null,
-				'birth_city'            => $birth_city ? $birth_city : null,
-				'income_range'          => $income_range ? $income_range : null,
-				'created_by'            => get_current_user_id(),
-			),
-			array( '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%d', '%s', '%s', '%d', '%s', '%s', '%s', '%d' )
+		$guest_row = array(
+			'first_name' => $first_name,
+			'last_name'  => $last_name,
+			'email'      => $email,
+			'phone'      => $phone,
+			'id_number'  => $id_number,
+			'accommodation_id' => $accommodation_id,
+			'rental_mode'       => $rental_mode,
+			'rental_start_date' => $rental_start_date ? $rental_start_date : null,
+			'rental_end_date'   => $rental_end_date ? $rental_end_date : null,
+			'rental_months'     => $rental_months ? $rental_months : null,
+			'rental_years'      => $rental_years ? $rental_years : null,
+			'desired_price'     => $desired_price,
+			'guarantee_text'    => $guarantee_text,
+			'mascotas'   => $mascotas,
+			'referencia_personal_1' => $referencia_personal_1,
+			'referencia_personal_2' => $referencia_personal_2,
+			'personas_viviran'      => $personas_viviran,
+			'nationality'           => $nationality ? $nationality : null,
+			'birth_city'            => $birth_city ? $birth_city : null,
+			'income_range'          => $income_range ? $income_range : null,
+			'created_by'            => get_current_user_id(),
 		);
+		$guest_formats = array( '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%d', '%s', '%s', '%d', '%s', '%s', '%s', '%d' );
+
+		if ( $reactivate_id ) {
+			$guest_row['deleted_at'] = null;
+			$guest_row['deleted_by'] = null;
+			$guest_formats[]         = '%s';
+			$guest_formats[]         = '%s';
+			$inserted                = false !== $wpdb->update( $wpdb->prefix . 'af_guests', $guest_row, array( 'id' => $reactivate_id ), $guest_formats, array( '%d' ) );
+		} else {
+			$inserted = $wpdb->insert( $wpdb->prefix . 'af_guests', $guest_row, $guest_formats );
+		}
 
 		if ( $inserted ) {
-			$guest_id      = (int) $wpdb->insert_id;
+			$guest_id      = $reactivate_id ? $reactivate_id : (int) $wpdb->insert_id;
 				Arriendo_Facil_Consent::record( 'tenant_record', get_current_user_id(), 'guest', $guest_id );
 			$upload_result = Arriendo_Facil_Guest::upload_guest_documents( $guest_id );
 
@@ -229,6 +251,95 @@ class Arriendo_Facil_Guest_Admin_Controller {
 			error_log( 'Arriendo Facil: no se pudo crear el inquilino: ' . $wpdb->last_error ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 			wp_send_json_error( array( 'message' => __( 'No se pudo crear el huesped.', 'arriendo-facil' ) ) );
 		}
+	}
+
+	/**
+	 * AJAX: removes a tenant from the lists (soft delete).
+	 *
+	 * The row stays: past leases, charges and invoices keep pointing at it, and
+	 * invoices must be kept for tax purposes. A tenant with a contract still in
+	 * force cannot be removed, and neither can one shared with another manager.
+	 *
+	 * @return void
+	 */
+	public function ajax_delete_guest() {
+		check_ajax_referer( 'af_guest_edit_nonce', 'nonce' );
+
+		if ( ! current_user_can( Arriendo_Facil_Tenancy::CAP ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		$guest_id = isset( $_POST['guest_id'] ) ? absint( wp_unslash( $_POST['guest_id'] ) ) : 0;
+		if ( ! $guest_id || ! Arriendo_Facil_Tenancy::can_access_guest( $guest_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'No encontramos al inquilino o no tienes acceso.', 'arriendo-facil' ) ), 404 );
+		}
+
+		$schema_result = Arriendo_Facil_Guest::ensure_guest_extra_columns();
+		if ( is_wp_error( $schema_result ) ) {
+			wp_send_json_error( array( 'message' => $schema_result->get_error_message() ), 500 );
+		}
+
+		global $wpdb;
+		$guests_table = $wpdb->prefix . 'af_guests';
+		$leases_table = $wpdb->prefix . 'af_leases';
+
+		$guest = $wpdb->get_row( $wpdb->prepare( "SELECT id, deleted_at FROM {$guests_table} WHERE id = %d", $guest_id ) );
+		if ( ! $guest || ! empty( $guest->deleted_at ) ) {
+			wp_send_json_error( array( 'message' => __( 'El inquilino ya fue eliminado. Recarga la página.', 'arriendo-facil' ) ), 409 );
+		}
+
+		$statuses_in = "'" . implode( "','", Arriendo_Facil_Property_Trash_Relations::LEASE_STATUSES ) . "'";
+		$open_leases = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM {$leases_table} WHERE guest_id = %d AND status IN ({$statuses_in}) AND deleted_at IS NULL", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- constant list.
+				$guest_id
+			)
+		);
+		if ( $open_leases > 0 ) {
+			wp_send_json_error(
+				array( 'message' => __( 'Este inquilino tiene un contrato vigente o en trámite. Finaliza o elimina el contrato primero y luego podrás eliminar al inquilino.', 'arriendo-facil' ) ),
+				409
+			);
+		}
+
+		// The row is global (one per e-mail): never hide a tenant another manager still works with.
+		$scope = Arriendo_Facil_Tenancy::accessible_accommodation_ids();
+		if ( null !== $scope ) {
+			$foreign = (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*) FROM {$leases_table} WHERE guest_id = %d AND deleted_at IS NULL AND accommodation_id NOT IN (" . Arriendo_Facil_Tenancy::ids_in_clause( $scope ) . ')', // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- ids cast to int.
+					$guest_id
+				)
+			);
+			if ( $foreign > 0 ) {
+				wp_send_json_error(
+					array( 'message' => __( 'Este inquilino también tiene contratos con otro gestor, por eso no se puede eliminar.', 'arriendo-facil' ) ),
+					409
+				);
+			}
+		}
+
+		$updated = $wpdb->update(
+			$guests_table,
+			array(
+				'deleted_at' => current_time( 'mysql' ),
+				'deleted_by' => get_current_user_id(),
+			),
+			array( 'id' => $guest_id ),
+			array( '%s', '%d' ),
+			array( '%d' )
+		);
+		if ( false === $updated ) {
+			error_log( 'Arriendo Facil: no se pudo eliminar el inquilino: ' . $wpdb->last_error ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			wp_send_json_error( array( 'message' => __( 'No se pudo eliminar al inquilino.', 'arriendo-facil' ) ), 500 );
+		}
+
+		wp_send_json_success(
+			array(
+				'message' => __( 'Inquilino eliminado.', 'arriendo-facil' ),
+				'id'      => $guest_id,
+			)
+		);
 	}
 
 	/**
@@ -452,16 +563,17 @@ class Arriendo_Facil_Guest_Admin_Controller {
 			$ids_sql   = $owner_ids ? implode( ',', array_map( 'intval', $owner_ids ) ) : '0';
 			$guests    = $wpdb->get_results(
 				$wpdb->prepare(
-					"SELECT * FROM {$wpdb->prefix}af_guests WHERE accommodation_id IN ($ids_sql) OR created_by = %d OR id IN ( SELECT guest_id FROM {$wpdb->prefix}af_leases WHERE accommodation_id IN ($ids_sql) AND deleted_at IS NULL AND guest_id IS NOT NULL ) ORDER BY created_at DESC LIMIT %d OFFSET %d",
+					"SELECT * FROM {$wpdb->prefix}af_guests WHERE deleted_at IS NULL AND ( accommodation_id IN ($ids_sql) OR created_by = %d OR id IN ( SELECT guest_id FROM {$wpdb->prefix}af_leases WHERE accommodation_id IN ($ids_sql) AND deleted_at IS NULL AND guest_id IS NOT NULL ) ) ORDER BY created_at DESC LIMIT %d OFFSET %d",
 					get_current_user_id(),
 					$per_page,
 					$offset
 				)
 			);
 		} else {
+			Arriendo_Facil_Guest::ensure_guest_extra_columns();
 			$guests = $wpdb->get_results(
 				$wpdb->prepare(
-					"SELECT * FROM {$wpdb->prefix}af_guests ORDER BY created_at DESC LIMIT %d OFFSET %d",
+					"SELECT * FROM {$wpdb->prefix}af_guests WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT %d OFFSET %d",
 					$per_page,
 					$offset
 				)

@@ -1957,3 +1957,169 @@ html.af-gsap body.af-custom-shell .af-modal .af-modal__backdrop {
 		transition-duration: 0ms !important;
 	}
 }
+
+/* ── Contratos en teléfono: una tarjeta por contrato ─────────────────────
+   Encabezado (inmueble + estado), inquilino, y los datos en rejilla de dos
+   columnas con la etiqueta pequeña encima del valor. Después, el documento
+   y las acciones. Solo cambia la presentación: las celdas son las mismas. */
+
+@media (max-width: 782px) {
+	body.af-custom-shell #wpbody-content .af-shell table.af-leases-table {
+		border: 0;
+		border-radius: 0;
+		background: transparent;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell table.af-leases-table tbody tr.af-lease-row {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+		align-items: start;
+		gap: 12px 16px;
+		margin: 0 0 12px;
+		padding: 16px;
+		border: 1px solid var(--af-border);
+		border-radius: 18px;
+		background: var(--af-surface);
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell table.af-leases-table tbody tr.af-lease-row:first-child {
+		border-top: 1px solid var(--af-border);
+	}
+
+	/* Cada dato: etiqueta arriba, valor debajo. */
+	body.af-custom-shell #wpbody-content .af-shell table.af-leases-table tbody tr.af-lease-row > td {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 3px;
+		min-width: 0;
+		font-size: 15px;
+		font-weight: 600;
+		line-height: 1.3;
+		color: var(--af-text);
+		overflow-wrap: anywhere;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell table.af-leases-table tbody tr.af-lease-row > td::before {
+		content: attr(data-label);
+		font-size: 11px;
+		font-weight: 700;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		color: var(--af-text-faint);
+	}
+
+	/* Encabezado: inmueble a la izquierda, estado a la derecha. */
+	body.af-custom-shell #wpbody-content .af-shell table.af-leases-table tbody tr.af-lease-row > td:nth-child(2) {
+		grid-column: 1;
+		grid-row: 1;
+		flex-direction: row;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 6px 8px;
+		font-size: 18px;
+		font-weight: 700;
+		letter-spacing: -0.01em;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell table.af-leases-table tbody tr.af-lease-row > td:nth-child(2)::before,
+	body.af-custom-shell #wpbody-content .af-shell table.af-leases-table tbody tr.af-lease-row > td.af-lease-status-cell::before,
+	body.af-custom-shell #wpbody-content .af-shell table.af-leases-table tbody tr.af-lease-row > td.af-lease-actions-cell::before {
+		content: none;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell table.af-leases-table tbody tr.af-lease-row > td.af-lease-status-cell {
+		grid-column: 2;
+		grid-row: 1;
+		align-items: flex-end;
+	}
+
+	/* Inquilino: la persona, a lo ancho y destacada. */
+	body.af-custom-shell #wpbody-content .af-shell table.af-leases-table tbody tr.af-lease-row > td:nth-child(4) {
+		grid-column: 1 / -1;
+		grid-row: 2;
+		padding: 10px 12px;
+		border-radius: 12px;
+		background: var(--af-raised);
+		font-size: 16px;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell table.af-leases-table tbody tr.af-lease-row > td:nth-child(5)  { grid-column: 1; grid-row: 3; } /* inicio */
+	body.af-custom-shell #wpbody-content .af-shell table.af-leases-table tbody tr.af-lease-row > td:nth-child(6)  { grid-column: 2; grid-row: 3; } /* fin */
+	body.af-custom-shell #wpbody-content .af-shell table.af-leases-table tbody tr.af-lease-row > td:nth-child(7)  { grid-column: 1; grid-row: 4; font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; } /* canon */
+	body.af-custom-shell #wpbody-content .af-shell table.af-leases-table tbody tr.af-lease-row > td:nth-child(9)  { grid-column: 2; grid-row: 4; } /* saldo */
+	body.af-custom-shell #wpbody-content .af-shell table.af-leases-table tbody tr.af-lease-row > td:nth-child(8)  { grid-column: 1; grid-row: 5; } /* día de pago */
+	body.af-custom-shell #wpbody-content .af-shell table.af-leases-table tbody tr.af-lease-row > td:nth-child(11) { grid-column: 2; grid-row: 5; display: block; } /* factura */
+	body.af-custom-shell #wpbody-content .af-shell table.af-leases-table tbody tr.af-lease-row > td:nth-child(1)  { grid-column: 1; grid-row: 6; font-size: 14px; color: var(--af-text-muted); } /* ID */
+	body.af-custom-shell #wpbody-content .af-shell table.af-leases-table tbody tr.af-lease-row > td:nth-child(3)  { grid-column: 2; grid-row: 6; font-size: 14px; color: var(--af-text-muted); } /* unidad */
+
+	body.af-custom-shell #wpbody-content .af-shell table.af-leases-table tbody tr.af-lease-row > td:nth-child(11)::before {
+		display: block;
+		margin-bottom: 3px;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell table.af-leases-table tbody tr.af-lease-row > td:nth-child(11) .button {
+		min-height: 36px;
+		margin-top: 6px;
+		white-space: normal;
+	}
+
+	/* Documento: franja con "Ver" como botón y el detalle de versión debajo. */
+	body.af-custom-shell #wpbody-content .af-shell table.af-leases-table tbody tr.af-lease-row > td.af-lease-document-cell {
+		grid-column: 1 / -1;
+		grid-row: 7;
+		display: block;
+		padding: 12px;
+		border: 1px dashed var(--af-control);
+		border-radius: 12px;
+		font-size: 13px;
+		font-weight: 500;
+		color: var(--af-text-muted);
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell table.af-leases-table tbody tr.af-lease-row > td.af-lease-document-cell::before {
+		display: block;
+		margin-bottom: 8px;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell table.af-leases-table .af-lease-view-link {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		min-height: 40px;
+		padding: 0 18px;
+		border-radius: 10px;
+		background: var(--af-accent);
+		color: #fff;
+		font-size: 14px;
+		font-weight: 700;
+		text-decoration: none;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell table.af-leases-table .af-lease-version-meta {
+		display: block;
+		margin-top: 8px;
+		overflow: visible;
+		white-space: normal;
+		text-overflow: clip;
+		font-size: 12.5px;
+		line-height: 1.4;
+		color: var(--af-text-muted);
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell table.af-leases-table tbody tr.af-lease-row > td.af-lease-actions-cell {
+		grid-column: 1 / -1;
+		grid-row: 8;
+		margin: 0;
+	}
+
+	body.af-custom-shell #wpbody-content .af-shell table.af-leases-table .af-lease-actions-menu > summary {
+		min-height: 46px;
+		border-color: var(--af-accent);
+		border-radius: 12px;
+		background: var(--af-accent-soft);
+		color: var(--af-accent-ink);
+		font-size: 15px;
+		font-weight: 700;
+	}
+}

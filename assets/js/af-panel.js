@@ -64,6 +64,8 @@
 		var tl = g.timeline({ defaults: { ease: 'power3.out' } });
 
 		tl.from('.af-panel__head > *', { y: 14, opacity: 0, duration: 0.5, stagger: 0.08, clearProps: clear })
+			.from('.af-quick__item', { y: 18, opacity: 0, scale: 0.92, duration: 0.45, stagger: 0.06, clearProps: clear }, '-=0.25')
+			.from('.af-quick__icon', { scale: 0.6, duration: 0.5, ease: 'back.out(2)', stagger: 0.06, clearProps: 'transform' }, '<0.1')
 			.from('.af-pk', { y: 28, opacity: 0, scale: 0.97, duration: 0.6, stagger: 0.09, clearProps: clear }, '-=0.25')
 			.from('.af-pcard', { y: 26, opacity: 0, duration: 0.6, stagger: 0.1, clearProps: clear }, '-=0.35')
 			.from('.af-plist__item', { x: -12, opacity: 0, duration: 0.4, stagger: 0.05, clearProps: clear }, '-=0.5')
@@ -104,6 +106,9 @@
 			});
 		});
 
+		// Insignias de número: aparecen con un pequeño rebote al final de la entrada.
+		g.from('.af-pcard__count, .af-plist__main--task strong', { scale: 0, duration: 0.45, delay: 0.9, stagger: 0.07, ease: 'back.out(2.4)', clearProps: 'transform' });
+
 		$$('.af-pk--danger .af-pk__icon').forEach(function (icon) {
 			g.to(icon, { scale: 1.12, duration: 0.9, repeat: -1, yoyo: true, ease: 'sine.inOut', delay: 1.5 });
 		});
@@ -118,8 +123,61 @@
 		});
 	}
 
+	/* Tarjetas desplegables: la altura y la flecha se animan con GSAP; sin GSAP
+	   o con "reducir movimiento" el <details> abre y cierra sin transición. */
+	function refreshChart() {
+		var canvas = document.getElementById('af-p-revenue-chart');
+		var chart = canvas && window.Chart && typeof window.Chart.getChart === 'function' ? window.Chart.getChart(canvas) : null;
+		if (chart) { chart.resize(); }
+	}
+
+	function initFolds() {
+		$$('details.af-pfold').forEach(function (card) {
+			var summary = card.querySelector(':scope > summary');
+			var chev = card.querySelector('.af-pfold__chev');
+			if (!summary) { return; }
+
+			var body = document.createElement('div');
+			body.className = 'af-pfold__body';
+			while (summary.nextSibling) { body.appendChild(summary.nextSibling); }
+			card.appendChild(body);
+
+			summary.addEventListener('click', function (event) {
+				// Un enlace dentro de la cabecera navega; no despliega.
+				if (event.target.closest('a')) { return; }
+				if (!g || reduced) {
+					window.setTimeout(refreshChart, 0);
+					return;
+				}
+				event.preventDefault();
+
+				if (card.dataset.afBusy) { return; }
+				card.dataset.afBusy = '1';
+				var opening = !card.open;
+
+				var done = function () {
+					g.set(body, { clearProps: 'height,opacity,overflow' });
+					if (chev) { g.set(chev, { clearProps: 'transform' }); }
+					delete card.dataset.afBusy;
+				};
+
+				if (opening) {
+					card.open = true;
+					g.set(body, { overflow: 'hidden' });
+					g.fromTo(body, { height: 0, opacity: 0 }, { height: 'auto', opacity: 1, duration: 0.38, ease: 'power3.out', onUpdate: refreshChart, onComplete: function () { done(); refreshChart(); } });
+					if (chev) { g.to(chev, { rotation: 180, duration: 0.3, ease: 'power3.out', clearProps: 'transform' }); }
+				} else {
+					g.set(body, { overflow: 'hidden' });
+					g.to(body, { height: 0, opacity: 0, duration: 0.3, ease: 'power3.inOut', onComplete: function () { card.open = false; done(); } });
+					if (chev) { g.fromTo(chev, { rotation: 180 }, { rotation: 0, duration: 0.3, ease: 'power3.inOut' }); }
+				}
+			});
+		});
+	}
+
 	function init() {
 		if (!document.querySelector('.af-panel')) { return; }
+		initFolds();
 		drawChart();
 		foldForPhone();
 		motion();

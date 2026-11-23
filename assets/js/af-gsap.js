@@ -231,7 +231,7 @@
 
 	/* ── Respuesta al toque ─────────────────────────────────────────── */
 
-	var PRESSABLE = '.af-btn, .button, .af-kpi, .af-property-card, .af-catalog-card, .af-pc, .af-quick-list__link, .af-menu-group__link, .af-sheet__foot-link, .af-app-nav__link';
+	var PRESSABLE = '.af-btn, .button, .af-kpi, .af-pk, .af-quick__item, .af-property-card, .af-catalog-card, .af-pc, .af-quick-list__link, .af-menu-group__link, .af-sheet__foot-link, .af-app-nav__link';
 
 	function pressFeedback() {
 		var held = null;

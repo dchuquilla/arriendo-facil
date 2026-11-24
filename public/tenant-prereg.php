@@ -29,7 +29,7 @@ if ( $af_manager ) {
 
 get_header();
 ?>
-<main class="af-tp" id="af-tp-prereg">
+<main class="af-tp af-tp--prereg" id="af-tp-prereg">
 
 	<?php if ( ! $af_manager ) : ?>
 
@@ -39,61 +39,101 @@ get_header();
 		</section>
 
 	<?php else : ?>
+		<?php
+		$af_locked    = ! empty( $af_ctx['locked'] ) && $af_selected;
+		$af_prop_name = $af_locked ? get_the_title( $af_selected ) : '';
+		$af_prop_img  = $af_locked ? get_the_post_thumbnail_url( $af_selected, 'medium' ) : '';
+		$af_prop_addr = $af_locked ? trim( (string) get_post_meta( $af_selected, '_af_address', true ) . ' ' . (string) get_post_meta( $af_selected, '_af_city', true ) ) : '';
+		?>
 
-		<section class="af-tp-card" data-pr-form-card aria-labelledby="af-pr-title">
-			<p class="af-tp-eyebrow"><?php echo esc_html( $af_name ); ?></p>
-			<h1 class="af-tp-title" id="af-pr-title"><?php esc_html_e( 'Pre-registro', 'arriendo-facil' ); ?></h1>
-			<p class="af-tp-lead"><?php esc_html_e( 'Déjanos tus datos básicos. Luego tu administrador te enviará un formulario completo para terminar el registro.', 'arriendo-facil' ); ?></p>
+		<section class="af-pr" data-pr-form-card aria-labelledby="af-pr-title">
+			<header class="af-pr__hero">
+				<p class="af-pr__eyebrow"><?php echo esc_html( $af_name ); ?></p>
+				<h1 class="af-pr__title" id="af-pr-title"><?php esc_html_e( 'Cuéntanos quién eres', 'arriendo-facil' ); ?></h1>
+				<p class="af-pr__lead"><?php esc_html_e( 'Son solo 5 datos. Luego el administrador te enviará un formulario completo.', 'arriendo-facil' ); ?></p>
+			</header>
 
-			<p class="af-tp-alert" role="alert" data-pr-alert hidden></p>
-
-			<form class="af-tp-form" data-pr-form novalidate>
-				<input type="hidden" name="key" value="<?php echo esc_attr( Arriendo_Facil_Tenant_Prereg::manager_key( (int) $af_manager->ID, false ) ); ?>" />
-				<input type="hidden" name="source" value="<?php echo esc_attr( $af_source ); ?>" />
-				<input type="hidden" name="form_ts" value="<?php echo esc_attr( (string) $af_ts ); ?>" />
-				<input type="hidden" name="form_sig" value="<?php echo esc_attr( Arriendo_Facil_Tenant_Prereg::form_sig( $af_ts ) ); ?>" />
-				<input class="af-tp-prereg__hp" type="text" name="website" value="" tabindex="-1" autocomplete="off" aria-hidden="true" />
-
-				<div class="af-tp-prereg__grid">
-					<div>
-						<label class="af-tp-label" for="af-pr-first"><?php esc_html_e( 'Nombres', 'arriendo-facil' ); ?></label>
-						<input class="af-tp-input" id="af-pr-first" name="first_name" type="text" autocomplete="given-name" maxlength="80" required />
-					</div>
-					<div>
-						<label class="af-tp-label" for="af-pr-last"><?php esc_html_e( 'Apellidos', 'arriendo-facil' ); ?></label>
-						<input class="af-tp-input" id="af-pr-last" name="last_name" type="text" autocomplete="family-name" maxlength="80" required />
-					</div>
-					<div class="is-wide">
-						<label class="af-tp-label" for="af-pr-email"><?php esc_html_e( 'Correo', 'arriendo-facil' ); ?></label>
-						<input class="af-tp-input" id="af-pr-email" name="email" type="email" autocomplete="email" inputmode="email" maxlength="190" required />
-					</div>
-					<div class="is-wide">
-						<label class="af-tp-label" for="af-pr-phone"><?php esc_html_e( 'Teléfono / WhatsApp', 'arriendo-facil' ); ?></label>
-						<input class="af-tp-input" id="af-pr-phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="20" required />
-					</div>
-
-					<?php if ( $af_properties ) : ?>
-						<div class="is-wide">
-							<label class="af-tp-label" for="af-pr-property"><?php esc_html_e( 'Inmueble que te interesa', 'arriendo-facil' ); ?></label>
-							<select class="af-tp-input" id="af-pr-property" name="accommodation_id">
-								<option value=""><?php esc_html_e( 'Aún no lo sé', 'arriendo-facil' ); ?></option>
-								<?php foreach ( $af_properties as $af_pid => $af_ptitle ) : ?>
-									<option value="<?php echo esc_attr( $af_pid ); ?>" <?php selected( $af_selected, $af_pid ); ?>><?php echo esc_html( $af_ptitle ); ?></option>
-								<?php endforeach; ?>
-							</select>
+			<div class="af-pr__body">
+				<?php if ( $af_locked ) : ?>
+					<div class="af-pr__prop" aria-label="<?php esc_attr_e( 'Inmueble seleccionado', 'arriendo-facil' ); ?>">
+						<?php if ( $af_prop_img ) : ?>
+							<img class="af-pr__thumb" src="<?php echo esc_url( $af_prop_img ); ?>" alt="" loading="lazy" />
+						<?php else : ?>
+							<span class="af-pr__thumb af-pr__thumb--empty" aria-hidden="true">
+								<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V21H3z"/><path d="M9 21v-6h6v6"/></svg>
+							</span>
+						<?php endif; ?>
+						<div class="af-pr__propinfo">
+							<span class="af-pr__chip"><?php esc_html_e( 'Te interesa', 'arriendo-facil' ); ?></span>
+							<strong><?php echo esc_html( $af_prop_name ); ?></strong>
+							<?php if ( $af_prop_addr ) : ?>
+								<small><?php echo esc_html( $af_prop_addr ); ?></small>
+							<?php endif; ?>
 						</div>
-					<?php endif; ?>
-
-					<div class="is-wide">
-						<label class="af-tp-label" for="af-pr-note"><?php esc_html_e( 'Mensaje (opcional)', 'arriendo-facil' ); ?></label>
-						<textarea class="af-tp-input" id="af-pr-note" name="note" rows="3" maxlength="300"></textarea>
 					</div>
-				</div>
+				<?php endif; ?>
 
-				<?php Arriendo_Facil_Consent::render( 'tenant_prereg' ); ?>
+				<p class="af-tp-alert" role="alert" data-pr-alert hidden></p>
 
-				<button class="af-tp-btn af-tp-btn--primary" type="submit" data-pr-submit><?php esc_html_e( 'Enviar pre-registro', 'arriendo-facil' ); ?></button>
-			</form>
+				<?php if ( ! $af_locked && empty( $af_properties ) ) : ?>
+					<p class="af-tp-empty"><?php esc_html_e( 'Por ahora no hay inmuebles disponibles para pre-registro. Vuelve a intentarlo más tarde.', 'arriendo-facil' ); ?></p>
+				<?php else : ?>
+
+				<form class="af-pr__form" data-pr-form novalidate>
+					<input type="hidden" name="key" value="<?php echo esc_attr( Arriendo_Facil_Tenant_Prereg::manager_key( (int) $af_manager->ID, false ) ); ?>" />
+					<input type="hidden" name="source" value="<?php echo esc_attr( $af_source ); ?>" />
+					<input type="hidden" name="form_ts" value="<?php echo esc_attr( (string) $af_ts ); ?>" />
+					<input type="hidden" name="form_sig" value="<?php echo esc_attr( Arriendo_Facil_Tenant_Prereg::form_sig( $af_ts ) ); ?>" />
+					<input class="af-tp-prereg__hp" type="text" name="website" value="" tabindex="-1" autocomplete="off" aria-hidden="true" />
+
+					<div class="af-pr__grid">
+						<div class="af-pr__field">
+							<label for="af-pr-first"><?php esc_html_e( 'Nombres', 'arriendo-facil' ); ?> <abbr title="<?php esc_attr_e( 'Obligatorio', 'arriendo-facil' ); ?>">*</abbr></label>
+							<input id="af-pr-first" name="first_name" type="text" autocomplete="given-name" maxlength="80" placeholder="<?php esc_attr_e( 'Ej. María José', 'arriendo-facil' ); ?>" required />
+							<small class="af-pr__err" data-err-for="first_name"></small>
+						</div>
+						<div class="af-pr__field">
+							<label for="af-pr-last"><?php esc_html_e( 'Apellidos', 'arriendo-facil' ); ?> <abbr title="<?php esc_attr_e( 'Obligatorio', 'arriendo-facil' ); ?>">*</abbr></label>
+							<input id="af-pr-last" name="last_name" type="text" autocomplete="family-name" maxlength="80" placeholder="<?php esc_attr_e( 'Ej. Pérez Loor', 'arriendo-facil' ); ?>" required />
+							<small class="af-pr__err" data-err-for="last_name"></small>
+						</div>
+						<div class="af-pr__field af-pr__field--wide">
+							<label for="af-pr-email"><?php esc_html_e( 'Correo electrónico', 'arriendo-facil' ); ?> <abbr title="<?php esc_attr_e( 'Obligatorio', 'arriendo-facil' ); ?>">*</abbr></label>
+							<input id="af-pr-email" name="email" type="email" autocomplete="email" inputmode="email" maxlength="190" placeholder="nombre@correo.com" required />
+							<small class="af-pr__err" data-err-for="email"></small>
+						</div>
+						<div class="af-pr__field af-pr__field--wide">
+							<label for="af-pr-phone"><?php esc_html_e( 'Teléfono / WhatsApp', 'arriendo-facil' ); ?> <abbr title="<?php esc_attr_e( 'Obligatorio', 'arriendo-facil' ); ?>">*</abbr></label>
+							<input id="af-pr-phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="20" placeholder="0991234567" required />
+							<small class="af-pr__hint"><?php esc_html_e( 'Por aquí te escribirá el administrador.', 'arriendo-facil' ); ?></small>
+							<small class="af-pr__err" data-err-for="phone"></small>
+						</div>
+
+						<?php if ( $af_locked ) : ?>
+							<input type="hidden" name="accommodation_id" value="<?php echo esc_attr( $af_selected ); ?>" />
+							<input type="hidden" name="prop_sig" value="<?php echo esc_attr( Arriendo_Facil_Tenant_Prereg::property_sig( (int) $af_manager->ID, $af_selected ) ); ?>" />
+						<?php else : ?>
+							<div class="af-pr__field af-pr__field--wide">
+								<label for="af-pr-property"><?php esc_html_e( 'Inmueble que te interesa', 'arriendo-facil' ); ?> <abbr title="<?php esc_attr_e( 'Obligatorio', 'arriendo-facil' ); ?>">*</abbr></label>
+								<select id="af-pr-property" name="accommodation_id" required>
+									<option value=""><?php esc_html_e( 'Selecciona un inmueble…', 'arriendo-facil' ); ?></option>
+									<?php foreach ( $af_properties as $af_pid => $af_ptitle ) : ?>
+										<option value="<?php echo esc_attr( $af_pid ); ?>"><?php echo esc_html( $af_ptitle ); ?></option>
+									<?php endforeach; ?>
+								</select>
+								<small class="af-pr__err" data-err-for="accommodation_id"></small>
+							</div>
+						<?php endif; ?>
+					</div>
+
+					<?php Arriendo_Facil_Consent::render( 'tenant_prereg' ); ?>
+
+					<button class="af-tp-btn af-tp-btn--primary af-pr__submit" type="submit" data-pr-submit><?php esc_html_e( 'Enviar pre-registro', 'arriendo-facil' ); ?></button>
+					<p class="af-tp-fine"><?php esc_html_e( 'Tus datos solo se comparten con el administrador de este inmueble.', 'arriendo-facil' ); ?></p>
+				</form>
+
+				<?php endif; ?>
+			</div>
 		</section>
 
 		<section class="af-tp-card af-tp-done" data-pr-done hidden aria-live="polite">

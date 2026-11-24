@@ -110,6 +110,18 @@ class Arriendo_Facil_Tenant_Prereg {
 	}
 
 	/**
+	 * Firma del inmueble elegido en el catálogo: con ella el formulario lo muestra
+	 * fijo y el servidor rechaza cualquier otro.
+	 *
+	 * @param int $manager_id Gestor.
+	 * @param int $property   Inmueble.
+	 * @return string
+	 */
+	public static function property_sig( $manager_id, $property ) {
+		return hash_hmac( 'sha256', 'prop|' . absint( $manager_id ) . '|' . absint( $property ), wp_salt( 'nonce' ) . 'af_prereg_prop_v1' );
+	}
+
+	/**
 	 * El formulario no se acepta ni demasiado rápido (bot) ni demasiado viejo.
 	 *
 	 * @param int    $ts  Marca de tiempo enviada.
@@ -275,6 +287,7 @@ class Arriendo_Facil_Tenant_Prereg {
 			'properties' => $manager ? self::public_properties( (int) $manager->ID ) : array(),
 			'selected'   => $manager ? self::requested_property( (int) $manager->ID ) : 0,
 		);
+		$GLOBALS['af_prereg']['locked'] = $GLOBALS['af_prereg']['selected'] > 0;
 
 		return ARRIENDO_FACIL_PLUGIN_DIR . 'public/tenant-prereg.php';
 	}
@@ -302,6 +315,12 @@ class Arriendo_Facil_Tenant_Prereg {
 					'send'     => __( 'Enviar pre-registro', 'arriendo-facil' ),
 					'network'  => __( 'No pudimos conectar. Revisa tu internet e inténtalo de nuevo.', 'arriendo-facil' ),
 					'opening'  => __( 'Abriendo WhatsApp…', 'arriendo-facil' ),
+					'errName'     => __( 'Escribe tu nombre (solo letras).', 'arriendo-facil' ),
+					'errLast'     => __( 'Escribe tu apellido (solo letras).', 'arriendo-facil' ),
+					'errEmail'    => __( 'Escribe un correo válido, como nombre@correo.com.', 'arriendo-facil' ),
+					'errPhone'    => __( 'Escribe un teléfono válido (7 a 15 dígitos).', 'arriendo-facil' ),
+					'errProperty' => __( 'Selecciona el inmueble que te interesa.', 'arriendo-facil' ),
+					'errConsent'  => __( 'Marca las dos casillas para continuar.', 'arriendo-facil' ),
 				),
 			)
 		);
@@ -478,7 +497,8 @@ class Arriendo_Facil_Tenant_Prereg {
 		$last  = isset( $_POST['last_name'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['last_name'] ) ) ) : '';
 		$email = isset( $_POST['email'] ) ? strtolower( sanitize_email( wp_unslash( $_POST['email'] ) ) ) : '';
 		$phone = self::normalize_phone( isset( $_POST['phone'] ) ? sanitize_text_field( wp_unslash( $_POST['phone'] ) ) : '' );
-		$note  = isset( $_POST['note'] ) ? mb_substr( sanitize_textarea_field( wp_unslash( $_POST['note'] ) ), 0, 300 ) : '';
+		$note  = '';
+		$psig  = isset( $_POST['prop_sig'] ) ? sanitize_text_field( wp_unslash( $_POST['prop_sig'] ) ) : '';
 		$prop  = isset( $_POST['accommodation_id'] ) ? absint( wp_unslash( $_POST['accommodation_id'] ) ) : 0;
 		$from  = isset( $_POST['source'] ) && 'catalogo' === sanitize_key( wp_unslash( $_POST['source'] ) ) ? 'catalogo' : 'link';
 		// phpcs:enable WordPress.Security.NonceVerification.Missing
@@ -492,8 +512,12 @@ class Arriendo_Facil_Tenant_Prereg {
 		if ( '' === $phone ) {
 			wp_send_json_error( array( 'message' => __( 'Escribe un teléfono válido (7 a 15 dígitos).', 'arriendo-facil' ) ), 400 );
 		}
-		if ( $prop && ! array_key_exists( $prop, self::public_properties( (int) $manager->ID ) ) ) {
-			$prop = 0; // Un inmueble ajeno o no publicado simplemente se ignora.
+		// Elegido desde el catálogo: solo vale ese inmueble, sin importar lo que llegue en el formulario.
+		if ( '' !== $psig && ! hash_equals( self::property_sig( (int) $manager->ID, $prop ), $psig ) ) {
+			wp_send_json_error( array( 'message' => __( 'El inmueble no coincide con el que elegiste. Vuelve al catálogo e inténtalo de nuevo.', 'arriendo-facil' ) ), 400 );
+		}
+		if ( ! $prop || ! array_key_exists( $prop, self::public_properties( (int) $manager->ID ) ) ) {
+			wp_send_json_error( array( 'message' => __( 'Selecciona el inmueble que te interesa.', 'arriendo-facil' ) ), 400 );
 		}
 
 		if ( self::throttled( 'mail', $manager->ID . '|' . $email, 3, DAY_IN_SECONDS ) ) {
@@ -518,7 +542,7 @@ class Arriendo_Facil_Tenant_Prereg {
 					'last_name'        => $last,
 					'phone'            => $phone,
 					'note'             => $note ? $note : null,
-					'accommodation_id' => $prop ? $prop : null,
+					'accommodation_id' => $prop,
 					'updated_at'       => $now,
 				),
 				array( 'id' => $lead_id ),
@@ -533,7 +557,7 @@ class Arriendo_Facil_Tenant_Prereg {
 				$table,
 				array(
 					'manager_id'       => (int) $manager->ID,
-					'accommodation_id' => $prop ? $prop : null,
+					'accommodation_id' => $prop,
 					'first_name'       => $first,
 					'last_name'        => $last,
 					'email'            => $email,
@@ -560,7 +584,7 @@ class Arriendo_Facil_Tenant_Prereg {
 
 		// WhatsApp del gestor con el mensaje listo (si tiene número válido).
 		$wa      = Arriendo_Facil_Catalog_Share::whatsapp_link( (string) get_user_meta( (int) $manager->ID, 'af_contact_phone', true ) );
-		$message = self::interested_message( $first, $prop ? get_the_title( $prop ) : '' );
+		$message = self::interested_message( $first, get_the_title( $prop ) );
 
 		wp_send_json_success(
 			array(

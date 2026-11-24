@@ -119,4 +119,12 @@ class TenantAccessTest extends TestCase {
 		$this->assertStringNotContainsString( '""', Arriendo_Facil_Tenant_Prereg::interested_message( 'Ana' ) );
 		$this->assertStringContainsString( 'https://x.ec/f', Arriendo_Facil_Tenant_Prereg::manager_message( 'Ana', 'https://x.ec/f' ) );
 	}
+
+	public function test_property_signature_binds_manager_and_property() {
+		$sig = Arriendo_Facil_Tenant_Prereg::property_sig( 5, 100 );
+
+		$this->assertSame( $sig, Arriendo_Facil_Tenant_Prereg::property_sig( 5, 100 ) );
+		$this->assertNotSame( $sig, Arriendo_Facil_Tenant_Prereg::property_sig( 5, 101 ), 'Otro inmueble.' );
+		$this->assertNotSame( $sig, Arriendo_Facil_Tenant_Prereg::property_sig( 6, 100 ), 'Otro gestor.' );
+	}
 }

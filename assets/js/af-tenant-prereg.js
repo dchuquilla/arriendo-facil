@@ -22,12 +22,56 @@
 		if (message) { alertBox.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
 	}
 
+	var rules = {
+		first_name: function (v) { return /^[\p{L}\p{M}][\p{L}\p{M}\s'.\-]{1,79}$/u.test(v) ? '' : i18n.errName; },
+		last_name: function (v) { return /^[\p{L}\p{M}][\p{L}\p{M}\s'.\-]{1,79}$/u.test(v) ? '' : i18n.errLast; },
+		email: function (v) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v) ? '' : i18n.errEmail; },
+		phone: function (v) { var d = v.replace(/\D+/g, ''); return d.length >= 7 && d.length <= 15 ? '' : i18n.errPhone; },
+		accommodation_id: function (v) { return v ? '' : i18n.errProperty; }
+	};
+
+	function setError(name, message) {
+		var field = form.querySelector('[name="' + name + '"]');
+		var box = form.querySelector('[data-err-for="' + name + '"]');
+		var wrap = field && field.closest('.af-pr__field');
+		if (!wrap) { return; }
+		wrap.classList.toggle('is-invalid', !!message);
+		if (box) { box.textContent = message || ''; }
+		field.setAttribute('aria-invalid', message ? 'true' : 'false');
+	}
+
+	function validate() {
+		var first = null;
+		Object.keys(rules).forEach(function (name) {
+			var field = form.querySelector('[name="' + name + '"]');
+			if (!field || field.type === 'hidden') { return; }
+			var message = rules[name](String(field.value || '').trim());
+			setError(name, message);
+			if (message && !first) { first = field; }
+		});
+		if (first) { first.focus(); }
+		return !first;
+	}
+
+	// El error desaparece en cuanto se corrige el campo.
+	Object.keys(rules).forEach(function (name) {
+		var field = form.querySelector('[name="' + name + '"]');
+		if (field && field.type !== 'hidden') {
+			field.addEventListener('input', function () { setError(name, rules[name](String(field.value || '').trim())); });
+			field.addEventListener('change', function () { setError(name, rules[name](String(field.value || '').trim())); });
+		}
+	});
+
 	form.addEventListener('submit', function (e) {
 		e.preventDefault();
 		show('');
 
-		if (!form.checkValidity()) {
-			form.reportValidity();
+		if (!validate()) { return; }
+
+		var read = form.querySelector('[name="consent_read"]');
+		var agree = form.querySelector('[name="consent_agree"]');
+		if ((read && !read.checked) || (agree && !agree.checked)) {
+			show(i18n.errConsent);
 			return;
 		}
 

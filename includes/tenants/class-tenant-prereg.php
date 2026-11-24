@@ -52,6 +52,7 @@ class Arriendo_Facil_Tenant_Prereg {
 		add_action( 'wp_ajax_af_tenant_prereg_submit', array( $this, 'ajax_submit' ) );
 		add_action( 'wp_ajax_af_prereg_invite', array( $this, 'ajax_invite' ) );
 		add_action( 'wp_ajax_af_prereg_status', array( $this, 'ajax_status' ) );
+		add_action( 'wp_ajax_af_prereg_delete', array( $this, 'ajax_delete' ) );
 		add_action( 'wp_ajax_af_prereg_regenerate_key', array( $this, 'ajax_regenerate_key' ) );
 		add_action( 'af_guest_profile_completed', array( __CLASS__, 'mark_completed' ), 10, 1 );
 	}
@@ -872,6 +873,30 @@ class Arriendo_Facil_Tenant_Prereg {
 
 		$wpdb->update( self::table(), array( 'status' => $status, 'updated_at' => gmdate( 'Y-m-d H:i:s' ) ), array( 'id' => (int) $lead->id ), array( '%s', '%s' ), array( '%d' ) );
 		wp_send_json_success( array( 'status' => $status ) );
+	}
+
+	/**
+	 * Eliminar definitivamente a un interesado. Solo los descartados: no hay forma de deshacerlo.
+	 */
+	public function ajax_delete() {
+		self::guard();
+
+		global $wpdb;
+		$lead = self::lead_for_current_user( isset( $_POST['lead_id'] ) ? absint( wp_unslash( $_POST['lead_id'] ) ) : 0 );
+
+		if ( ! $lead ) {
+			wp_send_json_error( array( 'message' => __( 'No encontramos a este interesado.', 'arriendo-facil' ) ), 404 );
+		}
+		if ( 'discarded' !== $lead->status ) {
+			wp_send_json_error( array( 'message' => __( 'Solo se pueden eliminar los interesados descartados.', 'arriendo-facil' ) ), 409 );
+		}
+
+		$deleted = $wpdb->delete( self::table(), array( 'id' => (int) $lead->id, 'status' => 'discarded' ), array( '%d', '%s' ) );
+		if ( ! $deleted ) {
+			wp_send_json_error( array( 'message' => __( 'No se pudo eliminar. Inténtalo de nuevo.', 'arriendo-facil' ) ), 500 );
+		}
+
+		wp_send_json_success( array( 'message' => __( 'Interesado eliminado definitivamente.', 'arriendo-facil' ) ) );
 	}
 
 	/**

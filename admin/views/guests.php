@@ -340,6 +340,10 @@ if ( $is_owner ) {
 										<?php endif; ?>
 										<button type="button" class="button af-btn af-btn--ghost af-btn--sm" data-lead-act="status" data-status="discarded"><?php esc_html_e( 'Descartar', 'arriendo-facil' ); ?></button>
 									</div>
+								<?php elseif ( 'discarded' === $af_lead->status ) : ?>
+									<div class="af-lead__actions">
+										<button type="button" class="button af-btn af-btn--danger af-btn--sm" data-lead-act="delete" data-name="<?php echo esc_attr( $af_lead_name ); ?>"><?php esc_html_e( 'Eliminar definitivamente', 'arriendo-facil' ); ?></button>
+									</div>
 								<?php endif; ?>
 							</li>
 						<?php endforeach; ?>
@@ -888,6 +892,25 @@ if ( $is_owner ) {
 	</div>
 </div>
 
+<!-- Modal: eliminar interesado definitivamente -->
+<div class="af-modal" id="af-modal-lead-delete" role="alertdialog" aria-modal="true" aria-labelledby="af-lead-delete-title" aria-describedby="af-lead-delete-text">
+	<div class="af-modal__backdrop" data-af-modal-close></div>
+	<div class="af-modal__dialog">
+		<button type="button" class="af-modal__close" data-af-modal-close aria-label="<?php esc_attr_e( 'Cerrar', 'arriendo-facil' ); ?>">&times;</button>
+		<div class="af-modal__header">
+			<h2 class="af-modal__title" id="af-lead-delete-title"><?php esc_html_e( 'Eliminar interesado', 'arriendo-facil' ); ?></h2>
+		</div>
+		<div class="af-modal__body">
+			<p id="af-lead-delete-text"></p>
+			<p class="af-modal__hint"><?php esc_html_e( 'Se borrarán sus datos de contacto y no se puede deshacer. Si vuelve a escribirte desde tu enlace, aparecerá como un interesado nuevo.', 'arriendo-facil' ); ?></p>
+		</div>
+		<div class="af-modal__footer">
+			<button type="button" class="button af-btn af-btn--ghost" data-af-modal-close><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
+			<button type="button" class="button af-btn af-btn--danger" id="af-lead-delete-confirm"><?php esc_html_e( 'Sí, eliminar', 'arriendo-facil' ); ?></button>
+		</div>
+	</div>
+</div>
+
 <!-- Modal: verificación de documentos -->
 <div class="af-modal" id="af-modal-verify" role="dialog" aria-modal="true" aria-labelledby="af-modal-verify-title">
 	<div class="af-modal__backdrop" data-af-modal-close></div>
@@ -1084,11 +1107,55 @@ if ( $is_owner ) {
 		});
 	}
 
+	// ---- Eliminar definitivamente a un interesado descartado (con confirmación) ----
+	const leadDelModal = document.getElementById('af-modal-lead-delete');
+	const leadDelText = document.getElementById('af-lead-delete-text');
+	const leadDelBtn = document.getElementById('af-lead-delete-confirm');
+	let leadDelRow = null;
+
+	function askDeleteLead(row, name) {
+		leadDelRow = row;
+		leadDelText.textContent = <?php echo wp_json_encode( __( '¿Eliminar definitivamente a', 'arriendo-facil' ) ); ?> + ' ' + (name || <?php echo wp_json_encode( __( 'este interesado', 'arriendo-facil' ) ); ?>) + '?';
+		leadDelBtn.disabled = false;
+		openModal(leadDelModal);
+		leadDelBtn.focus();
+	}
+
+	if (leadDelBtn) {
+		leadDelBtn.addEventListener('click', function () {
+			if (!leadDelRow) { return; }
+			const row = leadDelRow;
+			leadDelBtn.disabled = true;
+			post({ action: 'af_prereg_delete', nonce: preregNonce, lead_id: row.getAttribute('data-lead-id') }).then(function (json) {
+				if (!json || !json.success) {
+					leadDelBtn.disabled = false;
+					window.afNotify((json && json.data && json.data.message) || msg.fail, 'error');
+					return;
+				}
+				closeModal(leadDelModal);
+				leadDelRow = null;
+				window.afNotify(json.data.message, 'success');
+				row.style.transition = 'opacity .25s, transform .25s';
+				row.style.opacity = '0';
+				row.style.transform = 'translateX(8px)';
+				window.setTimeout(function () { row.remove(); }, 260);
+			}).catch(function () {
+				leadDelBtn.disabled = false;
+				window.afNotify(msg.fail, 'error');
+			});
+		});
+	}
+
 	document.querySelectorAll('[data-lead-act]').forEach(function (btn) {
 		btn.addEventListener('click', function () {
 			const row = btn.closest('[data-lead-id]');
 			const leadId = row.getAttribute('data-lead-id');
 			const act = btn.getAttribute('data-lead-act');
+
+			if (act === 'delete') {
+				askDeleteLead(row, btn.getAttribute('data-name') || '');
+				return;
+			}
 
 			if (act === 'status') {
 				const status = btn.getAttribute('data-status');

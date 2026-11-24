@@ -416,6 +416,15 @@ if ( $can_manage ) {
 
 	document.querySelectorAll('.af-guest-doc-view').forEach(function (btn) {
 		btn.addEventListener('click', function () {
+			const failMsg = <?php echo wp_json_encode( __( 'No se pudo abrir el documento.', 'arriendo-facil' ) ); ?>;
+			function notify(message) {
+				if (typeof window.afNotify === 'function') { window.afNotify(message); } else { window.alert(message); }
+			}
+
+			// La pestaña se abre ya, dentro del clic: tras una petición asíncrona el navegador bloquearía el popup.
+			const win = window.open('', '_blank');
+			if (win) { win.opener = null; }
+
 			btn.disabled = true;
 			const body = new URLSearchParams();
 			body.append('action', 'af_download_guest_document');
@@ -423,12 +432,17 @@ if ( $can_manage ) {
 			body.append('document_id', btn.getAttribute('data-document'));
 
 			post(body).then(function (json) {
-				btn.disabled = false;
 				if (!json || !json.success || !json.data || !json.data.url) {
-					window.afNotify((json && json.data && json.data.message) || <?php echo wp_json_encode( __( 'No se pudo abrir el documento.', 'arriendo-facil' ) ); ?>);
+					if (win) { win.close(); }
+					notify((json && json.data && json.data.message) || failMsg);
 					return;
 				}
-				window.open(json.data.url, '_blank', 'noopener,noreferrer');
+				if (win) { win.location.href = json.data.url; } else { window.location.href = json.data.url; }
+			}).catch(function () {
+				if (win) { win.close(); }
+				notify(failMsg);
+			}).then(function () {
+				btn.disabled = false;
 			});
 		});
 	});

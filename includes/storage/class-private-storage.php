@@ -82,13 +82,129 @@ class Arriendo_Facil_Private_Storage {
 
 		$status = (int) wp_remote_retrieve_response_code( $response );
 		if ( $status < 200 || $status >= 300 ) {
+			$s3_code = self::s3_error_code( $response );
+
 			return new WP_Error(
 				'af_storage_upload_failed',
-				sprintf( '%s (HTTP %d)', __( 'No se pudo subir el archivo al almacenamiento privado.', 'arriendo-facil' ), $status )
+				sprintf( '%s (HTTP %d%s)', __( 'No se pudo subir el archivo al almacenamiento privado.', 'arriendo-facil' ), $status, '' !== $s3_code ? ', ' . $s3_code : '' )
 			);
 		}
 
 		return true;
+	}
+
+	/**
+	 * Código de error que devuelve S3/R2 en el cuerpo XML (p. ej. SignatureDoesNotMatch).
+	 *
+	 * @param array $response Respuesta de wp_remote_request().
+	 * @return string Vacío si no hay.
+	 */
+	public static function s3_error_code( $response ) {
+		$body = (string) wp_remote_retrieve_body( $response );
+
+		return 1 === preg_match( '#<Code>([A-Za-z0-9]+)</Code>#', $body, $m ) ? $m[1] : '';
+	}
+
+	/**
+	 * Borra un objeto del bucket.
+	 *
+	 * @param string $object_key Clave del objeto.
+	 * @return true|WP_Error
+	 */
+	public static function delete( $object_key ) {
+		$config = self::get_config();
+		if ( is_wp_error( $config ) ) {
+			return $config;
+		}
+
+		$response = self::signed_request( $config, 'DELETE', $object_key, '', '', 30 );
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		$status = (int) wp_remote_retrieve_response_code( $response );
+		if ( $status < 200 || $status >= 300 ) {
+			$s3_code = self::s3_error_code( $response );
+
+			return new WP_Error( 'af_storage_delete_failed', sprintf( '%s (HTTP %d%s)', __( 'No se pudo borrar el archivo de prueba.', 'arriendo-facil' ), $status, '' !== $s3_code ? ', ' . $s3_code : '' ) );
+		}
+
+		return true;
+	}
+
+	/**
+	 * Traduce un código de error de S3/R2 a una causa y una acción concretas.
+	 *
+	 * @param string $s3_code Código (SignatureDoesNotMatch, NoSuchBucket…).
+	 * @param int    $status  Estado HTTP.
+	 * @return string
+	 */
+	public static function explain_error( $s3_code, $status = 0 ) {
+		$map = array(
+			'InvalidAccessKeyId'    => __( 'La Access Key ID no existe en esa cuenta de Cloudflare. Revisa que esté completa y sin espacios.', 'arriendo-facil' ),
+			'SignatureDoesNotMatch' => __( 'La Secret Access Key no corresponde a esa Access Key ID (o tiene un carácter de más o de menos). Genera un token nuevo y vuelve a copiarlo.', 'arriendo-facil' ),
+			'NoSuchBucket'          => __( 'El bucket no existe en esa cuenta. Revisa el nombre del bucket y que el endpoint sea el de la misma cuenta.', 'arriendo-facil' ),
+			'AccessDenied'          => __( 'La credencial es válida pero no puede escribir en este bucket. En Cloudflare, crea el token con permiso "Object Read & Write" sobre ese bucket.', 'arriendo-facil' ),
+			'RequestTimeTooSkewed'  => __( 'La hora del servidor está desfasada. Sincroniza el reloj del servidor (NTP).', 'arriendo-facil' ),
+			'EntityTooLarge'        => __( 'El archivo supera el límite del bucket.', 'arriendo-facil' ),
+		);
+
+		if ( isset( $map[ $s3_code ] ) ) {
+			return $map[ $s3_code ];
+		}
+		if ( 403 === (int) $status ) {
+			return __( 'Cloudflare rechazó las credenciales (403). Revisa Access Key, Secret y permisos del token.', 'arriendo-facil' );
+		}
+		if ( 404 === (int) $status ) {
+			return __( 'No se encontró el bucket o el endpoint (404). Revisa el nombre del bucket y la URL del endpoint.', 'arriendo-facil' );
+		}
+
+		return '';
+	}
+
+	/**
+	 * Prueba REAL de punta a punta: sube, lee y borra un archivo pequeño con las credenciales guardadas.
+	 *
+	 * @return array{ok:bool,step:string,message:string}
+	 */
+	public static function test_connection() {
+		$config = self::get_config();
+		if ( is_wp_error( $config ) ) {
+			return array( 'ok' => false, 'step' => 'config', 'message' => $config->get_error_message() );
+		}
+
+		$key     = 'healthcheck/' . gmdate( 'Ymd-His' ) . '-' . wp_generate_password( 8, false, false ) . '.txt';
+		$content = 'arriendo-facil healthcheck ' . gmdate( 'c' );
+
+		$put = self::signed_request( $config, 'PUT', $key, $content, 'text/plain', 20 );
+		if ( is_wp_error( $put ) ) {
+			return array(
+				'ok'      => false,
+				'step'    => 'network',
+				'message' => sprintf( /* translators: %s: transport error */ __( 'No se pudo conectar con el endpoint: %s. Revisa la URL del endpoint, el SSL del servidor y que el hosting permita conexiones salientes.', 'arriendo-facil' ), $put->get_error_message() ),
+			);
+		}
+
+		$status = (int) wp_remote_retrieve_response_code( $put );
+		if ( $status < 200 || $status >= 300 ) {
+			$s3_code = self::s3_error_code( $put );
+			$hint    = self::explain_error( $s3_code, $status );
+
+			return array(
+				'ok'      => false,
+				'step'    => 'upload',
+				'message' => sprintf( /* translators: 1: status, 2: code, 3: hint */ __( 'Cloudflare respondió HTTP %1$d%2$s. %3$s', 'arriendo-facil' ), $status, '' !== $s3_code ? ' (' . $s3_code . ')' : '', $hint ),
+			);
+		}
+
+		$read = self::download( $key, 20 );
+		self::delete( $key );
+
+		if ( is_wp_error( $read ) || $read !== $content ) {
+			return array( 'ok' => false, 'step' => 'download', 'message' => __( 'Se pudo subir, pero no leer el archivo de prueba. Al token le falta permiso de lectura.', 'arriendo-facil' ) );
+		}
+
+		return array( 'ok' => true, 'step' => 'done', 'message' => __( 'Subir, leer y borrar funcionan: las credenciales y el bucket son correctos.', 'arriendo-facil' ) );
 	}
 
 	/**

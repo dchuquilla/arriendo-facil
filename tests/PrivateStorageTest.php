@@ -98,6 +98,15 @@ class PrivateStorageTest extends TestCase {
 		$this->assertStringContainsString( 'HTTP 403', $result->get_error_message() );
 	}
 
+	public function test_explain_error_gives_a_concrete_cause_for_known_codes() {
+		$this->assertStringContainsString( 'Secret Access Key', Arriendo_Facil_Private_Storage::explain_error( 'SignatureDoesNotMatch', 403 ) );
+		$this->assertStringContainsString( 'bucket', Arriendo_Facil_Private_Storage::explain_error( 'NoSuchBucket', 404 ) );
+		$this->assertStringContainsString( 'Object Read & Write', Arriendo_Facil_Private_Storage::explain_error( 'AccessDenied', 403 ) );
+		// Sin código en el cuerpo, el estado HTTP todavía orienta.
+		$this->assertStringContainsString( '403', Arriendo_Facil_Private_Storage::explain_error( '', 403 ) );
+		$this->assertSame( '', Arriendo_Facil_Private_Storage::explain_error( '', 200 ) );
+	}
+
 	public function test_presigned_url_contains_expected_query() {
 		$url = Arriendo_Facil_Private_Storage::presigned_get_url( '/guest-documents/3/cedula.pdf', 99999 );
 

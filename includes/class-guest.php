@@ -359,6 +359,22 @@ class Arriendo_Facil_Guest {
 		global $wpdb;
 		$uploaded       = array();
 		$raw_bytes_out  = array();
+		$saved          = array(); // Filas y archivos de ESTA llamada, para deshacerlos si algo falla.
+
+		// Todo o nada: si un documento falla no se deja un expediente a medias.
+		$rollback = static function ( $error ) use ( &$saved, $wpdb ) {
+			foreach ( $saved as $item ) {
+				if ( ! empty( $item['row'] ) ) {
+					$wpdb->delete( $wpdb->prefix . 'af_guest_documents', array( 'id' => (int) $item['row'] ), array( '%d' ) );
+				}
+				if ( ! empty( $item['local'] ) ) {
+					Arriendo_Facil_Local_Private_Storage::delete( $item['local'] );
+				}
+			}
+			$saved = array();
+
+			return $error;
+		};
 
 		foreach ( $fields as $field_name => $doc_type ) {
 			if ( ! isset( $_FILES[ $field_name ] ) || ! is_array( $_FILES[ $field_name ] ) ) {
@@ -373,53 +389,62 @@ class Arriendo_Facil_Guest {
 			}
 
 			if ( UPLOAD_ERR_OK !== $file_error ) {
-				return new WP_Error( 'af_guest_pdf_upload_error', __( 'No se pudo subir uno de los documentos PDF del huesped.', 'arriendo-facil' ) );
+				return $rollback( new WP_Error( 'af_guest_pdf_upload_error', __( 'No se pudo subir uno de los documentos PDF del huesped.', 'arriendo-facil' ) ) );
 			}
 
 			if ( ! empty( $file_data['size'] ) && (int) $file_data['size'] > ( 10 * 1024 * 1024 ) ) {
-				return new WP_Error( 'af_guest_pdf_upload_too_large', __( 'El PDF del huesped supera el tamano maximo (10 MB).', 'arriendo-facil' ) );
+				return $rollback( new WP_Error( 'af_guest_pdf_upload_too_large', __( 'El PDF del huesped supera el tamano maximo (10 MB).', 'arriendo-facil' ) ) );
 			}
 
 			$checked = wp_check_filetype_and_ext( $file_data['tmp_name'], $file_data['name'], array( 'pdf' => 'application/pdf' ) );
 			if ( 'pdf' !== (string) $checked['ext'] ) {
-				return new WP_Error( 'af_guest_pdf_invalid_type', __( 'Solo se permiten archivos PDF para documentos del huesped.', 'arriendo-facil' ) );
+				return $rollback( new WP_Error( 'af_guest_pdf_invalid_type', __( 'Solo se permiten archivos PDF para documentos del huesped.', 'arriendo-facil' ) ) );
 			}
 
 			$contents = file_get_contents( $file_data['tmp_name'] ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 			if ( false === $contents || '' === $contents ) {
-				return new WP_Error( 'af_guest_pdf_read_failed', __( 'No se pudo leer uno de los documentos PDF del huesped.', 'arriendo-facil' ) );
+				return $rollback( new WP_Error( 'af_guest_pdf_read_failed', __( 'No se pudo leer uno de los documentos PDF del huesped.', 'arriendo-facil' ) ) );
 			}
 
 			$raw_bytes_out[ $doc_type ] = $contents;
 			$checksum                  = hash( 'sha256', $contents );
-			$storage                   = 'local';
+			$storage                   = '';
 			$object_key                = '';
 
+			// 1) Nube privada (R2) cuando está configurada.
 			if ( Arriendo_Facil_Private_Storage::is_configured() ) {
-				$object_key = 'guest-documents/' . (int) $guest_id . '/' . $doc_type . '-' . wp_generate_password( 12, false, false ) . '.pdf';
-				$put_result = Arriendo_Facil_Private_Storage::upload( $contents, $object_key, 'application/pdf' );
+				$remote_key = 'guest-documents/' . (int) $guest_id . '/' . $doc_type . '-' . wp_generate_password( 12, false, false ) . '.pdf';
+				$put_result = Arriendo_Facil_Private_Storage::upload( $contents, $remote_key, 'application/pdf' );
 
 				if ( is_wp_error( $put_result ) ) {
-					return new WP_Error( 'af_guest_pdf_save_failed', __( 'No se pudo guardar uno de los documentos PDF del huesped en el almacenamiento privado.', 'arriendo-facil' ) );
+					// El motivo real (credenciales, red, permisos del bucket) queda en el log; al usuario no se le muestra.
+					error_log( sprintf( 'Arriendo Facil: R2 rechazó el documento %s del inquilino #%d (%s: %s). Se usa el almacenamiento privado local.', $doc_type, (int) $guest_id, $put_result->get_error_code(), $put_result->get_error_message() ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+				} else {
+					$storage    = 'r2';
+					$object_key = $remote_key;
 				}
+			}
 
-				$storage = 'r2';
-			} else {
-				// Sin R2: almacenamiento local PRIVADO (fuera del directorio web cuando es posible),
-				// en la carpeta del propio huésped y con nombre legible. Nunca la biblioteca de medios.
+			// 2) Sin R2 (o si R2 falló): almacenamiento local PRIVADO (fuera del directorio web cuando es
+			// posible), en la carpeta del propio huésped y con nombre legible. Nunca la biblioteca de medios.
+			$local_key = '';
+			if ( '' === $storage ) {
 				$guest_row = $wpdb->get_row( $wpdb->prepare( "SELECT first_name, last_name FROM {$wpdb->prefix}af_guests WHERE id = %d", (int) $guest_id ) );
 				$person    = $guest_row ? trim( $guest_row->first_name . ' ' . $guest_row->last_name ) : '';
 				$stored    = Arriendo_Facil_Local_Private_Storage::store( $contents, Arriendo_Facil_Local_Private_Storage::CATEGORY_GUESTS, (int) $guest_id, $person, $doc_type );
 
 				if ( is_wp_error( $stored ) ) {
-					return new WP_Error( 'af_guest_pdf_save_failed', __( 'No se pudo guardar uno de los documentos PDF del huesped.', 'arriendo-facil' ) );
+					error_log( sprintf( 'Arriendo Facil: no se pudo guardar el documento %s del inquilino #%d en el almacenamiento local (%s).', $doc_type, (int) $guest_id, $stored->get_error_message() ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+
+					return $rollback( new WP_Error( 'af_guest_pdf_save_failed', __( 'No pudimos guardar uno de los documentos. Inténtalo de nuevo en unos minutos; si el problema continúa, avisa a tu administrador.', 'arriendo-facil' ) ) );
 				}
 
 				$storage    = Arriendo_Facil_Local_Private_Storage::STORAGE_ID;
 				$object_key = $stored;
+				$local_key  = $stored;
 			}
 
-			$wpdb->insert(
+			$inserted = $wpdb->insert(
 				$wpdb->prefix . 'af_guest_documents',
 				array(
 					'guest_id'        => (int) $guest_id,
@@ -434,7 +459,19 @@ class Arriendo_Facil_Guest {
 				array( '%d', '%s', '%s', '%s', '%s', '%d', '%s', '%d' )
 			);
 
+			if ( ! $inserted ) {
+				if ( '' !== $local_key ) {
+					Arriendo_Facil_Local_Private_Storage::delete( $local_key );
+				}
+
+				return $rollback( new WP_Error( 'af_guest_pdf_record_failed', __( 'No pudimos registrar uno de los documentos. Inténtalo de nuevo.', 'arriendo-facil' ) ) );
+			}
+
 			$uploaded[ $doc_type ] = (int) $wpdb->insert_id;
+			$saved[]               = array(
+				'row'   => (int) $wpdb->insert_id,
+				'local' => $local_key,
+			);
 		}
 
 		return $uploaded;

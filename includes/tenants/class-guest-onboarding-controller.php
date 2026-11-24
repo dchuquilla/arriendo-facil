@@ -303,6 +303,14 @@ class Arriendo_Facil_Guest_Onboarding_Controller {
 		}
 		$name_input = $name_trimmed;
 
+		// Primero los documentos: si no se pueden guardar, la ficha del inquilino queda intacta
+		// (nada de registros a medias que el administrador vea sin sus documentos).
+		$upload_result = Arriendo_Facil_Guest::upload_guest_documents( $guest_id, $raw_documents );
+		if ( is_wp_error( $upload_result ) ) {
+			$server_side = in_array( $upload_result->get_error_code(), array( 'af_guest_pdf_save_failed', 'af_guest_pdf_record_failed' ), true );
+			wp_send_json_error( array( 'message' => $upload_result->get_error_message() ), $server_side ? 500 : 400 );
+		}
+
 		$name_parts = preg_split( '/\s+/', trim( $name_input ) );
 		$first_name = ! empty( $name_parts[0] ) ? AF_Text_Normalizer::proper_name( (string) $name_parts[0] ) : '';
 		$last_name  = count( $name_parts ) > 1 ? AF_Text_Normalizer::proper_name( trim( implode( ' ', array_slice( $name_parts, 1 ) ) ) ) : '';
@@ -324,13 +332,13 @@ class Arriendo_Facil_Guest_Onboarding_Controller {
 		);
 
 		if ( false === $updated ) {
+			// Sin ficha actualizada no se dejan documentos sueltos: el reintento empezaría limpio.
+			foreach ( (array) $upload_result as $document_row_id ) {
+				$wpdb->delete( $wpdb->prefix . 'af_guest_documents', array( 'id' => (int) $document_row_id ), array( '%d' ) );
+			}
 			wp_send_json_error( array( 'message' => __( 'No se pudo actualizar el perfil legal del arrendatario.', 'arriendo-facil' ) ), 500 );
 		}
 
-		$upload_result = Arriendo_Facil_Guest::upload_guest_documents( $guest_id, $raw_documents );
-		if ( is_wp_error( $upload_result ) ) {
-			wp_send_json_error( array( 'message' => $upload_result->get_error_message() ), 400 );
-		}
 
 		// Cotejo automatico best-effort: busca el numero declarado dentro del texto
 		// del documento subido. Solo es una senal de apoyo para el revisor humano;

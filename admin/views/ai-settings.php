@@ -100,43 +100,18 @@ if ( isset( $_POST['af_save_storage_credentials'] ) ) {
 if ( isset( $_POST['af_test_storage_connection'] ) ) {
 	check_admin_referer( 'af_ai_settings_nonce' );
 
-	$endpoint_url = af_settings_get_value( 'AF_R2_ENDPOINT_URL', 'af_r2_endpoint_url', '' );
-	$bucket_name  = af_settings_get_value( 'AF_R2_BUCKET_NAME', 'af_r2_bucket_name', '' );
+	// Prueba real: sube, lee y borra un archivo pequeño con las credenciales guardadas.
+	$storage_test = Arriendo_Facil_Private_Storage::test_connection();
 
-	$test_url = '';
-	if ( $endpoint_url && $bucket_name ) {
-		$test_url = trailingslashit( untrailingslashit( $endpoint_url ) ) . rawurlencode( $bucket_name );
-	}
+	update_option( 'af_r2_connected', $storage_test['ok'] ? '1' : '0' );
+	update_option( 'af_r2_last_check', current_time( 'mysql' ) );
 
-	if ( ! $test_url ) {
-		update_option( 'af_r2_connected', '0' );
-		update_option( 'af_r2_last_check', current_time( 'mysql' ) );
-		echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__( 'Connection failed: missing endpoint or bucket name.', 'arriendo-facil' ) . '</p></div>';
-	} else {
-		$response = wp_remote_request(
-			$test_url,
-			array(
-				'method'  => 'HEAD',
-				'timeout' => 12,
-			)
-		);
-
-		$connected = false;
-		if ( ! is_wp_error( $response ) ) {
-			$status_code = (int) wp_remote_retrieve_response_code( $response );
-			$connected   = $status_code >= 200 && $status_code < 500;
-		}
-
-		update_option( 'af_r2_connected', $connected ? '1' : '0' );
-		update_option( 'af_r2_last_check', current_time( 'mysql' ) );
-
-		if ( $connected ) {
-			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Conectado: endpoint accesible.', 'arriendo-facil' ) . '</p></div>';
-		} else {
-			$error_message = is_wp_error( $response ) ? $response->get_error_message() : __( 'Unexpected response.', 'arriendo-facil' );
-			echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__( 'Connection failed:', 'arriendo-facil' ) . ' ' . esc_html( $error_message ) . '</p></div>';
-		}
-	}
+	printf(
+		'<div class="notice %1$s is-dismissible"><p><strong>%2$s</strong> %3$s</p></div>',
+		esc_attr( $storage_test['ok'] ? 'notice-success' : 'notice-error' ),
+		esc_html( $storage_test['ok'] ? __( 'Conectado.', 'arriendo-facil' ) : __( 'No conecta.', 'arriendo-facil' ) ),
+		esc_html( $storage_test['message'] )
+	);
 }
 
 if ( isset( $_POST['af_save_whatsapp'] ) ) {

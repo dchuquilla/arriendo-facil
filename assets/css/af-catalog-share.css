@@ -162,35 +162,39 @@
 }
 
 /*
- * Los botones son enlaces: sin fijar el color en cada estado, el estilo
- * `a:hover` del tema los pinta de verde y el texto se pierde sobre el fondo.
- * El selector con `a.` le gana al tema y cada estado conserva su contraste.
+ * Los botones son enlaces y el tema define `a:not([class*="afx-"]):hover`
+ * con el verde de enlace: con la misma especificidad gana el que carga al
+ * final y el texto se pierde sobre el fondo verde. Aquí se sube la
+ * especificidad (.af-cs-page) y se fija el color de cada estado con
+ * !important para que ningún estilo del tema lo cambie.
  */
-a.af-cs-btn--whatsapp,
-a.af-cs-btn--whatsapp:visited,
-a.af-cs-btn--whatsapp:hover,
-a.af-cs-btn--whatsapp:focus,
-a.af-cs-btn--whatsapp:active {
-	color: #06301a;
+.af-cs-page a.af-cs-btn--whatsapp,
+.af-cs-page a.af-cs-btn--whatsapp:link,
+.af-cs-page a.af-cs-btn--whatsapp:visited,
+.af-cs-page a.af-cs-btn--whatsapp:hover,
+.af-cs-page a.af-cs-btn--whatsapp:focus,
+.af-cs-page a.af-cs-btn--whatsapp:active {
+	color: #04210f !important;
 	text-decoration: none;
+	font-weight: 700;
 }
 
-a.af-cs-btn--whatsapp:hover,
-a.af-cs-btn--whatsapp:focus-visible {
+.af-cs-page a.af-cs-btn--whatsapp:hover,
+.af-cs-page a.af-cs-btn--whatsapp:focus-visible {
 	background: #1eb855;
-	box-shadow: 0 8px 18px -10px rgba(6, 48, 26, .55);
+	box-shadow: 0 8px 18px -10px rgba(4, 33, 15, .55);
 }
 
-a.af-cs-btn--whatsapp:focus-visible {
-	outline: 3px solid #06301a;
+.af-cs-page a.af-cs-btn--whatsapp:focus-visible {
+	outline: 3px solid #04210f;
 	outline-offset: 2px;
 }
 
-a.af-cs-btn--primary,
-a.af-cs-btn--primary:visited,
-a.af-cs-btn--primary:hover,
-a.af-cs-btn--primary:focus {
-	color: #164a55;
+.af-cs-page a.af-cs-btn--primary,
+.af-cs-page a.af-cs-btn--primary:visited,
+.af-cs-page a.af-cs-btn--primary:hover,
+.af-cs-page a.af-cs-btn--primary:focus {
+	color: #164a55 !important;
 	text-decoration: none;
 }
 
@@ -198,7 +202,7 @@ a.af-cs-btn--primary:focus {
 .af-cs-hero a.af-cs-btn--ghost:visited,
 .af-cs-hero a.af-cs-btn--ghost:hover,
 .af-cs-hero a.af-cs-btn--ghost:focus {
-	color: #fff;
+	color: #fff !important;
 }
 
 /* --------------------------------------------------------------- Filters */

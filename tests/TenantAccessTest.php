@@ -134,4 +134,15 @@ class TenantAccessTest extends TestCase {
 		$this->assertFalse( Arriendo_Facil_Tenant_Prereg::same_person( 'Melissa Carmendia', 'Jason Aldaz' ) );
 		$this->assertFalse( Arriendo_Facil_Tenant_Prereg::same_person( '', 'Jason Aldaz' ) );
 	}
+
+	public function test_ip_in_ranges_acepta_solo_rangos_de_cloudflare() {
+		$ranges = array( '173.245.48.0/20', '104.16.0.0/13', '2606:4700::/32' );
+
+		$this->assertTrue( Arriendo_Facil_Tenant_Access::ip_in_ranges( '173.245.48.10', $ranges ) );
+		$this->assertTrue( Arriendo_Facil_Tenant_Access::ip_in_ranges( '104.23.255.1', $ranges ) );
+		$this->assertTrue( Arriendo_Facil_Tenant_Access::ip_in_ranges( '2606:4700:10::1', $ranges ) );
+		$this->assertFalse( Arriendo_Facil_Tenant_Access::ip_in_ranges( '104.24.0.1', $ranges ) );
+		$this->assertFalse( Arriendo_Facil_Tenant_Access::ip_in_ranges( '8.8.8.8', $ranges ) );
+		$this->assertFalse( Arriendo_Facil_Tenant_Access::ip_in_ranges( 'no-es-ip', $ranges ) );
+	}
 }

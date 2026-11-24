@@ -129,17 +129,20 @@
 			if (emailInput) { emailInput.focus(); }
 		});
 
+		// wp_localize_script entrega los números como texto: se fuerza a número.
+		var codeLen = parseInt(cfg.codeLength, 10) || 6;
+
 		// Solo dígitos, con espacio visual opcional.
 		codeInput.addEventListener('input', function () {
-			codeInput.value = codeInput.value.replace(/\D+/g, '').slice(0, cfg.codeLength || 6);
-			if (codeInput.value.length === (cfg.codeLength || 6)) { codeForm.requestSubmit(); }
+			codeInput.value = codeInput.value.replace(/\D+/g, '').slice(0, codeLen);
+			if (codeInput.value.length === codeLen) { codeForm.requestSubmit(); }
 		});
 
 		codeForm.addEventListener('submit', function (e) {
 			e.preventDefault();
 			show(alertBox, '');
 			var code = codeInput.value.replace(/\D+/g, '');
-			if (code.length !== (cfg.codeLength || 6)) {
+			if (code.length !== codeLen) {
 				show(alertBox, i18n.badCode);
 				codeInput.focus();
 				return;

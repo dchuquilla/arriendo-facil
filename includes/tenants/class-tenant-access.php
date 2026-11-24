@@ -388,12 +388,79 @@ class Arriendo_Facil_Tenant_Access {
 	 * ─────────────────────────────────────────────────────────────────── */
 
 	/**
+	 * Rangos publicados por Cloudflare (https://www.cloudflare.com/ips/). Filtrable con `af_trusted_proxy_ranges`.
+	 *
+	 * @return string[]
+	 */
+	private static function cloudflare_ranges() {
+		$ranges = array(
+			'173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22', '141.101.64.0/18',
+			'108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20', '197.234.240.0/22', '198.41.128.0/17',
+			'162.158.0.0/15', '104.16.0.0/13', '104.24.0.0/14', '172.64.0.0/13', '131.0.72.0/22',
+			'2400:cb00::/32', '2606:4700::/32', '2803:f800::/32', '2405:b500::/32', '2405:8100::/32',
+			'2a06:98c0::/29', '2c0f:f248::/32',
+		);
+
+		return (array) apply_filters( 'af_trusted_proxy_ranges', $ranges );
+	}
+
+	/**
+	 * @param string   $ip     IP a comprobar.
+	 * @param string[] $ranges CIDR.
+	 * @return bool
+	 */
+	public static function ip_in_ranges( $ip, array $ranges ) {
+		$bin = @inet_pton( (string) $ip ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- IP inválida devuelve false.
+		if ( false === $bin ) {
+			return false;
+		}
+		foreach ( $ranges as $range ) {
+			$parts = explode( '/', (string) $range );
+			$base  = @inet_pton( $parts[0] ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+			if ( false === $base || strlen( $base ) !== strlen( $bin ) || ! isset( $parts[1] ) ) {
+				continue;
+			}
+			$bits  = (int) $parts[1];
+			$bytes = intdiv( $bits, 8 );
+			$rest  = $bits % 8;
+			if ( substr( $bin, 0, $bytes ) !== substr( $base, 0, $bytes ) ) {
+				continue;
+			}
+			if ( 0 === $rest ) {
+				return true;
+			}
+			$mask = ( 0xFF << ( 8 - $rest ) ) & 0xFF;
+			if ( ( ord( $bin[ $bytes ] ) & $mask ) === ( ord( $base[ $bytes ] ) & $mask ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * IP real del visitante: con Cloudflare delante solo se confía en CF-Connecting-IP
+	 * si la conexión llega desde un rango de Cloudflare; si no, REMOTE_ADDR.
+	 *
+	 * @return string
+	 */
+	private static function client_ip() {
+		$remote = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
+		if ( '' !== $remote && ! empty( $_SERVER['HTTP_CF_CONNECTING_IP'] ) && self::ip_in_ranges( $remote, self::cloudflare_ranges() ) ) {
+			$cf = sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_CONNECTING_IP'] ) );
+			if ( false !== filter_var( $cf, FILTER_VALIDATE_IP ) ) {
+				return $cf;
+			}
+		}
+
+		return $remote;
+	}
+
+	/**
 	 * @return string Hash corto de la IP (no se guarda la IP).
 	 */
 	private static function ip_key() {
-		$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
-
-		return md5( $ip );
+		return md5( self::client_ip() );
 	}
 
 	/**

@@ -414,8 +414,11 @@ if ( $can_manage ) {
 		});
 	}
 
-	document.querySelectorAll('.af-guest-doc-view').forEach(function (btn) {
-		btn.addEventListener('click', function () {
+	// Delegado: este script va antes de la tabla de documentos, que aún no existe al ejecutarse.
+	document.addEventListener('click', function (event) {
+		const btn = event.target.closest ? event.target.closest('.af-guest-doc-view') : null;
+		if (!btn) { return; }
+		{
 			const failMsg = <?php echo wp_json_encode( __( 'No se pudo abrir el documento.', 'arriendo-facil' ) ); ?>;
 			function notify(message) {
 				if (typeof window.afNotify === 'function') { window.afNotify(message); } else { window.alert(message); }
@@ -444,7 +447,7 @@ if ( $can_manage ) {
 			}).then(function () {
 				btn.disabled = false;
 			});
-		});
+		}
 	});
 })();
 </script>

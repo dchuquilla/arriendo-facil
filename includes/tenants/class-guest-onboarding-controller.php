@@ -256,6 +256,12 @@ class Arriendo_Facil_Guest_Onboarding_Controller {
 			wp_send_json_error( array( 'message' => $id_messages[ $id_type ] ), 400 );
 		}
 
+		// Una ficha ya identificada no cambia de número por un enlace público: ese ajuste lo hace el administrador.
+		$current_id = AF_Text_Normalizer::document( $id_type, (string) $guest->id_number );
+		if ( '' !== $current_id && $current_id !== $id_number ) {
+			wp_send_json_error( array( 'message' => __( 'Tu ficha ya tiene una identificación registrada distinta. Comunícate con tu administrador para corregirla.', 'arriendo-facil' ) ), 409 );
+		}
+
 		if ( '' === $nationality || ! array_key_exists( $nationality, Arriendo_Facil_Guest::get_nationality_options() ) ) {
 			wp_send_json_error( array( 'message' => __( 'Selecciona tu nacionalidad de la lista.', 'arriendo-facil' ) ), 400 );
 		}

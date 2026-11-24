@@ -110,6 +110,33 @@ class Arriendo_Facil_Tenant_Prereg {
 	}
 
 	/**
+	 * ¿Es la misma persona? Compara sin tildes ni mayúsculas y tolera que uno de los
+	 * nombres traiga menos palabras ("Ana Pérez" vs "Ana María Pérez Loor").
+	 *
+	 * @param string $a Nombre completo.
+	 * @param string $b Nombre completo.
+	 * @return bool
+	 */
+	public static function same_person( $a, $b ) {
+		$words = static function ( $name ) {
+			$name = function_exists( 'remove_accents' ) ? remove_accents( (string) $name ) : (string) $name;
+
+			return array_values( array_filter( preg_split( '/[^a-z0-9]+/', strtolower( $name ) ) ) );
+		};
+
+		$wa = $words( $a );
+		$wb = $words( $b );
+		if ( ! $wa || ! $wb ) {
+			return false;
+		}
+
+		$short = count( $wa ) <= count( $wb ) ? $wa : $wb;
+		$long  = count( $wa ) <= count( $wb ) ? $wb : $wa;
+
+		return ! array_diff( $short, $long );
+	}
+
+	/**
 	 * Firma del inmueble elegido en el catálogo: con ella el formulario lo muestra
 	 * fijo y el servidor rechaza cualquier otro.
 	 *
@@ -723,6 +750,37 @@ class Arriendo_Facil_Tenant_Prereg {
 			if ( ! $mine ) {
 				wp_send_json_error( array( 'message' => __( 'Este correo ya está registrado en otra cuenta. Pídele que use otro o contacta soporte.', 'arriendo-facil' ) ), 409 );
 			}
+			$lead_name  = trim( $lead->first_name . ' ' . $lead->last_name );
+			$guest_name = trim( $guest->first_name . ' ' . $guest->last_name );
+			$identified = '' !== trim( (string) $guest->id_number );
+
+			// La ficha es global por correo. Si ya pertenece a OTRA persona con identificación, el
+			// formulario le cambiaría sus datos: se frena y se le dice al gestor qué hacer.
+			if ( $identified && ! self::same_person( $lead_name, $guest_name ) ) {
+				wp_send_json_error(
+					array(
+						'message' => sprintf(
+							/* translators: 1: registered name, 2: lead name */
+							__( 'Ese correo ya está registrado a nombre de "%1$s", no de "%2$s". Pídele a esta persona otro correo, o abre la ficha existente.', 'arriendo-facil' ),
+							$guest_name,
+							$lead_name
+						),
+					),
+					409
+				);
+			}
+
+			// Ficha sin completar (solo un marcador): se alinea con quien realmente recibe el enlace.
+			if ( ! $identified ) {
+				$wpdb->update(
+					$guests,
+					array( 'first_name' => $lead->first_name, 'last_name' => $lead->last_name, 'phone' => $lead->phone ),
+					array( 'id' => (int) $guest->id ),
+					array( '%s', '%s', '%s' ),
+					array( '%d' )
+				);
+			}
+
 			if ( ! empty( $guest->deleted_at ) ) {
 				$wpdb->update( $guests, array( 'deleted_at' => null, 'deleted_by' => null ), array( 'id' => (int) $guest->id ), array( '%s', '%s' ), array( '%d' ) );
 			}

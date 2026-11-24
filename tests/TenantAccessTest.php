@@ -127,4 +127,11 @@ class TenantAccessTest extends TestCase {
 		$this->assertNotSame( $sig, Arriendo_Facil_Tenant_Prereg::property_sig( 5, 101 ), 'Otro inmueble.' );
 		$this->assertNotSame( $sig, Arriendo_Facil_Tenant_Prereg::property_sig( 6, 100 ), 'Otro gestor.' );
 	}
+
+	public function test_same_person_ignores_accents_case_and_missing_words() {
+		$this->assertTrue( Arriendo_Facil_Tenant_Prereg::same_person( 'Melissa Carmendia', 'melissa  CARMENDIA' ) );
+		$this->assertTrue( Arriendo_Facil_Tenant_Prereg::same_person( 'Ana Pérez', 'Ana María Pérez Loor' ) );
+		$this->assertFalse( Arriendo_Facil_Tenant_Prereg::same_person( 'Melissa Carmendia', 'Jason Aldaz' ) );
+		$this->assertFalse( Arriendo_Facil_Tenant_Prereg::same_person( '', 'Jason Aldaz' ) );
+	}
 }

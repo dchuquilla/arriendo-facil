@@ -162,6 +162,7 @@ class Arriendo_Facil_Guest_Onboarding_Controller {
 				'name'              => sanitize_text_field( trim( (string) $guest->first_name . ' ' . (string) $guest->last_name ) ),
 				'email'             => sanitize_email( (string) $guest->email ),
 				'phone'             => sanitize_text_field( (string) $guest->phone ),
+				'property'          => sanitize_text_field( (string) get_the_title( isset( $result['accommodation_id'] ) ? absint( $result['accommodation_id'] ) : absint( $guest->accommodation_id ) ) ),
 				'expires_at'        => isset( $result['expires_at'] ) ? (string) $result['expires_at'] : '',
 			)
 		);
@@ -190,6 +191,8 @@ class Arriendo_Facil_Guest_Onboarding_Controller {
 			wp_send_json_error( array( 'message' => __( 'Token invalido para completar perfil.', 'arriendo-facil' ) ), 400 );
 		}
 
+		$raw_documents = array();
+
 		global $wpdb;
 		$guest = $wpdb->get_row(
 			$wpdb->prepare(
@@ -208,56 +211,77 @@ class Arriendo_Facil_Guest_Onboarding_Controller {
 			wp_send_json_error( array( 'message' => $schema_result->get_error_message() ), 500 );
 		}
 
-		$name_input        = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
-		$phone             = isset( $_POST['phone'] ) ? sanitize_text_field( wp_unslash( $_POST['phone'] ) ) : '';
-		$id_number         = isset( $_POST['id_number'] ) ? sanitize_text_field( wp_unslash( $_POST['id_number'] ) ) : '';
-		$rental_start_date = isset( $_POST['rental_start_date'] ) ? sanitize_text_field( wp_unslash( $_POST['rental_start_date'] ) ) : '';
-		$rental_years      = isset( $_POST['rental_years'] ) ? max( 1, min( 20, absint( wp_unslash( $_POST['rental_years'] ) ) ) ) : 1;
-		$personas_viviran  = isset( $_POST['personas_viviran'] ) ? max( 1, absint( wp_unslash( $_POST['personas_viviran'] ) ) ) : 1;
+		// Los mismos datos que pide el registro interno de inquilinos (sin fechas ni personas:
+		// la vigencia del arriendo la define el administrador al crear el contrato).
+		$name_input   = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
+		$phone        = isset( $_POST['phone'] ) ? preg_replace( '/\D+/', '', sanitize_text_field( wp_unslash( $_POST['phone'] ) ) ) : '';
+		$id_type      = isset( $_POST['id_type'] ) ? sanitize_key( wp_unslash( $_POST['id_type'] ) ) : '';
+		$id_number    = isset( $_POST['id_number'] ) ? sanitize_text_field( wp_unslash( $_POST['id_number'] ) ) : '';
+		$nationality  = isset( $_POST['nationality'] ) ? sanitize_text_field( wp_unslash( $_POST['nationality'] ) ) : '';
+		$birth_city   = isset( $_POST['birth_city'] ) ? mb_substr( sanitize_text_field( wp_unslash( $_POST['birth_city'] ) ), 0, 150 ) : '';
+		$income_range = isset( $_POST['income_range'] ) ? sanitize_key( wp_unslash( $_POST['income_range'] ) ) : '';
 
 		if ( '' === $name_input ) {
 			$name_input = trim( (string) $guest->first_name . ' ' . (string) $guest->last_name );
 		}
 
-		if ( '' === $phone ) {
-			$phone = isset( $guest->phone ) ? sanitize_text_field( (string) $guest->phone ) : '';
+		if ( '' === $phone && ! empty( $guest->phone ) ) {
+			$phone = preg_replace( '/\D+/', '', (string) $guest->phone );
 		}
 
-		if ( '' === $id_number ) {
-			$id_number = isset( $guest->id_number ) ? sanitize_text_field( (string) $guest->id_number ) : '';
+		if ( ! is_email( (string) $guest->email ) || '' === $phone || '' === $id_number ) {
+			wp_send_json_error( array( 'message' => __( 'Faltan datos obligatorios para completar tu registro.', 'arriendo-facil' ) ), 400 );
 		}
 
-		if ( ! is_email( (string) $guest->email ) || '' === $phone || '' === $id_number || '' === $rental_start_date ) {
-			wp_send_json_error( array( 'message' => __( 'Faltan datos obligatorios para completar el perfil legal.', 'arriendo-facil' ) ), 400 );
+		if ( ! Arriendo_Facil_Consent::is_given() ) {
+			wp_send_json_error( array( 'message' => Arriendo_Facil_Consent::error_message() ), 400 );
 		}
 
-		if ( 1 !== preg_match( '/^[0-9]{10}$/', (string) $phone ) ) {
-			wp_send_json_error( array( 'message' => __( 'Telefono invalido. Debe tener exactamente 10 digitos.', 'arriendo-facil' ) ), 400 );
+		if ( 1 !== preg_match( '/^[0-9]{7,10}$/', (string) $phone ) ) {
+			wp_send_json_error( array( 'message' => __( 'El teléfono debe tener entre 7 y 10 dígitos, solo números.', 'arriendo-facil' ) ), 400 );
 		}
 
-		if ( 1 !== preg_match( '/^[0-9]{10}$/', (string) $id_number ) ) {
-			wp_send_json_error( array( 'message' => __( 'Cedula invalida. Debe tener exactamente 10 digitos.', 'arriendo-facil' ) ), 400 );
+		// Tipo de documento: el elegido o, si falta, el que sugiere el número.
+		if ( ! in_array( $id_type, array( 'cedula', 'ruc', 'pasaporte' ), true ) ) {
+			$digits  = preg_replace( '/\D/', '', $id_number );
+			$id_type = 13 === strlen( $digits ) ? 'ruc' : ( ctype_digit( $id_number ) ? 'cedula' : 'pasaporte' );
+		}
+		$id_number = AF_Text_Normalizer::document( $id_type, $id_number );
+		if ( ! Arriendo_Facil_Identity_Validator::validate_format( $id_type, $id_number ) ) {
+			$id_messages = array(
+				'pasaporte' => __( 'El pasaporte debe tener entre 6 y 12 caracteres alfanuméricos.', 'arriendo-facil' ),
+				'ruc'       => __( 'El RUC debe tener 13 dígitos.', 'arriendo-facil' ),
+				'cedula'    => __( 'La cédula debe tener 10 dígitos.', 'arriendo-facil' ),
+			);
+			wp_send_json_error( array( 'message' => $id_messages[ $id_type ] ), 400 );
 		}
 
-		if ( 1 !== preg_match( '/^\d{4}-\d{2}-\d{2}$/', (string) $rental_start_date ) ) {
-			wp_send_json_error( array( 'message' => __( 'La fecha de inicio debe tener formato YYYY-MM-DD.', 'arriendo-facil' ) ), 400 );
+		if ( '' === $nationality || ! array_key_exists( $nationality, Arriendo_Facil_Guest::get_nationality_options() ) ) {
+			wp_send_json_error( array( 'message' => __( 'Selecciona tu nacionalidad de la lista.', 'arriendo-facil' ) ), 400 );
 		}
 
-		// Validación del nombre completo: solo letras, mínimo dos palabras, sin insultos.
-		// Plan del administrador del inmueble: el visitante no puede superar sus límites.
+		if ( '' === $income_range || ! array_key_exists( $income_range, Arriendo_Facil_Guest::get_income_range_options() ) ) {
+			wp_send_json_error( array( 'message' => __( 'Selecciona tu rango de ingresos de la lista.', 'arriendo-facil' ) ), 400 );
+		}
+
+		// Documentos: copia de cédula siempre; un comprobante de ingresos; antecedentes si es extranjero.
+		$has_pdf = static function ( $field ) {
+			return isset( $_FILES[ $field ]['error'] ) && UPLOAD_ERR_OK === (int) $_FILES[ $field ]['error'];
+		};
+		if ( ! $has_pdf( 'guest_cedula_papeleta_pdf' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Adjunta la copia de tu documento de identidad en PDF.', 'arriendo-facil' ) ), 400 );
+		}
+		if ( ! $has_pdf( 'guest_certificado_laboral_pdf' ) && ! $has_pdf( 'guest_certificado_bancario_pdf' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Adjunta un comprobante de ingresos en PDF: certificado laboral o certificado bancario.', 'arriendo-facil' ) ), 400 );
+		}
+		if ( Arriendo_Facil_Guest::is_foreign_nationality( $nationality ) && ! $has_pdf( 'guest_antecedentes_penales_pdf' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Para extranjeros, adjunta el certificado de antecedentes penales en PDF.', 'arriendo-facil' ) ), 400 );
+		}
+
+		// El inmueble ligado al enlace no debe estar bloqueado por el plan de su administrador.
 		$plan_owner = (int) get_post_meta( $accommodation_id, '_af_owner_id', true );
-		if ( $plan_owner && Arriendo_Facil_Plans::applies_to( $plan_owner ) ) {
-			$unavailable = array( 'message' => __( 'Este inmueble no puede recibir más solicitudes por ahora. Comunícate con el administrador.', 'arriendo-facil' ) );
-
-			if ( ! Arriendo_Facil_Plans::lock( $plan_owner ) ) {
-				Arriendo_Facil_Plans::send_busy_error();
-			}
-			if ( Arriendo_Facil_Tenancy::is_plan_locked( $accommodation_id )
-				|| Arriendo_Facil_Plans::limit_gate( 'leases', $plan_owner )
-				|| ( empty( $guest->accommodation_id ) && Arriendo_Facil_Plans::limit_gate( 'guests', $plan_owner ) )
-			) {
-				wp_send_json_error( $unavailable, 409 );
-			}
+		if ( $plan_owner && Arriendo_Facil_Plans::applies_to( $plan_owner ) && Arriendo_Facil_Tenancy::is_plan_locked( $accommodation_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'Este inmueble no puede recibir más solicitudes por ahora. Comunícate con el administrador.', 'arriendo-facil' ) ), 409 );
 		}
 
 		$name_trimmed = trim( (string) $name_input );
@@ -279,8 +303,6 @@ class Arriendo_Facil_Guest_Onboarding_Controller {
 		}
 		$name_input = $name_trimmed;
 
-		$rental_end_date = gmdate( 'Y-m-d', strtotime( '+' . $rental_years . ' years', strtotime( $rental_start_date ) ) );
-
 		$name_parts = preg_split( '/\s+/', trim( $name_input ) );
 		$first_name = ! empty( $name_parts[0] ) ? AF_Text_Normalizer::proper_name( (string) $name_parts[0] ) : '';
 		$last_name  = count( $name_parts ) > 1 ? AF_Text_Normalizer::proper_name( trim( implode( ' ', array_slice( $name_parts, 1 ) ) ) ) : '';
@@ -288,25 +310,16 @@ class Arriendo_Facil_Guest_Onboarding_Controller {
 		$updated = $wpdb->update(
 			$wpdb->prefix . 'af_guests',
 			array(
-				'first_name'            => $first_name,
-				'last_name'             => $last_name,
-				'phone'                 => $phone,
-				'id_number'             => $id_number,
-				'accommodation_id'      => $accommodation_id,
-				'rental_mode'           => 'years',
-				'rental_start_date'     => $rental_start_date,
-				'rental_end_date'       => $rental_end_date,
-				'rental_months'         => null,
-				'rental_years'          => $rental_years,
-				'desired_price'         => '',
-				'guarantee_text'        => 'Garantia equivalente a dos (2) meses del canon de arrendamiento',
-				'mascotas'              => 0,
-				'personas_viviran'      => $personas_viviran,
-				'referencia_personal_1' => '',
-				'referencia_personal_2' => '',
+				'first_name'   => $first_name,
+				'last_name'    => $last_name,
+				'phone'        => $phone,
+				'id_number'    => $id_number,
+				'nationality'  => $nationality,
+				'birth_city'   => '' !== $birth_city ? $birth_city : null,
+				'income_range' => $income_range,
 			),
 			array( 'id' => $guest_id ),
-			array( '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%d', '%d', '%s', '%s' ),
+			array( '%s', '%s', '%s', '%s', '%s', '%s', '%s' ),
 			array( '%d' )
 		);
 
@@ -337,21 +350,6 @@ class Arriendo_Facil_Guest_Onboarding_Controller {
 			array( '%d' )
 		);
 
-		$lease_payload = array(
-			'accommodation_id'  => $accommodation_id,
-			'rental_mode'       => 'years',
-			'rental_start_date' => $rental_start_date,
-			'rental_end_date'   => $rental_end_date,
-			'rental_months'     => 0,
-			'rental_years'      => $rental_years,
-			'phone'             => $phone,
-			'id_number'         => $id_number,
-			'mascotas'          => 0,
-			'personas_viviran'  => $personas_viviran,
-			'name'              => trim( $first_name . ' ' . $last_name ),
-			'email'             => sanitize_email( (string) $guest->email ),
-		);
-
 		// Consume the token before responding (one-time use).
 		$this->onboarding->consume_guest_onboarding_token( isset( $resolved['token_id'] ) ? absint( $resolved['token_id'] ) : 0 );
 
@@ -363,24 +361,13 @@ class Arriendo_Facil_Guest_Onboarding_Controller {
 		 */
 		do_action( 'af_guest_profile_completed', $guest_id, $accommodation_id );
 
-		$contract_info = array(
-			'generated' => false,
-			'status'    => 'processed_with_errors',
-		);
-
-		try {
-			$contract_info = $this->onboarding->create_lease_contract_for_guest( $guest_id, $lease_payload );
-			$contract_info['status'] = ! empty( $contract_info['generated'] ) ? 'generated' : 'processed_without_document';
-		} catch ( Throwable $throwable ) {
-			error_log( 'Arriendo Facil sync token submit lease generation error: ' . $throwable->getMessage() );
-		}
+		Arriendo_Facil_Consent::record( 'tenant_signup', 0, 'guest', $guest_id );
 
 		wp_send_json_success(
 			array(
 				'guest_id'           => $guest_id,
 				'uploaded_documents' => $upload_result,
-				'contract'           => $contract_info,
-				'message'            => __( 'Perfil legal completado. Tu contrato fue procesado inmediatamente.', 'arriendo-facil' ),
+				'message'            => __( '¡Gracias! Recibimos tu información. Tu administrador la revisará y se pondrá en contacto contigo.', 'arriendo-facil' ),
 			)
 		);
 

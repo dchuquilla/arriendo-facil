@@ -298,6 +298,15 @@ class Arriendo_Facil_Document_Verification {
 			return new WP_Error( 'af_doc_update_failed', __( 'No se pudo actualizar el estado de verificacion.', 'arriendo-facil' ) );
 		}
 
+		if ( 'verificado' === $status ) {
+			/**
+			 * Los documentos del inquilino quedaron aprobados.
+			 *
+			 * @param int $guest_id Inquilino.
+			 */
+			do_action( 'af_guest_documents_verified', $guest_id );
+		}
+
 		return true;
 	}
 

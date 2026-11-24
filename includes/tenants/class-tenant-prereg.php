@@ -54,6 +54,7 @@ class Arriendo_Facil_Tenant_Prereg {
 		add_action( 'wp_ajax_af_prereg_status', array( $this, 'ajax_status' ) );
 		add_action( 'wp_ajax_af_prereg_delete', array( $this, 'ajax_delete' ) );
 		add_action( 'wp_ajax_af_prereg_regenerate_key', array( $this, 'ajax_regenerate_key' ) );
+		add_action( 'af_guest_documents_verified', array( __CLASS__, 'mark_verified' ), 10, 1 );
 		add_action( 'af_guest_profile_completed', array( __CLASS__, 'mark_completed' ), 10, 1 );
 	}
 
@@ -666,11 +667,16 @@ class Arriendo_Facil_Tenant_Prereg {
 		global $wpdb;
 		self::ensure_table();
 
-		$scope = Arriendo_Facil_Tenancy::can_manage_all() ? '' : $wpdb->prepare( 'WHERE l.manager_id = %d', get_current_user_id() );
+		// Una vez verificado (o con sus documentos aprobados) el interesado ya es un inquilino: sale de esta lista.
+		$scope = "WHERE l.status <> 'verified' AND ( g.id IS NULL OR g.doc_status <> 'verificado' OR l.status = 'discarded' )";
+		if ( ! Arriendo_Facil_Tenancy::can_manage_all() ) {
+			$scope .= $wpdb->prepare( ' AND l.manager_id = %d', get_current_user_id() );
+		}
 
 		return (array) $wpdb->get_results(
 			'SELECT l.*, p.post_title AS property FROM ' . self::table() . " l
 			 LEFT JOIN {$wpdb->posts} p ON p.ID = l.accommodation_id
+			 LEFT JOIN {$wpdb->prefix}af_guests g ON g.id = l.guest_id
 			 {$scope}
 			 ORDER BY FIELD(l.status, 'new', 'completed', 'invited', 'verified', 'discarded'), l.id DESC
 			 LIMIT " . absint( $limit ) // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
@@ -907,6 +913,22 @@ class Arriendo_Facil_Tenant_Prereg {
 
 		self::rotate_key( get_current_user_id() );
 		wp_send_json_success( array( 'url' => self::url( get_current_user_id() ) ) );
+	}
+
+	/**
+	 * Al aprobar los documentos, el interesado pasa a "verificado" y deja de listarse.
+	 *
+	 * @param int $guest_id Inquilino.
+	 */
+	public static function mark_verified( $guest_id ) {
+		global $wpdb;
+		$wpdb->query(
+			$wpdb->prepare(
+				'UPDATE ' . self::table() . " SET status = 'verified', updated_at = %s WHERE guest_id = %d AND status IN ('new','invited','completed')", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+				gmdate( 'Y-m-d H:i:s' ),
+				absint( $guest_id )
+			)
+		);
 	}
 
 	/**

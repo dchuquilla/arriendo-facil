@@ -4,13 +4,13 @@
  */
 
 .af-tp {
-	--tp-ink: #142a30;
+	--tp-ink: #1d3027;
 	--tp-muted: #4f6267;
-	--tp-line: #e1e9e7;
-	--tp-bg: #f4f7f6;
-	--tp-brand: #164a55;
-	--tp-brand-dark: #0f3d47;
-	--tp-soft: #eef5f3;
+	--tp-line: #d3ddcc;
+	--tp-bg: #f6f7ef;
+	--tp-brand: #426747;
+	--tp-brand-dark: #183c2b;
+	--tp-soft: #e5ecdd;
 	--tp-ok: #1b6b3a;
 	--tp-ok-bg: #def3e3;
 	--tp-warn: #8a5418;

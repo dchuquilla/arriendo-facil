@@ -1,0 +1,569 @@
+/**
+ * Arriendo Fácil — Pre-registro público.
+ * Usa la paleta del sitio (tokens --afx-*) con respaldo propio. Primero móvil;
+ * en escritorio, dos columnas que llenan el ancho sin dejar bandas vacías.
+ */
+
+.afp {
+	--p-pino: var(--afx-verde-pino, #183c2b);
+	--p-accion: var(--afx-verde-accion, #426747);
+	--p-dolar: var(--afx-verde-dolar, #6b8e5b);
+	--p-salvia: var(--afx-salvia, #bfd2a5);
+	--p-salvia-suave: var(--afx-salvia-suave, #e5ecdd);
+	--p-marfil: var(--afx-marfil, #f6f7ef);
+	--p-tinta: var(--afx-tinta, #1d3027);
+	--p-texto2: var(--afx-texto-2, #526356);
+	--p-borde: var(--afx-borde, #d3ddcc);
+	--p-lima: var(--afx-lima, #bddb98);
+	--p-error: #b3261e;
+
+	position: relative;
+	isolation: isolate;
+	display: flex;
+	align-items: center;
+	min-height: calc(100vh - var(--afx-header-h, 76px));
+	padding: clamp(20px, 4vw, 56px) var(--afx-pad, clamp(16px, 4vw, 48px)) clamp(32px, 5vw, 72px);
+	overflow: hidden;
+	background: var(--p-marfil);
+	color: var(--p-tinta);
+	font-family: var(--afx-font, "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+	line-height: 1.5;
+}
+
+.afp *,
+.afp *::before,
+.afp *::after {
+	box-sizing: border-box;
+}
+
+.afp [hidden] {
+	display: none !important;
+}
+
+/* Fondo: dos manchas suaves, solo decoración (no se anima: cuesta cero rendimiento). */
+.afp__bg {
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	pointer-events: none;
+}
+
+.afp__blob {
+	position: absolute;
+	border-radius: 50%;
+	filter: blur(70px);
+	opacity: 0.55;
+}
+
+.afp__blob--a {
+	top: -12%;
+	left: -8%;
+	width: min(52vw, 520px);
+	aspect-ratio: 1;
+	background: var(--p-salvia);
+}
+
+.afp__blob--b {
+	right: -10%;
+	bottom: -16%;
+	width: min(46vw, 460px);
+	aspect-ratio: 1;
+	background: #d7e8c4;
+}
+
+.afp__wrap {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: clamp(16px, 3vw, 32px);
+	width: 100%;
+	max-width: 1120px;
+	margin: 0 auto;
+}
+
+.afp__wrap--single {
+	max-width: 520px;
+}
+
+/* ── Columna izquierda: historia + inmueble ──────────────────────────── */
+
+.afp-story {
+	display: flex;
+	flex-direction: column;
+	gap: 18px;
+	padding: clamp(22px, 3.4vw, 40px);
+	border-radius: 28px;
+	background:
+		radial-gradient(120% 90% at 100% 0%, rgba(134, 197, 134, 0.35) 0%, transparent 55%),
+		linear-gradient(150deg, var(--p-pino) 0%, #24523a 55%, var(--p-accion) 100%);
+	color: #fff;
+	box-shadow: 0 36px 70px -34px rgba(24, 60, 43, 0.6);
+}
+
+.afp-eyebrow {
+	margin: 0;
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: var(--p-lima);
+}
+
+.afp-h1 {
+	margin: 0;
+	color: #fff;
+	font-size: clamp(28px, 4.4vw, 44px);
+	font-weight: 800;
+	letter-spacing: -0.03em;
+	line-height: 1.08;
+}
+
+.afp-h1--dark {
+	color: var(--p-tinta);
+	font-size: clamp(24px, 4vw, 30px);
+}
+
+.afp-lead {
+	margin: 0;
+	max-width: 46ch;
+	font-size: clamp(15px, 1.6vw, 17px);
+	color: rgba(255, 255, 255, 0.86);
+}
+
+.afp-prop {
+	position: relative;
+	margin: 0;
+	overflow: hidden;
+	border-radius: 20px;
+	background: #0f2a1d;
+	aspect-ratio: 16 / 10;
+}
+
+.afp-prop__img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	transform-origin: 50% 60%;
+}
+
+.afp-prop__img--empty {
+	display: grid;
+	place-items: center;
+	color: var(--p-lima);
+	background: linear-gradient(135deg, #1f4a33, #2d6244);
+}
+
+.afp-prop__cap {
+	position: absolute;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 36px 16px 14px;
+	background: linear-gradient(to top, rgba(10, 30, 20, 0.88), transparent);
+}
+
+.afp-prop__cap strong {
+	font-size: clamp(17px, 2vw, 20px);
+	line-height: 1.2;
+	overflow-wrap: anywhere;
+}
+
+.afp-prop__cap small {
+	color: rgba(255, 255, 255, 0.82);
+	font-size: 13px;
+}
+
+.afp-chip {
+	align-self: flex-start;
+	margin-bottom: 4px;
+	padding: 3px 11px;
+	border-radius: 999px;
+	background: var(--p-lima);
+	color: var(--p-pino);
+	font-size: 11px;
+	font-weight: 800;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+
+.afp-steps {
+	display: grid;
+	gap: 10px;
+	margin: 4px 0 0;
+	padding: 0;
+	list-style: none;
+}
+
+.afp-step {
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+}
+
+.afp-step__num {
+	display: grid;
+	flex-shrink: 0;
+	place-items: center;
+	width: 30px;
+	height: 30px;
+	border-radius: 50%;
+	background: rgba(255, 255, 255, 0.14);
+	border: 1px solid rgba(255, 255, 255, 0.3);
+	font-size: 13px;
+	font-weight: 800;
+}
+
+.afp-step strong,
+.afp-step small {
+	display: block;
+}
+
+.afp-step small {
+	color: rgba(255, 255, 255, 0.75);
+	font-size: 13px;
+}
+
+/* ── Columna derecha: formulario ─────────────────────────────────────── */
+
+.afp-card {
+	align-self: center;
+	width: 100%;
+	padding: clamp(22px, 3.2vw, 38px);
+	border: 1px solid var(--p-borde);
+	border-radius: 28px;
+	background: #fff;
+	box-shadow: 0 24px 60px -34px rgba(24, 60, 43, 0.45);
+}
+
+.afp-card--center {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 12px;
+	text-align: center;
+}
+
+.afp-card__head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 18px;
+}
+
+.afp-card__head h2 {
+	margin: 0;
+	font-size: clamp(20px, 2.4vw, 24px);
+	font-weight: 800;
+	letter-spacing: -0.02em;
+}
+
+.afp-req {
+	font-size: 12.5px;
+	color: var(--p-texto2);
+}
+
+.afp-h2 {
+	margin: 0;
+	font-size: clamp(22px, 3vw, 28px);
+	font-weight: 800;
+	letter-spacing: -0.02em;
+}
+
+.afp-muted {
+	margin: 0;
+	color: var(--p-texto2);
+}
+
+.afp-alert {
+	margin: 0 0 14px;
+	padding: 12px 14px;
+	border-radius: 14px;
+	background: #fdeceb;
+	color: var(--p-error);
+	font-size: 14px;
+	font-weight: 600;
+}
+
+.afp-empty {
+	margin: 0;
+	padding: 16px;
+	border-radius: 14px;
+	background: var(--p-salvia-suave);
+	color: var(--p-texto2);
+}
+
+.afp-form {
+	display: flex;
+	flex-direction: column;
+	gap: 18px;
+}
+
+.afp-grid {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 14px;
+}
+
+.afp-field {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	min-width: 0;
+}
+
+.afp-field label {
+	font-size: 14px;
+	font-weight: 700;
+}
+
+.afp-field abbr,
+.afp-req abbr {
+	color: var(--p-error);
+	text-decoration: none;
+}
+
+.afp-field input,
+.afp-field select {
+	width: 100%;
+	min-height: 52px;
+	padding: 0 16px;
+	border: 1.5px solid var(--p-borde);
+	border-radius: 16px;
+	background: var(--p-marfil);
+	color: var(--p-tinta);
+	font: inherit;
+	font-size: 16px; /* evita el zoom de iOS */
+	transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.afp-field input::placeholder {
+	color: #8a9a8d;
+}
+
+.afp-field input:focus,
+.afp-field select:focus {
+	border-color: var(--p-accion);
+	background: #fff;
+	outline: none;
+	box-shadow: 0 0 0 4px rgba(66, 103, 71, 0.18);
+}
+
+.afp-field.is-invalid input,
+.afp-field.is-invalid select {
+	border-color: var(--p-error);
+	background: #fffafa;
+}
+
+.afp-hint {
+	color: var(--p-texto2);
+	font-size: 12.5px;
+}
+
+.afp-err {
+	display: none;
+	color: var(--p-error);
+	font-size: 12.5px;
+	font-weight: 700;
+}
+
+.afp-field.is-invalid .afp-err {
+	display: block;
+}
+
+.afp-field.is-invalid .afp-hint {
+	display: none;
+}
+
+.afp-locked {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin: 0;
+	padding: 12px 14px;
+	border-radius: 14px;
+	background: var(--p-salvia-suave);
+	color: var(--p-pino);
+	font-size: 14px;
+}
+
+.afp-hp {
+	position: absolute;
+	left: -9999px;
+	width: 1px;
+	height: 1px;
+	opacity: 0;
+}
+
+/* Casillas de consentimiento (las pinta el componente compartido). */
+.afp-consent .af-consent {
+	display: grid;
+	gap: 10px;
+	margin: 0;
+	padding: 14px;
+	border: 1px solid var(--p-borde);
+	border-radius: 16px;
+	background: var(--p-marfil);
+}
+
+.afp-consent .af-consent__row {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	font-size: 13.5px;
+	line-height: 1.45;
+	color: var(--p-tinta);
+}
+
+.afp-consent .af-consent__row input {
+	flex-shrink: 0;
+	width: 20px;
+	height: 20px;
+	margin-top: 1px;
+	accent-color: var(--p-accion);
+}
+
+.afp-consent .af-consent__link {
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--p-accion);
+	font: inherit;
+	font-weight: 700;
+	text-decoration: underline;
+	cursor: pointer;
+}
+
+.afp-consent.is-invalid .af-consent {
+	border-color: var(--p-error);
+}
+
+.afp-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	width: 100%;
+	min-height: 56px;
+	padding: 0 24px;
+	border: 0;
+	border-radius: 999px;
+	background: linear-gradient(100deg, var(--p-accion) 0%, #5b8c5e 55%, #86c586 100%);
+	box-shadow: 0 14px 26px -14px var(--p-accion);
+	color: #fff;
+	font: 700 17px/1 var(--afx-font, "Inter", system-ui, sans-serif);
+	text-decoration: none;
+	cursor: pointer;
+	transition: filter 0.2s ease, box-shadow 0.2s ease;
+}
+
+.afp-btn:hover {
+	filter: brightness(1.06);
+	color: #fff;
+}
+
+.afp-btn:focus-visible {
+	outline: 3px solid var(--p-dolar);
+	outline-offset: 3px;
+}
+
+.afp-btn:disabled {
+	opacity: 0.65;
+	cursor: wait;
+}
+
+.afp-btn--wa {
+	background: #1fa855;
+	box-shadow: 0 14px 26px -14px #1fa855;
+}
+
+.afp-fine {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	margin: 0;
+	color: var(--p-texto2);
+	font-size: 12.5px;
+	text-align: center;
+}
+
+.afp-done__badge {
+	display: grid;
+	place-items: center;
+	width: 72px;
+	height: 72px;
+	border-radius: 50%;
+	background: var(--p-salvia-suave);
+	color: var(--p-accion);
+}
+
+/* ── Escritorio: dos columnas que llenan el ancho ────────────────────── */
+
+@media (min-width: 900px) {
+	.afp__wrap {
+		grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+		align-items: stretch;
+	}
+
+	.afp__wrap--single {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.afp-story {
+		justify-content: center;
+		gap: 22px;
+	}
+
+	.afp-grid {
+		grid-template-columns: 1fr 1fr;
+	}
+
+	.afp-field--wide {
+		grid-column: 1 / -1;
+	}
+
+	/* La confirmación ocupa el mismo lugar que el formulario. */
+	.afp__wrap > .afp-done {
+		grid-column: 2;
+		grid-row: 1;
+	}
+}
+
+/* ── Móvil: más compacto, el formulario manda ────────────────────────── */
+
+@media (max-width: 899px) {
+	.afp {
+		align-items: flex-start;
+		padding-top: 16px;
+	}
+
+	.afp-story {
+		gap: 14px;
+		border-radius: 24px;
+	}
+
+	.afp-steps {
+		display: none; /* en móvil se prioriza llegar al formulario */
+	}
+
+	.afp-prop {
+		aspect-ratio: 16 / 9;
+	}
+
+	.afp-card {
+		border-radius: 24px;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.afp *,
+	.afp *::before,
+	.afp *::after {
+		transition: none !important;
+		animation: none !important;
+	}
+}

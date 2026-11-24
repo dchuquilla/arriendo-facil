@@ -46,7 +46,7 @@ class Arriendo_Facil_Tenant_Prereg {
 		add_filter( 'query_vars', array( $this, 'add_query_var' ) );
 		add_action( 'template_redirect', array( $this, 'send_privacy_headers' ), 1 );
 		add_filter( 'template_include', array( $this, 'load_template' ) );
-		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_assets' ) );
+		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_assets' ), 40 ); // Después del tema, para reutilizar su GSAP.
 
 		add_action( 'wp_ajax_nopriv_af_tenant_prereg_submit', array( $this, 'ajax_submit' ) );
 		add_action( 'wp_ajax_af_tenant_prereg_submit', array( $this, 'ajax_submit' ) );
@@ -300,11 +300,14 @@ class Arriendo_Facil_Tenant_Prereg {
 			return;
 		}
 
-		$css = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-tenant-portal.css';
+		$css = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/css/af-tenant-prereg.css';
 		$js  = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/af-tenant-prereg.js';
 
-		wp_enqueue_style( 'af-tenant-portal', ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/af-tenant-portal.css', array(), file_exists( $css ) ? (string) filemtime( $css ) : ARRIENDO_FACIL_VERSION );
-		wp_enqueue_script( 'af-tenant-prereg', ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/af-tenant-prereg.js', array(), file_exists( $js ) ? (string) filemtime( $js ) : ARRIENDO_FACIL_VERSION, true );
+		wp_enqueue_style( 'af-tenant-prereg', ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/af-tenant-prereg.css', array(), file_exists( $css ) ? (string) filemtime( $css ) : ARRIENDO_FACIL_VERSION );
+
+		// GSAP viene del tema (local, sin CDN): si no está, la página funciona igual sin movimiento.
+		$deps = wp_script_is( 'afx-gsap', 'registered' ) ? array( 'afx-gsap' ) : array();
+		wp_enqueue_script( 'af-tenant-prereg', ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/af-tenant-prereg.js', $deps, file_exists( $js ) ? (string) filemtime( $js ) : ARRIENDO_FACIL_VERSION, true );
 		wp_localize_script(
 			'af-tenant-prereg',
 			'afTenantPrereg',

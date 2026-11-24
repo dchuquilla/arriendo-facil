@@ -161,6 +161,46 @@
 	background: #1eb855;
 }
 
+/*
+ * Los botones son enlaces: sin fijar el color en cada estado, el estilo
+ * `a:hover` del tema los pinta de verde y el texto se pierde sobre el fondo.
+ * El selector con `a.` le gana al tema y cada estado conserva su contraste.
+ */
+a.af-cs-btn--whatsapp,
+a.af-cs-btn--whatsapp:visited,
+a.af-cs-btn--whatsapp:hover,
+a.af-cs-btn--whatsapp:focus,
+a.af-cs-btn--whatsapp:active {
+	color: #06301a;
+	text-decoration: none;
+}
+
+a.af-cs-btn--whatsapp:hover,
+a.af-cs-btn--whatsapp:focus-visible {
+	background: #1eb855;
+	box-shadow: 0 8px 18px -10px rgba(6, 48, 26, .55);
+}
+
+a.af-cs-btn--whatsapp:focus-visible {
+	outline: 3px solid #06301a;
+	outline-offset: 2px;
+}
+
+a.af-cs-btn--primary,
+a.af-cs-btn--primary:visited,
+a.af-cs-btn--primary:hover,
+a.af-cs-btn--primary:focus {
+	color: #164a55;
+	text-decoration: none;
+}
+
+.af-cs-hero a.af-cs-btn--ghost,
+.af-cs-hero a.af-cs-btn--ghost:visited,
+.af-cs-hero a.af-cs-btn--ghost:hover,
+.af-cs-hero a.af-cs-btn--ghost:focus {
+	color: #fff;
+}
+
 /* --------------------------------------------------------------- Filters */
 
 .af-cs-filters {

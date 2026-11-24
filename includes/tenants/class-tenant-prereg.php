@@ -146,11 +146,11 @@ class Arriendo_Facil_Tenant_Prereg {
 	public static function interested_message( $name, $property = '' ) {
 		if ( '' !== $property ) {
 			/* translators: 1: name, 2: property */
-			return sprintf( __( 'Hola, soy %1$s. Acabo de hacer mi pre-registro para el inmueble "%2$s". ¿Me envías el enlace para completar mi información?', 'arriendo-facil' ), $name, $property );
+			return sprintf( __( 'Hola, soy %1$s. Acabo de dejar mis datos para el inmueble "%2$s". ¿Me envías el enlace para completar mi información?', 'arriendo-facil' ), $name, $property );
 		}
 
 		/* translators: %s: name */
-		return sprintf( __( 'Hola, soy %s. Acabo de hacer mi pre-registro. ¿Me envías el enlace para completar mi información?', 'arriendo-facil' ), $name );
+		return sprintf( __( 'Hola, soy %s. Acabo de dejar mis datos. ¿Me envías el enlace para completar mi información?', 'arriendo-facil' ), $name );
 	}
 
 	/**
@@ -315,7 +315,7 @@ class Arriendo_Facil_Tenant_Prereg {
 				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 				'i18n'    => array(
 					'sending'  => __( 'Enviando…', 'arriendo-facil' ),
-					'send'     => __( 'Enviar pre-registro', 'arriendo-facil' ),
+					'send'     => __( 'Enviar mis datos', 'arriendo-facil' ),
 					'network'  => __( 'No pudimos conectar. Revisa tu internet e inténtalo de nuevo.', 'arriendo-facil' ),
 					'opening'  => __( 'Abriendo WhatsApp…', 'arriendo-facil' ),
 					'errName'     => __( 'Escribe tu nombre (solo letras).', 'arriendo-facil' ),
@@ -524,7 +524,7 @@ class Arriendo_Facil_Tenant_Prereg {
 		}
 
 		if ( self::throttled( 'mail', $manager->ID . '|' . $email, 3, DAY_IN_SECONDS ) ) {
-			wp_send_json_error( array( 'message' => __( 'Ya recibimos tu pre-registro. El administrador se pondrá en contacto contigo.', 'arriendo-facil' ) ), 429 );
+			wp_send_json_error( array( 'message' => __( 'Ya recibimos tus datos. El administrador se pondrá en contacto contigo.', 'arriendo-facil' ) ), 429 );
 		}
 
 		global $wpdb;
@@ -577,7 +577,7 @@ class Arriendo_Facil_Tenant_Prereg {
 		}
 
 		if ( ! $lead_id ) {
-			wp_send_json_error( array( 'message' => __( 'No pudimos guardar tu pre-registro. Inténtalo de nuevo.', 'arriendo-facil' ) ), 500 );
+			wp_send_json_error( array( 'message' => __( 'No pudimos guardar tus datos. Inténtalo de nuevo.', 'arriendo-facil' ) ), 500 );
 		}
 
 		if ( $is_new ) {
@@ -611,12 +611,12 @@ class Arriendo_Facil_Tenant_Prereg {
 
 		Arriendo_Facil_Email::send(
 			$manager->user_email,
-			__( 'Nuevo pre-registro de interesado', 'arriendo-facil' ),
+			__( 'Nuevo interesado', 'arriendo-facil' ),
 			array(
 				'title'     => __( 'Tienes un nuevo interesado', 'arriendo-facil' ),
-				'body_text' => sprintf( /* translators: 1: name, 2: property */ __( '%1$s se pre-registró%2$s. Envíale el formulario completo desde Inquilinos → Pre-registros.', 'arriendo-facil' ), $name, $property ? sprintf( /* translators: %s: property */ __( ' para "%s"', 'arriendo-facil' ), get_the_title( $property ) ) : '' ),
+				'body_text' => sprintf( /* translators: 1: name, 2: property */ __( '%1$s dejó sus datos%2$s. Envíale el formulario completo desde Inquilinos → Interesados.', 'arriendo-facil' ), $name, $property ? sprintf( /* translators: %s: property */ __( ' para "%s"', 'arriendo-facil' ), get_the_title( $property ) ) : '' ),
 				'button'    => array(
-					'label' => __( 'Ver pre-registros', 'arriendo-facil' ),
+					'label' => __( 'Ver interesados', 'arriendo-facil' ),
 					'url'   => admin_url( 'admin.php?page=af-guests' ),
 				),
 			),

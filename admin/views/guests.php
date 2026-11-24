@@ -273,7 +273,7 @@ if ( $is_owner ) {
 		<details class="af-prereg" <?php echo $af_lead_open > 0 ? 'open' : ''; ?>>
 			<summary class="af-prereg__head">
 				<span class="af-prereg__titles">
-					<strong><?php esc_html_e( 'Pre-registros y acceso de inquilinos', 'arriendo-facil' ); ?></strong>
+					<strong><?php esc_html_e( 'Interesados y acceso de inquilinos', 'arriendo-facil' ); ?></strong>
 					<small><?php esc_html_e( 'Comparte tu enlace, recibe interesados y envíales el formulario completo.', 'arriendo-facil' ); ?></small>
 				</span>
 				<?php if ( $af_lead_open > 0 ) : ?>
@@ -284,11 +284,11 @@ if ( $is_owner ) {
 			<div class="af-prereg__body">
 				<div class="af-prereg__links">
 					<div class="af-prereg__link">
-						<label for="af-prereg-url"><?php esc_html_e( 'Tu enlace de pre-registro', 'arriendo-facil' ); ?></label>
+						<label for="af-prereg-url"><?php esc_html_e( 'Tu enlace para interesados', 'arriendo-facil' ); ?></label>
 						<div class="af-prereg__copy">
 							<input type="text" id="af-prereg-url" value="<?php echo esc_attr( $af_prereg_url ); ?>" readonly />
 							<button type="button" class="button af-btn af-btn--ghost af-btn--sm" data-af-copy="#af-prereg-url"><?php esc_html_e( 'Copiar', 'arriendo-facil' ); ?></button>
-							<a class="button af-btn af-btn--ghost af-btn--sm" id="af-prereg-share" target="_blank" rel="noopener noreferrer" href="<?php echo esc_url( 'https://wa.me/?text=' . rawurlencode( __( 'Déjame tus datos para tu pre-registro: ', 'arriendo-facil' ) . $af_prereg_url ) ); ?>"><?php esc_html_e( 'WhatsApp', 'arriendo-facil' ); ?></a>
+							<a class="button af-btn af-btn--ghost af-btn--sm" id="af-prereg-share" target="_blank" rel="noopener noreferrer" href="<?php echo esc_url( 'https://wa.me/?text=' . rawurlencode( __( 'Déjame tus datos aquí y te escribo: ', 'arriendo-facil' ) . $af_prereg_url ) ); ?>"><?php esc_html_e( 'WhatsApp', 'arriendo-facil' ); ?></a>
 						</div>
 						<small><?php esc_html_e( 'Quien lo use queda vinculado a tu cuenta. Si lo compartiste donde no debías, genera uno nuevo:', 'arriendo-facil' ); ?> <button type="button" class="af-prereg__linkbtn" id="af-prereg-regenerate"><?php esc_html_e( 'regenerar enlace', 'arriendo-facil' ); ?></button></small>
 					</div>
@@ -1043,7 +1043,7 @@ if ( $is_owner ) {
 		});
 	});
 
-	// ---- Pre-registros: copiar, regenerar enlace y enviar el formulario completo ----
+	// ---- Interesados: copiar, regenerar enlace y enviar el formulario completo ----
 	const preregNonce = <?php echo wp_json_encode( wp_create_nonce( 'af_prereg_nonce' ) ); ?>;
 	const msg = {
 		copied: <?php echo wp_json_encode( __( 'Enlace copiado.', 'arriendo-facil' ) ); ?>,
@@ -1078,7 +1078,7 @@ if ( $is_owner ) {
 				if (!json || !json.success) { window.afNotify(msg.fail, 'error'); return; }
 				document.getElementById('af-prereg-url').value = json.data.url;
 				const share = document.getElementById('af-prereg-share');
-				if (share) { share.href = 'https://wa.me/?text=' + encodeURIComponent(<?php echo wp_json_encode( __( 'Déjame tus datos para tu pre-registro: ', 'arriendo-facil' ) ); ?> + json.data.url); }
+				if (share) { share.href = 'https://wa.me/?text=' + encodeURIComponent(<?php echo wp_json_encode( __( 'Déjame tus datos aquí y te escribo: ', 'arriendo-facil' ) ); ?> + json.data.url); }
 				window.afNotify(msg.copied, 'success');
 			}).catch(function () { window.afNotify(msg.fail, 'error'); });
 		});

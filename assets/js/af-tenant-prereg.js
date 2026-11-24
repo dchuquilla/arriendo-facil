@@ -1,5 +1,5 @@
 /**
- * Arriendo Fácil — Pre-registro público.
+ * Arriendo Fácil — Página pública para interesados.
  *
  *  - Validación en el navegador con mensajes por campo (el servidor vuelve a validar todo).
  *  - Envío por AJAX y, al terminar, abre WhatsApp hacia el gestor con el mensaje listo.
@@ -74,6 +74,7 @@
 
 		if (!form) { return; }
 		var submit = form.querySelector('[data-pr-submit]');
+		var label = submit.querySelector('[data-pr-label]') || submit;
 
 		var rules = {
 			first_name: function (v) { return /^[\p{L}\p{M}][\p{L}\p{M}\s'.\-]{1,79}$/u.test(v) ? '' : i18n.errName; },
@@ -147,7 +148,7 @@
 
 			sending = true;
 			submit.disabled = true;
-			submit.textContent = i18n.sending;
+			label.textContent = i18n.sending;
 
 			fetch(cfg.ajaxUrl, {
 				method: 'POST',
@@ -159,7 +160,7 @@
 			}).then(function (res) {
 				sending = false;
 				submit.disabled = false;
-				submit.textContent = i18n.send;
+				label.textContent = i18n.send;
 
 				if (!res.success) {
 					show((res.data && res.data.message) || i18n.network);
@@ -185,7 +186,7 @@
 			}).catch(function () {
 				sending = false;
 				submit.disabled = false;
-				submit.textContent = i18n.send;
+				label.textContent = i18n.send;
 				show(i18n.network);
 			});
 		});

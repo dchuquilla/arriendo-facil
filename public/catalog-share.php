@@ -591,7 +591,7 @@ get_header();
 												href="<?php echo esc_url( $af_ws_message ); ?>"
 												rel="noopener"
 											>
-												<?php esc_html_e( 'Me interesa · Pre-registrarme', 'arriendo-facil' ); ?>
+												<?php esc_html_e( 'Me interesa', 'arriendo-facil' ); ?>
 											</a>
 										<?php endif; ?>
 

@@ -1,6 +1,6 @@
 <?php
 /**
- * Pre-registro de interesados (https://sitio/preregistro/<clave>/).
+ * Página pública de interesados (https://sitio/preregistro/<clave>/).
  *
  * Formulario corto y público, ligado al gestor dueño de la clave. Al enviarlo
  * se abre WhatsApp hacia el gestor con un mensaje listo para pedirle el enlace
@@ -48,7 +48,7 @@ get_header();
 		$af_prop_img  = $af_locked ? get_the_post_thumbnail_url( $af_selected, 'large' ) : '';
 		$af_prop_addr = $af_locked ? trim( (string) get_post_meta( $af_selected, '_af_address', true ) . ' ' . (string) get_post_meta( $af_selected, '_af_city', true ) ) : '';
 		$af_steps     = array(
-			array( __( 'Pre-registro', 'arriendo-facil' ), __( 'Tus 5 datos básicos. Menos de un minuto.', 'arriendo-facil' ) ),
+			array( __( 'Tus datos', 'arriendo-facil' ), __( 'Solo 5 datos básicos. Menos de un minuto.', 'arriendo-facil' ) ),
 			array( __( 'Formulario completo', 'arriendo-facil' ), __( 'El administrador te envía un enlace seguro por WhatsApp o correo.', 'arriendo-facil' ) ),
 			array( __( 'Verificación', 'arriendo-facil' ), __( 'Revisa tu información y continúa con el contrato.', 'arriendo-facil' ) ),
 		);
@@ -99,7 +99,7 @@ get_header();
 				<p class="afp-alert" role="alert" data-pr-alert hidden></p>
 
 				<?php if ( ! $af_locked && empty( $af_properties ) ) : ?>
-					<p class="afp-empty"><?php esc_html_e( 'Por ahora no hay inmuebles disponibles para pre-registro. Vuelve a intentarlo más tarde.', 'arriendo-facil' ); ?></p>
+					<p class="afp-empty"><?php esc_html_e( 'Por ahora no hay inmuebles disponibles por ahora. Vuelve a intentarlo más tarde.', 'arriendo-facil' ); ?></p>
 				<?php else : ?>
 
 				<form class="afp-form" data-pr-form novalidate>
@@ -157,7 +157,10 @@ get_header();
 						<?php Arriendo_Facil_Consent::render( 'tenant_prereg' ); ?>
 					</div>
 
-					<button class="afp-btn" type="submit" data-pr-submit><?php esc_html_e( 'Enviar pre-registro', 'arriendo-facil' ); ?></button>
+					<button class="afp-btn" type="submit" data-pr-submit>
+						<span data-pr-label><?php esc_html_e( 'Enviar mis datos', 'arriendo-facil' ); ?></span>
+						<svg class="afp-btn__icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+					</button>
 					<p class="afp-fine">
 						<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2 4 6v6c0 5 3.4 8.5 8 10 4.6-1.5 8-5 8-10V6z"/></svg>
 						<?php esc_html_e( 'Tus datos solo se comparten con el administrador de este inmueble.', 'arriendo-facil' ); ?>
@@ -171,7 +174,7 @@ get_header();
 				<span class="afp-done__badge" data-afp-badge aria-hidden="true">
 					<svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
 				</span>
-				<h2 class="afp-h2"><?php esc_html_e( '¡Listo, recibimos tu pre-registro!', 'arriendo-facil' ); ?></h2>
+				<h2 class="afp-h2"><?php esc_html_e( '¡Listo, recibimos tus datos!', 'arriendo-facil' ); ?></h2>
 				<p class="afp-muted" data-pr-done-text></p>
 				<a class="afp-btn afp-btn--wa" data-pr-wa href="#" target="_blank" rel="noopener noreferrer" hidden><?php esc_html_e( 'Abrir WhatsApp', 'arriendo-facil' ); ?></a>
 				<p class="afp-fine" data-pr-nowa hidden><?php esc_html_e( 'Tu administrador se pondrá en contacto contigo con el formulario completo.', 'arriendo-facil' ); ?></p>

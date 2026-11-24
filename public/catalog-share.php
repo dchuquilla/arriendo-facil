@@ -301,19 +301,12 @@ get_header();
 						);
 
 						/*
-						 * The business name is deliberately left out of the
-						 * message: the recipient is already talking to the
-						 * owner through this very catalog, and repeating the
-						 * account display name only adds noise.
+						 * "Me interesa" ya no escribe directo al gestor: lleva a su
+						 * pre-registro (con este inmueble preseleccionado) y, al
+						 * terminar, ese formulario abre WhatsApp con el mensaje listo.
 						 */
-						$af_ws_message = $catalog['whatsapp']
-							? rawurlencode(
-								sprintf(
-									/* translators: %s: property title */
-									__( 'Hola, me interesa el inmueble %s.', 'arriendo-facil' ),
-									$af_card['title']
-								)
-							)
+						$af_ws_message = ( $catalog_share_user instanceof WP_User )
+							? Arriendo_Facil_Tenant_Prereg::url( (int) $catalog_share_user->ID, (int) $af_card['id'], 'catalogo' )
 							: '';
 
 						/*
@@ -592,14 +585,13 @@ get_header();
 									</div>
 
 									<div class="af-cs-card__actions">
-										<?php if ( $af_ws_message && $catalog['whatsapp'] ) : ?>
+										<?php if ( $af_ws_message ) : ?>
 											<a
 												class="af-cs-btn af-cs-btn--whatsapp"
-												href="<?php echo esc_url( $catalog['whatsapp'] . '?text=' . $af_ws_message ); ?>"
-												target="_blank"
-												rel="noopener noreferrer"
+												href="<?php echo esc_url( $af_ws_message ); ?>"
+												rel="noopener"
 											>
-												<?php esc_html_e( 'Consultar por WhatsApp', 'arriendo-facil' ); ?>
+												<?php esc_html_e( 'Me interesa · Pre-registrarme', 'arriendo-facil' ); ?>
 											</a>
 										<?php endif; ?>
 

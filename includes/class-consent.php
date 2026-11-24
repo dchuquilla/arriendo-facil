@@ -68,6 +68,11 @@ class Arriendo_Facil_Consent {
 				'why'   => __( 'Sus datos personales serán tratados para gestionar su arrendamiento. Necesitamos su autorización expresa y su declaración de que la información entregada es veraz.', 'arriendo-facil' ),
 				'agree' => __( 'Estoy de acuerdo con el tratamiento de mis datos personales y declaro que la información que proporciono es veraz y de mi responsabilidad.', 'arriendo-facil' ),
 			),
+			'tenant_prereg' => array(
+				'title' => __( 'Pre-registro de interesado', 'arriendo-facil' ),
+				'why'   => __( 'Compartirás tu nombre y datos de contacto con el administrador del inmueble para que pueda comunicarse contigo y enviarte el formulario completo. Solo se usarán para gestionar tu posible arriendo.', 'arriendo-facil' ),
+				'agree' => __( 'Autorizo que mis datos de contacto se compartan con el administrador del inmueble y declaro que la información que proporciono es veraz.', 'arriendo-facil' ),
+			),
 			'contract'      => array(
 				'title' => __( 'Creación de contrato', 'arriendo-facil' ),
 				'why'   => __( 'El contrato se genera a partir de los datos y plantillas que usted proporciona. Debe revisarlo y, de ser necesario, consultarlo con un abogado. ', 'arriendo-facil' ) . $facilitator,

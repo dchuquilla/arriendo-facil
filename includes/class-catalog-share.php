@@ -325,7 +325,7 @@ class Arriendo_Facil_Catalog_Share {
 	 * @param string $phone Raw phone number.
 	 * @return string
 	 */
-	private static function whatsapp_link( $phone ) {
+	public static function whatsapp_link( $phone ) {
 		$phone = preg_replace( '/[^0-9+]/', '', (string) $phone );
 
 		if ( ! $phone ) {

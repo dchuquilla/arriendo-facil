@@ -254,6 +254,101 @@ if ( $is_owner ) {
 		</div>
 	<?php endif; ?>
 
+	<?php
+	$af_can_prereg = current_user_can( Arriendo_Facil_Tenancy::CAP ) && class_exists( 'Arriendo_Facil_Tenant_Prereg' );
+	if ( $af_can_prereg ) :
+		$af_prereg_url  = Arriendo_Facil_Tenant_Prereg::url( get_current_user_id() );
+		$af_portal_url  = Arriendo_Facil_Tenant_Access::portal_url();
+		$af_leads       = Arriendo_Facil_Tenant_Prereg::leads_for_current_user( 60 );
+		$af_lead_states = Arriendo_Facil_Tenant_Prereg::statuses();
+		$af_lead_tone   = array( 'new' => 'info', 'invited' => 'neutral', 'completed' => 'attention', 'verified' => 'success', 'discarded' => 'neutral' );
+		$af_lead_open   = 0;
+		foreach ( $af_leads as $af_l ) {
+			if ( in_array( $af_l->status, array( 'new', 'completed' ), true ) ) {
+				$af_lead_open++;
+			}
+		}
+		$af_my_properties = Arriendo_Facil_Tenant_Prereg::public_properties( get_current_user_id() );
+		?>
+		<details class="af-prereg" <?php echo $af_lead_open > 0 ? 'open' : ''; ?>>
+			<summary class="af-prereg__head">
+				<span class="af-prereg__titles">
+					<strong><?php esc_html_e( 'Pre-registros y acceso de inquilinos', 'arriendo-facil' ); ?></strong>
+					<small><?php esc_html_e( 'Comparte tu enlace, recibe interesados y envíales el formulario completo.', 'arriendo-facil' ); ?></small>
+				</span>
+				<?php if ( $af_lead_open > 0 ) : ?>
+					<span class="af-pill af-pill--attention"><?php echo esc_html( sprintf( /* translators: %d: pending leads */ _n( '%d por atender', '%d por atender', $af_lead_open, 'arriendo-facil' ), $af_lead_open ) ); ?></span>
+				<?php endif; ?>
+			</summary>
+
+			<div class="af-prereg__body">
+				<div class="af-prereg__links">
+					<div class="af-prereg__link">
+						<label for="af-prereg-url"><?php esc_html_e( 'Tu enlace de pre-registro', 'arriendo-facil' ); ?></label>
+						<div class="af-prereg__copy">
+							<input type="text" id="af-prereg-url" value="<?php echo esc_attr( $af_prereg_url ); ?>" readonly />
+							<button type="button" class="button af-btn af-btn--ghost af-btn--sm" data-af-copy="#af-prereg-url"><?php esc_html_e( 'Copiar', 'arriendo-facil' ); ?></button>
+							<a class="button af-btn af-btn--ghost af-btn--sm" id="af-prereg-share" target="_blank" rel="noopener noreferrer" href="<?php echo esc_url( 'https://wa.me/?text=' . rawurlencode( __( 'Déjame tus datos para tu pre-registro: ', 'arriendo-facil' ) . $af_prereg_url ) ); ?>"><?php esc_html_e( 'WhatsApp', 'arriendo-facil' ); ?></a>
+						</div>
+						<small><?php esc_html_e( 'Quien lo use queda vinculado a tu cuenta. Si lo compartiste donde no debías, genera uno nuevo:', 'arriendo-facil' ); ?> <button type="button" class="af-prereg__linkbtn" id="af-prereg-regenerate"><?php esc_html_e( 'regenerar enlace', 'arriendo-facil' ); ?></button></small>
+					</div>
+					<div class="af-prereg__link">
+						<label for="af-portal-url"><?php esc_html_e( 'Portal del inquilino (acceso con código por correo)', 'arriendo-facil' ); ?></label>
+						<div class="af-prereg__copy">
+							<input type="text" id="af-portal-url" value="<?php echo esc_attr( $af_portal_url ); ?>" readonly />
+							<button type="button" class="button af-btn af-btn--ghost af-btn--sm" data-af-copy="#af-portal-url"><?php esc_html_e( 'Copiar', 'arriendo-facil' ); ?></button>
+						</div>
+						<small><?php esc_html_e( 'Cada inquilino entra con su correo registrado. Desde su fila puedes enviarle su acceso personal.', 'arriendo-facil' ); ?></small>
+					</div>
+				</div>
+
+				<?php if ( empty( $af_leads ) ) : ?>
+					<p class="af-prereg__empty"><?php esc_html_e( 'Aún no hay interesados. Comparte tu enlace o el catálogo público: el botón "Me interesa" lleva aquí.', 'arriendo-facil' ); ?></p>
+				<?php else : ?>
+					<ul class="af-lead-list">
+						<?php foreach ( $af_leads as $af_lead ) : ?>
+							<?php
+							$af_lead_name = trim( $af_lead->first_name . ' ' . $af_lead->last_name );
+							$af_closed    = in_array( $af_lead->status, array( 'discarded', 'verified' ), true );
+							?>
+							<li class="af-lead" data-lead-id="<?php echo esc_attr( $af_lead->id ); ?>">
+								<div class="af-lead__main">
+									<strong><?php echo esc_html( $af_lead_name ); ?></strong>
+									<small><?php echo esc_html( $af_lead->email . ' · ' . $af_lead->phone ); ?></small>
+									<small><?php echo esc_html( ( $af_lead->property ? $af_lead->property : __( 'Sin inmueble elegido', 'arriendo-facil' ) ) . ' · ' . af_time_ago( strtotime( $af_lead->created_at . ' UTC' ) ) ); ?></small>
+									<?php if ( $af_lead->note ) : ?>
+										<small class="af-lead__note">“<?php echo esc_html( $af_lead->note ); ?>”</small>
+									<?php endif; ?>
+								</div>
+								<span class="af-pill af-pill--<?php echo esc_attr( $af_lead_tone[ $af_lead->status ] ); ?>"><?php echo esc_html( $af_lead_states[ $af_lead->status ] ); ?></span>
+								<?php if ( ! $af_closed ) : ?>
+									<div class="af-lead__actions">
+										<?php if ( ! $af_lead->accommodation_id && $af_my_properties ) : ?>
+											<select class="af-lead__prop" aria-label="<?php esc_attr_e( 'Inmueble', 'arriendo-facil' ); ?>">
+												<option value=""><?php esc_html_e( 'Inmueble…', 'arriendo-facil' ); ?></option>
+												<?php foreach ( $af_my_properties as $af_pid => $af_ptitle ) : ?>
+													<option value="<?php echo esc_attr( $af_pid ); ?>"><?php echo esc_html( $af_ptitle ); ?></option>
+												<?php endforeach; ?>
+											</select>
+										<?php endif; ?>
+										<?php if ( 'completed' !== $af_lead->status ) : ?>
+											<button type="button" class="button af-btn af-btn--primary af-btn--sm" data-lead-act="invite" data-channel="whatsapp"><?php echo esc_html( 'invited' === $af_lead->status ? __( 'Reenviar por WhatsApp', 'arriendo-facil' ) : __( 'Enviar formulario por WhatsApp', 'arriendo-facil' ) ); ?></button>
+											<button type="button" class="button af-btn af-btn--ghost af-btn--sm" data-lead-act="invite" data-channel="email"><?php esc_html_e( 'Por correo', 'arriendo-facil' ); ?></button>
+										<?php else : ?>
+											<a class="button af-btn af-btn--primary af-btn--sm" href="<?php echo esc_url( admin_url( 'admin.php?page=af-guests&view=profile&guest_id=' . (int) $af_lead->guest_id ) ); ?>"><?php esc_html_e( 'Revisar datos', 'arriendo-facil' ); ?></a>
+											<button type="button" class="button af-btn af-btn--ghost af-btn--sm" data-lead-act="status" data-status="verified"><?php esc_html_e( 'Marcar verificado', 'arriendo-facil' ); ?></button>
+										<?php endif; ?>
+										<button type="button" class="button af-btn af-btn--ghost af-btn--sm" data-lead-act="status" data-status="discarded"><?php esc_html_e( 'Descartar', 'arriendo-facil' ); ?></button>
+									</div>
+								<?php endif; ?>
+							</li>
+						<?php endforeach; ?>
+					</ul>
+				<?php endif; ?>
+			</div>
+		</details>
+	<?php endif; ?>
+
 	<div id="af-guest-form-card" class="card" style="max-width: 900px; margin: 16px 0; padding: 16px; display: none;">
 		<h2><?php esc_html_e( 'Nuevo inquilino', 'arriendo-facil' ); ?></h2>
 		<p class="af-modal__hint" style="margin:0 0 16px;">
@@ -752,6 +847,13 @@ if ( $is_owner ) {
 										<?php else : ?>
 											<span class="af-td-meta">—</span>
 										<?php endif; ?>
+										<?php if ( current_user_can( Arriendo_Facil_Tenancy::CAP ) && is_email( $guest->email ) ) : ?>
+											<button type="button" class="button af-btn af-btn--ghost af-btn--sm af-portal-access"
+												data-guest-id="<?php echo esc_attr( $guest->id ); ?>"
+												data-guest-name="<?php echo esc_attr( trim( $guest->first_name . ' ' . $guest->last_name ) ); ?>">
+												<?php esc_html_e( 'Enviar acceso', 'arriendo-facil' ); ?>
+											</button>
+										<?php endif; ?>
 										<?php if ( current_user_can( Arriendo_Facil_Tenancy::CAP ) ) : ?>
 											<button type="button" class="button af-btn af-btn--ghost af-btn--sm af-delete-guest"
 												data-guest-id="<?php echo esc_attr( $guest->id ); ?>"
@@ -938,6 +1040,107 @@ if ( $is_owner ) {
 			}
 			setStatus(verifyStatus, json.data.message, 'success');
 			setTimeout(function () { window.location.reload(); }, 900);
+		});
+	});
+
+	// ---- Pre-registros: copiar, regenerar enlace y enviar el formulario completo ----
+	const preregNonce = <?php echo wp_json_encode( wp_create_nonce( 'af_prereg_nonce' ) ); ?>;
+	const msg = {
+		copied: <?php echo wp_json_encode( __( 'Enlace copiado.', 'arriendo-facil' ) ); ?>,
+		fail: <?php echo wp_json_encode( __( 'La solicitud falló.', 'arriendo-facil' ) ); ?>,
+		regen: <?php echo wp_json_encode( __( 'El enlace actual dejará de funcionar. ¿Generar uno nuevo?', 'arriendo-facil' ) ); ?>,
+		discard: <?php echo wp_json_encode( __( '¿Descartar a este interesado?', 'arriendo-facil' ) ); ?>,
+		verify: <?php echo wp_json_encode( __( '¿Marcar los datos como verificados?', 'arriendo-facil' ) ); ?>,
+		pickProperty: <?php echo wp_json_encode( __( 'Elige primero el inmueble.', 'arriendo-facil' ) ); ?>,
+		access: <?php echo wp_json_encode( __( '¿Enviar su acceso al portal a', 'arriendo-facil' ) ); ?>
+	};
+
+	document.querySelectorAll('[data-af-copy]').forEach(function (btn) {
+		btn.addEventListener('click', function () {
+			const input = document.querySelector(btn.getAttribute('data-af-copy'));
+			if (!input) { return; }
+			input.select();
+			const done = function () { window.afNotify(msg.copied, 'success'); };
+			if (navigator.clipboard && navigator.clipboard.writeText) {
+				navigator.clipboard.writeText(input.value).then(done);
+			} else {
+				document.execCommand('copy');
+				done();
+			}
+		});
+	});
+
+	const regen = document.getElementById('af-prereg-regenerate');
+	if (regen) {
+		regen.addEventListener('click', function () {
+			if (!window.confirm(msg.regen)) { return; }
+			post({ action: 'af_prereg_regenerate_key', nonce: preregNonce }).then(function (json) {
+				if (!json || !json.success) { window.afNotify(msg.fail, 'error'); return; }
+				document.getElementById('af-prereg-url').value = json.data.url;
+				const share = document.getElementById('af-prereg-share');
+				if (share) { share.href = 'https://wa.me/?text=' + encodeURIComponent(<?php echo wp_json_encode( __( 'Déjame tus datos para tu pre-registro: ', 'arriendo-facil' ) ); ?> + json.data.url); }
+				window.afNotify(msg.copied, 'success');
+			}).catch(function () { window.afNotify(msg.fail, 'error'); });
+		});
+	}
+
+	document.querySelectorAll('[data-lead-act]').forEach(function (btn) {
+		btn.addEventListener('click', function () {
+			const row = btn.closest('[data-lead-id]');
+			const leadId = row.getAttribute('data-lead-id');
+			const act = btn.getAttribute('data-lead-act');
+
+			if (act === 'status') {
+				const status = btn.getAttribute('data-status');
+				if (!window.confirm(status === 'discarded' ? msg.discard : msg.verify)) { return; }
+				btn.disabled = true;
+				post({ action: 'af_prereg_status', nonce: preregNonce, lead_id: leadId, status: status }).then(function (json) {
+					if (!json || !json.success) {
+						btn.disabled = false;
+						window.afNotify((json && json.data && json.data.message) || msg.fail, 'error');
+						return;
+					}
+					window.location.reload();
+				}).catch(function () { btn.disabled = false; window.afNotify(msg.fail, 'error'); });
+				return;
+			}
+
+			const channel = btn.getAttribute('data-channel');
+			const prop = row.querySelector('.af-lead__prop');
+			if (prop && !prop.value) { window.afNotify(msg.pickProperty, 'error'); prop.focus(); return; }
+
+			// WhatsApp: se abre la pestaña al instante (el navegador no bloquea el clic) y luego se rellena.
+			const popup = channel === 'whatsapp' ? window.open('', '_blank') : null;
+			if (popup) { popup.opener = null; }
+
+			btn.disabled = true;
+			post({ action: 'af_prereg_invite', nonce: preregNonce, lead_id: leadId, channel: channel, accommodation_id: prop ? prop.value : '' }).then(function (json) {
+				if (!json || !json.success) {
+					if (popup) { popup.close(); }
+					btn.disabled = false;
+					window.afNotify((json && json.data && json.data.message) || msg.fail, 'error');
+					return;
+				}
+				if (popup && json.data.whatsapp_url) { popup.location.href = json.data.whatsapp_url; }
+				window.afNotify(json.data.message, 'success');
+				setTimeout(function () { window.location.reload(); }, 900);
+			}).catch(function () {
+				if (popup) { popup.close(); }
+				btn.disabled = false;
+				window.afNotify(msg.fail, 'error');
+			});
+		});
+	});
+
+	// ---- Acceso al portal del inquilino (código por correo) ----
+	document.querySelectorAll('.af-portal-access').forEach(function (btn) {
+		btn.addEventListener('click', function () {
+			if (!window.confirm(msg.access + ' ' + (btn.getAttribute('data-guest-name') || '') + '?')) { return; }
+			btn.disabled = true;
+			post({ action: 'af_send_tenant_portal_link', nonce: guestEditNonce, guest_id: btn.getAttribute('data-guest-id'), channel: 'email' }).then(function (json) {
+				btn.disabled = false;
+				window.afNotify((json && json.data && json.data.message) || msg.fail, json && json.success ? 'success' : 'error');
+			}).catch(function () { btn.disabled = false; window.afNotify(msg.fail, 'error'); });
 		});
 	});
 

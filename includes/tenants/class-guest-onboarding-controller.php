@@ -355,6 +355,14 @@ class Arriendo_Facil_Guest_Onboarding_Controller {
 		// Consume the token before responding (one-time use).
 		$this->onboarding->consume_guest_onboarding_token( isset( $resolved['token_id'] ) ? absint( $resolved['token_id'] ) : 0 );
 
+		/**
+		 * El inquilino terminó su formulario completo (el gestor aún debe revisarlo).
+		 *
+		 * @param int $guest_id         Inquilino.
+		 * @param int $accommodation_id Inmueble.
+		 */
+		do_action( 'af_guest_profile_completed', $guest_id, $accommodation_id );
+
 		$contract_info = array(
 			'generated' => false,
 			'status'    => 'processed_with_errors',

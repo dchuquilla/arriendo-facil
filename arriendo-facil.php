@@ -88,6 +88,8 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-owner-register-api.php'
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-guest.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-tenant-signup.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-guest-onboarding.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-tenant-access.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-tenant-prereg.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-guest-onboarding-controller.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-guest-admin-controller.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-property-admin-registration.php';
@@ -303,6 +305,8 @@ function arriendo_facil_init() {
 		'Arriendo_Facil_Owner_Contact',
 		'Arriendo_Facil_Guest',
 		'Arriendo_Facil_Tenant_Signup',
+		'Arriendo_Facil_Tenant_Access',
+		'Arriendo_Facil_Tenant_Prereg',
 		'Arriendo_Facil_Guest_Onboarding_Controller',
 		'Arriendo_Facil_Guest_Admin_Controller',
 		'Arriendo_Facil_Property_Admin_Registration',

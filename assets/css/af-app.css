@@ -2123,3 +2123,184 @@ html.af-gsap body.af-custom-shell .af-modal .af-modal__backdrop {
 		font-weight: 700;
 	}
 }
+
+/* ── Inquilinos: pre-registros y acceso al portal ───────────────────────── */
+
+.af-prereg {
+	margin: 0 0 16px;
+	border: 1px solid var(--af-border);
+	border-radius: 16px;
+	background: var(--af-surface);
+}
+
+.af-prereg__head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	min-height: 56px;
+	padding: 14px 18px;
+	list-style: none;
+	cursor: pointer;
+}
+
+.af-prereg__head::-webkit-details-marker {
+	display: none;
+}
+
+.af-prereg__head::after {
+	content: "";
+	flex-shrink: 0;
+	width: 9px;
+	height: 9px;
+	margin-left: 4px;
+	border-right: 2px solid var(--af-text-muted);
+	border-bottom: 2px solid var(--af-text-muted);
+	transform: rotate(45deg);
+	transition: transform 0.2s ease;
+}
+
+.af-prereg[open] > .af-prereg__head::after {
+	transform: rotate(-135deg);
+}
+
+.af-prereg__titles {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.af-prereg__titles small {
+	color: var(--af-text-muted);
+}
+
+.af-prereg__body {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+	padding: 0 18px 18px;
+}
+
+.af-prereg__links {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 14px;
+}
+
+.af-prereg__link {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	min-width: 0;
+	padding: 12px;
+	border-radius: 12px;
+	background: var(--af-raised);
+}
+
+.af-prereg__link label {
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: 0.03em;
+	text-transform: uppercase;
+	color: var(--af-text-muted);
+}
+
+.af-prereg__link small {
+	color: var(--af-text-muted);
+}
+
+.af-prereg__copy {
+	display: flex;
+	gap: 6px;
+}
+
+.af-prereg__copy input {
+	flex: 1;
+	min-width: 0;
+	min-height: 38px;
+	font-size: 13px;
+}
+
+.af-prereg__linkbtn {
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--af-accent);
+	font: inherit;
+	font-weight: 700;
+	text-decoration: underline;
+	cursor: pointer;
+}
+
+.af-prereg__empty {
+	margin: 0;
+	padding: 14px;
+	border-radius: 12px;
+	background: var(--af-raised);
+	color: var(--af-text-muted);
+}
+
+.af-lead-list {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.af-lead {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	gap: 10px 12px;
+	align-items: start;
+	padding: 14px;
+	border: 1px solid var(--af-border);
+	border-radius: 14px;
+}
+
+.af-lead__main {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.af-lead__main small {
+	color: var(--af-text-muted);
+	overflow-wrap: anywhere;
+}
+
+.af-lead__note {
+	font-style: italic;
+}
+
+.af-lead__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	grid-column: 1 / -1;
+}
+
+.af-lead__prop {
+	min-height: 36px;
+	max-width: 100%;
+}
+
+@media (max-width: 782px) {
+	.af-prereg__links {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.af-prereg__titles small {
+		display: none;
+	}
+
+	.af-lead__actions .button,
+	.af-lead__actions select {
+		flex: 1 1 100%;
+		min-height: 44px;
+		justify-content: center;
+	}
+}

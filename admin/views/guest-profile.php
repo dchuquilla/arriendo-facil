@@ -263,7 +263,8 @@ if ( $can_manage ) {
 			<div class="af-kpi__hint"><?php esc_html_e( 'Puntualidad, cuidado, convivencia y comunicación', 'arriendo-facil' ); ?></div>
 <?php if ( $can_manage ) : ?>
 <script>
-(function () {
+// El script va antes del formulario y de la tabla de documentos: se espera a que la página esté lista.
+document.addEventListener('DOMContentLoaded', function () {
 	const ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
 	const docNonce = <?php echo wp_json_encode( $profile_doc_nonce ); ?>;
 	const editNonce = <?php echo wp_json_encode( $profile_edit_nonce ); ?>;
@@ -466,7 +467,7 @@ if ( $can_manage ) {
 			});
 		}
 	});
-})();
+});
 </script>
 <?php endif; ?>
 

@@ -440,7 +440,25 @@
 		run();
 	}
 
+	/*
+	 * Pantallas donde quien administra escribe datos de OTRA persona (inquilinos, contactos, visitas…).
+	 * El navegador no debe rellenarlas con los datos de quien administra: se desactiva el autocompletado
+	 * en los campos personales que no lo declaren. Los datos propios (facturación, perfil) no se tocan.
+	 */
+	function initNoAutofill() {
+		var page = (new URLSearchParams(window.location.search).get('page') || '');
+		if (!/^af-(guests|leases|maintenance|calendar|property-admins|cleaning-requests|buildings|owner-contacts|reviews|catalog)$/.test(page)) { return; }
+
+		$$('.af-shell form, .af-modal').forEach(function (scope) {
+			if (scope.tagName === 'FORM' && !scope.hasAttribute('autocomplete')) { scope.setAttribute('autocomplete', 'off'); }
+			$$('input[type="text"], input[type="email"], input[type="tel"], input:not([type])', scope).forEach(function (input) {
+				if (!input.hasAttribute('autocomplete')) { input.setAttribute('autocomplete', 'off'); }
+			});
+		});
+	}
+
 	function init() {
+		initNoAutofill();
 		initSidebar();
 		initUserMenu();
 		initSheets();

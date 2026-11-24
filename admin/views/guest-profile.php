@@ -333,6 +333,23 @@ if ( $can_manage ) {
 	}
 
 	// ---- Guardar correcciones de la ficha ----
+	// El navegador puede autocompletar o restaurar estos campos con datos de quien administra (p. ej. tras
+	// recargar al verificar documentos). Los valores de la ficha son los del servidor: se reponen siempre.
+	if (editForm) {
+		const restoreServerValues = function () {
+			editForm.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"]').forEach(function (input) {
+				if (!input.dataset.touched && input.value !== input.defaultValue) { input.value = input.defaultValue; }
+			});
+		};
+		// Solo lo que escribe la persona (evento de teclado/pegado), no el autocompletado.
+		editForm.addEventListener('keydown', function (e) { if (e.target.dataset) { e.target.dataset.touched = '1'; } });
+		editForm.addEventListener('paste', function (e) { if (e.target.dataset) { e.target.dataset.touched = '1'; } });
+		restoreServerValues();
+		window.setTimeout(restoreServerValues, 300);
+		window.setTimeout(restoreServerValues, 1200);
+		window.addEventListener('pageshow', restoreServerValues);
+	}
+
 	if (editForm) {
 		editForm.addEventListener('submit', function (event) {
 			event.preventDefault();
@@ -492,27 +509,27 @@ if ( $can_manage ) {
 		</header>
 
 		<?php if ( $can_manage ) : ?>
-			<form id="af-profile-edit-form">
+			<form id="af-profile-edit-form" autocomplete="off">
 				<p class="af-modal__status" id="af-profile-edit-status"></p>
 				<table class="form-table" role="presentation">
 					<tr>
 						<th scope="row"><label for="af-profile-first-name"><?php esc_html_e( 'Nombre', 'arriendo-facil' ); ?> *</label></th>
-						<td><input type="text" id="af-profile-first-name" name="first_name" class="regular-text" maxlength="100" required value="<?php echo esc_attr( (string) $guest->first_name ); ?>" /></td>
+						<td><input type="text" id="af-profile-first-name" autocomplete="off" name="first_name" class="regular-text" maxlength="100" required value="<?php echo esc_attr( (string) $guest->first_name ); ?>" /></td>
 					</tr>
 					<tr>
 						<th scope="row"><label for="af-profile-last-name"><?php esc_html_e( 'Apellido', 'arriendo-facil' ); ?></label></th>
-						<td><input type="text" id="af-profile-last-name" name="last_name" class="regular-text" maxlength="100" value="<?php echo esc_attr( (string) $guest->last_name ); ?>" /></td>
+						<td><input type="text" id="af-profile-last-name" autocomplete="off" name="last_name" class="regular-text" maxlength="100" value="<?php echo esc_attr( (string) $guest->last_name ); ?>" /></td>
 					</tr>
 					<tr>
 						<th scope="row"><label for="af-profile-email"><?php esc_html_e( 'Correo', 'arriendo-facil' ); ?> *</label></th>
 						<td>
-							<input type="email" id="af-profile-email" name="email" class="regular-text" required value="<?php echo esc_attr( (string) $guest->email ); ?>" />
+							<input type="email" id="af-profile-email" autocomplete="off" name="email" class="regular-text" required value="<?php echo esc_attr( (string) $guest->email ); ?>" />
 							<p class="description"><?php esc_html_e( 'Debe ser único. Identifica al inquilino en el historial y en los contratos.', 'arriendo-facil' ); ?></p>
 						</td>
 					</tr>
 					<tr>
 						<th scope="row"><label for="af-profile-phone"><?php esc_html_e( 'Teléfono', 'arriendo-facil' ); ?></label></th>
-						<td><input type="text" id="af-profile-phone" name="phone" class="regular-text" inputmode="numeric" pattern="^[0-9]{1,10}$" maxlength="10" value="<?php echo esc_attr( (string) $guest->phone ); ?>" /></td>
+						<td><input type="text" id="af-profile-phone" autocomplete="off" name="phone" class="regular-text" inputmode="numeric" pattern="^[0-9]{1,10}$" maxlength="10" value="<?php echo esc_attr( (string) $guest->phone ); ?>" /></td>
 					</tr>
 					<tr>
 						<th scope="row"><label for="af-profile-id-type"><?php esc_html_e( 'Tipo de identificación', 'arriendo-facil' ); ?></label></th>

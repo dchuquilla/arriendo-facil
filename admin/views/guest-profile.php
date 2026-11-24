@@ -278,7 +278,13 @@ document.addEventListener('DOMContentLoaded', function () {
 		setStatusTo(status, message, variant);
 	}
 
+	// Éxito y error salen como toast; los avisos neutros ("Guardando…") quedan junto al botón.
 	function setStatusTo(target, message, variant) {
+		if (variant === 'success' || variant === 'error') {
+			if (target) { target.textContent = ''; target.className = 'af-modal__status'; }
+			if (typeof window.afNotify === 'function') { window.afNotify(message, variant); } else if (target) { target.textContent = message; target.className = 'af-modal__status is-' + variant; }
+			return;
+		}
 		if (!target) { return; }
 		target.textContent = message;
 		target.className = 'af-modal__status' + (variant ? ' is-' + variant : '');
@@ -439,7 +445,7 @@ document.addEventListener('DOMContentLoaded', function () {
 		{
 			const failMsg = <?php echo wp_json_encode( __( 'No se pudo abrir el documento.', 'arriendo-facil' ) ); ?>;
 			function notify(message) {
-				if (typeof window.afNotify === 'function') { window.afNotify(message); } else { window.alert(message); }
+				if (typeof window.afNotify === 'function') { window.afNotify(message, 'error'); } else { window.alert(message); }
 			}
 
 			// La pestaña se abre ya, dentro del clic: tras una petición asíncrona el navegador bloquearía el popup.

@@ -524,24 +524,24 @@ get_header();
 				<div><dt><?php esc_html_e( 'Nombre', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( $af_name ); ?></dd></div>
 				<div><dt><?php esc_html_e( 'Correo', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( $af_guest->email ); ?></dd></div>
 				<div><dt><?php esc_html_e( 'Identificación', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( $af_idmask ); ?></dd></div>
+				<?php if ( ! empty( $af_guest->nationality ) ) : ?>
+					<div><dt><?php esc_html_e( 'Nacionalidad', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( $af_guest->nationality ); ?></dd></div>
+				<?php endif; ?>
+				<?php if ( ! empty( $af_guest->birth_city ) ) : ?>
+					<div><dt><?php esc_html_e( 'Ciudad de nacimiento', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( $af_guest->birth_city ); ?></dd></div>
+				<?php endif; ?>
+				<?php
+				$af_income_opts = Arriendo_Facil_Guest::get_income_range_options();
+				if ( ! empty( $af_guest->income_range ) && isset( $af_income_opts[ $af_guest->income_range ] ) ) :
+					?>
+					<div><dt><?php esc_html_e( 'Rango de ingresos', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( $af_income_opts[ $af_guest->income_range ] ); ?></dd></div>
+				<?php endif; ?>
 			</dl>
 
 			<form class="af-tp-form" data-tp-form="af_tpa_profile_save" novalidate>
 				<p class="af-tp-alert" role="alert" data-tp-msg hidden></p>
-				<div class="af-tp-row">
-					<div>
-						<label class="af-tp-label" for="af-tp-phone"><?php esc_html_e( 'Teléfono', 'arriendo-facil' ); ?></label>
-						<input class="af-tp-input" type="tel" id="af-tp-phone" name="phone" inputmode="tel" autocomplete="tel" maxlength="20" value="<?php echo esc_attr( (string) $af_guest->phone ); ?>" required />
-					</div>
-					<div>
-						<label class="af-tp-label" for="af-tp-occ"><?php esc_html_e( 'Ocupación', 'arriendo-facil' ); ?></label>
-						<input class="af-tp-input" type="text" id="af-tp-occ" name="occupation" maxlength="120" value="<?php echo esc_attr( (string) ( $af_guest->occupation ?? '' ) ); ?>" />
-					</div>
-				</div>
-				<label class="af-tp-label" for="af-tp-addr"><?php esc_html_e( 'Dirección', 'arriendo-facil' ); ?></label>
-				<input class="af-tp-input" type="text" id="af-tp-addr" name="home_address" maxlength="255" autocomplete="street-address" value="<?php echo esc_attr( (string) ( $af_guest->home_address ?? '' ) ); ?>" />
-				<label class="af-tp-label" for="af-tp-emerg"><?php esc_html_e( 'Contacto de emergencia (nombre y teléfono)', 'arriendo-facil' ); ?></label>
-				<input class="af-tp-input" type="text" id="af-tp-emerg" name="emergency_contact" maxlength="190" value="<?php echo esc_attr( (string) ( $af_guest->emergency_contact ?? '' ) ); ?>" />
+				<label class="af-tp-label" for="af-tp-phone"><?php esc_html_e( 'Teléfono', 'arriendo-facil' ); ?></label>
+				<input class="af-tp-input" type="tel" id="af-tp-phone" name="phone" inputmode="tel" autocomplete="tel" maxlength="20" value="<?php echo esc_attr( (string) $af_guest->phone ); ?>" required />
 				<button class="af-tp-btn af-tp-btn--primary" type="submit" data-tp-submit><?php esc_html_e( 'Guardar cambios', 'arriendo-facil' ); ?></button>
 			</form>
 

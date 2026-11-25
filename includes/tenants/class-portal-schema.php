@@ -178,9 +178,6 @@ class Arriendo_Facil_Portal_Schema {
 		self::add_columns(
 			$wpdb->prefix . 'af_guests',
 			array(
-				'emergency_contact' => 'VARCHAR(190) DEFAULT NULL',
-				'home_address'      => 'VARCHAR(255) DEFAULT NULL',
-				'occupation'        => 'VARCHAR(120) DEFAULT NULL',
 				'profile_updated_at' => 'DATETIME DEFAULT NULL',
 				'profile_updated_review' => 'TINYINT UNSIGNED NOT NULL DEFAULT 0',
 			)

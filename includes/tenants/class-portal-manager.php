@@ -841,7 +841,7 @@ class Arriendo_Facil_Portal_Manager {
 								b.setAttribute('aria-pressed', on ? 'true' : 'false');
 							});
 						}
-						(window.afNotify || window.alert)((j && j.data && j.data.message) || '');
+						(window.afNotify || window.alert)((j && j.data && j.data.message) || '', j && j.success ? 'success' : 'error');
 					});
 					return;
 				}
@@ -901,9 +901,6 @@ class Arriendo_Facil_Portal_Manager {
 		);
 		$field_labels = array(
 			'phone'             => __( 'teléfono', 'arriendo-facil' ),
-			'emergency_contact' => __( 'contacto de emergencia', 'arriendo-facil' ),
-			'home_address'      => __( 'dirección', 'arriendo-facil' ),
-			'occupation'        => __( 'ocupación', 'arriendo-facil' ),
 			'name'              => __( 'nombre', 'arriendo-facil' ),
 			'id_number'         => __( 'identificación', 'arriendo-facil' ),
 		);

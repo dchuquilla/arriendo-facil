@@ -52,16 +52,13 @@ class Arriendo_Facil_Portal_Profile {
 	}
 
 	/**
-	 * Campos que el inquilino puede editar directamente y su largo máximo.
+	 * Campos que el inquilino puede editar directamente (los mismos que pide el registro interno; solo el teléfono) y su largo máximo.
 	 *
 	 * @return array<string,int>
 	 */
 	public static function editable_fields() {
 		return array(
 			'phone'             => 20,
-			'emergency_contact' => 190,
-			'home_address'      => 255,
-			'occupation'        => 120,
 		);
 	}
 

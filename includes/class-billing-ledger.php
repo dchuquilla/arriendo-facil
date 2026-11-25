@@ -430,11 +430,19 @@ class Arriendo_Facil_Billing_Ledger {
 			'created_by'       => get_current_user_id(),
 		);
 
+		if ( isset( $data['payer'] ) && in_array( $data['payer'], array( 'owner', 'tenant' ), true ) ) {
+			$row['payer'] = $data['payer'];
+			$row_format[] = '%s';
+		}
+
 		$existing = self::get_service_schedule( $unit_id, $accommodation_id, $service );
 
 		if ( $existing ) {
 			unset( $row['created_by'] );
 			$row_format = array( '%d', '%d', '%s', '%s', '%d', '%f', '%s', '%s', '%d' );
+			if ( isset( $row['payer'] ) ) {
+				$row_format[] = '%s';
+			}
 
 			$updated = $wpdb->update( self::schedules_table(), $row, array( 'id' => (int) $existing->id ), $row_format, array( '%d' ) );
 
@@ -605,18 +613,26 @@ class Arriendo_Facil_Billing_Ledger {
 			return new WP_Error( 'af_bill_table_missing', __( 'No se pudo guardar el pago.', 'arriendo-facil' ) );
 		}
 
-		$saved = $wpdb->replace(
-			self::bill_payments_table(),
-			array(
-				'schedule_id' => $schedule_id,
-				'period'      => $period,
-				'paid_on'     => $paid_on,
-				'amount'      => $amount,
-				'reference'   => '' !== $reference ? $reference : null,
-				'recorded_by' => get_current_user_id(),
-			),
-			array( '%d', '%s', '%s', '%f', '%s', '%d' )
+		$fields = array(
+			'paid_on'      => $paid_on,
+			'amount'       => $amount,
+			'reference'    => '' !== $reference ? $reference : null,
+			'recorded_by'  => get_current_user_id(),
+			'status'       => 'approved',
+			'reviewed_by'  => get_current_user_id(),
+			'reviewed_at'  => gmdate( 'Y-m-d H:i:s' ),
 		);
+
+		// UPDATE y no REPLACE: el comprobante que subió el inquilino cuelga del id de esta fila.
+		$existing_id = (int) $wpdb->get_var(
+			$wpdb->prepare( 'SELECT id FROM ' . self::bill_payments_table() . ' WHERE schedule_id = %d AND period = %s', $schedule_id, $period ) // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		);
+
+		if ( $existing_id ) {
+			$saved = $wpdb->update( self::bill_payments_table(), $fields, array( 'id' => $existing_id ) );
+		} else {
+			$saved = $wpdb->insert( self::bill_payments_table(), array_merge( $fields, array( 'schedule_id' => $schedule_id, 'period' => $period ) ) );
+		}
 
 		if ( false === $saved ) {
 			return new WP_Error( 'af_bill_save_failed', __( 'No se pudo guardar el pago.', 'arriendo-facil' ) );
@@ -690,6 +706,13 @@ class Arriendo_Facil_Billing_Ledger {
 		$no_lease = 0;
 
 		foreach ( $schedules as $schedule ) {
+			// El inquilino paga este servicio directo al proveedor, o entrega el dinero al propietario
+			// (que paga) y lo comprueba desde su portal: generarle además un cobro lo cobraría dos veces.
+			if ( isset( $schedule->payer ) && in_array( $schedule->payer, array( 'tenant', 'via_owner' ), true ) ) {
+				++$skipped;
+				continue;
+			}
+
 			$unit_id          = (int) $schedule->unit_id;
 			$accommodation_id = (int) $schedule->accommodation_id;
 			$service          = (string) $schedule->service;
@@ -920,11 +943,16 @@ class Arriendo_Facil_Billing_Ledger {
 		$leases_table   = $wpdb->prefix . 'af_leases';
 		$units_table    = Arriendo_Facil_Property_Structure::units_table();
 
+		// Columnas del portal del inquilino: si la migración aún no corrió, todo sigue como antes.
+		$has_portal    = class_exists( 'Arriendo_Facil_Portal_Schema' ) && Arriendo_Facil_Portal_Schema::column_exists( self::schedules_table(), 'payer' );
+		$payer_select  = $has_portal ? 's.payer' : "'owner' AS payer";
+		$bill_approved = $has_portal && Arriendo_Facil_Portal_Schema::column_exists( self::bill_payments_table(), 'status' ) ? " AND bp.status = 'approved'" : '';
+
 		$bill_select = 'NULL AS bill_id, NULL AS bill_paid_on, NULL AS bill_amount, NULL AS bill_reference';
 		$bill_join   = '';
 		if ( self::ensure_bill_payments_table() ) {
 			$bill_select = 'bp.id AS bill_id, bp.paid_on AS bill_paid_on, bp.amount AS bill_amount, bp.reference AS bill_reference';
-			$bill_join   = ' LEFT JOIN ' . self::bill_payments_table() . ' bp ON bp.schedule_id = s.id AND bp.period = %s';
+			$bill_join   = ' LEFT JOIN ' . self::bill_payments_table() . ' bp ON bp.schedule_id = s.id AND bp.period = %s' . $bill_approved;
 			$params[]    = $period;
 		}
 
@@ -940,7 +968,7 @@ class Arriendo_Facil_Billing_Ledger {
 			  ) )";
 
 		$sql = $wpdb->prepare(
-			"SELECT s.id AS schedule_id, s.unit_id, s.accommodation_id, s.service, s.service_label, s.due_day,
+			"SELECT s.id AS schedule_id, s.unit_id, s.accommodation_id, s.service, s.service_label, s.due_day, {$payer_select},
 			        s.flat_amount, s.amount_mode, s.is_active, s.notes, s.created_at AS schedule_created_at,
 			        COALESCE( NULLIF( s.accommodation_id, 0 ), u.accommodation_id ) AS resolved_accommodation_id,
 			        l.id AS lease_id, l.guest_id,
@@ -1028,6 +1056,7 @@ class Arriendo_Facil_Billing_Ledger {
 				'service'          => (string) $row->service,
 				'service_label'    => self::service_label( $row->service, isset( $row->service_label ) ? $row->service_label : '' ),
 				'due_day'          => (int) $row->due_day,
+				'payer'            => isset( $row->payer ) && 'tenant' === $row->payer ? 'tenant' : 'owner',
 				'flat_amount'      => (float) $row->flat_amount,
 				'amount_mode'      => (string) $row->amount_mode,
 				'notes'            => null === $row->notes ? '' : (string) $row->notes,

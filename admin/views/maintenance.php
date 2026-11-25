@@ -600,6 +600,8 @@ $active_providers = array_values(
 												</div>
 											</dl>
 
+											<?php Arriendo_Facil_Portal_Manager::render_incident_panel( $request ); ?>
+
 											<?php if ( ! empty( $request->notes ) ) : ?>
 												<details class="af-maint-card__notes">
 													<summary><?php esc_html_e( 'Notas', 'arriendo-facil' ); ?></summary>

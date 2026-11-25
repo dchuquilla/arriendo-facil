@@ -515,6 +515,14 @@ class Arriendo_Facil_Maintenance {
 		$data   = array( 'status' => $status );
 		$format = array( '%s' );
 
+		// Un incidente del portal no se cierra sin dejar por escrito quién responde por él.
+		if ( 'completed' === $status ) {
+			$pending = $wpdb->get_row( $wpdb->prepare( 'SELECT reported_by, responsibility FROM ' . self::table() . ' WHERE id = %d', $request_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( $pending && 'inquilino' === $pending->reported_by && 'por_definir' === $pending->responsibility ) {
+				return new WP_Error( 'af_maintenance_responsibility', __( 'Antes de cerrar, define quién responde por este incidente (propietario o inquilino) en "Portal del inquilino".', 'arriendo-facil' ) );
+			}
+		}
+
 		if ( 'completed' === $status ) {
 			$data['completed_date'] = gmdate( 'Y-m-d' );
 			$format[]               = '%s';
@@ -538,7 +546,8 @@ class Arriendo_Facil_Maintenance {
 		// On completion, any final cost is automatically charged against the
 		// lease garantia (deposit.service_deduction) so it shows up in the deposit
 		// settlement and the owner report.
-		if ( 'completed' === $status && (float) ( $request->cost ?? 0 ) > 0 && (int) ( $request->lease_id ?? 0 ) > 0 ) {
+		// Lo que repara el propietario no se descuenta de la garantía del inquilino.
+		if ( 'completed' === $status && (float) ( $request->cost ?? 0 ) > 0 && (int) ( $request->lease_id ?? 0 ) > 0 && 'owner' !== ( $request->responsibility ?? '' ) ) {
 			Arriendo_Facil_Maintenance::deduct_from_deposit( (int) $request->lease_id, round( (float) $request->cost, 2 ) );
 		}
 

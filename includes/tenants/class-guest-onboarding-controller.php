@@ -262,6 +262,18 @@ class Arriendo_Facil_Guest_Onboarding_Controller {
 			wp_send_json_error( array( 'message' => __( 'Tu ficha ya tiene una identificación registrada distinta. Comunícate con tu administrador para corregirla.', 'arriendo-facil' ) ), 409 );
 		}
 
+		// Ficha en revisión o aprobada: nombre e identificación solo los cambia el administrador.
+		if ( Arriendo_Facil_Document_Verification::identity_locked( $guest_id ) ) {
+			$current_name = trim( (string) $guest->first_name . ' ' . (string) $guest->last_name );
+			if ( '' !== $current_name && 0 !== strcasecmp( AF_Text_Normalizer::proper_name( $name_input ), AF_Text_Normalizer::proper_name( $current_name ) ) ) {
+				wp_send_json_error( array( 'message' => __( 'Tu ficha ya está en revisión o aprobada: el nombre no se puede cambiar desde aquí. Pide la corrección a tu administrador.', 'arriendo-facil' ) ), 409 );
+			}
+			$locked_id = AF_Text_Normalizer::document( $id_type, (string) $guest->id_number );
+			if ( '' !== $locked_id && $locked_id !== $id_number ) {
+				wp_send_json_error( array( 'message' => __( 'Tu identificación ya está en revisión o aprobada. Pide la corrección a tu administrador.', 'arriendo-facil' ) ), 409 );
+			}
+		}
+
 		if ( '' === $nationality || ! array_key_exists( $nationality, Arriendo_Facil_Guest::get_nationality_options() ) ) {
 			wp_send_json_error( array( 'message' => __( 'Selecciona tu nacionalidad de la lista.', 'arriendo-facil' ) ), 400 );
 		}

@@ -52,7 +52,7 @@ class Arriendo_Facil_Account_Deletion {
 	}
 
 	public static function is_premium( $user_id ) {
-		return 'pro' === Arriendo_Facil_Plans::get_plan( absint( $user_id ) );
+		return 'empresarial' === Arriendo_Facil_Plans::get_plan( absint( $user_id ) );
 	}
 
 	/** Fecha (timestamp) desde la cual se permite procesar o borrar la cuenta. */
@@ -650,6 +650,24 @@ class Arriendo_Facil_Account_Deletion {
 			}
 		}
 		self::delete_in( $p . 'af_guest_documents', 'guest_id', $guest_ids );
+		// Evidencia del portal del inquilino (comprobantes, fotos) y su bitácora.
+		if ( $guest_ids && self::table_has( $p . 'af_evidence', 'guest_id' ) ) {
+			$stored_ev = (array) $wpdb->get_results( "SELECT storage, object_key FROM {$p}af_evidence WHERE guest_id IN (" . implode( ',', array_map( 'absint', $guest_ids ) ) . ')' ); // phpcs:ignore WordPress.DB.PreparedSQL
+			foreach ( $stored_ev as $ev ) {
+				if ( 'r2' === $ev->storage && class_exists( 'Arriendo_Facil_Private_Storage' ) ) {
+					Arriendo_Facil_Private_Storage::delete( (string) $ev->object_key );
+				} elseif ( class_exists( 'Arriendo_Facil_Local_Private_Storage' ) && Arriendo_Facil_Local_Private_Storage::STORAGE_ID === $ev->storage ) {
+					Arriendo_Facil_Local_Private_Storage::delete( (string) $ev->object_key );
+				}
+			}
+			self::delete_in( $p . 'af_evidence', 'guest_id', $guest_ids );
+		}
+		if ( $guest_ids && self::table_has( $p . 'af_portal_events', 'guest_id' ) ) {
+			self::delete_in( $p . 'af_portal_events', 'guest_id', $guest_ids );
+		}
+		if ( $guest_ids && self::table_has( $p . 'af_service_collections', 'guest_id' ) ) {
+			self::delete_in( $p . 'af_service_collections', 'guest_id', $guest_ids );
+		}
 		self::delete_in( $p . 'af_otas_sync_log', 'accommodation_id', $acc_ids );
 		self::delete_in( $p . 'af_leases', 'id', $lease_ids );
 		self::delete_in( $p . 'af_units', 'id', $unit_ids );

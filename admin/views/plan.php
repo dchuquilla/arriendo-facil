@@ -171,18 +171,18 @@ $plan_lines = static function ( array $definition ) use ( $feature_lbls ) {
 		<?php foreach ( $definitions as $key => $definition ) : ?>
 			<?php
 			$is_current = $key === $current;
-			$is_pro     = 'pro' === $key;
+			$is_pro     = 'empresarial' === $key;
 			$is_pending = $request && $request['plan'] === $key;
 			$rank       = (int) array_search( $key, $keys, true );
 			$is_upgrade = $rank > $current_rank;
 			?>
-			<article class="af-plan-card<?php echo $is_current ? ' is-current' : ''; ?><?php echo $is_pro ? ' is-pro' : ''; ?><?php echo $target === $key ? ' is-target' : ''; ?>" data-plan="<?php echo esc_attr( $key ); ?>">
+			<article class="af-plan-card<?php echo $is_current ? ' is-current' : ''; ?><?php echo $is_pro ? ' is-empresarial' : ''; ?><?php echo $target === $key ? ' is-target' : ''; ?>" data-plan="<?php echo esc_attr( $key ); ?>">
 				<?php if ( $is_pro ) : ?>
 					<span class="af-plan-card__crown"><?php echo af_lucide( 'crown', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?><?php esc_html_e( 'Recomendado', 'arriendo-facil' ); ?></span>
 				<?php endif; ?>
 				<h3><?php echo esc_html( sprintf( /* translators: %s: plan name */ __( 'Plan %s', 'arriendo-facil' ), $definition['label'] ) ); ?></h3>
 				<p class="af-plan-card__tagline"><?php echo esc_html( $definition['tagline'] ); ?></p>
-				<p class="af-plan-card__price"><b>$<?php echo esc_html( number_format_i18n( (float) $definition['price'], 0 ) ); ?></b> <span><?php esc_html_e( '/ mes', 'arriendo-facil' ); ?></span></p>
+				<p class="af-plan-card__price"><b>$<?php echo esc_html( number_format_i18n( (float) $definition['price'], fmod( (float) $definition['price'], 1 ) !== 0.0 ? 2 : 0 ) ); ?></b> <span><?php echo esc_html( $is_pro ? __( '/ propiedad / mes', 'arriendo-facil' ) : __( '/ mes', 'arriendo-facil' ) ); ?></span></p>
 
 				<ul class="af-plan-card__list">
 					<?php foreach ( $plan_lines( $definition ) as $line ) : ?>
@@ -222,7 +222,7 @@ $plan_lines = static function ( array $definition ) use ( $feature_lbls ) {
 			<li><?php esc_html_e( 'Los planes son mensuales y vencen siempre el mismo día de cada mes. El precio del plan es fijo.', 'arriendo-facil' ); ?></li>
 			<li><?php esc_html_e( 'El pago se hace fuera de la plataforma: envía tu comprobante por WhatsApp y activamos o renovamos tu plan de forma manual.', 'arriendo-facil' ); ?></li>
 			<li><?php esc_html_e( 'Te avisamos en la plataforma y por correo 7, 3 y 1 días antes, y el día del vencimiento. Después tienes 3 días de gracia.', 'arriendo-facil' ); ?></li>
-			<li><?php esc_html_e( 'Si no se renueva al terminar la gracia, tu cuenta pasa al plan Free. No borramos información: se administran tus 4 primeros inmuebles y el resto queda oculto hasta que renueves o contrates un plan con capacidad suficiente.', 'arriendo-facil' ); ?></li>
+			<li><?php esc_html_e( 'Si no se renueva al terminar la gracia, tu cuenta pasa al plan Free. No borramos información: se administra tu primer inmueble y el resto queda oculto hasta que renueves o contrates un plan con capacidad suficiente.', 'arriendo-facil' ); ?></li>
 			<li><?php esc_html_e( 'Puedes cancelar cuando quieras: vuelves a Free de inmediato y conservas tus datos. Aplican los Términos y Condiciones del servicio.', 'arriendo-facil' ); ?></li>
 		</ul>
 	</details>

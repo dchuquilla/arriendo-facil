@@ -338,7 +338,7 @@ class Arriendo_Facil_Plan_Billing {
 				$title = __( 'Tu plan volvió a Free', 'arriendo-facil' );
 				$text  = sprintf(
 					/* translators: %s: previous plan */
-					__( 'No recibimos la renovación de tu plan %s. Conservamos todos tus datos: se administran tus 4 primeros inmuebles y el resto queda oculto hasta que renueves o contrates un plan con capacidad suficiente.', 'arriendo-facil' ),
+					__( 'No recibimos la renovación de tu plan %s. Conservamos todos tus datos: se administra tu primer inmueble y el resto queda oculto hasta que renueves o contrates un plan con capacidad suficiente.', 'arriendo-facil' ),
 					$defs[ $previous ]['label']
 				);
 				$tone  = 'danger';
@@ -566,7 +566,7 @@ class Arriendo_Facil_Plan_Billing {
 			$subject = __( '[Arriendo Fácil] Tu plan volvió a Free', 'arriendo-facil' );
 			$body    = sprintf(
 				/* translators: 1: name, 2: previous plan, 3: url */
-				__( "Hola %1\$s,\n\nNo recibimos la renovación de tu plan %2\$s, por lo que tu cuenta pasó al plan Free.\n\nNo borramos nada: se administran tus 4 primeros inmuebles y el resto queda oculto, con todos sus datos, hasta que renueves o contrates un plan con capacidad suficiente.\n\nPuedes renovar desde: %3\$s", 'arriendo-facil' ),
+				__( "Hola %1\$s,\n\nNo recibimos la renovación de tu plan %2\$s, por lo que tu cuenta pasó al plan Free.\n\nNo borramos nada: se administra tu primer inmueble y el resto queda oculto, con todos sus datos, hasta que renueves o contrates un plan con capacidad suficiente.\n\nPuedes renovar desde: %3\$s", 'arriendo-facil' ),
 				$name,
 				$prev,
 				$url

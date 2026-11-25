@@ -211,6 +211,8 @@ if ( $can_manage ) {
 	);
 	?>
 
+	<?php Arriendo_Facil_Portal_Manager::render_profile_notice( $guest_id ); ?>
+
 	<div class="af-kpi-grid" role="list">
 		<article class="af-kpi af-kpi--accent af-score-card" role="listitem">
 			<div class="af-kpi__head"><span class="af-kpi__label"><?php esc_html_e( 'Score de pago real', 'arriendo-facil' ); ?></span></div>

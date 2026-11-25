@@ -89,6 +89,14 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/class-guest.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-tenant-signup.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-guest-onboarding.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-tenant-access.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-portal-schema.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-portal-events.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-portal-evidence.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-portal-services.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-portal-incidents.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-portal-collections.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-portal-profile.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-portal-manager.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-tenant-prereg.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-guest-onboarding-controller.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-guest-admin-controller.php';
@@ -306,6 +314,12 @@ function arriendo_facil_init() {
 		'Arriendo_Facil_Guest',
 		'Arriendo_Facil_Tenant_Signup',
 		'Arriendo_Facil_Tenant_Access',
+		'Arriendo_Facil_Portal_Schema',
+		'Arriendo_Facil_Portal_Services',
+		'Arriendo_Facil_Portal_Incidents',
+		'Arriendo_Facil_Portal_Collections',
+		'Arriendo_Facil_Portal_Profile',
+		'Arriendo_Facil_Portal_Manager',
 		'Arriendo_Facil_Tenant_Prereg',
 		'Arriendo_Facil_Guest_Onboarding_Controller',
 		'Arriendo_Facil_Guest_Admin_Controller',

@@ -279,6 +279,8 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 	);
 	?>
 
+	<?php Arriendo_Facil_Portal_Manager::render_review_queue(); ?>
+
 	<?php if ( $unconfigured_count > 0 ) : ?>
 		<div class="af-service-callout af-service-callout--warning">
 			<span class="af-service-callout__icon" aria-hidden="true"><?php echo af_lucide( 'bell', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
@@ -493,6 +495,8 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 											<span><?php esc_html_e( 'Sin monto definido · solo recordatorio', 'arriendo-facil' ); ?></span>
 										<?php endif; ?>
 									</div>
+
+									<?php Arriendo_Facil_Portal_Manager::render_payer_toggle( (int) $row['schedule_id'], (string) $row['payer'], $period ); ?>
 
 									<?php if ( $progress > 0 && $progress < 100 ) : ?>
 										<div class="af-sp-progress" role="progressbar" aria-valuenow="<?php echo esc_attr( (string) $progress ); ?>" aria-valuemin="0" aria-valuemax="100">
@@ -797,6 +801,7 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 	</div>
 </div>
 
+<?php Arriendo_Facil_Portal_Manager::render_services_assets(); ?>
 <script>
 (function () {
 	const ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;

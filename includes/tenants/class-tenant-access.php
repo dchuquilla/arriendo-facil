@@ -37,7 +37,7 @@ class Arriendo_Facil_Tenant_Access {
 	const CODE_TTL       = 600;    // 10 minutos.
 	const MAX_ATTEMPTS   = 5;
 	const RESEND_WAIT    = 60;     // Segundos entre envíos.
-	const SESSION_IDLE   = 7200;   // 2 h de inactividad.
+	const SESSION_IDLE   = 1800;   // 30 min de inactividad (maneja documentos de identidad).
 	const SESSION_MAX    = 43200;  // 12 h absolutas.
 	const REPORTS_PER_DAY = 10;
 
@@ -51,9 +51,10 @@ class Arriendo_Facil_Tenant_Access {
 		add_filter( 'query_vars', array( $this, 'add_query_var' ) );
 		add_action( 'template_redirect', array( $this, 'send_privacy_headers' ), 1 );
 		add_filter( 'template_include', array( $this, 'load_template' ) );
+		add_filter( 'wp_robots', array( $this, 'robots_noindex' ), 99 );
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_assets' ) );
 
-		foreach ( array( 'request', 'verify', 'logout', 'report' ) as $action ) {
+		foreach ( array( 'request', 'verify', 'logout', 'report', 'ping' ) as $action ) {
 			add_action( 'wp_ajax_nopriv_af_tpa_' . $action, array( $this, 'ajax_' . $action ) );
 			add_action( 'wp_ajax_af_tpa_' . $action, array( $this, 'ajax_' . $action ) );
 		}
@@ -315,15 +316,48 @@ class Arriendo_Facil_Tenant_Access {
 	}
 
 	/**
-	 * Sin caché, sin indexar y sin filtrar el enlace por Referer.
+	 * Sin caché (navegador, CDN y plugins de caché), sin indexar, sin filtrar el
+	 * enlace por Referer y sin poder incrustarse en el marco de otro sitio.
 	 */
 	public function send_privacy_headers() {
 		if ( ! self::is_portal_request() ) {
 			return;
 		}
+
+		foreach ( array( 'DONOTCACHEPAGE', 'DONOTCACHEOBJECT', 'DONOTCACHEDB', 'DONOTMINIFY', 'DONOTCDN' ) as $const ) {
+			if ( ! defined( $const ) ) {
+				define( $const, true );
+			}
+		}
+
 		nocache_headers();
+		header( 'Cache-Control: no-store, no-cache, must-revalidate, max-age=0, private' );
 		header( 'X-Robots-Tag: noindex, nofollow, noarchive' );
 		header( 'Referrer-Policy: no-referrer' );
+		header( 'X-Frame-Options: DENY' );
+		// Sin script-src: la plantilla del tema trae scripts en línea. Se cierra todo lo demás.
+		header( "Content-Security-Policy: frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'" );
+		header( 'X-Content-Type-Options: nosniff' );
+		header( 'Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()' );
+	}
+
+	/**
+	 * Meta robots de la página (refuerza el encabezado X-Robots-Tag).
+	 *
+	 * @param array<string,mixed> $robots Directivas.
+	 * @return array<string,mixed>
+	 */
+	public function robots_noindex( $robots ) {
+		if ( self::is_portal_request() ) {
+			$robots = array(
+				'noindex'    => true,
+				'nofollow'   => true,
+				'noarchive'  => true,
+				'nosnippet'  => true,
+			);
+		}
+
+		return $robots;
 	}
 
 	/**
@@ -350,7 +384,9 @@ class Arriendo_Facil_Tenant_Access {
 		$js  = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/af-tenant-portal.js';
 
 		wp_enqueue_style( 'af-tenant-portal', ARRIENDO_FACIL_PLUGIN_URL . 'assets/css/af-tenant-portal.css', array(), file_exists( $css ) ? (string) filemtime( $css ) : ARRIENDO_FACIL_VERSION );
-		wp_enqueue_script( 'af-tenant-portal', ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/af-tenant-portal.js', array(), file_exists( $js ) ? (string) filemtime( $js ) : ARRIENDO_FACIL_VERSION, true );
+		$gsap = ARRIENDO_FACIL_PLUGIN_DIR . 'assets/js/vendor/gsap.min.js';
+		wp_register_script( 'af-gsap-vendor', ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/vendor/gsap.min.js', array(), file_exists( $gsap ) ? (string) filemtime( $gsap ) : ARRIENDO_FACIL_VERSION, true );
+		wp_enqueue_script( 'af-tenant-portal', ARRIENDO_FACIL_PLUGIN_URL . 'assets/js/af-tenant-portal.js', array( 'af-gsap-vendor' ), file_exists( $js ) ? (string) filemtime( $js ) : ARRIENDO_FACIL_VERSION, true );
 
 		$session = self::current_session();
 		$ref     = isset( $_GET['r'] ) ? sanitize_text_field( wp_unslash( $_GET['r'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- referencia firmada, no una acción.
@@ -378,6 +414,14 @@ class Arriendo_Facil_Tenant_Access {
 					'network'     => __( 'No pudimos conectar. Revisa tu internet e inténtalo de nuevo.', 'arriendo-facil' ),
 					'reported'    => __( 'Novedad enviada. Tu administrador ya la puede ver.', 'arriendo-facil' ),
 					'sendReport'  => __( 'Enviar novedad', 'arriendo-facil' ),
+					'saving'      => __( 'Guardando…', 'arriendo-facil' ),
+					'uploading'   => __( 'Subiendo…', 'arriendo-facil' ),
+					'tooBig'      => __( 'Cada archivo puede pesar hasta 8 MB.', 'arriendo-facil' ),
+					'tooMany'     => __( 'Puedes adjuntar hasta 6 archivos a la vez.', 'arriendo-facil' ),
+					'needFile'    => __( 'Adjunta al menos un archivo.', 'arriendo-facil' ),
+					'badType'     => __( 'Solo fotos (JPG, PNG, WebP) o PDF.', 'arriendo-facil' ),
+					'idleWarn'    => __( 'Tu sesión se cerrará pronto por inactividad.', 'arriendo-facil' ),
+					'stay'        => __( 'Seguir aquí', 'arriendo-facil' ),
 				),
 			)
 		);
@@ -472,7 +516,7 @@ class Arriendo_Facil_Tenant_Access {
 	 * @param int    $window Segundos de la ventana.
 	 * @return bool
 	 */
-	private static function throttled( $bucket, $key, $limit, $window ) {
+	public static function throttled( $bucket, $key, $limit, $window ) {
 		$name  = 'af_tp_' . $bucket . '_' . md5( $key );
 		$count = (int) get_transient( $name );
 		if ( $count >= $limit ) {
@@ -487,7 +531,7 @@ class Arriendo_Facil_Tenant_Access {
 	 * @param int $guest_id Inquilino.
 	 * @return object|null
 	 */
-	private static function guest_by_id( $guest_id ) {
+	public static function guest_by_id( $guest_id ) {
 		global $wpdb;
 		$guest_id = absint( $guest_id );
 		if ( ! $guest_id ) {
@@ -689,6 +733,17 @@ class Arriendo_Facil_Tenant_Access {
 	}
 
 	/**
+	 * Renueva la inactividad (botón "Seguir aquí" del aviso de cierre).
+	 */
+	public function ajax_ping() {
+		$session = self::current_session(); // Ya renueva la caducidad.
+		if ( ! $session || ! self::csrf_ok( $session ) ) {
+			wp_send_json_error( array( 'code' => 'session' ), 401 );
+		}
+		wp_send_json_success();
+	}
+
+	/**
 	 * Cierra la sesión actual.
 	 */
 	public function ajax_logout() {
@@ -723,7 +778,7 @@ class Arriendo_Facil_Tenant_Access {
 				'expires'  => $expires,
 				'path'     => COOKIEPATH ? COOKIEPATH : '/',
 				'domain'   => COOKIE_DOMAIN ? COOKIE_DOMAIN : '',
-				'secure'   => is_ssl(),
+				'secure'   => is_ssl() || 'https' === wp_parse_url( home_url(), PHP_URL_SCHEME ), // Tras un proxy is_ssl() puede fallar: si el sitio es https, la cookie nunca viaja en claro.
 				'httponly' => true,
 				'samesite' => 'Lax',
 			)
@@ -801,7 +856,7 @@ class Arriendo_Facil_Tenant_Access {
 	 * @param object $session Sesión.
 	 * @return bool
 	 */
-	private static function csrf_ok( $session ) {
+	public static function csrf_ok( $session ) {
 		$sent = isset( $_POST['csrf'] ) ? sanitize_text_field( wp_unslash( $_POST['csrf'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- es el propio token CSRF de la sesión.
 
 		return '' !== $sent && hash_equals( self::csrf_for( $session->token_hash ), $sent );
@@ -871,13 +926,23 @@ class Arriendo_Facil_Tenant_Access {
 			$balance += max( 0.0, (float) $charge->amount - (float) $charge->amount_paid );
 		}
 
+		$open_leases = array_filter(
+			$leases,
+			static function ( $l ) {
+				return in_array( $l->status, array( 'active', 'pending_release' ), true );
+			}
+		);
+
 		return array(
-			'guest'    => $guest,
-			'leases'   => $leases,
-			'charges'  => $charges,
-			'payments' => $payments,
-			'requests' => $requests,
-			'balance'  => round( $balance, 2 ),
+			'guest'     => $guest,
+			'leases'    => $leases,
+			'charges'   => $charges,
+			'payments'  => $payments,
+			'requests'  => $requests,
+			'balance'   => round( $balance, 2 ),
+			'services'  => Arriendo_Facil_Portal_Services::for_guest( (int) $guest->id, array_map( 'intval', wp_list_pluck( $open_leases, 'accommodation_id' ) ) ),
+			'incidents' => Arriendo_Facil_Portal_Incidents::for_guest( (int) $guest->id, $lease_ids ),
+			'documents' => Arriendo_Facil_Portal_Profile::documents_overview( (int) $guest->id ),
 		);
 	}
 

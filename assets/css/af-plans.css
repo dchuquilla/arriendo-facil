@@ -432,7 +432,7 @@
 	transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
 }
 
-.af-plan-card.is-pro {
+.af-plan-card.is-empresarial {
 	border-color: #f5b301;
 	box-shadow: 0 18px 40px -26px rgba(217, 154, 0, 0.7);
 }
@@ -593,7 +593,7 @@
 	color: #007058;
 }
 
-.af-plan-pill--pro {
+.af-plan-pill--empresarial {
 	background: linear-gradient(135deg, #ffe08a, #f5b301);
 	color: #3b2a00;
 }
@@ -718,7 +718,7 @@
 	box-shadow: 0 12px 30px -24px rgba(22, 74, 85, 0.45);
 }
 
-.af-plan-summary--pro {
+.af-plan-summary--empresarial {
 	border-color: #f5d27a;
 	background: linear-gradient(160deg, #fffdf5, #fff7df);
 }

@@ -1,9 +1,9 @@
 <?php
 /**
- * Planes de suscripción (Free / Básico / Profesional).
+ * Planes de suscripción (Free / Básico / Empresarial).
  *
  * El plan vive en el usermeta `af_plan` del gestor de propiedades. Una cuenta
- * sin ese campo (licencias anteriores a los planes) cuenta como Profesional;
+ * sin ese campo (licencias anteriores a los planes) cuenta como Empresarial;
  * las altas nuevas nacen en Free. El administrador de la plataforma activa los
  * planes a mano; el gestor puede solicitar un cambio o cancelar (vuelve a Free).
  *
@@ -128,9 +128,9 @@ class Arriendo_Facil_Plans {
 					'tagline'  => __( 'Para empezar a probar', 'arriendo-facil' ),
 					'price'    => 0,
 					'limits'   => array(
-						'properties' => 4,
-						'guests'     => 4,
-						'leases'     => 4,
+						'properties' => 1,
+						'guests'     => null,
+						'leases'     => null,
 					),
 					'features' => array(
 						'maintenance' => false,
@@ -142,23 +142,23 @@ class Arriendo_Facil_Plans {
 				'basic' => array(
 					'label'    => __( 'Básico', 'arriendo-facil' ),
 					'tagline'  => __( 'Para administrar con orden', 'arriendo-facil' ),
-					'price'    => 10,
+					'price'    => 20,
 					'limits'   => array(
-						'properties' => 15,
+						'properties' => 5,
 						'guests'     => 15,
 						'leases'     => 15,
 					),
 					'features' => array(
 						'maintenance' => true,
-						'catalog'     => false,
+						'catalog'     => true,
 						'billing'     => false,
 					),
 					'services' => null,
 				),
-				'pro'   => array(
-					'label'    => __( 'Profesional', 'arriendo-facil' ),
+				'empresarial' => array(
+					'label'    => __( 'Empresarial', 'arriendo-facil' ),
 					'tagline'  => __( 'Para crecer sin límites', 'arriendo-facil' ),
-					'price'    => 20,
+					'price'    => 1.20,
 					'limits'   => array(
 						'properties' => null,
 						'guests'     => null,
@@ -268,7 +268,7 @@ class Arriendo_Facil_Plans {
 	 */
 	private static function resolve_plan( $user_id ) {
 		if ( ! self::applies_to( $user_id ) ) {
-			return 'pro';
+			return 'empresarial';
 		}
 
 		$stored = self::normalize( (string) get_user_meta( $user_id, self::META_PLAN, true ) );
@@ -276,8 +276,8 @@ class Arriendo_Facil_Plans {
 			return $stored;
 		}
 
-		// Cuentas sin plan: Profesional solo mientras no corra la migración; después, Free.
-		return get_option( self::OPT_MIGRATED ) ? 'free' : 'pro';
+		// Cuentas sin plan: Empresarial solo mientras no corra la migración; después, Free.
+		return get_option( self::OPT_MIGRATED ) ? 'free' : 'empresarial';
 	}
 
 	/**
@@ -766,7 +766,7 @@ class Arriendo_Facil_Plans {
 	 * ------------------------------------------------------------------ */
 
 	/**
-	 * One-time grandfathering: managers that predate plans keep Profesional.
+	 * One-time grandfathering: managers that predate plans keep Empresarial.
 	 * Any account without a plan afterwards is treated as Free (fail closed).
 	 */
 	public function maybe_migrate_legacy() {
@@ -776,7 +776,7 @@ class Arriendo_Facil_Plans {
 
 		foreach ( get_users( array( 'role' => Arriendo_Facil_Tenancy::PROPERTY_MANAGER_ROLE, 'fields' => 'ID' ) ) as $user_id ) {
 			if ( '' === self::normalize( (string) get_user_meta( (int) $user_id, self::META_PLAN, true ) ) ) {
-				update_user_meta( (int) $user_id, self::META_PLAN, 'pro' );
+				update_user_meta( (int) $user_id, self::META_PLAN, 'empresarial' );
 			}
 		}
 
@@ -1114,10 +1114,10 @@ class Arriendo_Facil_Plans {
 					'requestTitle' => __( 'Solicitar plan %s', 'arriendo-facil' ),
 					'requestText'  => __( 'Te activaremos el plan %1$s ($%2$s al mes) cuando confirmemos el pago. Mientras tanto sigues con tu plan actual.', 'arriendo-facil' ),
 					'requestConfirm' => __( 'Solicitar plan', 'arriendo-facil' ),
-					'toFreeText'   => __( 'Volverás al plan Free de inmediato. Conservas todos tus datos: se administran tus 4 primeros inmuebles y el resto queda oculto, sin borrarse, hasta que renueves o contrates un plan con capacidad suficiente.', 'arriendo-facil' ),
+					'toFreeText'   => __( 'Volverás al plan Free de inmediato. Conservas todos tus datos: se administra tu primer inmueble y el resto queda oculto, sin borrarse, hasta que renueves o contrates un plan con capacidad suficiente.', 'arriendo-facil' ),
 					'toFreeConfirm' => __( 'Cambiar a Free', 'arriendo-facil' ),
 					'cancelTitle'  => __( '¿Cancelar tu plan %s?', 'arriendo-facil' ),
-					'cancelText'   => __( 'Volverás al plan Free de inmediato. Conservas todos tus datos: se administran tus 4 primeros inmuebles y el resto queda oculto, sin borrarse. Se reactivan al contratar de nuevo un plan con capacidad suficiente.', 'arriendo-facil' ),
+					'cancelText'   => __( 'Volverás al plan Free de inmediato. Conservas todos tus datos: se administra tu primer inmueble y el resto queda oculto, sin borrarse. Se reactiva al contratar de nuevo un plan con capacidad suficiente.', 'arriendo-facil' ),
 					'understood'   => __( 'Entendido', 'arriendo-facil' ),
 					'later'        => __( 'Más tarde', 'arriendo-facil' ),
 					'planName'     => __( 'Plan %s', 'arriendo-facil' ),
@@ -1206,7 +1206,7 @@ class Arriendo_Facil_Plans {
 			'gates' => self::locked_gates(),
 			'pill'  => self::topbar_pill(),
 			'menu'  => $menu,
-			'hint'  => 'pro' === $plan ? __( 'Administrar plan', 'arriendo-facil' ) : __( 'Mejorar plan', 'arriendo-facil' ),
+			'hint'  => 'empresarial' === $plan ? __( 'Administrar plan', 'arriendo-facil' ) : __( 'Mejorar plan', 'arriendo-facil' ),
 		);
 	}
 
@@ -1225,7 +1225,7 @@ class Arriendo_Facil_Plans {
 		$alert = in_array( $state, array( 'soon', 'due' ), true );
 
 		return '<span class="af-plan-pill af-plan-pill--' . esc_attr( $plan ) . ( $alert ? ' has-alert' : '' ) . '">'
-			. ( 'pro' === $plan ? af_lucide( 'crown', 12 ) : '' )
+			. ( 'empresarial' === $plan ? af_lucide( 'crown', 12 ) : '' )
 			. esc_html( self::get_definition()['label'] )
 			. '</span>';
 	}
@@ -1253,7 +1253,7 @@ class Arriendo_Facil_Plans {
 						<?php
 						if ( $snap['expires'] ) {
 							echo esc_html( sprintf( /* translators: %s: phrase like "en 12 días" */ __( 'Se renueva %s', 'arriendo-facil' ), Arriendo_Facil_Plan_Billing::days_phrase( $snap['days'] ) ) );
-						} elseif ( 'pro' === $plan ) {
+						} elseif ( 'empresarial' === $plan ) {
 							esc_html_e( 'Tienes todo incluido', 'arriendo-facil' );
 						} else {
 							esc_html_e( 'Mejorar plan', 'arriendo-facil' );
@@ -1298,7 +1298,7 @@ class Arriendo_Facil_Plans {
 				<span class="af-plan-summary__icon" aria-hidden="true"><?php echo af_lucide( 'crown', 22 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?></span>
 				<div>
 					<p class="af-plan-summary__eyebrow"><?php esc_html_e( 'Tu plan', 'arriendo-facil' ); ?></p>
-					<h2><?php echo esc_html( $definition['label'] ); ?> <small>$<?php echo esc_html( number_format_i18n( (float) $definition['price'], 0 ) ); ?> <?php esc_html_e( '/ mes', 'arriendo-facil' ); ?></small></h2>
+					<h2><?php echo esc_html( $definition['label'] ); ?> <small>$<?php echo esc_html( number_format_i18n( (float) $definition['price'], fmod( (float) $definition['price'], 1 ) !== 0.0 ? 2 : 0 ) ); ?> <?php echo esc_html( 'empresarial' === $plan ? __( '/ propiedad / mes', 'arriendo-facil' ) : __( '/ mes', 'arriendo-facil' ) ); ?></small></h2>
 					<?php if ( $snap['expires'] && 'ok' === $snap['state'] && ! $request ) : ?>
 						<p class="af-plan-summary__meta"><?php echo esc_html( sprintf( /* translators: 1: date, 2: phrase */ __( 'Se renueva el %1$s (%2$s)', 'arriendo-facil' ), Arriendo_Facil_Plan_Billing::format_date( $snap['expires'] ), Arriendo_Facil_Plan_Billing::days_phrase( $snap['days'] ) ) ); ?></p>
 					<?php endif; ?>
@@ -1320,7 +1320,7 @@ class Arriendo_Facil_Plans {
 					</div>
 				<?php endforeach; ?>
 			</div>
-			<a class="button af-btn <?php echo 'pro' === $plan ? 'af-btn--ghost' : 'af-btn--primary'; ?>" href="<?php echo esc_url( self::url() ); ?>"><?php echo 'pro' === $plan ? esc_html__( 'Administrar plan', 'arriendo-facil' ) : esc_html__( 'Ver planes', 'arriendo-facil' ); ?></a>
+			<a class="button af-btn <?php echo 'empresarial' === $plan ? 'af-btn--ghost' : 'af-btn--primary'; ?>" href="<?php echo esc_url( self::url() ); ?>"><?php echo 'empresarial' === $plan ? esc_html__( 'Administrar plan', 'arriendo-facil' ) : esc_html__( 'Ver planes', 'arriendo-facil' ); ?></a>
 		</section>
 		<?php
 	}

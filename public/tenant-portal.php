@@ -99,11 +99,11 @@ get_header();
 
 	<?php else : ?>
 		<?php
-		$af_guest   = $af_data['guest'];
-		$af_name    = trim( $af_guest->first_name . ' ' . $af_guest->last_name );
-		$af_id      = (string) $af_guest->id_number;
-		$af_idmask  = $af_id ? str_repeat( '•', max( 0, strlen( $af_id ) - 3 ) ) . substr( $af_id, -3 ) : '—';
-		$af_open    = array_values(
+		$af_guest    = $af_data['guest'];
+		$af_name     = trim( $af_guest->first_name . ' ' . $af_guest->last_name );
+		$af_id       = (string) $af_guest->id_number;
+		$af_idmask   = $af_id ? str_repeat( '•', max( 0, strlen( $af_id ) - 3 ) ) . substr( $af_id, -3 ) : '—';
+		$af_open     = array_values(
 			array_filter(
 				$af_data['leases'],
 				static function ( $l ) {
@@ -111,15 +111,103 @@ get_header();
 				}
 			)
 		);
-		$af_req_ty  = array(
+		$af_req_ty   = array(
 			'reparacion' => __( 'Reparación', 'arriendo-facil' ),
 			'emergencia' => __( 'Emergencia', 'arriendo-facil' ),
 			'limpieza'   => __( 'Limpieza', 'arriendo-facil' ),
 			'otro'       => __( 'Otro', 'arriendo-facil' ),
 		);
-		$af_req_st  = Arriendo_Facil_Maintenance::statuses();
-		$af_req_pr  = Arriendo_Facil_Maintenance::priorities();
+		$af_req_st    = Arriendo_Facil_Maintenance::statuses();
+		$af_req_pr    = Arriendo_Facil_Maintenance::priorities();
 		$af_charge_st = Arriendo_Facil_Tenant_Access::charge_status_labels();
+		$af_services  = $af_data['services'];
+		$af_incidents = $af_data['incidents'];
+		$af_docs      = $af_data['documents'];
+		$af_svc_todo  = Arriendo_Facil_Portal_Services::count_actionable( $af_services );
+		$af_inc_open  = count(
+			array_filter(
+				$af_incidents,
+				static function ( $r ) {
+					return ! in_array( $r->status, array( 'completed', 'cancelled' ), true ) || 'confirm' === Arriendo_Facil_Portal_Incidents::tenant_action( $r );
+				}
+			)
+		);
+		$af_ev        = static function ( $id ) {
+			return add_query_arg( array( 'action' => 'af_tpa_evidence_view', 'id' => (int) $id ), admin_url( 'admin-ajax.php' ) );
+		};
+		$af_dt        = static function ( $utc ) {
+			return $utc ? wp_date( 'j M Y, H:i', strtotime( $utc . ' UTC' ) ) : '—';
+		};
+		$af_pay_lbl   = array(
+			'pending'   => array( __( 'Por pagar', 'arriendo-facil' ), 'warn' ),
+			'submitted' => array( __( 'En revisión', 'arriendo-facil' ), 'info' ),
+			'approved'  => array( __( 'Aprobado', 'arriendo-facil' ), 'ok' ),
+			'rejected'  => array( __( 'Rechazado: corrige', 'arriendo-facil' ), 'bad' ),
+			'received'  => array( __( 'Dinero recibido', 'arriendo-facil' ), 'info' ),
+		);
+		$af_pay_lbl_via = array(
+			'pending'   => array( __( 'Falta entregar', 'arriendo-facil' ), 'warn' ),
+			'submitted' => array( __( 'Por confirmar', 'arriendo-facil' ), 'info' ),
+			'received'  => array( __( 'Entregado · con recibo', 'arriendo-facil' ), 'info' ),
+			'approved'  => array( __( 'Pagado a la empresa', 'arriendo-facil' ), 'ok' ),
+		);
+		$af_methods   = Arriendo_Facil_Portal_Collections::methods();
+		$af_rc_url    = static function ( $id ) {
+			return add_query_arg( array( 'action' => 'af_tpa_receipt', 'id' => (int) $id ), admin_url( 'admin-ajax.php' ) );
+		};
+		$af_resp_lbl  = array(
+			'por_definir' => __( 'Responsable por definir', 'arriendo-facil' ),
+			'owner'       => __( 'Lo repara el propietario', 'arriendo-facil' ),
+			'tenant'      => __( 'Te corresponde repararlo', 'arriendo-facil' ),
+		);
+		$af_gallery   = static function ( array $items ) use ( $af_ev ) {
+			if ( empty( $items ) ) {
+				return;
+			}
+			echo '<div class="af-tp-gallery">';
+			foreach ( $items as $ev ) {
+				$url = esc_url( $af_ev( $ev->id ) );
+				if ( 'application/pdf' === $ev->mime_type ) {
+					echo '<a class="af-tp-file" href="' . $url . '" target="_blank" rel="noopener">PDF</a>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+				} else {
+					echo '<a class="af-tp-thumb" href="' . $url . '" target="_blank" rel="noopener"><img src="' . $url . '" alt="' . esc_attr__( 'Foto adjunta', 'arriendo-facil' ) . '" loading="lazy" width="84" height="84"></a>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+				}
+			}
+			echo '</div>';
+		};
+		$af_timeline  = static function ( array $events ) use ( $af_dt ) {
+			if ( empty( $events ) ) {
+				return;
+			}
+			echo '<details class="af-tp-more"><summary>' . esc_html__( 'Historial', 'arriendo-facil' ) . '</summary><ol class="af-tp-timeline">';
+			foreach ( $events as $e ) {
+				$who = 'tenant' === $e->actor_type ? __( 'Tú', 'arriendo-facil' ) : ( 'manager' === $e->actor_type ? __( 'Administrador', 'arriendo-facil' ) : __( 'Sistema', 'arriendo-facil' ) );
+				echo '<li><span>' . esc_html( $af_dt( $e->created_at ) ) . '</span> ' . esc_html( $who . ' · ' . Arriendo_Facil_Portal_Events::label( $e->action ) ) . '</li>';
+			}
+			echo '</ol></details>';
+		};
+		$af_files_input = static function () {
+			echo '<label class="af-tp-label">' . esc_html__( 'Fotos o PDF', 'arriendo-facil' ) . '</label>';
+			echo '<input class="af-tp-input af-tp-file-input" type="file" name="files[]" accept="image/*,application/pdf" multiple data-tp-files>';
+			echo '<div class="af-tp-previews" data-tp-previews></div>';
+		};
+		$af_todo = array();
+		foreach ( $af_services as $svc ) {
+			if ( in_array( $svc['pay_status'], array( 'pending', 'rejected' ), true ) ) {
+				$af_todo[] = array( 'services', sprintf( /* translators: 1: service, 2: date */ __( 'Pagar %1$s (vence %2$s)', 'arriendo-facil' ), $svc['service_label'], $af_date( $svc['due_date'] ) ) );
+			}
+		}
+		foreach ( $af_incidents as $inc ) {
+			$act = Arriendo_Facil_Portal_Incidents::tenant_action( $inc );
+			if ( 'upload_repair' === $act ) {
+				$af_todo[] = array( 'incidents', __( 'Subir evidencia de una reparación que te corresponde', 'arriendo-facil' ) );
+			} elseif ( 'confirm' === $act ) {
+				$af_todo[] = array( 'incidents', __( 'Confirmar si una reparación quedó conforme', 'arriendo-facil' ) );
+			}
+		}
+		if ( $af_docs['missing'] > 0 ) {
+			$af_todo[] = array( 'profile', sprintf( /* translators: %d: count */ _n( 'Falta %d documento requerido', 'Faltan %d documentos requeridos', $af_docs['missing'], 'arriendo-facil' ), $af_docs['missing'] ) );
+		}
 		?>
 		<header class="af-tp-head">
 			<div>
@@ -130,30 +218,43 @@ get_header();
 		</header>
 
 		<section class="af-tp-summary" aria-label="<?php esc_attr_e( 'Resumen', 'arriendo-facil' ); ?>">
-			<div class="af-tp-stat <?php echo $af_data['balance'] > 0 ? 'is-bad' : 'is-ok'; ?>">
-				<span><?php esc_html_e( 'Saldo pendiente', 'arriendo-facil' ); ?></span>
-				<strong><?php echo esc_html( $af_money( $af_data['balance'] ) ); ?></strong>
-			</div>
-			<div class="af-tp-stat">
+			<button type="button" class="af-tp-stat <?php echo $af_svc_todo ? 'is-warn' : 'is-ok'; ?>" data-tp-goto="services">
+				<span><?php esc_html_e( 'Servicios por pagar', 'arriendo-facil' ); ?></span>
+				<strong data-tp-count><?php echo esc_html( number_format_i18n( $af_svc_todo ) ); ?></strong>
+			</button>
+			<button type="button" class="af-tp-stat <?php echo $af_inc_open ? 'is-info' : 'is-ok'; ?>" data-tp-goto="incidents">
+				<span><?php esc_html_e( 'Incidentes abiertos', 'arriendo-facil' ); ?></span>
+				<strong data-tp-count><?php echo esc_html( number_format_i18n( $af_inc_open ) ); ?></strong>
+			</button>
+			<button type="button" class="af-tp-stat <?php echo $af_docs['missing'] ? 'is-warn' : 'is-ok'; ?>" data-tp-goto="profile">
+				<span><?php esc_html_e( 'Documentos pendientes', 'arriendo-facil' ); ?></span>
+				<strong data-tp-count><?php echo esc_html( number_format_i18n( $af_docs['missing'] ) ); ?></strong>
+			</button>
+			<button type="button" class="af-tp-stat" data-tp-goto="overview">
 				<span><?php esc_html_e( 'Contratos vigentes', 'arriendo-facil' ); ?></span>
-				<strong><?php echo esc_html( number_format_i18n( count( $af_open ) ) ); ?></strong>
-			</div>
+				<strong data-tp-count><?php echo esc_html( number_format_i18n( count( $af_open ) ) ); ?></strong>
+			</button>
 		</section>
 
 		<nav class="af-tp-tabs" role="tablist" aria-label="<?php esc_attr_e( 'Secciones', 'arriendo-facil' ); ?>">
-			<button type="button" role="tab" class="is-active" aria-selected="true" data-tp-tab="profile"><?php esc_html_e( 'Mi perfil', 'arriendo-facil' ); ?></button>
-			<button type="button" role="tab" aria-selected="false" data-tp-tab="payments"><?php esc_html_e( 'Pagos', 'arriendo-facil' ); ?></button>
-			<button type="button" role="tab" aria-selected="false" data-tp-tab="maintenance"><?php esc_html_e( 'Mantenimiento', 'arriendo-facil' ); ?></button>
+			<button type="button" role="tab" class="is-active" aria-selected="true" data-tp-tab="overview"><span><?php esc_html_e( 'Resumen', 'arriendo-facil' ); ?></span></button>
+			<button type="button" role="tab" aria-selected="false" data-tp-tab="services"><span><?php esc_html_e( 'Servicios', 'arriendo-facil' ); ?></span><?php echo $af_svc_todo ? '<i class="af-tp-dot" aria-hidden="true"></i>' : ''; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></button>
+			<button type="button" role="tab" aria-selected="false" data-tp-tab="incidents"><span><?php esc_html_e( 'Incidentes', 'arriendo-facil' ); ?></span></button>
+			<button type="button" role="tab" aria-selected="false" data-tp-tab="profile"><span><?php esc_html_e( 'Perfil', 'arriendo-facil' ); ?></span></button>
 		</nav>
 
-		<section class="af-tp-card" data-tp-panel="profile" role="tabpanel">
-			<h2 class="af-tp-h2"><?php esc_html_e( 'Mis datos', 'arriendo-facil' ); ?></h2>
-			<dl class="af-tp-facts">
-				<div><dt><?php esc_html_e( 'Nombre', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( $af_name ); ?></dd></div>
-				<div><dt><?php esc_html_e( 'Correo', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( $af_guest->email ); ?></dd></div>
-				<div><dt><?php esc_html_e( 'Teléfono', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( $af_guest->phone ? $af_guest->phone : '—' ); ?></dd></div>
-				<div><dt><?php esc_html_e( 'Identificación', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( $af_idmask ); ?></dd></div>
-			</dl>
+		<!-- ───────── Resumen ───────── -->
+		<section class="af-tp-card" data-tp-panel="overview" role="tabpanel">
+			<h2 class="af-tp-h2"><?php esc_html_e( 'Pendiente de ti', 'arriendo-facil' ); ?></h2>
+			<?php if ( empty( $af_todo ) ) : ?>
+				<p class="af-tp-empty"><?php esc_html_e( 'Estás al día. No tienes nada pendiente.', 'arriendo-facil' ); ?></p>
+			<?php else : ?>
+				<ul class="af-tp-list">
+					<?php foreach ( $af_todo as $todo ) : ?>
+						<li class="af-tp-item"><div class="af-tp-item__main"><strong><?php echo esc_html( $todo[1] ); ?></strong></div><button type="button" class="af-tp-btn af-tp-btn--small" data-tp-goto="<?php echo esc_attr( $todo[0] ); ?>"><?php esc_html_e( 'Ir', 'arriendo-facil' ); ?></button></li>
+					<?php endforeach; ?>
+				</ul>
+			<?php endif; ?>
 
 			<h2 class="af-tp-h2"><?php esc_html_e( 'Mis contratos', 'arriendo-facil' ); ?></h2>
 			<?php if ( empty( $af_data['leases'] ) ) : ?>
@@ -174,10 +275,10 @@ get_header();
 					<?php endforeach; ?>
 				</ul>
 			<?php endif; ?>
-		</section>
 
-		<section class="af-tp-card" data-tp-panel="payments" role="tabpanel" hidden>
-			<h2 class="af-tp-h2"><?php esc_html_e( 'Cobros', 'arriendo-facil' ); ?></h2>
+			<h2 class="af-tp-h2"><?php esc_html_e( 'Cuenta', 'arriendo-facil' ); ?>
+				<span class="af-tp-h2__aside <?php echo $af_data['balance'] > 0 ? 'is-bad' : 'is-ok'; ?>"><?php echo esc_html( sprintf( /* translators: %s: amount */ __( 'Saldo pendiente %s', 'arriendo-facil' ), $af_money( $af_data['balance'] ) ) ); ?></span>
+			</h2>
 			<?php if ( empty( $af_data['charges'] ) ) : ?>
 				<p class="af-tp-empty"><?php esc_html_e( 'Todavía no hay cobros registrados.', 'arriendo-facil' ); ?></p>
 			<?php else : ?>
@@ -198,10 +299,8 @@ get_header();
 				</ul>
 			<?php endif; ?>
 
-			<h2 class="af-tp-h2"><?php esc_html_e( 'Pagos realizados', 'arriendo-facil' ); ?></h2>
-			<?php if ( empty( $af_data['payments'] ) ) : ?>
-				<p class="af-tp-empty"><?php esc_html_e( 'Aún no hay pagos registrados.', 'arriendo-facil' ); ?></p>
-			<?php else : ?>
+			<?php if ( ! empty( $af_data['payments'] ) ) : ?>
+				<h2 class="af-tp-h2"><?php esc_html_e( 'Pagos realizados', 'arriendo-facil' ); ?></h2>
 				<ul class="af-tp-list">
 					<?php foreach ( $af_data['payments'] as $af_pay ) : ?>
 						<li class="af-tp-item">
@@ -216,13 +315,93 @@ get_header();
 			<?php endif; ?>
 		</section>
 
-		<section class="af-tp-card" data-tp-panel="maintenance" role="tabpanel" hidden>
-			<h2 class="af-tp-h2"><?php esc_html_e( 'Reportar una novedad', 'arriendo-facil' ); ?></h2>
-			<?php if ( empty( $af_open ) ) : ?>
-				<p class="af-tp-empty"><?php esc_html_e( 'Podrás reportar novedades cuando tengas un contrato vigente.', 'arriendo-facil' ); ?></p>
+		<!-- ───────── Servicios ───────── -->
+		<section class="af-tp-card" data-tp-panel="services" role="tabpanel" hidden>
+			<h2 class="af-tp-h2"><?php esc_html_e( 'Servicios que pagas tú', 'arriendo-facil' ); ?></h2>
+			<p class="af-tp-lead af-tp-lead--left"><?php esc_html_e( 'Cuando pagues un servicio, márcalo y sube tu comprobante. Tu administrador lo revisa y queda guardado como respaldo para los dos.', 'arriendo-facil' ); ?></p>
+			<?php if ( empty( $af_services ) ) : ?>
+				<p class="af-tp-empty"><?php esc_html_e( 'No tienes servicios a tu cargo por ahora.', 'arriendo-facil' ); ?></p>
 			<?php else : ?>
-				<p class="af-tp-alert" role="alert" data-tp-report-alert hidden></p>
-				<form class="af-tp-form" data-tp-report novalidate>
+				<ul class="af-tp-stack">
+					<?php foreach ( $af_services as $svc ) : ?>
+						<?php
+						$af_via = 'via_owner' === $svc['payer'];
+						$lbl    = $af_via ? ( $af_pay_lbl_via[ $svc['pay_status'] ] ?? $af_pay_lbl_via['pending'] ) : ( $af_pay_lbl[ $svc['pay_status'] ] ?? $af_pay_lbl['pending'] );
+						?>
+						<li class="af-tp-svc">
+							<div class="af-tp-svc__top">
+								<div class="af-tp-item__main">
+									<strong><?php echo esc_html( $svc['service_label'] ); ?></strong>
+									<small><?php echo esc_html( $svc['accommodation_title'] . ' · ' . $svc['period'] ); ?></small>
+									<small><?php echo esc_html( sprintf( /* translators: %s: date */ __( 'Vence %s', 'arriendo-facil' ), $af_date( $svc['due_date'] ) ) ); ?></small>
+								</div>
+								<span class="af-tp-pill is-<?php echo esc_attr( $lbl[1] ); ?>"><?php echo esc_html( $lbl[0] ); ?></span>
+							</div>
+
+							<?php if ( $af_via ) : ?>
+								<p class="af-tp-meta"><?php esc_html_e( 'Este servicio lo paga tu administrador a la empresa. Tú le entregas el dinero y, cuando lo recibe, te emite un recibo que te respalda.', 'arriendo-facil' ); ?></p>
+								<?php if ( $svc['expected_amount'] > 0 ) : ?>
+									<p class="af-tp-meta"><?php echo esc_html( sprintf( /* translators: %s: amount */ __( 'Monto estimado: %s', 'arriendo-facil' ), $af_money( $svc['expected_amount'] ) ) ); ?></p>
+								<?php endif; ?>
+								<?php if ( ! empty( $svc['deliveries'] ) ) : ?>
+									<ul class="af-tp-deliveries">
+										<?php foreach ( $svc['deliveries'] as $d ) : ?>
+											<li>
+												<span><?php echo esc_html( $af_money( (float) $d->amount ) . ' · ' . ( $af_methods[ $d->method ] ?? $d->method ) . ' · ' . $af_date( $d->delivered_on ) ); ?></span>
+												<?php if ( 'received' === $d->status ) : ?>
+													<a class="af-tp-link" href="<?php echo esc_url( $af_rc_url( $d->id ) ); ?>" target="_blank" rel="noopener"><?php echo esc_html( sprintf( /* translators: %s: receipt number */ __( 'Ver recibo %s', 'arriendo-facil' ), $d->receipt_no ) ); ?></a>
+												<?php elseif ( 'submitted' === $d->status ) : ?>
+													<em><?php esc_html_e( 'esperando confirmación', 'arriendo-facil' ); ?></em>
+												<?php else : ?>
+													<em class="is-bad"><?php echo esc_html( sprintf( /* translators: %s: reason */ __( 'no confirmada: %s', 'arriendo-facil' ), (string) $d->review_note ) ); ?></em>
+												<?php endif; ?>
+											</li>
+										<?php endforeach; ?>
+									</ul>
+								<?php endif; ?>
+								<?php if ( 'approved' === $svc['pay_status'] && ! empty( $svc['company_paid_on'] ) ) : ?>
+									<p class="af-tp-meta"><?php echo esc_html( sprintf( /* translators: %s: date */ __( 'Tu administrador pagó a la empresa el %s.', 'arriendo-facil' ), $af_date( $svc['company_paid_on'] ) ) ); ?></p>
+								<?php endif; ?>
+							<?php endif; ?>
+							<?php if ( 'rejected' === $svc['pay_status'] && $svc['review_note'] ) : ?>
+								<p class="af-tp-alert is-note"><?php echo esc_html( sprintf( /* translators: %s: reason */ __( 'Motivo: %s', 'arriendo-facil' ), $svc['review_note'] ) ); ?></p>
+							<?php endif; ?>
+							<?php if ( $svc['bill_id'] && $svc['paid_amount'] > 0 ) : ?>
+								<p class="af-tp-meta"><?php echo esc_html( sprintf( /* translators: 1: amount, 2: date */ __( 'Enviaste %1$s el %2$s', 'arriendo-facil' ), $af_money( $svc['paid_amount'] ), $af_date( $svc['paid_on'] ) ) ); ?></p>
+							<?php endif; ?>
+
+							<?php $af_gallery( $svc['evidence'] ); ?>
+
+							<?php if ( $af_via && in_array( $svc['pay_status'], array( 'pending', 'received' ), true ) ) : ?>
+								<button type="button" class="af-tp-btn af-tp-btn--primary" data-tp-open-delivery
+									data-schedule="<?php echo esc_attr( $svc['schedule_id'] ); ?>"
+									data-period="<?php echo esc_attr( $svc['period'] ); ?>"
+									data-label="<?php echo esc_attr( $svc['service_label'] . ' · ' . $svc['period'] ); ?>"
+									data-amount="<?php echo esc_attr( $svc['expected_amount'] > 0 ? $svc['expected_amount'] : '' ); ?>"><?php echo esc_html( 'received' === $svc['pay_status'] ? __( 'Informar otra entrega', 'arriendo-facil' ) : __( 'Informar entrega de dinero', 'arriendo-facil' ) ); ?></button>
+							<?php endif; ?>
+							<?php if ( ! $af_via && in_array( $svc['pay_status'], array( 'pending', 'rejected' ), true ) ) : ?>
+								<button type="button" class="af-tp-btn af-tp-btn--primary" data-tp-open-pay
+									data-schedule="<?php echo esc_attr( $svc['schedule_id'] ); ?>"
+									data-period="<?php echo esc_attr( $svc['period'] ); ?>"
+									data-label="<?php echo esc_attr( $svc['service_label'] . ' · ' . $svc['period'] ); ?>"
+									data-amount="<?php echo esc_attr( $svc['expected_amount'] > 0 ? $svc['expected_amount'] : '' ); ?>"><?php echo esc_html( 'rejected' === $svc['pay_status'] ? __( 'Enviar comprobante corregido', 'arriendo-facil' ) : __( 'Marcar como pagado', 'arriendo-facil' ) ); ?></button>
+							<?php endif; ?>
+							<?php $af_timeline( $svc['timeline'] ); ?>
+						</li>
+					<?php endforeach; ?>
+				</ul>
+			<?php endif; ?>
+		</section>
+
+		<!-- ───────── Incidentes ───────── -->
+		<section class="af-tp-card" data-tp-panel="incidents" role="tabpanel" hidden>
+			<h2 class="af-tp-h2"><?php esc_html_e( 'Reportar un incidente', 'arriendo-facil' ); ?></h2>
+			<?php if ( empty( $af_open ) ) : ?>
+				<p class="af-tp-empty"><?php esc_html_e( 'Podrás reportar incidentes cuando tengas un contrato vigente.', 'arriendo-facil' ); ?></p>
+			<?php else : ?>
+				<p class="af-tp-lead af-tp-lead--left"><?php esc_html_e( 'Cuéntanos qué se dañó y adjunta fotos. Tu administrador lo ve de inmediato y todo queda registrado.', 'arriendo-facil' ); ?></p>
+				<form class="af-tp-form" data-tp-form="af_tpa_incident_report" novalidate>
+					<p class="af-tp-alert" role="alert" data-tp-msg hidden></p>
 					<?php if ( count( $af_open ) > 1 ) : ?>
 						<label class="af-tp-label" for="af-tp-lease"><?php esc_html_e( 'Inmueble', 'arriendo-facil' ); ?></label>
 						<select class="af-tp-input" id="af-tp-lease" name="lease_id" required>
@@ -253,41 +432,236 @@ get_header();
 						</div>
 					</div>
 
-					<label class="af-tp-label" for="af-tp-where"><?php esc_html_e( '¿Dónde ocurre? (opcional)', 'arriendo-facil' ); ?></label>
-					<input class="af-tp-input" type="text" id="af-tp-where" name="asset_location" maxlength="120" placeholder="<?php esc_attr_e( 'Ej. baño principal', 'arriendo-facil' ); ?>" />
+					<div class="af-tp-row">
+						<div>
+							<label class="af-tp-label" for="af-tp-asset"><?php esc_html_e( '¿Qué se dañó?', 'arriendo-facil' ); ?></label>
+							<input class="af-tp-input" type="text" id="af-tp-asset" name="asset_name" maxlength="190" placeholder="<?php esc_attr_e( 'Ej. calefón, llave del lavabo', 'arriendo-facil' ); ?>" />
+						</div>
+						<div>
+							<label class="af-tp-label" for="af-tp-where"><?php esc_html_e( '¿Dónde?', 'arriendo-facil' ); ?></label>
+							<input class="af-tp-input" type="text" id="af-tp-where" name="asset_location" maxlength="120" placeholder="<?php esc_attr_e( 'Ej. baño principal', 'arriendo-facil' ); ?>" />
+						</div>
+					</div>
 
 					<label class="af-tp-label" for="af-tp-details"><?php esc_html_e( 'Cuéntanos qué pasó', 'arriendo-facil' ); ?></label>
 					<textarea class="af-tp-input" id="af-tp-details" name="damage_details" rows="4" minlength="10" maxlength="1000" required></textarea>
 
-					<button class="af-tp-btn af-tp-btn--primary" type="submit" data-tp-submit><?php esc_html_e( 'Enviar novedad', 'arriendo-facil' ); ?></button>
+					<?php $af_files_input(); ?>
+					<button class="af-tp-btn af-tp-btn--primary" type="submit" data-tp-submit><?php esc_html_e( 'Enviar incidente', 'arriendo-facil' ); ?></button>
 				</form>
 			<?php endif; ?>
 
-			<h2 class="af-tp-h2"><?php esc_html_e( 'Mis novedades', 'arriendo-facil' ); ?></h2>
-			<?php if ( empty( $af_data['requests'] ) ) : ?>
-				<p class="af-tp-empty"><?php esc_html_e( 'No has reportado novedades.', 'arriendo-facil' ); ?></p>
+			<h2 class="af-tp-h2"><?php esc_html_e( 'Mis incidentes', 'arriendo-facil' ); ?></h2>
+			<?php if ( empty( $af_incidents ) ) : ?>
+				<p class="af-tp-empty"><?php esc_html_e( 'No has reportado incidentes.', 'arriendo-facil' ); ?></p>
 			<?php else : ?>
-				<ul class="af-tp-list">
-					<?php foreach ( $af_data['requests'] as $af_req ) : ?>
-						<?php $af_rtone = 'completed' === $af_req->status ? 'ok' : ( 'in_progress' === $af_req->status ? 'warn' : ( 'cancelled' === $af_req->status ? 'info' : 'bad' ) ); ?>
-						<li class="af-tp-item">
-							<div class="af-tp-item__main">
-								<strong><?php echo esc_html( isset( $af_req_ty[ $af_req->request_type ] ) ? $af_req_ty[ $af_req->request_type ] : ucfirst( (string) $af_req->request_type ) ); ?> · <?php echo esc_html( $af_date( $af_req->requested_date ) ); ?></strong>
-								<small><?php echo esc_html( wp_trim_words( (string) $af_req->damage_details, 18 ) ); ?></small>
+				<ul class="af-tp-stack">
+					<?php foreach ( $af_incidents as $inc ) : ?>
+						<?php
+						$rtone = 'completed' === $inc->status ? 'ok' : ( 'in_progress' === $inc->status ? 'warn' : ( 'cancelled' === $inc->status ? 'info' : 'bad' ) );
+						$act   = Arriendo_Facil_Portal_Incidents::tenant_action( $inc );
+						?>
+						<li class="af-tp-svc">
+							<div class="af-tp-svc__top">
+								<div class="af-tp-item__main">
+									<strong><?php echo esc_html( ( $inc->asset_name ? $inc->asset_name : ( $af_req_ty[ $inc->request_type ] ?? ucfirst( (string) $inc->request_type ) ) ) . ' · ' . $af_date( $inc->requested_date ) ); ?></strong>
+									<small><?php echo esc_html( wp_trim_words( (string) $inc->damage_details, 24 ) ); ?></small>
+								</div>
+								<span class="af-tp-pill is-<?php echo esc_attr( $rtone ); ?>"><?php echo esc_html( $af_req_st[ $inc->status ] ?? $inc->status ); ?></span>
 							</div>
-							<div class="af-tp-item__side">
-								<span class="af-tp-pill is-<?php echo esc_attr( $af_rtone ); ?>"><?php echo esc_html( isset( $af_req_st[ $af_req->status ] ) ? $af_req_st[ $af_req->status ] : $af_req->status ); ?></span>
-								<?php if ( $af_req->scheduled_date ) : ?>
-									<small><?php echo esc_html( sprintf( /* translators: %s: date */ __( 'Visita: %s', 'arriendo-facil' ), $af_date( $af_req->scheduled_date ) ) ); ?></small>
+
+							<div class="af-tp-tags">
+								<span class="af-tp-pill is-<?php echo esc_attr( 'tenant' === $inc->responsibility ? 'bad' : ( 'owner' === $inc->responsibility ? 'ok' : 'info' ) ); ?>"><?php echo esc_html( $af_resp_lbl[ $inc->responsibility ] ?? $inc->responsibility ); ?></span>
+								<?php if ( $inc->recurrence_of_id ) : ?>
+									<span class="af-tp-pill is-warn"><?php esc_html_e( 'Reincidencia', 'arriendo-facil' ); ?></span>
+								<?php endif; ?>
+								<?php if ( $inc->scheduled_date ) : ?>
+									<span class="af-tp-pill is-info"><?php echo esc_html( sprintf( /* translators: %s: date */ __( 'Visita: %s', 'arriendo-facil' ), $af_date( $inc->scheduled_date ) ) ); ?></span>
 								<?php endif; ?>
 							</div>
+
+							<?php if ( $inc->responsibility_note ) : ?>
+								<p class="af-tp-alert is-note"><strong><?php esc_html_e( 'Motivo registrado:', 'arriendo-facil' ); ?></strong> <?php echo esc_html( $inc->responsibility_note ); ?></p>
+							<?php endif; ?>
+
+							<?php if ( $inc->report_evidence ) : ?><p class="af-tp-meta"><?php esc_html_e( 'Tus fotos', 'arriendo-facil' ); ?></p><?php $af_gallery( $inc->report_evidence ); ?><?php endif; ?>
+							<?php if ( $inc->repair_evidence ) : ?><p class="af-tp-meta"><?php esc_html_e( 'Evidencia de la reparación', 'arriendo-facil' ); ?></p><?php $af_gallery( $inc->repair_evidence ); ?><?php endif; ?>
+
+							<?php if ( 'upload_repair' === $act ) : ?>
+								<form class="af-tp-form af-tp-form--inline" data-tp-form="af_tpa_incident_evidence" novalidate>
+									<p class="af-tp-alert" role="alert" data-tp-msg hidden></p>
+									<input type="hidden" name="request_id" value="<?php echo esc_attr( $inc->id ); ?>" />
+									<p class="af-tp-meta"><?php esc_html_e( 'Esta reparación te corresponde. Cuando esté lista, sube fotos del resultado o la factura.', 'arriendo-facil' ); ?></p>
+									<?php $af_files_input(); ?>
+									<button class="af-tp-btn af-tp-btn--primary" type="submit" data-tp-submit><?php esc_html_e( 'Subir evidencia de reparación', 'arriendo-facil' ); ?></button>
+								</form>
+							<?php elseif ( 'confirm' === $act ) : ?>
+								<form class="af-tp-form af-tp-form--inline" data-tp-form="af_tpa_incident_ack" novalidate>
+									<p class="af-tp-alert" role="alert" data-tp-msg hidden></p>
+									<input type="hidden" name="request_id" value="<?php echo esc_attr( $inc->id ); ?>" />
+									<p class="af-tp-meta"><strong><?php esc_html_e( '¿La reparación quedó bien?', 'arriendo-facil' ); ?></strong> <?php esc_html_e( 'Tu respuesta queda como constancia.', 'arriendo-facil' ); ?></p>
+									<input class="af-tp-input" type="text" name="note" maxlength="255" placeholder="<?php esc_attr_e( 'Comentario (obligatorio si no estás conforme)', 'arriendo-facil' ); ?>" />
+									<div class="af-tp-row">
+										<button class="af-tp-btn af-tp-btn--primary" type="submit" name="answer" value="conforme" data-tp-submit><?php esc_html_e( 'Recibí conforme', 'arriendo-facil' ); ?></button>
+										<button class="af-tp-btn af-tp-btn--ghost" type="submit" name="answer" value="no_conforme" data-tp-submit><?php esc_html_e( 'No estoy conforme', 'arriendo-facil' ); ?></button>
+									</div>
+								</form>
+							<?php elseif ( $inc->tenant_ack ) : ?>
+								<p class="af-tp-meta"><?php echo esc_html( sprintf( /* translators: 1: answer, 2: date */ __( 'Tu respuesta: %1$s (%2$s)', 'arriendo-facil' ), 'conforme' === $inc->tenant_ack ? __( 'conforme', 'arriendo-facil' ) : __( 'no conforme', 'arriendo-facil' ), $af_dt( $inc->tenant_ack_at ) ) ); ?></p>
+							<?php endif; ?>
+
+							<?php $af_timeline( $inc->timeline ); ?>
 						</li>
 					<?php endforeach; ?>
 				</ul>
 			<?php endif; ?>
 		</section>
 
-		<p class="af-tp-fine"><?php esc_html_e( 'Por seguridad la sesión se cierra sola tras un rato sin actividad.', 'arriendo-facil' ); ?></p>
+		<!-- ───────── Perfil ───────── -->
+		<section class="af-tp-card" data-tp-panel="profile" role="tabpanel" hidden>
+			<h2 class="af-tp-h2"><?php esc_html_e( 'Mis datos', 'arriendo-facil' ); ?></h2>
+			<dl class="af-tp-facts">
+				<div><dt><?php esc_html_e( 'Nombre', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( $af_name ); ?></dd></div>
+				<div><dt><?php esc_html_e( 'Correo', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( $af_guest->email ); ?></dd></div>
+				<div><dt><?php esc_html_e( 'Identificación', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( $af_idmask ); ?></dd></div>
+			</dl>
+
+			<form class="af-tp-form" data-tp-form="af_tpa_profile_save" novalidate>
+				<p class="af-tp-alert" role="alert" data-tp-msg hidden></p>
+				<div class="af-tp-row">
+					<div>
+						<label class="af-tp-label" for="af-tp-phone"><?php esc_html_e( 'Teléfono', 'arriendo-facil' ); ?></label>
+						<input class="af-tp-input" type="tel" id="af-tp-phone" name="phone" inputmode="tel" autocomplete="tel" maxlength="20" value="<?php echo esc_attr( (string) $af_guest->phone ); ?>" required />
+					</div>
+					<div>
+						<label class="af-tp-label" for="af-tp-occ"><?php esc_html_e( 'Ocupación', 'arriendo-facil' ); ?></label>
+						<input class="af-tp-input" type="text" id="af-tp-occ" name="occupation" maxlength="120" value="<?php echo esc_attr( (string) ( $af_guest->occupation ?? '' ) ); ?>" />
+					</div>
+				</div>
+				<label class="af-tp-label" for="af-tp-addr"><?php esc_html_e( 'Dirección', 'arriendo-facil' ); ?></label>
+				<input class="af-tp-input" type="text" id="af-tp-addr" name="home_address" maxlength="255" autocomplete="street-address" value="<?php echo esc_attr( (string) ( $af_guest->home_address ?? '' ) ); ?>" />
+				<label class="af-tp-label" for="af-tp-emerg"><?php esc_html_e( 'Contacto de emergencia (nombre y teléfono)', 'arriendo-facil' ); ?></label>
+				<input class="af-tp-input" type="text" id="af-tp-emerg" name="emergency_contact" maxlength="190" value="<?php echo esc_attr( (string) ( $af_guest->emergency_contact ?? '' ) ); ?>" />
+				<button class="af-tp-btn af-tp-btn--primary" type="submit" data-tp-submit><?php esc_html_e( 'Guardar cambios', 'arriendo-facil' ); ?></button>
+			</form>
+
+			<details class="af-tp-more">
+				<summary><?php esc_html_e( 'Cambiar mi correo', 'arriendo-facil' ); ?></summary>
+				<form class="af-tp-form" data-tp-form="af_tpa_email_request" data-tp-reveal="#af-tp-email-code" novalidate>
+					<p class="af-tp-alert" role="alert" data-tp-msg hidden></p>
+					<label class="af-tp-label" for="af-tp-newmail"><?php esc_html_e( 'Correo nuevo', 'arriendo-facil' ); ?></label>
+					<input class="af-tp-input" type="email" id="af-tp-newmail" name="new_email" autocomplete="email" maxlength="190" required />
+					<button class="af-tp-btn" type="submit" data-tp-submit><?php esc_html_e( 'Enviar código al correo nuevo', 'arriendo-facil' ); ?></button>
+				</form>
+				<form class="af-tp-form" id="af-tp-email-code" data-tp-form="af_tpa_email_verify" novalidate hidden>
+					<p class="af-tp-alert" role="alert" data-tp-msg hidden></p>
+					<label class="af-tp-label" for="af-tp-mailcode"><?php esc_html_e( 'Código de 6 dígitos', 'arriendo-facil' ); ?></label>
+					<input class="af-tp-input af-tp-input--code" type="text" id="af-tp-mailcode" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required />
+					<button class="af-tp-btn af-tp-btn--primary" type="submit" data-tp-submit><?php esc_html_e( 'Confirmar cambio', 'arriendo-facil' ); ?></button>
+				</form>
+			</details>
+
+			<details class="af-tp-more">
+				<summary><?php esc_html_e( 'Corregir nombre o identificación', 'arriendo-facil' ); ?></summary>
+				<p class="af-tp-meta"><?php esc_html_e( 'Por seguridad estos datos los cambia tu administrador. Cuéntanos qué corregir y lo revisará con tu documento.', 'arriendo-facil' ); ?></p>
+				<form class="af-tp-form" data-tp-form="af_tpa_correction" novalidate>
+					<p class="af-tp-alert" role="alert" data-tp-msg hidden></p>
+					<select class="af-tp-input" name="field"><option value="name"><?php esc_html_e( 'Nombre', 'arriendo-facil' ); ?></option><option value="id_number"><?php esc_html_e( 'Identificación', 'arriendo-facil' ); ?></option></select>
+					<input class="af-tp-input" type="text" name="value" maxlength="190" placeholder="<?php esc_attr_e( 'Valor correcto', 'arriendo-facil' ); ?>" required />
+					<input class="af-tp-input" type="text" name="note" maxlength="255" placeholder="<?php esc_attr_e( 'Motivo (opcional)', 'arriendo-facil' ); ?>" />
+					<button class="af-tp-btn" type="submit" data-tp-submit><?php esc_html_e( 'Solicitar corrección', 'arriendo-facil' ); ?></button>
+				</form>
+			</details>
+
+			<h2 class="af-tp-h2"><?php esc_html_e( 'Mis documentos', 'arriendo-facil' ); ?>
+				<span class="af-tp-pill is-<?php echo esc_attr( 'verificado' === $af_docs['status'] ? 'ok' : ( 'rechazado' === $af_docs['status'] ? 'bad' : 'info' ) ); ?>"><?php echo esc_html( ucfirst( $af_docs['status'] ) ); ?></span>
+			</h2>
+			<ul class="af-tp-list">
+				<?php foreach ( $af_docs['types'] as $key => $doc ) : ?>
+					<li class="af-tp-item">
+						<div class="af-tp-item__main">
+							<strong><?php echo esc_html( $doc['label'] ); ?></strong>
+							<small><?php echo esc_html( $doc['uploaded'] ? sprintf( /* translators: %s: date */ __( 'Subido %s', 'arriendo-facil' ), $af_dt( $doc['uploaded_at'] ) ) : ( $doc['required'] ? __( 'Falta · requerido', 'arriendo-facil' ) : ( $doc['income'] ? __( 'Opcional · comprobante de ingresos', 'arriendo-facil' ) : __( 'Opcional', 'arriendo-facil' ) ) ) ); ?></small>
+						</div>
+						<button type="button" class="af-tp-btn af-tp-btn--small" data-tp-open-doc data-type="<?php echo esc_attr( $key ); ?>" data-label="<?php echo esc_attr( $doc['label'] ); ?>"><?php echo esc_html( $doc['uploaded'] ? __( 'Reemplazar', 'arriendo-facil' ) : __( 'Subir', 'arriendo-facil' ) ); ?></button>
+					</li>
+				<?php endforeach; ?>
+			</ul>
+			<p class="af-tp-meta"><?php esc_html_e( 'Tus documentos se guardan en un espacio privado y solo los ve tu administrador. No se pueden descargar desde aquí.', 'arriendo-facil' ); ?></p>
+		</section>
+
+		<!-- Diálogos -->
+		<dialog class="af-tp-dialog" data-tp-dialog="pay" aria-labelledby="af-tp-pay-title">
+			<form class="af-tp-form" data-tp-form="af_tpa_service_pay" novalidate>
+				<h2 class="af-tp-h2" id="af-tp-pay-title"><?php esc_html_e( 'Registrar pago', 'arriendo-facil' ); ?></h2>
+				<p class="af-tp-meta" data-tp-dialog-label></p>
+				<p class="af-tp-alert" role="alert" data-tp-msg hidden></p>
+				<input type="hidden" name="schedule_id" /><input type="hidden" name="period" />
+				<div class="af-tp-row">
+					<div><label class="af-tp-label" for="af-tp-paid-on"><?php esc_html_e( 'Fecha de pago', 'arriendo-facil' ); ?></label>
+						<input class="af-tp-input" type="date" id="af-tp-paid-on" name="paid_on" max="<?php echo esc_attr( current_time( 'Y-m-d' ) ); ?>" value="<?php echo esc_attr( current_time( 'Y-m-d' ) ); ?>" required /></div>
+					<div><label class="af-tp-label" for="af-tp-amount"><?php esc_html_e( 'Monto pagado ($)', 'arriendo-facil' ); ?></label>
+						<input class="af-tp-input" type="text" id="af-tp-amount" name="amount" inputmode="decimal" required /></div>
+				</div>
+				<label class="af-tp-label" for="af-tp-ref"><?php esc_html_e( 'Referencia (opcional)', 'arriendo-facil' ); ?></label>
+				<input class="af-tp-input" type="text" id="af-tp-ref" name="reference" maxlength="190" />
+				<?php $af_files_input(); ?>
+				<div class="af-tp-row">
+					<button class="af-tp-btn af-tp-btn--ghost" type="button" data-tp-close><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
+					<button class="af-tp-btn af-tp-btn--primary" type="submit" data-tp-submit><?php esc_html_e( 'Enviar pago', 'arriendo-facil' ); ?></button>
+				</div>
+			</form>
+		</dialog>
+
+		<dialog class="af-tp-dialog" data-tp-dialog="delivery" aria-labelledby="af-tp-del-title">
+			<form class="af-tp-form" data-tp-form="af_tpa_delivery" novalidate>
+				<h2 class="af-tp-h2" id="af-tp-del-title"><?php esc_html_e( 'Informar entrega de dinero', 'arriendo-facil' ); ?></h2>
+				<p class="af-tp-meta" data-tp-dialog-label></p>
+				<p class="af-tp-alert" role="alert" data-tp-msg hidden></p>
+				<input type="hidden" name="schedule_id" /><input type="hidden" name="period" />
+				<label class="af-tp-label" for="af-tp-del-method"><?php esc_html_e( 'Cómo se lo entregaste', 'arriendo-facil' ); ?></label>
+				<select class="af-tp-input" id="af-tp-del-method" name="method" required data-tp-method>
+					<?php foreach ( $af_methods as $mk => $ml ) : ?>
+						<option value="<?php echo esc_attr( $mk ); ?>"><?php echo esc_html( $ml ); ?></option>
+					<?php endforeach; ?>
+				</select>
+				<div class="af-tp-row">
+					<div><label class="af-tp-label" for="af-tp-del-on"><?php esc_html_e( 'Fecha de entrega', 'arriendo-facil' ); ?></label>
+						<input class="af-tp-input" type="date" id="af-tp-del-on" name="delivered_on" max="<?php echo esc_attr( current_time( 'Y-m-d' ) ); ?>" value="<?php echo esc_attr( current_time( 'Y-m-d' ) ); ?>" required /></div>
+					<div><label class="af-tp-label" for="af-tp-del-amount"><?php esc_html_e( 'Monto entregado ($)', 'arriendo-facil' ); ?></label>
+						<input class="af-tp-input" type="text" id="af-tp-del-amount" name="amount" inputmode="decimal" required /></div>
+				</div>
+				<label class="af-tp-label" for="af-tp-del-ref"><?php esc_html_e( 'Referencia (opcional)', 'arriendo-facil' ); ?></label>
+				<input class="af-tp-input" type="text" id="af-tp-del-ref" name="reference" maxlength="190" />
+				<p class="af-tp-meta" data-tp-proof-hint><?php esc_html_e( 'En efectivo el comprobante es opcional: tu administrador te emitirá un recibo al confirmar. En transferencia o depósito sube la foto del comprobante.', 'arriendo-facil' ); ?></p>
+				<?php $af_files_input(); ?>
+				<div class="af-tp-row">
+					<button class="af-tp-btn af-tp-btn--ghost" type="button" data-tp-close><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
+					<button class="af-tp-btn af-tp-btn--primary" type="submit" data-tp-submit><?php esc_html_e( 'Enviar', 'arriendo-facil' ); ?></button>
+				</div>
+			</form>
+		</dialog>
+
+		<dialog class="af-tp-dialog" data-tp-dialog="doc" aria-labelledby="af-tp-doc-title">
+			<form class="af-tp-form" data-tp-form="af_tpa_doc_upload" novalidate>
+				<h2 class="af-tp-h2" id="af-tp-doc-title"><?php esc_html_e( 'Subir documento', 'arriendo-facil' ); ?></h2>
+				<p class="af-tp-meta" data-tp-dialog-label></p>
+				<p class="af-tp-alert" role="alert" data-tp-msg hidden></p>
+				<input type="hidden" name="doc_type" />
+				<?php $af_files_input(); ?>
+				<div class="af-tp-row">
+					<button class="af-tp-btn af-tp-btn--ghost" type="button" data-tp-close><?php esc_html_e( 'Cancelar', 'arriendo-facil' ); ?></button>
+					<button class="af-tp-btn af-tp-btn--primary" type="submit" data-tp-submit><?php esc_html_e( 'Subir', 'arriendo-facil' ); ?></button>
+				</div>
+			</form>
+		</dialog>
+
+		<div class="af-tp-idle" data-tp-idle role="alertdialog" aria-live="assertive" hidden>
+			<span><?php esc_html_e( 'Tu sesión se cerrará pronto por inactividad.', 'arriendo-facil' ); ?></span>
+			<button type="button" class="af-tp-btn af-tp-btn--small af-tp-btn--primary" data-tp-stay><?php esc_html_e( 'Seguir aquí', 'arriendo-facil' ); ?></button>
+		</div>
+
+		<p class="af-tp-fine"><?php esc_html_e( 'Por seguridad la sesión se cierra sola tras 30 minutos sin actividad.', 'arriendo-facil' ); ?></p>
 
 	<?php endif; ?>
 </main>

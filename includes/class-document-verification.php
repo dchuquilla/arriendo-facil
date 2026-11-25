@@ -332,6 +332,37 @@ class Arriendo_Facil_Document_Verification {
 	}
 
 	/**
+	 * ¿Nombre e identificación están bloqueados para el inquilino?
+	 *
+	 * Lo están cuando la ficha ya fue aprobada por el gestor ("verificado") o cuando está
+	 * en revisión: pendiente y con documentos subidos. Desde ese punto solo el gestor
+	 * puede cambiarlos; el inquilino pide la corrección y queda registrada.
+	 *
+	 * @param int $guest_id Guest ID.
+	 * @return bool
+	 */
+	public static function identity_locked( $guest_id ) {
+		global $wpdb;
+
+		$guest_id = absint( $guest_id );
+		if ( ! $guest_id ) {
+			return false;
+		}
+
+		$status = self::get_status( $guest_id );
+		if ( 'verificado' === $status ) {
+			return true;
+		}
+		if ( 'pendiente' !== $status ) {
+			return false; // Rechazado: puede corregir y volver a enviar.
+		}
+
+		return (int) $wpdb->get_var(
+			$wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}af_guest_documents WHERE guest_id = %d", $guest_id )
+		) > 0;
+	}
+
+	/**
 	 * Whether a tenant's identity documents are verified.
 	 *
 	 * @param int $guest_id Guest ID.

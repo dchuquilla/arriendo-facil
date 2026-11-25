@@ -1583,7 +1583,7 @@ array(
 						<?php echo af_lucide( 'crown', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static SVG helper. ?>
 						<span class="af-plan-chip__text">
 							<strong><?php echo esc_html( sprintf( /* translators: %s: plan name */ __( 'Plan %s', 'arriendo-facil' ), $af_plan_def['label'] ) ); ?></strong>
-							<small><?php echo 'pro' === Arriendo_Facil_Plans::get_plan() ? esc_html__( 'Administrar plan', 'arriendo-facil' ) : esc_html__( 'Mejorar plan', 'arriendo-facil' ); ?></small>
+							<small><?php echo 'empresarial' === Arriendo_Facil_Plans::get_plan() ? esc_html__( 'Administrar plan', 'arriendo-facil' ) : esc_html__( 'Mejorar plan', 'arriendo-facil' ); ?></small>
 						</span>
 					</a>
 				<?php endif; ?>

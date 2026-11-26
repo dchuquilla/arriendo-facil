@@ -434,6 +434,49 @@
 			});
 		});
 
+		/* Formularios de pago de canon de arriendo. */
+		$$('form[data-tp-canon-form]').forEach(function (form) {
+			form.addEventListener('submit', function (e) {
+				e.preventDefault();
+				var msg     = $('[data-tp-msg]', form);
+				show(msg, '');
+				msg.classList.remove('is-ok');
+
+				var fileInput = $('[data-tp-files]', form);
+				if ( fileInput && ! fileInput.files.length ) { show(msg, i18n.needFile); return; }
+				var fileError = checkFiles(form);
+				if (fileError) { show(msg, fileError); return; }
+
+				var chargeId = form.getAttribute('data-tp-canon-form');
+				var data     = new FormData(form);
+				data.append('action', 'af_tpa_canon_pay');
+				data.append('csrf', cfg.csrf);
+				data.append('charge_id', chargeId);
+
+				var buttons = $$('[data-tp-submit]', form);
+				buttons.forEach(function (b) { b.disabled = true; b.dataset.label = b.textContent; });
+				if (e.submitter) { e.submitter.textContent = fileInput && fileInput.files.length ? i18n.uploading : i18n.saving; }
+
+				fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: data })
+					.then(function (r) { return r.json().catch(function () { return { success: false, data: {} }; }); })
+					.then(function (res) {
+						buttons.forEach(function (b) { b.disabled = false; b.textContent = b.dataset.label; });
+						if (res.success) {
+							msg.classList.add('is-ok');
+							show(msg, (res.data && res.data.message) || '');
+							window.setTimeout(function () { window.location.reload(); }, 900);
+							return;
+						}
+						if (res.data && res.data.code === 'session') { window.location.reload(); return; }
+						show(msg, (res.data && res.data.message) || i18n.network);
+					})
+					.catch(function () {
+						buttons.forEach(function (b) { b.disabled = false; b.textContent = b.dataset.label; });
+						show(msg, i18n.network);
+					});
+			});
+		});
+
 		/* Aviso antes de que la sesión se cierre por inactividad. */
 		var idle = $('[data-tp-idle]');
 		if (idle) {

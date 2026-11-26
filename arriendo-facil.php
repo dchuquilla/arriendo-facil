@@ -93,6 +93,7 @@ require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-portal-schema.p
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-portal-events.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-portal-evidence.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-portal-services.php';
+require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-portal-canon.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-portal-incidents.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-portal-collections.php';
 require_once ARRIENDO_FACIL_PLUGIN_DIR . 'includes/tenants/class-portal-profile.php';
@@ -316,6 +317,7 @@ function arriendo_facil_init() {
 		'Arriendo_Facil_Tenant_Access',
 		'Arriendo_Facil_Portal_Schema',
 		'Arriendo_Facil_Portal_Services',
+		'Arriendo_Facil_Portal_Canon',
 		'Arriendo_Facil_Portal_Incidents',
 		'Arriendo_Facil_Portal_Collections',
 		'Arriendo_Facil_Portal_Profile',

@@ -1025,6 +1025,7 @@ class Arriendo_Facil_Activator {
 
 		self::maybe_add_maintenance_repair_columns();
 		self::maybe_add_service_provider_columns();
+		self::maybe_create_payment_submissions_table();
 
 		$meter_readings_table = $wpdb->prefix . 'af_meter_readings';
 
@@ -1821,6 +1822,43 @@ class Arriendo_Facil_Activator {
 				$wpdb->query( "ALTER TABLE {$table} ADD COLUMN {$column} {$definition}" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			}
 		}
+	}
+
+	/**
+	 * Creates af_payment_submissions (tenant-submitted canon payment proofs).
+	 * Uses IF NOT EXISTS so it is safe to call on every activation.
+	 */
+	private static function maybe_create_payment_submissions_table(): void {
+		global $wpdb;
+
+		$table = $wpdb->prefix . 'af_payment_submissions';
+
+		if ( $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s', DB_NAME, $table ) ) ) {
+			return; // already exists
+		}
+
+		$charset_collate = $wpdb->get_charset_collate();
+		$wpdb->query(
+			"CREATE TABLE IF NOT EXISTS {$table} (
+			  id          BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+			  charge_id   BIGINT(20) UNSIGNED NOT NULL,
+			  guest_id    BIGINT(20) UNSIGNED NOT NULL,
+			  lease_id    BIGINT(20) UNSIGNED NOT NULL,
+			  amount      DECIMAL(12,2)       NOT NULL,
+			  paid_on     DATE                NOT NULL,
+			  method      VARCHAR(50)         NOT NULL DEFAULT 'transferencia',
+			  reference   VARCHAR(255)        DEFAULT NULL,
+			  status      VARCHAR(20)         NOT NULL DEFAULT 'submitted',
+			  reviewed_by BIGINT(20) UNSIGNED DEFAULT NULL,
+			  reviewed_at DATETIME            DEFAULT NULL,
+			  review_note VARCHAR(255)        DEFAULT NULL,
+			  created_at  DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			  PRIMARY KEY (id),
+			  INDEX idx_cps_charge   (charge_id),
+			  INDEX idx_cps_guest_st (guest_id, status),
+			  INDEX idx_cps_status   (status, created_at)
+			) {$charset_collate}" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		);
 	}
 
 	/**

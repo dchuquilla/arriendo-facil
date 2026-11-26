@@ -24,7 +24,7 @@ class Arriendo_Facil_Portal_Manager {
 	 * Hooks.
 	 */
 	public function __construct() {
-		foreach ( array( 'set_payer', 'review_payment', 'set_responsibility', 'quick_set_responsibility', 'schedule_repair', 'repair_evidence', 'remove_evidence', 'review_profile' ) as $action ) {
+		foreach ( array( 'set_payer', 'review_payment', 'review_canon', 'set_responsibility', 'quick_set_responsibility', 'schedule_repair', 'repair_evidence', 'remove_evidence', 'review_profile' ) as $action ) {
 			add_action( 'wp_ajax_af_portal_' . $action, array( $this, 'ajax_' . $action ) );
 		}
 		add_action( 'wp_ajax_af_portal_evidence_view', array( $this, 'ajax_evidence_view' ) );
@@ -284,6 +284,138 @@ class Arriendo_Facil_Portal_Manager {
 		);
 
 		wp_send_json_success( array( 'message' => 'approved' === $status ? __( 'Pago aprobado.', 'arriendo-facil' ) : __( 'Comprobante rechazado. Se avisó al inquilino.', 'arriendo-facil' ) ) );
+	}
+
+	/* ─────────────────────────────────────────────────────────────────────
+	 * Canon de arriendo — revisión de comprobantes del inquilino
+	 * ─────────────────────────────────────────────────────────────────── */
+
+	/**
+	 * Envíos de canon pendientes de revisión.
+	 *
+	 * @return array<int,object>
+	 */
+	public static function pending_canon_submissions(): array {
+		global $wpdb;
+
+		if ( ! class_exists( 'Arriendo_Facil_Portal_Canon' ) ) {
+			return array();
+		}
+
+		$table = Arriendo_Facil_Portal_Canon::submissions_table();
+		$ids   = Arriendo_Facil_Tenancy::accessible_accommodation_ids();
+		if ( is_array( $ids ) && empty( $ids ) ) {
+			return array();
+		}
+		$scope = is_array( $ids ) ? ' AND l.accommodation_id IN (' . implode( ',', array_map( 'absint', $ids ) ) . ')' : '';
+
+		return (array) $wpdb->get_results(
+			"SELECT ps.id, ps.charge_id, ps.guest_id, ps.amount, ps.paid_on, ps.method, ps.reference, ps.created_at,
+			        c.charge_type, c.period, l.accommodation_id,
+			        p.post_title AS property,
+			        CONCAT( g.first_name, ' ', g.last_name ) AS guest_name
+			 FROM {$table} ps
+			 INNER JOIN {$wpdb->prefix}af_charges c ON c.id = ps.charge_id
+			 INNER JOIN {$wpdb->prefix}af_leases  l ON l.id = ps.lease_id
+			 LEFT  JOIN {$wpdb->posts}             p ON p.ID = l.accommodation_id
+			 LEFT  JOIN {$wpdb->prefix}af_guests   g ON g.id = ps.guest_id
+			 WHERE ps.status = 'submitted'{$scope}
+			 ORDER BY ps.created_at ASC LIMIT 100" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		);
+	}
+
+	/**
+	 * AJAX: aprueba o rechaza un comprobante de canon.
+	 *
+	 * @return void
+	 */
+	public function ajax_review_canon(): void {
+		global $wpdb;
+		self::guard();
+
+		if ( ! class_exists( 'Arriendo_Facil_Portal_Canon' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Módulo no disponible.', 'arriendo-facil' ) ), 500 );
+		}
+
+		$sub_id   = isset( $_POST['sub_id'] ) ? absint( wp_unslash( $_POST['sub_id'] ) ) : 0;
+		$decision = isset( $_POST['decision'] ) ? sanitize_key( wp_unslash( $_POST['decision'] ) ) : '';
+		$note     = isset( $_POST['note'] ) ? mb_substr( sanitize_text_field( wp_unslash( $_POST['note'] ) ), 0, 255 ) : '';
+
+		$table = Arriendo_Facil_Portal_Canon::submissions_table();
+		$sub   = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", $sub_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		if ( ! $sub || ! in_array( $decision, array( 'approve', 'reject' ), true ) ) {
+			wp_send_json_error( array( 'message' => __( 'Datos no válidos.', 'arriendo-facil' ) ), 400 );
+		}
+
+		// Verificar alcance del gestor sobre el inmueble.
+		$charge = $wpdb->get_row(
+			$wpdb->prepare( "SELECT c.*, l.accommodation_id FROM {$wpdb->prefix}af_charges c INNER JOIN {$wpdb->prefix}af_leases l ON l.id = c.lease_id WHERE c.id = %d", (int) $sub->charge_id ) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		);
+		if ( ! $charge ) {
+			wp_send_json_error( array( 'message' => __( 'El cargo ya no existe.', 'arriendo-facil' ) ), 404 );
+		}
+		self::guard_accommodation( (int) $charge->accommodation_id );
+
+		if ( 'submitted' !== $sub->status ) {
+			wp_send_json_error( array( 'message' => __( 'Este comprobante ya fue revisado.', 'arriendo-facil' ) ), 409 );
+		}
+		if ( 'reject' === $decision && mb_strlen( $note ) < 5 ) {
+			wp_send_json_error( array( 'message' => __( 'Explica brevemente el motivo del rechazo para que el inquilino pueda corregirlo.', 'arriendo-facil' ) ), 400 );
+		}
+
+		$status = 'approve' === $decision ? 'approved' : 'rejected';
+
+		$wpdb->update(
+			$table,
+			array(
+				'status'      => $status,
+				'reviewed_by' => get_current_user_id(),
+				'reviewed_at' => gmdate( 'Y-m-d H:i:s' ),
+				'review_note' => '' !== $note ? $note : null,
+			),
+			array( 'id' => $sub_id, 'status' => 'submitted' ),
+			array( '%s', '%d', '%s', '%s' ),
+			array( '%d', '%s' )
+		);
+
+		if ( 'approved' === $status ) {
+			// Registrar el pago real en af_payments para que el cargo quede saldado.
+			Arriendo_Facil_Billing_Ledger::record_payment(
+				array(
+					'charge_id'    => (int) $sub->charge_id,
+					'amount'       => (float) $sub->amount,
+					'payment_date' => (string) $sub->paid_on,
+					'method'       => (string) $sub->method,
+					'reference'    => (string) $sub->reference,
+					'notes'        => __( 'Comprobante enviado por inquilino — aprobado por gestor.', 'arriendo-facil' ),
+				)
+			);
+		}
+
+		$type_labels = Arriendo_Facil_Billing_Ledger::charge_types();
+		$type_label  = $type_labels[ $charge->charge_type ] ?? $charge->charge_type;
+
+		Arriendo_Facil_Portal_Events::log(
+			(int) $sub->guest_id,
+			(int) $sub->lease_id,
+			'canon_payment',
+			$sub_id,
+			'manager',
+			get_current_user_id(),
+			'payment_' . $status,
+			array( 'charge_type' => $type_label, 'period' => $charge->period, 'note' => $note )
+		);
+
+		self::notify_tenant(
+			(int) $sub->guest_id,
+			'approved' === $status ? __( 'Tu pago fue aprobado', 'arriendo-facil' ) : __( 'Tu comprobante necesita corrección', 'arriendo-facil' ),
+			'approved' === $status
+				? sprintf( /* translators: 1: type, 2: period */ __( 'Tu pago de %1$s (%2$s) fue aprobado. ¡Gracias!', 'arriendo-facil' ), $type_label, $charge->period )
+				: sprintf( /* translators: 1: type, 2: period, 3: note */ __( 'Tu comprobante de %1$s (%2$s) no fue aceptado: %3$s. Puedes subir uno nuevo desde tu portal.', 'arriendo-facil' ), $type_label, $charge->period, $note )
+		);
+
+		wp_send_json_success( array( 'message' => 'approved' === $status ? __( 'Pago aprobado y registrado.', 'arriendo-facil' ) : __( 'Comprobante rechazado. Se avisó al inquilino.', 'arriendo-facil' ) ) );
 	}
 
 	/* ─────────────────────────────────────────────────────────────────────
@@ -1231,15 +1363,17 @@ class Arriendo_Facil_Portal_Manager {
 	 * @return void
 	 */
 	public static function render_review_queue() {
-		$rows       = self::pending_payments();
-		$deliveries = Arriendo_Facil_Portal_Collections::pending();
-		if ( empty( $rows ) && empty( $deliveries ) ) {
+		$rows        = self::pending_payments();
+		$deliveries  = Arriendo_Facil_Portal_Collections::pending();
+		$canon_subs  = self::pending_canon_submissions();
+		$total_count = count( $rows ) + count( $deliveries ) + count( $canon_subs );
+		if ( ! $total_count ) {
 			return;
 		}
 		$methods = Arriendo_Facil_Portal_Collections::methods();
 		?>
 		<section class="af-section af-portal-queue" aria-labelledby="af-portal-queue-title" data-af-portal-queue>
-			<h2 class="af-section__title" id="af-portal-queue-title"><?php echo esc_html( sprintf( /* translators: %d: count */ _n( '%d comprobante por revisar', '%d comprobantes por revisar', count( $rows ) + count( $deliveries ), 'arriendo-facil' ), count( $rows ) + count( $deliveries ) ) ); ?></h2>
+			<h2 class="af-section__title" id="af-portal-queue-title"><?php echo esc_html( sprintf( /* translators: %d: count */ _n( '%d comprobante por revisar', '%d comprobantes por revisar', $total_count, 'arriendo-facil' ), $total_count ) ); ?></h2>
 			<div class="af-portal-queue__grid">
 				<?php foreach ( $deliveries as $d ) : ?>
 					<?php
@@ -1278,6 +1412,33 @@ class Arriendo_Facil_Portal_Manager {
 						<span><?php echo esc_html( sprintf( /* translators: 1: amount, 2: date */ __( 'Pagó $%1$s el %2$s', 'arriendo-facil' ), number_format_i18n( (float) $row->amount, 2 ), wp_date( 'j M Y', strtotime( $row->paid_on . ' 12:00:00' ) ) ) . ( $row->reference ? ' · ' . $row->reference : '' ) ); ?></span>
 						<div class="af-portal-gallery">
 							<?php foreach ( $files as $ev ) : $url = esc_url( self::evidence_url( (int) $ev->id ) ); ?>
+								<?php if ( 'application/pdf' === $ev->mime_type ) : ?>
+									<a class="af-portal-file" href="<?php echo $url; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>" target="_blank" rel="noopener">PDF</a>
+								<?php else : ?>
+									<a class="af-portal-thumb" href="<?php echo $url; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>" target="_blank" rel="noopener"><img src="<?php echo $url; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>" alt="" loading="lazy" width="72" height="72"></a>
+								<?php endif; ?>
+							<?php endforeach; ?>
+						</div>
+						<input type="text" class="af-portal-queue__note" maxlength="255" placeholder="<?php esc_attr_e( 'Nota (obligatoria si rechazas)', 'arriendo-facil' ); ?>">
+						<div class="af-portal-row">
+							<button type="button" class="button button-primary button-small" data-decision="approve"><?php esc_html_e( 'Aprobar', 'arriendo-facil' ); ?></button>
+							<button type="button" class="button button-small" data-decision="reject"><?php esc_html_e( 'Rechazar', 'arriendo-facil' ); ?></button>
+						</div>
+						<p class="af-portal-msg" data-msg role="status"></p>
+					</article>
+				<?php endforeach; ?>
+				<?php foreach ( $canon_subs as $csub ) : ?>
+					<?php
+					$type_labels = Arriendo_Facil_Billing_Ledger::charge_types();
+					$canon_label = ( $type_labels[ $csub->charge_type ] ?? $csub->charge_type ) . ' · ' . $csub->period;
+					$canon_files = Arriendo_Facil_Portal_Evidence::for_subject( 'canon_payment', (int) $csub->id, (int) $csub->guest_id );
+					?>
+					<article class="af-portal-queue__card" data-canon-sub="<?php echo esc_attr( (string) $csub->id ); ?>">
+						<strong><?php echo esc_html( $canon_label ); ?></strong>
+						<span><?php echo esc_html( trim( (string) $csub->guest_name ) . ' · ' . $csub->property ); ?></span>
+						<span><?php echo esc_html( sprintf( /* translators: 1: amount, 2: date */ __( 'Pagó $%1$s el %2$s', 'arriendo-facil' ), number_format_i18n( (float) $csub->amount, 2 ), wp_date( 'j M Y', strtotime( $csub->paid_on . ' 12:00:00' ) ) ) . ( $csub->reference ? ' · ' . $csub->reference : '' ) ); ?></span>
+						<div class="af-portal-gallery">
+							<?php foreach ( $canon_files as $ev ) : $url = esc_url( self::evidence_url( (int) $ev->id ) ); ?>
 								<?php if ( 'application/pdf' === $ev->mime_type ) : ?>
 									<a class="af-portal-file" href="<?php echo $url; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>" target="_blank" rel="noopener">PDF</a>
 								<?php else : ?>
@@ -1460,13 +1621,17 @@ class Arriendo_Facil_Portal_Manager {
 				}
 				var btn = e.target.closest('[data-af-portal-queue] [data-decision]');
 				if (!btn) { return; }
-				var card = btn.closest('[data-bill],[data-delivery]');
+				var card = btn.closest('[data-bill],[data-delivery],[data-canon-sub]');
 				var msg = card.querySelector('[data-msg]');
 				card.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
 				var isDelivery = card.hasAttribute('data-delivery');
-				send(isDelivery
+				var isCanon    = card.hasAttribute('data-canon-sub');
+				var payload = isDelivery
 					? { action: 'af_portal_delivery_review', delivery_id: card.getAttribute('data-delivery'), decision: btn.getAttribute('data-decision'), note: card.querySelector('.af-portal-queue__note').value }
-					: { action: 'af_portal_review_payment', bill_id: card.getAttribute('data-bill'), decision: btn.getAttribute('data-decision'), note: card.querySelector('.af-portal-queue__note').value }).then(function (j) {
+					: isCanon
+						? { action: 'af_portal_review_canon', sub_id: card.getAttribute('data-canon-sub'), decision: btn.getAttribute('data-decision'), note: card.querySelector('.af-portal-queue__note').value }
+						: { action: 'af_portal_review_payment', bill_id: card.getAttribute('data-bill'), decision: btn.getAttribute('data-decision'), note: card.querySelector('.af-portal-queue__note').value };
+				send(payload).then(function (j) {
 					msg.textContent = (j && j.data && j.data.message) || '';
 					msg.style.color = j && j.success ? '#1f6e63' : '#b03a36';
 					if (j && j.success) { setTimeout(function () { window.location.reload(); }, 700); }

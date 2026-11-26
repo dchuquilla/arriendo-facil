@@ -940,6 +940,7 @@ class Arriendo_Facil_Tenant_Access {
 			'payments'  => $payments,
 			'requests'  => $requests,
 			'balance'   => round( $balance, 2 ),
+			'canon'     => class_exists( 'Arriendo_Facil_Portal_Canon' ) ? Arriendo_Facil_Portal_Canon::for_guest( (int) $guest->id, $lease_ids, $charges ) : array(),
 			'services'  => Arriendo_Facil_Portal_Services::for_guest( (int) $guest->id, array_map( 'intval', wp_list_pluck( $open_leases, 'accommodation_id' ) ) ),
 			'incidents' => Arriendo_Facil_Portal_Incidents::for_guest( (int) $guest->id, $lease_ids ),
 			'documents' => Arriendo_Facil_Portal_Profile::documents_overview( (int) $guest->id ),

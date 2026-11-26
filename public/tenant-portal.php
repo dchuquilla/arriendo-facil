@@ -123,6 +123,8 @@ get_header();
 		$af_services  = $af_data['services'];
 		$af_incidents = $af_data['incidents'];
 		$af_docs      = $af_data['documents'];
+		$af_canon     = $af_data['canon'] ?? array();
+		$af_canon_todo = class_exists( 'Arriendo_Facil_Portal_Canon' ) ? Arriendo_Facil_Portal_Canon::count_actionable( $af_canon ) : 0;
 		$af_svc_todo  = Arriendo_Facil_Portal_Services::count_actionable( $af_services );
 		$af_inc_open  = count(
 			array_filter(
@@ -199,6 +201,12 @@ get_header();
 			echo '<div class="af-tp-previews" data-tp-previews></div>';
 		};
 		$af_todo = array();
+		foreach ( $af_canon as $cc ) {
+			if ( in_array( $cc['pay_status'], array( 'pending', 'rejected' ), true ) && ! in_array( $cc['charge_status'], array( 'paid', 'void' ), true ) ) {
+				$type_label = $af_type_labels[ $cc['charge_type'] ] ?? $cc['charge_type'];
+				$af_todo[] = array( 'overview', sprintf( /* translators: 1: type, 2: period, 3: date */ __( 'Enviar comprobante de %1$s %2$s (vence %3$s)', 'arriendo-facil' ), $type_label, $cc['period'], $af_date( $cc['due_date'] ) ) );
+			}
+		}
 		foreach ( $af_services as $svc ) {
 			if ( in_array( $svc['pay_status'], array( 'pending', 'rejected' ), true ) ) {
 				$af_todo[] = array( 'services', sprintf( /* translators: 1: service, 2: date */ __( 'Pagar %1$s (vence %2$s)', 'arriendo-facil' ), $svc['service_label'], $af_date( $svc['due_date'] ) ) );
@@ -339,39 +347,82 @@ get_header();
 				</ul>
 			<?php endif; ?>
 
-			<h2 class="af-tp-h2"><?php esc_html_e( 'Cuenta', 'arriendo-facil' ); ?>
+			<h2 class="af-tp-h2"><?php esc_html_e( 'Arriendo', 'arriendo-facil' ); ?>
 				<span class="af-tp-h2__aside <?php echo $af_data['balance'] > 0 ? 'is-bad' : 'is-ok'; ?>"><?php echo esc_html( sprintf( /* translators: %s: amount */ __( 'Saldo pendiente %s', 'arriendo-facil' ), $af_money( $af_data['balance'] ) ) ); ?></span>
 			</h2>
-			<?php if ( empty( $af_data['charges'] ) ) : ?>
+			<p class="af-tp-lead af-tp-lead--left"><?php esc_html_e( 'Cuando pagues el arriendo, sube tu comprobante. Tu administrador lo revisará y quedará guardado como respaldo para los dos.', 'arriendo-facil' ); ?></p>
+			<?php if ( empty( $af_canon ) ) : ?>
 				<p class="af-tp-empty"><?php esc_html_e( 'Todavía no hay cobros registrados.', 'arriendo-facil' ); ?></p>
 			<?php else : ?>
-				<ul class="af-tp-list">
-					<?php foreach ( $af_data['charges'] as $af_charge ) : ?>
-						<?php $af_tone = isset( $af_status_tone[ $af_charge->status ] ) ? $af_status_tone[ $af_charge->status ] : 'info'; ?>
-						<li class="af-tp-item">
-							<div class="af-tp-item__main">
-								<strong><?php echo esc_html( ( isset( $af_type_labels[ $af_charge->charge_type ] ) ? $af_type_labels[ $af_charge->charge_type ] : $af_charge->charge_type ) . ' · ' . $af_charge->period ); ?></strong>
-								<small><?php echo esc_html( sprintf( /* translators: %s: date */ __( 'Vence %s', 'arriendo-facil' ), $af_date( $af_charge->due_date ) ) ); ?></small>
+				<ul class="af-tp-stack">
+					<?php foreach ( $af_canon as $cc ) :
+						$cc_lbl  = $af_pay_lbl[ $cc['pay_status'] ] ?? $af_pay_lbl['pending'];
+						$cc_type = $af_type_labels[ $cc['charge_type'] ] ?? $cc['charge_type'];
+						$cc_can_submit = in_array( $cc['pay_status'], array( 'pending', 'rejected' ), true ) && ! in_array( $cc['charge_status'], array( 'paid', 'void' ), true );
+						$cc_methods = Arriendo_Facil_Billing_Ledger::payment_methods();
+					?>
+						<li class="af-tp-svc" id="af-tp-canon-<?php echo esc_attr( (string) $cc['id'] ); ?>">
+							<div class="af-tp-svc__top">
+								<div class="af-tp-item__main">
+									<strong><?php echo esc_html( $cc_type . ' · ' . $cc['period'] ); ?></strong>
+									<small><?php echo esc_html( sprintf( /* translators: %s: date */ __( 'Vence %s', 'arriendo-facil' ), $af_date( $cc['due_date'] ) ) ); ?></small>
+									<?php if ( $cc['description'] ) : ?><small><?php echo esc_html( $cc['description'] ); ?></small><?php endif; ?>
+								</div>
+								<div class="af-tp-item__side">
+									<strong><?php echo esc_html( $af_money( $cc['amount'] ) ); ?></strong>
+									<span class="af-tp-pill is-<?php echo esc_attr( $cc_lbl[1] ); ?>"><?php echo esc_html( $cc_lbl[0] ); ?></span>
+								</div>
 							</div>
-							<div class="af-tp-item__side">
-								<strong><?php echo esc_html( $af_money( $af_charge->amount ) ); ?></strong>
-								<span class="af-tp-pill is-<?php echo esc_attr( $af_tone ); ?>"><?php echo esc_html( isset( $af_charge_st[ $af_charge->status ] ) ? $af_charge_st[ $af_charge->status ] : $af_charge->status ); ?></span>
-							</div>
-						</li>
-					<?php endforeach; ?>
-				</ul>
-			<?php endif; ?>
 
-			<?php if ( ! empty( $af_data['payments'] ) ) : ?>
-				<h2 class="af-tp-h2"><?php esc_html_e( 'Pagos realizados', 'arriendo-facil' ); ?></h2>
-				<ul class="af-tp-list">
-					<?php foreach ( $af_data['payments'] as $af_pay ) : ?>
-						<li class="af-tp-item">
-							<div class="af-tp-item__main">
-								<strong><?php echo esc_html( $af_date( $af_pay->payment_date ) ); ?></strong>
-								<small><?php echo esc_html( ucfirst( (string) $af_pay->method ) . ( $af_pay->reference ? ' · ' . $af_pay->reference : '' ) ); ?></small>
-							</div>
-							<div class="af-tp-item__side"><strong class="af-tp-money-ok"><?php echo esc_html( $af_money( $af_pay->amount ) ); ?></strong></div>
+							<?php if ( 'rejected' === $cc['pay_status'] && $cc['review_note'] ) : ?>
+								<p class="af-tp-alert is-warn" style="margin:8px 0 0"><?php echo esc_html( sprintf( /* translators: %s: reason */ __( 'Rechazado: %s', 'arriendo-facil' ), $cc['review_note'] ) ); ?></p>
+							<?php endif; ?>
+
+							<?php if ( $cc_can_submit ) : ?>
+								<form class="af-tp-form af-tp-form--canon" data-tp-canon-form="<?php echo esc_attr( (string) $cc['id'] ); ?>" novalidate style="margin-top:12px">
+									<p class="af-tp-alert" role="alert" data-tp-msg hidden></p>
+									<div class="af-tp-row">
+										<div style="flex:1 1 110px">
+											<label class="af-tp-label"><?php esc_html_e( 'Fecha de pago', 'arriendo-facil' ); ?></label>
+											<input class="af-tp-input" type="date" name="paid_on" max="<?php echo esc_attr( current_time( 'Y-m-d' ) ); ?>" required>
+										</div>
+										<div style="flex:1 1 110px">
+											<label class="af-tp-label"><?php esc_html_e( 'Monto pagado', 'arriendo-facil' ); ?></label>
+											<input class="af-tp-input" type="number" name="amount" step="0.01" min="1" value="<?php echo esc_attr( (string) $cc['amount'] ); ?>" required>
+										</div>
+									</div>
+									<div class="af-tp-row">
+										<div style="flex:1 1 130px">
+											<label class="af-tp-label"><?php esc_html_e( 'Método de pago', 'arriendo-facil' ); ?></label>
+											<select class="af-tp-input" name="method">
+												<?php foreach ( $cc_methods as $k => $v ) : ?>
+													<option value="<?php echo esc_attr( $k ); ?>"><?php echo esc_html( $v ); ?></option>
+												<?php endforeach; ?>
+											</select>
+										</div>
+										<div style="flex:1 1 130px">
+											<label class="af-tp-label"><?php esc_html_e( 'Referencia / comprobante No.', 'arriendo-facil' ); ?></label>
+											<input class="af-tp-input" type="text" name="reference" maxlength="190" placeholder="<?php esc_attr_e( 'Opcional', 'arriendo-facil' ); ?>">
+										</div>
+									</div>
+									<?php $af_files_input( __( 'Adjuntar comprobante (requerido)', 'arriendo-facil' ) ); ?>
+									<button class="af-tp-btn af-tp-btn--primary" type="submit" data-tp-submit><?php esc_html_e( 'Enviar comprobante', 'arriendo-facil' ); ?></button>
+								</form>
+							<?php endif; ?>
+
+							<?php if ( 'submitted' === $cc['pay_status'] ) : ?>
+								<p class="af-tp-meta" style="margin-top:8px"><?php echo esc_html( sprintf( /* translators: 1: amount, 2: date */ __( 'Enviaste $%1$s el %2$s. Tu administrador lo revisará pronto.', 'arriendo-facil' ), number_format_i18n( $cc['paid_amount'], 2 ), $af_date( $cc['paid_on'] ) ) ); ?></p>
+								<?php $af_gallery( $cc['evidence'] ); ?>
+							<?php endif; ?>
+
+							<?php if ( 'approved' === $cc['pay_status'] ) : ?>
+								<p class="af-tp-meta" style="margin-top:8px"><?php echo esc_html( sprintf( /* translators: 1: amount, 2: date */ __( '✓ Pago de $%1$s aprobado el %2$s.', 'arriendo-facil' ), number_format_i18n( $cc['paid_amount'], 2 ), $af_date( $cc['paid_on'] ) ) ); ?></p>
+								<?php $af_gallery( $cc['evidence'] ); ?>
+							<?php endif; ?>
+
+							<?php if ( ! empty( $cc['timeline'] ) ) : ?>
+								<?php $af_timeline( $cc['timeline'] ); ?>
+							<?php endif; ?>
 						</li>
 					<?php endforeach; ?>
 				</ul>

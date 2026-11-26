@@ -577,6 +577,7 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 												data-flat="<?php echo esc_attr( (string) $row['flat_amount'] ); ?>"
 												data-mode="<?php echo esc_attr( $row['amount_mode'] ); ?>"
 												data-notes="<?php echo esc_attr( $row['notes'] ); ?>"
+												data-payer="<?php echo esc_attr( (string) $row['payer'] ); ?>"
 											><?php echo af_lucide( 'pencil', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></button>
 											<button type="button" class="af-sp-icon-btn af-delete-schedule" data-schedule="<?php echo esc_attr( (string) $row['schedule_id'] ); ?>" title="<?php esc_attr_e( 'Pausar alertas', 'arriendo-facil' ); ?>" aria-label="<?php esc_attr_e( 'Pausar alertas', 'arriendo-facil' ); ?>">
 												<?php echo af_lucide( 'pause', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
@@ -712,6 +713,15 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 					</div>
 				</div>
 				<p class="af-sp-preview" id="af-schedule-preview" aria-live="polite"></p>
+			</div>
+			<div class="af-modal__field">
+				<span class="af-modal__label" id="af-schedule-payer-label"><?php esc_html_e( 'Lo paga', 'arriendo-facil' ); ?></span>
+				<div class="af-payer" role="radiogroup" aria-labelledby="af-schedule-payer-label" id="af-schedule-payer">
+					<button type="button" class="af-payer__opt is-on" role="radio" aria-checked="true" data-schedule-payer="owner"><?php esc_html_e( 'Propietario', 'arriendo-facil' ); ?></button>
+					<button type="button" class="af-payer__opt" role="radio" aria-checked="false" data-schedule-payer="tenant"><?php esc_html_e( 'Inquilino (a la empresa)', 'arriendo-facil' ); ?></button>
+					<button type="button" class="af-payer__opt" role="radio" aria-checked="false" data-schedule-payer="via_owner"><?php esc_html_e( 'Inquilino (te lo entrega)', 'arriendo-facil' ); ?></button>
+				</div>
+				<p class="af-modal__hint"><?php esc_html_e( 'Si lo paga el inquilino, el servicio aparece en su portal para que suba su comprobante o, si te entrega el dinero, para informar la entrega y recibir su recibo.', 'arriendo-facil' ); ?></p>
 			</div>
 			<div class="af-modal__field">
 				<label for="af-schedule-amount"><?php esc_html_e( 'Monto aproximado (opcional)', 'arriendo-facil' ); ?></label>
@@ -990,6 +1000,22 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 	const scheduleMode = document.getElementById('af-schedule-mode');
 	const scheduleAmount = document.getElementById('af-schedule-amount');
 	const scheduleNotes = document.getElementById('af-schedule-notes');
+	const payerBox = document.getElementById('af-schedule-payer');
+	function setPayer(value) {
+		payerBox.querySelectorAll('[data-schedule-payer]').forEach(function (b) {
+			const on = b.getAttribute('data-schedule-payer') === value;
+			b.classList.toggle('is-on', on);
+			b.setAttribute('aria-checked', on ? 'true' : 'false');
+		});
+	}
+	function getPayer() {
+		const on = payerBox.querySelector('.is-on');
+		return on ? on.getAttribute('data-schedule-payer') : 'owner';
+	}
+	payerBox.addEventListener('click', function (e) {
+		const b = e.target.closest('[data-schedule-payer]');
+		if (b) { setPayer(b.getAttribute('data-schedule-payer')); }
+	});
 	const schedulePreview = document.getElementById('af-schedule-preview');
 	const scheduleConfirm = document.getElementById('af-schedule-confirm');
 	const serviceInputs = Array.prototype.slice.call(scheduleModal.querySelectorAll('input[name="af-schedule-service"]'));
@@ -1115,6 +1141,7 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 		scheduleMode.value = 'auto';
 		scheduleAmount.value = '';
 		scheduleNotes.value = '';
+		setPayer('owner');
 		markConfigured();
 		updatePreview();
 		clearStatus(scheduleStatus);
@@ -1155,6 +1182,7 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 			const flat = parseFloat(btn.getAttribute('data-flat')) || 0;
 			scheduleAmount.value = flat > 0 ? flat.toFixed(2) : '';
 			scheduleNotes.value = btn.getAttribute('data-notes') || '';
+			setPayer(btn.getAttribute('data-payer') || 'owner');
 			markConfigured();
 			updatePreview();
 			clearStatus(scheduleStatus);
@@ -1258,6 +1286,7 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 			amount_mode: scheduleMode.value,
 			flat_amount: scheduleAmount.value || '0',
 			notes: scheduleNotes.value,
+			payer: getPayer(),
 			is_active: '1'
 		}).then(function (json) {
 			scheduleConfirm.disabled = false;

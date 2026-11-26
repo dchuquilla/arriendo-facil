@@ -430,7 +430,7 @@ class Arriendo_Facil_Billing_Ledger {
 			'created_by'       => get_current_user_id(),
 		);
 
-		if ( isset( $data['payer'] ) && in_array( $data['payer'], array( 'owner', 'tenant' ), true ) ) {
+		if ( isset( $data['payer'] ) && in_array( $data['payer'], array( 'owner', 'tenant', 'via_owner' ), true ) && class_exists( 'Arriendo_Facil_Portal_Schema' ) && Arriendo_Facil_Portal_Schema::column_exists( self::schedules_table(), 'payer' ) ) {
 			$row['payer'] = $data['payer'];
 			$row_format[] = '%s';
 		}

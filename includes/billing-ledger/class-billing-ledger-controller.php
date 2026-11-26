@@ -233,6 +233,7 @@ class Arriendo_Facil_Billing_Ledger_Controller {
 				'flat_amount'      => isset( $_POST['flat_amount'] ) ? (float) wp_unslash( $_POST['flat_amount'] ) : 0,
 				'amount_mode'      => isset( $_POST['amount_mode'] ) ? wp_unslash( $_POST['amount_mode'] ) : 'auto',
 				'notes'            => isset( $_POST['notes'] ) ? wp_unslash( $_POST['notes'] ) : '',
+				'payer'            => isset( $_POST['payer'] ) ? sanitize_key( wp_unslash( $_POST['payer'] ) ) : null,
 				'is_active'        => ! empty( $_POST['is_active'] ),
 			)
 		);

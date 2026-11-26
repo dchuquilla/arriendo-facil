@@ -402,6 +402,17 @@ class Arriendo_Facil_Portal_Manager {
 			array( '%d' )
 		);
 
+		// Reemplaza el evento anterior en lugar de acumular duplicados al cambiar la decisión.
+		$wpdb->delete(
+			Arriendo_Facil_Portal_Schema::events_table(),
+			array(
+				'subject_type' => 'incident',
+				'subject_id'   => (int) $row->id,
+				'actor_type'   => 'manager',
+				'action'       => 'responsibility_set',
+			),
+			array( '%s', '%d', '%s', '%s' )
+		);
 		Arriendo_Facil_Portal_Events::log( (int) $row->guest_id, (int) $row->lease_id, 'incident', (int) $row->id, 'manager', get_current_user_id(), 'responsibility_set', array( 'responsibility' => $who ) );
 
 		self::notify_tenant(
@@ -429,30 +440,68 @@ class Arriendo_Facil_Portal_Manager {
 		global $wpdb;
 		self::guard();
 
-		$row   = self::incident_for_manager( isset( $_POST['request_id'] ) ? absint( wp_unslash( $_POST['request_id'] ) ) : 0 );
-		$date  = isset( $_POST['scheduled_date'] ) ? sanitize_text_field( wp_unslash( $_POST['scheduled_date'] ) ) : '';
-		$tech  = isset( $_POST['contact_name'] ) ? mb_substr( sanitize_text_field( wp_unslash( $_POST['contact_name'] ) ), 0, 190 ) : '';
-		$phone = isset( $_POST['contact_phone'] ) ? mb_substr( sanitize_text_field( wp_unslash( $_POST['contact_phone'] ) ), 0, 50 ) : '';
+		$row  = self::incident_for_manager( isset( $_POST['request_id'] ) ? absint( wp_unslash( $_POST['request_id'] ) ) : 0 );
+		$date = isset( $_POST['scheduled_date'] ) ? sanitize_text_field( wp_unslash( $_POST['scheduled_date'] ) ) : '';
 
 		if ( ! $date || ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) ) {
 			wp_send_json_error( array( 'message' => __( 'Elige la fecha de reparación.', 'arriendo-facil' ) ), 400 );
+		}
+
+		$provider_id = isset( $_POST['provider_id'] ) ? absint( wp_unslash( $_POST['provider_id'] ) ) : 0;
+		$tech        = '';
+		$phone       = '';
+
+		if ( $provider_id ) {
+			// Usar proveedor del catálogo.
+			$prov = $wpdb->get_row( $wpdb->prepare( 'SELECT name, phone FROM ' . Arriendo_Facil_Service_Providers::table() . ' WHERE id = %d', $provider_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( $prov ) {
+				$tech  = (string) ( $prov->name ?? '' );
+				$phone = (string) ( $prov->phone ?? '' );
+			}
+		} elseif ( ! empty( $_POST['new_name'] ) ) {
+			// Crear nuevo técnico en el catálogo.
+			$new_name  = mb_substr( sanitize_text_field( wp_unslash( $_POST['new_name'] ) ), 0, 190 );
+			$new_phone = mb_substr( sanitize_text_field( wp_unslash( $_POST['new_phone'] ?? '' ) ), 0, 50 );
+			$new_trade = isset( $_POST['new_trade'] ) ? sanitize_key( wp_unslash( $_POST['new_trade'] ) ) : 'general';
+
+			$created = Arriendo_Facil_Service_Providers::create( array(
+				'name'  => $new_name,
+				'phone' => $new_phone,
+				'trade' => $new_trade,
+			) );
+
+			if ( is_wp_error( $created ) ) {
+				wp_send_json_error( array( 'message' => $created->get_error_message() ), 400 );
+			}
+
+			$provider_id = $created;
+			$tech        = $new_name;
+			$phone       = $new_phone;
+		} else {
+			$tech  = mb_substr( sanitize_text_field( wp_unslash( $_POST['contact_name'] ?? '' ) ), 0, 190 );
+			$phone = mb_substr( sanitize_text_field( wp_unslash( $_POST['contact_phone'] ?? '' ) ), 0, 50 );
 		}
 
 		$wpdb->update(
 			Arriendo_Facil_Maintenance::table(),
 			array(
 				'scheduled_date' => $date,
+				'provider_id'    => $provider_id ?: null,
 				'contact_name'   => $tech ?: null,
 				'contact_phone'  => $phone ?: null,
 			),
 			array( 'id' => (int) $row->id ),
-			array( '%s', '%s', '%s' ),
+			array( '%s', '%d', '%s', '%s' ),
 			array( '%d' )
 		);
 
 		Arriendo_Facil_Portal_Events::log( (int) $row->guest_id, (int) $row->lease_id, 'incident', (int) $row->id, 'manager', get_current_user_id(), 'repair_scheduled', array( 'date' => $date, 'tech' => $tech ) );
 
-		wp_send_json_success( array( 'message' => __( 'Visita programada correctamente.', 'arriendo-facil' ) ) );
+		wp_send_json_success( array(
+			'message'      => __( 'Visita programada correctamente.', 'arriendo-facil' ),
+			'provider_id'  => $provider_id,
+			'contact_name' => $tech,
+		) );
 	}
 
 	/**
@@ -621,6 +670,7 @@ class Arriendo_Facil_Portal_Manager {
 		$repair    = Arriendo_Facil_Portal_Evidence::for_subject( 'incident', $id, $guest_id, 'repair' );
 		$timeline  = Arriendo_Facil_Portal_Events::timeline( 'incident', $id, $guest_id );
 		$resp      = (string) $request->responsibility;
+		$providers = Arriendo_Facil_Service_Providers::list( array( 'status' => 'active' ) );
 		$labels    = array(
 			'por_definir' => __( 'Por definir', 'arriendo-facil' ),
 			'owner'       => __( 'Propietario', 'arriendo-facil' ),
@@ -753,15 +803,38 @@ class Arriendo_Facil_Portal_Manager {
 						value="<?php echo esc_attr( (string) ( $request->scheduled_date ?? '' ) ); ?>"
 						min="<?php echo esc_attr( gmdate( 'Y-m-d' ) ); ?>">
 				</label>
-				<label class="af-pi-modal__label"><?php esc_html_e( 'Nombre del técnico', 'arriendo-facil' ); ?>
-					<input type="text" class="af-pi-modal__input" name="contact_name" maxlength="190"
-						placeholder="<?php esc_attr_e( 'Ej. Juan Pérez – Plomería', 'arriendo-facil' ); ?>"
-						value="<?php echo esc_attr( (string) ( $request->contact_name ?? '' ) ); ?>">
+
+				<label class="af-pi-modal__label"><?php esc_html_e( 'Técnico', 'arriendo-facil' ); ?>
+					<select class="af-pi-modal__input" name="provider_id" data-pi-prov-select>
+						<option value=""><?php esc_html_e( '— Sin asignar —', 'arriendo-facil' ); ?></option>
+						<?php foreach ( $providers as $prov ) : ?>
+							<option value="<?php echo esc_attr( (string) $prov->id ); ?>"
+								<?php selected( (int) ( $request->provider_id ?? 0 ), (int) $prov->id ); ?>>
+								<?php echo esc_html( $prov->name . ( $prov->trade && 'general' !== $prov->trade ? ' · ' . ( Arriendo_Facil_Service_Providers::trades()[ $prov->trade ] ?? $prov->trade ) : '' ) . ( $prov->phone ? ' · ' . $prov->phone : '' ) ); ?>
+							</option>
+						<?php endforeach; ?>
+						<option value="new"><?php esc_html_e( '+ Registrar nuevo técnico', 'arriendo-facil' ); ?></option>
+					</select>
 				</label>
-				<label class="af-pi-modal__label"><?php esc_html_e( 'Teléfono del técnico', 'arriendo-facil' ); ?>
-					<input type="tel" class="af-pi-modal__input" name="contact_phone" maxlength="50"
-						value="<?php echo esc_attr( (string) ( $request->contact_phone ?? '' ) ); ?>">
-				</label>
+
+				<!-- Campos para nuevo técnico (ocultos hasta seleccionar "new") -->
+				<div class="af-pi-modal__new-tech" data-pi-new-tech style="display:none">
+					<label class="af-pi-modal__label"><?php esc_html_e( 'Nombre', 'arriendo-facil' ); ?> <span class="af-pi-modal__req">*</span>
+						<input type="text" class="af-pi-modal__input" name="new_name" maxlength="190"
+							placeholder="<?php esc_attr_e( 'Nombre del técnico', 'arriendo-facil' ); ?>">
+					</label>
+					<label class="af-pi-modal__label"><?php esc_html_e( 'Especialidad', 'arriendo-facil' ); ?>
+						<select class="af-pi-modal__input" name="new_trade">
+							<?php foreach ( Arriendo_Facil_Service_Providers::trades() as $tk => $tv ) : ?>
+								<option value="<?php echo esc_attr( $tk ); ?>"><?php echo esc_html( $tv ); ?></option>
+							<?php endforeach; ?>
+						</select>
+					</label>
+					<label class="af-pi-modal__label"><?php esc_html_e( 'Teléfono', 'arriendo-facil' ); ?>
+						<input type="tel" class="af-pi-modal__input" name="new_phone" maxlength="50">
+					</label>
+				</div>
+
 				<p class="af-pi-modal__msg" data-pi-sched-msg role="status"></p>
 				<button type="button" class="af-pi__save-btn" style="width:100%" data-pi-save-schedule
 					data-request="<?php echo esc_attr( (string) $id ); ?>"
@@ -840,6 +913,7 @@ class Arriendo_Facil_Portal_Manager {
 			.af-pi-modal__input{padding:8px 10px;border:1.5px solid #c9d5d2;border-radius:8px;font-size:13px;font-family:inherit;outline:none;color:#222}
 			.af-pi-modal__input:focus{border-color:#164a55}
 			.af-pi-modal__msg{font-size:12px;margin:0;min-height:16px}
+			.af-pi-modal__new-tech{display:flex;flex-direction:column;gap:8px;padding:10px 12px;background:#f7f9f8;border:1px solid #e1e9e7;border-radius:8px}
 		</style>
 		<script>
 		(function () {
@@ -929,8 +1003,8 @@ class Arriendo_Facil_Portal_Manager {
 					var msgEl4 = modal4 ? modal4.querySelector('[data-pi-sched-msg]') : null;
 					var fd4 = new FormData();
 					if (modal4) {
-						modal4.querySelectorAll('input').forEach(function (inp) {
-							if (inp.name) { fd4.append(inp.name, inp.value); }
+						modal4.querySelectorAll('input, select').forEach(function (el) {
+							if (el.name) { fd4.append(el.name, el.value); }
 						});
 					}
 					schedBtn.disabled = true;
@@ -986,6 +1060,15 @@ class Arriendo_Facil_Portal_Manager {
 				var files = e.target.files;
 				nameEl.textContent = files.length === 0 ? LABELS.no_file
 					: (files.length === 1 ? files[0].name : files.length + ' archivos');
+			});
+
+			/* Show/hide new-technician fields */
+			document.addEventListener('change', function (e) {
+				var sel = e.target.closest('[data-pi-prov-select]');
+				if (!sel) { return; }
+				var modal = sel.closest('.af-pi-modal');
+				var newBlock = modal ? modal.querySelector('[data-pi-new-tech]') : null;
+				if (newBlock) { newBlock.style.display = sel.value === 'new' ? 'flex' : 'none'; }
 			});
 
 			/* Close modal on backdrop click */

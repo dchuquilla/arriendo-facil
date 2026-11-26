@@ -491,33 +491,44 @@ button.af-tp-stat { border: 1px solid var(--tp-border); font: inherit; }
 
 /* ── Mini profile card in Resumen ────────────────────────────────── */
 
-.af-tp-profile-mini {
+/* ── Profile card in Resumen ─────────────────────────────────────── */
+
+.af-tp-profile-card {
 	display: flex;
-	align-items: center;
-	gap: 12px;
-	padding: 14px 16px;
-	margin-bottom: 20px;
+	flex-direction: column;
+	gap: 0;
+	margin-bottom: 24px;
 	border: 1px solid var(--tp-border);
 	border-radius: var(--tp-radius-lg);
 	background: var(--tp-raised);
+	overflow: hidden;
 }
 
-.af-tp-profile-mini__avatar {
+.af-tp-profile-card__head {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	padding: 16px 18px;
+	background: linear-gradient(135deg, #0f3d47 0%, #164a55 100%);
+}
+
+.af-tp-profile-card__avatar {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: 44px;
-	height: 44px;
-	flex: 0 0 44px;
+	width: 48px;
+	height: 48px;
+	flex: 0 0 48px;
 	border-radius: 50%;
-	background: var(--tp-accent);
+	background: rgba(255,255,255,.18);
 	color: #fff;
-	font-size: 15px;
+	font-size: 17px;
 	font-weight: 700;
 	letter-spacing: 0.03em;
+	border: 2px solid rgba(255,255,255,.35);
 }
 
-.af-tp-profile-mini__body {
+.af-tp-profile-card__id {
 	flex: 1 1 auto;
 	display: flex;
 	flex-direction: column;
@@ -525,21 +536,39 @@ button.af-tp-stat { border: 1px solid var(--tp-border); font: inherit; }
 	min-width: 0;
 }
 
-.af-tp-profile-mini__body strong {
-	font-size: 14px;
+.af-tp-profile-card__id h2 {
+	margin: 0;
+	font-size: 16px;
 	font-weight: 700;
-	color: var(--tp-text);
+	color: #fff;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
 
-.af-tp-profile-mini__body span {
+.af-tp-profile-card__id span {
 	font-size: 12px;
-	color: var(--tp-muted);
+	color: rgba(255,255,255,.75);
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+.af-tp-profile-card .af-tp-facts {
+	margin: 0;
+	border-radius: 0;
+	border: none;
+	border-top: 1px solid var(--tp-border);
+	border-bottom: 1px solid var(--tp-border);
+	background: var(--tp-surface);
+	padding: 12px 18px;
+}
+
+.af-tp-profile-card__actions {
+	padding: 14px 18px;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
 }
 
 .af-tp-docs-trigger {
@@ -549,7 +578,7 @@ button.af-tp-stat { border: 1px solid var(--tp-border); font: inherit; }
 	gap: 6px;
 }
 
-/* ── Docs row in profile tab ─────────────────────────────────────── */
+/* ── Docs row (kept for backwards compat) ────────────────────────── */
 
 .af-tp-docs-row {
 	display: flex;
@@ -1104,17 +1133,7 @@ button.af-tp-stat { border: 1px solid var(--tp-border); font: inherit; }
 }
 
 @media (min-width: 1024px) {
-	.af-tp[data-state="portal"] [data-tp-panel="overview"] {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		column-gap: 28px;
-	}
-
-	.af-tp[data-state="portal"] [data-tp-panel="overview"] > .af-tp-h2:first-child,
-	.af-tp[data-state="portal"] [data-tp-panel="overview"] > .af-tp-list:nth-child(2),
-	.af-tp[data-state="portal"] [data-tp-panel="overview"] > .af-tp-empty:nth-child(2) {
-		grid-column: 1 / -1;
-	}
+	.af-tp-facts { grid-template-columns: repeat(3, 1fr); }
 }
 
 /* Teléfono: barra de navegación inferior fija */

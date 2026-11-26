@@ -221,27 +221,84 @@ get_header();
 			<button type="button" role="tab" class="is-active" aria-selected="true" data-tp-tab="overview"><span><?php esc_html_e( 'Resumen', 'arriendo-facil' ); ?></span></button>
 			<button type="button" role="tab" aria-selected="false" data-tp-tab="services"><span><?php esc_html_e( 'Servicios', 'arriendo-facil' ); ?></span><?php if ( $af_svc_todo ) : ?><span class="af-tp-tab-count" aria-label="<?php echo esc_attr( $af_svc_todo ); ?> servicios pendientes"><?php echo esc_html( number_format_i18n( $af_svc_todo ) ); ?></span><?php endif; ?></button>
 			<button type="button" role="tab" aria-selected="false" data-tp-tab="incidents"><span><?php esc_html_e( 'Incidentes', 'arriendo-facil' ); ?></span><?php if ( $af_inc_open ) : ?><span class="af-tp-tab-count af-tp-tab-count--info" aria-label="<?php echo esc_attr( $af_inc_open ); ?> incidentes abiertos"><?php echo esc_html( number_format_i18n( $af_inc_open ) ); ?></span><?php endif; ?></button>
-			<button type="button" role="tab" aria-selected="false" data-tp-tab="profile"><span><?php esc_html_e( 'Perfil', 'arriendo-facil' ); ?></span><?php if ( $af_docs['missing'] ) : ?><span class="af-tp-tab-count af-tp-tab-count--warn" aria-label="<?php echo esc_attr( $af_docs['missing'] ); ?> documentos pendientes"><?php echo esc_html( number_format_i18n( $af_docs['missing'] ) ); ?></span><?php endif; ?></button>
 		</nav>
 
 		<!-- ───────── Resumen ───────── -->
-		<section class="af-tp-card" data-tp-panel="overview" role="tabpanel">
+		<section class="af-tp-card af-tp-card--overview" data-tp-panel="overview" role="tabpanel">
 
-			<div class="af-tp-profile-mini">
-				<span class="af-tp-profile-mini__avatar" aria-hidden="true"><?php echo esc_html( mb_strtoupper( mb_substr( (string) $af_guest->first_name, 0, 1 ) . mb_substr( (string) $af_guest->last_name, 0, 1 ) ) ); ?></span>
-				<div class="af-tp-profile-mini__body">
-					<strong><?php echo esc_html( $af_name ); ?></strong>
-					<span><?php echo esc_html( $af_guest->email ); ?></span>
-					<?php if ( $af_guest->phone ) : ?><span><?php echo esc_html( (string) $af_guest->phone ); ?></span><?php endif; ?>
+			<!-- Perfil del inquilino -->
+			<div class="af-tp-profile-card">
+				<div class="af-tp-profile-card__head">
+					<span class="af-tp-profile-card__avatar" aria-hidden="true"><?php echo esc_html( mb_strtoupper( mb_substr( (string) $af_guest->first_name, 0, 1 ) . mb_substr( (string) $af_guest->last_name, 0, 1 ) ) ); ?></span>
+					<div class="af-tp-profile-card__id">
+						<h2><?php echo esc_html( $af_name ); ?></h2>
+						<span><?php echo esc_html( $af_guest->email ); ?></span>
+						<?php if ( $af_guest->phone ) : ?><span><?php echo esc_html( (string) $af_guest->phone ); ?></span><?php endif; ?>
+					</div>
+					<button type="button" class="af-tp-btn af-tp-btn--ghost af-tp-docs-trigger" data-tp-open-docs aria-haspopup="dialog">
+						<?php esc_html_e( 'Documentos', 'arriendo-facil' ); ?>
+						<?php if ( $af_docs['missing'] ) : ?>
+							<span class="af-tp-tab-count af-tp-tab-count--warn" aria-hidden="true"><?php echo esc_html( number_format_i18n( $af_docs['missing'] ) ); ?></span>
+						<?php else : ?>
+							<span class="af-tp-pill is-ok"><?php echo esc_html( ucfirst( $af_docs['status'] ) ); ?></span>
+						<?php endif; ?>
+					</button>
 				</div>
-				<button type="button" class="af-tp-btn af-tp-btn--ghost af-tp-docs-trigger" data-tp-open-docs aria-haspopup="dialog">
-					<?php esc_html_e( 'Mis documentos', 'arriendo-facil' ); ?>
-					<?php if ( $af_docs['missing'] ) : ?>
-						<span class="af-tp-tab-count af-tp-tab-count--warn" aria-hidden="true"><?php echo esc_html( number_format_i18n( $af_docs['missing'] ) ); ?></span>
-					<?php else : ?>
-						<span class="af-tp-pill is-ok"><?php echo esc_html( ucfirst( $af_docs['status'] ) ); ?></span>
+
+				<dl class="af-tp-facts">
+					<div><dt><?php esc_html_e( 'Identificación', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( $af_idmask ); ?></dd></div>
+					<?php if ( ! empty( $af_guest->nationality ) ) : ?>
+						<div><dt><?php esc_html_e( 'Nacionalidad', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( $af_guest->nationality ); ?></dd></div>
 					<?php endif; ?>
-				</button>
+					<?php if ( ! empty( $af_guest->birth_city ) ) : ?>
+						<div><dt><?php esc_html_e( 'Ciudad de nacimiento', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( $af_guest->birth_city ); ?></dd></div>
+					<?php endif; ?>
+					<?php
+					$af_income_opts = Arriendo_Facil_Guest::get_income_range_options();
+					if ( ! empty( $af_guest->income_range ) && isset( $af_income_opts[ $af_guest->income_range ] ) ) :
+						?>
+						<div><dt><?php esc_html_e( 'Rango de ingresos', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( $af_income_opts[ $af_guest->income_range ] ); ?></dd></div>
+					<?php endif; ?>
+				</dl>
+
+				<div class="af-tp-profile-card__actions">
+					<form class="af-tp-form af-tp-form--inline" data-tp-form="af_tpa_profile_save" novalidate>
+						<p class="af-tp-alert" role="alert" data-tp-msg hidden></p>
+						<div class="af-tp-row">
+							<div style="flex:1 1 160px">
+								<label class="af-tp-label" for="af-tp-phone"><?php esc_html_e( 'Teléfono', 'arriendo-facil' ); ?></label>
+								<input class="af-tp-input" type="tel" id="af-tp-phone" name="phone" inputmode="tel" autocomplete="tel" maxlength="20" value="<?php echo esc_attr( (string) $af_guest->phone ); ?>" required />
+							</div>
+							<button class="af-tp-btn af-tp-btn--primary" type="submit" data-tp-submit style="align-self:flex-end"><?php esc_html_e( 'Guardar', 'arriendo-facil' ); ?></button>
+						</div>
+					</form>
+					<details class="af-tp-more">
+						<summary><?php esc_html_e( 'Cambiar correo', 'arriendo-facil' ); ?></summary>
+						<form class="af-tp-form" data-tp-form="af_tpa_email_request" data-tp-reveal="#af-tp-email-code" novalidate>
+							<p class="af-tp-alert" role="alert" data-tp-msg hidden></p>
+							<label class="af-tp-label" for="af-tp-newmail"><?php esc_html_e( 'Correo nuevo', 'arriendo-facil' ); ?></label>
+							<input class="af-tp-input" type="email" id="af-tp-newmail" name="new_email" autocomplete="email" maxlength="190" required />
+							<button class="af-tp-btn" type="submit" data-tp-submit><?php esc_html_e( 'Enviar código al correo nuevo', 'arriendo-facil' ); ?></button>
+						</form>
+						<form class="af-tp-form" id="af-tp-email-code" data-tp-form="af_tpa_email_verify" novalidate hidden>
+							<p class="af-tp-alert" role="alert" data-tp-msg hidden></p>
+							<label class="af-tp-label" for="af-tp-mailcode"><?php esc_html_e( 'Código de 6 dígitos', 'arriendo-facil' ); ?></label>
+							<input class="af-tp-input af-tp-input--code" type="text" id="af-tp-mailcode" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required />
+							<button class="af-tp-btn af-tp-btn--primary" type="submit" data-tp-submit><?php esc_html_e( 'Confirmar cambio', 'arriendo-facil' ); ?></button>
+						</form>
+					</details>
+					<details class="af-tp-more">
+						<summary><?php esc_html_e( 'Corregir nombre o identificación', 'arriendo-facil' ); ?></summary>
+						<p class="af-tp-meta"><?php esc_html_e( 'Por seguridad estos datos los cambia tu administrador. Cuéntanos qué corregir y lo revisará con tu documento.', 'arriendo-facil' ); ?></p>
+						<form class="af-tp-form" data-tp-form="af_tpa_correction" novalidate>
+							<p class="af-tp-alert" role="alert" data-tp-msg hidden></p>
+							<select class="af-tp-input" name="field"><option value="name"><?php esc_html_e( 'Nombre', 'arriendo-facil' ); ?></option><option value="id_number"><?php esc_html_e( 'Identificación', 'arriendo-facil' ); ?></option></select>
+							<input class="af-tp-input" type="text" name="value" maxlength="190" placeholder="<?php esc_attr_e( 'Valor correcto', 'arriendo-facil' ); ?>" required />
+							<input class="af-tp-input" type="text" name="note" maxlength="255" placeholder="<?php esc_attr_e( 'Motivo (opcional)', 'arriendo-facil' ); ?>" />
+							<button class="af-tp-btn" type="submit" data-tp-submit><?php esc_html_e( 'Solicitar corrección', 'arriendo-facil' ); ?></button>
+						</form>
+					</details>
+				</div>
 			</div>
 
 			<h2 class="af-tp-h2"><?php esc_html_e( 'Pendiente de ti', 'arriendo-facil' ); ?></h2>
@@ -514,72 +571,6 @@ get_header();
 					<?php endforeach; ?>
 				</ul>
 			<?php endif; ?>
-		</section>
-
-		<!-- ───────── Perfil ───────── -->
-		<section class="af-tp-card" data-tp-panel="profile" role="tabpanel" hidden>
-			<h2 class="af-tp-h2"><?php esc_html_e( 'Mis datos', 'arriendo-facil' ); ?></h2>
-			<dl class="af-tp-facts">
-				<div><dt><?php esc_html_e( 'Nombre', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( $af_name ); ?></dd></div>
-				<div><dt><?php esc_html_e( 'Correo', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( $af_guest->email ); ?></dd></div>
-				<div><dt><?php esc_html_e( 'Identificación', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( $af_idmask ); ?></dd></div>
-				<?php if ( ! empty( $af_guest->nationality ) ) : ?>
-					<div><dt><?php esc_html_e( 'Nacionalidad', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( $af_guest->nationality ); ?></dd></div>
-				<?php endif; ?>
-				<?php if ( ! empty( $af_guest->birth_city ) ) : ?>
-					<div><dt><?php esc_html_e( 'Ciudad de nacimiento', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( $af_guest->birth_city ); ?></dd></div>
-				<?php endif; ?>
-				<?php
-				$af_income_opts = Arriendo_Facil_Guest::get_income_range_options();
-				if ( ! empty( $af_guest->income_range ) && isset( $af_income_opts[ $af_guest->income_range ] ) ) :
-					?>
-					<div><dt><?php esc_html_e( 'Rango de ingresos', 'arriendo-facil' ); ?></dt><dd><?php echo esc_html( $af_income_opts[ $af_guest->income_range ] ); ?></dd></div>
-				<?php endif; ?>
-			</dl>
-
-			<form class="af-tp-form" data-tp-form="af_tpa_profile_save" novalidate>
-				<p class="af-tp-alert" role="alert" data-tp-msg hidden></p>
-				<label class="af-tp-label" for="af-tp-phone"><?php esc_html_e( 'Teléfono', 'arriendo-facil' ); ?></label>
-				<input class="af-tp-input" type="tel" id="af-tp-phone" name="phone" inputmode="tel" autocomplete="tel" maxlength="20" value="<?php echo esc_attr( (string) $af_guest->phone ); ?>" required />
-				<button class="af-tp-btn af-tp-btn--primary" type="submit" data-tp-submit><?php esc_html_e( 'Guardar cambios', 'arriendo-facil' ); ?></button>
-			</form>
-
-			<details class="af-tp-more">
-				<summary><?php esc_html_e( 'Cambiar mi correo', 'arriendo-facil' ); ?></summary>
-				<form class="af-tp-form" data-tp-form="af_tpa_email_request" data-tp-reveal="#af-tp-email-code" novalidate>
-					<p class="af-tp-alert" role="alert" data-tp-msg hidden></p>
-					<label class="af-tp-label" for="af-tp-newmail"><?php esc_html_e( 'Correo nuevo', 'arriendo-facil' ); ?></label>
-					<input class="af-tp-input" type="email" id="af-tp-newmail" name="new_email" autocomplete="email" maxlength="190" required />
-					<button class="af-tp-btn" type="submit" data-tp-submit><?php esc_html_e( 'Enviar código al correo nuevo', 'arriendo-facil' ); ?></button>
-				</form>
-				<form class="af-tp-form" id="af-tp-email-code" data-tp-form="af_tpa_email_verify" novalidate hidden>
-					<p class="af-tp-alert" role="alert" data-tp-msg hidden></p>
-					<label class="af-tp-label" for="af-tp-mailcode"><?php esc_html_e( 'Código de 6 dígitos', 'arriendo-facil' ); ?></label>
-					<input class="af-tp-input af-tp-input--code" type="text" id="af-tp-mailcode" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required />
-					<button class="af-tp-btn af-tp-btn--primary" type="submit" data-tp-submit><?php esc_html_e( 'Confirmar cambio', 'arriendo-facil' ); ?></button>
-				</form>
-			</details>
-
-			<details class="af-tp-more">
-				<summary><?php esc_html_e( 'Corregir nombre o identificación', 'arriendo-facil' ); ?></summary>
-				<p class="af-tp-meta"><?php esc_html_e( 'Por seguridad estos datos los cambia tu administrador. Cuéntanos qué corregir y lo revisará con tu documento.', 'arriendo-facil' ); ?></p>
-				<form class="af-tp-form" data-tp-form="af_tpa_correction" novalidate>
-					<p class="af-tp-alert" role="alert" data-tp-msg hidden></p>
-					<select class="af-tp-input" name="field"><option value="name"><?php esc_html_e( 'Nombre', 'arriendo-facil' ); ?></option><option value="id_number"><?php esc_html_e( 'Identificación', 'arriendo-facil' ); ?></option></select>
-					<input class="af-tp-input" type="text" name="value" maxlength="190" placeholder="<?php esc_attr_e( 'Valor correcto', 'arriendo-facil' ); ?>" required />
-					<input class="af-tp-input" type="text" name="note" maxlength="255" placeholder="<?php esc_attr_e( 'Motivo (opcional)', 'arriendo-facil' ); ?>" />
-					<button class="af-tp-btn" type="submit" data-tp-submit><?php esc_html_e( 'Solicitar corrección', 'arriendo-facil' ); ?></button>
-				</form>
-			</details>
-
-			<div class="af-tp-docs-row">
-				<button type="button" class="af-tp-btn af-tp-btn--outline af-tp-docs-trigger" data-tp-open-docs aria-haspopup="dialog">
-					<span><?php esc_html_e( 'Ver mis documentos', 'arriendo-facil' ); ?></span>
-					<span class="af-tp-pill is-<?php echo esc_attr( 'verificado' === $af_docs['status'] ? 'ok' : ( 'rechazado' === $af_docs['status'] ? 'bad' : 'info' ) ); ?>"><?php echo esc_html( ucfirst( $af_docs['status'] ) ); ?></span>
-					<?php if ( $af_docs['missing'] ) : ?><span class="af-tp-tab-count af-tp-tab-count--warn"><?php echo esc_html( number_format_i18n( $af_docs['missing'] ) ); ?></span><?php endif; ?>
-				</button>
-				<p class="af-tp-meta"><?php esc_html_e( 'Tus documentos se guardan en un espacio privado y solo los ve tu administrador.', 'arriendo-facil' ); ?></p>
-			</div>
 		</section>
 
 		<!-- Diálogos -->

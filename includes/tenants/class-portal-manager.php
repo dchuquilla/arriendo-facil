@@ -878,7 +878,7 @@ class Arriendo_Facil_Portal_Manager {
 
 		$rows = $wpdb->get_results( $wpdb->prepare( // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			'SELECT period, amount, paid_on, reference FROM ' . $table . // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			" WHERE schedule_id = %d AND period < %s AND status IN ('approved','paid') ORDER BY period DESC LIMIT 6",
+			" WHERE schedule_id = %d AND period <= %s AND status IN ('approved','paid') ORDER BY period DESC LIMIT 6",
 			$schedule_id,
 			$period
 		) );

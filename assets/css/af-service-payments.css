@@ -594,12 +594,20 @@
 
 .af-sp-history__item {
 	display: flex;
+	flex-wrap: wrap;
 	align-items: center;
-	justify-content: space-between;
-	gap: 8px;
+	gap: 6px 8px;
 	padding: 7px 10px;
 	background: #fff;
 	font-size: 12px;
+}
+
+.af-sp-history__meta {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex: 1 1 auto;
+	min-width: 0;
 }
 
 .af-sp-history__period {
@@ -628,6 +636,89 @@
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	max-width: 80px;
+}
+
+.af-sp-history__proof {
+	display: flex;
+	gap: 4px;
+	flex-wrap: wrap;
+	padding: 4px 0 2px;
+	width: 100%;
+}
+
+.af-sp-ev-thumb {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 52px;
+	height: 52px;
+	border-radius: 6px;
+	border: 1px solid var(--af-gray-100);
+	background: var(--af-gray-50);
+	overflow: hidden;
+	cursor: pointer;
+	padding: 0;
+	transition: transform .12s, box-shadow .12s;
+}
+
+.af-sp-ev-thumb:hover { transform: scale(1.06); box-shadow: 0 2px 8px rgba(0,0,0,.18); }
+
+.af-sp-ev-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.af-sp-ev-thumb__pdf {
+	font-size: 10px;
+	font-weight: 700;
+	color: #b03a36;
+	letter-spacing: .05em;
+}
+
+/* ── Lightbox dialog (manager) ───────────────────────────────────── */
+
+#af-sp-lightbox {
+	border: none;
+	border-radius: 12px;
+	padding: 0;
+	width: min(90vw, 860px);
+	max-height: 92vh;
+	overflow: hidden;
+	background: #fff;
+	box-shadow: 0 20px 60px rgba(0,0,0,.35);
+}
+
+#af-sp-lightbox::backdrop { background: rgba(0,0,0,.7); }
+
+.af-sp-lightbox__head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 10px 14px;
+	border-bottom: 1px solid var(--af-gray-100);
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--af-gray-700);
+}
+
+.af-sp-lightbox__body {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 200px;
+	max-height: calc(92vh - 46px);
+	overflow: auto;
+	background: #111;
+}
+
+.af-sp-lightbox__body img { max-width: 100%; max-height: calc(92vh - 46px); display: block; }
+.af-sp-lightbox__body embed { width: 100%; height: calc(92vh - 46px); border: none; display: block; }
+
+.af-sp-lightbox__close {
+	background: none;
+	border: none;
+	cursor: pointer;
+	font-size: 20px;
+	color: var(--af-gray-500);
+	line-height: 1;
+	padding: 2px 6px;
 }
 
 .af-sp-tile__actions {

@@ -360,6 +360,21 @@
 			b.addEventListener('click', function () { var d = b.closest('dialog'); if (d) { d.close ? d.close() : d.removeAttribute('open'); } });
 		});
 
+		/* Lightbox: comprobantes de historial */
+		document.addEventListener('click', function (e) {
+			var btn = e.target.closest('[data-af-lightbox-src]');
+			if (!btn) { return; }
+			var src   = btn.getAttribute('data-af-lightbox-src');
+			var isPdf = btn.getAttribute('data-af-lightbox-pdf') === '1';
+			var lb    = dialog('lightbox');
+			var body  = document.getElementById('af-tp-lightbox-body');
+			if (!lb || !body) { return; }
+			body.innerHTML = isPdf
+				? '<embed src="' + src + '" type="application/pdf">'
+				: '<img src="' + src + '" alt="">';
+			if (typeof lb.showModal === 'function') { lb.showModal(); } else { lb.setAttribute('open', ''); }
+		});
+
 		/* Un solo manejador para todos los formularios del portal. */
 		$$('form[data-tp-form]').forEach(function (form) {
 			form.addEventListener('submit', function (e) {

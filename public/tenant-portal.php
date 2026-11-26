@@ -443,6 +443,16 @@ get_header();
 									data-amount="<?php echo esc_attr( $svc['expected_amount'] > 0 ? $svc['expected_amount'] : '' ); ?>"><?php echo esc_html( 'rejected' === $svc['pay_status'] ? __( 'Enviar comprobante corregido', 'arriendo-facil' ) : __( 'Marcar como pagado', 'arriendo-facil' ) ); ?></button>
 							<?php endif; ?>
 							<?php $af_timeline( $svc['timeline'] ); ?>
+
+							<?php
+							// Historial de pagos anteriores (excluye el período actual que ya se muestra arriba).
+							Arriendo_Facil_Portal_Manager::render_service_history(
+								(int) $svc['schedule_id'],
+								(string) $svc['period'],
+								$af_ev,
+								false
+							);
+							?>
 						</li>
 					<?php endforeach; ?>
 				</ul>
@@ -574,6 +584,16 @@ get_header();
 		</section>
 
 		<!-- Diálogos -->
+
+		<!-- Lightbox: comprobante -->
+		<dialog class="af-tp-dialog af-tp-dialog--lightbox" data-tp-dialog="lightbox" aria-label="<?php esc_attr_e( 'Comprobante de pago', 'arriendo-facil' ); ?>">
+			<div class="af-tp-dialog__head">
+				<span class="af-tp-h2"><?php esc_html_e( 'Comprobante de pago', 'arriendo-facil' ); ?></span>
+				<button type="button" class="af-tp-btn-close" data-tp-close aria-label="<?php esc_attr_e( 'Cerrar', 'arriendo-facil' ); ?>">&#x2715;</button>
+			</div>
+			<div class="af-tp-lightbox__body" id="af-tp-lightbox-body"></div>
+		</dialog>
+
 		<dialog class="af-tp-dialog af-tp-dialog--docs" data-tp-dialog="docs" aria-labelledby="af-tp-docs-title">
 			<div class="af-tp-dialog__head">
 				<h2 class="af-tp-h2" id="af-tp-docs-title"><?php esc_html_e( 'Mis documentos', 'arriendo-facil' ); ?>

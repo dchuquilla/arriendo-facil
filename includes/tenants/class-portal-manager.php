@@ -866,7 +866,17 @@ class Arriendo_Facil_Portal_Manager {
 	 * @param string $period      Período actual YYYY-MM (excluido del historial).
 	 * @return void
 	 */
-	public static function render_service_history( $schedule_id, $period ) {
+	/**
+	 * Renders payment history for a service schedule.
+	 *
+	 * @param int           $schedule_id    Schedule ID.
+	 * @param string        $period         Current period (YYYY-MM). Used as upper bound.
+	 * @param callable|null $ev_url         Optional. Receives int evidence_id, returns URL string.
+	 *                                       Defaults to manager evidence_url(). Pass null for manager.
+	 * @param bool          $include_current Whether to include $period itself (true) or only prior (false).
+	 * @return void
+	 */
+	public static function render_service_history( $schedule_id, $period, $ev_url = null, $include_current = true ) {
 		global $wpdb;
 
 		$schedule_id = absint( $schedule_id );
@@ -874,11 +884,14 @@ class Arriendo_Facil_Portal_Manager {
 			return;
 		}
 
-		$table = Arriendo_Facil_Billing_Ledger::bill_payments_table();
+		if ( null === $ev_url ) {
+			$ev_url = array( __CLASS__, 'evidence_url' );
+		}
 
-		$rows = $wpdb->get_results( $wpdb->prepare( // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			'SELECT period, amount, paid_on, reference FROM ' . $table . // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			" WHERE schedule_id = %d AND period <= %s AND status IN ('approved','paid') ORDER BY period DESC LIMIT 6",
+		$table     = Arriendo_Facil_Billing_Ledger::bill_payments_table();
+		$op        = $include_current ? '<=' : '<';
+		$rows      = $wpdb->get_results( $wpdb->prepare( // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			"SELECT id, period, amount, paid_on, reference FROM {$table} WHERE schedule_id = %d AND period {$op} %s AND status IN ('approved','paid') ORDER BY period DESC LIMIT 6", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			$schedule_id,
 			$period
 		) );
@@ -886,21 +899,48 @@ class Arriendo_Facil_Portal_Manager {
 		if ( empty( $rows ) ) {
 			return;
 		}
+
+		$ev_table = Arriendo_Facil_Portal_Schema::evidence_table();
+		foreach ( $rows as $r ) {
+			$r->evidence = $r->id ? (array) $wpdb->get_results( $wpdb->prepare( // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+				"SELECT id, mime_type FROM {$ev_table} WHERE subject_type = 'service_payment' AND subject_id = %d AND removed_at IS NULL ORDER BY id ASC LIMIT 6", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+				absint( $r->id )
+			) ) : array();
+		}
 		?>
 		<details class="af-sp-history">
 			<summary><?php esc_html_e( 'Historial de pagos', 'arriendo-facil' ); ?> <span>(<?php echo esc_html( count( $rows ) ); ?>)</span></summary>
 			<ul class="af-sp-history__list">
 				<?php foreach ( $rows as $r ) : ?>
 					<li class="af-sp-history__item">
-						<span class="af-sp-history__period"><?php echo esc_html( wp_date( 'M Y', strtotime( $r->period . '-01 12:00:00' ) ) ); ?></span>
-						<?php if ( $r->amount > 0 ) : ?>
-							<span class="af-sp-history__amount">$<?php echo esc_html( number_format_i18n( (float) $r->amount, 2 ) ); ?></span>
-						<?php endif; ?>
-						<?php if ( $r->paid_on ) : ?>
-							<span class="af-sp-history__date"><?php echo esc_html( wp_date( 'j M', strtotime( $r->paid_on . ' 12:00:00' ) ) ); ?></span>
-						<?php endif; ?>
-						<?php if ( $r->reference ) : ?>
-							<span class="af-sp-history__ref" title="<?php echo esc_attr( $r->reference ); ?>"><?php echo esc_html( $r->reference ); ?></span>
+						<div class="af-sp-history__meta">
+							<span class="af-sp-history__period"><?php echo esc_html( wp_date( 'M Y', strtotime( $r->period . '-01 12:00:00' ) ) ); ?></span>
+							<?php if ( $r->amount > 0 ) : ?>
+								<span class="af-sp-history__amount">$<?php echo esc_html( number_format_i18n( (float) $r->amount, 2 ) ); ?></span>
+							<?php endif; ?>
+							<?php if ( $r->paid_on ) : ?>
+								<span class="af-sp-history__date"><?php echo esc_html( wp_date( 'j M', strtotime( $r->paid_on . ' 12:00:00' ) ) ); ?></span>
+							<?php endif; ?>
+							<?php if ( $r->reference ) : ?>
+								<span class="af-sp-history__ref" title="<?php echo esc_attr( $r->reference ); ?>"><?php echo esc_html( $r->reference ); ?></span>
+							<?php endif; ?>
+						</div>
+						<?php if ( ! empty( $r->evidence ) ) : ?>
+							<div class="af-sp-history__proof">
+								<?php foreach ( $r->evidence as $ev ) : ?>
+									<?php
+									$src   = esc_url( call_user_func( $ev_url, (int) $ev->id ) );
+									$is_pdf = 'application/pdf' === $ev->mime_type;
+									?>
+									<button type="button" class="af-sp-ev-thumb" data-af-lightbox-src="<?php echo $src; ?>" data-af-lightbox-pdf="<?php echo $is_pdf ? '1' : '0'; ?>" aria-label="<?php echo $is_pdf ? esc_attr__( 'Ver PDF del comprobante', 'arriendo-facil' ) : esc_attr__( 'Ver foto del comprobante', 'arriendo-facil' ); ?>">
+										<?php if ( $is_pdf ) : ?>
+											<span class="af-sp-ev-thumb__pdf">PDF</span>
+										<?php else : ?>
+											<img src="<?php echo $src; ?>" alt="<?php esc_attr_e( 'Comprobante', 'arriendo-facil' ); ?>" loading="lazy" width="52" height="52">
+										<?php endif; ?>
+									</button>
+								<?php endforeach; ?>
+							</div>
 						<?php endif; ?>
 					</li>
 				<?php endforeach; ?>

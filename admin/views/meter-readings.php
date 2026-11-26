@@ -1420,3 +1420,38 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 	});
 })();
 </script>
+
+<!-- ── Lightbox: comprobante de pago ───────────────────────────────── -->
+<dialog id="af-sp-lightbox" aria-modal="true" aria-label="<?php esc_attr_e( 'Comprobante de pago', 'arriendo-facil' ); ?>">
+	<div class="af-sp-lightbox__head">
+		<span><?php esc_html_e( 'Comprobante de pago', 'arriendo-facil' ); ?></span>
+		<button type="button" class="af-sp-lightbox__close" id="af-sp-lightbox-close" aria-label="<?php esc_attr_e( 'Cerrar', 'arriendo-facil' ); ?>">&#x2715;</button>
+	</div>
+	<div class="af-sp-lightbox__body" id="af-sp-lightbox-body"></div>
+</dialog>
+<script>
+(function () {
+	var lb = document.getElementById('af-sp-lightbox');
+	var body = document.getElementById('af-sp-lightbox-body');
+	if (!lb || !body) { return; }
+
+	document.addEventListener('click', function (e) {
+		var btn = e.target.closest('[data-af-lightbox-src]');
+		if (!btn) { return; }
+		var src = btn.getAttribute('data-af-lightbox-src');
+		var isPdf = btn.getAttribute('data-af-lightbox-pdf') === '1';
+		body.innerHTML = isPdf
+			? '<embed src="' + src + '" type="application/pdf">'
+			: '<img src="' + src + '" alt="">';
+		if (typeof lb.showModal === 'function') { lb.showModal(); } else { lb.setAttribute('open', ''); }
+	});
+
+	document.getElementById('af-sp-lightbox-close').addEventListener('click', function () {
+		lb.close();
+		body.innerHTML = '';
+	});
+	lb.addEventListener('click', function (e) {
+		if (e.target === lb) { lb.close(); body.innerHTML = ''; }
+	});
+})();
+</script>

@@ -25,6 +25,44 @@ class Arriendo_Facil_Portal_Canon {
 	}
 
 	/**
+	 * Crea la tabla si no existe todavía (safe to call on every request).
+	 */
+	private static function ensure_table(): void {
+		global $wpdb;
+
+		if ( get_option( 'af_payment_submissions_ver' ) === '1' ) {
+			return;
+		}
+
+		$table = self::submissions_table();
+		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+		$charset = $wpdb->get_charset_collate();
+		dbDelta(
+			"CREATE TABLE IF NOT EXISTS {$table} (
+			  id          BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+			  charge_id   BIGINT(20) UNSIGNED NOT NULL,
+			  guest_id    BIGINT(20) UNSIGNED NOT NULL,
+			  lease_id    BIGINT(20) UNSIGNED NOT NULL,
+			  amount      DECIMAL(12,2)       NOT NULL,
+			  paid_on     DATE                NOT NULL,
+			  method      VARCHAR(50)         NOT NULL DEFAULT 'transferencia',
+			  reference   VARCHAR(255)        DEFAULT NULL,
+			  status      VARCHAR(20)         NOT NULL DEFAULT 'submitted',
+			  reviewed_by BIGINT(20) UNSIGNED DEFAULT NULL,
+			  reviewed_at DATETIME            DEFAULT NULL,
+			  review_note VARCHAR(255)        DEFAULT NULL,
+			  created_at  DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			  PRIMARY KEY (id),
+			  INDEX idx_cps_charge   (charge_id),
+			  INDEX idx_cps_guest_st (guest_id, status),
+			  INDEX idx_cps_status   (status, created_at)
+			) {$charset};" // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		);
+
+		update_option( 'af_payment_submissions_ver', '1', false );
+	}
+
+	/**
 	 * Registra la acción AJAX.
 	 */
 	public function __construct() {
@@ -42,6 +80,8 @@ class Arriendo_Facil_Portal_Canon {
 	 */
 	public static function for_guest( int $guest_id, array $lease_ids, array $charges ): array {
 		global $wpdb;
+
+		self::ensure_table();
 
 		if ( ! $guest_id || empty( $lease_ids ) || empty( $charges ) ) {
 			return array();
@@ -136,6 +176,8 @@ class Arriendo_Facil_Portal_Canon {
 	public function ajax_pay(): void {
 		global $wpdb;
 
+		self::ensure_table();
+
 		$session = Arriendo_Facil_Tenant_Access::current_session();
 		if ( ! $session || ! Arriendo_Facil_Tenant_Access::csrf_ok( $session ) ) {
 			wp_send_json_error( array( 'code' => 'session', 'message' => __( 'Tu sesión venció. Vuelve a entrar con un código.', 'arriendo-facil' ) ), 401 );
@@ -158,7 +200,7 @@ class Arriendo_Facil_Portal_Canon {
 		if ( $amount <= 0 || $amount > 1000000 ) {
 			wp_send_json_error( array( 'message' => __( 'Escribe el monto que pagaste.', 'arriendo-facil' ) ), 400 );
 		}
-		if ( ! array_key_exists( $method, Arriendo_Facil_Billing_Ledger::payment_methods() ) ) {
+		if ( ! array_key_exists( $method, Arriendo_Facil_Billing_Ledger::invoice_payment_methods() ) ) {
 			$method = 'transferencia';
 		}
 

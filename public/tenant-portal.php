@@ -359,7 +359,7 @@ get_header();
 						$cc_lbl  = $af_pay_lbl[ $cc['pay_status'] ] ?? $af_pay_lbl['pending'];
 						$cc_type = $af_type_labels[ $cc['charge_type'] ] ?? $cc['charge_type'];
 						$cc_can_submit = in_array( $cc['pay_status'], array( 'pending', 'rejected' ), true ) && ! in_array( $cc['charge_status'], array( 'paid', 'void' ), true );
-						$cc_methods = Arriendo_Facil_Billing_Ledger::payment_methods();
+						$cc_methods = Arriendo_Facil_Billing_Ledger::invoice_payment_methods();
 					?>
 						<li class="af-tp-svc" id="af-tp-canon-<?php echo esc_attr( (string) $cc['id'] ); ?>">
 							<div class="af-tp-svc__top">

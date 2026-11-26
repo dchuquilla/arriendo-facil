@@ -398,6 +398,13 @@ function arriendo_facil_has_lease_schema_drift() {
 		return false;
 	}
 
+	// Cache the result for 1 hour: INFORMATION_SCHEMA queries on every admin
+	// page load add measurable latency and are unnecessary once columns exist.
+	$cached = get_transient( 'af_lease_schema_drift' );
+	if ( false !== $cached ) {
+		return (bool) $cached;
+	}
+
 	global $wpdb;
 	$required_columns = array(
 		$wpdb->prefix . 'af_leases'  => array( 'template_attachment_id', 'payment_due_day' ),
@@ -406,6 +413,7 @@ function arriendo_facil_has_lease_schema_drift() {
 		$wpdb->prefix . 'af_electronic_invoices' => array( 'comprador_nombre' ),
 	);
 
+	$drift = false;
 	foreach ( $required_columns as $table_name => $required ) {
 		foreach ( $required as $column_name ) {
 			$found = $wpdb->get_var(
@@ -421,12 +429,17 @@ function arriendo_facil_has_lease_schema_drift() {
 				)
 			);
 			if ( ! (int) $found ) {
-				return true;
+				$drift = true;
+				break 2;
 			}
 		}
 	}
 
-	return false;
+	// Cache 1 hour: drift means upgrade runs and fixes columns immediately,
+	// so a stale false-positive is impossible in practice.
+	set_transient( 'af_lease_schema_drift', $drift ? '1' : '0', HOUR_IN_SECONDS );
+
+	return $drift;
 }
 
 /**
@@ -450,13 +463,20 @@ function arriendo_facil_maybe_upgrade_schema() {
 		return;
 	}
 
+	// Invalidate the drift-check cache so the next admin_init re-reads the
+	// real columns instead of a stale "drift=true" that would loop activate().
+	delete_transient( 'af_lease_schema_drift' );
+
 	Arriendo_Facil_Activator::activate();
 
-	// Migración legacy: normaliza la ocupación de todos los inmuebles para
-	// que las metas (_af_is_occupied, _af_status, af_leases.status) no se
-	// contradigan entre sí. Idempotente.
-	if ( class_exists( 'Arriendo_Facil_Occupancy' ) ) {
+	// Occupancy backfill: normaliza _af_is_occupied/_af_status contra los
+	// contratos reales. Tiene su propio flag ('af_occupancy_backfill_v1')
+	// para correr UNA SOLA VEZ, independientemente de cuántas veces se
+	// actualice af_db_schema_version. Nunca se re-ejecuta en upgrades
+	// posteriores a menos que el flag se elimine manualmente.
+	if ( class_exists( 'Arriendo_Facil_Occupancy' ) && ! get_option( 'af_occupancy_backfill_v1' ) ) {
 		Arriendo_Facil_Occupancy::backfill_all();
+		update_option( 'af_occupancy_backfill_v1', '1', false );
 	}
 
 	update_option( 'af_db_schema_version', $target_schema_version, false );

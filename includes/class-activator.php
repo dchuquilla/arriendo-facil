@@ -109,9 +109,18 @@ class Arriendo_Facil_Activator {
 			}
 		}
 
-		self::sync_existing_owner_users_to_role();
-		self::migrate_legacy_af_owner_role();
 		self::heal_current_user_capabilities();
+
+		// Expensive DB-backed migrations: only run when explicitly scheduled
+		// (during activate/upgrade) or when the legacy role still exists.
+		// Never on every request — sync_existing_owner_users_to_role() runs a
+		// full-table SELECT on every plugins_loaded otherwise.
+		self::migrate_legacy_af_owner_role();
+
+		if ( get_option( 'af_owner_role_sync_pending' ) ) {
+			self::sync_existing_owner_users_to_role();
+			delete_option( 'af_owner_role_sync_pending' );
+		}
 	}
 
 	/**
@@ -283,6 +292,9 @@ class Arriendo_Facil_Activator {
 	 * owner contacts and AI logs.
 	 */
 	public static function activate() {
+		// Schedule the owner-role sync so ensure_owner_role() picks it up once.
+		update_option( 'af_owner_role_sync_pending', '1', false );
+
 		self::ensure_tenant_role();
 		self::ensure_owner_role();
 

@@ -666,6 +666,76 @@ class Arriendo_Facil_Portal_Manager {
 			<?php self::render_collect_form( $schedule_id, $period ); ?>
 		<?php endif; ?>
 		<?php
+		self::render_inline_review( $schedule_id, $period );
+	}
+
+	/**
+	 * Comprobante o entrega pendiente de este servicio y mes, dentro de la propia tarjeta.
+	 * Usa los mismos botones que la cola de arriba (mismo manejador).
+	 *
+	 * @param int    $schedule_id Regla.
+	 * @param string $period      YYYY-MM.
+	 * @return void
+	 */
+	private static function render_inline_review( $schedule_id, $period ) {
+		global $wpdb;
+
+		if ( 1 !== preg_match( '/^\d{4}-(0[1-9]|1[0-2])$/', (string) $period ) ) {
+			return;
+		}
+		$bill = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . Arriendo_Facil_Billing_Ledger::bill_payments_table() . " WHERE schedule_id = %d AND period = %s AND status = 'submitted'", absint( $schedule_id ), $period ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$dels = array_filter(
+			Arriendo_Facil_Portal_Collections::for_service( (int) $schedule_id, $period ),
+			static function ( $d ) {
+				return 'submitted' === $d->status;
+			}
+		);
+		if ( ! $bill && empty( $dels ) ) {
+			return;
+		}
+		$methods = Arriendo_Facil_Portal_Collections::methods();
+		$gallery = static function ( array $items ) {
+			echo '<div class="af-portal-gallery">';
+			foreach ( $items as $ev ) {
+				$url = esc_url( Arriendo_Facil_Portal_Manager::evidence_url( (int) $ev->id ) );
+				if ( 'application/pdf' === $ev->mime_type ) {
+					echo '<a class="af-portal-file" href="' . $url . '" target="_blank" rel="noopener">PDF</a>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+				} else {
+					echo '<a class="af-portal-thumb" href="' . $url . '" target="_blank" rel="noopener"><img src="' . $url . '" alt="" loading="lazy" width="72" height="72"></a>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+				}
+			}
+			echo '</div>';
+		};
+		?>
+		<div class="af-inline-review" data-af-portal-queue>
+			<?php if ( $bill ) : ?>
+				<div class="af-portal-queue__card" data-bill="<?php echo esc_attr( (string) $bill->id ); ?>">
+					<strong><?php esc_html_e( 'El inquilino envió su comprobante', 'arriendo-facil' ); ?></strong>
+					<span><?php echo esc_html( sprintf( /* translators: 1: amount, 2: date */ __( 'Pagó $%1$s el %2$s', 'arriendo-facil' ), number_format_i18n( (float) $bill->amount, 2 ), wp_date( 'j M Y', strtotime( $bill->paid_on . ' 12:00:00' ) ) ) . ( $bill->reference ? ' · ' . $bill->reference : '' ) ); ?></span>
+					<?php $gallery( Arriendo_Facil_Portal_Evidence::for_subject( 'service_payment', (int) $bill->id, (int) $bill->guest_id ) ); ?>
+					<input type="text" class="af-portal-queue__note" maxlength="255" placeholder="<?php esc_attr_e( 'Nota (obligatoria si rechazas)', 'arriendo-facil' ); ?>">
+					<div class="af-portal-row">
+						<button type="button" class="button button-primary button-small" data-decision="approve"><?php esc_html_e( 'Aprobar', 'arriendo-facil' ); ?></button>
+						<button type="button" class="button button-small" data-decision="reject"><?php esc_html_e( 'Rechazar', 'arriendo-facil' ); ?></button>
+					</div>
+					<p class="af-portal-msg" data-msg role="status"></p>
+				</div>
+			<?php endif; ?>
+			<?php foreach ( $dels as $d ) : ?>
+				<div class="af-portal-queue__card" data-delivery="<?php echo esc_attr( (string) $d->id ); ?>">
+					<strong><?php esc_html_e( 'El inquilino dice que te entregó dinero', 'arriendo-facil' ); ?></strong>
+					<span><?php echo esc_html( sprintf( /* translators: 1: amount, 2: method */ __( '$%1$s · %2$s', 'arriendo-facil' ), number_format_i18n( (float) $d->amount, 2 ), isset( $methods[ $d->method ] ) ? $methods[ $d->method ] : $d->method ) ); ?></span>
+					<?php $gallery( Arriendo_Facil_Portal_Evidence::for_subject( 'delivery', (int) $d->id, (int) $d->guest_id ) ); ?>
+					<input type="text" class="af-portal-queue__note" maxlength="255" placeholder="<?php esc_attr_e( 'Nota (obligatoria si no lo confirmas)', 'arriendo-facil' ); ?>">
+					<div class="af-portal-row">
+						<button type="button" class="button button-primary button-small" data-decision="confirm"><?php esc_html_e( 'Sí, lo recibí: emitir recibo', 'arriendo-facil' ); ?></button>
+						<button type="button" class="button button-small" data-decision="reject"><?php esc_html_e( 'No confirmar', 'arriendo-facil' ); ?></button>
+					</div>
+					<p class="af-portal-msg" data-msg role="status"></p>
+				</div>
+			<?php endforeach; ?>
+		</div>
+		<?php
 	}
 
 	/**

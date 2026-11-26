@@ -349,6 +349,13 @@
 				});
 			});
 		});
+		$$('[data-tp-open-docs]').forEach(function (b) {
+			b.addEventListener('click', function () {
+				var d = dialog('docs');
+				if (!d) { return; }
+				if (typeof d.showModal === 'function') { d.showModal(); } else { d.setAttribute('open', ''); }
+			});
+		});
 		$$('[data-tp-close]').forEach(function (b) {
 			b.addEventListener('click', function () { var d = b.closest('dialog'); if (d) { d.close ? d.close() : d.removeAttribute('open'); } });
 		});

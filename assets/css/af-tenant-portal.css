@@ -468,6 +468,150 @@ button.af-tp-stat { border: 1px solid var(--tp-border); font: inherit; }
 	background: var(--tp-bad);
 }
 
+/* ── Tab count badges ─────────────────────────────────────────────── */
+
+.af-tp-tab-count {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 18px;
+	height: 18px;
+	padding: 0 5px;
+	border-radius: 999px;
+	background: var(--tp-bad);
+	color: #fff;
+	font-size: 11px;
+	font-weight: 700;
+	line-height: 1;
+	vertical-align: middle;
+}
+
+.af-tp-tab-count--info { background: var(--tp-info); }
+.af-tp-tab-count--warn { background: var(--tp-warn); }
+
+/* ── Mini profile card in Resumen ────────────────────────────────── */
+
+.af-tp-profile-mini {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 14px 16px;
+	margin-bottom: 20px;
+	border: 1px solid var(--tp-border);
+	border-radius: var(--tp-radius-lg);
+	background: var(--tp-raised);
+}
+
+.af-tp-profile-mini__avatar {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 44px;
+	height: 44px;
+	flex: 0 0 44px;
+	border-radius: 50%;
+	background: var(--tp-accent);
+	color: #fff;
+	font-size: 15px;
+	font-weight: 700;
+	letter-spacing: 0.03em;
+}
+
+.af-tp-profile-mini__body {
+	flex: 1 1 auto;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.af-tp-profile-mini__body strong {
+	font-size: 14px;
+	font-weight: 700;
+	color: var(--tp-text);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.af-tp-profile-mini__body span {
+	font-size: 12px;
+	color: var(--tp-muted);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.af-tp-docs-trigger {
+	flex-shrink: 0;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+/* ── Docs row in profile tab ─────────────────────────────────────── */
+
+.af-tp-docs-row {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 16px;
+	border: 1px solid var(--tp-border);
+	border-radius: var(--tp-radius-lg);
+	background: var(--tp-raised);
+}
+
+.af-tp-btn--outline {
+	border: 1.5px solid var(--tp-accent);
+	background: transparent;
+	color: var(--tp-accent);
+	font-weight: 600;
+}
+
+.af-tp-btn--outline:hover {
+	background: var(--tp-accent-soft);
+}
+
+/* ── Docs dialog ─────────────────────────────────────────────────── */
+
+.af-tp-dialog--docs {
+	overflow-y: auto;
+}
+
+.af-tp-dialog__head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 16px;
+}
+
+.af-tp-dialog__head .af-tp-h2 {
+	margin: 0;
+}
+
+.af-tp-btn-close {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 32px;
+	flex: 0 0 32px;
+	border: 1px solid var(--tp-border);
+	border-radius: 50%;
+	background: var(--tp-surface);
+	color: var(--tp-muted);
+	font-size: 16px;
+	line-height: 1;
+	cursor: pointer;
+	transition: background var(--tp-motion-fast), color var(--tp-motion-fast);
+}
+
+.af-tp-btn-close:hover {
+	background: var(--tp-raised);
+	color: var(--tp-text);
+}
+
 /* ═══════════════════════════════════════════════════════════════════
  * PORTAL — CONTENIDO
  * ═══════════════════════════════════════════════════════════════════ */

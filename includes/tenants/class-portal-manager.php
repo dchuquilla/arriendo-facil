@@ -860,6 +860,56 @@ class Arriendo_Facil_Portal_Manager {
 	}
 
 	/**
+	 * Historial de pagos de un servicio — últimos 6 meses aprobados.
+	 *
+	 * @param int    $schedule_id Regla de servicio.
+	 * @param string $period      Período actual YYYY-MM (excluido del historial).
+	 * @return void
+	 */
+	public static function render_service_history( $schedule_id, $period ) {
+		global $wpdb;
+
+		$schedule_id = absint( $schedule_id );
+		if ( ! $schedule_id ) {
+			return;
+		}
+
+		$table = Arriendo_Facil_Billing_Ledger::bill_payments_table();
+
+		$rows = $wpdb->get_results( $wpdb->prepare( // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			'SELECT period, amount, paid_on, reference FROM ' . $table . // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			" WHERE schedule_id = %d AND period < %s AND status IN ('approved','paid') ORDER BY period DESC LIMIT 6",
+			$schedule_id,
+			$period
+		) );
+
+		if ( empty( $rows ) ) {
+			return;
+		}
+		?>
+		<details class="af-sp-history">
+			<summary><?php esc_html_e( 'Historial de pagos', 'arriendo-facil' ); ?> <span>(<?php echo esc_html( count( $rows ) ); ?>)</span></summary>
+			<ul class="af-sp-history__list">
+				<?php foreach ( $rows as $r ) : ?>
+					<li class="af-sp-history__item">
+						<span class="af-sp-history__period"><?php echo esc_html( wp_date( 'M Y', strtotime( $r->period . '-01 12:00:00' ) ) ); ?></span>
+						<?php if ( $r->amount > 0 ) : ?>
+							<span class="af-sp-history__amount">$<?php echo esc_html( number_format_i18n( (float) $r->amount, 2 ) ); ?></span>
+						<?php endif; ?>
+						<?php if ( $r->paid_on ) : ?>
+							<span class="af-sp-history__date"><?php echo esc_html( wp_date( 'j M', strtotime( $r->paid_on . ' 12:00:00' ) ) ); ?></span>
+						<?php endif; ?>
+						<?php if ( $r->reference ) : ?>
+							<span class="af-sp-history__ref" title="<?php echo esc_attr( $r->reference ); ?>"><?php echo esc_html( $r->reference ); ?></span>
+						<?php endif; ?>
+					</li>
+				<?php endforeach; ?>
+			</ul>
+		</details>
+		<?php
+	}
+
+	/**
 	 * Estilos y script de la cola y del selector (una vez por pantalla).
 	 *
 	 * @return void
@@ -877,13 +927,14 @@ class Arriendo_Facil_Portal_Manager {
 			.af-portal-file{display:inline-flex;align-items:center;justify-content:center;width:72px;height:72px;border:1px solid #c9d5d2;border-radius:8px;font-weight:600}
 			.af-portal-row{display:flex;flex-wrap:wrap;gap:6px}
 			.af-portal-msg{font-size:12px;margin:0}
-			.af-payer{display:flex;align-items:center;gap:4px;margin:8px 0;flex-wrap:wrap}
-			.af-payer__label{font-size:12px;color:#4f6267;margin-right:2px}
-			.af-payer__opt{min-height:30px;padding:0 10px;border:1px solid #c9d5d2;border-radius:999px;background:#fff;font-size:12px;cursor:pointer}
-			.af-collect{margin:6px 0;font-size:12px}.af-collect summary{cursor:pointer;color:#164a55;font-weight:600}
+			.af-payer{display:flex;align-items:center;gap:4px;margin:4px 0;overflow-x:auto;scrollbar-width:none;padding-bottom:1px}
+			.af-payer::-webkit-scrollbar{display:none}
+			.af-payer__label{font-size:11px;color:#4f6267;font-weight:600;white-space:nowrap;flex-shrink:0;margin-right:2px}
+			.af-payer__opt{min-height:26px;padding:0 8px;border:1px solid #c9d5d2;border-radius:999px;background:#fff;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:inherit}
+			.af-payer__opt.is-on{background:#164a55;border-color:#164a55;color:#fff}
+			.af-collect{margin:4px 0;font-size:12px}.af-collect summary{cursor:pointer;color:#164a55;font-weight:600}
 			.af-collect__list{margin:6px 0;padding-left:16px}.af-collect__form{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 			.af-collect__form input,.af-collect__form select{max-width:130px;min-height:30px}
-			.af-payer__opt.is-on{background:#164a55;border-color:#164a55;color:#fff}
 		</style>
 		<script>
 		(function () {

@@ -509,6 +509,8 @@ $ledger_nonce = wp_create_nonce( 'af_ledger_nonce' );
 										<p class="af-sp-tile__note"><?php echo esc_html( $row['notes'] ); ?></p>
 									<?php endif; ?>
 
+									<?php Arriendo_Facil_Portal_Manager::render_service_history( (int) $row['schedule_id'], $period ); ?>
+
 									<?php if ( $row['bill_paid'] && ( $row['bill_amount'] > 0 || '' !== $row['bill_reference'] ) ) : ?>
 										<p class="af-sp-tile__meta">
 											<?php

@@ -217,34 +217,33 @@ get_header();
 			<button class="af-tp-btn af-tp-btn--ghost" type="button" data-tp-logout><?php esc_html_e( 'Salir', 'arriendo-facil' ); ?></button>
 		</header>
 
-		<section class="af-tp-summary" aria-label="<?php esc_attr_e( 'Resumen', 'arriendo-facil' ); ?>">
-			<button type="button" class="af-tp-stat <?php echo $af_svc_todo ? 'is-warn' : 'is-ok'; ?>" data-tp-goto="services">
-				<span><?php esc_html_e( 'Servicios por pagar', 'arriendo-facil' ); ?></span>
-				<strong data-tp-count><?php echo esc_html( number_format_i18n( $af_svc_todo ) ); ?></strong>
-			</button>
-			<button type="button" class="af-tp-stat <?php echo $af_inc_open ? 'is-info' : 'is-ok'; ?>" data-tp-goto="incidents">
-				<span><?php esc_html_e( 'Incidentes abiertos', 'arriendo-facil' ); ?></span>
-				<strong data-tp-count><?php echo esc_html( number_format_i18n( $af_inc_open ) ); ?></strong>
-			</button>
-			<button type="button" class="af-tp-stat <?php echo $af_docs['missing'] ? 'is-warn' : 'is-ok'; ?>" data-tp-goto="profile">
-				<span><?php esc_html_e( 'Documentos pendientes', 'arriendo-facil' ); ?></span>
-				<strong data-tp-count><?php echo esc_html( number_format_i18n( $af_docs['missing'] ) ); ?></strong>
-			</button>
-			<button type="button" class="af-tp-stat" data-tp-goto="overview">
-				<span><?php esc_html_e( 'Contratos vigentes', 'arriendo-facil' ); ?></span>
-				<strong data-tp-count><?php echo esc_html( number_format_i18n( count( $af_open ) ) ); ?></strong>
-			</button>
-		</section>
-
 		<nav class="af-tp-tabs" role="tablist" aria-label="<?php esc_attr_e( 'Secciones', 'arriendo-facil' ); ?>">
 			<button type="button" role="tab" class="is-active" aria-selected="true" data-tp-tab="overview"><span><?php esc_html_e( 'Resumen', 'arriendo-facil' ); ?></span></button>
-			<button type="button" role="tab" aria-selected="false" data-tp-tab="services"><span><?php esc_html_e( 'Servicios', 'arriendo-facil' ); ?></span><?php echo $af_svc_todo ? '<i class="af-tp-dot" aria-hidden="true"></i>' : ''; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></button>
-			<button type="button" role="tab" aria-selected="false" data-tp-tab="incidents"><span><?php esc_html_e( 'Incidentes', 'arriendo-facil' ); ?></span></button>
-			<button type="button" role="tab" aria-selected="false" data-tp-tab="profile"><span><?php esc_html_e( 'Perfil', 'arriendo-facil' ); ?></span></button>
+			<button type="button" role="tab" aria-selected="false" data-tp-tab="services"><span><?php esc_html_e( 'Servicios', 'arriendo-facil' ); ?></span><?php if ( $af_svc_todo ) : ?><span class="af-tp-tab-count" aria-label="<?php echo esc_attr( $af_svc_todo ); ?> servicios pendientes"><?php echo esc_html( number_format_i18n( $af_svc_todo ) ); ?></span><?php endif; ?></button>
+			<button type="button" role="tab" aria-selected="false" data-tp-tab="incidents"><span><?php esc_html_e( 'Incidentes', 'arriendo-facil' ); ?></span><?php if ( $af_inc_open ) : ?><span class="af-tp-tab-count af-tp-tab-count--info" aria-label="<?php echo esc_attr( $af_inc_open ); ?> incidentes abiertos"><?php echo esc_html( number_format_i18n( $af_inc_open ) ); ?></span><?php endif; ?></button>
+			<button type="button" role="tab" aria-selected="false" data-tp-tab="profile"><span><?php esc_html_e( 'Perfil', 'arriendo-facil' ); ?></span><?php if ( $af_docs['missing'] ) : ?><span class="af-tp-tab-count af-tp-tab-count--warn" aria-label="<?php echo esc_attr( $af_docs['missing'] ); ?> documentos pendientes"><?php echo esc_html( number_format_i18n( $af_docs['missing'] ) ); ?></span><?php endif; ?></button>
 		</nav>
 
 		<!-- ───────── Resumen ───────── -->
 		<section class="af-tp-card" data-tp-panel="overview" role="tabpanel">
+
+			<div class="af-tp-profile-mini">
+				<span class="af-tp-profile-mini__avatar" aria-hidden="true"><?php echo esc_html( mb_strtoupper( mb_substr( (string) $af_guest->first_name, 0, 1 ) . mb_substr( (string) $af_guest->last_name, 0, 1 ) ) ); ?></span>
+				<div class="af-tp-profile-mini__body">
+					<strong><?php echo esc_html( $af_name ); ?></strong>
+					<span><?php echo esc_html( $af_guest->email ); ?></span>
+					<?php if ( $af_guest->phone ) : ?><span><?php echo esc_html( (string) $af_guest->phone ); ?></span><?php endif; ?>
+				</div>
+				<button type="button" class="af-tp-btn af-tp-btn--ghost af-tp-docs-trigger" data-tp-open-docs aria-haspopup="dialog">
+					<?php esc_html_e( 'Mis documentos', 'arriendo-facil' ); ?>
+					<?php if ( $af_docs['missing'] ) : ?>
+						<span class="af-tp-tab-count af-tp-tab-count--warn" aria-hidden="true"><?php echo esc_html( number_format_i18n( $af_docs['missing'] ) ); ?></span>
+					<?php else : ?>
+						<span class="af-tp-pill is-ok"><?php echo esc_html( ucfirst( $af_docs['status'] ) ); ?></span>
+					<?php endif; ?>
+				</button>
+			</div>
+
 			<h2 class="af-tp-h2"><?php esc_html_e( 'Pendiente de ti', 'arriendo-facil' ); ?></h2>
 			<?php if ( empty( $af_todo ) ) : ?>
 				<p class="af-tp-empty"><?php esc_html_e( 'Estás al día. No tienes nada pendiente.', 'arriendo-facil' ); ?></p>
@@ -573,9 +572,24 @@ get_header();
 				</form>
 			</details>
 
-			<h2 class="af-tp-h2"><?php esc_html_e( 'Mis documentos', 'arriendo-facil' ); ?>
-				<span class="af-tp-pill is-<?php echo esc_attr( 'verificado' === $af_docs['status'] ? 'ok' : ( 'rechazado' === $af_docs['status'] ? 'bad' : 'info' ) ); ?>"><?php echo esc_html( ucfirst( $af_docs['status'] ) ); ?></span>
-			</h2>
+			<div class="af-tp-docs-row">
+				<button type="button" class="af-tp-btn af-tp-btn--outline af-tp-docs-trigger" data-tp-open-docs aria-haspopup="dialog">
+					<span><?php esc_html_e( 'Ver mis documentos', 'arriendo-facil' ); ?></span>
+					<span class="af-tp-pill is-<?php echo esc_attr( 'verificado' === $af_docs['status'] ? 'ok' : ( 'rechazado' === $af_docs['status'] ? 'bad' : 'info' ) ); ?>"><?php echo esc_html( ucfirst( $af_docs['status'] ) ); ?></span>
+					<?php if ( $af_docs['missing'] ) : ?><span class="af-tp-tab-count af-tp-tab-count--warn"><?php echo esc_html( number_format_i18n( $af_docs['missing'] ) ); ?></span><?php endif; ?>
+				</button>
+				<p class="af-tp-meta"><?php esc_html_e( 'Tus documentos se guardan en un espacio privado y solo los ve tu administrador.', 'arriendo-facil' ); ?></p>
+			</div>
+		</section>
+
+		<!-- Diálogos -->
+		<dialog class="af-tp-dialog af-tp-dialog--docs" data-tp-dialog="docs" aria-labelledby="af-tp-docs-title">
+			<div class="af-tp-dialog__head">
+				<h2 class="af-tp-h2" id="af-tp-docs-title"><?php esc_html_e( 'Mis documentos', 'arriendo-facil' ); ?>
+					<span class="af-tp-pill is-<?php echo esc_attr( 'verificado' === $af_docs['status'] ? 'ok' : ( 'rechazado' === $af_docs['status'] ? 'bad' : 'info' ) ); ?>"><?php echo esc_html( ucfirst( $af_docs['status'] ) ); ?></span>
+				</h2>
+				<button type="button" class="af-tp-btn-close" data-tp-close aria-label="<?php esc_attr_e( 'Cerrar', 'arriendo-facil' ); ?>">&#x2715;</button>
+			</div>
 			<ul class="af-tp-list">
 				<?php foreach ( $af_docs['types'] as $key => $doc ) : ?>
 					<li class="af-tp-item">
@@ -588,9 +602,11 @@ get_header();
 				<?php endforeach; ?>
 			</ul>
 			<p class="af-tp-meta"><?php esc_html_e( 'Tus documentos se guardan en un espacio privado y solo los ve tu administrador. No se pueden descargar desde aquí.', 'arriendo-facil' ); ?></p>
-		</section>
+			<div class="af-tp-row">
+				<button type="button" class="af-tp-btn af-tp-btn--ghost" data-tp-close><?php esc_html_e( 'Cerrar', 'arriendo-facil' ); ?></button>
+			</div>
+		</dialog>
 
-		<!-- Diálogos -->
 		<dialog class="af-tp-dialog" data-tp-dialog="pay" aria-labelledby="af-tp-pay-title">
 			<form class="af-tp-form" data-tp-form="af_tpa_service_pay" novalidate>
 				<h2 class="af-tp-h2" id="af-tp-pay-title"><?php esc_html_e( 'Registrar pago', 'arriendo-facil' ); ?></h2>

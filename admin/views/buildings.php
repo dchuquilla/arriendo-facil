@@ -184,6 +184,10 @@ $cob_alerts   = $cob_snapshot['display'];
 			'subtitle' => __( 'Cada tarjeta es un inmueble y su color indica el estado de pago. Ábrela para ver cobros y registrar pagos.', 'arriendo-facil' ),
 		)
 	);
+
+	if ( class_exists( 'Arriendo_Facil_Portal_Manager' ) ) {
+		Arriendo_Facil_Portal_Manager::render_canon_review_queue();
+	}
 	?>
 
 	<div class="af-tabs af-buildings-tabs">

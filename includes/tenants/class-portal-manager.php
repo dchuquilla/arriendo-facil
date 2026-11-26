@@ -356,6 +356,12 @@ class Arriendo_Facil_Portal_Manager {
 
 		Arriendo_Facil_Portal_Events::log( (int) $row->guest_id, (int) $row->lease_id, 'incident', (int) $row->id, 'manager', get_current_user_id(), 'responsibility_set', array( 'responsibility' => $who, 'note' => $note ) );
 
+		// Si se adjuntaron fotos/archivos de reparación, guardarlos también.
+		$files = Arriendo_Facil_Portal_Evidence::from_request( 'files', 0 );
+		if ( ! is_wp_error( $files ) && ! empty( $files ) ) {
+			Arriendo_Facil_Portal_Evidence::save( $files, (int) $row->guest_id, (int) $row->lease_id, 'incident', (int) $row->id, 'repair', 'manager' );
+		}
+
 		self::notify_tenant(
 			(int) $row->guest_id,
 			__( 'Se definió la responsabilidad de tu incidente', 'arriendo-facil' ),
@@ -364,7 +370,7 @@ class Arriendo_Facil_Portal_Manager {
 				: __( 'Tu administrador se hará cargo de la reparación de un incidente que reportaste. Entra a tu portal para seguirlo.', 'arriendo-facil' )
 		);
 
-		wp_send_json_success( array( 'message' => __( 'Responsabilidad guardada y notificada al inquilino.', 'arriendo-facil' ) ) );
+		wp_send_json_success( array( 'message' => __( 'Guardado y notificado al inquilino.', 'arriendo-facil' ) ) );
 	}
 
 	/**
@@ -545,75 +551,142 @@ class Arriendo_Facil_Portal_Manager {
 			}
 		};
 		?>
-		<details class="af-maint-card__notes af-portal-incident" data-af-portal-incident data-request="<?php echo esc_attr( (string) $id ); ?>" data-nonce="<?php echo esc_attr( $nonce ); ?>" <?php echo ( 'por_definir' === $resp && 'inquilino' === ( $request->reported_by ?? '' ) ) || $recurrence ? 'open' : ''; ?>>
-			<summary>
-				<?php esc_html_e( 'Portal del inquilino', 'arriendo-facil' ); ?>
-				· <?php echo esc_html( $labels[ $resp ] ?? $resp ); ?>
+		<details class="af-pi af-maint-card__notes" data-af-portal-incident data-request="<?php echo esc_attr( (string) $id ); ?>" data-nonce="<?php echo esc_attr( $nonce ); ?>" <?php echo ( 'por_definir' === $resp && 'inquilino' === ( $request->reported_by ?? '' ) ) || $recurrence ? 'open' : ''; ?>>
+			<summary class="af-pi__summary">
+				<span class="af-pi__summary-label"><?php esc_html_e( 'Portal del inquilino', 'arriendo-facil' ); ?></span>
+				<span class="af-pi__badge af-pi__badge--<?php echo esc_attr( 'owner' === $resp ? 'owner' : ( 'tenant' === $resp ? 'tenant' : 'pending' ) ); ?>"><?php echo esc_html( $labels[ $resp ] ?? $resp ); ?></span>
 				<?php if ( $recurrence ) : ?>
-					<strong style="color:#8e2b27;">· <?php esc_html_e( 'Reincidencia', 'arriendo-facil' ); ?></strong>
+					<span class="af-pi__badge af-pi__badge--warn"><?php esc_html_e( 'Reincidencia', 'arriendo-facil' ); ?></span>
 				<?php endif; ?>
 			</summary>
 
-			<?php if ( $recurrence ) : ?>
-				<p><strong><?php echo esc_html( sprintf( /* translators: %d: request id */ __( 'Este bien ya fue reparado por el propietario en el incidente #%d.', 'arriendo-facil' ), $recurrence ) ); ?></strong>
-				<?php esc_html_e( 'Por regla, una nueva falla del mismo bien suele corresponder al inquilino. Es una sugerencia: la decisión es tuya y debe quedar por escrito.', 'arriendo-facil' ); ?></p>
-			<?php endif; ?>
+			<div class="af-pi__body">
 
-			<?php if ( $report ) : ?>
-				<p><strong><?php esc_html_e( 'Fotos del reporte', 'arriendo-facil' ); ?></strong></p>
-				<div class="af-portal-gallery"><?php $thumbs( $report ); ?></div>
-			<?php endif; ?>
+				<?php if ( $recurrence ) : ?>
+					<div class="af-pi__alert">
+						<strong><?php echo esc_html( sprintf( /* translators: %d: request id */ __( 'Reincidencia del incidente #%d', 'arriendo-facil' ), $recurrence ) ); ?></strong>
+						<?php esc_html_e( 'Una nueva falla del mismo bien suele corresponder al inquilino. La decisión es tuya y debe quedar por escrito.', 'arriendo-facil' ); ?>
+					</div>
+				<?php endif; ?>
 
-			<?php if ( ! empty( $request->responsibility_note ) ) : ?>
-				<p><strong><?php esc_html_e( 'Motivo registrado:', 'arriendo-facil' ); ?></strong> <?php echo esc_html( (string) $request->responsibility_note ); ?></p>
-			<?php endif; ?>
+				<?php if ( $report ) : ?>
+					<div class="af-pi__photos">
+						<span class="af-pi__photos-label"><?php esc_html_e( 'Fotos del reporte', 'arriendo-facil' ); ?></span>
+						<div class="af-pi__gallery"><?php $thumbs( $report ); ?></div>
+					</div>
+				<?php endif; ?>
 
-			<div class="af-portal-row">
-				<select data-f="responsibility">
-					<option value="owner" <?php selected( 'owner', $resp ); ?>><?php esc_html_e( 'Lo repara el propietario', 'arriendo-facil' ); ?></option>
-					<option value="tenant" <?php selected( 'tenant', 'por_definir' === $resp && $recurrence ? 'tenant' : $resp ); ?>><?php esc_html_e( 'Le corresponde al inquilino', 'arriendo-facil' ); ?></option>
-				</select>
-				<input type="text" data-f="note" maxlength="255" placeholder="<?php esc_attr_e( 'Motivo (obligatorio, lo ven ambas partes)', 'arriendo-facil' ); ?>">
-				<button type="button" class="button button-small" data-act="set_responsibility"><?php esc_html_e( 'Guardar', 'arriendo-facil' ); ?></button>
-			</div>
+				<?php if ( $repair ) : ?>
+					<div class="af-pi__photos">
+						<span class="af-pi__photos-label"><?php esc_html_e( 'Evidencia de reparación', 'arriendo-facil' ); ?></span>
+						<div class="af-pi__gallery"><?php $thumbs( $repair ); ?></div>
+					</div>
+				<?php endif; ?>
 
-			<?php if ( $repair ) : ?>
-				<p><strong><?php esc_html_e( 'Evidencia de reparación', 'arriendo-facil' ); ?></strong></p>
-				<div class="af-portal-gallery"><?php $thumbs( $repair ); ?></div>
-			<?php endif; ?>
+				<?php if ( ! empty( $request->responsibility_note ) ) : ?>
+					<div class="af-pi__note-saved">
+						<span class="af-pi__note-saved__label"><?php esc_html_e( 'Motivo registrado', 'arriendo-facil' ); ?></span>
+						<span><?php echo esc_html( (string) $request->responsibility_note ); ?></span>
+					</div>
+				<?php endif; ?>
 
-			<div class="af-portal-row">
-				<input type="file" data-f="files" accept="image/jpeg,image/png,image/webp,application/pdf" multiple>
-				<button type="button" class="button button-small" data-act="repair_evidence"><?php esc_html_e( 'Subir evidencia de reparación', 'arriendo-facil' ); ?></button>
-			</div>
+				<div class="af-pi__form">
+					<div class="af-pi__resp-row">
+						<button type="button" class="af-pi__opt<?php echo 'owner' === $resp ? ' is-on' : ''; ?>" data-pi-resp="owner"><?php esc_html_e( 'Lo repara el propietario', 'arriendo-facil' ); ?></button>
+						<button type="button" class="af-pi__opt<?php echo 'tenant' === $resp || ( 'por_definir' === $resp && $recurrence ) ? ' is-on' : ''; ?>" data-pi-resp="tenant"><?php esc_html_e( 'Le corresponde al inquilino', 'arriendo-facil' ); ?></button>
+					</div>
+					<input type="hidden" data-f="responsibility" value="<?php echo esc_attr( 'por_definir' === $resp && $recurrence ? 'tenant' : $resp ); ?>">
+					<input type="text" class="af-pi__note-input" data-f="note" maxlength="255" placeholder="<?php esc_attr_e( 'Motivo (mínimo 10 caracteres, visible para ambas partes)', 'arriendo-facil' ); ?>" value="<?php echo esc_attr( (string) ( $request->responsibility_note ?? '' ) ); ?>">
 
-			<?php if ( ! empty( $request->tenant_ack ) ) : ?>
-				<p><strong><?php esc_html_e( 'Respuesta del inquilino:', 'arriendo-facil' ); ?></strong>
-					<?php echo esc_html( 'conforme' === $request->tenant_ack ? __( 'Recibió conforme', 'arriendo-facil' ) : __( 'No está conforme', 'arriendo-facil' ) ); ?>
-					<?php echo ! empty( $request->tenant_ack_note ) ? '— ' . esc_html( (string) $request->tenant_ack_note ) : ''; ?></p>
-			<?php endif; ?>
+					<label class="af-pi__upload-zone">
+						<input type="file" class="af-pi__file-input" data-f="files" accept="image/jpeg,image/png,image/webp,application/pdf" multiple>
+						<span class="af-pi__upload-icon">📎</span>
+						<span class="af-pi__upload-text"><?php esc_html_e( 'Adjuntar evidencia de reparación (opcional)', 'arriendo-facil' ); ?></span>
+						<span class="af-pi__file-name"><?php esc_html_e( 'Ningún archivo', 'arriendo-facil' ); ?></span>
+					</label>
 
-			<?php if ( $timeline ) : ?>
-				<ol class="af-portal-timeline">
-					<?php foreach ( $timeline as $ev ) : ?>
-						<li><?php echo esc_html( wp_date( 'j M Y H:i', strtotime( $ev->created_at . ' UTC' ) ) . ' · ' . ( 'tenant' === $ev->actor_type ? __( 'Inquilino', 'arriendo-facil' ) : ( 'manager' === $ev->actor_type ? __( 'Gestor', 'arriendo-facil' ) : __( 'Sistema', 'arriendo-facil' ) ) ) . ' · ' . Arriendo_Facil_Portal_Events::label( $ev->action ) ); ?></li>
-					<?php endforeach; ?>
-				</ol>
-			<?php endif; ?>
-			<p class="af-portal-msg" data-msg role="status"></p>
+					<button type="button" class="af-pi__save-btn" data-act="set_responsibility"><?php esc_html_e( 'Guardar decisión', 'arriendo-facil' ); ?></button>
+					<p class="af-pi__msg" data-msg role="status"></p>
+				</div>
+
+				<?php if ( ! empty( $request->tenant_ack ) ) : ?>
+					<div class="af-pi__ack">
+						<span class="af-pi__ack-label"><?php esc_html_e( 'Respuesta del inquilino:', 'arriendo-facil' ); ?></span>
+						<span class="af-pi__ack-val"><?php echo esc_html( 'conforme' === $request->tenant_ack ? __( 'Recibió conforme', 'arriendo-facil' ) : __( 'No está conforme', 'arriendo-facil' ) ); ?></span>
+						<?php if ( ! empty( $request->tenant_ack_note ) ) : ?>
+							<span class="af-pi__ack-note">— <?php echo esc_html( (string) $request->tenant_ack_note ); ?></span>
+						<?php endif; ?>
+					</div>
+				<?php endif; ?>
+
+				<?php if ( $timeline ) : ?>
+					<ol class="af-pi__timeline">
+						<?php foreach ( $timeline as $ev ) : ?>
+							<li><?php echo esc_html( wp_date( 'j M Y H:i', strtotime( $ev->created_at . ' UTC' ) ) . ' · ' . ( 'tenant' === $ev->actor_type ? __( 'Inquilino', 'arriendo-facil' ) : ( 'manager' === $ev->actor_type ? __( 'Gestor', 'arriendo-facil' ) : __( 'Sistema', 'arriendo-facil' ) ) ) . ' · ' . Arriendo_Facil_Portal_Events::label( $ev->action ) ); ?></li>
+						<?php endforeach; ?>
+					</ol>
+				<?php endif; ?>
+
+			</div><!-- .af-pi__body -->
 		</details>
 		<?php if ( ! $script_done ) : $script_done = true; ?>
 		<style>
-			.af-portal-gallery{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px}
-			.af-portal-thumb img{width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid #c9d5d2}
-			.af-portal-file{display:inline-flex;align-items:center;justify-content:center;width:72px;height:72px;border:1px solid #c9d5d2;border-radius:8px;font-weight:600}
-			.af-portal-row{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
-			.af-portal-row input[type=text]{flex:1 1 200px;min-width:0}
-			.af-portal-timeline{margin:8px 0 0 18px;font-size:12px;color:#4f6267}
-			.af-portal-msg{font-size:12px;margin:6px 0 0}
+			.af-pi{border:1px solid #e1e9e7;border-radius:10px;overflow:hidden;margin:12px 0 0;background:#f7f9f8}
+			.af-pi__summary{display:flex;align-items:center;gap:6px;padding:9px 14px;cursor:pointer;list-style:none;user-select:none;background:#f0f4f3}
+			.af-pi__summary::-webkit-details-marker{display:none}
+			.af-pi__summary-label{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#4f6267}
+			.af-pi__badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;background:#e1e9e7;color:#4f6267}
+			.af-pi__badge--owner{background:#ddeee9;color:#1a5a4a}
+			.af-pi__badge--tenant{background:#fde8e8;color:#8e2b27}
+			.af-pi__badge--warn{background:#fef0d9;color:#9a6128}
+			.af-pi__body{display:flex;flex-direction:column;gap:10px;padding:14px}
+			.af-pi__alert{padding:10px 12px;background:#fef0d9;border:1px solid #f5c66c;border-radius:8px;font-size:12px;color:#7a4800}
+			.af-pi__photos{display:flex;flex-direction:column;gap:6px}
+			.af-pi__photos-label{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#4f6267}
+			.af-pi__gallery{display:flex;flex-wrap:wrap;gap:5px}
+			.af-pi__gallery a img{width:64px;height:64px;object-fit:cover;border-radius:7px;border:1px solid #c9d5d2;display:block}
+			.af-pi__gallery a.af-portal-file{display:inline-flex;align-items:center;justify-content:center;width:64px;height:64px;border:1px solid #c9d5d2;border-radius:7px;font-size:10px;font-weight:700;color:#b03a36;text-decoration:none}
+			.af-pi__note-saved{display:flex;flex-direction:column;gap:2px;padding:8px 10px;background:#fff;border:1px solid #e1e9e7;border-radius:8px;font-size:12px}
+			.af-pi__note-saved__label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#4f6267}
+			.af-pi__form{display:flex;flex-direction:column;gap:8px}
+			.af-pi__resp-row{display:flex;gap:6px;flex-wrap:wrap}
+			.af-pi__opt{flex:1 1 auto;padding:7px 10px;border:1.5px solid #c9d5d2;border-radius:8px;background:#fff;font-size:12px;font-weight:600;color:#4f6267;cursor:pointer;text-align:center;transition:all .15s}
+			.af-pi__opt.is-on{background:#164a55;border-color:#164a55;color:#fff}
+			.af-pi__note-input{width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid #c9d5d2;border-radius:8px;font-size:12px;font-family:inherit;color:#222;background:#fff;outline:none}
+			.af-pi__note-input:focus{border-color:#164a55}
+			.af-pi__upload-zone{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1.5px dashed #c9d5d2;border-radius:8px;cursor:pointer;font-size:12px;color:#4f6267;background:#fff;transition:border-color .15s}
+			.af-pi__upload-zone:hover{border-color:#164a55}
+			.af-pi__file-input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+			.af-pi__upload-icon{font-size:14px;flex-shrink:0}
+			.af-pi__upload-text{flex:1 1 auto;min-width:0}
+			.af-pi__file-name{font-size:11px;color:#9aafad;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}
+			.af-pi__save-btn{padding:9px 16px;background:#164a55;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s}
+			.af-pi__save-btn:hover{background:#1f6050}
+			.af-pi__save-btn:disabled{opacity:.6;cursor:not-allowed}
+			.af-pi__msg{font-size:12px;margin:0;color:#4f6267}
+			.af-pi__ack{display:flex;align-items:center;gap:6px;font-size:12px;padding:6px 10px;background:#fff;border:1px solid #e1e9e7;border-radius:8px}
+			.af-pi__ack-label{font-weight:600;color:#4f6267}
+			.af-pi__ack-note{color:#9aafad}
+			.af-pi__timeline{margin:4px 0 0 18px;font-size:11px;color:#4f6267;line-height:1.6}
 		</style>
 		<script>
+		/* Toggles de responsabilidad */
 		document.addEventListener('click', function (e) {
+			var toggle = e.target.closest('[data-pi-resp]');
+			if (toggle) {
+				var box = toggle.closest('[data-af-portal-incident]');
+				if (!box) { return; }
+				box.querySelectorAll('[data-pi-resp]').forEach(function (b) { b.classList.toggle('is-on', b === toggle); });
+				var hidden = box.querySelector('[data-f="responsibility"]');
+				if (hidden) { hidden.value = toggle.getAttribute('data-pi-resp'); }
+				return;
+			}
+
+			/* File input label → update filename display */
+			var fileInput = e.target.closest('.af-pi__upload-zone') && e.target.closest('.af-pi__upload-zone').querySelector('.af-pi__file-input');
+			/* handled via change event below */
+
+			/* Save button */
 			var btn = e.target.closest('[data-af-portal-incident] [data-act]');
 			if (!btn) { return; }
 			var box = btn.closest('[data-af-portal-incident]');
@@ -627,6 +700,7 @@ class Arriendo_Facil_Portal_Manager {
 				else { fd.append(el.getAttribute('data-f'), el.value); }
 			});
 			btn.disabled = true;
+			msg.textContent = '';
 			fetch(<?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>, { method: 'POST', credentials: 'same-origin', body: fd })
 				.then(function (r) { return r.json(); })
 				.then(function (j) {
@@ -636,6 +710,19 @@ class Arriendo_Facil_Portal_Manager {
 					if (j && j.success) { setTimeout(function () { window.location.reload(); }, 900); }
 				})
 				.catch(function () { btn.disabled = false; msg.textContent = <?php echo wp_json_encode( __( 'No se pudo conectar. Inténtalo de nuevo.', 'arriendo-facil' ) ); ?>; msg.style.color = '#b03a36'; });
+		});
+
+		/* Muestra nombre del archivo seleccionado */
+		document.addEventListener('change', function (e) {
+			if (!e.target.classList.contains('af-pi__file-input')) { return; }
+			var label = e.target.closest('.af-pi__upload-zone');
+			if (!label) { return; }
+			var nameEl = label.querySelector('.af-pi__file-name');
+			if (!nameEl) { return; }
+			var files = e.target.files;
+			nameEl.textContent = files.length === 0
+				? <?php echo wp_json_encode( __( 'Ningún archivo', 'arriendo-facil' ) ); ?>
+				: (files.length === 1 ? files[0].name : files.length + ' archivos');
 		});
 		</script>
 		<?php endif;

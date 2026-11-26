@@ -186,9 +186,16 @@ get_header();
 			}
 			echo '</ol></details>';
 		};
-		$af_files_input = static function () {
-			echo '<label class="af-tp-label">' . esc_html__( 'Fotos o PDF', 'arriendo-facil' ) . '</label>';
-			echo '<input class="af-tp-input af-tp-file-input" type="file" name="files[]" accept="image/*,application/pdf" multiple data-tp-files>';
+		$af_files_input = static function ( string $label = '' ) {
+			$lbl = $label ?: __( 'Adjuntar fotos o PDF', 'arriendo-facil' );
+			echo '<div class="af-tp-upload">';
+			echo '<input class="af-tp-upload__input" type="file" name="files[]" accept="image/*,application/pdf" multiple data-tp-files id="af-tp-file-' . uniqid() . '">';
+			echo '<label class="af-tp-upload__zone" onclick="this.previousElementSibling.click()">';
+			echo '<span>📎</span>';
+			echo '<span class="af-tp-upload__label">' . esc_html( $lbl ) . '</span>';
+			echo '<span class="af-tp-upload__count"></span>';
+			echo '</label>';
+			echo '</div>';
 			echo '<div class="af-tp-previews" data-tp-previews></div>';
 		};
 		$af_todo = array();
@@ -269,7 +276,7 @@ get_header();
 								<label class="af-tp-label" for="af-tp-phone"><?php esc_html_e( 'Teléfono', 'arriendo-facil' ); ?></label>
 								<input class="af-tp-input" type="tel" id="af-tp-phone" name="phone" inputmode="tel" autocomplete="tel" maxlength="20" value="<?php echo esc_attr( (string) $af_guest->phone ); ?>" required />
 							</div>
-							<button class="af-tp-btn af-tp-btn--primary" type="submit" data-tp-submit style="align-self:flex-end"><?php esc_html_e( 'Guardar', 'arriendo-facil' ); ?></button>
+							<button class="af-tp-btn af-tp-btn--primary" type="submit" data-tp-submit style="align-self:flex-end;flex-shrink:0"><?php esc_html_e( 'Guardar', 'arriendo-facil' ); ?></button>
 						</div>
 					</form>
 					<details class="af-tp-more">

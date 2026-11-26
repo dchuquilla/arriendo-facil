@@ -273,8 +273,18 @@
 
 		/* Vista previa de archivos y validación antes de enviar. */
 		$$('[data-tp-files]').forEach(function (input) {
-			var box = input.parentNode.querySelector('[data-tp-previews]');
+			var zone = input.closest('.af-tp-upload');
+			var countEl = zone ? zone.querySelector('.af-tp-upload__count') : null;
+			var box = zone
+				? zone.nextElementSibling
+				: input.parentNode.querySelector('[data-tp-previews]');
 			input.addEventListener('change', function () {
+				/* Update count label */
+				if (countEl) {
+					countEl.textContent = input.files.length > 0
+						? (input.files.length === 1 ? input.files[0].name.slice(0, 24) : input.files.length + ' archivos')
+						: '';
+				}
 				if (!box) { return; }
 				box.innerHTML = '';
 				Array.prototype.forEach.call(input.files, function (f) {

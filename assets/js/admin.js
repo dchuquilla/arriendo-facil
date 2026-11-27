@@ -126,6 +126,7 @@
 				return;
 			}
 
+			modalEl.classList.remove( 'is-open' );
 			modalEl.setAttribute( 'hidden', 'hidden' );
 			document.body.classList.remove( 'af-modal-open' );
 			resetModalState();
@@ -134,6 +135,13 @@
 		function openModal( leaseId, nextVersion ) {
 			if ( ! modalEl ) {
 				return;
+			}
+
+			// Close any open actions dropdown so it doesn't float above the modal
+			// (the dropdown z-index is higher than the modal overlay).
+			var openMenu = document.querySelector( '.af-lease-actions-menu[open]' );
+			if ( openMenu ) {
+				openMenu.removeAttribute( 'open' );
 			}
 
 			// GSAP applies transform:translateY(0) to .af-shell (the page wrapper),
@@ -152,6 +160,7 @@
 			}
 
 			modalEl.removeAttribute( 'hidden' );
+			modalEl.classList.add( 'is-open' );
 			document.body.classList.add( 'af-modal-open' );
 		}
 

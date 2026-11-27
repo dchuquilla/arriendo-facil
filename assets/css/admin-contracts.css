@@ -24,8 +24,17 @@
   left: 0;
   z-index: 2;
   background: #fff;
-  min-width: 140px;
+  min-width: 150px;
+  max-width: 200px;
   box-shadow: 2px 0 4px rgba(0,0,0,.06);
+}
+
+.af-leases-table tbody td:nth-child(2) strong {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: 190px;
 }
 
 .af-leases-table thead th:nth-child(2) {

@@ -136,6 +136,14 @@
 				return;
 			}
 
+			// GSAP applies transform:translateY(0) to .af-shell (the page wrapper),
+			// which makes it the containing block for position:fixed descendants.
+			// Moving the modal to <body> escapes that stacking context so it covers
+			// the full viewport with the correct z-index.
+			if ( modalEl.parentElement !== document.body ) {
+				document.body.appendChild( modalEl );
+			}
+
 			state.leaseId = leaseId;
 			state.nextVersion = nextVersion;
 

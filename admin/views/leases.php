@@ -1871,12 +1871,13 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 
 	function place(menu) {
 		const summary = menu.querySelector('summary');
-		const panel   = menu.querySelector('.' + DROPDOWN_CLASS);
+		// Panel was moved to <body> on open; use stored reference.
+		var panel = menu.__afPanel || menu.querySelector('.' + DROPDOWN_CLASS);
 		if (!summary || !panel) { return; }
 
 		const trigger = summary.getBoundingClientRect();
 		const height  = panel.offsetHeight  || panel.getBoundingClientRect().height  || 0;
-		const width   = panel.offsetWidth   || panel.getBoundingClientRect().width   || 0;
+		const width   = panel.offsetWidth   || panel.getBoundingClientRect().width   || 248;
 		const vw      = document.documentElement.clientWidth;
 		const vh      = window.innerHeight;
 
@@ -1898,24 +1899,39 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 			left = VIEWPORT_PAD;
 		}
 
-		// Rebasa sobre el containing block real (viewport => origen 0,0).
-		const origin = containingBlockOrigin(panel);
-		panel.style.top  = Math.round(top  - origin.top)  + 'px';
-		panel.style.left = Math.round(left - origin.left) + 'px';
+		// Panel is now a direct child of <body>, so top/left are viewport coords.
+		panel.style.top  = Math.round(top)  + 'px';
+		panel.style.left = Math.round(left) + 'px';
 	}
 
 	function close(menu) {
 		if (!menu || menu.open === false) { return; }
 		menu.open = false;
 		menu.classList.remove('is-open');
+		// Return the panel to its original parent (was moved to body on open).
+		var panel = menu.__afPanel;
+		if (panel && menu.__afPanelParent) {
+			menu.__afPanelParent.appendChild(panel);
+		}
+		delete menu.__afPanel;
+		delete menu.__afPanelParent;
 		if (openMenu === menu) { openMenu = null; }
 	}
 
 	function open(menu) {
 		closeAllOthers(menu);
+		var panel = menu.querySelector('.' + DROPDOWN_CLASS);
+		// GSAP applies transform:translateY(0) to .af-shell, which makes it the
+		// containing block for position:fixed children. Moving the panel to <body>
+		// escapes that stacking context so position:fixed uses the viewport.
+		if (panel && panel.parentElement !== document.body) {
+			menu.__afPanelParent = panel.parentElement;
+			menu.__afPanel = panel;
+			document.body.appendChild(panel);
+		}
 		menu.classList.add('is-open');
 		openMenu = menu;
-		// Read layout before positioning so `display:grid` has settled.
+		// Read layout before positioning so display:grid has settled.
 		window.requestAnimationFrame(function () { place(menu); });
 	}
 

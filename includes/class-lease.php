@@ -1661,12 +1661,17 @@ class Arriendo_Facil_Lease {
 	}
 
 	/**
-	 * Returns the fixed password used for approved PDFs.
+	 * Returns the user/open password for approved PDFs.
+	 *
+	 * Empty string = no open password required; a random owner password is still
+	 * embedded by write_password_protected_pdf_file() to restrict editing/copying.
+	 * Access to the file is controlled by WordPress authentication, not by a PDF
+	 * open password, so there is no security regression in returning empty here.
 	 *
 	 * @return string
 	 */
 	private function get_approved_pdf_password() {
-		return 'arriendofacil.net';
+		return '';
 	}
 
 	/**

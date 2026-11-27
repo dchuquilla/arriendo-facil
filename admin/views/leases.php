@@ -1929,6 +1929,9 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 			menu.__afPanel = panel;
 			document.body.appendChild(panel);
 		}
+		// CSS selector "> .af-lease-actions-dropdown" no longer matches once the
+		// panel is on <body>, so force display:grid with an inline style.
+		if (panel) { panel.style.display = 'grid'; }
 		menu.classList.add('is-open');
 		openMenu = menu;
 		// Read layout before positioning so display:grid has settled.

@@ -251,13 +251,22 @@ class Arriendo_Facil_Lease {
 			wp_send_json_error( array( 'message' => __( 'El archivo Word supera el tamano maximo (12 MB).', 'arriendo-facil' ) ), 400 );
 		}
 
+		// finfo often detects DOCX (a ZIP-based format) as application/zip or application/octet-stream,
+		// so we include those MIME types to avoid false rejections on production servers.
 		$allowed_mimes = array(
 			'doc'  => 'application/msword',
 			'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+			'docx|zip' => 'application/zip',
+			'docx|bin' => 'application/octet-stream',
 		);
 
-		$checked = wp_check_filetype_and_ext( $file_data['tmp_name'], $file_data['name'], $allowed_mimes );
-		if ( ! in_array( (string) $checked['ext'], array( 'doc', 'docx' ), true ) ) {
+		$checked      = wp_check_filetype_and_ext( $file_data['tmp_name'], $file_data['name'], $allowed_mimes );
+		$name_ext     = strtolower( (string) pathinfo( (string) $file_data['name'], PATHINFO_EXTENSION ) );
+		$resolved_ext = in_array( (string) $checked['ext'], array( 'doc', 'docx' ), true )
+			? (string) $checked['ext']
+			: ( in_array( $name_ext, array( 'doc', 'docx' ), true ) ? $name_ext : '' );
+
+		if ( '' === $resolved_ext ) {
 			wp_send_json_error( array( 'message' => __( 'Solo se permiten archivos Word (.doc, .docx).', 'arriendo-facil' ) ), 400 );
 		}
 
@@ -271,7 +280,7 @@ class Arriendo_Facil_Lease {
 		$versions_data = $this->get_contract_versions( $lease_id );
 		$next_version  = count( isset( $versions_data['versions'] ) && is_array( $versions_data['versions'] ) ? $versions_data['versions'] : array() ) + 1;
 
-		$contract_ext  = (string) $checked['ext'];
+		$contract_ext  = $resolved_ext;
 		$contract_mime = '' !== (string) $checked['type'] ? (string) $checked['type'] : Arriendo_Facil_Contract_Text_Extractor::DOCX_MIME;
 		$safe_name     = sanitize_file_name( wp_basename( (string) $file_data['name'] ) );
 		$storage_meta  = null;

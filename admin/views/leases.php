@@ -1469,12 +1469,6 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 												<?php echo esc_html( $has_approved_pdf ? __( 'Documento aprobado', 'arriendo-facil' ) : __( 'Aprobar documento', 'arriendo-facil' ) ); ?>
 											</button>
 										<?php endif; ?>
-										<button type="button" class="button button-primary af-change-lease-status af-lease-activate-button"
-											data-lease-id="<?php echo esc_attr( $lease->id ); ?>"
-											data-status="active"
-											<?php disabled( in_array( (string) $lease->status, array( 'active', 'pending_release' ), true ) ); ?>>
-											<?php echo esc_html( in_array( (string) $lease->status, array( 'active', 'pending_release' ), true ) ? __( 'Contrato activo', 'arriendo-facil' ) : __( 'Activar contrato', 'arriendo-facil' ) ); ?>
-										</button>
 										<?php if ( in_array( (string) $lease->status, array( 'active', 'pending_release' ), true ) ) : ?>
 											<button type="button"
 												class="button af-btn af-btn--danger"

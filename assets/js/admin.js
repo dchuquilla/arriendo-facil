@@ -147,10 +147,8 @@
 			document.body.classList.add( 'af-modal-open' );
 		}
 
-		if ( ! modalEl || !fileInputEl || !fileNameEl || !feedbackEl || !selectBtnEl || !submitBtnEl ) {
-			return;
-		}
-
+		// Always register the open/close handlers — they delegate on document and
+		// work even if the modal markup hasn't rendered yet (other admin pages).
 		$( document ).on( 'click', '.af-open-upload-version-modal', function () {
 			var leaseId = parseInt( String( this.getAttribute( 'data-lease-id' ) || '0' ), 10 );
 			var nextVersion = parseInt( String( this.getAttribute( 'data-next-version' ) || '1' ), 10 );
@@ -164,6 +162,10 @@
 		$( document ).on( 'click', '[data-af-close-upload-modal]', function () {
 			closeModal();
 		} );
+
+		if ( ! modalEl || !fileInputEl || !fileNameEl || !feedbackEl || !selectBtnEl || !submitBtnEl ) {
+			return;
+		}
 
 		document.addEventListener( 'keydown', function ( event ) {
 			if ( 'Escape' === event.key && modalEl && !modalEl.hasAttribute( 'hidden' ) ) {

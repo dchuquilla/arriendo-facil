@@ -8,8 +8,50 @@
    teléfono) la pone af-app.css; aquí solo lo propio de esta tabla.
    ────────────────────────────────────────────────────────────────────────── */
 
+.af-leases-table {
+  table-layout: auto;
+  width: 100%;
+}
+
 .af-leases-table thead th {
   white-space: nowrap;
+}
+
+/* Columna Inmueble (2ª) fija al scroll horizontal */
+.af-leases-table thead th:nth-child(2),
+.af-leases-table tbody td:nth-child(2) {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #fff;
+  min-width: 140px;
+  box-shadow: 2px 0 4px rgba(0,0,0,.06);
+}
+
+.af-leases-table thead th:nth-child(2) {
+  z-index: 3;
+  background: #f6f7f7; /* WP table header bg */
+}
+
+/* Columna Acciones (última) fija al scroll */
+.af-leases-table thead th:last-child,
+.af-leases-table tbody td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+  background: #fff;
+  box-shadow: -2px 0 4px rgba(0,0,0,.06);
+}
+
+.af-leases-table thead th:last-child {
+  z-index: 3;
+  background: #f6f7f7;
+}
+
+/* Filas alternas: mantener fondo en columnas sticky */
+.af-leases-table.striped tbody tr:nth-child(odd) td:nth-child(2),
+.af-leases-table.striped tbody tr:nth-child(odd) td:last-child {
+  background: #f9f9f9;
 }
 
 .af-leases-table td strong {

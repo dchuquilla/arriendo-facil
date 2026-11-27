@@ -1295,7 +1295,7 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 		</div>
 
 	<div class="af-table-scroll">
-	<table class="wp-list-table widefat fixed striped af-leases-table af-leases-table--compact af-data-table">
+	<table class="wp-list-table widefat striped af-leases-table af-leases-table--compact af-data-table">
 		<thead>
 			<tr>
 				<th><?php esc_html_e( 'ID', 'arriendo-facil' ); ?></th>
@@ -1454,21 +1454,22 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 									<svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true" style="flex-shrink:0;"><path d="M5 7.5 10 12.5 15 7.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
 								</summary>
 								<div class="af-lease-actions-dropdown">
-									<button type="button" class="button button-secondary af-open-upload-version-modal"
-											data-lease-id="<?php echo esc_attr( $lease->id ); ?>"
-											data-next-version="<?php echo esc_attr( $next_version ); ?>">
-											<?php echo esc_html( sprintf( __( 'Subir v%d', 'arriendo-facil' ), $next_version ) ); ?>
-										</button>
-										<?php $has_document = $versions_count > 0 || $lease->document_url; ?>
-										<?php if ( $has_document || $document_queued ) : ?>
-											<button type="button" class="button button-primary af-approve-lease-document"
+									<?php if ( ! $has_approved_pdf ) : ?>
+										<button type="button" class="button button-secondary af-open-upload-version-modal"
 												data-lease-id="<?php echo esc_attr( $lease->id ); ?>"
-												data-active-version="<?php echo esc_attr( max( 1, $active_version ) ); ?>"
-												<?php echo $has_document ? '' : 'style="display:none"'; ?>
-												<?php disabled( $has_approved_pdf ); ?>>
-												<?php echo esc_html( $has_approved_pdf ? __( 'Documento aprobado', 'arriendo-facil' ) : __( 'Aprobar documento', 'arriendo-facil' ) ); ?>
+												data-next-version="<?php echo esc_attr( $next_version ); ?>">
+												<?php echo esc_html( sprintf( __( 'Subir v%d', 'arriendo-facil' ), $next_version ) ); ?>
 											</button>
-										<?php endif; ?>
+											<?php $has_document = $versions_count > 0 || $lease->document_url; ?>
+											<?php if ( $has_document || $document_queued ) : ?>
+												<button type="button" class="button button-primary af-approve-lease-document"
+													data-lease-id="<?php echo esc_attr( $lease->id ); ?>"
+													data-active-version="<?php echo esc_attr( max( 1, $active_version ) ); ?>"
+													<?php echo $has_document ? '' : 'style="display:none"'; ?>>
+													<?php esc_html_e( 'Aprobar documento', 'arriendo-facil' ); ?>
+												</button>
+											<?php endif; ?>
+									<?php endif; ?>
 										<?php if ( in_array( (string) $lease->status, array( 'active', 'pending_release' ), true ) ) : ?>
 											<button type="button"
 												class="button af-btn af-btn--danger"

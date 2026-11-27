@@ -157,6 +157,54 @@ $total_leases = is_array( $leases ) ? count( $leases ) : 0;
 	);
 	?>
 
+	<?php if ( current_user_can( 'manage_options' ) && ! get_option( 'af_pdf_migrate_open_password_done' ) ) : ?>
+	<div id="af-pdf-migrate-notice" class="notice notice-warning" style="margin:12px 0 20px;">
+		<p>
+			<strong><?php esc_html_e( 'Migración de contratos PDF', 'arriendo-facil' ); ?></strong> —
+			<?php esc_html_e( 'Los contratos aprobados anteriormente solicitan contraseña al abrirse. Haz clic en "Migrar PDFs" para regenerarlos sin contraseña (proceso irreversible y seguro).', 'arriendo-facil' ); ?>
+		</p>
+		<p>
+			<button type="button" id="af-run-pdf-migration" class="button button-primary">
+				<?php esc_html_e( 'Migrar PDFs', 'arriendo-facil' ); ?>
+			</button>
+			<span id="af-pdf-migration-status" style="margin-left:12px;font-style:italic;"></span>
+		</p>
+	</div>
+	<script>
+	( function () {
+		var btn    = document.getElementById( 'af-run-pdf-migration' );
+		var status = document.getElementById( 'af-pdf-migration-status' );
+		if ( ! btn ) { return; }
+		btn.addEventListener( 'click', function () {
+			btn.disabled = true;
+			status.textContent = <?php echo wp_json_encode( __( 'Migrando…', 'arriendo-facil' ) ); ?>;
+			var data = new FormData();
+			data.append( 'action', 'af_migrate_pdf_remove_open_password' );
+			data.append( 'nonce',  <?php echo wp_json_encode( wp_create_nonce( 'af_lease_nonce' ) ); ?> );
+			fetch( <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>, { method: 'POST', body: data } )
+				.then( function ( r ) { return r.json(); } )
+				.then( function ( json ) {
+					if ( json && json.success ) {
+						var d = json.data;
+						status.textContent = d.migrated + ' migrados, ' + d.skipped + ' omitidos.';
+						if ( d.errors && d.errors.length ) {
+							status.textContent += ' Errores: ' + d.errors.join( '; ' );
+						}
+						document.getElementById( 'af-pdf-migrate-notice' ).style.display = 'none';
+					} else {
+						status.textContent = ( json && json.data && json.data.message ) ? json.data.message : <?php echo wp_json_encode( __( 'Error desconocido.', 'arriendo-facil' ) ); ?>;
+						btn.disabled = false;
+					}
+				} )
+				.catch( function () {
+					status.textContent = <?php echo wp_json_encode( __( 'Error de red.', 'arriendo-facil' ) ); ?>;
+					btn.disabled = false;
+				} );
+		} );
+	} () );
+	</script>
+	<?php endif; ?>
+
 	<?php
 	// Filter accommodations by current user's scope
 	// Note: accessible_accommodation_ids() returns null if user is admin (can manage all)

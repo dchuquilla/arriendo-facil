@@ -28,6 +28,7 @@ class Arriendo_Facil_Lease {
 		add_action( 'wp_ajax_af_upload_lease_contract_version', array( $this, 'ajax_upload_lease_contract_version' ) );
 		add_action( 'wp_ajax_af_approve_lease_contract', array( $this, 'ajax_approve_lease_contract' ) );
 		add_action( 'wp_ajax_af_lease_document_status', array( $this, 'ajax_lease_document_status' ) );
+		add_action( 'wp_ajax_af_migrate_pdf_remove_open_password', array( $this, 'ajax_migrate_pdf_remove_open_password' ) );
 	}
 
 	/**
@@ -1658,6 +1659,143 @@ class Arriendo_Facil_Lease {
 		$key_len = min( strlen( $file_key ) + 5, 16 );
 
 		return substr( $hash, 0, $key_len );
+	}
+
+	/**
+	 * Re-generates all existing approved PDFs without an open/user password.
+	 *
+	 * One-time migration: finds every stored approved PDF, reads the original
+	 * source document (DOCX/text), regenerates the PDF with an empty open
+	 * password, and overwrites the stored file in-place (R2 or local).
+	 * Metadata (approved_at, approved_by, object_key) is unchanged.
+	 * Idempotent — safe to run more than once.
+	 *
+	 * Requires: manage_options capability + af_lease_nonce nonce.
+	 */
+	public function ajax_migrate_pdf_remove_open_password() {
+		check_ajax_referer( 'af_lease_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permiso denegado.', 'arriendo-facil' ) ), 403 );
+		}
+
+		global $wpdb;
+
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s",
+				$wpdb->esc_like( 'af_lease_contract_storage_' ) . '%'
+			),
+			ARRAY_A
+		);
+
+		$migrated = 0;
+		$skipped  = 0;
+		$errors   = array();
+
+		foreach ( (array) $rows as $row ) {
+			$option_name = $row['option_name'];
+			$lease_id    = absint( str_replace( 'af_lease_contract_storage_', '', $option_name ) );
+			if ( ! $lease_id ) {
+				continue;
+			}
+
+			$stored = get_option( $option_name, false );
+			if ( ! is_array( $stored ) || ! isset( $stored['versions'] ) || ! is_array( $stored['versions'] ) ) {
+				continue;
+			}
+
+			foreach ( $stored['versions'] as $version_entry ) {
+				if ( ! is_array( $version_entry ) ) {
+					continue;
+				}
+				if ( empty( $version_entry['approved_pdf'] ) || empty( $version_entry['approved_pdf']['object_key'] ) ) {
+					continue;
+				}
+
+				$version_num = absint( $version_entry['version'] ?? 1 );
+				$label       = "lease {$lease_id} v{$version_num}";
+
+				$source = $this->read_contract_version_source( $version_entry );
+				if ( is_wp_error( $source ) ) {
+					$errors[] = "{$label}: " . $source->get_error_message();
+					$skipped++;
+					continue;
+				}
+
+				$contract_text = $this->extract_text_from_contract_binary(
+					isset( $source['contents'] ) ? (string) $source['contents'] : '',
+					isset( $source['mime_type'] ) ? (string) $source['mime_type'] : ''
+				);
+
+				if ( '' === trim( $contract_text ) ) {
+					$errors[] = "{$label}: no se pudo extraer el texto del contrato";
+					$skipped++;
+					continue;
+				}
+
+				$temp_dir  = trailingslashit( get_temp_dir() );
+				$file_name = sprintf( 'lease-%d-v%d-migrate-%s.pdf', $lease_id, $version_num, gmdate( 'Ymd-His' ) );
+				$file_path = $temp_dir . wp_unique_filename( $temp_dir, $file_name );
+
+				$written = $this->write_password_protected_pdf_file( $file_path, $contract_text, '' );
+				if ( ! $written ) {
+					$errors[] = "{$label}: fallo al generar el PDF";
+					$skipped++;
+					continue;
+				}
+
+				$pdf_contents = file_get_contents( $file_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+				Arriendo_Facil_Contract_File_Store::discard_local_copy( $file_path );
+
+				if ( false === $pdf_contents || '' === $pdf_contents ) {
+					$errors[] = "{$label}: fallo al leer el PDF generado";
+					$skipped++;
+					continue;
+				}
+
+				$provider   = sanitize_key( (string) $version_entry['approved_pdf']['provider'] );
+				$object_key = sanitize_text_field( (string) $version_entry['approved_pdf']['object_key'] );
+
+				if ( Arriendo_Facil_Private_Storage::PROVIDER_R2 === $provider ) {
+					$result = Arriendo_Facil_Private_Storage::upload( $pdf_contents, $object_key, 'application/pdf' );
+					if ( is_wp_error( $result ) ) {
+						$errors[] = "{$label}: fallo al subir a R2 — " . $result->get_error_message();
+						$skipped++;
+						continue;
+					}
+				} elseif ( Arriendo_Facil_Local_Private_Storage::STORAGE_ID === $provider ) {
+					$abs_path = Arriendo_Facil_Local_Private_Storage::resolve( $object_key );
+					if ( is_wp_error( $abs_path ) ) {
+						$errors[] = "{$label}: no se encontró el archivo local — " . $abs_path->get_error_message();
+						$skipped++;
+						continue;
+					}
+					$result = file_put_contents( $abs_path, $pdf_contents ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+					if ( false === $result ) {
+						$errors[] = "{$label}: fallo al escribir el archivo local";
+						$skipped++;
+						continue;
+					}
+				} else {
+					$errors[] = "{$label}: proveedor desconocido '{$provider}'";
+					$skipped++;
+					continue;
+				}
+
+				$migrated++;
+			}
+		}
+
+		update_option( 'af_pdf_migrate_open_password_done', 1, false );
+
+		wp_send_json_success(
+			array(
+				'migrated' => $migrated,
+				'skipped'  => $skipped,
+				'errors'   => $errors,
+			)
+		);
 	}
 
 	/**
